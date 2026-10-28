@@ -38,6 +38,15 @@ final class DiagnosticsViewModel: ObservableObject {
     /// The files of the chosen run to share: its document, then its summary. Empty while there is none to share
     @Published private(set) var shareFiles: [URL] = []
 
+    /// What a screen reader is told after the person picks a run, as the list does not move its focus to the summary
+    struct Notice: Equatable {
+        let id = UUID()
+        let text: String
+    }
+
+    /// The announcement after the last run the person picked; nil until they pick one
+    @Published private(set) var notice: Notice?
+
     private let access: TraceAccess
     private let locale: Locale
     private let calendar: () -> Calendar
@@ -73,6 +82,12 @@ final class DiagnosticsViewModel: ObservableObject {
             summary = ""
             shareFiles = []
         }
+    }
+
+    /// The person picks a run: chooses it, and tells a screen reader where its summary is.
+    func choose(_ id: UUID) async {
+        await select(id)
+        notice = Notice(text: "diagnostics.summary.announcement".localized)
     }
 
     /// Chooses a run: shows its summary, and makes the copies of its files to share.

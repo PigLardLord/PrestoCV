@@ -103,6 +103,24 @@ struct DiagnosticsViewModelTests {
         #expect(model.shareFiles == ReaderSpy.files(of: Self.draftID))
     }
 
+    @Test("A run the person picks announces where its summary is, each time, and the run chosen at load does not")
+    func pickingAnnouncesTheSummary() async {
+        let model = viewModel(reader: ReaderSpy(runs: Self.runs))
+        await model.checkAvailability()
+        await model.load()
+        #expect(model.notice == nil, "Nothing is announced for the run chosen on its own")
+
+        await model.choose(Self.draftID)
+        let first = model.notice
+
+        #expect(model.selection == Self.draftID)
+        #expect(first?.text == "diagnostics.summary.announcement".localized)
+
+        await model.choose(Self.draftID)
+
+        #expect(model.notice != first, "Picking the same run again is announced again")
+    }
+
     @Test("When the copies to share cannot be made, the summary is shown and nothing is handed out")
     func copiesFail() async {
         let model = viewModel(reader: ReaderSpy(runs: Self.runs, failsCopies: true))

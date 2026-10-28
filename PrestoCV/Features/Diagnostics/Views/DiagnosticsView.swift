@@ -36,6 +36,10 @@ struct DiagnosticsView: View {
                             .font(.system(.footnote, design: .monospaced))
                             .textSelection(.enabled)
                             .accessibilityIdentifier("diagnostics.summary")
+                    } header: {
+                        Text("diagnostics.summary.title".localized)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("diagnostics.summary.title")
                     }
                 }
             }
@@ -59,11 +63,16 @@ struct DiagnosticsView: View {
         .task {
             await viewModel.load()
         }
+        .onChange(of: viewModel.notice) { _, notice in
+            if let notice {
+                AccessibilityNotification.Announcement(notice.text).post()
+            }
+        }
     }
 
     private func runButton(_ row: DiagnosticsViewModel.Row) -> some View {
         Button {
-            Task { await viewModel.select(row.id) }
+            Task { await viewModel.choose(row.id) }
         } label: {
             VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                 Text(row.title)
