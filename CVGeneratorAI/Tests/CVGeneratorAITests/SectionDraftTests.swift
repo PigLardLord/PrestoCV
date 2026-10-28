@@ -324,6 +324,55 @@ struct SectionDraftTests {
         #expect(CVDataSanitizer.place(after: "Atelier Morel", in: "Atelier Morel, à lyon, puis Atelier Morel à Lyon.") == "Lyon")
         #expect(CVDataSanitizer.place(after: " ", in: description) == nil)
     }
+
+    // MARK: The employer with the noun of its kind
+
+    private static let spanish = """
+        Soy Lucía Ferrer, contable en Huesca. Desde 2019 trabajo en Talleres Cinca, donde llevo las cuentas. Antes, de 2015 a \
+        2019, trabajé en la gestoría Sarrablo y Pons.
+        """
+
+    @Test("An employer written after the noun of its kind and an article takes the noun; one written otherwise stays as it is")
+    func employerWithItsKind() {
+        #expect(CVDataSanitizer.employer("Sarrablo y Pons", in: Self.spanish, language: .spanish) == "gestoría Sarrablo y Pons")
+        #expect(CVDataSanitizer.employer("Pixel Gaúcho", in: "Antes, de 2015 a 2019, trabalhei na agência Pixel Gaúcho.",
+                                         language: .portuguese) == "agência Pixel Gaúcho")
+        #expect(CVDataSanitizer.employer("Talleres Cinca", in: Self.spanish, language: .spanish) == "Talleres Cinca")
+        #expect(CVDataSanitizer.employer("gestoría Sarrablo y Pons", in: Self.spanish, language: .spanish) == "gestoría Sarrablo y Pons")
+        #expect(CVDataSanitizer.employer("Sarrablo y Pons", in: "Trabajé gestionando Sarrablo y Pons.", language: .spanish) == "Sarrablo y Pons")
+        #expect(CVDataSanitizer.employer("Sarrablo y Pons", in: "Trabajé en la 2 Sarrablo y Pons.", language: .spanish) == "Sarrablo y Pons")
+        #expect(CVDataSanitizer.employer("Sarrablo y Pons", in: Self.spanish, language: nil) == "Sarrablo y Pons")
+    }
+
+    @Test("A job the extraction names without the noun of its kind keeps the years its request read (es-traps, #354)")
+    func employerWithItsKindKeepsItsYears() async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(CVData(
+            personalInfo: PersonalInfo(name: "Lucía Ferrer", title: "contable"),
+            experience: [
+                Experience(title: "contable", company: "Talleres Cinca", current: true),
+                Experience(title: "contable", company: "Sarrablo y Pons"),
+            ]
+        ))
+        service.jobResults = [
+            0: RoleWriting(startDate: "2019", endDate: nil, duties: "Llevo las cuentas. Reviso las facturas."),
+            1: RoleWriting(startDate: "2015", endDate: "2019", duties: "Llevé las cuentas. Revisé las facturas."),
+        ]
+        service.toolsResult = [["hojas de cálculo"], ["hojas de cálculo"]]
+        service.softSkillsResult = ["precisión", "organización"]
+        service.summaryResult = "Trabajo como contable."
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let generator = CVGeneratorUseCase(
+            service: service, claimChecker: FakeClaimChecker(), logger: SilentLogger(), clock: ContinuousClock(),
+            validator: DefaultCVValidator(), sanitizer: spanish, limits: .standard
+        )
+
+        let draft = try await generator.generateCV(from: CVGenerationRequest(userPrompt: Self.spanish)).cvData
+
+        let earlier = try #require(job("gestoría Sarrablo y Pons", in: draft))
+        #expect([earlier.startDate, earlier.endDate] == ["2015", "2019"])
+        #expect(job("Talleres Cinca", in: draft)?.startDate == "2019")
+    }
 }
 
 /// The task of a draft under test, which a request of the fake service cancels.

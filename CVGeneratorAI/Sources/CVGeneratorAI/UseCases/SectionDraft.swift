@@ -44,14 +44,17 @@ final class SectionDraft {
         self.description = description
     }
 
-    /// What the requests write around `facts`, the grounded `generated` draft of the extraction, and that draft with the place
-    /// after each employer, the years each job's request read and the skills as the person wrote them: the final check reads both.
+    /// What the requests write around `facts`, the grounded `generated` draft of the extraction, and that draft with each employer
+    /// as the description writes it with the noun of its kind, the place after it, the years each job's request read and the skills
+    /// as the person wrote them: the final check reads both.
     /// Nil when there is nothing to write around (no title, job or degree, or no language of the six) or when no job can be given
     /// its clauses.
     func write(
         around facts: CVData, generated: CVData, language: Vocabulary.Language?
     ) async throws -> (writing: DraftWriting, draft: CVData)? {
         guard DraftBrief(facts, language: language) != nil else { return nil }
+        // The employers as the description writes them with the noun of their kind, so that their clauses give their years.
+        let generated = generated.with(experience: generated.experience.map { employed($0, language: language) })
         let context: CVDataSanitizer.DraftContext
         do {
             context = try sanitizer.draftContext(of: generated, against: description)
@@ -89,6 +92,16 @@ final class SectionDraft {
         let said = generated.experience.indices.contains(job.job) ? generated.experience[job.job].description?.presentValue : nil
         guard let said, !job.clauses.contains(where: { $0.localizedCaseInsensitiveContains(said) }) else { return job.clauses }
         return job.clauses + [said]
+    }
+
+    /// `job` with its employer as the description writes it with the noun of its kind (`CVDataSanitizer.employer`).
+    private func employed(_ job: Experience, language: Vocabulary.Language?) -> Experience {
+        let company = CVDataSanitizer.employer(job.company, in: description, language: language)
+        guard company != job.company else { return job }
+        return Experience(
+            title: job.title, company: company, location: job.location, startDate: job.startDate, endDate: job.endDate,
+            current: job.current, description: job.description, achievements: job.achievements
+        )
     }
 
     /// `job` with the place the description names right after its employer, when the extraction left its location empty or wrote

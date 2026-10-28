@@ -45,6 +45,26 @@ extension CVDataSanitizer {
         return nil
     }
 
+    /// The employer with the noun of its kind that the description writes right before it, after an article, a possessive or a
+    /// preposition ("trabajé en la gestoría Aranda y Molina", "trabalhei na agência Pixel Gaúcho"): a word in lower case that no
+    /// vocabulary explains. A clause backs a job only when each of its words is explained, and the words of the job's own employer
+    /// explain themselves: without its noun the clause backs nothing, and the years it gives the job are lost (#354). `company`
+    /// itself when no mention of it is written so, or when the language of the description is not known.
+    static func employer(_ company: String, in description: String, language: Vocabulary.Language?) -> String {
+        let name = Word.words(in: company).map(\.folded)
+        let words = Word.words(in: description)
+        guard let language, !name.isEmpty, words.count >= name.count + 2 else { return company }
+        let characters = Array(Digits.ascii(description))
+        for start in 2...(words.count - name.count) where (0..<name.count).allSatisfy({ words[start + $0].folded == name[$0] }) {
+            let kind = words[start - 1]
+            let sign = words[start - 2]
+            guard !kind.isNumber, !kind.endsWithABreak, !sign.endsWithABreak, characters[kind.range.lowerBound].isLowercase,
+                  !Vocabulary.explains(kind.folded, in: language), Voice.isNounSign(sign.accented, in: language) else { continue }
+            return String(characters[kind.range.lowerBound..<words[start + name.count - 1].range.upperBound])
+        }
+        return company
+    }
+
     /// The prepositions that introduce the place of an employer, in the six languages.
     private static let placePrepositions: Set<String> = ["in", "di", "a", "à", "en", "em", "bei"]
 
