@@ -100,7 +100,9 @@ public struct CVDataSanitizer: Sendable {
         let spoken = entries.spoken(in: source)
         let claimed = entries.claimed(in: source)
         let titles = ([cvData.personalInfo.title] + jobTitles).compactMap(\.presentValue)
-        let interests = unique(cvData.interests.compactMap(claimed.named).filter { !Self.isWork($0, titles: titles, source) }) { $0 }
+        let interests = unique(cvData.interests.compactMap(claimed.named).filter {
+            !Self.isWork($0, titles: titles, source) && !Self.isQualityAtWork($0, in: source.explainer.language)
+        }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = Self.withWholeTitle(Self.withStatedTitle(

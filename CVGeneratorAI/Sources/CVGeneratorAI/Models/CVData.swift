@@ -30,7 +30,7 @@ public struct CVData: Codable, Equatable, Sendable {
     @Guide(description: "Certifications the person named; empty if none was mentioned")
     public let certifications: [Certification]
 
-    @Guide(description: "Hobbies and interests the person named; empty if none was mentioned")
+    @Guide(description: "Hobbies and pastimes the person named, a few words each, never a quality or a way of working; otherwise empty")
     public let interests: [String]
 
     public init(
