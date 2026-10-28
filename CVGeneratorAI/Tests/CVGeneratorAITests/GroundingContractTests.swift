@@ -418,6 +418,7 @@ enum GroundingRows {
         rows += writtenText()
         rows += inferredSkills()
         rows += statedTitles()
+        rows += summariesWithNoRole()
         return rows
     }()
 
@@ -6508,6 +6509,42 @@ extension GroundingRows {
                         "I am a plumber and a welder.",
                         CVData(personalInfo: person(title: "welder"), experience: [job("plumber")]),
                         .exactly(CVData(personalInfo: person(title: "welder")))))
+        return rows
+    }
+
+    /// With no title, job or school there is no role (ADR 0031): the summary keeps only its quotes, and a quote of what the person
+    /// likes is none, nor a quote of its words without the word of liking.
+    private static func summariesWithNoRole() -> [GroundingRow] {
+        typealias Liking = (language: String, description: String, summary: String)
+        var liking: [Liking] = []
+        liking.append(("en", "I like long walks with my dog, reading crime novels and cooking for my friends at the weekend.",
+                       "I like long walks with my dog."))
+        liking.append(("it", "Mi piace camminare in montagna con il mio cane, leggere romanzi gialli e cucinare per gli amici.",
+                       "Mi piace camminare in montagna con il mio cane."))
+        liking.append(("de", "Ich gehe gern mit meinem Hund spazieren, lese Krimis und koche am Wochenende für meine Freunde.",
+                       "Ich gehe gern mit meinem Hund spazieren."))
+        liking.append(("es", "Me gusta pasear con mi perro, leer novelas policíacas y cocinar para mis amigos los fines de semana.",
+                       "Me gusta pasear con mi perro."))
+        liking.append(("fr", "J'aime me promener avec mon chien, lire des romans policiers et cuisiner pour mes amis le week-end.",
+                       "J'aime me promener avec mon chien."))
+        liking.append(("pt", "Gosto de passear com o meu cão, ler romances policiais e cozinhar para os amigos ao fim de semana.",
+                       "Gosto de passear com o meu cão."))
+
+        var rows: [GroundingRow] = []
+        for v in liking {
+            rows.append(row("a-summary-of-what-the-person-likes-is-no-role-\(v.language)",
+                            "no title, job or school: a quote of what the person likes is no summary",
+                            v.description, CVData(summary: v.summary), .exactly(CVData()), language: v.language))
+        }
+        rows.append(row("a-summary-of-a-hobby-without-the-word-of-liking-is-no-role",
+                        "reading crime novels is quoted from the sentence of what the person likes: no summary",
+                        "I like long walks with my dog, reading crime novels and cooking for my friends at the weekend.",
+                        CVData(summary: "Reading crime novels and cooking for my friends."), .exactly(CVData())))
+        rows.append(row("a-summary-of-a-hobby-goes-the-quote-of-a-role-stays",
+                        "a nurse in Turin is a quote of the role: it stays, the sentence of the hobby goes",
+                        "I'm a nurse in Turin. I like hiking in the mountains.",
+                        CVData(summary: "A nurse in Turin. I like hiking in the mountains."),
+                        .exactly(CVData(summary: "A nurse in Turin."))))
         return rows
     }
 }

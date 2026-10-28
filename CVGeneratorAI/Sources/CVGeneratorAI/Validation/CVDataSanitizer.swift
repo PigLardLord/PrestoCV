@@ -122,7 +122,7 @@ public struct CVDataSanitizer: Sendable {
             personalInfo: personalInfo,
             summary: hasAFact
                 ? summary(writing?.summary) ?? summary(cvData.summary)
-                : source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false),
+                : Self.withoutLiking(source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false), source),
             experience: experience,
             education: education,
             skills: sanitize(
@@ -224,6 +224,19 @@ public struct CVDataSanitizer: Sendable {
                 achievements: experience.achievements
             )
         }
+    }
+
+    /// The sentences of `summary` that say nothing of what the person likes (`LeisureMentions.speaksOfLiking`) and quote no sentence of
+    /// the description that does, or nil when none is left: a summary with no fact to write around keeps only its quotes, and a hobby
+    /// is no role ("Me gusta pasear con mi perro, leer novelas policíacas": neither it nor "Leer novelas policíacas" stays).
+    private static func withoutLiking(_ summary: String?, _ source: DescriptionText) -> String? {
+        guard let summary else { return nil }
+        let language = source.explainer.language
+        let kept = SentenceSplitter.sentences(in: summary).filter { sentence in
+            !LeisureMentions.speaksOfLiking(sentence, in: language)
+                && !source.restates(sentence, ofSentencesWhere: { LeisureMentions.speaksOfLiking($0.raw, in: language) })
+        }
+        return kept.isEmpty ? nil : kept.joined(separator: " ")
     }
 
     /// The sentences of `first`, then those of `second` that `first` does not hold already.

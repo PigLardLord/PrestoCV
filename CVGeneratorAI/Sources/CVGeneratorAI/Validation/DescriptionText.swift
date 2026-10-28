@@ -137,6 +137,16 @@ struct DescriptionText {
         return kept.isEmpty ? nil : kept.joined(separator: " ")
     }
 
+    /// Whether each clause of `sentence` quotes a clause of the sentences of the description that `isSource` picks (`ProseQuotes`).
+    func restates(_ sentence: String, ofSentencesWhere isSource: (Sentence) -> Bool) -> Bool {
+        let said = sentences.filter(isSource)
+        guard !said.isEmpty else { return false }
+
+        let clauses = DescriptionClauses(sentences: said.map(\.raw), protecting: [], language: explainer.language).sentences.joined()
+        let quotes = ProseQuotes(sources: clauses.map { ProseQuotes.Source($0) }, language: explainer.language)
+        return isGrounded(sentence, quoting: quotes, allowsNumbers: true)
+    }
+
     /// The words of the description, as `Word.folded` writes them.
     var foldedWords: Set<String> {
         Set(Word.words(in: text).map(\.folded))

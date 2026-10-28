@@ -29,6 +29,27 @@ struct LeisureMentions {
 
     private static let everyWord: Set<String> = wordsByLanguage.values.reduce(into: []) { $0.formUnion($1) }
 
+    /// The words that say the person likes something, or name a hobby, as `Word.folded` writes them: the words of leisure without
+    /// those of time ("free", "tempo", "libre"...), which also say "free of charge" or "full time", and with the German "gern".
+    private static let likingByLanguage: [Vocabulary.Language: Set<String>] = [
+        .english: ["leisure", "hobby", "hobbies", "pastime", "pastimes", "like", "likes", "enjoy", "enjoys", "love", "loves"],
+        .italian: ["hobby", "passatempo", "passatempi", "piace", "piacciono", "amo", "adoro"],
+        .german: ["freizeit", "hobby", "hobbys", "hobbies", "mag", "liebe", "gern", "gerne"],
+        .spanish: ["ocio", "aficion", "aficiones", "pasatiempo", "pasatiempos", "gusta", "gustan", "encanta", "encantan"],
+        .french: ["loisir", "loisirs", "aime", "adore"],
+        .portuguese: ["lazer", "passatempo", "passatempos", "hobby", "hobbies", "gosto", "adoro", "amo"],
+    ]
+
+    private static let everyLikingWord: Set<String> = likingByLanguage.values.reduce(into: []) { $0.formUnion($1) }
+
+    /// Whether `sentence` says what the person likes or does for leisure ("I like long walks with my dog", "Me gusta cocinar"), in
+    /// the language of the description, or in any of the six when it is not known. Such a sentence says nothing of a role (ADR 0031):
+    /// a summary on the quote path, with no fact to write around, keeps none.
+    static func speaksOfLiking(_ sentence: String, in language: Vocabulary.Language?) -> Bool {
+        let words = language.map { likingByLanguage[$0] ?? [] } ?? everyLikingWord
+        return Word.words(in: sentence).contains { words.contains($0.folded) }
+    }
+
     private let clauses: DescriptionClauses
     private let language: Vocabulary.Language?
     /// The folded words of the draft's interests that the description gives.
