@@ -5,7 +5,7 @@ public struct NoTracer: DiagnosticTracer {
     public init() {}
 
     public func begin(_ kind: TraceKind) -> any TraceRunRecording { NoRun() }
-    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {}
+    public func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField]) {}
     public func mirror(_ event: TraceEvent) {}
 }
 
@@ -31,9 +31,9 @@ public struct GatedTracer: DiagnosticTracer {
         gate.isOpen ? next.begin(kind) : NoRun()
     }
 
-    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
+    public func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField]) {
         guard gate.isOpen else { return }
-        next.record(name, fields, into: kind)
+        next.record(name, into: kind, fields: fields)
     }
 
     public func mirror(_ event: TraceEvent) {

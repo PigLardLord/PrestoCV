@@ -225,20 +225,36 @@ if let only = config.compositionOnly {
     let adrExists = adrDir.map { dir in ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).contains { $0.hasPrefix(only.adr + "-") } } ?? false
     if !adrExists { problems.append("compositionOnly cites ADR \(only.adr), which does not exist") }
     for file in only.files where !files.contains(file) { problems.append("compositionOnly lists \(file), which does not exist") }
-    let modules = Set(only.modules), types = Set(only.types)
+    let modules = Set(only.modules)
     let parsedTrees = Dictionary(parsed.map { ($0.file, $0.tree) }, uniquingKeysWith: { first, _ in first })
-    for (file, target) in assignment where !only.files.contains(file) && !modules.contains(target.name) {
+    // The files the rule covers: every production file, and every legacy one that is not a test, outside the modules themselves.
+    var covered: [(file: String, tree: SourceFileSyntax)] = []
+    for (file, target) in assignment where !modules.contains(target.name) {
         let kind = target.kind ?? "production"
         guard kind == "production" || (kind == "legacy" && !target.name.hasSuffix("Tests")) else { continue }
-        let tree: SourceFileSyntax
-        if let known = parsedTrees[file] { tree = known } else {
-            guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
-            tree = Parser.parse(source: source)
+        if let known = parsedTrees[file] { covered.append((file, known)); continue }
+        guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
+        covered.append((file, Parser.parse(source: source)))
+    }
+    // The types and every alias of them, wherever declared (the composition root may declare one that another file uses).
+    var types = Set(only.types)
+    var grew = true
+    while grew {
+        grew = false
+        for (file, tree) in covered {
+            let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: [:], serviceSuffixes: [], dependencySuffixes: [])
+            scanner.walk(tree)
+            for alias in scanner.aliases where types.insert(alias.alias).inserted { grew = true }
         }
+    }
+    for (file, tree) in covered where !only.files.contains(file) {
         let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: [:], serviceSuffixes: [], dependencySuffixes: [])
         scanner.walk(tree)
         for imp in scanner.imports where modules.contains(imp.module) {
             problems.append("\(file):\(imp.line): R4 compositionOnly: \(imp.node) outside the composition root (ADR \(only.adr))")
+        }
+        for alias in scanner.aliases {
+            problems.append("\(file):\(alias.line): R4 compositionOnly: typealias \(alias.alias) of \(alias.type) outside the composition root (ADR \(only.adr))")
         }
         for hit in scanner.hits where hit.detector == "infrastructureConstruction" && types.contains(String(hit.detail.prefix { $0 != "(" })) {
             problems.append("\(file):\(hit.line): R4 compositionOnly: \(hit.detail) outside the composition root (ADR \(only.adr))")

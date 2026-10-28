@@ -70,8 +70,8 @@ public final class RecordingTracer: DiagnosticTracer {
 
     public func begin(_ kind: TraceKind) -> any TraceRunRecording { recorder.begin(kind) }
 
-    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
-        recorder.record(name, fields, into: kind)
+    public func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField]) {
+        recorder.record(name, into: kind, fields: fields)
     }
 
     public func mirror(_ event: TraceEvent) { recorder.mirror(event) }
@@ -95,7 +95,7 @@ public final class RefusingTracer: DiagnosticTracer {
 
     public func begin(_ kind: TraceKind) -> any TraceRunRecording { RefusedRun(tracer: self) }
 
-    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
+    public func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField]) {
         counted.withLock { $0 += 1 }
     }
 

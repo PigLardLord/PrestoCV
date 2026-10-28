@@ -434,11 +434,11 @@ private final class InterleavingService: CVGenerationService {
     func generateCV(from request: CVGenerationRequest) async throws -> CVData {
         calls += 1
         let call = calls
-        tracer.record(.request, [.text("prompt", "call \(call)")], into: .aiDraft)
+        tracer.record(.request, into: .aiDraft) { [.text("prompt", "call \(call)")] }
         if call == 1 {
             await withCheckedContinuation { release = $0; arrived.yield() }
         }
-        tracer.record(.response, [.text("raw", "answer \(call)")], into: .aiDraft)
+        tracer.record(.response, into: .aiDraft) { [.text("raw", "answer \(call)")] }
         return sample
     }
 }

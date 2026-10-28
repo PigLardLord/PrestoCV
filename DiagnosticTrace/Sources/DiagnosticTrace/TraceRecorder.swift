@@ -49,9 +49,9 @@ public final class TraceRecorder: DiagnosticTracer {
         return RecordedRun(recorder: self, id: run.id, kind: kind)
     }
 
-    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
+    public func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField]) {
         guard case .run(let id) = target(of: kind) else { return }
-        record(name, fields, inRun: id)
+        record(name, fields(), inRun: id)
     }
 
     public func mirror(_ event: TraceEvent) {

@@ -25,11 +25,11 @@ struct TraceScopeTests {
     func newerFinishesFirst() async {
         let (tracer, older, newer) = twoRuns()
 
-        await older.within { tracer.record(.request, [.text("prompt", "older first")], into: .aiDraft) }
-        await newer.within { tracer.record(.request, [.text("prompt", "newer")], into: .aiDraft) }
+        await older.within { tracer.record(.request, into: .aiDraft) { [.text("prompt", "older first")] } }
+        await newer.within { tracer.record(.request, into: .aiDraft) { [.text("prompt", "newer")] } }
         newer.finish(.finished)
         await older.within {
-            tracer.record(.response, [.text("raw", "older answer")], into: .aiDraft)
+            tracer.record(.response, into: .aiDraft) { [.text("raw", "older answer")] }
             tracer.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "older event"))
         }
         older.finish(.finished)
@@ -44,9 +44,9 @@ struct TraceScopeTests {
         let (tracer, older, newer) = twoRuns()
 
         older.finish(.cancelled)
-        await older.within { tracer.record(.response, [.text("raw", "late answer of the older")], into: .aiDraft) }
+        await older.within { tracer.record(.response, into: .aiDraft) { [.text("raw", "late answer of the older")] } }
         await newer.within {
-            tracer.record(.request, [.text("prompt", "newer")], into: .aiDraft)
+            tracer.record(.request, into: .aiDraft) { [.text("prompt", "newer")] }
             tracer.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "newer event"))
         }
 
@@ -59,8 +59,8 @@ struct TraceScopeTests {
         let (tracer, older, newer) = twoRuns()
 
         await older.within {
-            await Task { tracer.record(.request, [.text("prompt", "from a child task")], into: .aiDraft) }.value
-            tracer.record(.check, [.text("note", "an import step")], into: .textImport)
+            await Task { tracer.record(.request, into: .aiDraft) { [.text("prompt", "from a child task")] } }.value
+            tracer.record(.check, into: .textImport) { [.text("note", "an import step")] }
         }
 
         #expect(texts(tracer, older) == ["from a child task"])
@@ -72,7 +72,7 @@ struct TraceScopeTests {
     func unscopedStepIsDropped() {
         let (tracer, older, newer) = twoRuns()
 
-        tracer.record(.request, [.text("prompt", "unscoped")], into: .aiDraft)
+        tracer.record(.request, into: .aiDraft) { [.text("prompt", "unscoped")] }
 
         #expect(texts(tracer, older).isEmpty)
         #expect(texts(tracer, newer).isEmpty)
@@ -95,7 +95,7 @@ struct TraceScopeTests {
 
         await older.within {
             await Task.detached {
-                tracer.record(.request, [.text("prompt", "detached")], into: .aiDraft)
+                tracer.record(.request, into: .aiDraft) { [.text("prompt", "detached")] }
                 tracer.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "detached event"))
             }.value
         }
@@ -110,7 +110,7 @@ struct TraceScopeTests {
         let (tracer, older, newer) = twoRuns()
 
         older.withinSync {
-            tracer.record(.request, [.text("prompt", "sync")], into: .aiDraft)
+            tracer.record(.request, into: .aiDraft) { [.text("prompt", "sync")] }
             tracer.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "sync event"))
         }
 
@@ -140,9 +140,9 @@ struct TraceScopeTests {
         let first = tracer.begin(.aiDraft)
         await gate.ask(FixedDistribution(.sandbox))
         let retry = tracer.begin(.aiDraft)
-        await retry.within { tracer.record(.request, [.text("prompt", "retry request")], into: .aiDraft) }
+        await retry.within { tracer.record(.request, into: .aiDraft) { [.text("prompt", "retry request")] } }
         await first.within {
-            tracer.record(.response, [.text("raw", "response of the first")], into: .aiDraft)
+            tracer.record(.response, into: .aiDraft) { [.text("raw", "response of the first")] }
             tracer.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "event of the first"))
         }
         retry.finish(.finished)

@@ -28,14 +28,12 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
     func answer(to candidates: [ClaimCandidate], in description: String) async throws -> [ClaimVerdictEntry] {
         let session = LanguageModelSession(instructions: Self.instructions)
         let prompt = Self.prompt(for: candidates, in: description)
-        tracer.record(
-            .request,
+        tracer.record(.request, into: .aiDraft) {
             [
                 .token("call", "claimCheck"), .count("candidates", candidates.count), .flag("schemaInPrompt", true),
                 .token("sampling", "greedy"), .text("instructions", Self.instructions), .text("prompt", prompt),
-            ],
-            into: .aiDraft
-        )
+            ]
+        }
         let response: LanguageModelSession.Response<GeneratedContent>
         do {
             response = try await session.respond(
@@ -45,16 +43,14 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
                 options: GenerationOptions(samplingMode: .greedy)
             )
         } catch {
-            tracer.record(
-                .response, [.token("call", "claimCheck"), .flag("answered", false), .text("framework", String(describing: error))],
-                into: .aiDraft
-            )
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "claimCheck"), .flag("answered", false), .text("framework", String(describing: error))]
+            }
             throw error
         }
-        tracer.record(
-            .response, [.token("call", "claimCheck"), .flag("answered", true), .text("raw", response.content.jsonString)],
-            into: .aiDraft
-        )
+        tracer.record(.response, into: .aiDraft) {
+            [.token("call", "claimCheck"), .flag("answered", true), .text("raw", response.content.jsonString)]
+        }
         let verdicts = try response.content.value([ClaimVerdict].self, forProperty: Self.verdictsProperty)
         return verdicts.map { ClaimVerdictEntry(item: $0.item, quote: $0.quote, stance: $0.stance) }
     }

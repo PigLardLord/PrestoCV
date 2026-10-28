@@ -10,7 +10,11 @@ public protocol DiagnosticTracer: Sendable {
     func begin(_ kind: TraceKind) -> any TraceRunRecording
     /// Adds a step to the run whose scope the work is in (`TraceScope`), when it is of that kind: for a part that does not hold
     /// the run, such as the model service. Outside a recording scope, the step is dropped.
-    func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind)
+    ///
+    /// The fields are a closure, called only once the step is certain to be kept: the gate is open, the work is in the scope of
+    /// an open run of that kind. A part that records what it holds for the CV (a raw answer, an error text) builds it inside
+    /// the closure, so that a build that records nothing serializes nothing.
+    func record(_ name: TraceStepName, into kind: TraceKind, fields: () -> [TraceField])
     /// Adds a log entry to the run whose scope the work is in, when it is of the entry's kind and still open; to the session's
     /// events otherwise, also outside every scope; nowhere inside a suppressed one.
     func mirror(_ event: TraceEvent)

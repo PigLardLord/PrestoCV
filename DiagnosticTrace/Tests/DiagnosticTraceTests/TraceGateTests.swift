@@ -55,7 +55,7 @@ struct TraceGateTests {
 
         let run = tracer.begin(.aiDraft)
         run.record(.input, .text("description", "marker-word"))
-        tracer.record(.response, [.text("raw", "marker-word")], into: .aiDraft)
+        tracer.record(.response, into: .aiDraft) { [.text("raw", "marker-word")] }
         tracer.mirror(TraceEvent(kind: nil, category: "draft", level: "info", line: "draft.started"))
         run.finish(.finished)
 
@@ -70,7 +70,7 @@ struct TraceGateTests {
 
         let run = tracer.begin(.aiDraft)
         run.record(.input, .text("description", "marker-word"))
-        run.withinSync { tracer.record(.response, [.text("raw", "answer")], into: .aiDraft) }
+        run.withinSync { tracer.record(.response, into: .aiDraft) { [.text("raw", "answer")] } }
         tracer.mirror(TraceEvent(kind: nil, category: "export", level: "info", line: "export.finished"))
         run.finish(.finished)
 
@@ -99,8 +99,74 @@ struct TraceGateTests {
         let run = tracer.begin(.aiDraft)
         run.record(.input, .text("description", "marker-word"))
         run.finish(.finished)
-        tracer.record(.input, [], into: .aiDraft)
+        tracer.record(.input, into: .aiDraft) { [] }
         tracer.mirror(TraceEvent(kind: nil, category: "draft", level: "info", line: "draft.started"))
+    }
+}
+
+@Suite("A step recorded by kind builds its payload only once it is certain to be kept")
+struct LazyPayloadTests {
+    /// Records a step by kind and says whether its payload was built.
+    private func built(by tracer: some DiagnosticTracer, kind: TraceKind = .aiDraft) -> Bool {
+        var built = false
+        tracer.record(.response, into: kind) {
+            built = true
+            return [.text("raw", "marker-word")]
+        }
+        return built
+    }
+
+    @Test("With the gate closed, the payload is not built, in a run's scope or out of it")
+    func closedGateBuildsNothing() {
+        let tracer = GatedTracer(gate: DistributionGate(), next: TraceRecorder.sample(store: RecordingTraceStore(), clock: TickingClock(step: .milliseconds(1))))
+
+        #expect(!built(by: tracer))
+        let run = tracer.begin(.aiDraft)
+        run.withinSync { #expect(!built(by: tracer)) }
+    }
+
+    @Test("A run begun with the gate closed builds no payload after the gate opens")
+    func suppressedRunBuildsNothing() async {
+        let gate = DistributionGate()
+        let tracer = GatedTracer(gate: gate, next: TraceRecorder.sample(store: RecordingTraceStore(), clock: TickingClock(step: .milliseconds(1))))
+        let run = tracer.begin(.aiDraft)
+        await gate.ask(FixedDistribution(.sandbox))
+
+        run.withinSync { #expect(!built(by: tracer)) }
+    }
+
+    @Test("The no-op tracer builds no payload")
+    func noTracerBuildsNothing() {
+        #expect(!built(by: NoTracer()))
+    }
+
+    @Test("Out of every scope, in another kind's run, or in a finished run, the payload is not built")
+    func unkeptStepBuildsNothing() {
+        let recorder = TraceRecorder.sample(store: RecordingTraceStore(), clock: TickingClock(step: .milliseconds(1)))
+
+        #expect(!built(by: recorder))
+        let run = recorder.begin(.aiDraft)
+        run.withinSync { #expect(!built(by: recorder, kind: .textImport)) }
+        run.finish(.finished)
+        run.withinSync { #expect(!built(by: recorder)) }
+    }
+
+    @Test("In the scope of an open run of its kind, the payload is built once and recorded")
+    func keptStepBuildsOnce() throws {
+        let store = RecordingTraceStore()
+        let recorder = TraceRecorder.sample(store: store, clock: TickingClock(step: .milliseconds(1)))
+        let run = recorder.begin(.aiDraft)
+        var builds = 0
+
+        run.withinSync {
+            recorder.record(.response, into: .aiDraft) {
+                builds += 1
+                return [.text("raw", "answer")]
+            }
+        }
+
+        #expect(builds == 1)
+        #expect(try #require(store.latest(.aiDraft)).steps.map(\.name) == [.response])
     }
 }
 

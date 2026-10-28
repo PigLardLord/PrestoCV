@@ -51,7 +51,7 @@ struct TraceRecorderTests {
         run.finish(.failed(code: "model"))
         run.record(.input, .text("description", "late"))
         run.finish(.finished)
-        recorder.record(.response, [.text("raw", "late")], into: .aiDraft)
+        recorder.record(.response, into: .aiDraft) { [.text("raw", "late")] }
 
         let saved = try #require(store.latest(.aiDraft))
         #expect(saved.steps.isEmpty)
@@ -64,12 +64,12 @@ struct TraceRecorderTests {
         let store = RecordingTraceStore()
         let recorder = TraceRecorder.sample(store: store, clock: TickingClock(step: .milliseconds(1)))
 
-        recorder.record(.request, [.text("prompt", "before")], into: .aiDraft)
+        recorder.record(.request, into: .aiDraft) { [.text("prompt", "before")] }
         let run = recorder.begin(.aiDraft)
-        recorder.record(.request, [.text("prompt", "unscoped")], into: .aiDraft)
+        recorder.record(.request, into: .aiDraft) { [.text("prompt", "unscoped")] }
         await run.within {
-            recorder.record(.request, [.text("prompt", "during")], into: .aiDraft)
-            recorder.record(.input, [.text("text", "other kind")], into: .textImport)
+            recorder.record(.request, into: .aiDraft) { [.text("prompt", "during")] }
+            recorder.record(.input, into: .textImport) { [.text("text", "other kind")] }
         }
         run.finish(.finished)
 

@@ -28,7 +28,7 @@ public final class FoundationModelsService: CVGenerationService {
 
         let prompt = CVPrompt(request: request, delivery: instructionsDelivery)
         let session = LanguageModelSession(instructions: prompt.instructions)
-        tracer.record(.request, prompt.traceFields, into: .aiDraft)
+        tracer.record(.request, into: .aiDraft) { prompt.traceFields }
 
         do {
             let response = try await session.respond(
@@ -37,9 +37,9 @@ public final class FoundationModelsService: CVGenerationService {
                 includeSchemaInPrompt: true,
                 options: GenerationOptions(samplingMode: .greedy)
             )
-            tracer.record(
-                .response, [.token("call", "draft"), .flag("answered", true), .text("raw", response.rawContent.jsonString)], into: .aiDraft
-            )
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "draft"), .flag("answered", true), .text("raw", response.rawContent.jsonString)]
+            }
             return response.content
         } catch is CancellationError {
             throw CancellationError()
@@ -49,14 +49,12 @@ public final class FoundationModelsService: CVGenerationService {
                 throw CancellationError()
             }
             let failure = Self.map(failure: error)
-            tracer.record(
-                .response,
+            tracer.record(.response, into: .aiDraft) {
                 [
                     .token("call", "draft"), .flag("answered", false), .token("error", "\(failure.logCode)"),
                     .text("framework", String(describing: error)),
-                ],
-                into: .aiDraft
-            )
+                ]
+            }
             throw failure
         }
     }
