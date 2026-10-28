@@ -99,7 +99,8 @@ public struct CVDataSanitizer: Sendable {
         let entries = Entries(cvData, personalInfo: sanitize(cvData.personalInfo, jobTitles: jobTitles, source), source)
         let spoken = entries.spoken(in: source)
         let claimed = entries.claimed(in: source)
-        let interests = unique(cvData.interests.compactMap(claimed.named)) { $0 }
+        let titles = ([cvData.personalInfo.title] + jobTitles).compactMap(\.presentValue)
+        let interests = unique(cvData.interests.compactMap(claimed.named).filter { !Self.isWork($0, titles: titles, source) }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = Self.withStatedTitle(
@@ -126,7 +127,8 @@ public struct CVDataSanitizer: Sendable {
             experience: experience,
             education: education,
             skills: sanitize(
-                cvData.skills + roleSkills, source, claimed: claimed, interests: interests, entries,
+                cvData.skills + roleSkills, source, claimed: claimed, interests: interests,
+                titles: ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue), entries,
                 inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
             ),
             languages: sanitize(cvData.languages, claimed),
@@ -184,7 +186,9 @@ public struct CVDataSanitizer: Sendable {
     ///
     /// Its description also keeps the sentences that state no fact of their own (`WrittenText`), with no word of the title or the
     /// employer of another job, and that restate no sentence of the description about another job alone (ADR 0031): those of its own
-    /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result.
+    /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result. When
+    /// the job has duties, a sentence of its own description that only says the person held the job (`RoleStub`) goes: it restates
+    /// the title and the employer in front of them; with none, it is the job's only text, and stays.
     private func sanitize(
         _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
     ) -> [Experience] {
@@ -221,12 +225,29 @@ public struct CVDataSanitizer: Sendable {
                 }
             }
             let duties = position < duties.count ? description(duties[position]) : nil
+            let jobWords = Self.words(of: [experience.title, experience.company])
+            let quote = description(experience.description).flatMap { quote in
+                duties == nil ? quote : SentenceSplitter.sentences(in: quote)
+                    .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
+                    .joined(separator: " ").presentValue
+            }
             return Experience(
                 title: experience.title, company: experience.company, location: experience.location,
                 startDate: experience.startDate, endDate: experience.endDate, current: experience.current,
-                description: Self.joined(description(experience.description), duties),
+                description: Self.joined(quote, duties),
                 achievements: experience.achievements
             )
+        }
+    }
+
+    /// Whether every sentence of the description that gives `interest` also names one of the draft's `titles` and says nothing of
+    /// liking (`LeisureMentions.speaksOfLiking`): "I am a plumber and I fix pipes" gives the work, not a hobby, so neither "fix pipes"
+    /// nor "plumber" is an interest (#354). A sentence that likes something ("I am a nurse and I love painting") keeps it.
+    private static func isWork(_ interest: String, titles: [String], _ source: DescriptionText) -> Bool {
+        let giving = source.sentences.filter { !DescriptionText.spans(of: DescriptionText.normalized(interest), in: $0.folded).isEmpty }
+        return !giving.isEmpty && giving.allSatisfy { sentence in
+            titles.contains { !DescriptionText.spans(of: DescriptionText.normalized($0), in: sentence.folded).isEmpty }
+                && !LeisureMentions.speaksOfLiking(sentence.raw, in: source.explainer.language)
         }
     }
 
@@ -301,11 +322,17 @@ public struct CVDataSanitizer: Sendable {
     ///
     /// A skill the description does not name is one the model wrote for the person's role (ADR 0031): it stays, without a level, only
     /// when `inferring` accepts it, and within `InferredSkills.caps` once the named skills of its kind are counted. One whose name ends
-    /// with a named skill ("Adobe Illustrator" beside "Illustrator") is that skill again, and goes.
+    /// with a named skill ("Adobe Illustrator" beside "Illustrator") is that skill again, and goes; so does one whose words hold, or
+    /// are held by, those of a skill the model wrote before it ("écoute active" after "écoute", #354): the first of them stays.
+    ///
+    /// A skill whose name is one of the grounded draft's `titles` ("sviluppatore iOS") says the title again, which the draft shows as the title,
+    /// and goes, named or not (#354); a skill that is only a word of a title ("iOS" of "iOS developer") stays.
     private func sanitize(
-        _ skills: [Skill], _ source: DescriptionText, claimed: DescriptionText, interests: [String], _ entries: Entries,
-        inferring inferred: InferredSkills?
+        _ skills: [Skill], _ source: DescriptionText, claimed: DescriptionText, interests: [String], titles: [String],
+        _ entries: Entries, inferring inferred: InferredSkills?
     ) -> [Skill] {
+        let titleNames = Set(titles.map { DescriptionText.normalized($0) })
+        let skills = skills.filter { !titleNames.contains(DescriptionText.normalized($0.name)) }
         let names = skills.compactMap { claimed.named($0.name) }
         let hobbies = interests.map { DescriptionText.normalized($0) }
         let cleaned = skills.compactMap { skill -> (skill: Skill, isNamed: Bool)? in
@@ -321,8 +348,14 @@ public struct CVDataSanitizer: Sendable {
             return (skill: Skill(name: name, level: statedLevel(skill.level, allowed: allowed), kind: skill.kind), isNamed: true)
         }
         let named = cleaned.filter(\.isNamed).map { DescriptionText.normalized($0.skill.name) }
+        var written: [String] = []
         let kept = unique(cleaned) { $0.skill.name }.filter { item in
-            item.isNamed || !named.contains { DescriptionText.normalized(item.skill.name).hasSuffix(" " + $0) }
+            guard !item.isNamed else { return true }
+            let name = DescriptionText.normalized(item.skill.name)
+            guard !named.contains(where: { name.hasSuffix(" " + $0) }),
+                  !written.contains(where: { Self.holds($0, name) || Self.holds(name, $0) }) else { return false }
+            written.append(name)
+            return true
         }
         var room = InferredSkills.caps
         for named in kept where named.isNamed { room[named.skill.kind, default: 0] -= 1 }
@@ -369,6 +402,11 @@ public struct CVDataSanitizer: Sendable {
     /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
     private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
         source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
+    }
+
+    /// Whether the normalized name `outer` holds the normalized name `inner` as whole words ("ecoute active" holds "ecoute").
+    private static func holds(_ outer: String, _ inner: String) -> Bool {
+        !DescriptionText.spans(of: inner, in: outer).isEmpty
     }
 
     /// Whether every word of a skill's name is the name of a language ("English", "italiano inglese").

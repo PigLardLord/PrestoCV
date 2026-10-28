@@ -37,7 +37,7 @@ struct Entries {
     private let language: Vocabulary.Language?
 
     init(_ cvData: CVData, personalInfo: PersonalInfo, _ source: DescriptionText) {
-        let companies = cvData.experience.map { (company: source.named($0.company), title: source.named($0.title)) }
+        let companies = cvData.experience.map { (company: source.namedEmployer($0.company), title: source.named($0.title)) }
         let institutions = cvData.education.map { (institution: source.named($0.institution), degree: source.named($0.degree)) }
         var subjects: [Subject] = []
 

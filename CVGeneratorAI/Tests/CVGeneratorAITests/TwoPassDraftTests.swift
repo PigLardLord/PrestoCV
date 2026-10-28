@@ -269,6 +269,75 @@ struct TwoPassDraftTests {
         #expect(result.experience.first?.description == quote + ". " + plainDuties)
     }
 
+    /// Invented wording: a description in each language, a role's quote that says only that the person held the job, and plain duties.
+    /// The employer is a common noun: a quote that names a capitalised employer is a name the written text drops already (`WrittenText`).
+    private nonisolated static let stubs: [(description: String, title: String, company: String, quote: String, duties: String)] = [
+        ("From 2018 to 2021 I worked as a cook in a bakery.", "cook", "bakery",
+         "I worked as a cook in a bakery.", "Prepared meals and kept the kitchen clean."),
+        ("Dal 2018 al 2021 sono stato aiuto cuoco in una trattoria.", "aiuto cuoco", "trattoria",
+         "Sono stato aiuto cuoco in una trattoria.", "Preparava i piatti e teneva pulita la cucina."),
+        ("De 2018 a 2021 trabajé como auxiliar en una guardería.", "auxiliar", "guardería",
+         "Trabajé como auxiliar en una guardería.", "Cuidaba a los niños y preparaba las actividades del día."),
+    ]
+
+    @Test("A role's quote that says only that the person held the job goes when the duties are written, and stays as the only text (#354)",
+          arguments: stubs)
+    func stubGivesWayToTheDuties(
+        _ stub: (description: String, title: String, company: String, quote: String, duties: String)
+    ) throws {
+        let draft = CVData(experience: [Experience(
+            title: stub.title, company: stub.company, startDate: "2018", endDate: "2021", description: stub.quote
+        )])
+
+        let written = try sanitizer.sanitize(draft, writing: writing(duties: [stub.duties]), against: stub.description)
+        let unwritten = try sanitizer.sanitize(draft, writing: writing(duties: [nil]), against: stub.description)
+
+        #expect(written.experience.first?.description == stub.duties)
+        #expect(unwritten.experience.first?.description == stub.quote)
+    }
+
+    @Test("A role's quote that says what the person did stays in front of the written duties (#354)")
+    func quoteOfADutyStays() throws {
+        let description = "From 2018 to 2021 I worked as a cook in a bakery, where I baked the bread."
+        let quote = "I worked as a cook in a bakery, where I baked the bread."
+        let duties = "Prepared meals and kept the kitchen clean."
+        let draft = CVData(experience: [Experience(
+            title: "cook", company: "bakery", startDate: "2018", endDate: "2021", description: quote
+        )])
+
+        let result = try sanitizer.sanitize(draft, writing: writing(duties: [duties]), against: description)
+
+        #expect(result.experience.first?.description == quote + " " + duties)
+    }
+
+    @Test("A fragment with no letter, what the model leaves of its answer's punctuation, goes from the written text (#354)")
+    func fragmentsWithoutALetterGo() throws {
+        let written = writing(
+            summary: plainSummary + "  ,",
+            duties: [plainDuties + "  }, {", "Looked after the children during play.  ,"]
+        )
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+
+        #expect(result.summary == plainSummary)
+        #expect(result.experience.map(\.description) == [plainDuties, "Looked after the children during play."])
+    }
+
+    @Test("A written skill whose words hold, or are held by, those of one written before it goes; one sharing a word stays (#354)")
+    func writtenSkillsAreNotRepeated() throws {
+        let written = writing(
+            technologies: ["Lesson planning", "Planning", "Lesson design"],
+            softSkills: ["Listening", "Active listening", "Patience"]
+        )
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+
+        #expect(result.skills == [
+            Skill(name: "Lesson planning", kind: .technology), Skill(name: "Lesson design", kind: .technology),
+            Skill(name: "Listening", kind: .softSkill), Skill(name: "Patience", kind: .softSkill),
+        ])
+    }
+
     @Test("With no title, job or school there is nothing to write around: the written summary and skills go")
     func noFactNoWriting() throws {
         let description = "This is a test of the app, I like chess."

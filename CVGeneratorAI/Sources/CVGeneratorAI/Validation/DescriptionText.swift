@@ -112,6 +112,31 @@ struct DescriptionText {
         return name
     }
 
+    /// An employer of a job, kept as `named` keeps a name, when one of its occurrences in the description can be an employer's name:
+    /// one right after a possessive of the person ("les entreprises de mon quartier", "my street") is a place or a thing of theirs, and
+    /// names no one the person works for (#354).
+    func namedEmployer(_ name: String?) -> String? {
+        guard let name = named(name) else { return nil }
+        let possessives = vocabularyLanguage.map { Self.possessives[$0] ?? [] }
+            ?? Self.possessives.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let isAName = Self.spans(of: Self.normalized(name), in: text).contains { span in
+            let start = String.Index(utf16Offset: span.lowerBound, in: text)
+            let before = text[..<start].split(separator: " ").last.map(String.init) ?? ""
+            return !possessives.contains(before)
+        }
+        return isAName ? name : nil
+    }
+
+    /// The possessives of the person, in the first person, as `normalized` writes them.
+    private static let possessives: [Vocabulary.Language: Set<String>] = [
+        .english: ["my", "our"],
+        .italian: ["mio", "mia", "miei", "mie", "nostro", "nostra", "nostri", "nostre"],
+        .german: ["mein", "meine", "meinem", "meinen", "meiner", "meines", "unser", "unsere", "unserem", "unseren", "unserer", "unseres"],
+        .spanish: ["mi", "mis", "nuestro", "nuestra", "nuestros", "nuestras"],
+        .french: ["mon", "ma", "mes", "notre", "nos"],
+        .portuguese: ["meu", "minha", "meus", "minhas", "nosso", "nossa", "nossos", "nossas"],
+    ]
+
     // MARK: - Prose
 
     /// The sentences of `prose` each of whose clauses quotes one of the `quotes` (see `ProseQuotes`), or nil when none is left.
@@ -120,8 +145,14 @@ struct DescriptionText {
     func grounded(_ prose: String?, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> String? {
         guard let prose = prose.presentValue else { return nil }
 
-        let kept = SentenceSplitter.sentences(in: prose).filter { isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) }
+        let kept = Self.sentences(of: prose).filter { isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) }
         return kept.isEmpty ? nil : kept.joined(separator: " ")
+    }
+
+    /// The sentences of `prose` that hold a letter: one with none (" ,", "}, {", what the model leaves of its answer's punctuation)
+    /// has no word to check, so no rule would ever drop it, and it says nothing (#354).
+    private static func sentences(of prose: String) -> [String] {
+        SentenceSplitter.sentences(in: prose).filter { $0.contains(where: \.isLetter) }
     }
 
     /// The sentences of `prose` that are grounded (see `grounded(_:quoting:allowsNumbers:)`) or `isPlain`: the text the model writes
@@ -131,7 +162,7 @@ struct DescriptionText {
     ) -> String? {
         guard let prose = prose.presentValue else { return nil }
 
-        let kept = SentenceSplitter.sentences(in: prose).filter {
+        let kept = Self.sentences(of: prose).filter {
             isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) || isPlain($0)
         }
         return kept.isEmpty ? nil : kept.joined(separator: " ")

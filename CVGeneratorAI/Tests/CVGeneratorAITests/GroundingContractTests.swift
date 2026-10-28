@@ -421,6 +421,7 @@ enum GroundingRows {
         rows += statedTitles()
         rows += summariesWithNoRole()
         rows += endedJobs()
+        rows += factsInTheirPlace()
         return rows
     }()
 
@@ -6386,7 +6387,24 @@ extension GroundingRows {
                        to: AppExample.en + " I do not teach music."),
             summaryRow("from-a-colleague-goes", "music is only in a colleague's clause", adding: "Teaches music to the pupils.",
                        to: AppExample.en + " My colleague teaches music."),
+            summaryRow("fragment-without-a-letter-goes",
+                       "a fragment with no letter is what the model left of its answer's punctuation: it goes, the written sentence stays",
+                       adding: ","),
         ]
+        let italianSummary = plainSummary["it"] ?? ""
+        rows.append(row("written-text-fragment-without-a-letter-goes-it",
+                        "a fragment with no letter after an Italian summary goes, and the written sentences stay (#354)",
+                        AppExample.it,
+                        CVData(personalInfo: teacher("it"), summary: italianSummary + " ,"),
+                        .keeping([], rewriting: [Rewrite("summary", to: italianSummary, "a fragment with no letter says nothing")]),
+                        language: "it"))
+        rows.append(row("written-role-fragment-without-a-letter-goes",
+                        "a fragment with no letter in a role text goes, and the written duties stay (#354)", AppExample.en,
+                        CVData(personalInfo: teacher("en"), experience: [
+                            schoolJob("en", description: "Plans lessons and keeps in touch with families. }, {"),
+                        ]),
+                        .keeping([], rewriting: [Rewrite("experience[0].description", to: "Plans lessons and keeps in touch with families.",
+                                                         "a fragment with no letter says nothing")])))
 
         let germanPlain = "Geduldige Lehrerin, die den Unterricht plant."
         rows.append(row("written-text-german-name-goes", "a German word no dictionary knows, with its capital, is a name",
@@ -6530,6 +6548,19 @@ extension GroundingRows {
                       .exactly(CVData(personalInfo: info, skills: technologies.prefix(8).map { Skill(name: $0) }
                                           + softSkills.prefix(5).map { Skill(name: $0, kind: .softSkill) })),
                       description: AppExample.en + " I use Excel every day."),
+            // #354: the model wrote "écoute" and "écoute active" in one draft; the second says the first again.
+            secondGoes("held-by-an-earlier-one-goes", "planning is a word of lesson planning, written before it: the same skill again",
+                       "Planning"),
+            skillsRow("holding-an-earlier-one-goes", "active listening holds listening, written before it: the same skill again",
+                      [planning, Skill(name: "Listening", kind: .softSkill), Skill(name: "Active listening", kind: .softSkill)],
+                      .keeping([Drop("skills[2].name", "listening is written before it"),
+                                 Drop("skills[2].kind", "listening is written before it")])),
+            skillsRow("sharing-a-word-stays", "lesson design shares a word with lesson planning and holds no other skill: both stay",
+                      [planning, Skill(name: "Lesson design")],
+                      .unchanged),
+            skillsRow("holding-a-piece-of-a-word-stays", "art is a piece of smart, not a word of it: both stay",
+                      [Skill(name: "Art"), Skill(name: "Smart boards")],
+                      .unchanged),
             row("inferred-skill-no-fact-no-inference",
                 "with no title, job or school there is no role: no summary and no skill of the model's own",
                 "I like to help people.",
@@ -6638,14 +6669,48 @@ extension GroundingRows {
                         "a role in a game is no fact to write around: the summary written around it goes too",
                         "I am a nurse and only in a video game.",
                         CVData(summary: "A nurse who cares for patients on a busy ward.", experience: [job("nurse")]), .exactly(CVData())))
-        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-no-headline-es",
-                        "no pronoun tells a verb from a qualifier in Spanish: the safe way to fail is no headline",
+        // These two rows gave no headline until #354 (ids "a-title-and-a-clause-with-no-pronoun-is-no-headline-es/-it"): a clause after
+        // "and" that opens with a verb in the first person is the person's own, as one that opens with the pronoun.
+        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-the-headline-es",
+                        "the clause after y opens with a verb in the first person, the person's own claim: the title is the headline",
                         "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.", CVData(experience: [job("camarero")]),
-                        .exactly(CVData()), language: "es"))
-        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-no-headline-it",
-                        "no pronoun tells a verb from a qualifier in Italian: the safe way to fail is no headline",
+                        .exactly(CVData(personalInfo: person(title: "camarero"))), language: "es"))
+        rows.append(row("a-title-and-a-clause-with-no-pronoun-is-the-headline-it",
+                        "the clause after e opens with a verb in the first person, the person's own claim: the title is the headline",
                         "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.", CVData(experience: [job("sviluppatore iOS")]),
-                        .exactly(CVData()), language: "it"))
+                        .exactly(CVData(personalInfo: person(title: "sviluppatore iOS"))), language: "it"))
+        typealias VerbOfI = (language: String, description: String, title: String)
+        var verbsOfI: [VerbOfI] = []
+        verbsOfI.append(("it", "Sono idraulico e riparo tubature e caldaie nelle case dei clienti.", "idraulico"))
+        verbsOfI.append(("es", "Soy panadero y preparo pan y bollos cada mañana para el barrio.", "panadero"))
+        verbsOfI.append(("pt", "Sou eletricista e instalo quadros de luz em casas e lojas.", "eletricista"))
+        verbsOfI.append(("de", "Ich bin Gärtnerin und pflege Gärten und Parks in der Stadt.", "Gärtnerin"))
+        for v in verbsOfI {
+            rows.append(row("a-title-and-a-verb-of-the-person-is-the-headline-\(v.language)",
+                            "the clause after and opens with a verb in the first person, with no pronoun: the title is the headline",
+                            v.description, CVData(experience: [job(v.title)]),
+                            .exactly(CVData(personalInfo: person(title: v.title))), language: v.language))
+        }
+        typealias Qualified = (id: String, language: String, description: String, title: String, reason: String)
+        var qualified: [Qualified] = []
+        qualified.append(("soltanto-it", "it", "Sono infermiere e soltanto in un videogioco.", "infermiere", "soltanto qualifies the title"))
+        qualified.append(("solo-it", "it", "Sono infermiere e solo in un videogioco.", "infermiere", "solo qualifies the title"))
+        qualified.append(("solo-accented-es", "es", "Soy enfermero y sólo en un videojuego.", "enfermero", "sólo qualifies the title"))
+        qualified.append(("tampoco-es", "es", "Soy enfermero y tampoco en la vida real.", "enfermero", "tampoco qualifies the title"))
+        qualified.append(("nao-pt", "pt", "Sou enfermeiro e não na vida real.", "enfermeiro", "não denies the title"))
+        qualified.append(("so-pt", "pt", "Sou enfermeiro e só num videogame.", "enfermeiro", "só qualifies the title"))
+        qualified.append(("nur-de", "de", "Ich bin Krankenschwester und nur in einem Videospiel.", "Krankenschwester",
+                          "nur qualifies the title"))
+        qualified.append(("keine-de", "de", "Ich bin Krankenschwester und keine echte.", "Krankenschwester", "keine denies the title"))
+        qualified.append(("noun-de", "de", "Ich bin Krankenschwester und Mutter von zwei Kindern.", "Krankenschwester",
+                          "a noun after und is no verb of the person, the safe way to fail"))
+        qualified.append(("capital-it", "it", "Sono infermiere e Roma è la mia città.", "infermiere",
+                          "a word with a capital after e is no verb of the person, the safe way to fail"))
+        for v in qualified {
+            rows.append(row("a-title-and-a-qualifier-with-no-pronoun-is-no-headline-\(v.id)",
+                            "\(v.reason): only a clause of the person after and leaves the title the headline",
+                            v.description, CVData(experience: [job(v.title)]), .exactly(CVData()), language: v.language))
+        }
         rows.append(row("a-title-ending-its-sentence-in-es-is-the-headline",
                         "the sentence ends after the title, and the next sentence is the duties: the title is the headline",
                         "Soy camarero. Atiendo a los clientes en la terraza y en la barra del bar.", CVData(experience: [job("camarero")]),
@@ -6692,6 +6757,76 @@ extension GroundingRows {
                         CVData(summary: "A nurse in Turin. I like hiking in the mountains."),
                         .exactly(CVData(summary: "A nurse in Turin."))))
         return rows
+    }
+
+    /// A word the description gives is a fact only in its place (#354): a word right after a possessive of the person ("de mon
+    /// quartier") or before "'s" is no employer, and a duty or a title of a sentence that names the person's title is no interest
+    /// unless the sentence says the person likes it. A real employer, and a hobby the person says they like, stay.
+    private static func factsInTheirPlace() -> [GroundingRow] {
+        [
+            row("an-employer-after-a-possessive-is-no-employer-fr",
+                "de mon village is where the person works, not who for: village is no employer",
+                "Je suis comptable et je tiens les comptes de petites entreprises de mon village.",
+                CVData(experience: [job("comptable", "village", current: true,
+                                        description: "Je tiens les comptes de petites entreprises de mon village")]),
+                .safe(never: [], absent: ["experience[0].company"]),
+                language: "fr"),
+            row("an-employer-after-a-possessive-is-no-employer-it",
+                "del mio paese is where the person works, not who for: paese is no employer",
+                "Sono idraulico e riparo i bagni delle case del mio paese.",
+                CVData(experience: [job("idraulico", "paese", current: true, description: "Riparo i bagni delle case del mio paese")]),
+                .safe(never: [], absent: ["experience[0].company"]),
+                language: "it"),
+            row("an-employer-before-a-genitive-is-no-employer-en",
+                "the mayor's office is whose office it is: mayor is no employer",
+                "I am a cleaner and I clean the mayor's office every evening.",
+                CVData(experience: [job("cleaner", "mayor", current: true, description: "I clean the mayor's office every evening")]),
+                .safe(never: [], absent: ["experience[0].company"])),
+            row("an-employer-with-a-possessive-elsewhere-stays-en",
+                "Globex is named as the employer before my Globex team: it stays",
+                "Since 2020 I have worked as a programmer at Globex, and my Globex team builds apps for shops.",
+                CVData(experience: [job("programmer", "Globex", from: "2020", current: true)]),
+                .safe(never: [], keeping: ["experience[0].company": "Globex"])),
+            row("an-employer-with-a-genitive-in-its-name-stays-en",
+                "Mario's Kitchen is a name with a genitive in it: it stays",
+                "Since 2020 I have worked as a cook at Mario's Kitchen.",
+                CVData(experience: [job("cook", "Mario's Kitchen", from: "2020", current: true)]),
+                .safe(never: [], keeping: ["experience[0].company": "Mario's Kitchen"])),
+            row("a-duty-beside-the-title-is-no-interest-en",
+                "mow lawns is what the gardener does at work, not a hobby",
+                "I am a gardener and I mow lawns.",
+                CVData(personalInfo: person(title: "gardener"), interests: ["mow lawns"]),
+                .safe(never: ["mow lawns"], keeping: ["personalInfo.title": "gardener"])),
+            row("the-title-is-no-interest-de",
+                "Konditorin is the person's title, not a hobby",
+                "Ich bin Konditorin und backe Torten.",
+                CVData(personalInfo: person(title: "Konditorin"), interests: ["Konditorin"]),
+                .safe(never: [], absent: ["interests[0]"], keeping: ["personalInfo.title": "Konditorin"]),
+                language: "de"),
+            row("the-title-is-no-skill-it",
+                "sviluppatore iOS is the person's title, which the draft shows as the title: as a technology it says the title again",
+                "Sono sviluppatore iOS e scrivo app in Swift.",
+                CVData(personalInfo: person(title: "sviluppatore iOS"),
+                       skills: [Skill(name: "sviluppatore iOS", kind: .technology), Skill(name: "Swift", kind: .technology)]),
+                .safe(never: [], absent: ["skills[1]"], keeping: ["skills[0].name": "Swift", "personalInfo.title": "sviluppatore iOS"]),
+                language: "it"),
+            row("a-skill-inside-the-title-is-a-skill-en",
+                "iOS is one word of the title, and a platform the person names: it stays as a skill",
+                "I am an iOS developer and I write apps in Swift.",
+                CVData(personalInfo: person(title: "iOS developer"),
+                       skills: [Skill(name: "iOS", kind: .technology), Skill(name: "Swift", kind: .technology)]),
+                .safe(never: [], keeping: ["skills[0].name": "iOS", "skills[1].name": "Swift", "personalInfo.title": "iOS developer"])),
+            row("a-liked-thing-beside-the-title-is-an-interest-en",
+                "the nurse says she loves painting: painting is a hobby, beside the title or not",
+                "I am a nurse and I love painting.",
+                CVData(personalInfo: person(title: "nurse"), interests: ["painting"]),
+                .safe(never: [], keeping: ["interests[0]": "painting"])),
+            row("an-interest-of-its-own-sentence-is-an-interest-en",
+                "chess has a sentence of its own, with no title in it: it is a hobby",
+                "I am a gardener. At weekends I play chess.",
+                CVData(personalInfo: person(title: "gardener"), interests: ["chess"]),
+                .safe(never: [], keeping: ["interests[0]": "chess"])),
+        ]
     }
 
     /// A title the description says only in a clause that names no employer supports no job that has ended, even when the clause of
