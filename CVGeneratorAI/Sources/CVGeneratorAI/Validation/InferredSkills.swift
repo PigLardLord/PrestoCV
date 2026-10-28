@@ -44,9 +44,10 @@ struct InferredSkills {
 
         let lists = WrittenTextWords.of(language)
         let statesAFact = words.enumerated().contains { index, word in
+            let previous = index > 0 ? words[index - 1].folded : nil
             let next = index + 1 < words.count ? words[index + 1].folded : nil
             return written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded)
-                || lists.isQualification(word.folded, followedBy: next) || Self.isALanguage(word.folded)
+                || lists.isQualification(word.folded, after: previous, before: next) || Self.isALanguage(word.folded)
         }
         let normalized = DescriptionText.normalized(name)
         guard !statesAFact, !interests.contains(normalized),

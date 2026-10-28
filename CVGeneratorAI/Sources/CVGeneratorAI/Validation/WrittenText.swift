@@ -56,8 +56,9 @@ struct WrittenText {
 
         let sentenceWords = Word.words(in: sentence)
         let states = sentenceWords.enumerated().contains { index, word in
+            let previous = index > 0 ? sentenceWords[index - 1].folded : nil
             let next = index + 1 < sentenceWords.count ? sentenceWords[index + 1].folded : nil
-            return statesAFact(word.folded, followedBy: next, foreignWords: foreignWords)
+            return statesAFact(word.folded, after: previous, before: next, foreignWords: foreignWords)
         }
         guard !states else { return false }
         return !namesSomething(sentenceWords, in: sentence, ownWords: ownWords)
@@ -73,8 +74,8 @@ struct WrittenText {
         (words.seniority.contains(word) || Vocabulary.isLevel(word, in: language)) && !descriptionWords.contains(word)
     }
 
-    private func statesAFact(_ word: String, followedBy next: String?, foreignWords: Set<String>) -> Bool {
-        words.isNumber(word) || words.isQualification(word, followedBy: next) || words.months.contains(word) || words.negations.contains(word)
+    private func statesAFact(_ word: String, after previous: String?, before next: String?, foreignWords: Set<String>) -> Bool {
+        words.isNumber(word) || words.isQualification(word, after: previous, before: next) || words.months.contains(word) || words.negations.contains(word)
             || isAnUnstatedLevel(word) || isExcluded(word) || foreignWords.contains(word)
     }
 

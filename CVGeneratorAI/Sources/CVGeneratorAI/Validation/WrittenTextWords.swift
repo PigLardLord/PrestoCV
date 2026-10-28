@@ -15,16 +15,17 @@ struct WrittenTextWords: Sendable {
     let negations: Set<String>
     /// Words that name a qualification ("certified", "degree", "abilitazione"): a skill the model writes holds none.
     let qualifications: Set<String>
-    /// Words that name a qualification only before one of `followers`: English "master" is a degree in "Master of Science" and
-    /// "Master's degree", a verb in "masters complex workflows" and a name in "Master Data Management". Each is matched as a phrase.
-    let contextualQualifications: [String: Set<String>]
+    /// Pairs of words, as "first second", in which a word of `qualifications` names no qualification: the name of a technology or a
+    /// trade ("Master Data Management", "Scrum Master"). Any other use of the word, "Holds a masters", is a qualification: a
+    /// pair joins this list whole, with a test that the word alone is still one.
+    let notQualifications: Set<String>
     /// What a number written as one word is made of besides the numbers themselves: "uno" and the elided tens of "ventuno", the "und"
     /// of "einundzwanzig", the "cientos" of "doscientos".
     private let joiningParts: Set<String>
 
     init(numbers: String, months: String, seniority: String, negations: String, qualifications: String, joiningParts: String = "",
-         contextualQualifications: [String: Set<String>] = [:]) {
-        self.contextualQualifications = contextualQualifications
+         notQualifications: Set<String> = []) {
+        self.notQualifications = notQualifications
         self.numbers = Self.set(of: numbers)
         self.joiningParts = Self.set(of: joiningParts)
         self.months = Self.set(of: months)
@@ -45,11 +46,12 @@ struct WrittenTextWords: Sendable {
         }
     }
 
-    /// Whether `word`, followed by `next`, names a qualification: one of the list, or a contextual one before its followers.
-    func isQualification(_ word: String, followedBy next: String?) -> Bool {
-        if qualifications.contains(word) { return true }
-        guard let next, let followers = contextualQualifications[word] else { return false }
-        return followers.contains(next)
+    /// Whether `word`, between `previous` and `next`, names a qualification: one of the list, but for the pairs of `notQualifications`.
+    func isQualification(_ word: String, after previous: String?, before next: String?) -> Bool {
+        guard qualifications.contains(word) else { return false }
+        if let previous, notQualifications.contains("\(previous) \(word)") { return false }
+        if let next, notQualifications.contains("\(word) \(next)") { return false }
+        return true
     }
 
     /// Whether `word` is a number written in words: one of the list, or a compound of them ("ventuno", "einundzwanzig",
@@ -86,19 +88,12 @@ struct WrittenTextWords: Sendable {
         """,
         negations: "not no never nor neither none nothing nobody cannot",
         qualifications: """
-        degree degrees diploma diplomas bachelor bachelors mba phd doctorate certificate certificates certified
+        degree degrees diploma diplomas bachelor bachelors master masters mba phd doctorate certificate certificates certified
         certification certifications license licensed licence licenced accredited accreditation qualification qualifications
         qualified chartered registered
         """,
-        contextualQualifications: [
-            "master": masterFollowers, "masters": masterFollowers,
-        ]
+        notQualifications: ["master data", "masters data", "scrum master"]
     )
-
-    /// What follows "master" when it is a degree: "Master of Science", "Master in", "Master's degree" ("s"), "Masters degree".
-    private static let masterFollowers: Set<String> = [
-        "of", "in", "s", "degree", "degrees", "program", "programme", "course", "level", "diploma", "from", "with",
-    ]
 
     static let italian = WrittenTextWords(
         numbers: """

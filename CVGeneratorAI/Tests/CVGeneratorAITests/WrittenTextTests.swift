@@ -31,12 +31,13 @@ struct WrittenTextTests {
         #expect(!written(teacher).isPlain(sentence, ownWords: []))
     }
 
-    @Test("A master is a degree only before the words of a degree; a verb or a name is plain", arguments: [
+    @Test("A master is a degree in any use, but in the pairs of a technology or a trade", arguments: [
         ("Has a master in education.", false), ("Holds a Master of Science.", false), ("Has a master's degree.", false),
-        ("Masters complex workflows with the pupils.", true), ("Works with Master Data Management.", true),
+        ("Holds a masters.", false), ("Holds a masters focused on education.", false), ("Holds a master.", false),
+        ("Works with Master Data Management.", true), ("Works as a Scrum Master.", true),
     ])
-    func masterIsContextual(sentence: String, isPlain: Bool) {
-        #expect(written(teacher).isPlain(sentence, ownWords: ["master", "data", "management"]) == isPlain, "\(sentence)")
+    func masterIsADegree(sentence: String, isPlain: Bool) {
+        #expect(written(teacher).isPlain(sentence, ownWords: ["master", "data", "management", "scrum"]) == isPlain, "\(sentence)")
     }
 
     @Test("A length, a rank or a level is a fact only when the description does not write it")

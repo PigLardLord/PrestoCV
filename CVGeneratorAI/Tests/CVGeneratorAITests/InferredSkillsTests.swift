@@ -17,7 +17,7 @@ struct InferredSkillsTests {
 
     @Test("The names of technologies and soft skills stay, with the punctuation of their trade",
           arguments: ["Lesson planning", "Phonics", "C++", "C#", "F#", "Node.js", "ASP.NET", "Vue.js", ".NET", "Objective-C", "CI/CD",
-                      "Q&A", "Delta Lake", "SAT solving", "GRE tunnel", "CPA tracking", "OCP cluster", "Praxis management", "Master Data Management",
+                      "Q&A", "Delta Lake", "SAT solving", "GRE tunnel", "CPA tracking", "OCP cluster", "Praxis management", "Master Data Management", "Scrum Master",
                       "Maya", "NODE.JS", "Node.js Express", "Team leadership", "Gestione della classe", "Pädagogik", "Planificación", "Éducation", "Comunicação"])
     func plainNamesStay(name: String) {
         #expect(skills().accepted(name) == name)
@@ -26,7 +26,7 @@ struct InferredSkillsTests {
     @Test("The name of an exam or a certification is a qualification, in any spelling",
           arguments: ["TOEFL", "toefl", "IELTS", "TOEIC", "Cambridge CELTA", "TEFL", "TESOL", "DELE", "DELF", "TestDaF", "Goethe Zertifikat",
                       "HSK", "JLPT", "GMAT", "PMP", "CISSP", "CCNA", "ITIL", "Six Sigma", "Green Belt", "Security+", "Network+", "A+",
-                      "SAT", "SAT exam", "GRE General Test", "SAT reasoning test", "Praxis Core exam", "Delta certification", "GRE test", "CPA", "OCP", "Praxis", "Esame di stato", "Staatsexamen", "Examen", "Oposiciones", "Concorso pubblico", "Prüfung", "BLS", "ACLS"])
+                      "Master", "Masters focused on education", "SAT", "SAT exam", "GRE General Test", "SAT reasoning test", "Praxis Core exam", "Delta certification", "GRE test", "CPA", "OCP", "Praxis", "Esame di stato", "Staatsexamen", "Examen", "Oposiciones", "Concorso pubblico", "Prüfung", "BLS", "ACLS"])
     func examsAreQualifications(name: String) {
         #expect(skills().accepted(name) == nil, "\(name)")
     }
