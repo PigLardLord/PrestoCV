@@ -201,6 +201,17 @@ struct DraftingWrittenTests {
         #expect(Self.reader(person, "en").isEmpty)
     }
 
+    @Test("With no title kept, a summary that names a stated title names the person, and one that does not is counted")
+    func summaryOfAnUntitledDraft() {
+        let title = ExpectedFact.title("tide gauge keeper", "keeper")
+        let job = Experience(company: "Harbour Board", description: "I read the tide gauges.")
+        let person = CVData(summary: "I work as a tide gauge keeper. I read the gauges twice a day.", experience: [job])
+        let about = CVData(summary: "Tides shape the life of every harbour. The gauges need care.", experience: [job])
+
+        #expect(Self.reader(person, "en", facts: [title]).isEmpty)
+        #expect(Self.reader(about, "en", facts: [title]).map(\.kind) == [.summaryWithoutPerson])
+    }
+
     @Test("A duty that starts with an infinitive or a gerund is counted once a job, and a first person is not")
     func infinitiveDuty() {
         let cv = CVData(experience: [

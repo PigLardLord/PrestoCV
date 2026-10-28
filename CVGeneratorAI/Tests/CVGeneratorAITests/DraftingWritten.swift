@@ -408,13 +408,16 @@ enum ReaderRules {
         return []
     }
 
-    /// A summary that names no title of the draft whole (or, with none, no word of the field), and summary sentences that repeat.
+    /// A summary that names no title of the draft whole (with none kept, no stated title; with none stated, no word of the field),
+    /// and summary sentences that repeat.
     static func summary(of cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
         let summary = (cv.summary ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !summary.isEmpty else { return [] }
         var found: [ReaderFinding] = []
         let words = InventedFacts.words(of: summary)
-        let titles = ([cv.personalInfo.title ?? ""] + cv.experience.map(\.title)).map { InventedFacts.words(of: $0) }.filter { !$0.isEmpty }
+        let kept = ([cv.personalInfo.title ?? ""] + cv.experience.map(\.title)).map { InventedFacts.words(of: $0) }.filter { !$0.isEmpty }
+        let stated = input.facts.filter { $0.kind == .title }.flatMap(\.forms).map { InventedFacts.words(of: $0) }.filter { !$0.isEmpty }
+        let titles = kept.isEmpty ? stated : kept
         let named = titles.isEmpty
             ? InventedFacts.words(of: input.field ?? "").filter { $0.count > 3 }.contains(where: words.contains)
             : titles.contains { InventedFacts.holds(words, run: $0) }
