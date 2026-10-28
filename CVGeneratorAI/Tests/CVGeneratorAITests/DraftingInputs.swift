@@ -36,6 +36,10 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
         case noRole
         /// A description of the app's end-to-end campaign that the evaluation lacked (#354): an employer and a tool, no title.
         case app
+        /// A description shaped like a person's own account of their work (#354): about eight lines in the first person, the kind of
+        /// work and the years, then four employers with dates, the position and the duties, two of them in one run-on sentence, one
+        /// with a word of the past and of doubt, the tools and the qualities, and what the person looks for.
+        case jobs
     }
 
     let id: String
@@ -98,14 +102,14 @@ extension DraftingInput {
     }
 }
 
-/// The 31 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
-/// cannot drift, 4 written descriptions per language (plain, with traps, sparse, with no role) and the descriptions of the app's
-/// end-to-end campaign. Every person, address and number in them is invented.
+/// The 37 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
+/// cannot drift, 5 written descriptions per language (plain, with traps, sparse, with no role, and one with four jobs) and the
+/// descriptions of the app's end-to-end campaign. Every person, employer, address and number in them is invented.
 enum DraftingInputs {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     static func all() throws -> [DraftingInput] {
-        try examples() + written + short + app
+        try examples() + written + short + jobs + app
     }
 
     // MARK: - Fields
@@ -128,6 +132,9 @@ enum DraftingInputs {
         "de-sparse": ("Bäckerei", ["HACCP"]), "es-sparse": ("hostelería", ["HACCP"]),
         "fr-sparse": ("comptabilité", ["SAP"]), "pt-sparse": ("transporte de cargas", []),
         "ai-language-data": ("work at San Camillo, with Excel", []),
+        "jobs-en": ("live sound engineering", []), "jobs-it": ("manutenzione industriale", []),
+        "jobs-de": ("Garten- und Landschaftsbau", []), "jobs-es": ("mecánica del automóvil", []),
+        "jobs-fr": ("accueil hôtelier", []), "jobs-pt": ("carpintaria", []),
     ]
 
     // MARK: - The app's examples
@@ -459,6 +466,130 @@ enum DraftingInputs {
             id: "pt-norole", kind: .noRole, language: "pt",
             description: "Gosto de passear com o meu cão, ler romances policiais e cozinhar para os amigos ao fim de semana.",
             facts: [], traps: []
+        ),
+    ]
+
+    // MARK: - Four jobs, as a person tells them (#354)
+
+    /// Descriptions shaped like a person's own account of their work: the kind of work and the years, four employers with dates,
+    /// the position and the duties, two of the jobs in one run-on sentence ("..., then at B ..., <duties>"), one with a word of the
+    /// past and of doubt ("was also helping"), the tools, the qualities, and a last line on the job the person looks for, which is
+    /// a trap.
+    static let jobs: [DraftingInput] = [
+        DraftingInput(
+            id: "jobs-en", kind: .jobs, language: "en",
+            description: """
+            I have worked in live sound for theatres and touring shows for thirteen years.
+            I started in 2013 as a stagehand at the Fenwick Playhouse in Norwich, where I rigged the lights and loaded the trucks until 2016.
+            Then I was a sound technician at Brightwater Events from 2016 to 2019, then at Copperfield Arena from 2019 to 2021, setting up the PA systems and mixing the support acts.
+            At Copperfield Arena I was also helping the lighting crew with the follow spots.
+            Since 2021 I have been head of sound at the Orchard Lane Theatre, where I plan the sound design for each production and train the junior technicians.
+            I mix on digital consoles and edit the sound effects for the shows.
+            I stay calm under pressure and I like working closely with directors.
+            I am now looking for a technical manager role at a larger venue.
+            """,
+            facts: [
+                .title("head of sound"), .title("sound technician"), .title("stagehand"),
+                .employer("Fenwick Playhouse", "Fenwick"), .employer("Brightwater Events", "Brightwater"),
+                .employer("Copperfield Arena", "Copperfield"), .employer("Orchard Lane Theatre", "Orchard Lane"),
+            ],
+            traps: ["technical manager"]
+        ),
+        DraftingInput(
+            id: "jobs-it", kind: .jobs, language: "it",
+            description: """
+            Lavoro da sedici anni nella manutenzione di impianti industriali, soprattutto nel settore alimentare.
+            Dal 2010 al 2014 sono stato operaio manutentore alla Conserve Albarella di Termoli, dove riparavo i nastri trasportatori e sostituivo i cuscinetti.
+            Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018, poi al Molino Fontebasso dal 2018 al 2020, controllando i quadri elettrici e programmando la manutenzione preventiva.
+            Al Molino Fontebasso davo anche una mano con gli ordini dei ricambi.
+            Dal 2020 sono capoturno della manutenzione al Birrificio Valtrigno di Campobasso, dove coordino tre tecnici e gestisco i fermi impianto.
+            Leggo gli schemi elettrici e pneumatici e uso i PLC per trovare i guasti.
+            Sono preciso e mi piace lavorare in squadra.
+            Cerco un posto da responsabile della manutenzione in un'azienda più grande.
+            """,
+            facts: [
+                .title("capoturno della manutenzione", "capoturno"), .title("manutentore elettromeccanico"),
+                .title("operaio manutentore"), .employer("Conserve Albarella", "Albarella"),
+                .employer("Pastificio Cerreto", "Cerreto"), .employer("Molino Fontebasso", "Fontebasso"),
+                .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"),
+            ],
+            traps: ["responsabile della manutenzione"]
+        ),
+        DraftingInput(
+            id: "jobs-de", kind: .jobs, language: "de",
+            description: """
+            Ich arbeite seit sechzehn Jahren im Garten- und Landschaftsbau.
+            Von 2009 bis 2013 war ich Gärtnerhelferin bei der Baumschule Lindenhof in Kassel, wo ich Jungpflanzen umgetopft und die Beete gepflegt habe.
+            Danach war ich Landschaftsgärtnerin bei Gartenbau Mertens von 2013 bis 2017, dann bei Grünwerk Sauer von 2017 bis 2020, mit dem Verlegen von Pflasterflächen und dem Einbau von Bewässerungsanlagen.
+            Bei Grünwerk Sauer habe ich auch mal bei der Baumpflege ausgeholfen.
+            Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, wo ich die Kolonne einteile und die Pflege der Parkanlagen plane.
+            Ich fahre Minibagger und arbeite mit Rüttelplatte und Motorsäge.
+            Ich bin zuverlässig und arbeite gern im Team.
+            Jetzt suche ich eine Stelle als Bauleiterin in einem größeren Betrieb.
+            """,
+            facts: [
+                .title("Vorarbeiterin"), .title("Landschaftsgärtnerin"), .title("Gärtnerhelferin"),
+                .employer("Baumschule Lindenhof", "Lindenhof"), .employer("Gartenbau Mertens", "Mertens"),
+                .employer("Grünwerk Sauer", "Grünwerk"), .employer("Stadtgärtnerei Hollerbach", "Hollerbach"),
+            ],
+            traps: ["Bauleiterin"]
+        ),
+        DraftingInput(
+            id: "jobs-es", kind: .jobs, language: "es",
+            description: """
+            Trabajo desde hace quince años en la mecánica del automóvil.
+            De 2011 a 2014 fui ayudante de taller en Talleres Ribera, en Zaragoza, donde cambiaba el aceite y montaba los neumáticos.
+            Después fui mecánico en Autos Montaner de 2014 a 2018, luego en Garaje Lozano de 2018 a 2021, revisando los frenos y diagnosticando averías del motor.
+            En Garaje Lozano también ayudaba a veces con los presupuestos.
+            Desde 2021 soy jefe de taller en el Concesionario Valdeolmos, donde reparto el trabajo del equipo y atiendo a los clientes.
+            Uso el equipo de diagnosis, el elevador y la llave dinamométrica.
+            Soy ordenado y me gusta trabajar en equipo.
+            Ahora busco un puesto de gerente de posventa en un concesionario más grande.
+            """,
+            facts: [
+                .title("jefe de taller"), .title("mecánico"), .title("ayudante de taller"),
+                .employer("Talleres Ribera", "Ribera"), .employer("Autos Montaner", "Montaner"),
+                .employer("Garaje Lozano", "Lozano"), .employer("Concesionario Valdeolmos", "Valdeolmos"),
+            ],
+            traps: ["gerente de posventa"]
+        ),
+        DraftingInput(
+            id: "jobs-fr", kind: .jobs, language: "fr",
+            description: """
+            Je travaille depuis quatorze ans dans l'accueil hôtelier.
+            De 2012 à 2015, j'ai été auditrice de nuit à l'Hôtel des Tilleuls à Annecy, où je faisais la clôture de caisse et je répondais au téléphone.
+            Ensuite j'ai été réceptionniste à la Résidence Belcourt de 2015 à 2018, puis à l'Hôtel du Lac Vert de 2018 à 2021, en gérant les réservations et en accueillant les groupes.
+            À l'Hôtel du Lac Vert, j'aidais aussi parfois au service des petits-déjeuners.
+            Depuis 2021, je suis chef de réception au Domaine de Mirabel à Chambéry, où j'organise les plannings de l'équipe et je traite les réclamations.
+            J'utilise un logiciel de réservation et le terminal de paiement.
+            Je suis souriante et organisée, et j'aime le travail en équipe.
+            Je cherche maintenant un poste de directrice d'hébergement dans un hôtel plus grand.
+            """,
+            facts: [
+                .title("chef de réception"), .title("réceptionniste"), .title("auditrice de nuit"),
+                .employer("Hôtel des Tilleuls", "Tilleuls"), .employer("Résidence Belcourt", "Belcourt"),
+                .employer("Hôtel du Lac Vert", "Lac Vert"), .employer("Domaine de Mirabel", "Mirabel"),
+            ],
+            traps: ["directrice d'hébergement"]
+        ),
+        DraftingInput(
+            id: "jobs-pt", kind: .jobs, language: "pt",
+            description: """
+            Trabalho há quinze anos com carpintaria, em obras e em oficinas de móveis.
+            De 2010 a 2013 fui ajudante de marcenaria na Marcenaria Ipê, em Curitiba, onde lixava as peças e cortava as chapas.
+            Depois fui carpinteiro na Móveis Araucária de 2013 a 2017, depois na Oficina Tapajós de 2017 a 2020, montando armários e instalando portas.
+            Na Oficina Tapajós também ajudava às vezes com os orçamentos.
+            Desde 2020 sou encarregado de carpintaria na Construtora Serra Azul, em Londrina, onde coordeno a equipe e confiro as medidas das fôrmas.
+            Trabalho com serra circular, tupia e plaina elétrica.
+            Sou caprichoso e gosto de trabalhar em equipe.
+            Agora procuro uma vaga de mestre de obras em uma construtora maior.
+            """,
+            facts: [
+                .title("encarregado de carpintaria"), .title("carpinteiro"), .title("ajudante de marcenaria"),
+                .employer("Marcenaria Ipê", "Ipê"), .employer("Móveis Araucária", "Araucária"),
+                .employer("Oficina Tapajós", "Tapajós"), .employer("Construtora Serra Azul", "Serra Azul"),
+            ],
+            traps: ["mestre de obras"]
         ),
     ]
 

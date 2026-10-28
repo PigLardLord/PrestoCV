@@ -77,6 +77,72 @@ struct DraftingWrittenTests {
         #expect(measure.offField.allSatisfy { $0.hasSuffix("(written around a description with no role)") })
     }
 
+    // MARK: - The reader's classes
+
+    @Test("A quality listed as a technology is a soft skill as a technology, and a quality listed as a soft skill is not")
+    func softAsTechnology() throws {
+        let cv = CVData(skills: [
+            Skill(name: "Teamwork"), Skill(name: "Mixing consoles"), Skill(name: "Communication skills", kind: .softSkill),
+        ])
+
+        let measure = try Self.measure("en-plain", cv)
+
+        #expect(measure.readerFindings == [ReaderFinding(kind: .softAsTechnology, path: "skills[0].name", value: "Teamwork")])
+    }
+
+    @Test("A technology that is a word for anything, or a lone word for an activity, is no tool of the trade; an acronym and a machine are")
+    func noToolOfTheTrade() throws {
+        let cv = CVData(skills: [
+            Skill(name: "Manutenzione"), Skill(name: "documenti"), Skill(name: "PLC"), Skill(name: "Saldatrice a filo"),
+        ])
+
+        let measure = try Self.measure("it-plain", cv)
+
+        #expect(measure.readerFindings.map(\.kind) == [.noToolOfTheTrade, .noToolOfTheTrade])
+        #expect(measure.readerFindings.map(\.value) == ["Manutenzione", "documenti"])
+    }
+
+    @Test("A job whose duties start in two forms is counted once, and a word that joins the duties is not their form")
+    func twoForms() throws {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "I mix the evening shows. Rigging the speakers before the doors open."),
+            Experience(company: "B", description: "I mix the evening shows. Then I rig the speakers before the doors open."),
+            Experience(company: "C", description: "Mixing the evening shows. Rigging the speakers before the doors open."),
+        ])
+
+        let measure = try Self.measure("en-plain", cv)
+
+        #expect(measure.readerFindings.map(\.kind) == [.twoForms])
+        #expect(measure.readerFindings.map(\.path) == ["experience[0].description"])
+    }
+
+    @Test("A skill of English words in a draft of another language is counted, and in an English draft it is not")
+    func skillInAnotherLanguage() throws {
+        let cv = CVData(skills: [
+            Skill(name: "Preventive maintenance"), Skill(name: "Problem solving", kind: .softSkill),
+            Skill(name: "Manutenzione preventiva"), Skill(name: "PLC"),
+        ])
+
+        let italian = try Self.measure("it-plain", cv)
+        let english = try Self.measure("en-plain", cv)
+
+        #expect(italian.readerFindings.filter { $0.kind == .skillInAnotherLanguage }.map(\.value) == [
+            "Preventive maintenance", "Problem solving",
+        ])
+        #expect(!english.readerFindings.contains { $0.kind == .skillInAnotherLanguage })
+    }
+
+    @Test("A run set counts the reader's classes over its distinct drafts, with no threshold")
+    func readerCounts() throws {
+        let teamwork = Tweak(edit: { $0.skills.append(Skill(name: "Teamwork")) })
+        let measured = try DraftMeasures.set(["en-plain", "it-plain"], runs: 2, tweak: DraftMeasures.tweak(teamwork, for: "en-plain"))
+
+        let counts = WrittenCounts(measured)
+
+        #expect(counts.reader == ReaderCounts(softAsTechnology: 1, noToolOfTheTrade: 0, twoForms: 0, skillInAnotherLanguage: 0))
+        #expect(counts.shortfalls(p95Seconds: 10).isEmpty)
+    }
+
     // MARK: - The fixture
 
     @Test("The fixture's written layer is inferred or quoted, never invented or sent to review, in every input with a role")

@@ -158,6 +158,19 @@ struct DraftingSummaryTests {
         #expect(summary.shortfalls.isEmpty)
     }
 
+    @Test("The text counts the reader's classes and lists each, as numbers to follow, not findings")
+    func readerLines() throws {
+        let teamwork = Tweak(edit: { $0.skills.append(Skill(name: "Teamwork")) })
+        let summary = try Scenario.make(ids: ["en-plain"], tweak: DraftMeasures.tweak(teamwork, for: "en-plain")).summary
+
+        #expect(summary.text.contains(
+            "the reader's classes, by rough rules: a soft skill as a technology 1; no tool of the trade 0; two forms in one job 0; "
+                + "a skill in another language 0"
+        ))
+        #expect(summary.text.contains("reader class: en-plain run 1: softAsTechnology skills["))
+        #expect(summary.readerClasses.count == 1)
+    }
+
     @Test("A draft whose claim check gave no answer fails its input, in all three runs, and the first line says so")
     func uncheckedInputFails() throws {
         let thrown = CheckEvent(candidates: 4, answers: nil, error: "serviceFailed", cancelled: false)

@@ -104,6 +104,8 @@ struct DraftSummary: Codable, Equatable {
     let offField: [String]
     /// What the distinct final drafts write around the facts.
     let written: WrittenCounts
+    /// "<id> run <n>: <class> <path> \"<value>\"" for every value of a final draft in a reader's class: numbers to follow, not findings.
+    let readerClasses: [String]
     /// The thresholds of #354 the set misses: not hard findings, and no GO while any is left.
     let shortfalls: [String]
     /// The fields and the drafts a person reads once for this set (review.json).
@@ -137,6 +139,9 @@ struct DraftSummary: Codable, Equatable {
         lost = measured.flatMap { draft in draft.report.lost.map { "\(draft.id) run \(draft.run): \($0)" } }
         offField = measured.flatMap { draft in (draft.written?.offField ?? []).map { "\(draft.id) run \(draft.run): \($0)" } }
         written = WrittenCounts(measured)
+        readerClasses = measured.flatMap { draft in
+            (draft.written?.readerFindings ?? []).map { "\(draft.id) run \(draft.run): \($0.kind.rawValue) \($0.path) \"\($0.value)\"" }
+        }
         shortfalls = written.shortfalls(p95Seconds: p95Seconds)
         reviewItems = ReviewItem.unique(in: measured).count
     }
@@ -193,11 +198,13 @@ struct DraftSummary: Codable, Equatable {
                 + "\(written.keptJobs) kept jobs; enough skills in \(written.withSkills) of \(written.drafts); "
                 + "\(written.otherLanguage) of \(written.sentences) sentences in another language; off-field hits \(offField.count)"
         )
+        lines.append(written.reader.line)
         lines += invented.map { "invented: \($0)" }
         lines += failures.map { "failed: \($0)" }
         lines += exampleMisses.map { "example miss: \($0)" }
         lines += offField.map { "off-field: \($0)" }
         lines += shortfalls.map { "missed: \($0)" }
+        lines += readerClasses.map { "reader class: \($0)" }
         return lines.joined(separator: "\n") + "\n"
     }
 
