@@ -66,7 +66,15 @@
 - every written sentence in the description's language;
 - at most 90 s a draft at the 95th percentile, the claim check included; above it, the guide counts go down to 6 technologies and 4 soft skills, and the set is measured again.
 
-**Pending.** The acceptance step fills this section from the real-model evaluation it runs: the numbers, the OS of the model and the revision measured, and the per-draft pertinence verdicts it records. The owner's try on the release candidate is the human check before submission; no person reads each draft in this step.
+**Measured: NO-GO at revision a1e64ab5** (macOS 27.0.1 build 26A434, Xcode 27.1, 30 inputs, 3 runs each, 90 runs; the model is deterministic, so the 3 runs of an input are identical).
+- Invented facts: 3 runs (1 input, 1 job title said in a sentence that names no employer). Failed runs: 9 (3 inputs: the model returned nothing). Missed examples: 3 runs (1 example lost its title). Tools of another trade: 3 runs (1 input with no role wrote a summary from its interests).
+- A summary in 5 of 23 distinct drafts of inputs with a role, study or field (3 of the 6 examples; every example needs one). A description on 12 of 37 kept jobs. Enough technologies and soft skills in 6 of 23 drafts.
+- Every written sentence in the description's language: 75 of 75.
+- Time: median 13.7 s, 95th percentile 18.9 s, maximum 21.7 s, within the 90 s budget.
+- Claim check (3 sets, 3 runs each): 0 false keeps and 0 errors; 6 false drops of 263 items (5 in the adversarial set, 1 in the held-out set, 0 in the frozen set), all of a language.
+- A person read all 28 distinct final drafts (`verdicts.md` of the evaluation folder): 2 accepted, 26 rejected, plus 3 inputs with no draft.
+
+The thresholds are not met on the summary, the role descriptions and the skills: the model leaves them empty or short far more often than 10% of the time. The next step is a change to the prompt or the schema, then a new measurement. The owner's try on the release candidate is the human check before submission.
 
 ## Consequences
 
