@@ -243,13 +243,31 @@ public struct CVDataSanitizer: Sendable {
         return kept.isEmpty ? nil : kept.joined(separator: " ")
     }
 
-    /// The sentences of `first`, then those of `second` that `first` does not hold already.
+    /// The sentences of `first`, then those of `second` that `first` does not hold already, each a sentence of its own: the role's
+    /// quote ("I plan the night shifts") ends with a full stop when it has none, and a written sentence opens with a capital when its
+    /// first word has none ("plans the menus"), so that neither reads as part of the other (ADR 0031).
     private static func joined(_ first: String?, _ second: String?) -> String? {
         guard let second else { return first }
         guard let first else { return second }
         let held = Set(SentenceSplitter.sentences(in: first).map { DescriptionText.normalized($0) })
         let added = SentenceSplitter.sentences(in: second).filter { !held.contains(DescriptionText.normalized($0)) }
-        return ([first] + added).joined(separator: " ")
+        guard !added.isEmpty else { return first }
+        return ([Self.ended(first)] + added.map(Self.capitalized)).joined(separator: " ")
+    }
+
+    /// `text` with a full stop after it, unless it ends with one, a question mark, an exclamation mark or an ellipsis.
+    private static func ended(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let last = trimmed.last, !".!?…".contains(last) else { return trimmed }
+        return trimmed + "."
+    }
+
+    /// `sentence` with a capital on its first letter when its first word has none: a word written with a capital inside ("eBooks",
+    /// "iOS") stays as written.
+    private static func capitalized(_ sentence: String) -> String {
+        let firstWord = sentence.prefix { !$0.isWhitespace }
+        guard let first = firstWord.first, first.isLowercase, !firstWord.contains(where: \.isUppercase) else { return sentence }
+        return first.uppercased() + sentence.dropFirst()
     }
 
     private func sanitize(_ studies: [Entries.Study], _ source: DescriptionText, _ entries: Entries) -> [Education] {

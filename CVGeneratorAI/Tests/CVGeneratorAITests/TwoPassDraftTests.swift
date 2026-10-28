@@ -183,6 +183,19 @@ struct TwoPassDraftTests {
         #expect(result.experience.first?.description == plainDuties + " Looks after the children during play.")
     }
 
+    @Test("The duties start a sentence of their own after the role's quote: the quote gets its full stop, the duties their capital")
+    func dutiesStartTheirOwnSentence() throws {
+        let description = "Since 2019 I have worked as a teacher at Acme, where I plan the night shifts."
+        let quote = "I plan the night shifts"
+        let draft = CVData(experience: [Experience(title: "teacher", company: "Acme", startDate: "2019", current: true, description: quote)])
+        let lowercased = plainDuties.prefix(1).lowercased() + plainDuties.dropFirst()
+        let written = writing(duties: [lowercased])
+
+        let result = try sanitizer.sanitize(draft, writing: written, against: description)
+
+        #expect(result.experience.first?.description == quote + ". " + plainDuties)
+    }
+
     @Test("With no title, job or school there is nothing to write around: the written summary and skills go")
     func noFactNoWriting() throws {
         let description = "This is a test of the app, I like chess."
