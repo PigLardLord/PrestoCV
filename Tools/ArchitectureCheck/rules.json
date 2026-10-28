@@ -66,7 +66,13 @@
   "MacPDFRenderer",
   "FoundationModelsDrafter",
   "PDFKitTextExtractor",
-  "OSLogDiagnosticLogger"
+  "OSLogDiagnosticLogger",
+  "TraceFileStore",
+  "AppTransactionDistribution",
+  "TraceRecorder",
+  "DistributionGate",
+  "TracingLogger",
+  "GatedTracer"
  ],
  "serviceSuffixes": [
   "UseCase",
@@ -112,6 +118,25 @@
   "Platform/",
   "Resources/"
  ],
+ "compositionOnly": {
+  "adr": "0032",
+  "files": [
+   "PrestoCV/PrestoCVApp.swift",
+   "PrestoCV/App/AppEnvironment.swift"
+  ],
+  "modules": [
+   "DiagnosticTraceFiles",
+   "DiagnosticTraceDistribution"
+  ],
+  "types": [
+   "TracingLogger",
+   "GatedTracer",
+   "TraceRecorder",
+   "DistributionGate",
+   "TraceFileStore",
+   "AppTransactionDistribution"
+  ]
+ },
  "targets": [
   {
    "name": "PrestoCVDomain",
@@ -220,7 +245,8 @@
    "allowedImports": [
     "PrestoCVDomain",
     "Foundation",
-    "DiagnosticLogging"
+    "DiagnosticLogging",
+    "DiagnosticTrace"
    ],
    "rules": [
     "R1",
@@ -245,7 +271,9 @@
     "PrestoCVImporting",
     "PrestoCVDomain",
     "DiagnosticLogging",
-    "DiagnosticLoggingTestSupport"
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
    ],
    "rules": []
   },
@@ -791,6 +819,106 @@
    ]
   },
   {
+   "name": "DiagnosticTrace",
+   "path": "DiagnosticTrace/Sources/DiagnosticTrace",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceFiles",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceFiles",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceDistribution",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceDistribution",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "StoreKit"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceTestSupport",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceTests",
+   "path": "DiagnosticTrace/Tests/DiagnosticTraceTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceFilesTests",
+   "path": "DiagnosticTrace/Tests/DiagnosticTraceFilesTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DiagnosticTraceFiles",
+    "DiagnosticTrace",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
    "name": "PrestoCVCore",
    "path": "PrestoCVCore/Sources/PrestoCVCore",
    "kind": "legacy",
@@ -850,7 +978,8 @@
    "path": "CVGeneratorAI/Sources/CVGeneratorAI",
    "kind": "legacy",
    "allowedImports": [
-    "DiagnosticLogging"
+    "DiagnosticLogging",
+    "DiagnosticTrace"
    ],
    "rules": []
   },
@@ -861,7 +990,9 @@
    "allowedImports": [
     "CVGeneratorAI",
     "DiagnosticLogging",
-    "DiagnosticLoggingTestSupport"
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
    ],
    "rules": []
   },
@@ -1021,6 +1152,18 @@
   {
    "name": "DiagnosticLoggingManifest",
    "path": "DiagnosticLogging/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceManifest",
+   "path": "DiagnosticTrace/Package.swift",
    "kind": "manifest",
    "allowedImports": [
     "PackageDescription"

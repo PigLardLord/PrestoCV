@@ -108,6 +108,24 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 |---|---|---|---|
 | `launch.seedFailed` | error | `files` (the CV files the test handed over), `error` | The CV files a UI test hands over could not be written into the new storage folder (they are written beside it and moved to it when every file is there, so no half-seeded folder is left), so the test starts without them. |
 
+### The trace store (category `trace`, TestFlight and Debug builds only)
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `trace.writeFailed` | error | `error` (`write`) | A run or the session's events could not be written to the device. The draft or the import goes on. |
+| `trace.readFailed` | error | `error` (`corruptRun` or `write`) | A stored run or the session's events did not read back, or the folder could not be listed; the run is left out of the list. |
+| `trace.shareFailed` | error | `error` (`share`) | The copies of a run to share could not be made or removed. |
+
+## The trace of a test build
+
+A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.
+
+- **When it is on:** in a Debug build, and in a Release build installed from TestFlight, which the app checks once per launch with `AppTransaction`. An App Store install, an unverified record, an offline first launch and an unknown answer all leave it off; the app then writes no file and makes no folder. A Debug build takes `-diagnosticsDistribution sandbox|production|unknown` to run the Release check with one answer.
+- **What a run holds:** the input, then steps named from a closed set (`input`, `availability`, `languageData`, `request`, `response`, `check`, `removal`, `timing`, `finalDraft`, `event`, `failure`, `truncated`). Every entry of this log written while a run of its kind is open (`draft` for the AI draft, `import` for the import) appears in it as an `event` step, with the same line; the others go to the session's events.
+- **Where it is:** `Library/Application Support/Diagnostics/` in the app's container: per run `run-<time>-<kind>-<id>.json` and the same name in `.txt`, a summary a person can read; and `session-events.json`. The ten newest runs and the last 200 session events are kept. The folder is excluded from backup and deleted with the app.
+- **Reading it:** the "Share diagnostics" button at the top of the CV list, shown only while the trace is on, lists the runs and previews the summary; its share button hands the two files of a run to the system share sheet, for example to AirDrop them to a Mac. Nothing leaves the device otherwise. On a simulator, the files are in the app's data container (`xcrun simctl get_app_container booted com.PigLardLord.prestocv data`).
+- **Adding a step:** a type that traces takes an `any DiagnosticTracer` in its initialiser, with no default value (R17), and records with a step name and fields: `.text`, `.count`, `.flag`, `.duration` and `.token`. A test passes a `RecordingTracer`, from `DiagnosticTraceTestSupport`, and a preview a `NoTracer`.
+
 ## Adding a line
 
 1. **Declare the category once**, in the module that owns the flow, if it has none: `extension LogCategory { static let export = LogCategory("export") }`. A module that is a step of the same flow, as the PDF reader is of the import, logs under the category of the module it serves (`public` there) and declares none; a source check fails when two files declare one name.

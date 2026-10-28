@@ -23,6 +23,7 @@ The current app and packages are the legacy code the migration replaces, one con
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
 | `DiagnosticLogging/`, `docs/logging.md` | The diagnostic log (ADR 0030): one interface that carries no CV content, its decorators and its unified log adapter; the guide says how to read the log, what each event holds and how to add one. |
+| `DiagnosticTrace/` | The trace of a test build (ADR 0032): each step of the AI draft and the import, with its text, kept on the device in TestFlight and Debug builds only, and shared by the person; `docs/logging.md` says where it is and how to read it. |
 | `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |
 | `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
 | `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene, the deployment targets. They read the repository, so they run with `swift test`, not in the test plans. |
@@ -39,6 +40,7 @@ xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug bui
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -testPlan CI -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 swift test --package-path DiagnosticLogging
+swift test --package-path DiagnosticTrace
 swift test --package-path PrestoCVCore
 swift test --package-path Tools/SourceChecks
 Tools/ArchitectureCheck/check.sh

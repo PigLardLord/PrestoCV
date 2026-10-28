@@ -53,6 +53,7 @@ jobs:
             swift build --package-path "$package"
           done
           swift test --package-path DiagnosticLogging
+          swift test --package-path DiagnosticTrace
           swift test --package-path PrestoCVCore
           swift test --package-path CVPDFExporter
 
@@ -98,7 +99,7 @@ jobs:
         # On a Linux host the manifests declare only the targets that build on Linux (ADR 0012), and every one of them
         # must build for Android too: arm64, API level 28. The tests do not run on an emulator yet.
         run: |
-          for package in DiagnosticLogging PrestoCVCore CVPDFExporter CVGeneratorAI PrestoCVApp; do
+          for package in DiagnosticLogging DiagnosticTrace PrestoCVCore CVPDFExporter CVGeneratorAI PrestoCVApp; do
             ~/swift-toolchain/usr/bin/swift build --package-path "$package" \
               --swift-sdks-path ~/swift-sdks --swift-sdk aarch64-unknown-linux-android28
           done

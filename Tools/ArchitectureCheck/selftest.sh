@@ -504,6 +504,35 @@ legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) 
 expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
 if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
 else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothing else"; fi
+# --- ADR 0032: the trace store and the distribution check are composition-only: only the files the rule lists may import
+# their modules or make the chain's types, in production and legacy targets alike; tests may
+composition_only() {   # a legacy app with a composition file and a screen, its legacy tests, and the rule (ADR $1)
+  setup; src 'let x = 1'; mkdir -p "$ROOT/App" "$ROOT/AppTests"
+  echo 'let root = 1' > "$ROOT/App/Root.swift"; echo 'let screen = 1' > "$ROOT/App/Screen.swift"; echo 'let t = 1' > "$ROOT/AppTests/T.swift"
+  echo '# ADR' > "$ROOT/adr/0032-record-each-step.md"
+  python3 - "$ROOT/rules.json" "$1" "${2:-App/Root.swift}" <<'PY2'
+import json, sys
+p, adr, listed = sys.argv[1:]; r = json.load(open(p))
+r["targets"] += [{"name": "App", "path": "App", "kind": "legacy", "allowedImports": [], "rules": []},
+                 {"name": "AppTests", "path": "AppTests", "kind": "legacy", "allowedImports": [], "rules": []}]
+r["compositionOnly"] = {"adr": adr, "files": [listed], "modules": ["TraceFiles"], "types": ["GatedTracer", "TracingLogger"]}
+json.dump(r, open(p, "w"))
+PY2
+}
+composition_only 0032; printf '%s\n' 'import TraceFiles' 'let s = TraceStore()' 'let g = GatedTracer(gate: gate, next: s)' > "$ROOT/App/Root.swift"
+expect "ADR 0032: the composition file imports the store's module and makes the chain" 0 ""
+composition_only 0032; printf '%s\n' 'import TraceFiles' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: another file of a legacy app may not import the store's module" 1 "App/Screen.swift:1: R4 compositionOnly: import TraceFiles"
+composition_only 0032; printf '%s\n' 'import struct TraceFiles.TraceStore' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor import one of its types" 1 "App/Screen.swift:1: R4 compositionOnly: import TraceFiles"
+composition_only 0032; printf '%s\n' 'let l = TracingLogger(tracer: t, next: n, kinds: [:])' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: another file may not make the chain" 1 "App/Screen.swift:1: R4 compositionOnly: TracingLogger"
+composition_only 0032; src 'let g = GatedTracer(gate: gate, next: next)'
+expect "ADR 0032: nor may a production target" 1 "Sources/Pure/P.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'import TraceFiles' 'let g = GatedTracer(gate: gate, next: next)' > "$ROOT/AppTests/T.swift"
+expect "ADR 0032: a legacy test target may, to test the chain" 0 ""
+composition_only 0099; expect "ADR 0032: the rule cites an ADR that exists" 1 "compositionOnly cites ADR 0099"
+composition_only 0032 App/Gone.swift; expect "ADR 0032: every file the rule lists exists" 1 "compositionOnly lists App/Gone.swift"
 # --- R18: a pure target stays portable to Android: no Apple-only module and no bundle; an API that needs the full
 # Foundation, with ICU, warns without failing (#267)
 only_portable() {   # the Pure target has only R18 and may import every module a case names, so a case shows R18 alone

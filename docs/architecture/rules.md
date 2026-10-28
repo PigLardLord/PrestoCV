@@ -18,7 +18,7 @@ The checker applies to **production targets**: domain, application, integration,
 
 ## R1. Packages are isolated; contexts depend only along documented edges
 
-- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`. Each may import `DiagnosticLogging`, a leaf package with no product types, and only its port target ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)).
+- **Packages are isolated.** `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` never import one another. Translation between them happens only in `PrestoCVIntegration`. Each may import `DiagnosticLogging`, a leaf package with no product types, and only its port target ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). `PrestoCVCore` and `CVGeneratorAI` may also import the port target of `DiagnosticTrace`, the trace of a test build; only the composition root imports its adapters ([ADR 0032](adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)).
 - **Inside a package, contexts depend only along the edges listed in [modules.md](modules.md).** There are two such edges today, and each goes one way:
   - in `CVPDFExporter`, Document Rendering is downstream of Design Catalog (`CVRendering` imports `CVDesignCatalog`);
   - in `PrestoCVCore`, CV Import is downstream of CV Authoring (`PrestoCVImporting` imports `PrestoCVDomain`), so that it reads the CV's value objects and period rule instead of copying them ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)).
