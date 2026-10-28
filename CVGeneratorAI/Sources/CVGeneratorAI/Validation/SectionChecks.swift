@@ -521,7 +521,7 @@ extension CVDataSanitizer {
         let check = { (raw: String, cutsVerb: Bool) -> String? in
             let item = raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
             let words = item.split(separator: " ").map(String.init)
-            guard let first = words.first?.lowercased(), words.count <= 4, !item.contains("."), !item.contains(":"),
+            guard let first = words.first?.lowercased(), words.count <= Self.mostSkillWords, !item.contains("."), !item.contains(":"),
                   let last = words.last, !Self.skillEndWords.contains(last.lowercased()) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "fragment"))
                 return nil
@@ -588,8 +588,13 @@ extension CVDataSanitizer {
         "soft skill", "soft skills", "qualita", "qualities", "quality",
     ]
 
-    /// A skill the facts request quoted with its verb ("usare i PLC") as the object the verb names ("PLC"); any other as it is.
-    func statedSkill(_ name: String, against description: String) -> String {
+    /// The most words of a skill: a longer one is a clause ("edit the sound effects for the shows"), not the name of a skill.
+    static let mostSkillWords = 4
+
+    /// A skill the facts request quoted with its verb ("usare i PLC") as the object the verb names ("PLC"); none for one of more than
+    /// `mostSkillWords` words, a clause of the person's that names no skill (#354); any other as it is.
+    func statedSkill(_ name: String, against description: String) -> String? {
+        guard name.split(whereSeparator: \.isWhitespace).count <= Self.mostSkillWords else { return nil }
         let verdict = skillCheck(technologies: [name], softSkills: [], against: description)
         guard verdict.dropped.contains(where: { $0.reason == "verb cut" }) else { return name }
         return verdict.technologies.first ?? verdict.softSkills.first ?? name

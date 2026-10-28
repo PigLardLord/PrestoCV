@@ -284,6 +284,16 @@ struct DraftingWrittenTests {
         ])
     }
 
+    @Test("A skill of more than four words is a clause, of either kind, and a name of four words is not")
+    func clauseAsSkill() {
+        let cv = CVData(skills: [
+            Skill(name: "edit the voice tracks for the podcasts"), Skill(name: "Adobe Audition sound editor"),
+            Skill(name: "stay calm when the show runs late", kind: .softSkill),
+        ])
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
+    }
+
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])

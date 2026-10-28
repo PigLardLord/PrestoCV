@@ -200,6 +200,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case lostYear
     /// A job description that writes a run of five words twice: one duty said twice.
     case repeatedDuty
+    /// A skill of more than four words: a clause, not the name of a skill ("edit the sound effects for the shows").
+    case clauseAsSkill
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -219,6 +221,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .repeatedSentence: "a repeated summary sentence"
         case .lostYear: "a lost year"
         case .repeatedDuty: "a duty said twice in one job"
+        case .clauseAsSkill: "a clause as a skill"
         }
     }
 }
@@ -265,6 +268,9 @@ enum ReaderRules {
             }
             if language != "en", isEnglish(skill.name) {
                 found.append(ReaderFinding(kind: .skillInAnotherLanguage, path: path, value: skill.name))
+            }
+            if letterWords(of: skill.name).count > 4 {
+                found.append(ReaderFinding(kind: .clauseAsSkill, path: path, value: skill.name))
             }
         }
         let vocabulary = Vocabulary.Language(rawValue: language)

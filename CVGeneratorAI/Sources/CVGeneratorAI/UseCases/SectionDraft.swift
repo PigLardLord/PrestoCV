@@ -116,7 +116,8 @@ final class SectionDraft {
     }
 
     /// `located` with the years each job's request read filling the dates the extraction left empty, and each technology as the
-    /// person wrote it: the rules check them as any date and skill.
+    /// person wrote it, without the verb it was said with, and none that is a clause (`statedSkill`): the rules check them as any
+    /// date and skill.
     private func dated(_ located: CVData, context: CVDataSanitizer.DraftContext) -> CVData {
         var experience = located.experience
         for (number, role) in years where context.jobs.indices.contains(number) && experience.indices.contains(context.jobs[number].job) {
@@ -129,9 +130,10 @@ final class SectionDraft {
                 current: job.current, description: job.description, achievements: job.achievements
             )
         }
-        let skills = located.skills.map { skill in
+        let skills = located.skills.compactMap { skill in
             skill.kind == .technology
-                ? Skill(name: sanitizer.statedSkill(skill.name, against: description), level: skill.level, kind: skill.kind) : skill
+                ? sanitizer.statedSkill(skill.name, against: description).map { Skill(name: $0, level: skill.level, kind: skill.kind) }
+                : skill
         }
         return located.with(experience: experience).with(skills: skills)
     }

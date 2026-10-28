@@ -373,6 +373,23 @@ struct SectionDraftTests {
         #expect([earlier.startDate, earlier.endDate] == ["2015", "2019"])
         #expect(job("Talleres Cinca", in: draft)?.startDate == "2019")
     }
+
+    // MARK: A stated technology
+
+    @Test("A technology the person states with its verb keeps its object; one of more than four words is a clause and goes (jobs-en, #354)")
+    func statedClauseIsNoTechnology() async throws {
+        let service = service()
+        service.generateResult = .success(Self.extracted.with(skills: [
+            Skill(name: "mix on digital desks"), Skill(name: "edit the voice tracks for the podcasts"),
+        ]))
+        let description = self.description + "\nI mix on digital desks and edit the voice tracks for the podcasts."
+
+        let draft = try await generator(service).generateCV(from: CVGenerationRequest(userPrompt: description)).cvData
+
+        let names = draft.skills.filter { $0.kind == .technology }.map(\.name)
+        #expect(names.contains("digital desks"), "\(names)")
+        #expect(!names.contains { $0.contains("voice tracks") }, "\(names)")
+    }
 }
 
 /// The task of a draft under test, which a request of the fake service cancels.
