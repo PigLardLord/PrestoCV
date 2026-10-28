@@ -46,7 +46,7 @@ struct InferredSkills {
         let normalized = DescriptionText.normalized(name)
         let isATechnology = Self.technologiesNamedLikeQualifications.contains(normalized)
         let statesAFact = words.contains { word in
-            written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded)
+            written.isAnUnstatedLevel(word.folded) || written.isExcluded(word.folded) || written.isAnExcludedForm(word.folded)
                 || (lists.qualifications.contains(word.folded) && !isATechnology) || Self.languageNames.contains(word.folded)
         }
         guard !statesAFact, !interests.contains(normalized),

@@ -164,14 +164,17 @@ enum SectionPrompts {
         brief.headline.map { ["Headline title: \($0)"] } ?? []
     }
 
-    private static func roleLine(_ role: DraftBrief.Role, employer: Bool) -> String {
-        ([role.title.presentValue ?? DraftWritingPrompt.noTitle] + (employer ? role.employer.map { ["employer: \($0)"] } ?? [] : [])
+    /// A role's line: its title, or `standIn` for a role with none, then its employer when asked and whether it ended.
+    private static func roleLine(_ role: DraftBrief.Role, employer: Bool, standIn: String? = nil) -> String {
+        ([role.title.presentValue ?? standIn ?? DraftWritingPrompt.noTitle] + (employer ? role.employer.map { ["employer: \($0)"] } ?? [] : [])
             + (role.hasEnded ? ["ended"] : [])).joined(separator: "; ")
     }
 
+    /// The jobs of the skills requests: a job with no title reads the headline title, the person's trade, so that its tools are of
+    /// that trade and not of the trade its employer's name suggests (#354). The draft's job keeps no title.
     private static func jobList(_ brief: DraftBrief) -> String {
         "Jobs:\n" + brief.roles.enumerated().map { index, role in
-            "\(index + 1). " + roleLine(role, employer: false)
+            "\(index + 1). " + roleLine(role, employer: false, standIn: brief.headline)
                 + (role.clauses.isEmpty ? "" : "\n   " + role.clauses.map(asSentence).joined(separator: " "))
         }.joined(separator: "\n")
     }

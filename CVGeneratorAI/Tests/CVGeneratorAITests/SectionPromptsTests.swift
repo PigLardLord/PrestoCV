@@ -54,6 +54,30 @@ struct SectionPromptsTests {
         #expect(lines.contains("Job: no title given; employer: Brightwater Events; ended"))
     }
 
+    @Test("In the skills requests a job with no title reads the headline title, so its tools are of the person's trade (#354)")
+    func skillsOfAJobWithNoTitle() {
+        let brief = DraftBrief(
+            language: "Portuguese", headline: "programador",
+            roles: [
+                .init(title: "", employer: "Estúdio Ventania", hasEnded: true, clauses: ["trabalhei no estúdio Ventania"]),
+                .init(title: "analista de testes", employer: "Lumen Dados", hasEnded: false),
+            ],
+            studies: [], namedSkills: []
+        )
+        let noHeadline = DraftBrief(
+            language: "Portuguese", headline: nil, roles: [.init(title: "", employer: "Estúdio Ventania", hasEnded: true)],
+            studies: [], namedSkills: []
+        )
+
+        for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
+                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: []).text] {
+            #expect(text.contains("Jobs:\n1. programador; ended"))
+            #expect(text.contains("\n2. analista de testes"))
+        }
+        #expect(SectionPrompts.tools(for: noHeadline).text.contains("1. no title given; ended"))
+        #expect(SectionPrompts.job(number: 0, of: brief).text.contains("Job: no title given; employer: Estúdio Ventania; ended"))
+    }
+
     @Test("A job's instructions ask for the years the person said, 2 to 4 whole duties and no fact of their own")
     func jobInstructions() {
         let instructions = SectionPrompts.jobInstructions

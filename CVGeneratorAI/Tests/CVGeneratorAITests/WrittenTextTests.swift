@@ -58,6 +58,22 @@ struct WrittenTextTests {
         #expect(text.isExcluded("music"))
     }
 
+    @Test("A form of a word the person only wishes, by its first 7 letters, is one too, unless the person claims a word of that form (#354)")
+    func formsOfExcludedWords() {
+        let wished = written(
+            "Soy contable en Teruel. Me gustaría trabajar como auditor.", claiming: ["Soy contable en Teruel."],
+            languageOfText: { _ in "es" }
+        )
+        let claimedToo = written(
+            "Soy contable y preparo auditorías internas. Me gustaría trabajar como auditor.",
+            claiming: ["Soy contable y preparo auditorías internas."], languageOfText: { _ in "es" }
+        )
+
+        #expect(wished.isAnExcludedForm("auditoria"))
+        #expect(!wished.isAnExcludedForm("contabilidad"))
+        #expect(!claimedToo.isAnExcludedForm("auditoria"))
+    }
+
     @Test("A word of another job is another job's duty")
     func foreignWords() {
         #expect(!written(teacher).isPlain("Looks after the children of the nursery.", ownWords: [], foreignWords: ["nursery"]))

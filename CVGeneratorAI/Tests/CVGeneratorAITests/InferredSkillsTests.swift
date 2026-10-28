@@ -15,6 +15,25 @@ struct InferredSkillsTests {
         return InferredSkills(cvData, language: language, written: written)
     }
 
+    @Test("A skill that is a form of a word the person only wishes goes; with that form claimed, it stays (#354)")
+    func formsOfWishedWords() {
+        let skills = { (description: String, claimed: String) -> InferredSkills in
+            let source = DescriptionText(description, languageOfText: { _ in "es" })
+            let written = WrittenText(
+                source: source, claimed: DescriptionText(sentences: [claimed], of: source), wordList: TableWordList(), tagger: NoNames()
+            )
+            return InferredSkills(CVData(personalInfo: PersonalInfo(title: "contable")), language: .spanish, written: written)
+        }
+        let wished = skills("Soy contable en Teruel. Me gustaría trabajar como auditor.", "Soy contable en Teruel.")
+        let claimed = skills(
+            "Soy contable y preparo auditorías internas. Me gustaría trabajar como auditor.", "Soy contable y preparo auditorías internas."
+        )
+
+        #expect(wished.accepted("Técnicas de auditoría") == nil)
+        #expect(wished.accepted("Conciliación bancaria") == "Conciliación bancaria")
+        #expect(claimed.accepted("Técnicas de auditoría") == "Técnicas de auditoría")
+    }
+
     @Test("The names of technologies and soft skills stay, with the punctuation of their trade",
           arguments: ["Lesson planning", "Phonics", "C++", "C#", "F#", "Node.js", "ASP.NET", "Vue.js", ".NET", "Objective-C", "CI/CD",
                       "Q&A", "Delta Lake", "SAT solving", "GRE tunnel", "CPA tracking", "Master Data Management", "Scrum Master",

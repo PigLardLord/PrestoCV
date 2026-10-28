@@ -22,6 +22,8 @@ struct WrittenText {
     private let descriptionWords: Set<String>
     /// The content words that the description holds only in clauses that claim nothing for the person.
     private let excludedWords: Set<String>
+    /// The first 7 letters of the excluded words of 7 letters or more, and of none of the words the person claims.
+    private let excludedStems: Set<String>
     private let wordList: any WordList
     private let tagger: any LexicalTagger
 
@@ -35,9 +37,11 @@ struct WrittenText {
         words = WrittenTextWords.of(language)
         descriptionWords = source.foldedWords
         let language = language
-        excludedWords = source.foldedWords.subtracting(claimed.foldedWords).filter { word in
+        let excludedWords = source.foldedWords.subtracting(claimed.foldedWords).filter { word in
             !Vocabulary.isNeutral(word, in: language) && !word.allSatisfy(\.isNumber)
         }
+        self.excludedWords = excludedWords
+        excludedStems = Set(excludedWords.compactMap(Self.stem)).subtracting(claimed.foldedWords.compactMap(Self.stem))
         self.wordList = wordList
         self.tagger = tagger
     }
@@ -97,6 +101,17 @@ struct WrittenText {
     /// Whether `word` is a word that the description holds only in clauses that claim nothing for the person.
     func isExcluded(_ word: String) -> Bool {
         excludedWords.contains(word)
+    }
+
+    /// Whether `word` is a form of a word that the description holds only in clauses that claim nothing for the person: its first 7
+    /// letters are those of such a word, and of no word the person claims ("auditoria" of "I would like to work as an auditor", #354).
+    func isAnExcludedForm(_ word: String) -> Bool {
+        Self.stem(word).map(excludedStems.contains) ?? false
+    }
+
+    /// The first 7 letters of a word of 7 letters or more.
+    private static func stem(_ word: String) -> String? {
+        word.count >= 7 ? String(word.prefix(7)) : nil
     }
 
     /// Whether `word` is a word of level, duration or seniority that the description does not write.
