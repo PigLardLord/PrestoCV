@@ -14,7 +14,7 @@ enum StreamedAnswer {
     ///
     /// - Parameter keepsPartial: Whether an error the stream fails with after an element leaves that element to keep, as the cut of
     ///   the token limit does. Any other error is thrown, and so is every error before the first element.
-    /// - Throws: What the stream throws, as above; the cancellation of the task always.
+    /// - Throws: What the stream throws, as above; the cancellation of the task always, also when the stream ends with no failure.
     static func last<Stream: AsyncSequence>(
         of stream: Stream, keepingPartialAfter keepsPartial: (any Error) -> Bool, isolation: isolated (any Actor)? = #isolation
     ) async throws -> Last<Stream.Element>? {
@@ -27,6 +27,8 @@ enum StreamedAnswer {
             guard !(error is CancellationError), !Task.isCancelled, let last, keepsPartial(error) else { throw error }
             return Last(answer: last, isComplete: false)
         }
+        // A stream whose task is cancelled may end with no failure, as if it had ended on its own: its last element is no answer.
+        try Task.checkCancellation()
         return last.map { Last(answer: $0, isComplete: true) }
     }
 }

@@ -60,6 +60,17 @@ struct StreamedWritingTests {
         }
     }
 
+    @Test("A cancellation is thrown when the cancelled stream ends with no failure, after an element")
+    func cancellationOfAStreamThatEnds() async {
+        let (stream, continuation) = AsyncThrowingStream<Int, any Error>.makeStream()
+        continuation.yield(1)
+        let task = Task { try await StreamedAnswer.last(of: stream, keepingPartialAfter: { _ in true })?.answer }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        continuation.finish()
+    }
+
     // MARK: - WritingSnapshot
 
     private let brief = DraftBrief(
@@ -131,5 +142,39 @@ struct StreamedWritingTests {
         #expect(cutInTheSoftSkills.writing(for: brief, isComplete: false).technologies == technologies)
         #expect(cutInTheTechnologies.writing(for: brief, isComplete: false).technologies == ["Patient care"])
         #expect(cutInTheTechnologies.writing(for: brief, isComplete: false).summary == nil)
+    }
+
+    @Test("A cut inside an abbreviation, or right after one, keeps the sentences before it", arguments: [
+        "Looks after patients. Dresses wounds, e.g",
+        "Looks after patients. Dresses wounds, e.g.",
+        "Looks after patients. Dresses wounds, e.g. leg ul",
+        "Looks after patients. Dresses wounds, esp. leg ul",
+        "Looks after patients. Works beside Dr.",
+        "Looks after patients. Works beside Dr. Ro",
+        "Looks after patients. Orders approx. 12 bo",
+        "Looks after patients. Versorgt Wunden, z.B. Bein",
+        "Looks after patients. Answers calls from the U.S",
+    ])
+    func cutAtAnAbbreviation(text: String) {
+        let cutInARole = WritingSnapshot(
+            technologies: technologies, softSkills: softSkills, summary: summary, roles: [.init(number: 1, text: text)]
+        )
+        let cutInTheSummary = WritingSnapshot(technologies: technologies, softSkills: softSkills, summary: text, roles: nil)
+
+        #expect(cutInARole.writing(for: brief, isComplete: false).roleDescriptions == ["Looks after patients.", nil])
+        #expect(cutInTheSummary.writing(for: brief, isComplete: false).summary == "Looks after patients.")
+    }
+
+    @Test("A cut keeps a sentence that ends in a number, a question, an exclamation or a closing quote", arguments: [
+        ("Leads 3.5 shifts a week. Gives medic", "Leads 3.5 shifts a week."),
+        ("Is the ward calm? Yes! Gives medic", "Is the ward calm? Yes!"),
+        ("Says \"I care.\" Gives medic", "Says \"I care.\""),
+        ("Looks after patients (night ward). Gives medic", "Looks after patients (night ward)."),
+        ("Looks after patients. Works beside Dr. Rossi. Gives medic", "Looks after patients. Works beside Dr. Rossi."),
+    ])
+    func cutKeepsWholeSentences(text: String, kept: String) {
+        let cut = WritingSnapshot(technologies: technologies, softSkills: softSkills, summary: text, roles: nil)
+
+        #expect(cut.writing(for: brief, isComplete: false).summary == kept)
     }
 }
