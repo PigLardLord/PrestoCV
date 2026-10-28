@@ -36,6 +36,15 @@ struct InterestQualityTests {
         #expect(result.interests == ["fotografia"])
     }
 
+    @Test("A liking of some work goes when the verb of liking is not its first word")
+    func likingOfWorkGoes() throws {
+        let draft = CVData(interests: ["mi piace lavorare in gruppo", "fotografia"])
+
+        let result = try sanitizer.sanitize(draft, against: Self.italian)
+
+        #expect(result.interests == ["fotografia"])
+    }
+
     @Test("A hobby with the person's own things in it stays")
     func hobbiesStay() throws {
         let draft = CVData(interests: ["chess", "long walks with my dog", "hiking in the Alps"])

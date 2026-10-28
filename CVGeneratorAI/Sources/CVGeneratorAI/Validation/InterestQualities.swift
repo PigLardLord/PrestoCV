@@ -7,7 +7,7 @@ extension CVDataSanitizer {
         let words = Word.words(in: interest).map(\.folded)
         let subjects = language.map { interestSubjects[$0] ?? [] } ?? interestSubjects.values.reduce(into: []) { $0.formUnion($1) }
         if words.contains(where: subjects.contains) { return true }
-        if let first = words.first, likingWords.contains(first), words.contains(where: workWords.contains) { return true }
+        if words.contains(where: likingWords.contains), words.contains(where: workWords.contains) { return true }
         let normalized = DescriptionText.normalized(interest)
         return qualityStems.contains { stem in
             stem.contains(" ") ? normalized.contains(stem) : words.contains { $0.hasPrefix(stem) }
@@ -20,7 +20,7 @@ extension CVDataSanitizer {
         .french: ["je", "j", "suis"], .portuguese: ["eu", "sou"],
     ]
 
-    /// The verbs of liking that open an interest written as a clause ("like working ...").
+    /// The verbs of liking of an interest written as a clause ("like working ...", "mi piace lavorare ...").
     private static let likingWords: Set<String> = [
         "like", "love", "enjoy", "piace", "adoro", "amo", "mag", "liebe", "gusta", "encanta", "aime", "adore", "gosto",
     ]
