@@ -228,27 +228,34 @@ if let only = config.compositionOnly {
     let modules = Set(only.modules)
     let parsedTrees = Dictionary(parsed.map { ($0.file, $0.tree) }, uniquingKeysWith: { first, _ in first })
     // The files the rule covers: every production file, and every legacy one that is not a test, outside the modules themselves.
-    var covered: [(file: String, tree: SourceFileSyntax)] = []
+    var covered: [(file: String, target: String, tree: SourceFileSyntax)] = []
     for (file, target) in assignment where !modules.contains(target.name) {
         let kind = target.kind ?? "production"
         guard kind == "production" || (kind == "legacy" && !target.name.hasSuffix("Tests")) else { continue }
-        if let known = parsedTrees[file] { covered.append((file, known)); continue }
+        if let known = parsedTrees[file] { covered.append((file, target.name, known)); continue }
         guard let source = try? String(contentsOf: root.appendingPathComponent(file), encoding: .utf8) else { problems.append("cannot read \(file)"); continue }
-        covered.append((file, Parser.parse(source: source)))
+        covered.append((file, target.name, Parser.parse(source: source)))
+    }
+    // What each type of a target declares, so that a contextual `.init()` passed as an argument resolves to its parameter's type.
+    var coveredMembers: [String: [String: TypeMembers]] = [:]
+    for (_, target, tree) in covered {
+        for (type, members) in MemberIndex.members(in: tree) { coveredMembers[target, default: [:]][type, default: TypeMembers()].merge(members) }
     }
     // The types and every alias of them, wherever declared (the composition root may declare one that another file uses).
     var types = Set(only.types)
     var grew = true
     while grew {
         grew = false
-        for (file, tree) in covered {
-            let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: [:], serviceSuffixes: [], dependencySuffixes: [])
+        for (file, target, tree) in covered {
+            let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: coveredMembers[target] ?? [:],
+                                  serviceSuffixes: [], dependencySuffixes: [])
             scanner.walk(tree)
             for alias in scanner.aliases where types.insert(alias.alias).inserted { grew = true }
         }
     }
-    for (file, tree) in covered where !only.files.contains(file) {
-        let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: [:], serviceSuffixes: [], dependencySuffixes: [])
+    for (file, target, tree) in covered where !only.files.contains(file) {
+        let scanner = Scanner(tree: tree, file: file, infrastructureTypes: types, viewTypes: [], memberTypes: coveredMembers[target] ?? [:],
+                              serviceSuffixes: [], dependencySuffixes: [])
         scanner.walk(tree)
         for imp in scanner.imports where modules.contains(imp.module) {
             problems.append("\(file):\(imp.line): R4 compositionOnly: \(imp.node) outside the composition root (ADR \(only.adr))")
