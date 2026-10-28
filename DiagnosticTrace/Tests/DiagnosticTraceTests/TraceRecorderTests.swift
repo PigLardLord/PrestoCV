@@ -59,15 +59,18 @@ struct TraceRecorderTests {
         #expect(store.runWrites == 1)
     }
 
-    @Test("A step recorded into a kind goes to the open run of that kind, and is dropped when none is open")
-    func recordIntoOpenRun() throws {
+    @Test("A step recorded into a kind goes to the run whose scope the work is in, and is dropped without a scope")
+    func recordIntoScopedRun() async throws {
         let store = RecordingTraceStore()
         let recorder = TraceRecorder.sample(store: store, clock: TickingClock(step: .milliseconds(1)))
 
         recorder.record(.request, [.text("prompt", "before")], into: .aiDraft)
         let run = recorder.begin(.aiDraft)
-        recorder.record(.request, [.text("prompt", "during")], into: .aiDraft)
-        recorder.record(.input, [.text("text", "other kind")], into: .textImport)
+        recorder.record(.request, [.text("prompt", "unscoped")], into: .aiDraft)
+        await run.within {
+            recorder.record(.request, [.text("prompt", "during")], into: .aiDraft)
+            recorder.record(.input, [.text("text", "other kind")], into: .textImport)
+        }
         run.finish(.finished)
 
         let saved = try #require(store.latest(.aiDraft))
@@ -111,15 +114,17 @@ struct TraceRecorderTests {
 
     // MARK: Events
 
-    @Test("An event goes into the open run of its kind, and to the session events when no run of that kind is open")
-    func eventsFollowTheOpenRun() throws {
+    @Test("An event goes into the run whose scope the work is in, and to the session events when it is of another kind or of none")
+    func eventsFollowTheScopedRun() throws {
         let store = RecordingTraceStore()
         let recorder = TraceRecorder.sample(store: store, clock: TickingClock(step: .milliseconds(1)))
 
         let run = recorder.begin(.aiDraft)
-        recorder.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "draft.started"))
-        recorder.mirror(TraceEvent(kind: .textImport, category: "import", level: "info", line: "import.finished"))
-        recorder.mirror(TraceEvent(kind: nil, category: "export", level: "error", line: "export.failed"))
+        run.withinSync {
+            recorder.mirror(TraceEvent(kind: .aiDraft, category: "draft", level: "info", line: "draft.started"))
+            recorder.mirror(TraceEvent(kind: .textImport, category: "import", level: "info", line: "import.finished"))
+            recorder.mirror(TraceEvent(kind: nil, category: "export", level: "error", line: "export.failed"))
+        }
         run.finish(.finished)
 
         let saved = try #require(store.latest(.aiDraft))

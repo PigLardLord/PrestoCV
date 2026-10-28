@@ -99,6 +99,30 @@ struct DraftTraceTests {
         #expect(!second.allText.contains("answer 1"))
     }
 
+    @Test("A draft begun behind the closed gate stays unrecorded when the gate opens and a retry runs before its model call returns")
+    func suppressedDraftDoesNotReachItsRetry() async throws {
+        let recording = RecordingTracer()
+        let gate = DistributionGate()
+        let tracer = GatedTracer(gate: gate, next: recording)
+        let service = InterleavingService(tracer: tracer, sample: example.draft)
+        let generator = generator(service, tracer: tracer)
+        let request = request
+        var arrivals = service.arrivals.makeAsyncIterator()
+
+        let older = Task { try await generator.generateCV(from: request) }
+        await arrivals.next()
+        await gate.ask(FixedDistribution(.sandbox))
+        _ = try await generator.generateCV(from: request)
+        service.releaseFirst()
+        _ = try? await older.value
+
+        let run = try #require(recording.runs.first)
+        #expect(recording.runs.count == 1)
+        #expect(run.steps(.request).compactMap { $0.text("prompt") } == ["call 2"])
+        #expect(!run.allText.contains("answer 1"))
+        #expect(recording.store.sessionEvents.isEmpty)
+    }
+
     // MARK: A finished draft
 
     @Test("A finished draft records its input, the model's draft, what each stage removed, the times and the final draft, in order")

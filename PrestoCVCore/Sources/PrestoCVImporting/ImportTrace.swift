@@ -11,6 +11,11 @@ struct ImportTrace {
         run = tracer.begin(.textImport)
     }
 
+    /// Runs the import so that what the logger records by kind goes to this run.
+    func within<T>(_ work: () throws -> T) rethrows -> T {
+        try run.withinSync(work)
+    }
+
     func input(_ text: String) {
         guard run.isRecording else { return }
         run.record(.input, .token("source", "text"), .count("characters", text.unicodeScalars.count), .text("text", text))

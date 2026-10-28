@@ -16,14 +16,14 @@
 ### 1. A trace of its own, apart from the logs
 
 - **The trace lives in a package of its own, `DiagnosticTrace`**, next to `DiagnosticLogging`. It is the only place where a diagnostic value may hold text. `DiagnosticLogging` keeps its promise that nothing in it can carry CV content.
-- **Two ports, not one field kind.** `DiagnosticLogger` stays as it is, with no text field. The trace has its own port, `DiagnosticTracer`: `begin(kind)` opens a run, the run records named steps and finishes with an outcome, `record(_:_:into:)` adds a step to the open run of a kind, and `mirror(_:)` takes a log entry.
+- **Two ports, not one field kind.** `DiagnosticLogger` stays as it is, with no text field. The trace has its own port, `DiagnosticTracer`: `begin(kind)` opens a run, the run records named steps and finishes with an outcome, `record(_:_:into:)` adds a step to the run whose scope the work is in, and `mirror(_:)` takes a log entry.
 - **Its targets:**
   - `DiagnosticTrace`, pure: the values, the port, the decorators (`NoTracer`, `GatedTracer`, `TracingLogger`), the recorder, the gate rule, the document, the summary and the retention rule;
   - `DiagnosticTraceFiles`, an adapter: the store on the device;
   - `DiagnosticTraceDistribution`, an Apple-only adapter: reads how the app was installed;
   - `DiagnosticTraceTestSupport`, for tests.
 - **A run is one AI draft or one import of pasted text.** Its steps come from a closed set of names (`input`, `availability`, `languageData`, `request`, `response`, `check`, `removal`, `timing`, `finalDraft`, `event`, `failure`, `truncated`), each with ordered values: a text, a count, a flag, a duration or a token. A text is cut at 32 KB with its length kept, and a run at about 1 MB, past which one `truncated` step counts what was left out.
-- **One run holds the whole story.** `TracingLogger` sits in front of the native log and mirrors every log entry into the open run of its kind (category `draft` to the AI draft, `import` to the import), or into the session's events when no run of that kind is open. The log entry itself still carries no CV content.
+- **One run holds the whole story.** `TracingLogger` sits in front of the native log and mirrors every log entry into the run the work belongs to (category `draft` to the AI draft, `import` to the import), or into the session's events when the work is in no run. The run is named by a task-local scope with three cases: in a run, in a run that records nothing (begun behind the closed gate; everything it records by kind is discarded), or in none. There is no fallback to the newest run of a kind, so work that does not name its run cannot land in another one. The log entry itself still carries no CV content.
 
 ### 2. On only in TestFlight and Debug builds, failing closed
 

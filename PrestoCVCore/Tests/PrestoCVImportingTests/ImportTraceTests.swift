@@ -18,7 +18,7 @@ struct ImportTraceTests {
 
     private static let step = Duration.milliseconds(7)
 
-    private func importer(tracer: any DiagnosticTracer, logger: RecordingLogger = RecordingLogger(), limits: ImportLimits? = nil) -> ImportCV {
+    private func importer(tracer: any DiagnosticTracer, logger: any DiagnosticLogger = RecordingLogger(), limits: ImportLimits? = nil) -> ImportCV {
         ImportCV(pdfReader: ScriptedPDFReader(), limits: limits ?? self.limits, logger: logger, clock: TickingClock(step: Self.step), tracer: tracer)
     }
 
@@ -53,6 +53,23 @@ struct ImportTraceTests {
         )).importText(Self.pastedCV) }
 
         #expect(tracer.calls == 0)
+    }
+
+    // MARK: The log entries of the import
+
+    @Test("The import's own log entries are events of its run, and none goes to the session or another run")
+    func logEntriesJoinTheRun() throws {
+        let tracer = RecordingTracer()
+        let logger = TracingLogger(tracer: tracer, next: RecordingLogger(), kinds: ["import": .textImport])
+        let other = tracer.begin(.textImport)
+
+        _ = try importer(tracer: tracer, logger: logger).importText(Self.pastedCV)
+
+        let run = try #require(tracer.runs.first)
+        #expect(tracer.runs.count == 1, "The other run, left open, received nothing")
+        #expect(run.id != other.scope.id)
+        #expect(run.steps(.event).compactMap { $0.text("line") }.contains { $0.hasPrefix("import.finished") })
+        #expect(tracer.store.sessionEvents.isEmpty)
     }
 
     // MARK: A finished import

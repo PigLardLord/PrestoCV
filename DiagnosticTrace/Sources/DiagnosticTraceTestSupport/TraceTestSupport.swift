@@ -107,7 +107,7 @@ public final class RefusingTracer: DiagnosticTracer {
 
     private struct RefusedRun: TraceRunRecording {
         let tracer: RefusingTracer
-        var isRecording: Bool { false }
+        var scope: TraceScope { .suppressed }
 
         func record(_ name: TraceStepName, _ fields: [TraceField]) { tracer.count() }
         func finish(_ outcome: TraceOutcome) {}

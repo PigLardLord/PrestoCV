@@ -70,7 +70,7 @@ struct TraceGateTests {
 
         let run = tracer.begin(.aiDraft)
         run.record(.input, .text("description", "marker-word"))
-        tracer.record(.response, [.text("raw", "answer")], into: .aiDraft)
+        run.withinSync { tracer.record(.response, [.text("raw", "answer")], into: .aiDraft) }
         tracer.mirror(TraceEvent(kind: nil, category: "export", level: "info", line: "export.finished"))
         run.finish(.finished)
 
@@ -114,7 +114,7 @@ struct TracingLoggerTests {
         let logger = TracingLogger(tracer: recorder, next: sink, kinds: ["draft": .aiDraft, "import": .textImport])
 
         let run = recorder.begin(.aiDraft)
-        logger.info(.draft, "draft.started", .count("characters", 21))
+        run.withinSync { logger.info(.draft, "draft.started", .count("characters", 21)) }
         run.finish(.finished)
 
         #expect(sink.events == ["draft.started"])
@@ -122,7 +122,7 @@ struct TracingLoggerTests {
         #expect(saved.steps.map(\.fields) == [[.token("category", "draft"), .token("level", "info"), .text("line", "draft.started characters=21")]])
     }
 
-    @Test("An entry with no open run of its kind, or of a category with no kind, goes to the session events")
+    @Test("An entry outside every run's scope, or of a category with no kind, goes to the session events")
     func otherEntriesGoToTheSession() {
         let store = RecordingTraceStore()
         let recorder = TraceRecorder.sample(store: store, clock: TickingClock(step: .milliseconds(1)))

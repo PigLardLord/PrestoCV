@@ -100,17 +100,22 @@ public struct ImportCV: Sendable {
         let stopwatch = Stopwatch(started: self.clock)
         let log = ImportLog(logger: logger, source: .text)
         let trace = ImportTrace(tracer: tracer)
-        trace.input(text)
-        do {
-            let reading = try readText(text)
-            let elapsed = stopwatch.elapsed
-            log.finished(reading, pages: nil, elapsed: elapsed)
-            trace.finished(reading, elapsed: elapsed)
-            return reading.result
-        } catch {
-            let elapsed = stopwatch.elapsed
-            trace.failed(error, elapsed: elapsed)
-            throw log.failed(error, elapsed: elapsed)
+        // The logger records by kind: the scope tells it this import's run, so its entries are events of that run.
+        return try trace.within {
+            trace.input(text)
+            do {
+                let reading = try readText(text)
+                let elapsed = stopwatch.elapsed
+                log.finished(reading, pages: nil, elapsed: elapsed)
+                trace.finished(reading, elapsed: elapsed)
+                return reading.result
+            } catch {
+                let elapsed = stopwatch.elapsed
+                // The entry is logged first: once the run is finished, it takes no more
+                let failure = log.failed(error, elapsed: elapsed)
+                trace.failed(error, elapsed: elapsed)
+                throw failure
+            }
         }
     }
 

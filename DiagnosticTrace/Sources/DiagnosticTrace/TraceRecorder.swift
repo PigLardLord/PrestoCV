@@ -12,8 +12,6 @@ public final class TraceRecorder: DiagnosticTracer {
 
     private struct State {
         var open: [UUID: OpenRun] = [:]
-        /// The newest open run of each kind, for the steps recorded by kind.
-        var latest: [TraceKind: UUID] = [:]
     }
 
     private let store: any TraceStoring
@@ -47,32 +45,49 @@ public final class TraceRecorder: DiagnosticTracer {
         let stopwatch = startStopwatch()
         state.withLock { state in
             state.open[run.id] = OpenRun(builder: TraceRunBuilder(run: run), stopwatch: stopwatch)
-            state.latest[kind] = run.id
         }
         return RecordedRun(recorder: self, id: run.id, kind: kind)
     }
 
     public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
-        guard let id = target(of: kind) else { return }
+        guard case .run(let id) = target(of: kind) else { return }
         record(name, fields, inRun: id)
     }
 
     public func mirror(_ event: TraceEvent) {
-        if let kind = event.kind, let id = target(of: kind) {
+        let target = event.kind.map(target(of:)) ?? (TraceScope.current == .suppressed ? .nowhere : .session)
+        switch target {
+        case .run(let id):
             record(.event, [.token("category", event.category), .token("level", event.level), .text("line", event.line)], inRun: id)
-        } else {
+        case .session:
             store.save(sessionEvent: TraceSessionEvent(time: now(), category: event.category, level: event.level, line: event.line))
+        case .nowhere:
+            break
         }
     }
 
-    /// The run a step of a kind belongs to: the run whose scope the work is in, when it is of that kind (nil once it has
-    /// finished, so that its late steps do not land in a newer run), else the newest open run of the kind.
-    private func target(of kind: TraceKind) -> UUID? {
-        state.withLock { state in
-            if let scope = TraceScope.current, scope.kind == kind {
-                return state.open[scope.id] == nil ? nil : scope.id
-            }
-            return state.latest[kind]
+    /// Where something recorded by kind goes.
+    private enum Target {
+        /// The run whose scope the work is in.
+        case run(UUID)
+        /// The session's events: a log entry of work that is in no run, or whose run is finished or of another kind. A step
+        /// has no place there and is dropped.
+        case session
+        /// Discarded: work in a run that records nothing.
+        case nowhere
+    }
+
+    /// Where a step or an entry of a kind goes: to the run whose scope the work is in, when it is of that kind and still open.
+    /// There is no fallback to the newest run of the kind: work that does not name its run is never put in one.
+    private func target(of kind: TraceKind) -> Target {
+        switch TraceScope.current {
+        case .recording(let id, let scoped):
+            guard scoped == kind, state.withLock({ $0.open[id] != nil }) else { return .session }
+            return .run(id)
+        case .suppressed:
+            return .nowhere
+        case .none:
+            return .session
         }
     }
 
@@ -91,7 +106,6 @@ public final class TraceRecorder: DiagnosticTracer {
     fileprivate func finish(_ outcome: TraceOutcome, run id: UUID) {
         state.withLock { state in
             guard var open = state.open.removeValue(forKey: id) else { return }
-            if state.latest[open.builder.run.kind] == id { state.latest[open.builder.run.kind] = nil }
             open.builder.finish(outcome)
             store.save(open.builder.run)
         }
@@ -104,7 +118,7 @@ private struct RecordedRun: TraceRunRecording {
     let id: UUID
     let kind: TraceKind
 
-    var scope: TraceScope? { TraceScope(id: id, kind: kind) }
+    var scope: TraceScope { .recording(id: id, kind: kind) }
 
     func record(_ name: TraceStepName, _ fields: [TraceField]) {
         recorder.record(name, fields, inRun: id)
