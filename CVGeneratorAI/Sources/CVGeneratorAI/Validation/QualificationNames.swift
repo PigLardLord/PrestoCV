@@ -26,7 +26,7 @@ enum QualificationNames {
 
     /// Names of an exam or a certification that are also words or technologies: "Delta Lake", "SAT solving", "Praxis", "GRE tunnel",
     /// "CPA" (cost per acquisition), "OCP" (OpenShift). Such a word is a qualification only as the whole name or with a word of
-    /// `qualifiers` ("SAT exam", "Delta certification"), never with another word.
+    /// `qualifiers`, wherever it stands ("SAT exam", "GRE General Test"), never with another word alone ("SAT solving").
     private static let ambiguousWords: Set<String> = [
         "delta", "sat", "gre", "praxis", "onset", "pmi", "cpa", "cma", "ocp", "csm", "psm",
     ]
@@ -43,7 +43,8 @@ enum QualificationNames {
     static func isOne(_ name: String) -> Bool {
         let folded = Word.words(in: name).map(\.folded)
         if folded.contains(where: { words.contains($0) }) { return true }
-        if folded.contains(where: { ambiguousWords.contains($0) }), folded.allSatisfy({ ambiguousWords.contains($0) || qualifiers.contains($0) }) {
+        if folded.contains(where: { ambiguousWords.contains($0) }),
+           folded.allSatisfy({ ambiguousWords.contains($0) }) || folded.contains(where: { qualifiers.contains($0) }) {
             return true
         }
         let normalized = DescriptionText.normalized(name)
