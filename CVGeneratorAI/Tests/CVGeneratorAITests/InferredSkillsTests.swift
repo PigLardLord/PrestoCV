@@ -18,7 +18,7 @@ struct InferredSkillsTests {
     @Test("The names of technologies and soft skills stay, with the punctuation of their trade",
           arguments: ["Lesson planning", "Phonics", "C++", "C#", "F#", "Node.js", "ASP.NET", "Vue.js", ".NET", "Objective-C", "CI/CD",
                       "Q&A", "Delta Lake", "SAT solving", "GRE tunnel", "CPA tracking", "OCP cluster", "Praxis management", "Master Data Management", "Scrum Master",
-                      "Maya", "NODE.JS", "Node.js Express", "Team leadership", "Gestione della classe", "Pädagogik", "Planificación", "Éducation", "Comunicação"])
+                      "Maya", "Autodesk Maya", "NODE.JS", "Node.js Express", "Team leadership", "Gestione della classe", "Pädagogik", "Planificación", "Éducation", "Comunicação"])
     func plainNamesStay(name: String) {
         #expect(skills().accepted(name) == name)
     }
