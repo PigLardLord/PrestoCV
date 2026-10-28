@@ -195,6 +195,8 @@ struct VocabularyTests {
         #expect(modality("I wrote care plans for patients").isEmpty)
         #expect(modality("I was responsible for planning").isEmpty)
         #expect(modality("planning, budgeting").isEmpty)
+        #expect(modality("I plan the night shifts").isEmpty, "an activity: what is planned has no preposition or verb after it")
+        #expect(modality("I plan the move to Berlin") == ["plan"], "a move to a place is still an intention")
     }
 
     @Test("Ability and part qualify a claim; denial, wish and condition withdraw it")

@@ -4093,6 +4093,16 @@ enum GroundingRows {
                         .exactly(CVData(personalInfo: person(name: "Maria Rossi")))))
         rows.append(row("planning-on-is-an-intention", "planning on is an intention: no skill",
                         "I'm planning on a Rust course.", CVData(skills: [Skill(name: "Rust")]), .exactly(CVData())))
+        rows.append(row("i-plan-the-shifts-is-an-activity",
+                        "I plan the night shifts names the work done at Acme (#354): the written sentence keeps night",
+                        "Since 2019 I have worked at Acme, where I plan the night shifts.",
+                        CVData(experience: [job("", "Acme", from: "2019", current: true, description: "I plan the night shifts.")]),
+                        .unchanged))
+        rows.append(row("i-plan-the-move-is-an-intention",
+                        "I plan the move to a place is an intention: the place goes, the name stays",
+                        "I'm Maria Rossi. I plan the move to Berlin.",
+                        CVData(personalInfo: person(name: "Maria Rossi", location: "Berlin")),
+                        .exactly(CVData(personalInfo: person(name: "Maria Rossi")))))
 
         typealias Planning = (language: String, activity: String, intention: String)
         var others: [Planning] = []
