@@ -313,11 +313,14 @@ extension CVDataSanitizer {
         "el profesional", "ele ", "ela ", "o candidato", "o profissional", "a profissional",
     ]
 
-    /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes; so does a second one that
-    /// names nothing of the `work` (the kept duties and tools) or of the titles, and one the rules drop (`WrittenText`). The `field`
-    /// names the topic only when no title does, and only when it reads as a name.
+    /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes, and so does one with no
+    /// word of the person in a language that keeps its pronoun; so does a sentence that starts with the verb of an earlier one, one
+    /// with no word beyond a sentence of the kept `duties` (one that joins several duties stays), a second one that names nothing of the `work` (the kept duties and tools) or
+    /// of the titles, and one the rules drop (`WrittenText`). A summary that names no title whole gets an opening from the facts,
+    /// and a kept sentence that starts with the opening's verb then goes. The `field` names the topic only when no title does, and
+    /// only when it reads as a name.
     func summaryCheck(
-        of cvData: CVData, summary: String?, field: String?, work: [String] = [], against description: String
+        of cvData: CVData, summary: String?, field: String?, work: [String] = [], duties: [String] = [], against description: String
     ) throws(CVGenerationError) -> SummaryVerdict {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
@@ -332,17 +335,31 @@ extension CVDataSanitizer {
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
             let namesWork = { (sentence: String) in !Self.workStems(of: [sentence]).isDisjoint(with: workStems) }
 
+            let language = source.explainer.language
+            let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
             var verdict = SummaryVerdict()
             var idle = 0
             var seen = Set<String>()
+            var verbs = Set<String>()
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 let sentence = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
                 let lower = sentence.lowercased()
+                let verb = Self.leadingVerb(of: sentence)
+                let own = Self.stems(of: sentence)
                 if Self.thirdPersonOpeners.contains(where: lower.hasPrefix) {
                     verdict.rejected.append(Rejection(
                         sentence: sentence, reason: "it speaks of the person in the third person: write it as the person, with no subject"
+                    ))
+                } else if let language, let words = Self.firstPersonWords[language],
+                          !Self.letterWords(of: sentence).contains(where: words.contains) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.saysNothingOfThePerson))
+                } else if let verb, verbs.contains(verb) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
+                } else if dutySentences.contains(where: own.isSubset) {
+                    verdict.rejected.append(Rejection(
+                        sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
                     ))
                 } else if !workStems.isEmpty, !namesWork(sentence), idle >= 1 {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: "it says nothing of the work: name a duty or a tool of the lists"))
@@ -351,31 +368,60 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !namesWork(sentence) { idle += 1 }
+                    if let verb { verbs.insert(verb) }
                     verdict.kept.append(sentence)
                 }
             }
 
-            let text = verdict.kept.joined(separator: " ")
-            if verdict.kept.count < 2 { verdict.problems.append("it keeps fewer than 2 sentences") }
-            if verdict.kept.count > 4 { verdict.problems.append("it has more than 4 sentences") }
-            if text.count < 120 { verdict.problems.append("it is shorter than 120 characters") }
-            let opening = Self.opening(of: facts, language: source.explainer.language)
-            if !topicWords.isEmpty, Set(Word.words(in: text).map(\.folded)).isDisjoint(with: topicWords) {
+            let opening = Self.opening(of: facts, language: language)
+            let textWords = Word.words(in: verdict.kept.joined(separator: " ")).map(\.folded)
+            let titleRuns = titles.compactMap { $0?.presentValue }.map(EntryEvidence.foldedWords).filter { !$0.isEmpty }
+            let namesATitle = titleRuns.contains { run in
+                textWords.indices.contains { textWords[$0...].prefix(run.count).elementsEqual(run) }
+            }
+            if !topicWords.isEmpty, titleRuns.isEmpty ? Set(textWords).isDisjoint(with: topicWords) : !namesATitle {
                 let named = titles.compactMap { $0?.presentValue }
                 var seenNames = Set<String>()
                 let listed = (named.isEmpty ? [cleanField].compactMap { $0?.presentValue } : named).filter { seenNames.insert($0.lowercased()).inserted }
-                let problem = "it names no word of the person's job titles" + (listed.isEmpty ? "" : "; name one of: " + listed.joined(separator: ", "))
+                let problem = "it names none of the person's job titles whole"
+                    + (listed.isEmpty ? "" : "; name one of: " + listed.joined(separator: ", "))
                 verdict.problems.append(problem)
                 if let opening {
                     verdict.opening = opening
                     verdict.openingProblem = problem
                 }
             }
-            if verdict.opening == nil, !verdict.kept.isEmpty, verdict.kept.count < 2 || text.count < 120 {
+            if verdict.opening == nil, !verdict.kept.isEmpty, verdict.kept.count < 2 || verdict.kept.joined(separator: " ").count < 120 {
                 verdict.opening = opening
             }
+            if let verb = verdict.opening.flatMap(Self.leadingVerb) {
+                verdict.rejected += verdict.kept.filter { Self.leadingVerb(of: $0) == verb }
+                    .map { Rejection(sentence: $0, reason: Self.startsAsAnEarlierOne) }
+                verdict.kept.removeAll { Self.leadingVerb(of: $0) == verb }
+            }
+            var sizes: [String] = []
+            if verdict.kept.count < 2 { sizes.append("it keeps fewer than 2 sentences") }
+            if verdict.kept.count > 4 { sizes.append("it has more than 4 sentences") }
+            if verdict.kept.joined(separator: " ").count < 120 { sizes.append("it is shorter than 120 characters") }
+            verdict.problems = sizes + verdict.problems
             return verdict
         }
+    }
+
+    static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
+    static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
+
+    /// The words of the person, in the languages whose sentences keep the subject pronoun: a summary sentence there with none of them
+    /// ("Sound design is the core of every project") says nothing of the person (#354). Italian, Spanish and Portuguese drop it.
+    private static let firstPersonWords: [Vocabulary.Language: Set<String>] = [
+        .english: ["i", "my", "me", "myself"],
+        .german: ["ich", "mich", "mir", "mein", "meine", "meinen", "meinem", "meiner", "meines"],
+        .french: ["je", "j", "moi", "me", "m", "mon", "ma", "mes"],
+    ]
+
+    /// The first word of a sentence after a subject pronoun of the first person: its verb, in a summary written as the person.
+    static func leadingVerb(of sentence: String) -> String? {
+        letterWords(of: sentence).first { !["i", "ich", "je", "j", "io", "yo", "eu"].contains($0) }
     }
 
     /// The first four letters of each word of 4 letters or more of `texts`: how a summary sentence is matched to the work.

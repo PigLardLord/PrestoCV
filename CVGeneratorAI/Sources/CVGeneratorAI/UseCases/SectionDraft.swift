@@ -199,7 +199,9 @@ final class SectionDraft {
         let written = try await request(.summary) {
             try await self.service.writeSummary(for: brief, duties: keptDuties, skills: keptSkills)
         }
-        guard let first = try? sanitizer.summaryCheck(of: dated, summary: written, field: field, work: work, against: description) else {
+        guard let first = try? sanitizer.summaryCheck(
+            of: dated, summary: written, field: field, work: work, duties: keptDuties.compactMap { $0 }, against: description
+        ) else {
             return
         }
         summary = first.text
@@ -215,8 +217,9 @@ final class SectionDraft {
             )
         }
         let cut = repaired.map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
-        guard let second = try? sanitizer.summaryCheck(of: dated, summary: cut, field: field, work: work, against: description),
-              second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
+        guard let second = try? sanitizer.summaryCheck(
+            of: dated, summary: cut, field: field, work: work, duties: keptDuties.compactMap { $0 }, against: description
+        ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
     }
 

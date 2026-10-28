@@ -165,6 +165,74 @@ struct SectionChecksTests {
         #expect(verdict.opening == "Lavoro come capoturno della manutenzione.")
     }
 
+    @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")
+    func summaryOfThePerson() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("sound technician", "Copperfield Arena", from: "2019")])
+        let description = "I am a sound technician at Copperfield Arena since 2019. I set up the PA systems and mix the support acts."
+
+        let verdict = try english.summaryCheck(
+            of: facts,
+            summary: "Clear sound is the heart of every live show. As a sound technician, my work covers the sound desks, the stage "
+                + "monitors and the mixing of live acts. I keep calm when a show runs late.",
+            field: nil, against: description
+        )
+
+        #expect(verdict.rejected.map(\.sentence) == ["Clear sound is the heart of every live show."])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.saysNothingOfThePerson])
+        #expect(verdict.kept.count == 2)
+        #expect(verdict.opening == nil)
+    }
+
+    @Test("A summary naming no title whole gets the opening; a sentence with its verb, an earlier verb or a duty goes (#354)")
+    func summaryWithoutRepeats() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("sound technician", "Copperfield Arena", from: "2019")])
+        let description = "I am a sound technician at Copperfield Arena since 2019. I set up the PA systems and mix the support acts."
+
+        let verdict = try english.summaryCheck(
+            of: facts,
+            summary: "I work with sound for bands of every kind and size. I mix live acts with a steady hand and a clear ear. "
+                + "I mix bands on small stages too. I set up the PA systems and mix the support acts.",
+            field: nil, duties: ["I set up the PA systems and mix the support acts."], against: description
+        )
+
+        #expect(verdict.opening == "I work as a sound technician.")
+        #expect(verdict.kept == ["I mix live acts with a steady hand and a clear ear."])
+        #expect(verdict.rejected.map(\.reason) == [
+            CVDataSanitizer.startsAsAnEarlierOne,
+            "it says again a duty of a job: say what the person's work has in common",
+            CVDataSanitizer.startsAsAnEarlierOne,
+        ])
+        #expect(verdict.problems.first == "it keeps fewer than 2 sentences")
+    }
+
+    @Test("A summary naming a title whole gets no opening; its sentences with other verbs, and one joining duties, stay (#354)")
+    func summaryNamingATitle() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("sound technician", "Copperfield Arena", from: "2019")])
+        let description = "I am a sound technician at Copperfield Arena since 2019. I set up the PA systems and mix the support acts."
+
+        let verdict = try english.summaryCheck(
+            of: facts,
+            summary: "I work as a sound technician for live shows of every size. I mix live acts with a steady hand and a clear ear, "
+                + "from the first check to the last song.",
+            field: nil, duties: ["I set up the PA systems and mix the support acts."], against: description
+        )
+
+        #expect(verdict.opening == nil)
+        #expect(verdict.rejected.isEmpty)
+        #expect(verdict.kept.count == 2)
+
+        let joining = try english.summaryCheck(
+            of: facts,
+            summary: "I work as a sound technician for live shows of every size. I set up the sound systems, mix the support "
+                + "acts and keep each show on time.",
+            field: nil, duties: ["I set up the sound systems.", "I mix the support acts."], against: description
+        )
+        #expect(joining.rejected.isEmpty)
+    }
+
     @Test("The opening says the current job's title in the present, else the last one's in the past, in the description's language")
     func openings() {
         let teacher = CVData(experience: [Self.job("institutrice", "École Lamartine", from: "2015")])
