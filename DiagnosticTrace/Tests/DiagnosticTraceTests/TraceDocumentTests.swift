@@ -49,6 +49,19 @@ struct TraceDocumentTests {
         #expect(read.outcome == nil)
     }
 
+    @Test("A run keeps its file name stem through its document, for a start at any millisecond")
+    func stemSurvivesTheDocument() throws {
+        let starts = (0..<3_000).map { Date(timeIntervalSince1970: 1_793_188_800 + Double($0) * 0.001 + (Double($0 % 2) * 0.0002 + 0.0003)) }
+        for started in starts {
+            let run = TraceRun(
+                id: TraceRun.sample(outcome: nil).id, kind: .aiDraft, started: started,
+                build: TraceRun.sample(outcome: nil).build, steps: [], outcome: nil
+            )
+            let read = try TraceRun(document: run.document())
+            #expect(read.fileStem == run.fileStem, "a start of \(started.timeIntervalSince1970)")
+        }
+    }
+
     // MARK: File name
 
     @Test("The file name stem holds the UTC start time, the kind and the first eight characters of the id")

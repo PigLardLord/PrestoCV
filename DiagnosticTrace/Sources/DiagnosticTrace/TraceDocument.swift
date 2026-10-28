@@ -200,7 +200,9 @@ enum UTCTime {
     }
 
     private static func split(_ date: Date) -> (DateComponents, Int) {
-        let milliseconds = Int((date.timeIntervalSince1970 * 1_000).rounded(.down))
+        // To the nearest millisecond, not down: a date read back from its text is a hair under its millisecond, and cutting it
+        // would give it the millisecond before, so a run would not find its own files by the name it computes from the document.
+        let milliseconds = Int((date.timeIntervalSince1970 * 1_000).rounded())
         let (seconds, millisecond) = milliseconds.quotientAndRemainder(dividingBy: 1_000)
         let whole = Date(timeIntervalSince1970: Double(millisecond < 0 ? seconds - 1 : seconds))
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: whole)
