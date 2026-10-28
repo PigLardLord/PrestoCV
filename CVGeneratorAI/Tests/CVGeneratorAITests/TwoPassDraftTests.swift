@@ -46,7 +46,7 @@ struct TwoPassDraftTests {
 
     // MARK: The brief
 
-    @Test("The brief holds the language, the titles, which roles have ended, the studies and the named skills, and no employer, school or place")
+    @Test("The brief holds the language, the titles, the employers, which roles have ended, the studies and the named skills, and no school, place, person or date")
     func briefOfTheFacts() throws {
         let facts = try sanitizer.sanitize(english.draft, against: english.description)
 
@@ -55,11 +55,14 @@ struct TwoPassDraftTests {
         #expect(brief.language == "English")
         #expect(brief.headline == "primary school teacher")
         #expect(brief.roles == [
-            DraftBrief.Role(title: "primary school teacher", hasEnded: false), DraftBrief.Role(title: "assistant", hasEnded: true),
+            DraftBrief.Role(title: "primary school teacher", employer: "Don Milani school", hasEnded: false),
+            DraftBrief.Role(title: "assistant", employer: "nursery", hasEnded: true),
         ])
         #expect(brief.studies == ["Education Sciences"])
         let text = DraftWritingPrompt(brief: brief).text
-        for name in ["Don Milani", "nursery", "Bologna", "Maria", "2016", "2012"] {
+        // The employer tells the trade of a role: an assistant at a nursery looks after small children, not pupils (#354)
+        #expect(text.contains("2. assistant; employer: nursery; ended"))
+        for name in ["Bologna", "Maria", "2016", "2012"] {
             #expect(!text.contains(name), "The second pass never sees \(name): it has nothing to copy")
         }
     }
@@ -77,11 +80,14 @@ struct TwoPassDraftTests {
 
     // MARK: The prompt of the second pass
 
-    @Test("The prompt numbers the titled roles by their place in the brief, marks the ended ones and lists the skills already named")
+    @Test("The prompt numbers the roles by their place in the brief, with their employers, marks the ended ones and lists the skills already named")
     func promptOfTheBrief() {
         let brief = DraftBrief(
             language: "Italian", headline: "infermiera",
-            roles: [.init(title: "infermiera", hasEnded: false), .init(title: "", hasEnded: true), .init(title: "barista", hasEnded: true)],
+            roles: [
+                .init(title: "infermiera", employer: "Ospedale Civile", hasEnded: false), .init(title: "", employer: "Casa di Cura", hasEnded: true),
+                .init(title: "barista", hasEnded: true),
+            ],
             studies: ["Scienze infermieristiche"], namedSkills: ["HACCP"]
         )
 
@@ -93,11 +99,27 @@ struct TwoPassDraftTests {
             Scrivi in italiano.
             Headline title: infermiera
             Roles:
-            1. infermiera
-            3. barista (ended)
+            1. infermiera; employer: Ospedale Civile
+            2. no title given; employer: Casa di Cura; ended
+            3. barista; ended
             Studies: Scienze infermieristiche
             Skills already listed: HACCP
             """)
+    }
+
+    @Test("A role with no title is described from the headline title, and with no headline it has nothing to describe (#354)")
+    func roleWithNoTitle() {
+        let roles: [DraftBrief.Role] = [.init(title: "nurse", employer: "City Hospital", hasEnded: false), .init(title: "", employer: "Care Home", hasEnded: true)]
+        let withHeadline = DraftBrief(language: "English", headline: "nurse", roles: roles, studies: [], namedSkills: [])
+        let withoutHeadline = DraftBrief(language: "English", headline: nil, roles: roles, studies: [], namedSkills: [])
+        let answers = [(number: 1, text: "Cares for patients."), (number: 2, text: "Looked after residents.")]
+
+        #expect(DraftWritingPrompt.descriptions(answers, of: withHeadline) == ["Cares for patients.", "Looked after residents."])
+        #expect(DraftWritingPrompt.descriptions(answers, of: withoutHeadline) == ["Cares for patients.", nil])
+        #expect(!DraftWritingPrompt(brief: withoutHeadline).text.contains("Care Home"))
+        #expect(DraftWritingPrompt.instructionsText.contains(
+            "For a role with no title given, the responsibilities typical of the headline title there, without naming a title"
+        ))
     }
 
     @Test("Each description goes to the role of its number; a number of no role and a second answer for a number are ignored")
@@ -145,6 +167,41 @@ struct TwoPassDraftTests {
         #expect(instructions.contains("Each sentence starts with a capital letter and ends with a full stop"))
         #expect(instructions.contains("never a list of phrases or a copy of a title"))
         #expect(instructions.contains("Name each technology and soft skill in that language too"))
+    }
+
+    @Test("The second pass is asked for technologies of the trade that are no soft skill, and for no voice: a rule on the voice drew Italian drafts into English (#354)")
+    func promptAsksForTheTradeAndNoVoice() {
+        let instructions = DraftWritingPrompt.instructionsText
+
+        #expect(!instructions.contains("subject"), "A rule on the voice, in English or in the language line, drew the drafts into English")
+        #expect(instructions.contains("tools, methods or techniques of the trade"))
+        #expect(!instructions.contains("knowledge of the trade"), "Knowledge invites abstract nouns such as communication or analysis")
+        #expect(instructions.contains("a soft skill is never a technology"))
+    }
+
+    @Test("A role line joins its title, employer and end with labels, never with an English word: \"cuoco at Il Gabbiano\" drew the Italian drafts into English (#354)")
+    func roleLinesHoldNoEnglishWord() {
+        let brief = DraftBrief(
+            language: "Italian", headline: "cuoco",
+            roles: [.init(title: "cuoco", employer: "Il Gabbiano", hasEnded: false), .init(title: "", employer: "Hotel Belvedere", hasEnded: true)],
+            studies: [], namedSkills: []
+        )
+        let roles = DraftWritingPrompt(brief: brief).text.split(separator: "\n").filter { $0.first?.isNumber == true }
+
+        #expect(roles == ["1. cuoco; employer: Il Gabbiano", "2. no title given; employer: Hotel Belvedere; ended"])
+        for role in roles {
+            #expect(!Word.words(in: String(role)).contains { $0.folded == "at" }, "\(role)")
+        }
+    }
+
+    @Test("The rule of the skills quotes no word: the model copied each quoted English example into drafts of other trades and languages (#354)")
+    func skillRuleQuotesNoWord() {
+        let rules = DraftWritingPrompt.instructionsText.split(separator: "\n").filter { $0.contains("- Technologies") }
+
+        #expect(rules.count == 1)
+        for rule in rules {
+            #expect(!rule.contains("\""), "\(rule)")
+        }
     }
 
     // MARK: Grounding what the second pass wrote

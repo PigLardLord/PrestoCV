@@ -1,18 +1,22 @@
 import Foundation
 
 /// What the second pass of a draft writes from (ADR 0031): the facts that the rules kept from the first pass, and nothing of the
-/// description. It holds the titles, the studies and the skills the person named, and no employer, school, place or person, so the
-/// text written from it has no name to copy.
+/// description. It holds the titles, the employers, the studies and the skills the person named, and no school, place, person or
+/// date: the employer tells the trade of a role ("a nursery" is no school, #354), and the rules drop a written sentence that names it.
 public struct DraftBrief: Equatable, Sendable {
     /// A job of the draft, as the second pass sees it.
     public struct Role: Equatable, Sendable {
-        /// The job title the rules kept; empty for a job kept by its employer alone, which the second pass does not describe.
+        /// The job title the rules kept; empty for a job kept by its employer alone, which the second pass describes from the
+        /// headline title when there is one, with no title of its own (#354).
         public let title: String
+        /// The employer the rules kept, if any.
+        public let employer: String?
         /// Whether the description says the job is over: its text then speaks of it in the past.
         public let hasEnded: Bool
 
-        public init(title: String, hasEnded: Bool) {
+        public init(title: String, employer: String? = nil, hasEnded: Bool) {
             self.title = title
+            self.employer = employer
             self.hasEnded = hasEnded
         }
     }
@@ -40,7 +44,9 @@ public struct DraftBrief: Equatable, Sendable {
     /// and no degree (a draft of no role gets no summary and no skills of the model's own), or a description of no known language.
     init?(_ facts: CVData, language: Vocabulary.Language?) {
         guard let language, let name = CVPrompt.languageName(forCode: language.rawValue) else { return nil }
-        let roles = facts.experience.map { Role(title: $0.title, hasEnded: !$0.current && $0.endDate.presentValue != nil) }
+        let roles = facts.experience.map {
+            Role(title: $0.title, employer: $0.company.presentValue, hasEnded: !$0.current && $0.endDate.presentValue != nil)
+        }
         let studies = facts.education.compactMap { $0.degree.presentValue }
         let headline = facts.personalInfo.title.presentValue
         guard headline != nil || roles.contains(where: { $0.title.presentValue != nil }) || !studies.isEmpty else { return nil }

@@ -180,7 +180,7 @@ struct RoleAnswer {
     @Guide(description: "The number of the role")
     let number: Int
 
-    @Guide(description: "1 to 2 sentences with the responsibilities typical of the role's title")
+    @Guide(description: "1 to 2 sentences with the responsibilities typical of the role's title at its employer")
     let description: String
 }
 #endif
