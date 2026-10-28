@@ -1761,8 +1761,8 @@ enum GroundingRows {
     // MARK: A completion year is never a start date (no-go round 3)
 
     /// A year written with a verb of finishing a course ("I completed my degree at Alpha University in 2016") is the year the study
-    /// ended: the draft's end date may take it, its start date never (ADR 0023, rule (c), dates). A year written with a start
-    /// ("since 2014") stays the start date.
+    /// ended: the draft's end date takes it, even when the model wrote it as the start, and its start date never (ADR 0023, rule (c),
+    /// dates; #354). A year written with a start ("since 2014") stays the start date.
     private static func aCompletionYearIsNeverAStart() -> [GroundingRow] {
         typealias Variant = (language: String, completed: String, started: String, school: String)
         let variants: [Variant] = [
@@ -1777,9 +1777,9 @@ enum GroundingRows {
         var rows: [GroundingRow] = []
         for v in variants {
             rows.append(row("a-completion-year-is-no-start-\(v.language)",
-                            "2016 is written with a verb of finishing: the study ended then, it did not start then",
+                            "2016 is written with a verb of finishing: the study ended then, so it is its end date and never its start",
                             v.completed, CVData(education: [study(at: v.school, from: "2016")]),
-                            .exactly(CVData(education: [study(at: v.school)])), language: v.language))
+                            .exactly(CVData(education: [study(at: v.school, to: "2016")])), language: v.language))
             rows.append(row("a-completion-year-stays-the-end-\(v.language)",
                             "2016 is written with a verb of finishing: the end date of the study keeps it",
                             v.completed, CVData(education: [study(at: v.school, to: "2016")]),
@@ -5348,10 +5348,11 @@ enum GroundingRows {
         let certificates = "I have a BLS from the Italian Resuscitation Council in 2023 and a PALS from the American Heart Association in 2019."
 
         rows.append(row("school-omitted-school-lends-its-dates",
-                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out; 2010 is written with graduated, so it is not a start",
+                        "Beta University's 2014 is not Alpha University's when the draft leaves Beta out; 2010 is written with graduated, "
+                            + "so it is the end date and never a start",
                         "At Alpha University in 2010 I graduated and at Beta University in 2014 I did a master.",
                         CVData(education: [study(at: "Alpha University", from: "2010", to: "2014")]),
-                        .exactly(CVData(education: [study(at: "Alpha University")]))))
+                        .exactly(CVData(education: [study(at: "Alpha University", to: "2010")]))))
         rows.append(row("school-joined-clause-after",
                         "graduated in 2012 is a graduation phrase: it joins the clause of the school next to it and gives the degree its year",
                         "I studied Education Sciences at the University of Bologna and graduated in 2012.",
@@ -5790,7 +5791,6 @@ enum GroundingRows {
         drops.append(Drop("experience[0].description", "its 3 and its words come from a clause that no quote of the draft can explain"))
         drops.append(Drop("experience[0].achievements[0]", "the quote begins with a number, not with a CV verb: it explains nothing"))
         drops.append(Drop("experience[1].location", "Bologna is not in the clause that names the Kinderkrippe"))
-        drops.append(Drop("education[0].endDate", "2016 is not a year of the studies: the description gives 2012"))
         drops.append(Drop("education[0].description", "Studium and abgeschlossen are words of studying that the description does not use"))
         drops.append(Drop("education[0].startDate", "2012 meinen Abschluss gemacht gives a degree its end date, and the end date of the draft is 2016"))
         // ADR 0031: the nursery's role text and the summary's last sentence are no quotes, but they state no fact of their own: they
@@ -5801,6 +5801,8 @@ enum GroundingRows {
             isoDate("experience[0].startDate", "2016"),
             isoDate("experience[1].startDate", "2012"),
             isoDate("experience[1].endDate", "2016"),
+            Rewrite("education[0].endDate", to: "2012",
+                    "2016 is not a year of the studies: the description gives 2012 with a word of graduating, and the end date takes it"),
         ]
         return row("probe-de",
                    "kept: name, place, title, both jobs with their years and current, the degree; the summary is no quote, and goes",
@@ -5912,9 +5914,12 @@ enum GroundingRows {
         drops.append(Drop("experience[0].achievements[0]", "formação is not a word of the description"))
         drops += Drop.entry("experience[1]", in: draft,
                             because: "the title is not a quote (the description says: auxiliar em uma creche) and the employer is the word null")
-        drops.append(Drop("education[0].endDate", "2016 is not a year of the studies: the description gives 2012"))
         drops.append(Drop("education[0].startDate", "me formei em 2012 gives a degree its end date, and the end date of the draft is 2016"))
-        let rewrites = [isoDate("experience[0].startDate", "2016")]
+        let rewrites = [
+            isoDate("experience[0].startDate", "2016"),
+            Rewrite("education[0].endDate", to: "2012",
+                    "2016 is not a year of the studies: the description gives 2012 with a word of graduating, and the end date takes it"),
+        ]
         return row("probe-pt",
                    "kept: name, place, title, the school (employer, year), the degree, a study text made of one clause's words, languages, interests",
                    AppExample.pt, draft, .keeping(drops, rewriting: rewrites), kind: .probe, language: "pt")
@@ -5998,7 +6003,6 @@ enum GroundingRows {
         // ADR 0031, D1: "where I stayed until 2012" continues the sentence of the Mauriziano alone: 2012 is its end.
         // ADR 0031: the Mauriziano role text is no quote, but it gives the duties of the title and states no fact of its own: it stays.
         drops.append(Drop("experience[3].achievements[0]", "the same words"))
-        drops.append(Drop("education[0].endDate", "2012 is the end of another job; the clause of the studies gives 2009"))
         drops.append(Drop("education[0].startDate", "2009 is written with graduated: the year of the degree is never the start of the studies"))
         for index in 0..<5 {
             drops.append(Drop("skills[\(index)].level", "the description names the skills and says nothing of their level"))
@@ -6017,6 +6021,8 @@ enum GroundingRows {
             Rewrite("experience[3].startDate", to: "2009", "I started in 2009 as a nursing assistant at the Mauriziano hospital is explained"),
             isoDate("experience[1].endDate", "2021"),
             isoDate("experience[3].endDate", "2012"),
+            Rewrite("education[0].endDate", to: "2009",
+                    "2012 is the end of another job; the clause of the studies gives 2009 with graduated, and the end date takes it"),
         ]
         return row("probe-long-en",
                    "kept: the contacts, name, place, the four employers and titles, the Mauriziano start and end, the Humanitas end (D1), the degree, skills, languages, interests, BLS and ACLS",

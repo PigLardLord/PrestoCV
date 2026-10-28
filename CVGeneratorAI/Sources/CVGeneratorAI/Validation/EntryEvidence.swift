@@ -69,6 +69,16 @@ struct EntryEvidence {
         }
     }
 
+    /// The year the graduation clauses give the study, when they give one alone and none of `dates` holds it: the year the person
+    /// says they finished it ("2011 meine Ausbildung abgeschlossen"), for a study whose end date the model wrote with another year or
+    /// left out (#354). Nil when the clauses give no year, or more than one.
+    func completionYear(besides dates: [String?]) -> String? {
+        let years = Set(Self.yearCounts(of: graduation).keys)
+        let held = Set(dates.compactMap { $0 }.flatMap { Digits.runs(in: Digits.ascii($0)).filter { $0.count == 4 } })
+        guard years.count == 1, let year = years.first, !held.contains(year) else { return nil }
+        return year
+    }
+
     // MARK: - Dates
 
     /// How many times each year stands in the clauses, and how many of them a date may still take.

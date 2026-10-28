@@ -338,9 +338,10 @@ struct SanitizerOmittedEntryTests {
 
         let alpha = try sanitized(draft, from: description).education.first
 
-        // 2010 is written with "graduated": the year of the degree, never the start (ADR 0023). Beta's 2014 is not Alpha's.
+        // 2010 is written with "graduated": the year of the degree, so the end date and never the start (ADR 0023, #354). Beta's
+        // 2014 is not Alpha's.
         #expect(alpha?.startDate == nil)
-        #expect(alpha?.endDate == nil)
+        #expect(alpha?.endDate == "2010")
     }
 
     @Test("An issuer and a date given for a certification the draft left out are not the draft's")

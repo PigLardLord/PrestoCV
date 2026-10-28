@@ -339,7 +339,11 @@ public struct CVDataSanitizer: Sendable {
                 EntryWording.namesADegree($0, in: source.explainer.language) ? $0 : nil
             }
             guard degree != nil || study.institution != nil else { return nil }
-            let dates = evidence.supportedDates([study.entry.endDate, study.entry.startDate], graduationDate: 0)
+            var dates = evidence.supportedDates([study.entry.endDate, study.entry.startDate], graduationDate: 0)
+            // A study the model dated keeps the year the person says they finished it as its end date, whatever dates the model
+            // wrote (#354); a study the model left undated stays so.
+            let dated = study.entry.endDate != nil || study.entry.startDate != nil
+            if dates[0] == nil, dated { dates[0] = evidence.completionYear(besides: dates) }
 
             return Education(
                 degree: degree,

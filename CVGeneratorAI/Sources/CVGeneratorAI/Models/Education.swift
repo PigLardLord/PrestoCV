@@ -5,7 +5,7 @@ import FoundationModels
 /// Education entry
 @Generable
 public struct Education: Codable, Equatable, Sendable {
-    @Guide(description: "Degree or course exactly as written, only if the person said it; otherwise null")
+    @Guide(description: "Degree, course or subject studied exactly as written, never a word for a diploma alone; otherwise null")
     public let degree: String?
 
     @Guide(description: "School or university exactly as written, only if the person said it; otherwise null")
