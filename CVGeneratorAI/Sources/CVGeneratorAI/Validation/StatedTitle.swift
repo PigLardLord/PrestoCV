@@ -15,7 +15,8 @@ import Foundation
 /// in a game", "Sono infermiere e soltanto in un videogioco"), so nothing but "and" and a clause of the person may follow it in its
 /// sentence: "I am a nurse in Leeds" gives no headline either, the safe way to fail. What follows the title is read in the sentence as
 /// the person wrote it, not as the claimed clauses leave it: they leave out a clause that denies ("I am a nurse, but not in real life"),
-/// and the title would end its sentence there.
+/// and the title would end its sentence there. A clause further on, after the clause of the person, is read for a denial or a limiter
+/// as well ("I am a doctor and I treat patients, but only in a video game").
 enum StatedTitle {
     /// `title` when a sentence states it as above both in `claimed`, the clauses that claim something for the person, and in `source`,
     /// the description as written, sentence by sentence (`claimed` keeps one sentence for each of `source`); otherwise nil.
@@ -38,7 +39,8 @@ enum StatedTitle {
             let words = clauses[index].words
             guard words.count >= wanted.count, words.suffix(wanted.count).map(\.folded) == wanted else { return false }
             let endsTheSentence = index == clauses.count - 1
-            guard endsTheSentence || (endsWithAnd(clauses[index], in: language) && isOfThePerson(clauses[index + 1], in: language)) else {
+            guard endsTheSentence || (endsWithAnd(clauses[index], in: language) && isOfThePerson(clauses[index + 1], in: language)
+                && clauses[(index + 2)...].allSatisfy { !holdsADenial($0, in: language) }) else {
                 return false
             }
             return isSaid(before: words.count - wanted.count, in: words, language: language)
@@ -65,10 +67,15 @@ enum StatedTitle {
     /// A clause that holds a negation or a word that limits ("not", "only", "nur", "solo", "apenas") anywhere may say so too, after an
     /// adverb that reads like a verb ("und bedauerlicherweise nur in einem Videospiel"): it is no claim, the safe way to fail.
     private static func isOfThePerson(_ clause: Clause, in language: Vocabulary.Language?) -> Bool {
-        guard let first = clause.words.first else { return false }
-        let denials = WrittenTextWords.of(language).negations.union(language.flatMap { limiters[$0] } ?? [])
-        guard !clause.words.contains(where: { denials.contains($0.folded) }) else { return false }
+        guard let first = clause.words.first, !holdsADenial(clause, in: language) else { return false }
         return forms(firstPersonPronouns, in: language).contains(first.folded) || opensWithAVerbOfI(clause, in: language)
+    }
+
+    /// Whether the clause holds a negation or a word that limits, anywhere: "ma solo in un videogioco" in a clause further on takes
+    /// the role away from the person as much as one right after "and", so every clause to the end of the sentence is read for it.
+    private static func holdsADenial(_ clause: Clause, in language: Vocabulary.Language?) -> Bool {
+        let denials = WrittenTextWords.of(language).negations.union(language.flatMap { limiters[$0] } ?? [])
+        return clause.words.contains { denials.contains($0.folded) }
     }
 
     /// Words that limit what comes before to a part of it, as `Word.folded` writes them, beside the negations of `WrittenTextWords`.

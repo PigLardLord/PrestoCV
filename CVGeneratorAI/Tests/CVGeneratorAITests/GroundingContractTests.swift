@@ -6745,11 +6745,28 @@ extension GroundingRows {
                           "apenas after an adverb still qualifies the title"))
         qualified.append(("verb-and-a-denial-de", "de", "Ich bin Arzt und arbeite nicht mehr.", "Arzt",
                           "the clause of the person denies the work, the safe way to fail"))
+        // Fix-check of #354: a qualifier in a clause further on, after a clause of the person, limits the role as well.
+        qualified.append(("later-clause-it", "it", "Sono medico e curo pazienti, ma solo in un videogioco.", "medico",
+                          "solo in a later clause limits the title"))
+        qualified.append(("later-clause-es", "es", "Soy médico y atiendo pacientes, pero solo en un videojuego.", "médico",
+                          "solo in a later clause limits the title"))
+        qualified.append(("later-clause-pt", "pt", "Sou médico e atendo pacientes, mas apenas num videogame.", "médico",
+                          "apenas in a later clause limits the title"))
+        qualified.append(("later-clause-de", "de", "Ich bin Arzt und behandle Patienten, aber nur in einem Videospiel.", "Arzt",
+                          "nur in a later clause limits the title"))
+        qualified.append(("later-clause-en", "en", "I am a doctor and I treat patients, but only in a video game.", "doctor",
+                          "only in a later clause limits the title"))
+        qualified.append(("later-denial-it", "it", "Sono medico e curo pazienti, ma non nella vita reale.", "medico",
+                          "a denial in a later clause limits the title"))
         for v in qualified {
             rows.append(row("a-title-and-a-qualifier-with-no-pronoun-is-no-headline-\(v.id)",
                             "\(v.reason): only a clause of the person after and leaves the title the headline",
                             v.description, CVData(experience: [job(v.title)]), .exactly(CVData()), language: v.language))
         }
+        rows.append(row("a-title-and-later-clauses-of-the-person-is-the-headline-it",
+                        "a clause further on that denies and limits nothing leaves the title the headline",
+                        "Sono medico e curo pazienti, e lavoro in un ospedale di città.", CVData(experience: [job("medico")]),
+                        .exactly(CVData(personalInfo: person(title: "medico"))), language: "it"))
         rows.append(row("a-title-ending-its-sentence-in-es-is-the-headline",
                         "the sentence ends after the title, and the next sentence is the duties: the title is the headline",
                         "Soy camarero. Atiendo a los clientes en la terraza y en la barra del bar.", CVData(experience: [job("camarero")]),
