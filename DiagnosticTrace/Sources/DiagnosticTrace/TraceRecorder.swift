@@ -49,19 +49,30 @@ public final class TraceRecorder: DiagnosticTracer {
             state.open[run.id] = OpenRun(builder: TraceRunBuilder(run: run), stopwatch: stopwatch)
             state.latest[kind] = run.id
         }
-        return RecordedRun(recorder: self, id: run.id)
+        return RecordedRun(recorder: self, id: run.id, kind: kind)
     }
 
     public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
-        guard let id = state.withLock({ $0.latest[kind] }) else { return }
+        guard let id = target(of: kind) else { return }
         record(name, fields, inRun: id)
     }
 
     public func mirror(_ event: TraceEvent) {
-        if let kind = event.kind, let id = state.withLock({ $0.latest[kind] }) {
+        if let kind = event.kind, let id = target(of: kind) {
             record(.event, [.token("category", event.category), .token("level", event.level), .text("line", event.line)], inRun: id)
         } else {
             store.save(sessionEvent: TraceSessionEvent(time: now(), category: event.category, level: event.level, line: event.line))
+        }
+    }
+
+    /// The run a step of a kind belongs to: the run whose scope the work is in, when it is of that kind (nil once it has
+    /// finished, so that its late steps do not land in a newer run), else the newest open run of the kind.
+    private func target(of kind: TraceKind) -> UUID? {
+        state.withLock { state in
+            if let scope = TraceScope.current, scope.kind == kind {
+                return state.open[scope.id] == nil ? nil : scope.id
+            }
+            return state.latest[kind]
         }
     }
 
@@ -91,6 +102,9 @@ public final class TraceRecorder: DiagnosticTracer {
 private struct RecordedRun: TraceRunRecording {
     let recorder: TraceRecorder
     let id: UUID
+    let kind: TraceKind
+
+    var scope: TraceScope? { TraceScope(id: id, kind: kind) }
 
     func record(_ name: TraceStepName, _ fields: [TraceField]) {
         recorder.record(name, fields, inRun: id)

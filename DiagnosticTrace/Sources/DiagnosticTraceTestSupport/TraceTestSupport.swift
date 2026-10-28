@@ -83,6 +83,37 @@ public final class RecordingTracer: DiagnosticTracer {
     public var runs: [TraceRun] { store.runs }
 }
 
+/// A tracer whose runs keep nothing, as a closed gate's do, and which counts every call made on them: a test that a part
+/// builds none of its payloads when nothing records expects `calls` to stay at zero.
+public final class RefusingTracer: DiagnosticTracer {
+    private let counted = Mutex(0)
+
+    public init() {}
+
+    /// How many steps were handed to a run, or recorded by kind.
+    public var calls: Int { counted.withLock { $0 } }
+
+    public func begin(_ kind: TraceKind) -> any TraceRunRecording { RefusedRun(tracer: self) }
+
+    public func record(_ name: TraceStepName, _ fields: [TraceField], into kind: TraceKind) {
+        counted.withLock { $0 += 1 }
+    }
+
+    public func mirror(_ event: TraceEvent) {}
+
+    fileprivate func count() {
+        counted.withLock { $0 += 1 }
+    }
+
+    private struct RefusedRun: TraceRunRecording {
+        let tracer: RefusingTracer
+        var isRecording: Bool { false }
+
+        func record(_ name: TraceStepName, _ fields: [TraceField]) { tracer.count() }
+        func finish(_ outcome: TraceOutcome) {}
+    }
+}
+
 extension TraceRun {
     /// The steps with a name.
     public func steps(_ name: TraceStepName) -> [TraceStep] {

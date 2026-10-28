@@ -61,6 +61,12 @@ public final class CVGeneratorUseCase {
     ///   if that leaves it empty (ADR 0028).
     public func generateCV(from request: CVGenerationRequest) async throws -> GeneratedDraft {
         let trace = DraftTrace(tracer: tracer)
+        // The model service and the logger record by kind: the scope tells them which draft they work for when a cancelled
+        // draft and its retry are both in flight.
+        return try await trace.within { try await generate(from: request, trace: trace) }
+    }
+
+    private func generate(from request: CVGenerationRequest, trace: DraftTrace) async throws -> GeneratedDraft {
         trace.input(request)
         let availability = service.availability()
         trace.availability(availability)

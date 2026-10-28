@@ -12,11 +12,14 @@ struct ImportTrace {
     }
 
     func input(_ text: String) {
+        guard run.isRecording else { return }
         run.record(.input, .token("source", "text"), .count("characters", text.unicodeScalars.count), .text("text", text))
     }
 
     /// One `check` step per section, one `removal` step per piece dropped, then the time and the final draft.
     func finished(_ reading: CVReader.Reading, elapsed: Duration) {
+        // The section and removal analysis and the JSON are costly: a run that records nothing builds none of them
+        guard run.isRecording else { return }
         let result = reading.result
         for step in Self.sectionSteps(reading) { run.record(.check, step) }
         for step in Self.removalSteps(result) { run.record(.removal, step) }
@@ -30,6 +33,7 @@ struct ImportTrace {
 
     /// The failure with its code, and the bound it reached; a cancellation as such.
     func failed(_ error: any Error, elapsed: Duration) {
+        guard run.isRecording else { return }
         if error is CancellationError {
             run.record(.failure, .token("error", "cancelled"))
             run.record(.timing, .duration("elapsed", elapsed))

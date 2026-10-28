@@ -11,6 +11,7 @@ public struct NoTracer: DiagnosticTracer {
 
 /// A run that keeps nothing.
 struct NoRun: TraceRunRecording {
+    var isRecording: Bool { false }
     func record(_ name: TraceStepName, _ fields: [TraceField]) {}
     func finish(_ outcome: TraceOutcome) {}
 }

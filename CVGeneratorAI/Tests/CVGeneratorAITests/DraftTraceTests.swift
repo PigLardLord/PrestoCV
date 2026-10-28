@@ -22,7 +22,7 @@ struct DraftTraceTests {
     private var request: CVGenerationRequest { CVGenerationRequest(userPrompt: example.description) }
 
     private func generator(
-        _ service: FakeCVGenerationService, checker: FakeClaimChecker = FakeClaimChecker(), sanitizer: CVDataSanitizer = CVDataSanitizer(),
+        _ service: any CVGenerationService, checker: FakeClaimChecker = FakeClaimChecker(), sanitizer: CVDataSanitizer = CVDataSanitizer(),
         logger: RecordingLogger = RecordingLogger(), tracer: any DiagnosticTracer
     ) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
@@ -54,6 +54,49 @@ struct DraftTraceTests {
     /// The removal step of a stage.
     private func removal(_ stage: String, in run: TraceRun) -> TraceStep? {
         run.steps(.removal).first { $0.value("stage") == .token(stage) }
+    }
+
+    // MARK: A run that records nothing
+
+    @Test("A run that records nothing is handed no step: the difference and the JSON are never built")
+    func closedRunBuildsNothing() async throws {
+        let tracer = RefusingTracer()
+
+        let draft = try await generator(drafting(example.draft), tracer: tracer).generateCV(from: request)
+
+        #expect(!draft.cvData.experience.isEmpty)
+        #expect(tracer.calls == 0)
+
+        await #expect(throws: CVGenerationError.serviceFailed) {
+            try await generator(failing(CVGenerationError.serviceFailed), tracer: tracer).generateCV(from: request)
+        }
+        #expect(tracer.calls == 0)
+    }
+
+    // MARK: Two drafts of one kind in flight
+
+    @Test("A cancelled draft's model steps and log events stay in its run when its retry began and finished first")
+    func overlappingDraftsKeepTheirOwnSteps() async throws {
+        let tracer = RecordingTracer()
+        let service = InterleavingService(tracer: tracer, sample: example.draft)
+        let generator = generator(service, tracer: tracer)
+        let request = request
+        var arrivals = service.arrivals.makeAsyncIterator()
+
+        let older = Task { try await generator.generateCV(from: request) }
+        await arrivals.next()
+        // The retry begins while the older draft's model call is still out, and ends before it
+        _ = try await generator.generateCV(from: request)
+        service.releaseFirst()
+        _ = try? await older.value
+
+        #expect(tracer.runs.count == 2)
+        let first = try #require(tracer.runs.first)
+        let second = try #require(tracer.runs.last)
+        #expect(first.steps(.request).compactMap { $0.text("prompt") } == ["call 1"])
+        #expect(first.steps(.response).compactMap { $0.text("raw") }.contains("answer 1"))
+        #expect(second.steps(.request).compactMap { $0.text("prompt") } == ["call 2"])
+        #expect(!second.allText.contains("answer 1"))
     }
 
     // MARK: A finished draft
@@ -337,4 +380,41 @@ private struct UnmappedFailure: Error {}
 private struct TracedDraft: Decodable {
     let cvData: CVData
     let personalItemsUnchecked: Bool
+}
+
+/// A model service whose first call waits until it is released, so that a second draft can begin and end in the meantime. Each
+/// call records its prompt and its answer by kind, as the real service does, and returns the sample.
+@MainActor
+private final class InterleavingService: CVGenerationService {
+    private let tracer: any DiagnosticTracer
+    private let sample: CVData
+    private var calls = 0
+    private var release: CheckedContinuation<Void, Never>?
+    private let arrived: AsyncStream<Void>.Continuation
+    /// Yields once, when the first call is waiting
+    let arrivals: AsyncStream<Void>
+
+    init(tracer: any DiagnosticTracer, sample: CVData) {
+        self.tracer = tracer
+        self.sample = sample
+        (arrivals, arrived) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    func availability() -> AIAvailability { .available }
+
+    func releaseFirst() {
+        release?.resume()
+        release = nil
+    }
+
+    func generateCV(from request: CVGenerationRequest) async throws -> CVData {
+        calls += 1
+        let call = calls
+        tracer.record(.request, [.text("prompt", "call \(call)")], into: .aiDraft)
+        if call == 1 {
+            await withCheckedContinuation { release = $0; arrived.yield() }
+        }
+        tracer.record(.response, [.text("raw", "answer \(call)")], into: .aiDraft)
+        return sample
+    }
 }

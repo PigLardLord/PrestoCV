@@ -18,7 +18,7 @@ struct ImportTraceTests {
 
     private static let step = Duration.milliseconds(7)
 
-    private func importer(tracer: RecordingTracer, logger: RecordingLogger = RecordingLogger(), limits: ImportLimits? = nil) -> ImportCV {
+    private func importer(tracer: any DiagnosticTracer, logger: RecordingLogger = RecordingLogger(), limits: ImportLimits? = nil) -> ImportCV {
         ImportCV(pdfReader: ScriptedPDFReader(), limits: limits ?? self.limits, logger: logger, clock: TickingClock(step: Self.step), tracer: tracer)
     }
 
@@ -39,6 +39,21 @@ struct ImportTraceTests {
     ## Volontariato
     Croce Rossa, dal 2015
     """
+
+    // MARK: A run that records nothing
+
+    @Test("A run that records nothing is handed no step: the section analysis and the JSON are never built")
+    func closedRunBuildsNothing() throws {
+        let tracer = RefusingTracer()
+
+        _ = try importer(tracer: tracer).importText(Self.pastedCV)
+        #expect(throws: (any Error).self) { try importer(tracer: tracer, limits: ImportLimits(
+            maximumPDFBytes: 1_000, maximumPages: 3, maximumCharacters: 5, maximumWords: 1_000, maximumLines: 200, maximumCells: 400,
+            maximumAnalysisSteps: 1_000_000
+        )).importText(Self.pastedCV) }
+
+        #expect(tracer.calls == 0)
+    }
 
     // MARK: A finished import
 

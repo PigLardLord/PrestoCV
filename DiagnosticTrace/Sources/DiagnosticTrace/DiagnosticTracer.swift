@@ -1,3 +1,5 @@
+import Foundation
+
 /// Where the AI draft and the import write each step of a run, with the text it read and wrote (ADR 0032).
 ///
 /// A type that traces takes one in its initialiser, with no default; only the composition root makes the recorder, the
@@ -18,6 +20,38 @@ public protocol TraceRunRecording: Sendable {
     func record(_ name: TraceStepName, _ fields: [TraceField])
     /// Closes the run. Steps and outcomes after the first finish change nothing.
     func finish(_ outcome: TraceOutcome)
+    /// What names this run to the steps recorded by kind while its work runs (`within`); nil for a run that records nothing.
+    var scope: TraceScope? { get }
+    /// Whether the run keeps what it is given. A caller that builds a large payload asks first, and skips the work when not.
+    var isRecording: Bool { get }
+}
+
+/// The run that the work of the current task belongs to. The model service and the logger do not hold the run: they record
+/// by kind, and the recorder reads the scope to find the run of the draft that is asking, so that two drafts of one kind in
+/// flight, such as a cancelled one and its retry, each get their own steps.
+public struct TraceScope: Sendable, Equatable {
+    public let id: UUID
+    public let kind: TraceKind
+
+    public init(id: UUID, kind: TraceKind) {
+        self.id = id
+        self.kind = kind
+    }
+
+    @TaskLocal public static var current: TraceScope?
+}
+
+extension TraceRunRecording {
+    public var scope: TraceScope? { nil }
+    public var isRecording: Bool { scope != nil }
+
+    /// Runs work whose steps and log entries belong to this run, wherever they are recorded by kind: the scope reaches the
+    /// tasks the work starts as well.
+    public func within<T>(
+        isolation: isolated (any Actor)? = #isolation, _ work: () async throws -> T
+    ) async rethrows -> T {
+        try await TraceScope.$current.withValue(scope, operation: work, isolation: isolation)
+    }
 }
 
 extension TraceRunRecording {

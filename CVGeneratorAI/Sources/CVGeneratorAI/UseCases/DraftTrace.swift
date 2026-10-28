@@ -15,6 +15,11 @@ struct DraftTrace {
         run = tracer.begin(.aiDraft)
     }
 
+    /// Runs the draft so that what the model service and the logger record by kind goes to this run.
+    func within<T>(isolation: isolated (any Actor)? = #isolation, _ work: () async throws -> T) async rethrows -> T {
+        try await run.within(isolation: isolation, work)
+    }
+
     /// The step that records what a stage gave. A switch over every stage, so that a new one cannot be added without its step.
     static func step(for stage: DraftLog.Stage) -> TraceStepName {
         switch stage {
@@ -25,6 +30,7 @@ struct DraftTrace {
 
     /// The description the person typed, as the use case received it.
     func input(_ request: CVGenerationRequest) {
+        guard run.isRecording else { return }
         run.record(
             .input, .token("source", "description"), .count("characters", request.userPrompt.count), .text("description", request.userPrompt),
             .token("fallbackLanguage", request.fallbackLanguageCode ?? "none")
@@ -32,6 +38,7 @@ struct DraftTrace {
     }
 
     func availability(_ availability: AIAvailability) {
+        guard run.isRecording else { return }
         switch availability {
         case .available:
             run.record(.availability, .flag("available", true))
@@ -42,6 +49,7 @@ struct DraftTrace {
 
     /// The language of the description, and whether grounding it needs the device's data and finds it.
     func languageData(_ check: LanguageCheck) {
+        guard run.isRecording else { return }
         run.record(
             .languageData, .flag("supported", check.language != nil), .token("language", check.language.map { "\($0.logName)" } ?? "none"),
             .token("data", "\(check.data.logName)")
@@ -51,6 +59,8 @@ struct DraftTrace {
     /// What a stage gave: the model's draft whole, and for every later stage what it removed, changed, added or reordered.
     /// - Parameter before: The draft the stage started from; nil for the model, which starts from the description.
     func stage(_ stage: DraftLog.Stage, gave after: CVData, from before: CVData?) {
+        // The difference and the JSON are the costly part of a draft's trace: a run that records nothing builds neither
+        guard run.isRecording else { return }
         var fields: [TraceField] = [.token("stage", "\(stage.logName)")]
         if let before {
             let difference = DraftDifference(from: before, to: after)
@@ -70,6 +80,7 @@ struct DraftTrace {
 
     /// What the claim check said of each personal item, and why it gave no answer when it did not.
     func claims(_ report: ClaimCheckReport) {
+        guard run.isRecording else { return }
         var fields: [TraceField] = [
             .token("stage", "\(DraftLog.Stage.claimCheck.logName)"), .count("candidates", report.candidates.count),
             .flag("answered", report.failure == nil),
@@ -85,6 +96,7 @@ struct DraftTrace {
 
     /// A draft asked for while the model cannot run.
     func unavailable(_ reason: AIAvailability.Reason) {
+        guard run.isRecording else { return }
         run.record(.failure, .token("check", "availability"), .token("error", "unavailable"), .token("reason", "\(reason.logName)"))
         run.finish(.failed(code: "unavailable"))
     }
@@ -92,12 +104,14 @@ struct DraftTrace {
     /// A description refused before the model was asked: it broke a rule of the request, or the device lacks the language data
     /// that grounding it needs.
     func rejected(check: DraftLog.Check, by error: any Error) {
+        guard run.isRecording else { return }
         run.record(.failure, [.token("check", "\(check.logName)")] + Self.fields(of: error))
         run.finish(.failed(code: Self.code(of: error)))
     }
 
     /// A draft that came to its end: the time of each stage, and the draft the person sees.
     func finished(_ draft: GeneratedDraft, timing: DraftTiming) {
+        guard run.isRecording else { return }
         timing.record(into: run)
         run.record(.finalDraft, .text("draft", Self.json(draft)), .flag("personalItemsUnchecked", draft.personalItemsUnchecked))
         run.finish(.finished)
@@ -105,6 +119,7 @@ struct DraftTrace {
 
     /// A draft that stopped at a stage: why, and the time of each stage up to it.
     func stopped(at stage: DraftLog.Stage, by error: any Error, timing: DraftTiming) {
+        guard run.isRecording else { return }
         if error is CancellationError {
             run.record(.failure, .token("stage", "\(stage.logName)"), .token("error", "cancelled"))
             timing.record(into: run)
