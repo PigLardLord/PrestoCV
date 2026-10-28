@@ -11,24 +11,33 @@ import Foundation
 /// not a nurse", "My mother is a nurse", "I'm looking for a job as a nurse" and "I am a nurse assistant" state no "nurse"; "I was a
 /// nurse", "J'étais étudiant en 2015" and "Ich bin Bäckerin gewesen" state a title the person had. A word after the title can make it
 /// no role the person holds ("Je suis médecin dans un jeu vidéo", "I am a nurse, but only in a game"), so nothing but "and" may
-/// follow it in its sentence: "I am a nurse in Leeds" gives no headline either, the safe way to fail.
+/// follow it in its sentence: "I am a nurse in Leeds" gives no headline either, the safe way to fail. What follows the title is read in
+/// the sentence as the person wrote it, not as the claimed clauses leave it: they leave out a clause that denies ("I am a nurse, but
+/// not in real life"), and the title would end its sentence there.
 enum StatedTitle {
-    /// `title` when a clause of `claimed`, the clauses that claim something for the person, states it as above; otherwise nil.
-    static func title(_ title: String?, in claimed: DescriptionText) -> String? {
-        guard let title = claimed.named(title) else { return nil }
+    /// `title` when a sentence states it as above both in `claimed`, the clauses that claim something for the person, and in `source`,
+    /// the description as written, sentence by sentence (`claimed` keeps one sentence for each of `source`); otherwise nil.
+    static func title(_ title: String?, in claimed: DescriptionText, said source: DescriptionText) -> String? {
+        guard let title = claimed.named(title), claimed.sentences.count == source.sentences.count else { return nil }
         let wanted = EntryEvidence.foldedWords(of: title)
         let language = claimed.explainer.language
 
-        let sentences = DescriptionClauses(sentences: claimed.sentences.map(\.raw), protecting: [wanted], language: language).sentences
-        let isStated = sentences.contains { clauses in
-            clauses.indices.contains { index in
-                let words = clauses[index].words
-                guard words.count >= wanted.count, words.suffix(wanted.count).map(\.folded) == wanted else { return false }
-                guard index == clauses.count - 1 || endsWithAnd(clauses[index], in: language) else { return false }
-                return isSaid(before: words.count - wanted.count, in: words, language: language)
-            }
+        let isStated = claimed.sentences.indices.contains { index in
+            states(wanted, in: claimed.sentences[index].raw, language: language)
+                && states(wanted, in: source.sentences[index].raw, language: language)
         }
         return isStated ? title : nil
+    }
+
+    /// Whether a clause of `sentence` says the title as above, with nothing after it in the sentence but "and" and the clause it starts.
+    private static func states(_ wanted: [String], in sentence: String, language: Vocabulary.Language?) -> Bool {
+        let clauses = DescriptionClauses(sentences: [sentence], protecting: [wanted], language: language).sentences.first ?? []
+        return clauses.indices.contains { index in
+            let words = clauses[index].words
+            guard words.count >= wanted.count, words.suffix(wanted.count).map(\.folded) == wanted else { return false }
+            guard index == clauses.count - 1 || endsWithAnd(clauses[index], in: language) else { return false }
+            return isSaid(before: words.count - wanted.count, in: words, language: language)
+        }
     }
 
     /// Whether the words before `start` say the title as what the person is now: the lead-in, the present of "to be" in the first

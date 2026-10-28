@@ -104,7 +104,7 @@ public struct CVDataSanitizer: Sendable {
 
         let personalInfo = Self.withStatedTitle(
             sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
-            from: cvData.experience, claimed
+            from: cvData.experience, claimed, said: source
         )
         let experience = sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? [])
         let education = sanitize(entries.studies, source, entries)
@@ -166,10 +166,12 @@ public struct CVDataSanitizer: Sendable {
 
     /// The person's headline, or when the draft gives none, the title of a job with no employer and no date that the person states as
     /// what they are (`StatedTitle`, #354): such a job goes (next), and its title is the person's own ("I am a plumber").
-    private static func withStatedTitle(_ info: PersonalInfo, from jobs: [Experience], _ claimed: DescriptionText) -> PersonalInfo {
+    private static func withStatedTitle(
+        _ info: PersonalInfo, from jobs: [Experience], _ claimed: DescriptionText, said source: DescriptionText
+    ) -> PersonalInfo {
         guard info.title == nil else { return info }
         let titleOnly = jobs.filter { $0.company.presentValue == nil && $0.startDate.presentValue == nil && $0.endDate.presentValue == nil }
-        guard let title = titleOnly.lazy.compactMap({ StatedTitle.title($0.title, in: claimed) }).first else { return info }
+        guard let title = titleOnly.lazy.compactMap({ StatedTitle.title($0.title, in: claimed, said: source) }).first else { return info }
 
         return PersonalInfo(
             name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,

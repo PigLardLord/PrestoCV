@@ -6551,6 +6551,17 @@ extension GroundingRows {
         rows.append(row("a-title-followed-by-a-place-is-no-headline",
                         "a word after the title may say the role is not the person's: none may follow it, the safe way to fail",
                         "I am a nurse in Leeds.", CVData(experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-before-a-denial-is-no-headline-en",
+                        "the clause that denies the title is no claim, but the title does not end its sentence as written: no headline",
+                        "I am a nurse, but not in real life.", CVData(experience: [job("nurse")]), .exactly(CVData())))
+        rows.append(row("a-title-before-a-denial-is-no-headline-fr",
+                        "the clause that denies the title is no claim, but the title does not end its sentence as written: no headline",
+                        "Je suis infirmière, mais pas dans la vraie vie.", CVData(experience: [job("infirmière")]), .exactly(CVData()),
+                        language: "fr"))
+        rows.append(row("a-title-before-a-denial-gives-no-summary",
+                        "a title the person denies is no fact to write around: the summary written around it goes too",
+                        "I am a nurse, but not in real life.",
+                        CVData(summary: "A nurse who cares for patients on a busy ward.", experience: [job("nurse")]), .exactly(CVData())))
         rows.append(row("a-title-followed-by-the-end-of-the-sentence-is-the-headline",
                         "the sentence ends after the title: the title is the headline",
                         "I am a plumber.", CVData(experience: [job("plumber")]), .exactly(CVData(personalInfo: person(title: "plumber")))))
