@@ -324,18 +324,19 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "de").filter { $0.kind == .toolAsSoftSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
     }
 
-    @Test("An interest that starts with the finite verb of its clause is a clause; a pastime with an adjective or an infinitive is not")
-    func verbAsInterest() {
+    @Test("An interest that starts with the finite verb of its clause is a clause, also with a capital; a pastime with an adjective or an infinitive is not",
+          arguments: ["spiele Schach", "Spiele Schach"])
+    func verbAsInterest(clause: String) {
         let input = DraftingInput(
             id: "reader-de", kind: .plain, language: "de",
             description: "Ich arbeite als Feinmechaniker in Suhl. In meiner Freizeit gehe ich klettern, höre klassische Musik und spiele Schach.",
             facts: [], traps: []
         )
-        let cv = CVData(interests: ["klettern", "klassische Musik", "spiele Schach"])
+        let cv = CVData(interests: ["klettern", "klassische Musik", clause])
 
         let found = ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
 
-        #expect(found.filter { $0.kind == .clauseAsInterest }.map(\.value) == ["spiele Schach"])
+        #expect(found.filter { $0.kind == .clauseAsInterest }.map(\.value) == [clause])
     }
 
     @Test("A year the description gives a school and the draft does not hold is counted")

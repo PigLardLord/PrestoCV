@@ -559,7 +559,8 @@ enum ReaderRules {
         let start = input.description.distance(from: input.description.startIndex, to: range.lowerBound)
         let tagger = DeviceLexicalTagger()
         return tagger.verbs(in: input.description, language: input.language).contains { $0.contains(start) }
-            || input.language == "de" && tagger.verbs(in: "ich " + interest, language: "de").contains { $0.contains(4) }
+            || input.language == "de" && tagger.verbs(in: "ich " + interest.prefix(1).lowercased() + interest.dropFirst(), language: "de")
+                .contains { $0.contains(4) }
     }
 
     /// The words of `text`, lowered, folded and split at anything not a letter.

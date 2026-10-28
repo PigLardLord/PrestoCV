@@ -302,9 +302,9 @@ public struct CVDataSanitizer: Sendable {
             }) else { continue }
             let verbs = lexicalClasses.verbs(in: sentence.raw, language: language.rawValue)
             // A German verb that shares the subject of an earlier clause ("... und spiele Schach") is tagged as the person says it,
-            // after "ich": in the sentence the tags read it as an adjective.
-            let saidAlone = language == .german && lexicalClasses.verbs(in: "ich " + interest, language: language.rawValue)
-                .contains { $0.contains(4) }
+            // after "ich" and in lower case: in the sentence the tags read it as an adjective, and capitalized as a noun.
+            let saidAlone = language == .german
+                && lexicalClasses.verbs(in: "ich " + Self.lowercasingFirst(interest), language: language.rawValue).contains { $0.contains(4) }
             guard saidAlone || verbs.contains(where: { $0.contains(said[start].range.lowerBound) }) else { return interest }
             let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.folded) }
             guard let next = rest.first, rest.contains(where: { $0.folded.count >= 3 }) else { return interest }
@@ -552,6 +552,11 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// The lowercased runs of letters of `text`.
+    /// `text` with its first letter in lower case, the rest as written.
+    static func lowercasingFirst(_ text: String) -> String {
+        text.prefix(1).lowercased() + text.dropFirst()
+    }
+
     static func letterWords(of text: String) -> [String] {
         text.lowercased().split { !$0.isLetter }.map(String.init)
     }

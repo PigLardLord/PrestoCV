@@ -72,6 +72,17 @@ struct InterestQualityTests {
         #expect(sundays.interests == ["chess", "hiking in the Alps"])
     }
 
+    #if canImport(NaturalLanguage)
+    @Test("A German interest that starts with a capital verb after \"und\" is the pastime the verb names, by the device's tags (#354)")
+    func capitalVerbOfAnInterestGoes() throws {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: DeviceLexicalTagger(), wordList: TableWordList())
+
+        let leisure = try german.sanitize(CVData(interests: ["klettern", "klassische Musik", "Spiele Schach"]), against: Self.german)
+
+        #expect(leisure.interests == ["klettern", "klassische Musik", "Schach"])
+    }
+    #endif
+
     @Test("A hobby with the person's own things in it stays")
     func hobbiesStay() throws {
         let draft = CVData(interests: ["chess", "long walks with my dog", "hiking in the Alps"])
