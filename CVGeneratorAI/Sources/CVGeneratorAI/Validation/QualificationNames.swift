@@ -13,8 +13,8 @@ enum QualificationNames {
         gmat lsat mcat usmle nclex gcse abitur baccalaureat maturita
         """
         let certifications = """
-        pmp cissp cisa cism ccna ccnp ccie comptia itil acca cfa frm mcse mcsa mcsd ceh oscp rhce rhcsa togaf cbap
-        cspo ecdl icdl bls acls pals atls cpr
+        pmp pmi cissp cisa cism ccna ccnp ccie comptia itil acca cfa cma frm mcse mcsa mcsd ceh oscp rhce rhcsa togaf cbap
+        csm psm cspo ecdl icdl bls acls pals atls cpr
         """
         return Set([exams, certifications, examWordList].flatMap { $0.split(whereSeparator: \.isWhitespace).map(String.init) })
     }()
@@ -25,10 +25,11 @@ enum QualificationNames {
     private static let examWords = Set(examWordList.split(whereSeparator: \.isWhitespace).map(String.init))
 
     /// Names of an exam or a certification that are also words or technologies: "Delta Lake", "SAT solving", "Praxis", "GRE tunnel",
-    /// "CPA" (cost per acquisition), "OCP" (OpenShift). Such a word is a qualification only as the whole name or with a word of
+    /// "CPA" (cost per acquisition), "OCP" (OpenShift). A word certifications are written with ("PSM I", "PMI-ACP", "CSM")
+    /// stays in the word list. Such a word is a qualification only as the whole name or with a word of
     /// `qualifiers`, wherever it stands ("SAT exam", "GRE General Test"), never with another word alone ("SAT solving").
     private static let ambiguousWords: Set<String> = [
-        "delta", "sat", "gre", "praxis", "onset", "pmi", "cpa", "cma", "ocp", "csm", "psm",
+        "delta", "sat", "gre", "praxis", "onset", "cpa", "ocp",
     ]
     /// The words that make an ambiguous word the name of an exam or a certification.
     private static let qualifiers: Set<String> = {
