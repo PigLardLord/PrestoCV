@@ -198,6 +198,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case repeatedSentence
     /// A year the description gives an entry and the draft does not hold (`InventedFacts.Report.lostYears`).
     case lostYear
+    /// A job description that writes a run of five words twice: one duty said twice.
+    case repeatedDuty
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -216,6 +218,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .clauseAsInterest: "a clause as an interest"
         case .repeatedSentence: "a repeated summary sentence"
         case .lostYear: "a lost year"
+        case .repeatedDuty: "a duty said twice in one job"
         }
     }
 }
@@ -306,7 +309,25 @@ enum ReaderRules {
         if !job.current, tenses.count > 1 {
             found.append(ReaderFinding(kind: .mixedTense, path: path, value: description))
         }
+        if let run = repeatedRun(in: description) {
+            found.append(ReaderFinding(kind: .repeatedDuty, path: path, value: run))
+        }
         return found
+    }
+
+    /// The first run of five words that `text` writes twice, the second time apart from the first, if any.
+    static func repeatedRun(in text: String) -> String? {
+        let words = letterWords(of: text)
+        var seen: [String: Int] = [:]
+        for start in words.indices.dropLast(4) {
+            let run = words[start..<(start + 5)].joined(separator: " ")
+            if let earlier = seen[run] {
+                if start - earlier >= 5 { return run }
+            } else {
+                seen[run] = start
+            }
+        }
+        return nil
     }
 
     /// Whether `sentence` starts with an infinitive or a gerund: by the endings of the word, a rough rule; none in German, whose

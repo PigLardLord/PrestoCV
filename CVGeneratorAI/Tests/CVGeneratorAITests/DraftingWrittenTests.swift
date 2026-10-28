@@ -270,6 +270,20 @@ struct DraftingWrittenTests {
         ])
     }
 
+    @Test("A job that writes a run of five words twice is counted once, and words of one duty said once are not")
+    func repeatedDuty() {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "Sistemavo gli scaffali, dando una mano con le consegne ai clienti. "
+                + "Davo anche una mano con le consegne ai clienti."),
+            Experience(company: "B", description: "Sistemavo gli scaffali. Davo anche una mano con le consegne ai clienti."),
+            Experience(company: "C", description: "Davo una mano con le consegne. Davo una mano con gli ordini."),
+        ])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .repeatedDuty } == [
+            ReaderFinding(kind: .repeatedDuty, path: "experience[0].description", value: "una mano con le consegne"),
+        ])
+    }
+
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])

@@ -127,4 +127,30 @@ struct JobClausesTests {
         #expect(withDuties.experience.first?.description == "I was setting up the PA systems and mixing the support acts.")
         #expect(plain.experience.first?.description == "setting up the PA systems and mixing the support acts.")
     }
+
+    // MARK: A duty said twice
+
+    static let storeroom = """
+        Dal 2016 al 2021 ho fatto il magazziniere alla Ferramenta Bruni di Rieti, sistemando gli scaffali e ricevendo la merce dei \
+        fornitori.
+        Alla Ferramenta Bruni davo anche una mano con le consegne ai clienti.
+        """
+
+    @Test("A clause of a job's quote that a duty the person said holds, after its verb, goes; one with a word of its own stays (#354)",
+          arguments: [
+              ("sistemando gli scaffali, dando una mano con le consegne ai clienti", false),
+              ("sistemando gli scaffali, dando una mano con le consegne dei fornitori", true),
+          ])
+    func clauseSaidTwice(quote: String, staysWhole: Bool) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let draft = CVData(experience: [Self.job("magazziniere", "Ferramenta Bruni", from: "2016", to: "2021", description: quote)])
+        let written = DraftWriting(summary: nil, roleDescriptions: ["Controllavo le bolle di carico."], technologies: [], softSkills: [])
+
+        let job = try sanitizer.sanitize(draft, writing: written, against: Self.storeroom).experience.first
+        let text = try #require(job?.description)
+
+        #expect(text.components(separatedBy: "una mano con le consegne").count - 1 == (staysWhole ? 2 : 1), "\(text)")
+        #expect(text.contains("una mano con le consegne dei fornitori") == staysWhole, "\(text)")
+        #expect(text.contains("Davo anche una mano con le consegne ai clienti."), "\(text)")
+    }
 }

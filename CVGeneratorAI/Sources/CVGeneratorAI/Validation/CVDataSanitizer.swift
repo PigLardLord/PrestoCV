@@ -235,6 +235,7 @@ public struct CVDataSanitizer: Sendable {
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
                     // A quoted sentence the duties restate goes, so the job's text keeps one voice.
                     .filter { !Self.letterWords(of: $0).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains) }
+                    .map { Self.withoutClausesSaid($0, in: pinned) }
                     .joined(separator: " ").presentValue
             }
             // A job written a section at a time is in the first person, even when none of its written duties stays: a quoted
@@ -316,6 +317,23 @@ public struct CVDataSanitizer: Sendable {
         let added = SentenceSplitter.sentences(in: second).filter { !held.contains(DescriptionText.normalized($0)) }
         guard !added.isEmpty else { return first }
         return ([Self.ended(first)] + added.map(Self.capitalized)).joined(separator: " ")
+    }
+
+    /// `sentence` without each clause after its first that one of the duties the person said holds, by the words after its verb:
+    /// three or more of them, of three letters or more, all words of that duty ("dando una mano con gli ordini dei ricambi" and the
+    /// person's own "Davo anche una mano con gli ordini dei ricambi"), so that the job's text says the duty once, in the person's
+    /// words (#354). A clause with a word that no one of them has stays.
+    static func withoutClausesSaid(_ sentence: String, in duties: [String]) -> String {
+        let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = trimmed.last.map { ".!?…".contains($0) ? String($0) : "" } ?? ""
+        let clauses = trimmed.dropLast(end.count).components(separatedBy: ", ")
+        guard clauses.count > 1 else { return sentence }
+        let dutyWords = duties.map { Set(Self.letterWords(of: $0)) }
+        let kept = [clauses[0]] + clauses.dropFirst().filter { clause in
+            let said = Self.letterWords(of: clause).dropFirst().filter { $0.count >= 3 }
+            return said.count < 3 || !dutyWords.contains { words in said.allSatisfy(words.contains) }
+        }
+        return kept.count == clauses.count ? sentence : kept.joined(separator: ", ") + end
     }
 
     /// `text` with a full stop after it, unless it ends with one, a question mark, an exclamation mark or an ellipsis.
