@@ -294,28 +294,36 @@ public struct CVDataSanitizer: Sendable {
     /// A skill the description names is a fact of the person: it stays only as a clause that claims it gives it (`claimed`), so "I have
     /// never used Python" gives no Python. A skill whose name is one of the interests that the description gives, and that the
     /// person mentions only as leisure ("In my free time I like chess and hiking"), is a hobby: as a skill it would claim an ability
-    /// the person never claimed, so it goes, and the interest stays. A skill the person mentions anywhere else ("proficient in
-    /// Python", a job's clause, a list of skills) stays; another person's clause counts for neither (see `LeisureMentions`).
+    /// the person never claimed, so it goes, and the interest stays. The same holds for a skill that is part of an interest ("cooking
+    /// for friends" of "cooking for friends at the weekend"). A skill the person mentions anywhere else ("proficient in Python", a
+    /// job's clause, a list of skills) stays; another person's clause counts for neither (see `LeisureMentions`). A skill whose words
+    /// are all names of languages ("English", "Deutsch") is a language, which the draft lists apart: as a skill it goes.
     ///
     /// A skill the description does not name is one the model wrote for the person's role (ADR 0031): it stays, without a level, only
-    /// when `inferring` accepts it, and within `InferredSkills.caps` once the named skills of its kind are counted.
+    /// when `inferring` accepts it, and within `InferredSkills.caps` once the named skills of its kind are counted. One whose name ends
+    /// with a named skill ("Adobe Illustrator" beside "Illustrator") is that skill again, and goes.
     private func sanitize(
         _ skills: [Skill], _ source: DescriptionText, claimed: DescriptionText, interests: [String], _ entries: Entries,
         inferring inferred: InferredSkills?
     ) -> [Skill] {
         let names = skills.compactMap { claimed.named($0.name) }
-        let hobbies = Set(interests.map { DescriptionText.normalized($0) })
+        let hobbies = interests.map { DescriptionText.normalized($0) }
         let cleaned = skills.compactMap { skill -> (skill: Skill, isNamed: Bool)? in
             guard source.named(skill.name) != nil else {
                 return inferred?.accepted(skill.name).map { (skill: Skill(name: $0, kind: skill.kind), isNamed: false) }
             }
-            guard let name = claimed.named(skill.name) else { return nil }
-            let isAHobby = hobbies.contains(DescriptionText.normalized(name)) && entries.mentionsOnlyAsLeisure(name, interests: interests)
+            guard let name = claimed.named(skill.name), !Self.isALanguage(name) else { return nil }
+            let normalized = DescriptionText.normalized(name)
+            let isAHobby = hobbies.contains { !DescriptionText.spans(of: normalized, in: $0).isEmpty }
+                && entries.mentionsOnlyAsLeisure(name, interests: interests)
             guard !isAHobby else { return nil }
             let allowed = claimed.levels(of: name, among: names, vocabulary: .skills)
             return (skill: Skill(name: name, level: statedLevel(skill.level, allowed: allowed), kind: skill.kind), isNamed: true)
         }
-        let kept = unique(cleaned) { $0.skill.name }
+        let named = cleaned.filter(\.isNamed).map { DescriptionText.normalized($0.skill.name) }
+        let kept = unique(cleaned) { $0.skill.name }.filter { item in
+            item.isNamed || !named.contains { DescriptionText.normalized(item.skill.name).hasSuffix(" " + $0) }
+        }
         var room = InferredSkills.caps
         for named in kept where named.isNamed { room[named.skill.kind, default: 0] -= 1 }
         return kept.compactMap { item in
@@ -361,6 +369,12 @@ public struct CVDataSanitizer: Sendable {
     /// An employer or a school without its leading indefinite article ("a nursery"), when what is left is a quote too.
     private func withoutArticle(_ name: String, _ source: DescriptionText) -> String {
         source.named(EntryWording.withoutLeadingArticle(name, in: source.explainer.language)) ?? name
+    }
+
+    /// Whether every word of a skill's name is the name of a language ("English", "italiano inglese").
+    private static func isALanguage(_ name: String) -> Bool {
+        let words = Word.words(in: name)
+        return !words.isEmpty && words.allSatisfy { InferredSkills.languageNames.contains($0.folded) }
     }
 
     /// The model's level, if the description allows it.

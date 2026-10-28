@@ -381,6 +381,7 @@ enum GroundingRows {
         rows += bareNamesBeforeAVerblessContact()
         rows += namesInAFragmentBeforeAContact()
         rows += hobbiesAreNoSkills()
+        rows += languagesAreNoSkills()
         rows += skillsTheDescriptionClaims()
         rows += hobbiesOfThePersonAlone()
         rows += factsTheDescriptionWithdraws()
@@ -3225,6 +3226,55 @@ enum GroundingRows {
                         "chess coaching is a skill the person claims, though it holds the interest chess: it stays",
                         "My skills include chess coaching and first aid. In my free time I like chess.",
                         CVData(skills: [Skill(name: "chess coaching"), Skill(name: "first aid")], interests: ["chess"]), .unchanged))
+
+        // #354: the model listed part of an interest as a technology ("cozinhar para os amigos" of "cozinhar para os amigos ao fim
+        // de semana"). Invented sample wording.
+        rows.append(row("a-part-of-a-hobby-is-no-skill-pt",
+                        "baking for the neighbours is part of an interest the person mentions only as leisure: the skill goes, the interests stay",
+                        "Gosto de jogar xadrez e de fazer bolos para os vizinhos ao domingo.",
+                        CVData(skills: [Skill(name: "fazer bolos para os vizinhos")], interests: ["jogar xadrez", "fazer bolos para os vizinhos ao domingo"]),
+                        .exactly(CVData(interests: ["jogar xadrez", "fazer bolos para os vizinhos ao domingo"])), language: "pt"))
+        rows.append(row("a-part-of-a-hobby-is-no-skill-en",
+                        "baking is part of an interest the person mentions only as leisure: the skill goes, the interest stays",
+                        "In my free time I like baking for the neighbours.",
+                        CVData(skills: [Skill(name: "baking")], interests: ["baking for the neighbours"]),
+                        .exactly(CVData(interests: ["baking for the neighbours"]))))
+        rows.append(row("a-skill-in-a-list-stays-though-part-of-a-hobby",
+                        "baking stands in the list of skills as well as inside a pastime: the skill stays",
+                        "My skills include baking and first aid. In my free time I like baking for the neighbours.",
+                        CVData(skills: [Skill(name: "baking"), Skill(name: "first aid")], interests: ["baking for the neighbours"]),
+                        .unchanged))
+        return rows
+    }
+
+    // MARK: A language is no skill (#354)
+
+    /// The model listed the person's languages as skills ("English", "Deutsch", soft skills "español" and "inglés"): a language is
+    /// listed apart, so a skill whose words are all names of languages goes, and the languages stay. A skill that only holds the
+    /// name of a language among other words stays.
+    private static func languagesAreNoSkills() -> [GroundingRow] {
+        typealias Variant = (language: String, description: String, first: String, second: String, tool: String)
+        var variants: [Variant] = []
+        variants.append(("en", "I speak English and Hindi. I use Excel.", "English", "Hindi", "Excel"))
+        variants.append(("it", "Parlo italiano e inglese. Uso Excel.", "italiano", "inglese", "Excel"))
+        variants.append(("de", "Ich spreche Deutsch und Englisch. Ich benutze Excel.", "Deutsch", "Englisch", "Excel"))
+        variants.append(("es", "Hablo español e inglés. Uso Excel.", "español", "inglés", "Excel"))
+        variants.append(("fr", "Je parle français et anglais. J'utilise Excel.", "français", "anglais", "Excel"))
+        variants.append(("pt", "Falo português e inglês. Uso Excel.", "português", "inglês", "Excel"))
+
+        var rows: [GroundingRow] = []
+        for v in variants {
+            let languages = [Language(name: v.first), Language(name: v.second)]
+            rows.append(row("a-language-is-no-skill-\(v.language)",
+                            "the languages are skills too, one a technology and one a soft skill: as skills they go, the languages and the tool stay",
+                            v.description,
+                            CVData(skills: [Skill(name: v.first), Skill(name: v.second, kind: .softSkill), Skill(name: v.tool)], languages: languages),
+                            .exactly(CVData(skills: [Skill(name: v.tool)], languages: languages)), language: v.language))
+        }
+        rows.append(row("a-skill-that-holds-a-language-stays",
+                        "business English is a skill the person claims, though it holds the name of a language: it stays",
+                        "My skills include business English and Excel.",
+                        CVData(skills: [Skill(name: "business English"), Skill(name: "Excel")]), .unchanged))
         return rows
     }
 
@@ -6456,6 +6506,14 @@ extension GroundingRows {
             secondGoes("markup-goes", "markup is no skill name", "<b>Phonics</b>"),
             secondGoes("too-long-goes", "a skill has at most four words", "Planning engaging lessons for young pupils"),
             secondGoes("repeated-goes", "the draft keeps one skill of a name", "lesson planning"),
+            skillsRow("named-again-goes", "Microsoft Excel is the named Excel again, with its maker: it goes",
+                      [Skill(name: "Excel"), planning, Skill(name: "Microsoft Excel")],
+                      .keeping([Drop("skills[2].name", "Excel is named")]),
+                      description: AppExample.en + " I use Excel every day."),
+            skillsRow("named-tool-with-a-task-stays", "Excel modelling is a task done with the named Excel, not Excel again: it stays",
+                      [Skill(name: "Excel"), planning, Skill(name: "Excel modelling")],
+                      .unchanged,
+                      description: AppExample.en + " I use Excel every day."),
             secondGoes("from-a-wish-goes", "python is only in a wish of the person", "Python for teachers",
                        description: AppExample.en + " I would like to learn Python."),
             skillsRow("interest-goes", "a skill that is an interest of the draft would claim an ability the person never claimed",
