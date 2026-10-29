@@ -82,7 +82,9 @@ final class SectionDraft {
             brief.roles[number].avoid = check?.avoid ?? []
             if let check {
                 brief.roles[number].said = check.pinned.count
-                brief.roles[number].adding = DraftBrief.Role.adding(said: check.pinned.count)
+                // The duties the person said, by clause: two sentences of two duties each are four (#354, round 15).
+                let clauses = check.pinned.reduce(0) { $0 + DutyClauses.count(in: $1, language: language) }
+                brief.roles[number].adding = DraftBrief.Role.adding(said: max(clauses, check.pinned.count))
             }
         }
         duties = Array(repeating: nil, count: brief.roles.count)
