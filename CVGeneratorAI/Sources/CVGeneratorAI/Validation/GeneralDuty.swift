@@ -5,7 +5,7 @@ import Foundation
 /// duties of the current job (`CVDataSanitizer.generalDutyJob(among:)`).
 ///
 /// The sentence is one of the person's own (`Grounding.ownSentences`); here it also opens with the person's verb in the present, and
-/// holds no word of the past, of being or staying ("I am", "Sono"), of liking, of speaking a language or playing, of working "as" a
+/// holds no word of the past, of being or staying ("I am", "Sono"), of knowing ("Ich kenne mich mit … aus"), of liking, of speaking a language or playing, of working "as" a
 /// title, of a quality at work, and no number, month, duration, negation or qualification (`WrittenTextWords`): those stay where
 /// their own rules put them, as qualities, interests, languages or the person's title.
 enum GeneralDuty {
@@ -57,28 +57,28 @@ enum GeneralDuty {
     /// The languages whose sentences keep the subject pronoun.
     private static let requiresPronoun: Set<Vocabulary.Language> = [.english, .german, .french]
 
-    /// The words, folded, that make the sentence no duty: the past and its auxiliaries, being and staying, liking, speaking a
-    /// language, playing, and working "as" a title.
+    /// The words, folded, that make the sentence no duty: the past and its auxiliaries, being and staying, knowing or mastering
+    /// (a skill, not a duty), liking, speaking a language, playing, and working "as" a title.
     private static let stopWords: [Vocabulary.Language: Set<String>] = [
         .english: [
             "am", "was", "were", "have", "has", "had", "did", "used", "stay", "remain", "like", "love", "enjoy", "speak", "play",
-            "as",
+            "as", "know", "knows", "master",
         ],
         .italian: [
             "sono", "ero", "stato", "stata", "ho", "avevo", "sto", "resto", "rimango", "piace", "piacciono", "amo", "adoro", "parlo",
-            "gioco", "pratico", "come",
+            "gioco", "pratico", "come", "conosco", "padroneggio",
         ],
         .german: [
-            "bin", "war", "habe", "hatte", "bleibe", "mag", "liebe", "gern", "gerne", "spreche", "spiele", "als",
+            "bin", "war", "habe", "hatte", "bleibe", "mag", "liebe", "gern", "gerne", "spreche", "spiele", "als", "kenne", "weiss", "weiß", "beherrsche",
         ],
         .spanish: [
-            "soy", "era", "fui", "estoy", "he", "habia", "gusta", "encanta", "hablo", "juego", "practico", "como",
+            "soy", "era", "fui", "estoy", "he", "habia", "gusta", "encanta", "hablo", "juego", "practico", "como", "conozco", "domino",
         ],
         .french: [
-            "suis", "etais", "ai", "avais", "reste", "aime", "adore", "parle", "joue", "pratique", "comme",
+            "suis", "etais", "ai", "avais", "reste", "aime", "adore", "parle", "joue", "pratique", "comme", "connais", "sais", "maitrise",
         ],
         .portuguese: [
-            "sou", "era", "fui", "estou", "tenho", "fico", "gosto", "adoro", "amo", "falo", "jogo", "pratico", "como",
+            "sou", "era", "fui", "estou", "tenho", "fico", "gosto", "adoro", "amo", "falo", "jogo", "pratico", "como", "conheco", "domino",
         ],
     ]
 }

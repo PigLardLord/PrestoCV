@@ -207,13 +207,31 @@ struct SectionChecksTests {
     ])
 
     @Test(
-        "ADR 0031, D7: a present sentence of work with no job is a duty of the current job, in the step and the final check alike; one in the past, a quality, a pastime and one that names another employer are none",
+        "ADR 0031, D7: a sentence of what the person does is a duty in each language; one of what the person knows is none",
+        arguments: [
+            ("Ich verlege die Wärmepumpen und prüfe die Kältekreise.", Vocabulary.Language.german, true),
+            ("Ich kenne mich mit Wärmepumpen aus.", .german, false),
+            ("Je règle les compresseurs.", .french, true),
+            ("Je connais bien les compresseurs.", .french, false),
+            ("Reviso los compresores.", .spanish, true),
+            ("Conozco bien los compresores.", .spanish, false),
+            ("Reviso os compressores.", .portuguese, true),
+            ("Conheço bem os compressores.", .portuguese, false),
+        ]
+    )
+    func generalDutyIsNoKnowledge(sentence: String, language: Vocabulary.Language, holds: Bool) {
+        #expect(GeneralDuty.holds(sentence, language: language) == holds)
+    }
+
+    @Test(
+        "ADR 0031, D7: a present sentence of work with no job is a duty of the current job, in the step and the final check alike; one in the past, a quality, a pastime, a knowledge and one that names another employer are none",
         arguments: [
             ("Taro le valvole e smonto i riduttori delle linee.", true),
             ("Taravo le valvole e smontavo i riduttori delle linee.", false),
             ("Sono paziente e mi piace lavorare in gruppo.", false),
             ("Gioco a calcetto con gli amici.", false),
             ("Taro le valvole per la Ditta Ponzio.", false),
+            ("Conosco bene le celle frigorifere e i compressori.", false),
         ]
     )
     func generalDutyOfTheCurrentJob(sentence: String, moves: Bool) throws {
@@ -249,11 +267,12 @@ struct SectionChecksTests {
     #if canImport(NaturalLanguage)
     // English verbs are read with the device's language data, which only an Apple platform has.
     @Test(
-        "ADR 0031, D7: in English too, a present sentence of work with no job is a duty of the current job; one in the past and a pastime are none",
+        "ADR 0031, D7: in English too, a present sentence of work with no job is a duty of the current job; one in the past, a pastime and a knowledge are none",
         arguments: [
             ("I rebuild the carburettors and tune the fuel pumps.", true),
             ("I rebuilt the carburettors and tuned the fuel pumps.", false),
             ("I play football.", false),
+            ("I know the marine diesel engines well.", false),
         ]
     )
     func generalDutyInEnglish(sentence: String, moves: Bool) throws {
