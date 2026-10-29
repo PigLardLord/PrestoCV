@@ -217,6 +217,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// characters or more: a duty the person did not say, in a job they described ("I coordinated the movement of heavy equipment";
     /// ADR 0031, D6).
     case fillerDuty
+    /// A summary sentence whose subject is a bare word of the person's work, a word of a title or of the field with no article,
+    /// followed by a verb "to be" and no word of the person before it ("Manutenzione è la mia attività principale."; #354, round 1).
+    case bareSubjectSummary
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -242,6 +245,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .bareInterest: "an interest without the verb of its phrase"
         case .unwrittenStatement: "a stated duty or quality the draft does not hold"
         case .fillerDuty: "a duty not said, in a job the person described"
+        case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
         }
     }
 }
@@ -511,8 +515,32 @@ enum ReaderRules {
         }
         found += sentences.filter { inTheThirdPerson($0, titles: titles, language: input.language) }
             .map { ReaderFinding(kind: .thirdPersonSummary, path: "summary", value: $0) }
+        let workWords = Set((titles.flatMap { $0 } + InventedFacts.words(of: input.field ?? "")).filter { $0.count > 3 })
+        found += sentences.filter { hasBareSubject($0, of: workWords) }
+            .map { ReaderFinding(kind: .bareSubjectSummary, path: "summary", value: $0) }
         return found
     }
+
+    /// Whether `sentence` starts with a word of `workWords` and has a verb "to be" among its next three words, with no word of the
+    /// person before it: the work spoken of as a thing, not the person speaking.
+    static func hasBareSubject(_ sentence: String, of workWords: Set<String>) -> Bool {
+        let words = sentence.lowercased().split { !$0.isLetter }.map(String.init)
+        guard let first = words.first, workWords.contains(fold(first)),
+              let copula = words.dropFirst().prefix(3).firstIndex(where: copulas.contains) else { return false }
+        return !words[..<copula].contains(where: personWords.contains)
+    }
+
+    /// The forms of "to be" of the third person, accented: "è" is, "e" is and.
+    static let copulas: Set<String> = [
+        "is", "are", "was", "were", "è", "sono", "era", "erano", "ist", "sind", "war", "waren", "es", "son", "fue", "est", "sont",
+        "était", "é", "são", "foi",
+    ]
+
+    /// The words of the person of the six languages, lower case.
+    static let personWords: Set<String> = [
+        "i", "my", "me", "io", "mio", "mia", "miei", "mie", "mi", "ich", "mein", "meine", "mich", "mir", "je", "j", "mon", "ma", "mes",
+        "moi", "yo", "mis", "eu", "meu", "minha", "meus", "minhas",
+    ]
 
     /// Whether `sentence` starts, after a title of the person and its article, with "se" or "si" before a word, or with a word of 4
     /// letters or more ending in -a or -e and an article right after it: a rough rule for a verb of the third person, in the

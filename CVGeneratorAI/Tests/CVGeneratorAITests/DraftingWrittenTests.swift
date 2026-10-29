@@ -313,6 +313,20 @@ struct DraftingWrittenTests {
         ])
     }
 
+    @Test("A summary sentence whose subject is a bare word of a title or of the field, before a verb to be, is counted; one as the person is not (#354, round 1)")
+    func bareSubjectSummary() throws {
+        let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
+        let cv = CVData(
+            summary: "Lavoro come capoturno della manutenzione. Manutenzione è la mia attività principale. "
+                + "La manutenzione delle linee è il mio lavoro di ogni giorno. Industriale e preciso, seguo ogni intervento.",
+            experience: [Experience(title: "capoturno della manutenzione", company: "Conserve Albarella", startDate: "2019", current: true)]
+        )
+
+        let found = ReaderRules.findings(in: cv, for: italian, report: InventedFacts.count(cv, for: italian))
+
+        #expect(found.filter { $0.kind == .bareSubjectSummary }.map(\.value) == ["Manutenzione è la mia attività principale."])
+    }
+
     @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
     func toolAsSoftSkill() {
         let cv = CVData(skills: [

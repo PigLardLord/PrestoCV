@@ -288,6 +288,23 @@ struct SectionChecksTests {
         #expect(verdict.opening == "Lavoro come capoturno della manutenzione.")
     }
 
+    @Test("A summary sentence whose subject is a bare word of the person's work goes; one with its article or as the person stays (#354, round 1)")
+    func summaryWithABareSubject() throws {
+        let description = JobClausesTests.italian.replacingOccurrences(
+            of: "Birrificio Valtrigno di Campobasso, dove coordino tre tecnici.", with: "Birrificio Valtrigno."
+        )
+
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.italianJobs,
+            summary: "Manutenzione è la mia attività principale. La manutenzione degli impianti è il mio lavoro di ogni giorno. "
+                + "Mi occupo degli impianti con cura.",
+            field: nil, against: description
+        )
+
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.hasABareSubject])
+        #expect(verdict.kept == ["La manutenzione degli impianti è il mio lavoro di ogni giorno.", "Mi occupo degli impianti con cura."])
+    }
+
     @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")
     func summaryOfThePerson() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

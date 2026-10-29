@@ -418,7 +418,8 @@ extension CVDataSanitizer {
     ]
 
     /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes, and so does one with no
-    /// word of the person in a language that keeps its pronoun; so does a sentence that starts with the verb of an earlier one, one
+    /// word of the person in a language that keeps its pronoun, and one whose subject is a bare word of the person's work
+    /// (`hasABareSubject`); so does a sentence that starts with the verb of an earlier one, one
     /// with no word beyond a sentence of the kept `duties` (one that joins several duties stays), a second one that names nothing of the `work` (the kept duties and tools) or
     /// of the titles, and one the rules drop (`WrittenText`). A summary that names no title whole gets an opening from the facts,
     /// and a kept sentence that starts with the opening's verb then goes. The `field` names the topic only when no title does, and
@@ -436,6 +437,7 @@ extension CVDataSanitizer {
                 field.split(separator: " ").count <= 4 && field.allSatisfy { $0.isLetter || $0 == " " || $0 == "-" } ? field : nil
             }
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
+            let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
             let namesWork = { (sentence: String) in !Self.workStems(of: [sentence]).isDisjoint(with: workStems) }
 
@@ -458,6 +460,8 @@ extension CVDataSanitizer {
                 } else if let language, let words = Self.firstPersonWords[language],
                           !Self.letterWords(of: sentence).contains(where: words.contains) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.saysNothingOfThePerson))
+                } else if let language, Self.hasABareSubject(sentence, workWords: workWords, language: language) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
                 } else if let verb, verbs.contains(verb) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
                 } else if dutySentences.contains(where: own.isSubset) {
@@ -514,6 +518,33 @@ extension CVDataSanitizer {
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
+    static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
+
+    /// Whether `sentence` starts with a word of the person's work (`workWords`, folded) with no article, and has a form of "to be"
+    /// of `language` among its next three words with no word of the person before it: the work spoken of as a thing
+    /// ("Manutenzione è la mia attività principale.", #354). The language that drops the pronoun has no other sign of it.
+    static func hasABareSubject(_ sentence: String, workWords: Set<String>, language: Vocabulary.Language) -> Bool {
+        let words = Word.words(in: sentence)
+        guard let first = words.first, workWords.contains(first.folded), let be = toBe[language],
+              let verb = words.dropFirst().prefix(3).firstIndex(where: { be.contains($0.accented) }) else { return false }
+        return !words[..<verb].contains { wordsOfThePerson.contains($0.folded) }
+    }
+
+    /// The forms of "to be" of the third person, accented: the Italian "è" is a verb, "e" is "and".
+    private static let toBe: [Vocabulary.Language: Set<String>] = [
+        .english: ["is", "are", "was", "were"],
+        .italian: ["è", "sono", "era", "erano", "fu"],
+        .german: ["ist", "sind", "war", "waren"],
+        .spanish: ["es", "son", "era", "eran", "fue"],
+        .french: ["est", "sont", "était", "étaient", "fut"],
+        .portuguese: ["é", "são", "era", "eram", "foi"],
+    ]
+
+    /// The words of the person in the six languages, folded: a subject that has one ("my work is") is the person's.
+    private static let wordsOfThePerson: Set<String> = [
+        "i", "my", "me", "io", "mio", "mia", "miei", "mie", "mi", "ich", "mein", "meine", "mich", "mir", "je", "j", "mon", "ma",
+        "mes", "moi", "yo", "mis", "eu", "meu", "minha", "meus", "minhas",
+    ]
 
     /// The words of the person, in the languages whose sentences keep the subject pronoun: a summary sentence there with none of them
     /// ("Sound design is the core of every project") says nothing of the person (#354). Italian, Spanish and Portuguese drop it.
