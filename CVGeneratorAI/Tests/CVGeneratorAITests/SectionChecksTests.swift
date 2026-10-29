@@ -1588,6 +1588,16 @@ struct SectionChecksTests {
             == ["the mail", "the towels", "the chairs", "the tables"])
     }
 
+    @Test("The summary reads a current job's work as the topics of the duties the person said, and those of its written duties only when the person said none (#354, round 11)")
+    func workTopicsOfACurrentJob() {
+        let written = "Gestisco le fatture dei fornitori. Organizzo le comunicazioni con i fornitori."
+        #expect(CVDataSanitizer.workTopics(stated: ["Gestisco le fatture dei fornitori."], duties: written) == ["le fatture dei fornitori"])
+        #expect(CVDataSanitizer.workTopics(stated: [], duties: written) == ["le fatture dei fornitori", "le comunicazioni con i fornitori"])
+        #expect(CVDataSanitizer.workTopics(stated: [], duties: nil).isEmpty)
+        let french = "Je prépare les ateliers d'éveil et j'accueille les familles le matin."
+        #expect(CVDataSanitizer.workTopics(stated: [french], duties: french + " Je range la salle.")
+            == ["les ateliers d'éveil", "les familles le matin"])
+    }
 }
 
 /// A dictionary that knows every word in English and none in any other language.

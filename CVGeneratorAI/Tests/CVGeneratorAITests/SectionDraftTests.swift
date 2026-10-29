@@ -154,7 +154,9 @@ struct SectionDraftTests {
 
         let brief = try #require(service.sectionCalls.firstIndex(of: "summary").map { service.sectionBriefs[$0] })
         #expect(brief.opening == Self.opening)
-        #expect(brief.roles[3].work.contains("the technical rehearsals"))
+        // A current job's work is the topics of the duties the person said: a written one came back in the summary as the
+        // person's own claim (#354, round 11).
+        #expect(brief.roles[3].work == ["the junior technicians"])
         // The jobs that ended, by the years their requests read, are titles alone (#354, round 10).
         #expect(brief.roles.prefix(3).allSatisfy { $0.hasEnded && $0.work.isEmpty })
         #expect(!brief.roles[3].hasEnded)

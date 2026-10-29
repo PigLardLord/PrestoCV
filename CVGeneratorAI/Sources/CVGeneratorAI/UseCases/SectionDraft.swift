@@ -345,8 +345,13 @@ final class SectionDraft {
         let isCurrent = brief.roles.contains { !$0.hasEnded }
         for number in brief.roles.indices where jobDuties.indices.contains(number) {
             let role = brief.roles[number]
-            let topics = role.hasEnded ? (isCurrent ? nil : stated[number].joined(separator: " ")) : jobDuties[number]
-            brief.roles[number].work = topics.map { CVDataSanitizer.workTopics(of: $0) } ?? []
+            // A current job's work is the topics of the duties the person said, those of its written ones only when the person
+            // said none: a written duty came back in the summary as the person's own claim (#354, round 11).
+            if !role.hasEnded {
+                brief.roles[number].work = CVDataSanitizer.workTopics(stated: stated[number], duties: jobDuties[number])
+            } else {
+                brief.roles[number].work = isCurrent ? [] : CVDataSanitizer.workTopics(of: stated[number].joined(separator: " "))
+            }
         }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
         let written = try await request(.summary) { [brief] in

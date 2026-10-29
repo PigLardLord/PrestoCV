@@ -317,6 +317,13 @@ extension CVDataSanitizer {
         return Array(topics.prefix(limit))
     }
 
+    /// The topics of a current job that the summary request reads: those of the duties the person said, else those of `duties`,
+    /// its kept ones. A written duty came back in the summary as the person's own work (#354, round 11).
+    static func workTopics(stated: [String], duties: String?) -> [String] {
+        let own = workTopics(of: stated.joined(separator: " "))
+        return own.isEmpty ? workTopics(of: duties ?? "") : own
+    }
+
     /// What the work of a job's own lines is done on, which its tools request reads as no tool (#354, round 6): their topics,
     /// none that names a tool or its kind, holds an acronym or, but in German, whose nouns all take a capital, a name. Asked for
     /// the tools of all jobs at once, the request listed the panels and the belts the person repairs.
