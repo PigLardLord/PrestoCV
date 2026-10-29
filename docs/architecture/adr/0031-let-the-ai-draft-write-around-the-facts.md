@@ -131,7 +131,7 @@ A streamed answer cut by its cap keeps its whole parts (`StreamedAnswer`), as th
 - 0 invented facts, 0 failed runs, 0 tools of another trade, 0 missed examples, 0 rejected pertinence items;
 - a summary in at least 90% of the drafts of inputs with a role, study or field, and in every draft of an example;
 - a description on at least 90% of the kept jobs;
-- at least 4 technologies and 3 soft skills in at least 90% of the drafts (3 and 2 for a sparse description);
+- at least 4 tools of the trade and 3 soft skills in at least 90% of the drafts (3 and 2 for a sparse description): a tool of the trade is a technology in no reader's class of a technology that is no tool (a quality, a work object, an activity, a person or a document, a bare kind of tool, stationery, a tool of no word of the trade, one with a word of a name; `WrittenMeasure.tradeTools`, #354 round 9), so a list of 4 entries with a vague system among them is short;
 - every written sentence in the description's language;
 - at most 90 s a draft at the 95th percentile, the claim check included; above it, the guide counts go down to 6 technologies and 4 soft skills, and the set is measured again.
 

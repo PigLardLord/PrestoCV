@@ -195,7 +195,7 @@ struct DraftSummary: Codable, Equatable {
         lines.append(
             "written around the facts: a summary in \(written.withSummary) of \(written.drafts) distinct drafts "
                 + "(examples \(written.examplesWithSummary) of \(written.exampleDrafts)); a description on \(written.describedJobs) of "
-                + "\(written.keptJobs) kept jobs; enough skills in \(written.withSkills) of \(written.drafts); "
+                + "\(written.keptJobs) kept jobs; enough tools of the trade and soft skills in \(written.withSkills) of \(written.drafts); "
                 + "\(written.otherLanguage) of \(written.sentences) sentences in another language; off-field hits \(offField.count)"
         )
         lines.append(written.reader.line)

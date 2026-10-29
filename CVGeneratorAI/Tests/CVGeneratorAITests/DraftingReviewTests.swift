@@ -70,7 +70,7 @@ struct DraftingReviewTests {
         #expect(items.map(\.context) == ["warehouse logistics", "cucina", "cucina"])
         #expect(items.allSatisfy { $0.reason == ReviewItem.pertinenceReason })
         #expect(items[0].value.contains("summary: Reliable and careful worker"))
-        #expect(items[0].value.contains("Work planning, Safety procedures, Stock control, Record keeping"))
+        #expect(items[0].value.contains("reach truck, pallet jack, order picker, label printer"))
         #expect(items[0].value.contains("soft skills: Teamwork, Reliability, Communication"))
     }
 
@@ -260,7 +260,7 @@ struct VerdictCase: Sendable, CustomTestStringConvertible {
         VerdictCase(label: "an off-field hit", reason: "1 off-field hits") {
             try Scenario.make(tweak: DraftMeasures.tweak(Tweak(edit: { $0.skills.append(Skill(name: "Java")) }), for: "en-plain")).adjudicated()
         },
-        VerdictCase(label: "a missed threshold", reason: "a threshold is missed: enough technologies and soft skills in 1 of 2") {
+        VerdictCase(label: "a missed threshold", reason: "a threshold is missed: enough tools of the trade and soft skills in 1 of 2") {
             try Scenario.make(tweak: DraftMeasures.tweak(Tweak(edit: { $0.skills = [] }), for: "it-plain")).adjudicated()
         },
         VerdictCase(label: "a run that failed", reason: "1 failed runs") {

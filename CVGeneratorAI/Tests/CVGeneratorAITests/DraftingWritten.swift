@@ -16,6 +16,8 @@ struct WrittenMeasure: Codable, Equatable {
     /// The kept jobs whose description has at least 40 characters in all.
     let describedJobs: Int
     let technologies: Int
+    /// The technologies in no class of the reader's that says a technology is no tool of the trade (`notTools`; #354, round 9).
+    let tradeTools: Int
     let softSkills: Int
     /// The sentences of the summary and of the job descriptions.
     let sentences: Int
@@ -70,8 +72,18 @@ struct WrittenMeasure: Codable, Equatable {
             hits += report.inferred.map { "\($0.path) \"\($0.value)\" (written around a description with no role)" }
         }
         offField = hits
-        readerFindings = ReaderRules.findings(in: cv, for: input, report: report) + ReaderRules.gluedWords(in: cv, answers: answers)
+        let findings = ReaderRules.findings(in: cv, for: input, report: report)
+        let rejected = Set(findings.filter { Self.notTools.contains($0.kind) }.map(\.path))
+        tradeTools = cv.skills.indices.filter { cv.skills[$0].kind == .technology && !rejected.contains("skills[\($0)].name") }.count
+        readerFindings = findings + ReaderRules.gluedWords(in: cv, answers: answers)
     }
+
+    /// The reader's classes of a technology that is no tool of the trade: a quality, a work object, an activity, a person or a
+    /// document, a bare kind of tool, stationery, a tool of no word of the trade, or one with a word of a name.
+    static let notTools: Set<ReaderClass> = [
+        .softAsTechnology, .workObjectTechnology, .noToolOfTheTrade, .nonToolTechnology, .categoryAsTechnology, .stationeryTechnology,
+        .offTradeTechnology, .employerWordTechnology,
+    ]
 
     /// The first seven letters of each single-word trap of 6 letters or more ("auditor" of a wish to become one): a skill with a
     /// word that starts with one ("auditoría") echoes what the person does not state of themselves.
@@ -86,9 +98,9 @@ struct WrittenMeasure: Codable, Equatable {
     /// Whether the draft has a summary of 2 to 4 sentences and at least 120 characters.
     var hasSummary: Bool { (2...4).contains(summarySentences) && summaryCharacters >= 120 }
 
-    /// Whether the draft has at least 4 technologies and 3 soft skills; 3 and 2 for a sparse description.
+    /// Whether the draft has at least 4 tools of the trade (`tradeTools`) and 3 soft skills; 3 and 2 for a sparse description.
     func hasSkills(sparse: Bool) -> Bool {
-        technologies >= (sparse ? 3 : 4) && softSkills >= (sparse ? 2 : 3)
+        tradeTools >= (sparse ? 3 : 4) && softSkills >= (sparse ? 2 : 3)
     }
 
     /// The sentences of `text`, trimmed, as the system tells them apart.
@@ -155,7 +167,7 @@ struct WrittenCounts: Codable, Equatable {
         }
         if short(describedJobs, of: keptJobs) { lines.append("a description on \(describedJobs) of \(keptJobs) kept jobs (90% needed)") }
         if short(withSkills, of: drafts) {
-            lines.append("enough technologies and soft skills in \(withSkills) of \(drafts) distinct drafts (90% needed)")
+            lines.append("enough tools of the trade and soft skills in \(withSkills) of \(drafts) distinct drafts (90% needed)")
         }
         if otherLanguage > 0 { lines.append("\(otherLanguage) of \(sentences) written sentences in another language (none allowed)") }
         if p95Seconds > Self.p95Budget {

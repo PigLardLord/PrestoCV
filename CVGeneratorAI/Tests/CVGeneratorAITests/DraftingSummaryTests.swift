@@ -152,7 +152,7 @@ struct DraftingSummaryTests {
 
         #expect(summary.text.contains(
             "written around the facts: a summary in 2 of 2 distinct drafts (examples 1 of 1); a description on "
-                + "\(summary.written.keptJobs) of \(summary.written.keptJobs) kept jobs; enough skills in 2 of 2; "
+                + "\(summary.written.keptJobs) of \(summary.written.keptJobs) kept jobs; enough tools of the trade and soft skills in 2 of 2; "
                 + "0 of \(summary.written.sentences) sentences in another language; off-field hits 0"
         ))
         #expect(summary.shortfalls.isEmpty)

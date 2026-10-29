@@ -3,7 +3,7 @@ import Foundation
 import CVGeneratorAI
 
 // What a draft writes around the facts (ADR 0031) is measured against the thresholds of #354: a summary, a description of each kept
-// job, enough technologies and soft skills, every sentence in the description's language, no tool of another trade.
+// job, enough tools of the trade and soft skills, every sentence in the description's language, no tool of another trade.
 
 @Suite("Drafting evaluation: what the draft writes around the facts")
 struct DraftingWrittenTests {
@@ -33,7 +33,7 @@ struct DraftingWrittenTests {
     @Test("The skills count by kind, and a sparse description needs fewer")
     func skills() throws {
         let cv = CVData(skills: [
-            Skill(name: "Pipe fitting"), Skill(name: "Drain cleaning"), Skill(name: "Leak detection"),
+            Skill(name: "Pipe wrench"), Skill(name: "Drain auger"), Skill(name: "Pipe cutter"),
             Skill(name: "Punctuality", kind: .softSkill), Skill(name: "Patience", kind: .softSkill),
         ])
 
@@ -43,6 +43,25 @@ struct DraftingWrittenTests {
         #expect(measure.softSkills == 2)
         #expect(measure.hasSkills(sparse: true))
         #expect(!measure.hasSkills(sparse: false))
+    }
+
+    @Test("Enough skills count the tools of the trade: a technology the reader rejects is no tool (#354, round 9)")
+    func tradeTools() throws {
+        let soft = ["precisione", "affidabilità", "organizzazione"].map { Skill(name: $0, kind: .softSkill) }
+        let clerk = CVData(skills: ["Microsoft Excel", "Google Calendar", "Outlook", "archivio digitale"].map { Skill(name: $0) } + soft)
+        let maintainer = CVData(skills: [
+            "PLC", "software di gestione impianti", "strumenti di diagnostica industriale", "sensori di temperatura",
+            "sistema di tracciamento dati",
+        ].map { Skill(name: $0) } + soft)
+
+        let clerkMeasure = try Self.measure("it-traps", clerk)
+        let maintainerMeasure = try Self.measure("jobs-it", maintainer)
+
+        #expect(clerkMeasure.technologies == 4)
+        #expect(clerkMeasure.tradeTools == 3)
+        #expect(!clerkMeasure.hasSkills(sparse: false))
+        #expect(maintainerMeasure.tradeTools == 4)
+        #expect(maintainerMeasure.hasSkills(sparse: false))
     }
 
     @Test("A written sentence in another language than the description's is listed with its path")
@@ -617,7 +636,7 @@ struct DraftingWrittenTests {
         for input in try DraftingInputs.all() where input.kind != .noRole {
             let report = try DraftMeasures.measure(input.id).report
             let text = try #require(WrittenLayer.texts[input.language], "\(input.id): no written layer for \(input.language)")
-            let written = Set([text.summary, text.job] + text.technologies + text.softSkills)
+            let written = Set([text.summary, text.job] + WrittenLayer.technologies(for: input) + text.softSkills)
 
             let wrong = report.findings.filter {
                 $0.kind == .invented || (written.contains($0.value) && $0.kind != .inferred && $0.kind != .quote)
