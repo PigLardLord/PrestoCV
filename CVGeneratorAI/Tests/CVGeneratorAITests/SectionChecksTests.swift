@@ -382,6 +382,18 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["a word for a skill", "a word for a skill", "a word for a skill"])
     }
 
+    @Test("A soft skill that only says the person is a professional or has experience goes; a quality, and one said with that word, stay (#354, round 3)")
+    func emptyWordIsNoQuality() {
+        let verdict = sanitizer.skillCheck(
+            technologies: [],
+            softSkills: ["professionale", "puntualità", "competente", "esperienza", "atteggiamento professionale", "pazienza"],
+            against: JobClausesTests.italian
+        )
+
+        #expect(verdict.softSkills == ["puntualità", "atteggiamento professionale", "pazienza"])
+        #expect(verdict.dropped.map(\.reason) == ["an empty word, not a quality", "an empty word, not a quality", "an empty word, not a quality"])
+    }
+
     @Test("Of two soft skills of one quality, care or teamwork, the second goes; qualities of other kinds stay (#354, round 2)")
     func oneQualityOnce() {
         let verdict = sanitizer.skillCheck(

@@ -735,6 +735,10 @@ extension CVDataSanitizer {
         }
         for raw in softSkills {
             guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
+            guard !Self.emptyQualities.contains(DescriptionText.normalized(item)) else {
+                verdict.dropped.append(Rejection(sentence: raw, reason: "an empty word, not a quality"))
+                continue
+            }
             guard !Self.namesATool(item, language: language) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
                 continue
@@ -761,6 +765,16 @@ extension CVDataSanitizer {
         "knowledge", "understanding", "expertise", "wissen", "verstandnis", "kenntnis", "kenntnisse", "fachwissen", "conoscenza",
         "conoscenze", "comprensione", "conocimiento", "conocimientos", "comprension", "connaissance", "connaissances",
         "comprehension", "conhecimento", "conhecimentos", "compreensao",
+    ]
+
+    /// The words that say only that the person is a professional or has experience, folded: no quality a reader can weigh, so no
+    /// soft skill (#354, round 3). A quality said with one of them ("atteggiamento professionale") stays.
+    static let emptyQualities: Set<String> = [
+        "professional", "professionale", "professionell", "professionnel", "professionnelle", "profesional", "profissional",
+        "experience", "experienced", "esperienza", "esperto", "esperta", "erfahrung", "erfahren", "experiencia", "experimentado",
+        "experimentada", "experimente", "experimentee", "experiente", "competent", "competente", "kompetent",
+        "qualified", "qualificato", "qualificata", "qualifiziert", "qualifie", "qualifiee",
+        "cualificado", "cualificada", "qualificado", "qualificada",
     ]
 
     /// The beginnings of the words of one quality, by quality: two soft skills with a word of one group say one quality twice
