@@ -505,6 +505,17 @@ struct DraftingReaderTests {
             == ["Ho svolto compiti legati alla gestione dei documenti.", "I handled tasks related to the office."])
     }
 
+    @Test("A description that only says the person worked is counted; one with a word of the job or a duty is not (#354, round 11)")
+    func bareWorkDescription() {
+        let cv = CVData(experience: [
+            Experience(company: "Transportes Ebro Norte", current: true, description: "Trabajo en Transportes Ebro Norte. Llevo la contabilidad."),
+            Experience(company: "gestoría Aranda y Molina", endDate: "2018", description: "Trabajé."),
+            Experience(company: "guardería", endDate: "2014", description: "Trabajé como auxiliar en una guardería."),
+        ])
+
+        #expect(Self.reader(cv, "es").filter { $0.kind == .bareWorkDescription }.map(\.path) == ["experience[1].description"])
+    }
+
     @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")
     func gerundSoftSkill() {
         let counted = { (names: [String], language: String) in

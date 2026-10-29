@@ -166,6 +166,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case employerWordInDuty
     /// A duty of a vague phrase that names no task ("Ho svolto compiti legati alla gestione dei documenti"; #354, round 11).
     case vagueDuty
+    /// A job's description that only says the person worked, with no word of the job ("Trabajé."; #354, round 11).
+    case bareWorkDescription
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -227,6 +229,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .writtenDutyInSummary: "a summary sentence from a duty the draft wrote"
         case .employerWordInDuty: "a duty with a word of an employer's name"
         case .vagueDuty: "a duty of a vague phrase"
+        case .bareWorkDescription: "a description that only says the person worked"
         }
     }
 }
@@ -330,6 +333,12 @@ enum ReaderRules {
         for (index, job) in cv.experience.enumerated() {
             found += WrittenMeasure.sentences(of: job.description ?? "").filter(isVague)
                 .map { ReaderFinding(kind: .vagueDuty, path: "experience[\(index)].description", value: $0) }
+        }
+        for (index, job) in cv.experience.enumerated() {
+            let sentences = WrittenMeasure.sentences(of: job.description ?? "")
+            if !sentences.isEmpty, sentences.allSatisfy({ RoleStub.isStub($0, jobWords: [], language: vocabulary) }) {
+                found.append(ReaderFinding(kind: .bareWorkDescription, path: "experience[\(index)].description", value: job.description ?? ""))
+            }
         }
         for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
