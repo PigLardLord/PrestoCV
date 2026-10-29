@@ -216,7 +216,7 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("The summary request reads the opening code wrote, each job's title and work, the studies, the kept tools and qualities, and no employer (#354, round 3)")
+    @Test("The summary request reads the opening code wrote, each job's title and its work one topic a line, the studies, the kept tools and qualities, and no employer (#354, round 3)")
     func summaryPrompt() {
         var brief = Self.brief
         brief.roles[1].work = ["i turni dei tecnici", "le linee di imbottigliamento"]
@@ -230,8 +230,9 @@ struct SectionPromptsTests {
             Scrivi in italiano.
             Roles:
             - manutentore elettromeccanico; ended
-            - capoturno della manutenzione
-              work: i turni dei tecnici; le linee di imbottigliamento
+            - capoturno della manutenzione, work:
+              - i turni dei tecnici
+              - le linee di imbottigliamento
             Studies: Perito elettrotecnico
             Tools: PLC; inverter
             Qualities: precisione

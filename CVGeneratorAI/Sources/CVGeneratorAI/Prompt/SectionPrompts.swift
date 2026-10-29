@@ -125,8 +125,10 @@ enum SectionPrompts {
     /// a copied duty (#354, round 2); with no work at all it wrote lists of qualities (round 3).
     static func summary(for brief: DraftBrief, tools: [String], qualities: [String]) -> Prompt {
         var lines = header(brief) + headline(brief)
+        // Each topic of a role's work on its own line: written on one line with semicolons, the topics came back as one summary
+        // sentence of clauses joined by semicolons (#354, round 3).
         let roles = brief.roles.map { role in
-            "- " + roleLine(role, employer: false) + (role.work.isEmpty ? "" : "\n  work: " + role.work.joined(separator: "; "))
+            "- " + roleLine(role, employer: false) + (role.work.isEmpty ? "" : ", work:" + role.work.map { "\n  - " + $0 }.joined())
         }
         if !roles.isEmpty { lines.append("Roles:\n" + roles.joined(separator: "\n")) }
         if !brief.studies.isEmpty { lines.append("Studies: " + brief.studies.joined(separator: "; ")) }

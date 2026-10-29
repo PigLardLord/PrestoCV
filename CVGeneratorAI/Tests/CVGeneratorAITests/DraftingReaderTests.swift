@@ -63,6 +63,16 @@ struct DraftingReaderTests {
         #expect(found.map(\.value) == ["Mechanic with a steady hand and an eye for detail."])
     }
 
+    @Test("A summary sentence of three clauses joined by semicolons is counted; one with a single semicolon is not")
+    func chainedSummary() {
+        let cv = CVData(summary: "I work as a lock keeper. I grease the gates; I log the boats; I clear the weirs of driftwood. "
+            + "I check the sluices each morning; the barges pass at noon.")
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .chainedSummary }.map(\.value) == [
+            "I grease the gates; I log the boats; I clear the weirs of driftwood.",
+        ])
+    }
+
     // MARK: Skills
 
     @Test("A soft skill that is an empty word of experience or of being a professional is counted; a quality and the word for a skill are not")

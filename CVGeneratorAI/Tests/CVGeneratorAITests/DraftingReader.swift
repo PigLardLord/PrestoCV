@@ -88,6 +88,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A job whose final description is under 40 characters while the step that writes the job pins a duty the description does not
     /// hold: the step counted that duty toward the job and asked for nothing more, and the final check moved it out (#354, round 3).
     case stepVsFinalPinned
+    /// A summary sentence of three clauses or more joined by semicolons ("I manage the flow; I ensure …; I adapt …."; #354, round
+    /// 3, at 0608938b).
+    case chainedSummary
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -124,6 +127,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .listySummary: "a summary sentence that lists skills"
         case .emptySoftSkill: "an empty word as a soft skill"
         case .stepVsFinalPinned: "a short job with a pinned duty it does not hold"
+        case .chainedSummary: "a summary sentence of clauses joined by semicolons"
         }
     }
 }
@@ -431,6 +435,8 @@ enum ReaderRules {
             let words = InventedFacts.words(of: sentence)
             return skills.count { InventedFacts.holds(words, run: $0) } >= 3
         }.map { ReaderFinding(kind: .listySummary, path: "summary", value: $0) }
+        found += sentences.filter { $0.filter { $0 == ";" }.count >= 2 }
+            .map { ReaderFinding(kind: .chainedSummary, path: "summary", value: $0) }
         let qualities = cv.skills.filter { $0.kind == .softSkill }.map { letterWords(of: $0.name) }.filter { !$0.isEmpty }
         found += sentences.filter { hasQualitySubject($0, qualities: qualities) }
             .map { ReaderFinding(kind: .qualitySubjectSummary, path: "summary", value: $0) }
