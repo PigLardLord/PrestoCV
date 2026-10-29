@@ -440,6 +440,71 @@ struct DraftingReaderTests {
         #expect(counted("Reviso los pagos semanales.", "Reviso cada semana los pagos semanales del taller.") == [])
     }
 
+    @Test("A summary sentence with a kept tool the description does not state is counted; one with a stated tool is not (#354, round 11)")
+    func unstatedToolInSummary() {
+        let input = DraftingInput(
+            id: "reader-de", kind: .plain, language: "de", description: "Ich bin Elektriker und kenne mich mit KNX aus.", facts: [], traps: []
+        )
+        let cv = CVData(
+            summary: "Ich arbeite als Elektriker. Ich programmiere die Gebäude mit KNX. Ich sichere alle Schritte mit dem Werkzeugkasten ab.",
+            skills: ["KNX", "Werkzeugkasten"].map { Skill(name: $0) }
+        )
+
+        #expect(ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+            .filter { $0.kind == .unstatedToolInSummary }.map(\.value) == ["Ich sichere alle Schritte mit dem Werkzeugkasten ab."])
+    }
+
+    @Test("A summary sentence from a duty the draft wrote is counted; one from a stated duty is not (#354, round 11)")
+    func writtenDutyInSummary() {
+        let input = DraftingInput(
+            id: "reader-it", kind: .plain, language: "it", description: "Sono impiegata amministrativa e gestisco le fatture dei fornitori.",
+            facts: [], traps: []
+        )
+        let cv = CVData(
+            summary: "Lavoro come impiegata amministrativa. Controllo le fatture dei fornitori con precisione. "
+                + "Rispondo alle comunicazioni con i corrieri.",
+            experience: [Experience(
+                title: "impiegata amministrativa", company: "Ferramenta Olmo",
+                description: "Gestisco le fatture dei fornitori. Organizzo le comunicazioni con i corrieri."
+            )]
+        )
+
+        #expect(ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+            .filter { $0.kind == .writtenDutyInSummary }.map(\.value) == ["Rispondo alle comunicazioni con i corrieri."])
+    }
+
+    @Test("A duty word in lower case that the description has only in an employer's name is counted; the name and a word said elsewhere are not (#354, round 11)")
+    func employerWordInDuty() {
+        let counted = { (said: String) in
+            let input = DraftingInput(
+                id: "reader-es", kind: .plain, language: "es", description: said, facts: [.employer("Transportes Ebro Norte")], traps: []
+            )
+            let cv = CVData(experience: [Experience(
+                title: "contable", company: "Transportes Ebro Norte",
+                description: "Llevo la contabilidad de Transportes Ebro Norte. Calculo los gastos de transporte."
+            )])
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .employerWordInDuty }.map(\.value)
+        }
+
+        #expect(counted("Trabajo en Transportes Ebro Norte, donde llevo la contabilidad.") == ["transporte"])
+        #expect(counted("Trabajo en Transportes Ebro Norte, donde llevo la contabilidad y reviso el transporte.") == [])
+    }
+
+    @Test("A duty of a vague phrase is counted; a duty that names its task is not (#354, round 11)")
+    func vagueDuty() {
+        let cv = CVData(experience: [
+            Experience(
+                title: "impiegata", company: "Studio Olmo",
+                description: "Ho svolto compiti legati alla gestione dei documenti. Gestisco l'archivio dei documenti dei clienti."
+            ),
+            Experience(title: "clerk", company: "Olmo Ltd", description: "I handled tasks related to the office. I file the invoices."),
+        ])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .vagueDuty }.map(\.value)
+            == ["Ho svolto compiti legati alla gestione dei documenti.", "I handled tasks related to the office."])
+    }
+
     @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")
     func gerundSoftSkill() {
         let counted = { (names: [String], language: String) in

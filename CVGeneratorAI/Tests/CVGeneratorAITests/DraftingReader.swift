@@ -156,6 +156,16 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A soft skill of three words or more that opens with a gerund, a clause of the description ("working closely with directors";
     /// #354, round 10).
     case gerundSoftSkill
+    /// A summary sentence that names a kept technology the description does not state ("mit dem Werkzeugkasten"; #354, round 11).
+    case unstatedToolInSummary
+    /// A summary sentence past the opening whose words of the work come from a duty the draft wrote, not from the description, at
+    /// least as many as from the description ("Rispondo alle comunicazioni con i fornitori"; #354, round 11).
+    case writtenDutyInSummary
+    /// A word of a job's description, in lower case, that the description writes only inside the name of an employer
+    /// ("transporte" of "Transportes Ebro Norte"; #354, round 11).
+    case employerWordInDuty
+    /// A duty of a vague phrase that names no task ("Ho svolto compiti legati alla gestione dei documenti"; #354, round 11).
+    case vagueDuty
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -213,6 +223,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .selfPraiseTail: "a self-praise closing clause after the first"
         case .inventedFrequency: "a frequency the description does not say"
         case .gerundSoftSkill: "a clause with a gerund as a soft skill"
+        case .unstatedToolInSummary: "a summary sentence with a tool the description does not state"
+        case .writtenDutyInSummary: "a summary sentence from a duty the draft wrote"
+        case .employerWordInDuty: "a duty with a word of an employer's name"
+        case .vagueDuty: "a duty of a vague phrase"
         }
     }
 }
@@ -312,6 +326,11 @@ enum ReaderRules {
             found.append(ReaderFinding(kind: .gerundSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
         found += inventedFrequencies(in: cv, of: input.description)
+        found += employerWords(in: cv, for: input)
+        for (index, job) in cv.experience.enumerated() {
+            found += WrittenMeasure.sentences(of: job.description ?? "").filter(isVague)
+                .map { ReaderFinding(kind: .vagueDuty, path: "experience[\(index)].description", value: $0) }
+        }
         for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
         }
@@ -572,6 +591,10 @@ enum ReaderRules {
         found += endedDuties(in: sentences, of: cv, language: input.language)
             .map { ReaderFinding(kind: .endedDutyInSummary, path: "summary", value: $0) }
         found += selfPraiseTails(in: sentences).map { ReaderFinding(kind: .selfPraiseTail, path: "summary", value: $0) }
+        found += unstatedTools(in: sentences, of: cv, for: input)
+            .map { ReaderFinding(kind: .unstatedToolInSummary, path: "summary", value: $0) }
+        found += writtenDutySentences(in: sentences, of: cv, for: input)
+            .map { ReaderFinding(kind: .writtenDutyInSummary, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -1424,6 +1447,82 @@ enum ReaderRules {
                 .map { ReaderFinding(kind: .inventedFrequency, path: path, value: $0) }
         }
     }
+
+    // MARK: Round 11
+
+    /// The summary sentences that name a kept technology whose words the description does not hold in a row.
+    static func unstatedTools(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
+        let described = InventedFacts.words(of: input.description)
+        let unstated = cv.skills.filter { $0.kind == .technology }.map { InventedFacts.words(of: $0.name) }
+            .filter { !$0.isEmpty && !InventedFacts.holds(described, run: $0) }
+        return sentences.filter { sentence in
+            let words = InventedFacts.words(of: sentence)
+            return unstated.contains { InventedFacts.holds(words, run: $0) }
+        }
+    }
+
+    /// The summary sentences past the opening that share a word of the work with a duty the draft wrote (one of whose words of five
+    /// letters or more fewer than half are in the description) and not with the description, at least as many as they share with
+    /// the description. A description with no word of the work has no duty to tell apart.
+    static func writtenDutySentences(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
+        let said = Set(longWords(of: input.description).map { $0.prefix(5) })
+        let stated = anchorStems(of: [input.description])
+        guard !stated.isEmpty else { return [] }
+        let written = cv.experience.flatMap { WrittenMeasure.sentences(of: $0.description ?? "") }.filter { sentence in
+            let words = longWords(of: sentence)
+            return !words.isEmpty && Double(words.count { said.contains($0.prefix(5)) }) / Double(words.count) < 0.5
+        }
+        let writtenStems = anchorStems(of: written).subtracting(stated).subtracting(idleSummaryStems)
+        return sentences.dropFirst().filter { sentence in
+            let own = anchorStems(of: [sentence])
+            let fromWritten = own.intersection(writtenStems)
+            return !fromWritten.isEmpty && fromWritten.count >= own.intersection(stated).count
+        }
+    }
+
+    /// Stems of words that say nothing of a duty ("during", "ensuring").
+    static let idleSummaryStems: Set<String> = ["durin", "ensur"]
+
+    /// The words of the job descriptions of `cv`, in lower case, that are a word of an employer's name of `input`, or one of its
+    /// forms, and that the description writes nowhere outside the employers' names.
+    static func employerWords(in cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
+        let employers = input.facts.filter { $0.kind == .employer }.flatMap(\.forms)
+        let names = Set(employers.flatMap(letterWords(of:)).filter { $0.count >= 4 })
+        guard !names.isEmpty else { return [] }
+        var rest = fold(input.description)
+        for name in employers.sorted(by: { $0.count > $1.count }) {
+            rest = rest.replacingOccurrences(of: fold(name), with: " ")
+        }
+        let outside = Set(rest.split { !$0.isLetter }.filter { $0.count >= 4 }.map { String($0.prefix(6)) })
+        return cv.experience.enumerated().flatMap { index, job in
+            (job.description ?? "").split { !$0.isLetter }.filter { $0.first?.isLowercase == true }.map { fold(String($0)) }
+                .filter { word in
+                    word.count >= 4 && names.contains { isFormOf(word, $0) } && !outside.contains(String(word.prefix(6)))
+                }
+                .map { ReaderFinding(kind: .employerWordInDuty, path: "experience[\(index)].description", value: $0) }
+        }
+    }
+
+    /// Whether two folded words are one, or forms of one: of five letters or more, at most two letters apart in length, and
+    /// alike but for their last two letters ("transporte", "transportes").
+    static func isFormOf(_ first: String, _ second: String) -> Bool {
+        guard first != second else { return true }
+        let shorter = min(first.count, second.count)
+        guard abs(first.count - second.count) <= 2, shorter >= 5 else { return false }
+        return zip(first, second).prefix { $0 == $1 }.count >= max(5, shorter - 2)
+    }
+
+    /// Whether a duty holds a phrase that names no task but a field of tasks, in the six languages; the reader's own list.
+    static func isVague(_ duty: String) -> Bool {
+        let folded = fold(duty)
+        return vaguePhrases.contains(where: folded.contains)
+    }
+
+    static let vaguePhrases = [
+        "compiti legat", "compiti relativ", "attivita legat", "attivita relativ", "mansioni legat", "mansioni relativ",
+        "tasks related to", "duties related to", "various tasks", "tareas relacionadas", "tareas vinculadas", "taches liees",
+        "taches relatives", "aufgaben im bereich", "aufgaben rund um", "tarefas relacionadas", "atividades relacionadas",
+    ]
 
     /// The frequency a folded word says, by the beginnings of its words in the six languages.
     static func frequency(of word: String) -> String? {
