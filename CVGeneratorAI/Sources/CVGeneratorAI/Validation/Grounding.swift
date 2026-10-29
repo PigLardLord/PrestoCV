@@ -851,8 +851,8 @@ extension Grounding {
         "cherche", "recherche",
     ]
 
-    /// The first clause that speaks for the person, starts its sentence, names no entry and belongs to no job: what the
-    /// person says their field is ("I have worked in live sound for theatres").
+    /// The first clause that speaks for the person, starts its sentence, names no entry, belongs to no job and gives no
+    /// contact: what the person says their field is ("I have worked in live sound for theatres").
     func fieldClause() -> String? {
         let personWords = Set(reading.ofPerson.flatMap { $0 })
         return clauses.places.first { place in
@@ -860,6 +860,8 @@ extension Grounding {
             return clause.isAnchored && reading.speaks(at: place) && !reading.claimedWords(at: place).isEmpty
                 && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
                 && !clause.words.contains(where: \.isNumber) && clause.words.count >= 4
+                // A clause that gives the person's contacts ("La mia email è ...") is no field (#354, round 14).
+                && !reading.givesContacts(at: place)
                 // A clause that names the person ("Je suis Maria Rossi") is no field.
                 && !clause.words.indices.dropFirst().contains { i in
                     personWords.contains(clause.words[i].folded) && clause.written(from: i, to: i + 1).first?.isUppercase == true

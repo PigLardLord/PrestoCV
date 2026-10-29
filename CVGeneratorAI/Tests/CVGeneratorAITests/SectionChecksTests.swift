@@ -689,6 +689,17 @@ struct SectionChecksTests {
         #expect(!context.own.contains { $0.contains("Pastificio") || $0.contains("Albarella") })
     }
 
+    @Test("A clause that gives the person's e-mail is no field; the clause that says what the person does stays the field (#354, round 14)")
+    func fieldIsNoContact() throws {
+        let field = try sanitizer.draftContext(of: Self.italianJobs, against: JobClausesTests.italian).field
+        let afterAContact = try sanitizer.draftContext(
+            of: Self.italianJobs, against: "La mia email è marco.tiglio@example.com.\n" + JobClausesTests.italian
+        ).field
+
+        #expect(field?.hasPrefix("Lavoro da sedici anni") == true, "\(String(describing: field))")
+        #expect(afterAContact == field, "\(String(describing: afterAContact))")
+    }
+
     // MARK: The skills
 
     @Test("A quality listed as a tool is a soft skill, and a tool named by what it does stays, even when the tagger reads its first word as a verb (#354, round 5)")
