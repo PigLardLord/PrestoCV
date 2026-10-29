@@ -149,13 +149,14 @@ extension CVDataSanitizer {
             let job = entries.jobs[index]
             let language = source.explainer.language
             let rule = DutyRule(job: job, among: entries.jobs, source: source, entries: entries, written: written)
-            let quotes = rule.evidence.quotable.adding(rule.evidence.quotableByAchievements)
-            let reason = { (sentence: String) -> String? in
+            let reason = { (sentence: String, quotes: ProseQuotes) -> String? in
                 source.written(sentence, quoting: quotes, allowsNumbers: true) { _ in false } != nil ? nil : rule.rejection(of: sentence)
             }
             let current = job.entry.current && rule.evidence.statesCurrent
             var verdicts = DutyVerdicts()
-            verdicts.pinned = entries.pinnedDuties(of: job.subject).flatMap { $0.kept { reason($0) == nil ? $0 : nil } }
+            // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
+            // achievements stays an achievement, so it counts toward none of the job's text (#354).
+            verdicts.pinned = entries.pinnedDuties(of: job.subject).flatMap { $0.kept { reason($0, rule.evidence.quotable) == nil ? $0 : nil } }
                 .map { FirstPersonDuty.written($0, current: current, language: language, wordList: wordList) }
             verdicts.avoid = rule.wordsToAvoid()
 
@@ -170,7 +171,7 @@ extension CVDataSanitizer {
                 var rejection: String?
                 if words.count < 3 || words.last.map(Self.dutyConjunctions.contains) == true {
                     rejection = "it is not a whole sentence"
-                } else if let ruled = reason(sentence) {
+                } else if let ruled = reason(sentence, rule.evidence.quotable.adding(rule.evidence.quotableByAchievements)) {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
                     rejection = "it repeats a duty already written"

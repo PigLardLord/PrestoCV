@@ -106,6 +106,41 @@ struct SectionChecksTests {
         #expect(verdicts.saysEnough)
     }
 
+    #if canImport(NaturalLanguage)
+    // The French clauses are read with the device's language data, which only an Apple platform has.
+    @Test("The step that writes a job pins the duties the final check pins: an achievement of the job counts toward neither (#354, round 3)")
+    func stepPinsAsTheFinalCheck() throws {
+        let description = try DraftingInputs.exampleText(in: "fr")
+        let cv = CVData(experience: [
+            Experience(title: "assistante", company: "crèche", startDate: "2012", endDate: "2016"),
+            Experience(
+                title: "institutrice", company: "école Don Milani", startDate: "2016", current: true,
+                achievements: ["j'ai formé 3 nouveaux enseignants"]
+            ),
+        ])
+        let french = CVDataSanitizer(languageOfText: { _ in "fr" })
+
+        let step = try french.dutyCheck(of: cv, job: 1, duties: "J'ai formé trois nouveaux enseignants. J'enseigne à l'école Don Milani.", against: description)
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, step.kept.joined(separator: " ")], technologies: [], softSkills: [])
+        let final = try french.sanitize(cv, writing: writing, against: description).experience
+            .first { $0.company == "école Don Milani" }?.description ?? ""
+
+        #expect(step.pinned.allSatisfy { final.contains($0) }, "step \(step.pinned), final \(final)")
+        #expect(!step.saysEnough || final.count >= CVDataSanitizer.DutyVerdicts.describedLength, "final \(final)")
+    }
+    #endif
+
+    @Test("A job's plain stated duties of 40 characters are pinned by the step and kept by the final check alike (#354, round 3)")
+    func plainDutiesPinnedAlike() throws {
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, nil, nil, nil], technologies: [], softSkills: [])
+
+        let step = try sanitizer.dutyCheck(of: Self.italianJobs, job: 1, duties: nil, against: JobClausesTests.italian)
+        let final = try sanitizer.sanitize(Self.italianJobs, writing: writing, against: JobClausesTests.italian)
+
+        #expect(step.saysEnough)
+        #expect(step.pinned.allSatisfy { duty in final.experience.contains { ($0.description ?? "").contains(duty) } })
+    }
+
     @Test("A repair's duties are checked against the duties kept before it, and the duties of a job past the draft's are none")
     func repairAgainstEarlier() throws {
         let verdicts = try sanitizer.dutyCheck(
