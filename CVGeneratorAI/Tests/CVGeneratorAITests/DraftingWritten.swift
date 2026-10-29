@@ -223,6 +223,19 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A technology with a word in neither the description nor the reader's tools of the input's trade (`DraftingInputs.vocabularies`):
     /// a tool of another trade, an activity, or jargon ("frequency calibration", "software di tracciamento"; #354, round 1).
     case offTradeTechnology
+    /// A technology that names a kind of tool and no tool of it: its head noun is a category ("software", "plataforma de
+    /// desenvolvimento", "digital sound workstation") and none of its words is a name or an acronym (#354, round 2).
+    case categoryAsTechnology
+    /// Two soft skills of one quality ("precisione" and "attenzione"; "teamwork" and "collaboration"; #354, round 2).
+    case sameQuality
+    /// A summary sentence whose subject is a quality: it starts with a soft skill of the draft or a word for a quality at work
+    /// ("Precisione e attenzione sono le mie qualità."; #354, round 2).
+    case qualitySubjectSummary
+    /// Two summary sentences that end with the same three words ("..., con enfoque práctico." twice; #354, round 2).
+    case repeatedEnding
+    /// A job description with three sentences or more that start with the same two words ("Je préparais ..." three times; #354,
+    /// round 2).
+    case sameOpening
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -250,6 +263,11 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .fillerDuty: "a duty not said, in a job the person described"
         case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
         case .offTradeTechnology: "a technology neither stated nor of the trade"
+        case .categoryAsTechnology: "a category as a technology"
+        case .sameQuality: "two soft skills of one quality"
+        case .qualitySubjectSummary: "a summary sentence with a quality as its subject"
+        case .repeatedEnding: "two summary sentences with one ending"
+        case .sameOpening: "three sentences of one job with one opening"
         }
     }
 }
@@ -291,8 +309,10 @@ enum ReaderRules {
             if skill.kind == .technology {
                 if isQuality(skill.name) {
                     found.append(ReaderFinding(kind: .softAsTechnology, path: path, value: skill.name))
-                } else if isNoTool(skill.name) {
+                } else if isNoTool(skill.name) || isActivity(skill.name, language: language) {
                     found.append(ReaderFinding(kind: .noToolOfTheTrade, path: path, value: skill.name))
+                } else if isCategory(skill.name, language: language) {
+                    found.append(ReaderFinding(kind: .categoryAsTechnology, path: path, value: skill.name))
                 }
             }
             if language != "en", isEnglish(skill.name) {
@@ -324,6 +344,7 @@ enum ReaderRules {
         for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && isTool(skill.name, language: language) {
             found.append(ReaderFinding(kind: .toolAsSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
+        found += sameQualities(in: cv)
         for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
         }
@@ -358,6 +379,10 @@ enum ReaderRules {
         }
         if let run = repeatedRun(in: description) {
             found.append(ReaderFinding(kind: .repeatedDuty, path: path, value: run))
+        }
+        let openings = sentences.map { letterWords(of: $0).prefix(2).joined(separator: " ") }.filter { $0.contains(" ") }
+        if let opening = openings.first(where: { opening in openings.count { $0 == opening } >= 3 }) {
+            found.append(ReaderFinding(kind: .sameOpening, path: path, value: opening))
         }
         return found
     }
@@ -460,13 +485,17 @@ enum ReaderRules {
         for (index, skill) in cv.skills.enumerated() where skill.kind == .technology {
             let words = letterWords(of: skill.name).filter { !["l", "d"].contains($0) }
             guard let word = ["en", "de"].contains(language) ? words.last : words.first, word.count >= 4 else { continue }
-            let head = stem(word)
+            let head = headGroups[stem(word)] ?? stem(word)
             if !heads.insert(head).inserted {
                 found.append(ReaderFinding(kind: .sharedHeadNoun, path: "skills[\(index)].name", value: skill.name))
             }
         }
         return found
     }
+
+    /// The stems of head nouns that name one tool, by the stem that stands for them: a console, a mixer and a desk are one
+    /// mixing console (#354, round 2).
+    static let headGroups: [String: String] = ["mixer": "consol", "desk": "consol"]
 
     /// A word without the ending of its plural and its last vowel ("consoles" and "console" are "consol").
     static func stem(_ word: String) -> String {
@@ -526,7 +555,28 @@ enum ReaderRules {
         let workWords = Set((titles.flatMap { $0 } + InventedFacts.words(of: input.field ?? "")).filter { $0.count > 3 })
         found += sentences.filter { hasBareSubject($0, of: workWords) }
             .map { ReaderFinding(kind: .bareSubjectSummary, path: "summary", value: $0) }
+        let qualities = cv.skills.filter { $0.kind == .softSkill }.map { letterWords(of: $0.name) }.filter { !$0.isEmpty }
+        found += sentences.filter { hasQualitySubject($0, qualities: qualities) }
+            .map { ReaderFinding(kind: .qualitySubjectSummary, path: "summary", value: $0) }
+        var endings: Set<String> = []
+        for sentence in sentences {
+            let words = letterWords(of: sentence)
+            guard words.count >= 5 else { continue }
+            if !endings.insert(words.suffix(3).joined(separator: " ")).inserted {
+                found.append(ReaderFinding(kind: .repeatedEnding, path: "summary", value: sentence))
+            }
+        }
         return found
+    }
+
+    /// Whether `sentence` starts with the words of a soft skill of the draft, or with a word for a quality at work, in a clause of
+    /// five words or more: a quality spoken of as the subject, not the person speaking. A quality that opens a sentence before a
+    /// comma ("Affidabile e preciso, seguo ...") describes the person who speaks after it.
+    static func hasQualitySubject(_ sentence: String, qualities: [[String]]) -> Bool {
+        let words = letterWords(of: sentence)
+        let clause = letterWords(of: String(sentence.prefix { $0 != "," }))
+        guard clause.count >= 5, let first = words.first, !personWords.contains(first), !pronouns.contains(first) else { return false }
+        return qualities.contains { words.starts(with: $0) } || isQuality(first)
     }
 
     /// Whether `sentence` starts with a word of `workWords` and has a verb "to be" among its next three words, with no word of the
@@ -591,7 +641,33 @@ enum ReaderRules {
         "skill", "skills", "ability", "abilities", "competence", "competences", "competencies", "competenza", "competenze", "abilita",
         "capacita", "kompetenz", "kompetenzen", "fahigkeit", "fahigkeiten", "competencia", "competencias", "habilidad",
         "habilidades", "capacidad", "capacidades", "capacite", "capacites", "aptitude", "aptitudes", "habilidade", "capacidade",
+        "knowledge", "understanding", "expertise", "wissen", "verstandnis", "kenntnis", "kenntnisse", "fachwissen", "conoscenza",
+        "conoscenze", "comprensione", "conocimiento", "conocimientos", "comprension", "connaissance", "connaissances",
+        "comprehension", "conhecimento", "conhecimentos", "compreensao",
     ]
+
+    /// The parts of the words of one quality, by quality: two soft skills with a word of one group say one quality twice.
+    static let qualityGroups: [[String]] = [
+        ["precis", "präzis", "prazis", "attent", "attenz", "atenc", "atenç", "accura", "accurat", "genau", "sorgf", "exact", "rigor",
+         "rigueur", "meticul", "minuz", "esmero", "cuidad", "cuidado"],
+        ["teamw", "teamf", "collab", "colab", "coope", "zusammenarb", "squadra", "equipo", "équipe", "equipe"],
+    ]
+
+    /// The soft skills of a quality an earlier soft skill has.
+    static func sameQualities(in cv: CVData) -> [ReaderFinding] {
+        var seen: Set<Int> = []
+        var found: [ReaderFinding] = []
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill {
+            let words = skill.name.lowercased().split { !$0.isLetter }.map(String.init)
+            guard let group = qualityGroups.indices.first(where: { group in
+                words.contains { word in qualityGroups[group].contains { word.hasPrefix($0) } }
+            }) else { continue }
+            if !seen.insert(group).inserted {
+                found.append(ReaderFinding(kind: .sameQuality, path: "skills[\(index)].name", value: skill.name))
+            }
+        }
+        return found
+    }
 
     /// The nouns of a tool, a device or a machine, folded.
     static let toolNouns: Set<String> = [
@@ -718,7 +794,8 @@ enum ReaderRules {
     static let englishSkillWords: Set<String> = [
         "management", "communication", "skills", "solving", "teamwork", "leadership", "attention", "detail", "organization", "planning",
         "listening", "problem", "customer", "approach", "record", "keeping", "tools", "safety", "clear", "expression", "respect",
-        "active", "collaborative", "document", "maintenance", "troubleshooting", "mixing", "systems", "electrical", "preventive",
+        "active", "collaborative", "document", "maintenance", "troubleshooting", "mixing", "systems", "electrical", "preventive", "printer",
+        "printers", "scanner", "spreadsheet",
     ]
 
     /// English words the other five languages write as their own in a CV ("leadership", "software").
@@ -738,6 +815,48 @@ enum ReaderRules {
         let single = !lowered.contains(" ")
         let acronym = name == name.uppercased()
         return single && !acronym && activityEndings.contains { lowered.hasSuffix($0) }
+    }
+
+    /// The German nouns of an activity that are an infinitive with a capital ("Messen", "Verdrahten"): a word of the list, or one
+    /// ending in "-ieren" ("Installieren").
+    static let activityInfinitives: Set<String> = [
+        "messen", "prufen", "bohren", "loten", "schweissen", "verdrahten", "montieren", "schneiden", "planen", "kochen", "backen",
+        "reinigen", "reparieren", "warten", "verlegen", "anschliessen", "einbauen", "frasen", "schleifen",
+    ]
+
+    /// Whether a technology of one word is an activity in its infinitive: German only, where the noun of an activity is its
+    /// infinitive with a capital.
+    static func isActivity(_ name: String, language: String) -> Bool {
+        guard language == "de" else { return false }
+        let words = letterWords(of: name.replacingOccurrences(of: "ß", with: "ss"))
+        guard words.count == 1, let word = words.first else { return false }
+        return activityInfinitives.contains(word) || word.count > 7 && word.hasSuffix("ieren")
+    }
+
+    /// The head nouns that name a kind of tool and no tool, folded; the head is the last word in English and German, the first
+    /// in the other languages.
+    static let categoryNouns: Set<String> = [
+        "software", "softwares", "program", "programs", "programma", "programmi", "programa", "programas", "programm", "programme",
+        "application", "applications", "app", "apps", "applicazione", "applicazioni", "aplicacion", "aplicaciones", "aplicacao",
+        "aplicativo", "aplicativos", "anwendung", "anwendungen", "logiciel", "logiciels", "platform", "platforms", "piattaforma",
+        "plataforma", "plataformas", "plattform", "plateforme", "editor", "editors", "editeur", "workstation", "workstations",
+        "tool", "tools", "ferramenta", "ferramentas", "herramienta", "herramientas", "strumento", "strumenti", "outil", "outils",
+        "werkzeug", "werkzeuge",
+    ]
+
+    /// Whether a technology names a category and no tool of it: its head noun is a category noun, and none of its words is a
+    /// name (a capital inside it, or at its start after the first word), an acronym or a number.
+    static func isCategory(_ name: String, language: String) -> Bool {
+        let words = name.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let folded = words.map(fold)
+        guard let head = ["en", "de"].contains(language) ? folded.last : folded.first, categoryNouns.contains(head) else { return false }
+        let named = words.enumerated().contains { index, word in
+            word.count > 1 && word == word.uppercased() && word.contains(where: \.isLetter)
+                || word.dropFirst().contains(where: \.isUppercase)
+                || index > 0 && word.first?.isUppercase == true && language != "de"
+                || word.contains(where: \.isNumber)
+        }
+        return !named
     }
 
     static func isEnglish(_ name: String) -> Bool {

@@ -156,7 +156,7 @@ enum DraftingInputs {
             "DI boxes", "Dante", "QLab", "Pro Tools", "Logic Pro", "Reaper", "Ableton Live", "Smaart", "Yamaha CL", "DiGiCo",
             "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
             "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
-            "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com",
+            "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com", "sound mixers", "lighting rigs",
         ],
         "jobs-it": [
             "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
@@ -164,6 +164,32 @@ enum DraftingInputs {
             "pneumatica", "oleodinamica", "saldatrice", "trapano", "chiave dinamometrica", "avvitatore", "estrattore per cuscinetti",
             "riduttori", "pompe", "compressori", "software CMMS", "SAP PM", "lubrificanti", "carrello elevatore", "sensori",
             "encoder", "valvole",
+        ],
+        "en-plain": [
+            "warehouse management system", "WMS", "reach truck", "pallet jack", "pallet truck", "order picker", "barcode scanner",
+            "handheld scanner", "RF scanner", "label printer", "stretch wrapper", "conveyor", "Microsoft Outlook", "Microsoft Word",
+            "safety harness", "hand truck",
+        ],
+        "it-traps": [
+            "Excel", "Word", "Outlook", "Microsoft Office", "gestionale", "TeamSystem", "Zucchetti", "Danea Easyfatt", "PEC",
+            "Sistema di Interscambio", "home banking", "database", "stampante", "scanner", "fotocopiatrice", "fax", "calcolatrice",
+        ],
+        "de-plain": [
+            "Multimeter", "Spannungsprüfer", "Duspol", "Isolationsmessgerät", "Installationstester", "Schaltschrank", "Verteiler",
+            "Sicherungskasten", "Abisolierzange", "Crimpzange", "Seitenschneider", "Kabelschere", "Bohrhammer", "Akkuschrauber",
+            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme",
+        ],
+        "es-traps": [
+            "Excel", "Word", "ContaPlus", "A3", "Sage", "Holded", "Factusol", "hoja de cálculo", "base de datos", "calculadora",
+            "banca electrónica",
+        ],
+        "pt-traps": [
+            "Git", "GitHub", "GitLab", "Visual Studio Code", "Android Studio", "JavaScript", "TypeScript", "React", "Node.js", "PHP",
+            "Python", "SQL", "PostgreSQL", "MySQL", "Docker", "Figma", "Postman", "Jira",
+        ],
+        "example-fr": [
+            "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
+            "tableau", "cahiers", "ENT", "logiciels éducatifs", "matériel de manipulation",
         ],
     ]
 

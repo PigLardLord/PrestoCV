@@ -110,7 +110,7 @@ struct DraftingWrittenTests {
 
         let measure = try Self.measure("en-plain", cv)
 
-        #expect(measure.readerFindings.filter { $0.path.hasPrefix("skills") } == [
+        #expect(measure.readerFindings.filter { $0.kind == .softAsTechnology } == [
             ReaderFinding(kind: .softAsTechnology, path: "skills[0].name", value: "Teamwork"),
         ])
     }
@@ -348,6 +348,96 @@ struct DraftingWrittenTests {
         #expect(counted(["PLC", "quadri elettrici", "multimetro", "termocamera", "inverter"], italian).isEmpty)
     }
 
+    @Test("A technology that names a kind of tool and no tool of it is counted; one with a name, an acronym or a head of its own is not (#354, round 2)")
+    func categoryAsTechnology() {
+        let english = CVData(skills: ["accounting software", "Sage 50", "PA system", "ticketing platform", "QuickBooks software"]
+            .map { Skill(name: $0) })
+        let portuguese = CVData(skills: ["editor de texto", "Visual Studio Code", "ferramenta de versionamento", "plataforma AWS"]
+            .map { Skill(name: $0) })
+        let counted = { (cv: CVData, language: String) in
+            Self.reader(cv, language).filter { $0.kind == .categoryAsTechnology }.map(\.value)
+        }
+
+        #expect(counted(english, "en") == ["accounting software", "ticketing platform"])
+        #expect(counted(portuguese, "pt") == ["editor de texto", "ferramenta de versionamento"])
+    }
+
+    @Test("A German technology that is an activity in its infinitive is no tool of the trade; the tool of that activity is one (#354, round 2)")
+    func activityInfinitive() {
+        let cv = CVData(skills: ["Löten", "Lötkolben", "Kalibrieren", "Prüfgerät"].map { Skill(name: $0) })
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .noToolOfTheTrade }.map(\.value) == ["Löten", "Kalibrieren"])
+    }
+
+    @Test("A device in English in a draft of another language is a skill in another language (#354, round 2)")
+    func englishDevice() {
+        let cv = CVData(skills: [Skill(name: "stampante laser"), Skill(name: "label printer")])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .skillInAnotherLanguage }.map(\.value) == ["label printer"])
+    }
+
+    @Test("A console, a mixer and a desk are one tool: the second and the third are counted as one head noun (#354, round 2)")
+    func headGroups() {
+        let cv = CVData(skills: ["analog mixer", "stage boxes", "digital console", "broadcast desk"].map { Skill(name: $0) })
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .sharedHeadNoun }.map(\.value) == ["digital console", "broadcast desk"])
+    }
+
+    @Test("A word for knowledge listed as a soft skill is the word for a skill; a quality is not (#354, round 2)")
+    func knowledgeAsQuality() {
+        let cv = CVData(skills: ["Fachwissen", "Verständnis", "Geduld"].map { Skill(name: $0, kind: .softSkill) })
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .skillWordAsQuality }.map(\.value) == ["Fachwissen", "Verständnis"])
+    }
+
+    @Test("A soft skill of the quality of an earlier one is counted; qualities of their own are not (#354, round 2)")
+    func sameQuality() {
+        let cv = CVData(skills: ["accuratezza", "pazienza", "attenzione ai dettagli", "spirito di collaborazione", "lavoro di squadra"]
+            .map { Skill(name: $0, kind: .softSkill) })
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .sameQuality }.map(\.value) == [
+            "attenzione ai dettagli", "lavoro di squadra",
+        ])
+    }
+
+    @Test("A summary sentence whose subject is a quality is counted; a quality before a comma and the person is not (#354, round 2)")
+    func qualitySubjectSummary() {
+        let cv = CVData(
+            summary: "Sono tecnica di laboratorio da sei anni. Pazienza e metodo sono i miei punti di forza. "
+                + "Affidabile e paziente, preparo ogni campione con cura.",
+            skills: [Skill(name: "pazienza", kind: .softSkill), Skill(name: "metodo", kind: .softSkill)]
+        )
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .qualitySubjectSummary }.map(\.value) == [
+            "Pazienza e metodo sono i miei punti di forza.",
+        ])
+    }
+
+    @Test("A summary sentence that ends with the three words of an earlier one is counted (#354, round 2)")
+    func repeatedEnding() {
+        let cv = CVData(
+            summary: "Soy técnico de sonido con enfoque práctico. Monto los equipos de cada gira con enfoque práctico. "
+                + "Trabajo bien con los músicos."
+        )
+
+        #expect(Self.reader(cv, "es").filter { $0.kind == .repeatedEnding }.map(\.value) == [
+            "Monto los equipos de cada gira con enfoque práctico.",
+        ])
+    }
+
+    @Test("A job with three sentences that open with the same two words is counted once; two are not (#354, round 2)")
+    func sameOpening() {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "Je préparais les ateliers du matin. Je préparais les goûters. "
+                + "Je préparais les sorties au parc. J'accueillais les familles."),
+            Experience(company: "B", description: "Je préparais les ateliers du matin. Je préparais les goûters. J'accueillais les familles."),
+        ])
+
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .sameOpening } == [
+            ReaderFinding(kind: .sameOpening, path: "experience[0].description", value: "je preparais"),
+        ])
+    }
+
     @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
     func toolAsSoftSkill() {
         let cv = CVData(skills: [
@@ -473,8 +563,10 @@ struct DraftingWrittenTests {
 
         let counts = WrittenCounts(measured)
 
+        // "Teamwork" as a technology is a quality, and no tool of the warehouse either.
+        let added: Set<ReaderClass> = [.softAsTechnology, .offTradeTechnology]
         for kind in ReaderClass.allCases {
-            #expect(counts.reader.count(kind) == plain.count(kind) + (kind == .softAsTechnology ? 1 : 0), "\(kind)")
+            #expect(counts.reader.count(kind) == plain.count(kind) + (added.contains(kind) ? 1 : 0), "\(kind)")
         }
         #expect(counts.shortfalls(p95Seconds: 10).isEmpty)
     }
