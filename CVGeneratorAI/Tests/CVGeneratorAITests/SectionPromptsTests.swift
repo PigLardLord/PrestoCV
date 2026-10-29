@@ -441,13 +441,25 @@ struct SectionPromptsTests {
 
     // MARK: A clause as a sentence
 
-    @Test("A clause reads as a whole sentence: a capital first letter and a full stop, its joining punctuation and the relative word that tied it to the employer gone (#354, round 12)")
+    @Test("A clause reads as a whole sentence: a capital first letter and a full stop, its joining punctuation gone")
     func clauseAsSentence() {
-        #expect(SectionPrompts.asSentence(", dove coordino tre tecnici;") == "Coordino tre tecnici.")
-        #expect(SectionPrompts.asSentence("où je range 12 rayons de livres") == "Je range 12 rayons de livres.")
-        #expect(SectionPrompts.asSentence("where needed, I mend the nets") == "Where needed, I mend the nets.")
-        #expect(SectionPrompts.asSentence("wo ich die Netze flicke") == "Wo ich die Netze flicke.")
+        #expect(SectionPrompts.asSentence(", dove coordino tre tecnici;") == "Dove coordino tre tecnici.")
         #expect(SectionPrompts.asSentence("I train the juniors!") == "I train the juniors!")
         #expect(SectionPrompts.asSentence(" ") == "")
+    }
+
+    @Test("A clause a job request reads as a duty also loses the relative word that tied it to the employer (#354, round 12)")
+    func clauseAsDuty() {
+        #expect(SectionPrompts.asDuty(", dove coordino tre tecnici;") == "Coordino tre tecnici.")
+        #expect(SectionPrompts.asDuty("où je range 12 rayons de livres") == "Je range 12 rayons de livres.")
+        #expect(SectionPrompts.asDuty("where needed, I mend the nets") == "Where needed, I mend the nets.")
+        #expect(SectionPrompts.asDuty("wo ich die Netze flicke") == "Wo ich die Netze flicke.")
+        #expect(SectionPrompts.asDuty("I train the juniors!") == "I train the juniors!")
+    }
+
+    @Test("The skills requests read a clause as the person said it, its relative word kept: they copy no clause, and the word dropped there changed the tools of three drafts (#354, round 12)")
+    func skillsReadTheClauseAsSaid() {
+        #expect(SectionPrompts.tools(for: Self.brief, roles: [1], count: 2...3).text.contains("- Dove coordino tre tecnici.\n"))
+        #expect(SectionPrompts.softSkills(for: Self.brief).text.contains("Dove coordino tre tecnici."))
     }
 }

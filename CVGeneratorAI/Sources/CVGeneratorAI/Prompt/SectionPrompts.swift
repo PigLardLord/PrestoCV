@@ -73,7 +73,7 @@ enum SectionPrompts {
         masking.names = brief.names.filter { $0.first?.isUppercase == true }
         lines.append("Job: " + roleLine(role, employer: true, masked: brief))
         if !role.clauses.isEmpty {
-            lines.append("What the person said about this job:\n" + bullets(role.clauses.map { asSentence(masked($0, in: masking)) }))
+            lines.append("What the person said about this job:\n" + bullets(role.clauses.map { asDuty(masked($0, in: masking)) }))
         }
         if avoiding, !role.avoid.isEmpty { lines.append("Words to avoid: " + role.avoid.joined(separator: ", ")) }
         return lines
@@ -242,16 +242,19 @@ enum SectionPrompts {
 
     // MARK: The parts of a request
 
-    /// A clause of the description as a whole sentence: a capital first letter and a full stop, its joining punctuation gone, and
-    /// the relative word that tied it to the employer (`CVDataSanitizer.withoutRelativeOpening`): the model wrote "Où j'ai formé…"
-    /// back as a duty (#354, round 12).
+    /// A clause of the description as a whole sentence: a capital first letter and a full stop, its joining punctuation gone.
     static func asSentence(_ clause: String) -> String {
-        let trimmed = CVDataSanitizer.withoutRelativeOpening(
-            clause.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
-        )
+        let trimmed = clause.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
         guard let first = trimmed.first else { return trimmed }
         let capital = first.uppercased() + trimmed.dropFirst()
         return capital.last.map { ".!?".contains($0) } == true ? capital : capital + "."
+    }
+
+    /// A clause a job request reads, which the model writes back as a duty: a whole sentence without the relative word that tied
+    /// it to the employer (`CVDataSanitizer.withoutRelativeOpening`): the model wrote "Où j'ai formé…" back as a duty (#354, round
+    /// 12). Only the job requests drop it: the skills requests copy no clause, and there the dropped word changed the tools.
+    static func asDuty(_ clause: String) -> String {
+        asSentence(CVDataSanitizer.withoutRelativeOpening(asSentence(clause)))
     }
 
     private static func header(_ brief: DraftBrief) -> [String] {
