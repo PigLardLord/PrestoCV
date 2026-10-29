@@ -130,6 +130,23 @@ struct DraftingReaderTests {
         #expect(counted(CVData(summary: "The work asks for patience."), "en").isEmpty)
     }
 
+    @Test("An Italian, Spanish or Portuguese summary sentence that opens with a participle and has no person is counted; one with a verb of the person, or a first person of the same ending, is not (#354, round 6)")
+    func participleSummary() {
+        let italian = CVData(summary: "Curato ogni dettaglio delle cornici dorate. Abituato alla polvere, restauro le cornici antiche. "
+            + "Valuto lo stato di ogni tela. Restauro le cornici antiche con pazienza.")
+        let spanish = CVData(summary: "Mantenido un archivo ordenado de las partituras, lo que facilita los ensayos. "
+            + "Mantengo un archivo ordenado de las partituras. Decido el orden de los ensayos.")
+        let portuguese = CVData(summary: "Mantido um arquivo organizado das plantas da obra. Mantenho um arquivo organizado das plantas.")
+        let counted = { (cv: CVData, language: String) in
+            Self.reader(cv, language).filter { $0.kind == .participleSummary }.map(\.value)
+        }
+
+        #expect(counted(italian, "it") == ["Curato ogni dettaglio delle cornici dorate."])
+        #expect(counted(spanish, "es") == ["Mantenido un archivo ordenado de las partituras, lo que facilita los ensayos."])
+        #expect(counted(portuguese, "pt") == ["Mantido um arquivo organizado das plantas da obra."])
+        #expect(counted(CVData(summary: "Trained the new staff."), "en").isEmpty)
+    }
+
     @Test("A German subordinate clause that ends with a noun after its verb is counted; one that ends with its verb is not (#354, round 5)")
     func germanVerbPosition() {
         let cv = CVData(summary: "Ich arbeite als Schleusenwärter. Ich prüfe, dass alle Tore schließen sauber nach jeder Fahrt. "

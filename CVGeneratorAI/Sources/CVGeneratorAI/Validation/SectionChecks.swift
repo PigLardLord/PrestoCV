@@ -589,7 +589,7 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
                 } else if let language, Self.isAFragment(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
-                } else if let language, Self.dropsThePronoun.contains(language), !Self.speaksAsThePerson(sentence) {
+                } else if let language, Self.dropsThePronoun.contains(language), !Self.speaksAsThePerson(sentence, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerbOfThePerson))
                 } else if language == .german, Self.putsTheVerbBeforeTheEnd(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.putsTheVerbBeforeTheEnd))
@@ -877,14 +877,45 @@ extension CVDataSanitizer {
     /// Whether an Italian, Spanish or Portuguese summary sentence speaks as the person (#354, round 5): it holds a word of the
     /// person or an auxiliary of the first person ("mi", "tengo", "sou"), or its first word, or the first word after a comma, is a
     /// verb of the first person, in "-o" ("Controllo …", "Con cura, verifico …") or in the past of the first person in Spanish and
-    /// Portuguese ("Revisé …", "Organizei …"). A rough rule: "Con cura verifico" is not read.
-    private static func speaksAsThePerson(_ sentence: String) -> Bool {
+    /// Portuguese ("Revisé …", "Organizei …"). A past participle (`isParticiple`) is no verb of the person (#354, round 6):
+    /// "Mantenido un control riguroso …" speaks as no one. A rough rule: "Con cura verifico" is not read.
+    private static func speaksAsThePerson(_ sentence: String, language: Vocabulary.Language) -> Bool {
         if letterWords(of: sentence).contains(where: wordsOfTheSpeaker.contains) { return true }
         let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
         return firsts.contains { word in
-            word.count >= 3 && !openersInO.contains(word) && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei")))
+            word.count >= 3 && !openersInO.contains(word) && !isParticiple(word, language: language)
+                && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei")))
         }
     }
+
+    /// Whether a folded word of six letters or more ends as a past participle, "-ato", "-ito" or "-uto" in Italian and "-ado" or
+    /// "-ido" in Spanish and Portuguese, and is no first person of the same ending that a summary writes ("valuto", "decido"). A
+    /// rough rule: a first person missing from the list reads as a participle, and its sentence goes.
+    private static func isParticiple(_ word: String, language: Vocabulary.Language) -> Bool {
+        guard word.count >= 6, let endings = participleEndings[language], endings.contains(where: word.hasSuffix) else { return false }
+        return !(firstPersonsAsParticiples[language] ?? []).contains(word)
+    }
+
+    /// The endings of the past participle of the languages that drop the pronoun.
+    private static let participleEndings: [Vocabulary.Language: [String]] = [
+        .italian: ["ato", "ito", "uto"], .spanish: ["ado", "ido"], .portuguese: ["ado", "ido"],
+    ]
+
+    /// The first persons of the present that end as a past participle, folded as `letterWords` writes them.
+    private static let firstPersonsAsParticiples: [Vocabulary.Language: Set<String>] = [
+        .italian: [
+            "valuto", "saluto", "rifiuto", "discuto", "disputo", "computo", "recluto", "visito", "medito", "facilito", "sollecito",
+            "esercito", "accredito", "deposito", "abilito", "riabilito", "delimito", "limito", "invito", "recito", "agito", "ospito",
+        ],
+        .spanish: [
+            "decido", "divido", "subdivido", "valido", "convalido", "consolido", "liquido", "presido", "resido", "coincido", "impido",
+            "despido", "expido", "traslado", "persuado", "disuado", "agrado", "degrado", "olvido", "invado", "evado",
+        ],
+        .portuguese: [
+            "decido", "divido", "subdivido", "valido", "consolido", "liquido", "presido", "resido", "coincido", "duvido", "convido",
+            "agrido", "agrado", "degrado", "persuado", "dissuado",
+        ],
+    ]
 
     /// `sentence` as the person says it, in Italian, Spanish or Portuguese (#354, round 5): a sentence that opens with a verb of the
     /// third person (`speaksInTheThirdPerson`), alone or after a lone word of the kept `qualities` ("Precisa gestisce la contabilità"),

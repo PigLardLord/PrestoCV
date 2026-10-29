@@ -107,6 +107,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An Italian, Spanish or Portuguese summary sentence with no verb of the first person and no word of the person: the work
     /// spoken of, not the person speaking ("Ogni azione è guidata dalla cura…"; #354, round 5).
     case impersonalSummary
+    /// An Italian, Spanish or Portuguese summary sentence that opens with a past participle, as a note, and has no verb or word of
+    /// the person: the participle's "-o" read as the first person ("Mantenido un enfoque preciso…"; #354, round 6).
+    case participleSummary
     /// A German subordinate clause after "dass", "weil", "sodass" or "ob" whose finite verb is not its last word: the clause ends
     /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354, round 5).
     case germanVerbPosition
@@ -152,6 +155,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .nonToolTechnology: "a person, an activity or a document as a technology"
         case .clippedModifier: "a modifier cut from its noun as a technology"
         case .impersonalSummary: "a summary sentence with no person speaking"
+        case .participleSummary: "a summary sentence that opens with a participle"
         case .germanVerbPosition: "a German finite verb before the end of its subordinate clause"
         }
     }
@@ -485,6 +489,8 @@ enum ReaderRules {
         if ["it", "es", "pt"].contains(input.language) {
             found += sentences.filter { !speaksAsThePerson($0, language: input.language) }
                 .map { ReaderFinding(kind: .impersonalSummary, path: "summary", value: $0) }
+            found += sentences.filter { opensWithAParticiple($0, language: input.language) }
+                .map { ReaderFinding(kind: .participleSummary, path: "summary", value: $0) }
         }
         var endings: Set<String> = []
         for sentence in sentences {
@@ -520,6 +526,43 @@ enum ReaderRules {
         let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
         return firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) }
     }
+
+    /// Whether an Italian, Spanish or Portuguese sentence opens with a past participle (`isParticiple`) and nothing else in it speaks
+    /// as the person: no word of the person, and no verb of the first person first after a comma ("Abituato al rumore, controllo …"
+    /// speaks).
+    static func opensWithAParticiple(_ sentence: String, language: String) -> Bool {
+        let words = letterWords(of: sentence)
+        guard let first = words.first, isParticiple(first, language: language),
+              !words.contains(where: (speakerWords[language] ?? []).contains) else { return false }
+        let firsts = sentence.split(separator: ",").dropFirst().compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
+        return !firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) && !isParticiple($0, language: language) }
+    }
+
+    /// Whether a folded word of six letters or more ends as a past participle: "-ato", "-ito" or "-uto" in Italian, "-ado" or "-ido"
+    /// in Spanish and Portuguese, and is no first person of the same ending that a summary writes ("valuto", "decido"). A rough rule:
+    /// a first person missing from the list reads as a participle.
+    static func isParticiple(_ word: String, language: String) -> Bool {
+        guard word.count >= 6, let endings = participleEndings[language], endings.contains(where: word.hasSuffix) else { return false }
+        return !(firstPersonsAsParticiples[language] ?? []).contains(word)
+    }
+
+    private static let participleEndings: [String: [String]] = ["it": ["ato", "ito", "uto"], "es": ["ado", "ido"], "pt": ["ado", "ido"]]
+
+    /// The first persons that end as a participle, folded.
+    static let firstPersonsAsParticiples: [String: Set<String>] = [
+        "it": [
+            "valuto", "saluto", "rifiuto", "discuto", "disputo", "computo", "recluto", "visito", "medito", "facilito", "sollecito",
+            "esercito", "accredito", "deposito", "abilito", "riabilito", "delimito", "limito", "invito", "recito", "agito", "ospito",
+        ],
+        "es": [
+            "decido", "divido", "subdivido", "valido", "convalido", "consolido", "liquido", "presido", "resido", "coincido", "impido",
+            "despido", "expido", "traslado", "persuado", "disuado", "agrado", "degrado", "olvido", "invado", "evado",
+        ],
+        "pt": [
+            "decido", "divido", "subdivido", "valido", "consolido", "liquido", "presido", "resido", "coincido", "duvido", "convido",
+            "agrido", "agrado", "degrado", "persuado", "dissuado",
+        ],
+    ]
 
     /// The words of the person, and the auxiliaries of the first person, by language, folded.
     private static let speakerWords: [String: Set<String>] = [

@@ -999,12 +999,18 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksInTheThirdPerson])
     }
 
-    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays (#354, round 5)",
+    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays; a past participle first is no verb of the person (#354, rounds 5 and 6)",
           arguments: [
               ("it", "Ogni azione è guidata dalla cura per i conti.", false), ("it", "Controllo i conti della ditta ogni giorno.", true),
               ("it", "Con cura, verifico i movimenti di cassa.", true), ("it", "Il mio lavoro è tenere i conti in ordine.", true),
               ("es", "Cada asiento exige atención constante.", false), ("es", "Reviso las facturas cada semana.", true),
               ("pt", "Cada lançamento exige atenção constante.", false), ("pt", "Reviso as faturas todas as semanas.", true),
+              // A past participle first is no verb of the person; a first person of the same ending is one (#354, round 6).
+              ("es", "Mantenido un control riguroso de las facturas, lo que agiliza los cierres.", false),
+              ("es", "Mantengo un control riguroso de las facturas.", true), ("es", "Decido el orden de los cierres mensuales.", true),
+              ("it", "Curato ogni dettaglio delle registrazioni contabili.", false),
+              ("it", "Abituato alle scadenze, controllo i conti ogni giorno.", true), ("it", "Valuto i rischi di ogni registrazione.", true),
+              ("pt", "Mantido um controle rigoroso das faturas.", false), ("pt", "Decido a ordem dos fechamentos mensais.", true),
           ])
     func summaryWithNoVerbOfThePerson(language: String, sentence: String, stays: Bool) throws {
         let (checker, facts, description) = Self.accountant(language)
