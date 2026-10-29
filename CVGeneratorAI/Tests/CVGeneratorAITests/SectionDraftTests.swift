@@ -270,6 +270,33 @@ struct SectionDraftTests {
         #expect(!draft.skills.contains { $0.name == "software" })
     }
 
+    @Test("A summary sentence of clauses each opened by the person, joined by semicolons, is cut into sentences, at most four with the opening (#354, round 4)")
+    func chainedSummaryIsCut() async throws {
+        let service = service()
+        service.summaryResult = """
+            I plan the sound of each production with the mixing desks; I look after the stage monitors in every show; I train the \
+            technicians before the tours; I keep the microphones ready.
+            """
+
+        let draft = try await draft(service)
+
+        let summary = try #require(draft.summary)
+        #expect(!summary.contains(";"))
+        #expect(summary.contains("I plan the sound of each production with the mixing desks. I look after the stage monitors in every show."))
+        #expect(SentenceSplitter.sentences(in: summary).count == 4)
+    }
+
+    @Test("A semicolon the person's own clause does not follow stays in its sentence (#354, round 4)", arguments: [
+        ("I look after the mixing desks; cables, stands and cases too.", "I look after the mixing desks; cables, stands and cases too."),
+        ("I run the sound checks; I train the crew.", "I run the sound checks. I train the crew."),
+        ("Je règle les consoles ; j'accompagne les tournées.", "Je règle les consoles. J'accompagne les tournées."),
+        ("Ich prüfe die Pulte; ich schule das Team.", "Ich prüfe die Pulte. Ich schule das Team."),
+        ("Preparo i banchi; i cavi restano in ordine.", "Preparo i banchi; i cavi restano in ordine."),
+    ])
+    func semicolonBeforeAClause(text: String, cut: String) {
+        #expect(SentenceSplitter.unchained(text) == cut)
+    }
+
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()

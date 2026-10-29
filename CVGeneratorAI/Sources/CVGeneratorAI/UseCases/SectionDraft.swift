@@ -260,7 +260,9 @@ final class SectionDraft {
         let written = try await request(.summary) { [brief] in
             try await self.service.writeSummary(for: brief, tools: keptTools, qualities: keptQualities)
         }
-        let opened = Self.opened(written, by: brief.opening)
+        // A sentence of clauses joined by semicolons is cut into sentences, then the summary to its most (#354, round 4).
+        let opened = Self.opened(written.map(SentenceSplitter.unchained), by: brief.opening)
+            .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let first = try? sanitizer.summaryCheck(
             of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities,
             tools: keptTools, against: description
@@ -279,7 +281,7 @@ final class SectionDraft {
                 for: brief, tools: keptTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
-        let cut = Self.opened(repaired, by: brief.opening)
+        let cut = Self.opened(repaired.map(SentenceSplitter.unchained), by: brief.opening)
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
             of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities,
