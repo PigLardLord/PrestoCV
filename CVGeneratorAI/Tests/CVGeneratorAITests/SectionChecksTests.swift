@@ -670,6 +670,19 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.opening(of: CVData(), language: .english) == nil)
         #expect(CVDataSanitizer.opening(of: teacher, language: nil) == nil)
     }
+
+    @Test("The summary reads a job's work as its duties' topics: each clause with its subject, auxiliary and verb gone, none with a number (#354, round 3)")
+    func workTopics() {
+        #expect(CVDataSanitizer.workTopics(of: "Je prépare les ateliers d'éveil et j'accueille les familles le matin.")
+            == ["les ateliers d'éveil", "les familles le matin"])
+        #expect(CVDataSanitizer.workTopics(of: "Ich habe die Lichtleisten montiert und prüfe die Notbeleuchtung.")
+            == ["die Lichtleisten", "die Notbeleuchtung"])
+        #expect(CVDataSanitizer.workTopics(of: "Mi occupo delle bolle dei corrieri, controllando gli scaffali e i carrelli.")
+            == ["delle bolle dei corrieri", "gli scaffali", "carrelli"])
+        #expect(CVDataSanitizer.workTopics(of: "I trained 4 new porters. I sort the parcels and labels.") == ["the parcels", "labels"])
+        #expect(CVDataSanitizer.workTopics(of: "I sort the mail. I sort the mail. I fold the towels. I stack the chairs. I wipe the tables.")
+            == ["the mail", "the towels", "the chairs", "the tables"])
+    }
 }
 
 /// A dictionary that knows every word in English and none in any other language.

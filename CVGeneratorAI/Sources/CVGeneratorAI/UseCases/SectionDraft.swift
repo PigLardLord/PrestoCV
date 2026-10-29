@@ -235,20 +235,28 @@ final class SectionDraft {
 
     // MARK: - Summary
 
-    /// The summary, last, from the jobs and the skills the final check keeps. A summary that keeps a sentence but names no title,
-    /// or is too short, gets an opening code writes from the facts; one that drops a sentence or misses something else gets one
-    /// repair, kept when it misses no more than the first.
+    /// The summary, last, from the jobs and the skills the final check keeps. Code writes its opening from the facts and the request
+    /// what follows it, from the topics of each job's kept duties (#354, round 3). A summary that keeps a sentence but names no
+    /// title, or is too short, gets the opening again; one that drops a sentence or misses something else gets one repair, kept when
+    /// it misses no more than the first.
     private func writeSummary(of brief: DraftBrief, field: String?, around dated: CVData) async throws {
         let kept = try kept(around: dated)
         let keptDuties = kept.experience.compactMap(\.description)
         let keptTools = kept.skills.filter { $0.kind != .softSkill }.map(\.name)
         let keptQualities = kept.skills.filter { $0.kind == .softSkill }.map(\.name)
         let work = keptDuties + technologies
-        let written = try await request(.summary) {
+        var brief = brief
+        let jobDuties = kept.experience.count == brief.roles.count ? kept.experience.map(\.description) : duties
+        for number in brief.roles.indices where jobDuties.indices.contains(number) {
+            brief.roles[number].work = jobDuties[number].map { CVDataSanitizer.workTopics(of: $0) } ?? []
+        }
+        brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
+        let written = try await request(.summary) { [brief] in
             try await self.service.writeSummary(for: brief, tools: keptTools, qualities: keptQualities)
         }
+        let opened = Self.opened(written, by: brief.opening)
         guard let first = try? sanitizer.summaryCheck(
-            of: dated, summary: written, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
+            of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
         ) else {
             return
         }
@@ -257,18 +265,26 @@ final class SectionDraft {
         if let opening { summary = Self.joining(opening, first.kept) }
         let problems = first.problems.filter { $0 != first.openingProblem }
         guard !first.rejected.isEmpty || !problems.isEmpty else { return }
-        let keptSentences = (opening.map { [$0] } ?? []) + first.kept
+        let keptSentences = ((opening.map { [$0] } ?? []) + first.kept).filter { $0 != brief.opening }
         let rejected = first.rejected.map(Self.quoted)
-        let repaired = try await request(.summary) {
+        let repaired = try await request(.summary) { [brief] in
             try await self.service.repairSummary(
                 for: brief, tools: keptTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
-        let cut = repaired.map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
+        let cut = Self.opened(repaired, by: brief.opening)
+            .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
             of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
         ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
+    }
+
+    /// The sentences a summary request wrote after `opening`, which code wrote: nil when it wrote none. The check drops a sentence
+    /// that says the opening again.
+    private static func opened(_ written: String?, by opening: String?) -> String? {
+        guard let written = written?.presentValue else { return nil }
+        return opening.map { $0 + " " + written } ?? written
     }
 
     /// The opening, then the kept sentences that are not it, at most four.

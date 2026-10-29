@@ -120,21 +120,27 @@ enum SectionPrompts {
 
     // MARK: The summary
 
-    /// The summary, written last from the brief's job titles and the tools and qualities the checks kept. It reads no duty: a duty
-    /// it read came back word for word, and the check drops a copied duty (#354, round 2).
+    /// The summary, written last from the brief's job titles, the topics of the duties the checks kept, and the tools and qualities
+    /// they kept, after the opening code wrote. It reads no whole duty: a duty it read came back word for word, and the check drops
+    /// a copied duty (#354, round 2); with no work at all it wrote lists of qualities (round 3).
     static func summary(for brief: DraftBrief, tools: [String], qualities: [String]) -> Prompt {
         var lines = header(brief) + headline(brief)
-        let roles = brief.roles.map { "- " + roleLine($0, employer: false) }
+        let roles = brief.roles.map { role in
+            "- " + roleLine(role, employer: false) + (role.work.isEmpty ? "" : "\n  work: " + role.work.joined(separator: "; "))
+        }
         if !roles.isEmpty { lines.append("Roles:\n" + roles.joined(separator: "\n")) }
         if !brief.studies.isEmpty { lines.append("Studies: " + brief.studies.joined(separator: "; ")) }
         if !tools.isEmpty { lines.append("Tools: " + tools.joined(separator: "; ")) }
         if !qualities.isEmpty { lines.append("Qualities: " + qualities.joined(separator: "; ")) }
+        if let opening = brief.opening { lines.append("Opening, already written: " + opening) }
         return Prompt(instructions: summaryInstructions, text: lines.joined(separator: "\n"))
     }
 
     static let summaryInstructions = """
-        You write the summary of a CV, from the roles and skills below. Write in the language named on the first line.
-        - 2 to 3 sentences, at least 120 characters in all, on the person's trade and strengths; the first one names the trade.
+        You write the summary of a CV after the opening, which is written, from the roles and skills below. Write in the language \
+        named on the first line.
+        - 2 to 3 sentences, at least 120 characters in all, on the work of the roles and how the person does it, with a tool or a \
+        quality of the lists in it; no list of tools or qualities, and never the opening or its first verb again.
         - Each sentence starts with a capital letter and ends with a full stop; write as the person, never "he", "she" or "the person".
         - No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
         - Never add a language, job, study, certification, hobby, achievement or result.
@@ -152,9 +158,9 @@ enum SectionPrompts {
     }
 
     static let summaryRepairInstructions = """
-        You fix the summary of a CV. Write in the language named on the first line.
-        - Write the whole summary again: 2 to 3 sentences, at least 120 characters in all, that keep the sentences kept and fix \
-        each reason; the first one names the trade.
+        You fix the summary of a CV after the opening, which is written. Write in the language named on the first line.
+        - Write the summary again: 2 to 3 sentences, at least 120 characters in all, that keep the sentences kept and fix each \
+        reason, on the work of the roles; no list of tools or qualities, and never the opening or its first verb again.
         - Each sentence starts with a capital letter and ends with a full stop; write as the person, never "he", "she" or "the person".
         - No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
         - Never add a language, job, study, certification, hobby, achievement or result.

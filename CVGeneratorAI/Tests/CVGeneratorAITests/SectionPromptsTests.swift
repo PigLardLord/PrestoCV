@@ -216,9 +216,13 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("The summary request reads each job's title, the studies, the kept tools and the kept qualities, and no duty or employer (#354, round 2)")
+    @Test("The summary request reads the opening code wrote, each job's title and work, the studies, the kept tools and qualities, and no employer (#354, round 3)")
     func summaryPrompt() {
-        let prompt = SectionPrompts.summary(for: Self.brief, tools: ["PLC", "inverter"], qualities: ["precisione"])
+        var brief = Self.brief
+        brief.roles[1].work = ["i turni dei tecnici", "le linee di imbottigliamento"]
+        brief.opening = "Lavoro come capoturno della manutenzione."
+
+        let prompt = SectionPrompts.summary(for: brief, tools: ["PLC", "inverter"], qualities: ["precisione"])
 
         #expect(prompt.instructions == SectionPrompts.summaryInstructions)
         #expect(prompt.text == """
@@ -227,11 +231,14 @@ struct SectionPromptsTests {
             Roles:
             - manutentore elettromeccanico; ended
             - capoturno della manutenzione
+              work: i turni dei tecnici; le linee di imbottigliamento
             Studies: Perito elettrotecnico
             Tools: PLC; inverter
             Qualities: precisione
+            Opening, already written: Lavoro come capoturno della manutenzione.
             """)
         #expect(!prompt.text.contains("Cerreto"))
+        #expect(SectionPrompts.summary(for: Self.brief, tools: [], qualities: []).text.hasSuffix("Studies: Perito elettrotecnico"))
     }
 
     @Test("The summary repair reads the summary request, the sentences kept, those rejected with their reasons and what it misses")
@@ -259,6 +266,8 @@ struct SectionPromptsTests {
             #expect(instructions.contains("write as the person, never \"he\", \"she\" or \"the person\""))
             #expect(instructions.contains("No number, date, company, school, place or person's name"))
             #expect(instructions.contains("Never add a language, job, study, certification, hobby, achievement or result."))
+            #expect(instructions.contains("after the opening, which is written"))
+            #expect(instructions.contains("no list of tools or qualities"))
         }
     }
 

@@ -216,6 +216,56 @@ extension CVDataSanitizer {
         return words
     }
 
+    /// The topics of `duties`, at most `limit`, that the summary request reads (#354, round 3): each clause with its subject, its
+    /// auxiliary and its verb gone ("Je range les dossiers et j'accueille les clients." gives "les dossiers" and "les clients"), so
+    /// that the summary says what the work is about without a duty to copy, which its check drops. A clause with a number goes:
+    /// the summary states none.
+    static func workTopics(of duties: String, limit: Int = 4) -> [String] {
+        var topics: [String] = []
+        var seen = Set<String>()
+        for sentence in SentenceSplitter.sentences(in: duties) {
+            let characters = Array(Digits.ascii(sentence))
+            var pieces: [[Word]] = [[]]
+            for word in Word.words(in: sentence) {
+                if dutyConjunctions.contains(word.folded), !word.isHyphenated {
+                    pieces.append([])
+                    continue
+                }
+                pieces[pieces.count - 1].append(word)
+                if word.endsWithABreak { pieces.append([]) }
+            }
+            for (index, piece) in pieces.enumerated() {
+                guard let topic = topic(of: piece, opensTheSentence: index == 0), !topic.contains(where: \.isNumber),
+                      let first = topic.first, let last = topic.last else { continue }
+                let text = String(characters[first.range.lowerBound..<last.range.upperBound])
+                if seen.insert(text.lowercased()).inserted { topics.append(text) }
+            }
+        }
+        return Array(topics.prefix(limit))
+    }
+
+    /// The words of a clause of a duty after its subject, auxiliary and verb; a single word after a conjunction is a topic as it
+    /// is ("le fatture e i preventivi"). The German perfect has its participle last ("Ich habe die Regale montiert").
+    private static func topic(of piece: [Word], opensTheSentence: Bool) -> ArraySlice<Word>? {
+        var words = piece[...]
+        while let first = words.first, subjectWords.contains(first.folded) { words = words.dropFirst() }
+        guard opensTheSentence || words.count > 1 else { return words.isEmpty ? nil : words }
+        if let first = words.first, germanAuxiliaries.contains(first.folded) {
+            words = words.dropFirst().dropLast()
+        } else if let first = words.first, auxiliaries.contains(first.folded) {
+            words = words.dropFirst(2)
+        } else {
+            words = words.dropFirst()
+        }
+        return words.isEmpty ? nil : words
+    }
+
+    /// The subject pronouns of the first person, and the reflexive ones before a verb, folded ("j" of "j'accueille").
+    private static let subjectWords: Set<String> = ["i", "ich", "je", "j", "io", "yo", "eu", "mi", "me", "m", "mich", "se", "si"]
+
+    /// The German auxiliaries of the perfect and the passive, folded: their participle ends the clause.
+    private static let germanAuxiliaries: Set<String> = ["habe", "hat", "hatte", "bin", "wurde"]
+
     /// The auxiliaries a past or a perfect tense opens with after its subject, folded.
     private static let auxiliaries: Set<String> = [
         "have", "has", "had", "am", "was", "were", "habe", "hat", "hatte", "bin", "war", "wurde", "ai", "avais", "suis", "etais",
@@ -548,6 +598,14 @@ extension CVDataSanitizer {
             if verdict.kept.joined(separator: " ").count < 120 { sizes.append("it is shorter than 120 characters") }
             verdict.problems = sizes + verdict.problems
             return verdict
+        }
+    }
+
+    /// The summary's opening for `cvData`, as `summaryCheck` writes it from the facts it keeps: the summary request writes what
+    /// follows it (#354, round 3). Nil when the facts hold no title or the description's language is none of the six.
+    func summaryOpening(of cvData: CVData, against description: String) throws(CVGenerationError) -> String? {
+        try reading(description) { source in
+            Self.opening(of: grounded(cvData, writing: nil, in: source), language: source.explainer.language)
         }
     }
 

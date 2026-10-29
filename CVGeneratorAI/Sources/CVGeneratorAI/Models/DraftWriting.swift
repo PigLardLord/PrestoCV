@@ -20,6 +20,9 @@ public struct DraftBrief: Equatable, Sendable {
         /// Whether the duties the person said for the job run to 40 characters: its request then asks for no typical duty (ADR 0031,
         /// D6).
         public var described = false
+        /// The topics of the duties the checks kept for the job, which the summary request reads in place of the duties, which it
+        /// would copy (#354, round 3).
+        public var work: [String] = []
 
         public init(title: String, employer: String? = nil, hasEnded: Bool, clauses: [String] = []) {
             self.title = title
@@ -42,6 +45,8 @@ public struct DraftBrief: Equatable, Sendable {
     /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): the
     /// skills requests read them.
     public var own: [String] = []
+    /// The summary's first sentence, which code writes from the facts; the summary request writes what follows it (#354, round 3).
+    public var opening: String?
 
     public init(language: String, headline: String?, roles: [Role], studies: [String], namedSkills: [String]) {
         self.language = language

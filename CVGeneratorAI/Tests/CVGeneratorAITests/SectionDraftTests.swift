@@ -48,10 +48,12 @@ struct SectionDraftTests {
     ]
     private static let tools = [["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
     private static let qualities = ["teamwork", "calm under pressure", "attention to detail"]
+    /// An invented answer to the summary request, which follows the opening code writes.
     private static let summary = """
-        I work as head of sound in theatres and on tours. I plan the sound of each production, run the rehearsals and look after the \
-        mixing desks and stage monitors.
+        I plan the sound of each production, run the rehearsals and look after the mixing desks and stage monitors.
         """
+    /// The opening code writes for the jobs of `extracted`.
+    private static let opening = "I work as a head of sound."
 
     private func service() -> FakeCVGenerationService {
         let service = FakeCVGenerationService()
@@ -86,7 +88,7 @@ struct SectionDraftTests {
 
     // MARK: The order of the requests
 
-    @Test("After the facts, a request per job in order, then the tools, the soft skills and the summary, each reading the brief")
+    @Test("After the facts, a request per job in order, then the tools, the soft skills and the summary, each reading the brief, the summary with its opening and work")
     func order() async throws {
         let service = service()
 
@@ -95,19 +97,27 @@ struct SectionDraftTests {
         #expect(service.generateRequests.count == 1)
         #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "softSkills", "summary"])
         let brief = try #require(service.sectionBriefs.first)
-        #expect(service.sectionBriefs.allSatisfy { $0 == brief })
+        #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
+        var summaryBrief = try #require(service.sectionBriefs.last)
+        summaryBrief.opening = nil
+        for number in summaryBrief.roles.indices { summaryBrief.roles[number].work = [] }
+        #expect(summaryBrief == brief)
         #expect(brief.roles.map(\.title) == ["stagehand", "sound technician", "sound technician", "head of sound"])
         #expect(brief.roles[0].clauses.contains { $0.contains("rigged the lights") })
         #expect(!brief.roles[0].clauses.contains { $0.contains("Orchard Lane") })
         #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
     }
 
-    @Test("The summary request reads the tools and the qualities the checks kept, apart, and no duty (#354, round 2)")
+    @Test("The summary request reads the opening code wrote, the topics of each job's kept duties, and the tools and the qualities the checks kept, apart (#354, round 3)")
     func summaryInputs() async throws {
         let service = service()
 
         _ = try await draft(service)
 
+        let brief = try #require(service.sectionCalls.firstIndex(of: "summary").map { service.sectionBriefs[$0] })
+        #expect(brief.opening == Self.opening)
+        #expect(brief.roles[3].work.contains("the technical rehearsals"))
+        #expect(!brief.roles.flatMap(\.work).contains { $0.hasPrefix("I ") })
         let request = try #require(service.summaryRequests.first)
         #expect(request.tools.contains("mixing desks"))
         #expect(!request.tools.contains("teamwork"))
@@ -145,7 +155,7 @@ struct SectionDraftTests {
         #expect(draft.experience.allSatisfy { $0.description?.isEmpty == false })
         #expect(draft.skills.contains(Skill(name: "mixing desks", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "teamwork", kind: .softSkill)))
-        #expect(draft.summary == Self.summary)
+        #expect(draft.summary == Self.opening + " " + Self.summary)
     }
 
     @Test("An invented fact goes from each section that writes text: a duty, a technology, a soft skill and a summary sentence")
@@ -262,7 +272,7 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.suffix(2) == ["summary", "repairSummary"])
         let repair = try #require(service.summaryRepairs.first)
-        #expect(repair.kept.first == "I work as a head of sound.")
+        #expect(repair.kept == ["I keep every show running smoothly."])
         #expect(repair.rejected.contains { $0.hasPrefix("\"He is a sound engineer.\": it speaks of the person in the third person") })
         let summary = try #require(draft.summary)
         #expect(SentenceSplitter.sentences(in: summary).count <= 4)
@@ -324,7 +334,7 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.filter { $0 == "tools" }.count == 2)
         #expect(service.sectionCalls.last == "summary")
-        #expect(draft.summary == Self.summary)
+        #expect(draft.summary == Self.opening + " " + Self.summary)
     }
 
     @Test("A draft cancelled while a section is written throws the cancellation, and nothing more is asked")
