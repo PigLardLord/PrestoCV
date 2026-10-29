@@ -876,7 +876,7 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
                 } else if Self.namesAnEverydayObject(item) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "an everyday object, not a tool of the trade"))
-                } else if Self.namesAKindOfTool(item, language: language), !item.contains(" ") {
+                } else if Self.namesABareKind(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
@@ -1147,8 +1147,28 @@ extension CVDataSanitizer {
         }
     }
 
-    /// The nouns of a kind of tool, without accents: a system names a whole of tools ("PA systems") and is none of them.
+    /// Whether a technology is a kind of tool with no word of its trade: the kind alone ("software", "Maschine"), or with generic
+    /// words only ("editor de texto", "plataforma de desenvolvimento"; #354, round 5). A kind with a word of its trade stays
+    /// ("software di rilievo", "machine à coudre").
+    private static func namesABareKind(_ item: String, language: String?) -> Bool {
+        guard namesAKindOfTool(item, language: language) else { return false }
+        let folded = item.split { !$0.isLetter && !$0.isNumber }.map { DescriptionText.normalized(String($0)) }
+        let others = ["en", "de"].contains(language ?? "") ? folded.dropLast() : folded.dropFirst()
+        return others.allSatisfy { skillLinkWords.contains($0) || genericToolWords.contains($0) }
+    }
+
+    /// The words that name no trade beside a kind of tool, without accents.
+    private static let genericToolWords: Set<String> = [
+        "text", "texto", "testo", "texte", "development", "desenvolvimento", "desarrollo", "sviluppo", "developpement", "entwicklung",
+        "data", "dados", "datos", "dati", "donnees", "daten",
+    ]
+
+    /// The nouns of a kind of tool, without accents. A system and a machine name a whole of tools and are none of them alone; with
+    /// a word of their trade, a name or an acronym they name one ("PA systems", "Steuerungssystem", "macchina da cucire").
     static let toolKinds: Set<String> = [
+        "machine", "machines", "maschine", "maschinen", "macchina", "macchine", "maquina", "maquinas", "gerat", "gerate", "equipment",
+        "attrezzatura", "equipo", "equipos", "equipamento", "equipamentos", "equipement", "system", "systems", "systeme", "systemes",
+        "sistema", "sistemi", "sistemas",
         "software", "softwares", "program", "programs", "programma", "programmi", "programa", "programas", "programm", "programme",
         "application", "applications", "app", "apps", "applicazione", "applicazioni", "aplicacion", "aplicaciones", "aplicacao",
         "aplicativo", "aplicativos", "anwendung", "anwendungen", "logiciel", "logiciels", "platform", "platforms", "piattaforma",

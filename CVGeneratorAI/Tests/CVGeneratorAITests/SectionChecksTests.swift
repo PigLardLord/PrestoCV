@@ -499,8 +499,8 @@ struct SectionChecksTests {
               ("it", ["software", "software CMMS", "piattaforma di stampa", "multimetro"], ["software CMMS", "piattaforma di stampa", "multimetro"]),
               ("es", ["editor", "editor de código", "Visual Studio Code", "hoja de cálculo"],
                ["editor de código", "Visual Studio Code", "hoja de cálculo"]),
-              ("pt", ["ferramenta", "ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"],
-               ["ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"]),
+              ("pt", ["ferramenta", "ferramenta de teste", "Postman", "aplicativos Android"],
+               ["ferramenta de teste", "Postman", "aplicativos Android"]),
           ])
     func kindOfToolIsNoTechnology(language: String, technologies: [String], kept: [String]) {
         let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -509,6 +509,25 @@ struct SectionChecksTests {
 
         #expect(verdict.technologies == kept)
         #expect(verdict.dropped.map(\.reason) == ["a kind of tool, not its name"])
+    }
+
+    @Test("A lone machine, system or piece of equipment, and a kind whose only other word is generic, go; with a word of its trade, a name or an acronym it stays (#354, round 5)",
+          arguments: [
+              ("de", ["Maschine", "Steuerungssystem", "Drehmaschine", "Gerät"], ["Steuerungssystem", "Drehmaschine"]),
+              ("it", ["macchina", "sistema di controllo remoto", "attrezzatura", "macchina da cucire"], ["sistema di controllo remoto", "macchina da cucire"]),
+              ("fr", ["machine", "système", "machine à coudre", "logiciel de gestion de classe"], ["machine à coudre", "logiciel de gestion de classe"]),
+              ("en", ["system", "equipment", "PA systems", "text editor", "lighting desk"], ["PA systems", "lighting desk"]),
+              ("pt", ["editor de texto", "plataforma de desenvolvimento", "editor de código", "máquina de solda"], ["editor de código", "máquina de solda"]),
+              ("es", ["equipo", "máquina", "software de datos", "software de contabilidad"], ["software de contabilidad"]),
+          ])
+    func genericKindIsNoTechnology(language: String, technologies: [String], kept: [String]) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
+
+        #expect(verdict.technologies == kept)
+        #expect(Set(verdict.dropped.map(\.reason)) == ["a kind of tool, not its name"])
+        #expect(verdict.dropped.count == technologies.count - kept.count)
     }
 
     @Test("A kind of tool with a word of its trade stays though the CV lists enough tools; a bare kind goes (#354, round 4)")
