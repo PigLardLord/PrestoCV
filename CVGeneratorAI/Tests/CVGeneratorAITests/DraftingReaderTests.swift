@@ -737,6 +737,84 @@ struct DraftingReaderTests {
     // MARK: -
 
     /// The reader's findings in `cv` for an input of `language` with no field, whose description states nothing.
+    // MARK: Round 16
+
+    @Test("A phrase the duties of three jobs write is counted once; one of two jobs, and one the description states, are not (#354, round 16)")
+    func repeatedPhraseAcrossJobs() {
+        let jobs = [
+            "I manage the audio flow across all areas. I mix the shows.", "I was adjusting the audio flow for live performances.",
+            "I was adjusting the audio flow for different performers. I set up the stage monitors.", "I set up the stage monitors.",
+        ]
+        let cv = CVData(experience: jobs.map { Experience(title: "sound technician", company: "Werk", description: $0) })
+        let stated = DraftingInput(
+            id: "reader-en", kind: .plain, language: "en", description: "I adjust the audio flow of the shows.", facts: [], traps: []
+        )
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .repeatedPhraseAcrossJobs }.map(\.value) == ["audio flow"])
+        #expect(ReaderRules.findings(in: cv, for: stated, report: InventedFacts.count(cv, for: stated))
+            .filter { $0.kind == .repeatedPhraseAcrossJobs }.isEmpty)
+    }
+
+    @Test("A general verb with the noun of an activity as its object is counted; a general verb with a thing, and a verb of the work, are not (#354, round 16)")
+    func nominalDuty() {
+        let cv = CVData(experience: [
+            Experience(title: "stagehand", company: "Werk", description: "I managed the movement of heavy equipment across the site. "
+                + "I ensured all equipment was ready. I moved the heavy equipment."),
+            Experience(title: "manutentore", company: "Werk", description: "Mantenevo l'integrità dei cavi di alimentazione. "
+                + "Mantenevo i cavi di alimentazione in ordine."),
+        ])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .nominalDuty }.map(\.value)
+            == ["I managed the movement of heavy equipment across the site.", "Mantenevo l'integrità dei cavi di alimentazione."])
+    }
+
+    @Test("A duty that ends with a phrase of care is counted; one with care inside it and one without are not (#354, round 16)")
+    func fillerTail() {
+        let cv = CVData(experience: [Experience(
+            title: "manutentore", company: "Werk",
+            description: "Pulivo le superfici interne con attenzione. Con attenzione ai dettagli controllavo i filtri. Pulivo i filtri."
+        )])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .fillerTail }.map(\.value) == ["Pulivo le superfici interne con attenzione."])
+    }
+
+    @Test("A container of tools as a technology is counted; a tool and a soft skill are not (#354, round 16)")
+    func containerTechnology() {
+        let cv = CVData(skills: [
+            Skill(name: "Werkzeugkasten"), Skill(name: "Spannungsprüfer"), Skill(name: "toolbox"), Skill(name: "Ordnung", kind: .softSkill),
+        ])
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .containerTechnology }.map(\.value) == ["Werkzeugkasten", "toolbox"])
+    }
+
+    @Test("A summary sentence that says the person works as a title an earlier one says is counted; another title is not (#354, round 16)")
+    func repeatedTitleClause() {
+        let cv = CVData(
+            summary: "Ich arbeite als Elektriker. Davor habe ich als Monteur gearbeitet. Als Elektriker arbeite ich mit Präzision.",
+            experience: [Experience(title: "Elektriker", company: "Werk"), Experience(title: "Monteur", company: "Werk")]
+        )
+        let english = CVData(
+            summary: "I work as a head of sound. As a head of sound, I work with care. I plan the sound design.",
+            experience: [Experience(title: "head of sound", company: "Werk")]
+        )
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .repeatedTitleClause }.map(\.value)
+            == ["Als Elektriker arbeite ich mit Präzision."])
+        #expect(Self.reader(english, "en").filter { $0.kind == .repeatedTitleClause }.map(\.value) == ["As a head of sound, I work with care."])
+    }
+
+    @Test("A duty of a verb and a bare general object is counted; a duty that says what the object is is not (#354, round 16)")
+    func bareObjectDuty() {
+        let cv = CVData(experience: [
+            Experience(title: "Monteur", company: "Werk", description: "Ich habe Geräte montiert. Ich habe Komponenten angepasst. "
+                + "Ich habe Halterungen befestigt. Ich habe Schaltschränke und Geräte montiert."),
+            Experience(title: "fitter", company: "Werk", description: "I installed the components. I installed the brake components."),
+        ])
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .bareObjectDuty }.map(\.value)
+            == ["Ich habe Geräte montiert.", "Ich habe Komponenten angepasst.", "I installed the components."])
+    }
+
     private static func reader(_ cv: CVData, _ language: String) -> [ReaderFinding] {
         let input = DraftingInput(id: "reader-\(language)", kind: .plain, language: language, description: "", facts: [], traps: [])
         return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))

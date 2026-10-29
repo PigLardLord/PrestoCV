@@ -190,6 +190,22 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A topic of the second summary slot that is the words of a duty the description states, already written in the job
     /// ("Anlagen in Neubauten"; #354, round 15): the sentence then restates it.
     case statedDutyAsSlotTopic
+    /// A phrase of two words of four letters or more that the duties of three jobs or more write and the description does not
+    /// ("audio flow" in three jobs; #354, round 16).
+    case repeatedPhraseAcrossJobs
+    /// A duty whose verb is a general one (manage, maintain, ensure) and whose object is the noun of an activity or a state
+    /// ("I managed the movement of heavy equipment", "Mantenevo l'integrità dei cavi"; #354, round 16).
+    case nominalDuty
+    /// A duty that ends with a phrase of care that says nothing of the work ("Pulivo le superfici interne con attenzione."; #354,
+    /// round 16).
+    case fillerTail
+    /// A container of tools as a technology ("Werkzeugkasten", "toolbox"; #354, round 16).
+    case containerTechnology
+    /// A summary sentence that says the person works as a title that an earlier sentence already says with the same words
+    /// ("Ich arbeite als Elektriker. … Als Elektriker arbeite ich mit Präzision"; #354, round 16).
+    case repeatedTitleClause
+    /// A duty of a verb and a bare general object only ("Ich habe Geräte montiert.", "I installed the components."; #354, round 16).
+    case bareObjectDuty
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -260,6 +276,12 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .pastGroupPadding: "a tool of a past title's request that is no tool of the trade"
         case .repairGenericSystem: "a generic system of the request for more skills"
         case .statedDutyAsSlotTopic: "a stated duty as the topic of the second summary slot"
+        case .repeatedPhraseAcrossJobs: "a phrase the duties of three jobs repeat"
+        case .nominalDuty: "a general verb with the noun of an activity as its object"
+        case .fillerTail: "a duty that ends with a phrase of care"
+        case .containerTechnology: "a container of tools as a technology"
+        case .repeatedTitleClause: "a summary sentence that repeats the clause of a title"
+        case .bareObjectDuty: "a duty of a verb and a bare general object"
         }
     }
 }
@@ -402,6 +424,7 @@ enum ReaderRules {
                 verbsBeforeTheEnd(in: text).map { ReaderFinding(kind: .germanVerbPosition, path: path, value: $0) }
             }
         }
+        found += roundSixteen(in: cv, for: input)
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         found += report.lost.filter { [.duty, .quality].contains($0.kind) }
             .map { ReaderFinding(kind: .unwrittenStatement, path: $0.kind.rawValue, value: $0.forms[0]) }
@@ -1819,4 +1842,166 @@ enum ReaderRules {
         }
         return String(rest)
     }
+}
+
+// MARK: - Round 16
+
+extension ReaderRules {
+    /// The classes of round 16: a phrase repeated across jobs, a general verb with an activity noun, a care tail, a container as a
+    /// technology, a title clause said twice in the summary and a duty of a bare general object.
+    static func roundSixteen(in cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
+        let language = input.language
+        var found: [ReaderFinding] = []
+        found += repeatedPhrases(in: cv, for: input).map { ReaderFinding(kind: .repeatedPhraseAcrossJobs, path: "experience", value: $0) }
+        for (index, job) in cv.experience.enumerated() {
+            let path = "experience[\(index)].description"
+            let sentences = WrittenMeasure.sentences(of: job.description ?? "")
+            found += sentences.filter { isNominal($0, language: language) }.map { ReaderFinding(kind: .nominalDuty, path: path, value: $0) }
+            found += sentences.filter(endsWithCare).map { ReaderFinding(kind: .fillerTail, path: path, value: $0) }
+            found += sentences.filter(isBareObjectDuty).map { ReaderFinding(kind: .bareObjectDuty, path: path, value: $0) }
+        }
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .technology && isContainer(skill.name) {
+            found.append(ReaderFinding(kind: .containerTechnology, path: "skills[\(index)].name", value: skill.name))
+        }
+        found += repeatedTitleClauses(in: cv, language: language).map { ReaderFinding(kind: .repeatedTitleClause, path: "summary", value: $0) }
+        return found
+    }
+
+    /// The phrases of two words of four letters or more, neither a link or a stop word, that the descriptions of three jobs or more
+    /// hold and the description of the input does not.
+    static func repeatedPhrases(in cv: CVData, for input: DraftingInput) -> [String] {
+        let stated = " " + letterWords(of: input.description).joined(separator: " ") + " "
+        var jobs: [String: Int] = [:]
+        var order: [String] = []
+        for job in cv.experience {
+            var phrases: Set<String> = []
+            for sentence in WrittenMeasure.sentences(of: job.description ?? "") {
+                let words = letterWords(of: sentence)
+                for (first, second) in zip(words, words.dropFirst()) {
+                    let pair = [first, second]
+                    guard pair.allSatisfy({ $0.count >= 4 && !abstractStops.contains($0) && !linkWords.contains($0) }) else { continue }
+                    phrases.insert(pair.joined(separator: " "))
+                }
+            }
+            for phrase in phrases.sorted() where !stated.contains(" \(phrase) ") {
+                if jobs[phrase] == nil { order.append(phrase) }
+                jobs[phrase, default: 0] += 1
+            }
+        }
+        return order.filter { (jobs[$0] ?? 0) >= 3 }
+    }
+
+    /// Whether a duty's general verb (`generalVerbs`) has the noun of an activity or a state (`activityNouns`) as its first word
+    /// past the articles; in German, whether it holds both.
+    static func isNominal(_ duty: String, language: String) -> Bool {
+        let words = letterWords(of: duty)
+        if language == "de" {
+            return words.contains(where: generalVerbs.contains) && words.contains(where: activityNouns.contains)
+        }
+        guard let verb = words.firstIndex(where: generalVerbs.contains),
+              let object = words[(verb + 1)...].first(where: { !objectArticles.contains($0) }) else { return false }
+        return activityNouns.contains(object)
+    }
+
+    /// The general verbs of a duty in the first person, folded, in the six languages.
+    static let generalVerbs: Set<String> = [
+        "manage", "managed", "oversee", "oversaw", "maintain", "maintained", "ensure", "ensured", "handle", "handled", "coordinate",
+        "coordinated", "supervise", "supervised", "monitor", "monitored",
+        "gestisco", "gestivo", "gestito", "mantengo", "mantenevo", "mantenuto", "garantisco", "garantivo", "garantito", "curo",
+        "curavo", "curato", "coordino", "coordinavo", "coordinato", "assicuro", "assicuravo", "supervisiono", "supervisionavo",
+        "gestiono", "gestionaba", "mantuve", "mantenia", "garantizo", "garantice", "garantizaba", "coordine",
+        "coordinaba", "superviso", "supervise", "supervisaba", "aseguro", "asegure", "aseguraba",
+        "gere", "gerais", "maintiens", "maintenais", "maintenu", "assure", "assurais", "coordonne", "coordonnais", "supervisais",
+        "gerencio", "gerenciei", "gerenciava", "mantenho", "mantive", "mantinha", "garanto", "garantia", "coordeno", "coordenei",
+        "coordenava", "supervisiono", "supervisionei", "asseguro", "assegurei",
+        "verwalte", "verwaltete", "verwaltet", "gewahrleiste", "gewahrleistet", "sichere", "gesichert", "uberwache", "uberwacht",
+        "koordiniere", "koordiniert", "betreue", "betreut",
+    ]
+
+    /// The nouns of an activity or a state that a general verb takes in place of the thing worked on, folded.
+    static let activityNouns: Set<String> = [
+        "movement", "movements", "flow", "flows", "integrity", "quality", "efficiency", "continuity", "functionality", "functioning",
+        "operation", "operations", "process", "processes", "activities", "handling", "workflow", "workflows",
+        "movimento", "movimenti", "flusso", "flussi", "integrita", "qualita", "efficienza", "continuita", "funzionalita",
+        "funzionamento", "operazioni", "processi", "attivita", "gestione",
+        "movimiento", "movimientos", "flujo", "flujos", "integridad", "calidad", "eficiencia", "continuidad", "funcionamiento",
+        "operaciones", "procesos", "actividades",
+        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement", "operations",
+        "processus", "activites",
+        "fluxo", "fluxos", "integridade", "qualidade", "continuidade", "operacoes", "processos", "atividades",
+        "bewegung", "ablauf", "ablaufe", "fluss", "integritat", "qualitat", "effizienz", "betrieb", "prozesse",
+    ]
+
+    /// The articles and determiners between a verb and its object, folded.
+    static let objectArticles: Set<String> = [
+        "the", "a", "an", "all", "il", "lo", "la", "l", "i", "gli", "le", "el", "los", "las", "un", "una", "uno", "une", "des",
+        "les", "du", "o", "os", "as", "um", "uma", "tutti", "tutte", "todos", "todas", "tous", "toutes",
+    ]
+
+    /// Whether a duty ends with a phrase of care (`careTails`).
+    static func endsWithCare(_ duty: String) -> Bool {
+        let folded = " " + letterWords(of: duty).joined(separator: " ")
+        return careTails.contains { folded.hasSuffix(" \($0)") }
+    }
+
+    /// The phrases of care that close a duty and say nothing of the work, folded, in the six languages.
+    static let careTails = [
+        "with care", "carefully", "attentively", "con attenzione", "con cura", "attentamente", "accuratamente", "con cuidado",
+        "con atencion", "cuidadosamente", "avec soin", "avec attention", "soigneusement", "com cuidado", "com atencao",
+        "mit sorgfalt", "sorgfaltig", "mit bedacht",
+    ]
+
+    /// Whether a technology is a container of tools (`containers`).
+    static func isContainer(_ name: String) -> Bool {
+        let folded = letterWords(of: name).joined(separator: " ")
+        return containers.contains(where: folded.contains)
+    }
+
+    /// The containers of tools, folded, in the six languages.
+    static let containers = [
+        "werkzeugkasten", "werkzeugkoffer", "werkzeugtasche", "toolbox", "tool box", "tool bag", "toolbag", "tool case",
+        "cassetta degli attrezzi", "cassetta attrezzi", "borsa degli attrezzi", "valigetta degli attrezzi", "caja de herramientas",
+        "maletin de herramientas", "boite a outils", "caisse a outils", "caixa de ferramentas", "maleta de ferramentas",
+    ]
+
+    /// The summary sentences after the first that say the person works as one title with the same words ("als Elektriker").
+    static func repeatedTitleClauses(in cv: CVData, language: String) -> [String] {
+        let titles = Set(([cv.personalInfo.title ?? ""] + cv.experience.map(\.title)).map { letterWords(of: $0).joined(separator: " ") })
+            .filter { !$0.isEmpty }
+        let asWords = titleClauseWords[language] ?? []
+        var found: [String] = []
+        for title in titles.sorted() {
+            let saying = WrittenMeasure.sentences(of: cv.summary ?? "").filter { sentence in
+                let folded = " " + letterWords(of: sentence).joined(separator: " ") + " "
+                return asWords.contains { folded.contains(" \($0) \(title) ") }
+            }
+            found += saying.dropFirst()
+        }
+        return found
+    }
+
+    /// The words before a title in the clause that says the person works as it, folded.
+    static let titleClauseWords: [String: [String]] = [
+        "en": ["as a", "as an", "as"], "it": ["come"], "es": ["como"], "fr": ["comme", "en tant que"], "pt": ["como"], "de": ["als"],
+    ]
+
+    /// Whether a duty holds two words of three letters or more past its pronouns, auxiliaries and articles, its verb and a bare
+    /// general object (`bareObjects`).
+    static func isBareObjectDuty(_ duty: String) -> Bool {
+        let content = letterWords(of: duty).filter { $0.count >= 3 && !bareStops.contains($0) }
+        return content.count == 2 && content.contains(where: bareObjects.contains)
+    }
+
+    /// The general objects that name no thing of a trade, folded.
+    static let bareObjects: Set<String> = [
+        "gerate", "komponenten", "teile", "bauteile", "materialien", "devices", "components", "parts", "items", "pieces", "materials",
+        "componenti", "pezzi", "parti", "dispositivi", "elementi", "materiali", "componentes", "piezas", "partes", "dispositivos",
+        "elementos", "materiales", "composants", "appareils", "elements", "materiaux", "pecas", "itens", "materiais",
+    ]
+
+    /// The pronouns, auxiliaries and articles of three letters or more of a duty, folded.
+    static let bareStops: Set<String> = [
+        "ich", "habe", "hatte", "die", "der", "das", "den", "dem", "ein", "eine", "einen", "the", "was", "were", "have", "had",
+        "avevo", "gli", "los", "las", "una", "uno", "une", "des", "les", "uma", "tenho", "tinha", "hai", "abbiamo",
+    ]
 }
