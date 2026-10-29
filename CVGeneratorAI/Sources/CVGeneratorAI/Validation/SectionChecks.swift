@@ -121,23 +121,13 @@ extension CVDataSanitizer {
         var rejected: [Rejection] = []
         /// The words of the job's clauses that the check drops in a written duty: the request avoids them.
         var avoid: [String] = []
-
-        /// The characters of the job's text once kept.
-        var length: Int { (pinned + kept).joined(separator: " ").count }
-
-        /// The characters of a job's text from which it is described: under them, it gets typical duties (ADR 0031, D6).
-        static let describedLength = 40
-        /// Why a typical duty goes from a job the person described.
-        static let describedReason = "the person said what they did in this job: write only that"
-
-        /// Whether the duties the person said for the job run to `describedLength`: it then keeps no typical duty (D6).
-        var saysEnough: Bool { pinned.joined(separator: " ").count >= Self.describedLength }
     }
 
     /// The duties of the job at `index` of `cvData.experience`, sentence by sentence: a sentence that is no whole sentence, that the
     /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, or that is written in
-    /// another form than the job's first duty (`DutyForm`) goes with its reason, and so does any duty that quotes none of the job's
-    /// own clauses when its stated duties run to 40 characters (D6). A duty said with a gerund is read, and kept, in the job's first
+    /// another form than the job's first duty (`DutyForm`) goes with its reason. A duty typical of the job stays beside the person's,
+    /// and so does how often it is done, which is draft content under the owner's decision O1 (ADR 0031); a number still goes by
+    /// the rules. A duty said with a gerund is read, and kept, in the job's first
     /// person (`FirstPersonDuty`).
     func dutyCheck(
         of cvData: CVData, job index: Int, duties: String?, keeping earlier: [String] = [], against description: String
@@ -158,7 +148,6 @@ extension CVDataSanitizer {
             }
             let current = job.entry.current && rule.evidence.statesCurrent
             let names = Self.ownNames(of: cvData)
-            let often = Self.frequencies(in: description)
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
             // achievements stays an achievement, so it counts toward none of the job's text (#354).
@@ -188,8 +177,6 @@ extension CVDataSanitizer {
                     rejection = Self.vagueReason
                 } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
                     rejection = Self.onlyWhereReason
-                } else if !Self.frequencies(in: sentence).isSubset(of: often) {
-                    rejection = Self.howOftenReason
                 } else if let ruled = reason(sentence, quotes) {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
@@ -208,9 +195,6 @@ extension CVDataSanitizer {
                 if rejection == nil, !current, Self.tense(of: sentence, language: language) == .present,
                    held.contains(where: { Self.tense(of: $0, language: language) == .past }) {
                     rejection = "it is in the present, and the job has ended: write it in the past, as the other duties"
-                }
-                if rejection == nil, verdicts.saysEnough, !rule.quotesOwnClauses(sentence) {
-                    rejection = DutyVerdicts.describedReason
                 }
                 if rejection == nil, let opening = Self.opening(of: sentence), held.count { Self.opening(of: $0) == opening } >= 2 {
                     rejection = Self.opensAsTwoEarlierOnes

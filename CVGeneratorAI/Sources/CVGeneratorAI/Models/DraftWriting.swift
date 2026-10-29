@@ -24,11 +24,20 @@ public struct DraftBrief: Equatable, Sendable {
         public var avoid: [String] = []
         /// The duties the person said for the job, as the check reads them: its request writes them first.
         public var said = 0
-        /// The duties typical of its title the job's request writes after the person's: none when the person said 40 characters of
-        /// it (ADR 0031, D6), else enough to reach two duties, and at least one (#354, round 10). A job that needs none gets no
-        /// request: asked for 2 to 4 duties, the request padded a job of one short stated duty with three typical ones, one of them
-        /// the same duty said again.
-        public var adding = 2
+        /// The duties typical of its title the job's request writes after the person's (`adding(said:)`): under the owner's
+        /// decision O1 each job gets 3 to 4 duties, the person's first (ADR 0031). A job with no title and no duty the person
+        /// said gets the duties typical of the headline title, and no title.
+        public var adding = Self.leastDuties
+
+        /// The duties each job gets at least, and from how many of the person's own it gets no typical one (O1).
+        public static let leastDuties = 3
+        public static let mostDuties = 4
+
+        /// The typical duties a job of `said` stated duties needs: enough to reach `leastDuties`, at least one, and none from
+        /// `mostDuties` on. Asked for a range, the request padded a job with the same duty said again (#354, round 10).
+        public static func adding(said: Int) -> Int {
+            said >= mostDuties ? 0 : max(leastDuties - said, 1)
+        }
         /// The topics of the duties the checks kept for the job, which the summary request reads in place of the duties, which it
         /// would copy (#354, round 3).
         public var work: [String] = []

@@ -17,7 +17,8 @@ enum SectionPrompts {
         Prompt(instructions: jobInstructions, text: (jobLines(number: number, of: brief) + [count(of: brief.roles[number])]).joined(separator: "\n"))
     }
 
-    /// How many duties the job's request writes: the person's, then exactly the typical ones the job needs (#354, round 10).
+    /// How many duties the job's request writes: the person's, then exactly the typical ones the job needs (#354, round 10), after
+    /// them (O1, round 13).
     private static func count(of role: DraftBrief.Role) -> String {
         let more = role.adding == 1 ? "1 more duty" : "\(role.adding) more duties"
         switch (role.said, role.adding) {
@@ -28,7 +29,7 @@ enum SectionPrompts {
             return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties"): first the duties the person said above, then typical ones of this job."
         case (0, _): return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties") typical of this job."
         case (_, 0): return "Write only the \(role.said == 1 ? "duty" : "duties") the person said, and add none."
-        default: return "Write the \(role.said == 1 ? "duty" : "duties") the person said, then exactly \(more) typical of this job."
+        default: return "Write exactly \(more) typical of this job, after the \(role.said == 1 ? "duty" : "duties") the person said."
         }
     }
 
@@ -43,13 +44,15 @@ enum SectionPrompts {
         - Never add a job, study, certification, achievement or result.
         """
 
-    /// The repair of the job at `number`: the duties the check kept, and each sentence it rejected with its reason.
+    /// The repair of the job at `number`: the duties the check kept, each sentence it rejected with its reason, and exactly the
+    /// duties the job still needs to reach `DraftBrief.Role.leastDuties` (O1, round 13).
     static func jobRepair(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) -> Prompt {
         let role = brief.roles[number]
         var lines = jobLines(number: number, of: brief, avoiding: false)
         if !kept.isEmpty { lines.append("Duties kept:\n" + bullets(kept)) }
         if !rejected.isEmpty { lines.append("Sentences rejected, with the reason:\n" + bullets(rejected)) }
-        lines.append("Add one more duty typical of this job.")
+        let missing = max(DraftBrief.Role.leastDuties - kept.count, 1)
+        lines.append("Add exactly \(missing == 1 ? "1 more duty" : "\(missing) more duties") typical of this job.")
         if !role.avoid.isEmpty { lines.append("Words to avoid: " + role.avoid.joined(separator: ", ")) }
         return Prompt(instructions: jobRepairInstructions, text: lines.joined(separator: "\n"))
     }
@@ -57,7 +60,7 @@ enum SectionPrompts {
     static let jobRepairInstructions = """
         You fix the duties of one job of a CV. Write in the language named on the first line.
         - Write each rejected sentence again so that its reason no longer holds, or leave it out.
-        - When asked, add one more duty typical of the job.
+        - Add exactly as many more duties typical of the job as the request asks.
         - Each duty one whole sentence that starts with a capital letter and ends with a full stop, in the same form as the duties kept.
         - Do not repeat a duty kept. No number, date, name of a company, place or person, and none of the words to avoid.
         - Never add a job, study, certification, achievement or result.

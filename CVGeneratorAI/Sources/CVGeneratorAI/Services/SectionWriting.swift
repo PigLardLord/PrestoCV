@@ -240,7 +240,7 @@ extension FoundationModelsService {
 
 @Generable
 struct JobRepairAnswer {
-    @Guide(description: "The rejected sentences written again and the duty asked for, one short whole sentence each", .count(1...3))
+    @Guide(description: "The rejected sentences written again and the duties asked for, one short whole sentence each", .count(1...3))
     let duties: [String]
 }
 

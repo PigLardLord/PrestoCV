@@ -82,7 +82,7 @@ final class SectionDraft {
             stated[number] = check?.pinned ?? []
             if let check {
                 brief.roles[number].said = check.pinned.count
-                brief.roles[number].adding = check.saysEnough ? 0 : max(1, 2 - check.pinned.count)
+                brief.roles[number].adding = DraftBrief.Role.adding(said: check.pinned.count)
             }
         }
         duties = Array(repeating: nil, count: brief.roles.count)
@@ -162,9 +162,9 @@ final class SectionDraft {
     // MARK: - Jobs
 
     /// A request per job, in order, for the typical duties it needs (`DraftBrief.Role.adding`), its duties checked; a job whose
-    /// check keeps fewer than two duties or under 40 characters gets one repair, and what still fails goes. A job whose stated
-    /// duties run to 40 characters keeps no typical duty and gets no repair (ADR 0031, D6), and no request when the extraction read
-    /// its years. A job keeps only its written duties, no more than it needs: the person's own come back in the final check.
+    /// stated and kept duties are fewer than three gets one repair that asks for exactly those missing, and what still fails goes
+    /// (O1, ADR 0031). A job that needs no typical duty gets no request when the extraction read its years. A job keeps only its
+    /// written duties, no more than it needs: the person's own come back in the final check.
     private func writeJobs(of brief: DraftBrief, context: CVDataSanitizer.DraftContext, in located: CVData) async throws {
         for number in brief.roles.indices.prefix(Self.writtenJobs) {
             // A job that needs no typical duty and whose years the extraction read gets no request: its own duties come back in
@@ -180,8 +180,7 @@ final class SectionDraft {
             ) else { continue }
             // No more typical duties than the job needs: an echo of the person's own duty goes in the check, and does not count.
             var kept = Array(first.kept.prefix(adding))
-            let length = (first.pinned + kept).joined(separator: " ").count
-            if !first.saysEnough, length < CVDataSanitizer.DutyVerdicts.describedLength || first.pinned.count + kept.count < 2 {
+            if first.pinned.count + kept.count < DraftBrief.Role.leastDuties {
                 let rejected = first.rejected.map(Self.quoted)
                 let repaired = try await request(.jobs) { [kept] in
                     try await self.service.repairJob(number: number, of: brief, kept: first.pinned + kept, rejected: rejected)
@@ -189,7 +188,7 @@ final class SectionDraft {
                 if let repaired, let second = try? sanitizer.dutyCheck(
                     of: located, job: job, duties: Self.mended(repaired.joined(separator: " ")), keeping: kept, against: description
                 ) {
-                    kept += second.kept.prefix(max(adding - kept.count, 1))
+                    kept += second.kept.prefix(adding - kept.count)
                 }
             }
             duties[number] = kept.joined(separator: " ").presentValue

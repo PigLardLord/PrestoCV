@@ -37,17 +37,17 @@ struct SectionPromptsTests {
             - Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018.
             - Controllando i quadri elettrici.
             Words to avoid: Valtrigno, capoturno
-            Write exactly 2 duties: first the duties the person said above, then typical ones of this job.
+            Write exactly 3 duties: first the duties the person said above, then typical ones of this job.
             """)
         #expect(!prompt.text.contains("tre tecnici"))
     }
 
-    @Test("A job's request asks for exactly the typical duties the job needs after the person's: none for a described job, one after one short duty, two for a job with none (#354, rounds 1 and 10)",
+    @Test("o1: a job's request asks for exactly the typical duties the job needs after the person's, to reach three (#354, rounds 10 and 13)",
           arguments: [
-              (1, 0, "Write only the duty the person said, and add none."),
-              (2, 0, "Write only the duties the person said, and add none."),
-              (1, 1, "Write the duty the person said, then exactly 1 more duty typical of this job."),
-              (0, 2, "Write exactly 2 duties: first the duties the person said above, then typical ones of this job."),
+              (4, 0, "Write only the duties the person said, and add none."),
+              (1, 2, "Write exactly 2 more duties typical of this job, after the duty the person said."),
+              (3, 1, "Write exactly 1 more duty typical of this job, after the duties the person said."),
+              (0, 3, "Write exactly 3 duties: first the duties the person said above, then typical ones of this job."),
           ])
     func jobAsksForTheDutiesItNeeds(said: Int, adding: Int, line: String) {
         var brief = Self.brief
@@ -75,9 +75,9 @@ struct SectionPromptsTests {
         )
 
         #expect(SectionPrompts.job(number: 0, of: said).text.hasSuffix(
-            "\nWrite exactly 2 duties: first the duties the person said above, then typical ones of this job."
+            "\nWrite exactly 3 duties: first the duties the person said above, then typical ones of this job."
         ))
-        #expect(SectionPrompts.job(number: 0, of: silent).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
+        #expect(SectionPrompts.job(number: 0, of: silent).text.hasSuffix("\nWrite exactly 3 duties typical of this job."))
     }
 
     @Test("A job whose clauses only say where the person worked asks for typical duties alone: asked for what the person said first, the model wrote that they worked there (#354, round 11)")
@@ -92,7 +92,7 @@ struct SectionPromptsTests {
         )
         brief.roles[0].clausesNameWork = false
 
-        #expect(SectionPrompts.job(number: 0, of: brief).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
+        #expect(SectionPrompts.job(number: 0, of: brief).text.hasSuffix("\nWrite exactly 3 duties typical of this job."))
     }
 
     @Test("A job's request reads its employer masked, and a name of its own masked in its clauses: the duties of an accountant at a haulier were about transport (#354, round 11)")
@@ -194,7 +194,7 @@ struct SectionPromptsTests {
         #expect(instructions.contains("Never add a job, study, certification, achievement or result."))
     }
 
-    @Test("A job's repair reads the duties kept, each rejected sentence with its reason, and asks for one more duty")
+    @Test("o1: a job's repair reads the duties kept, each rejected sentence with its reason, and asks for exactly the duties missing to reach three (#354, round 13)")
     func jobRepair() {
         let prompt = SectionPrompts.jobRepair(
             number: 1, of: Self.brief, kept: ["Coordino tre tecnici."],
@@ -212,8 +212,18 @@ struct SectionPromptsTests {
             - Coordino tre tecnici.
             Sentences rejected, with the reason:
             - "Controllavo i quadri.": it is written in another form: write it in the present, as the person
-            Add one more duty typical of this job.
+            Add exactly 2 more duties typical of this job.
             """)
+        #expect(SectionPrompts.jobRepairInstructions.contains("Add exactly as many more duties typical of the job as the request asks."))
+        let two = SectionPrompts.jobRepair(number: 1, of: Self.brief, kept: ["Coordino tre tecnici.", "Pianifico i turni."], rejected: [])
+        #expect(two.text.hasSuffix("\nAdd exactly 1 more duty typical of this job."))
+    }
+
+    @Test("o1: a job gets typical duties to reach three, at least one, and none from four duties of its own (#354, round 13)",
+          arguments: [(0, 3), (1, 2), (2, 1), (3, 1), (4, 0), (6, 0)])
+    func typicalDutiesAJobNeeds(said: Int, adding: Int) {
+        #expect(DraftBrief.Role.adding(said: said) == adding)
+        #expect(DraftBrief.Role(title: "", hasEnded: false).adding == DraftBrief.Role.leastDuties)
     }
 
     // MARK: The skills

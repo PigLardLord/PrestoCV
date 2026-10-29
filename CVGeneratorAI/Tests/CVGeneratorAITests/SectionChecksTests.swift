@@ -177,20 +177,21 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.frequencies(in: text) == said)
     }
 
-    @Test("A written duty that says how often the work is done, which the description does not, goes with its reason (#354, round 11)")
+    @Test("o1: a typical duty keeps how often the work is done, which the description does not say; a number still goes (#354, round 13)")
     func dutyThatSaysHowOften() throws {
         let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
-        let verdicts = try sanitizer.dutyCheck(
-            of: Self.esTrapsJobs, job: 0, duties: "Calculo los gastos mensuales de transporte.",
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let verdicts = try spanish.dutyCheck(
+            of: Self.esTrapsJobs, job: 1, duties: "Calculé los movimientos financieros diarios. Reviso las cuentas cada 3 meses.",
             against: description
         )
 
-        #expect(verdicts.rejected.map(\.sentence) == ["Calculo los gastos mensuales de transporte."])
-        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.howOftenReason])
-        #expect(CVDataSanitizer.howOftenReason.hasSuffix("do not say how often"))
+        #expect(verdicts.kept == ["Calculé los movimientos financieros diarios."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Reviso las cuentas cada 3 meses."])
+        #expect(verdicts.rejected.first?.reason.contains("number") == true, "\(verdicts.rejected)")
     }
 
-    @Test("A written duty keeps how often the work is done when the description says it, in other words (#354, round 11)")
+    @Test("o1: a typical duty keeps how often the work is done, whether or not the description says it (#354, round 13)")
     func dutyThatSaysHowOftenAsThePerson() throws {
         let description = "Sono Chiara Benedetti, impiegata amministrativa a Verona. Dal 2017 lavoro alla Ferramenta Scaligera, dove ogni mese "
             + "preparo le buste paga."
@@ -199,9 +200,8 @@ struct SectionChecksTests {
             against: description
         )
 
-        #expect(!verdicts.rejected.contains { $0.sentence.contains("mensili") })
-        #expect(verdicts.rejected.map(\.sentence) == ["Archivio le fatture settimanali dei fornitori."])
-        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.howOftenReason])
+        #expect(verdicts.kept == ["Verifico i contributi mensili dei dipendenti.", "Archivio le fatture settimanali dei fornitori."])
+        #expect(verdicts.rejected.isEmpty)
     }
 
     @Test("A summary sentence that says how often the work is done, which the description does not, goes with its reason (#354, round 11)")
@@ -217,29 +217,30 @@ struct SectionChecksTests {
         #expect(!verdict.kept.contains { $0.contains("mensuales") })
     }
 
-    // MARK: D6, the typical duties of a job the person described (#354, round 1)
+    // MARK: O1, the typical duties beside the person's (#354, round 13; D6 withdrawn)
 
-    @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them")
-    func d6TypicalDutyOfAShortJobStays() throws {
+    @Test("o1: a job whose stated duty is short keeps a typical duty after it")
+    func typicalDutyOfAShortJobStays() throws {
         let verdicts = try sanitizer.dutyCheck(
             of: Self.italianJobs, job: 3, duties: "Pianifico i turni della squadra.", against: JobClausesTests.italian
         )
 
         #expect(verdicts.pinned == ["Coordino tre tecnici."])
         #expect(verdicts.kept == ["Pianifico i turni della squadra."])
-        #expect(!verdicts.saysEnough)
     }
 
-    @Test("d6: a job whose stated duties run to 40 characters keeps them and drops a typical duty, with its reason")
-    func d6TypicalDutyOfADescribedJobGoes() throws {
+    @Test("o1: a job whose stated duties run to 40 characters keeps a typical duty after them; one that names an employer, a customer or a product the person did not goes")
+    func typicalDutyOfADescribedJobStays() throws {
         let verdicts = try sanitizer.dutyCheck(
-            of: Self.italianJobs, job: 1, duties: "Eseguivo la lubrificazione dei macchinari.", against: JobClausesTests.italian
+            of: Self.italianJobs, job: 1,
+            duties: "Eseguivo la lubrificazione dei macchinari. Riparavo le linee Krones per il cliente Peroni.",
+            against: JobClausesTests.italian
         )
 
         #expect(verdicts.pinned == ["Controllavo i quadri elettrici e programmavo la manutenzione preventiva."])
-        #expect(verdicts.kept.isEmpty)
-        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.DutyVerdicts.describedReason])
-        #expect(verdicts.saysEnough)
+        #expect(verdicts.pinned.joined().count >= 40)
+        #expect(verdicts.kept == ["Eseguivo la lubrificazione dei macchinari."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Riparavo le linee Krones per il cliente Peroni."])
     }
 
     #if canImport(NaturalLanguage)
@@ -262,7 +263,6 @@ struct SectionChecksTests {
             .first { $0.company == "école Don Milani" }?.description ?? ""
 
         #expect(step.pinned.allSatisfy { final.contains($0) }, "step \(step.pinned), final \(final)")
-        #expect(!step.saysEnough || final.count >= CVDataSanitizer.DutyVerdicts.describedLength, "final \(final)")
     }
 
     @Test("A count the person gave in digits that a duty writes in words stays, in digits, in the step and the final check; another count goes (#354, round 6)",
@@ -302,7 +302,7 @@ struct SectionChecksTests {
         let step = try sanitizer.dutyCheck(of: Self.italianJobs, job: 1, duties: nil, against: JobClausesTests.italian)
         let final = try sanitizer.sanitize(Self.italianJobs, writing: writing, against: JobClausesTests.italian)
 
-        #expect(step.saysEnough)
+        #expect(step.pinned.joined().count >= 40)
         #expect(step.pinned.allSatisfy { duty in final.experience.contains { ($0.description ?? "").contains(duty) } })
     }
 
