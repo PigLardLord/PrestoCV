@@ -203,8 +203,8 @@ enum SectionPrompts {
     static let summaryInstructions = """
         You write the summary of a CV after the opening, which is written, from the roles and skills below. Write in the language \
         named on the first line.
-        - 2 to 3 sentences, at least 120 characters in all, on the work of the roles and how the person does it, with a tool or a \
-        quality of the lists in it; no list of tools or qualities, and never the opening or its first verb again.
+        - 2 to 3 sentences, at least 120 characters in all, on the work of the roles and how the person does it; no list of tools \
+        or qualities, and never the opening or its first verb again.
         - Each sentence starts with a capital letter and ends with a full stop; write as the person, never "he", "she" or "the person".
         - No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
         - Never add a language, job, study, certification, hobby, achievement or result.

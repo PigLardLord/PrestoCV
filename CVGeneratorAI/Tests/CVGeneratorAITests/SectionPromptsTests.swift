@@ -348,6 +348,8 @@ struct SectionPromptsTests {
             #expect(instructions.contains("Never add a language, job, study, certification, hobby, achievement or result."))
             #expect(instructions.contains("after the opening, which is written"))
             #expect(instructions.contains("no list of tools or qualities"))
+            // Asked for a quality in each sentence, the summary closed each with the person's own praise (#354, round 10).
+            #expect(!instructions.contains("quality of the lists"))
         }
     }
 

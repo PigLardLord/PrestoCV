@@ -1131,16 +1131,16 @@ struct SectionChecksTests {
 
         let verdict = try german.summaryCheck(
             of: facts,
-            summary: "Ich arbeite als Tischler und baue Regale für jeden Raum, was meine Sorgfalt zeigt. "
-                + "Ich messe jeden Raum genau aus, was meine Geduld zeigt. Ich plane jedes Regal mit dem Kunden, was meine Ruhe stärkt.",
+            summary: "Ich arbeite als Tischler und baue Regale für jeden Raum, was die Montage erleichtert. "
+                + "Ich messe jeden Raum genau aus, was den Einbau erleichtert. Ich plane jedes Regal mit dem Kunden, was Umbauten spart.",
             field: nil, work: ["Regale", "Räume"], duties: [], qualities: [], against: description
         )
 
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.endsAsAnEarlierOne])
-        #expect(verdict.rejected.map(\.sentence) == ["Ich messe jeden Raum genau aus, was meine Geduld zeigt."])
+        #expect(verdict.rejected.map(\.sentence) == ["Ich messe jeden Raum genau aus, was den Einbau erleichtert."])
         #expect(verdict.kept == [
-            "Ich arbeite als Tischler und baue Regale für jeden Raum, was meine Sorgfalt zeigt.",
-            "Ich plane jedes Regal mit dem Kunden, was meine Ruhe stärkt.",
+            "Ich arbeite als Tischler und baue Regale für jeden Raum, was die Montage erleichtert.",
+            "Ich plane jedes Regal mit dem Kunden, was Umbauten spart.",
         ])
     }
 
@@ -1211,6 +1211,51 @@ struct SectionChecksTests {
         )
 
         #expect(!verdict.rejected.contains { $0.reason == CVDataSanitizer.speaksOfAnEndedJob })
+    }
+
+    struct SelfPraiseRow: Sendable {
+        let summary: String
+        let kept: [String]
+    }
+
+    static let selfPraiseRows: [SelfPraiseRow] = [
+        SelfPraiseRow(
+            summary: "Ich arbeite als Elektriker und setze mit dem Bauleiter die Anschlüsse jedes neuen Hauses. "
+                + "Ich verlege die Leitungen in neuen Häusern, was die Sicherheit erhöht. "
+                + "Ich montiere die Schaltschränke mit Sorgfalt, was meine Konzentration verdeutlicht.",
+            kept: [
+                "Ich arbeite als Elektriker und setze mit dem Bauleiter die Anschlüsse jedes neuen Hauses.",
+                "Ich verlege die Leitungen in neuen Häusern, was die Sicherheit erhöht.",
+                "Ich montiere die Schaltschränke mit Sorgfalt.",
+            ]
+        ),
+        SelfPraiseRow(
+            summary: "Ich arbeite als Elektriker und setze mit dem Bauleiter die Anschlüsse jedes neuen Hauses. "
+                + "Ich verlege die Leitungen in neuen Häusern, was meine Genauigkeit zeigt. "
+                + "Ich montiere die Schaltschränke mit Sorgfalt, was meine Konzentration verdeutlicht.",
+            kept: [
+                "Ich arbeite als Elektriker und setze mit dem Bauleiter die Anschlüsse jedes neuen Hauses.",
+                "Ich verlege die Leitungen in neuen Häusern, was meine Genauigkeit zeigt.",
+                "Ich montiere die Schaltschränke mit Sorgfalt.",
+            ]
+        ),
+    ]
+
+    @Test("A closing clause of self-praise after an earlier sentence's closing comment goes and its sentence stays; the first comment stays (#354, round 10)",
+          arguments: selfPraiseRows)
+    func summaryWithASecondSelfPraise(row: SelfPraiseRow) throws {
+        let (summary, kept) = (row.summary, row.kept)
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("Elektriker", "Elektro Lindner", from: "2015")])
+        let description = "Ich wohne in Suhl. Seit 2015 arbeite ich als Elektriker bei Elektro Lindner. Ich verlege die Leitungen. "
+            + "Ich montiere die Schaltschränke. Ich setze die Anschlüsse jedes neuen Hauses."
+
+        let verdict = try german.summaryCheck(
+            of: facts, summary: summary, field: nil, work: ["Leitungen", "Anschlüsse", "Schaltschränke"], duties: [], qualities: [], against: description
+        )
+
+        #expect(verdict.rejected.isEmpty, "\(verdict.rejected)")
+        #expect(verdict.kept == kept)
     }
 
     @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")

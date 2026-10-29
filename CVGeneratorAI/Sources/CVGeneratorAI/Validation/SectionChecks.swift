@@ -615,8 +615,11 @@ extension CVDataSanitizer {
             var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
-                let sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
+                var sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
+                // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays (round 10).
+                if hasATail, let tail = Self.commentTail(of: sentence), tail.praises { sentence = tail.head }
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
                 let lower = sentence.lowercased()
@@ -662,6 +665,7 @@ extension CVDataSanitizer {
                     if let verb { verbs.insert(verb) }
                     if let ending = Self.ending(of: sentence) { endings.insert(ending) }
                     if let closing = Self.closing(of: sentence) { closings.insert(closing) }
+                    if Self.commentTail(of: sentence) != nil { hasATail = true }
                     verdict.kept.append(sentence)
                 }
             }
@@ -891,6 +895,29 @@ extension CVDataSanitizer {
         guard words.count >= 3, let first = words.first, let last = words.last else { return nil }
         return [first, last]
     }
+
+    /// The last clause of `sentence` after a comma when it comments on what the sentence says ("…, was die Sicherheit erhöht",
+    /// "…, which shows my care"): the sentence without it, with a full stop, and whether it praises the person's own quality
+    /// (`selfPraise`). Nil when the last clause is no comment. The summary closed each sentence with a quality of the person
+    /// ("…, was meine Präzision zeigt. …, was meine Verlässlichkeit beweist."; #354, round 10): after the first comment, a later
+    /// one of praise goes and its sentence stays.
+    static func commentTail(of sentence: String) -> (head: String, praises: Bool)? {
+        guard let comma = sentence.lastIndex(of: ",") else { return nil }
+        let words = Word.words(in: String(sentence[sentence.index(after: comma)...])).map(\.folded)
+        let clause = " " + words.joined(separator: " ") + " "
+        guard words.count >= 3, commentOpenings.contains(where: { clause.hasPrefix(" " + $0 + " ") }) else { return nil }
+        let head = sentence[..<comma].trimmingCharacters(in: .whitespaces) + "."
+        return (head, selfPraise.contains { clause.range(of: $0, options: .regularExpression) != nil })
+    }
+
+    /// The words that open a clause commenting on the sentence before it, folded, in the six languages.
+    private static let commentOpenings = ["was", "which", "il che", "cosa che", "che", "ce qui", "lo que", "lo cual", "o que", "o qual"]
+
+    /// The patterns of a comment that praises the person's own quality, over its folded words joined by single spaces.
+    private static let selfPraise = [
+        "^ was mein(e|en|er|em)? ", "^ which [a-z]+ my ", "^ (il che|cosa che|che) [a-z]+ (la mia|il mio|le mie|i miei) ",
+        "^ ce qui [a-z]+ (mon|ma|mes) ", "^ lo (que|cual) [a-z]+ (mi|mis) ", "^ o (que|qual) [a-z]+ (o meu|a minha|os meus|as minhas|meu|minha) ",
+    ]
 
     /// The last three words of `sentence`, folded, when it has five or more: two sentences that end alike repeat a phrase
     /// ("…con enfoque organizado.", #354, round 2).
