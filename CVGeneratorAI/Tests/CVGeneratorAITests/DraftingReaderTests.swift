@@ -572,6 +572,47 @@ struct DraftingReaderTests {
         #expect(Self.reader(french, "fr").filter { $0.kind == .twoPastForms }.map(\.path) == ["experience[0].description"])
     }
 
+    @Test("A draft sentence about the person's own e-mail or phone is counted; a duty of answering callers is not (#354, round 14)")
+    func contactInDraft() {
+        let cv = CVData(
+            summary: "Lavoro come archivista. Curo la mia email con ordine. Rispondo al telefono dei clienti.",
+            experience: [
+                Experience(title: "receptionist", company: "Elm Hotel", description: "I answer the phone at the desk. I check my e-mail every hour."),
+                Experience(title: "programadora", company: "Bit Sul", description: "Respondo ao meu e-mail todo dia. Desenvolvo aplicativos."),
+            ]
+        )
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .contactInDraft }.map(\.value)
+            == ["I check my e-mail every hour.", "Respondo ao meu e-mail todo dia.", "Curo la mia email con ordine."])
+    }
+
+    @Test("A duty whose words past its verb are all abstract is counted; a duty with a work object is not (#354, round 14)")
+    func abstractDuty() {
+        let cv = CVData(experience: [
+            Experience(
+                title: "lighting technician", company: "Elm Stage",
+                description: "I kept the overall balance of the systems. I focus the spotlights before each show."
+            ),
+            Experience(title: "Tischler", company: "Werkstatt Linde", description: "Ich habe Elemente verbunden. Ich habe Schränke gebaut."),
+            Experience(title: "analista", company: "Bit Sul", description: "Otimizei fluxos de trabalho digitais. Revisei os contratos dos processos."),
+        ])
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .abstractDuty }.map(\.value)
+            == ["I kept the overall balance of the systems.", "Ich habe Elemente verbunden.", "Otimizei fluxos de trabalho digitais."])
+    }
+
+    @Test("A summary sentence that holds every word of a duty with words added between them is counted; one that misses a word of the duty is not (#354, round 14)")
+    func restatedDutyInSummary() {
+        let cv = CVData(
+            summary: "Ich arbeite als Elektrikerin. Ich verlege sorgfältig neue Kabel in Altbauten mit Präzision. "
+                + "Ich verlege Leitungen in Altbauten mit Ruhe.",
+            experience: [Experience(title: "Elektrikerin", company: "Licht Linde", description: "Ich verlege Kabel in Altbauten. Ich prüfe Sicherungen.")]
+        )
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .restatedDutyInSummary }.map(\.value)
+            == ["Ich verlege sorgfältig neue Kabel in Altbauten mit Präzision."])
+    }
+
     @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")
     func gerundSoftSkill() {
         let counted = { (names: [String], language: String) in

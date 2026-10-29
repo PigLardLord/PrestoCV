@@ -134,6 +134,9 @@ A streamed answer cut by its cap keeps its whole parts (`StreamedAnswer`), as th
 
 - **The tools by the headline's title (T), measured and withdrawn.** The headline's title asked 6 to 8 tools and each other title at most 1, then the headline's title up to 2 tools of one kind at a time, with a short positive definition of a tool. On the 8 tier-1 inputs it did not meet its condition (fewer than 8 tools of no trade of the person's and fewer than 6 generic systems, with no input losing tools of its trade): 28 tools of no trade and 5 generic systems, and 5 inputs lost tools of their trade. Asked for 6 to 8, the request named the objects and stationery of the job's field when it knew fewer tools. The skills requests stay as they were before T. Two facts measured on the way hold for any later request: the model fails an array of 0 to 1 items before a word, and a request shown the tools kept names them again.
 
+**The fourteenth measured fix round (#354).** Each class is first a measure of the evaluation, then fixed at its root, structure first. No rule of the facts changes.
+- **The measures.** Three reader classes with no threshold: `contactInDraft`, a summary or job sentence about the person's own contact (an address, or a possessive of the first person before a contact word); `abstractDuty`, a duty whose words past its verb are all abstract nouns or empty modifiers, with no work object; `restatedDutyInSummary`, a summary sentence that holds every word of four letters or more of a duty, with words added between them. The lists are the reader's own and partial. Rows: `DraftingReaderTests` `contactInDraft`, `abstractDuty`, `restatedDutyInSummary`.
+
 ### What it supersedes
 
 - **The single second call of "Two passes".** The text around the facts is written by a request per section ("A request per section"); the second call's limit (45 s) and bounds (400 tokens, one schema for every section) are replaced by the caps and deadlines there.

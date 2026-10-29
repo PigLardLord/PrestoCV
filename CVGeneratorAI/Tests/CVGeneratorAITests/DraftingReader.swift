@@ -172,6 +172,14 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An ended job whose duties use a compound past and an imperfect ("Ho gestito le comunicazioni. Verificavo i documenti.";
     /// #354, round 12).
     case twoPastForms
+    /// A summary or job sentence about the person's own contact ("Gestisco la mia email con attenzione."; #354, round 14).
+    case contactInDraft
+    /// A duty whose words past its verb are all abstract, with no work object ("I maintained the structural balance at all
+    /// times."; #354, round 14). The reader's own list, partial.
+    case abstractDuty
+    /// A summary sentence that holds every word of a duty of the draft, with words added between them, which
+    /// copiedDutyInSummary does not count ("Ich installiere elektrische Anlagen in Neubauten mit Sorgfalt"; #354, round 14).
+    case restatedDutyInSummary
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -236,6 +244,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .relativeDuty: "a job sentence that opens with a relative word"
         case .ownNounDuty: "a verb with the noun of its own action"
         case .twoPastForms: "an ended job in a compound past and an imperfect"
+        case .contactInDraft: "a draft sentence about the person's own contact"
+        case .abstractDuty: "a duty of abstract words only"
+        case .restatedDutyInSummary: "a summary sentence that restates a duty"
         }
     }
 }
@@ -350,6 +361,14 @@ enum ReaderRules {
         }
         found += WrittenMeasure.sentences(of: cv.summary ?? "").filter(namesItsOwnAction)
             .map { ReaderFinding(kind: .ownNounDuty, path: "summary", value: $0) }
+        for (index, job) in cv.experience.enumerated() {
+            let path = "experience[\(index)].description"
+            let sentences = WrittenMeasure.sentences(of: job.description ?? "")
+            found += sentences.filter(givesAContact).map { ReaderFinding(kind: .contactInDraft, path: path, value: $0) }
+            found += sentences.filter(isAbstract).map { ReaderFinding(kind: .abstractDuty, path: path, value: $0) }
+        }
+        found += WrittenMeasure.sentences(of: cv.summary ?? "").filter(givesAContact)
+            .map { ReaderFinding(kind: .contactInDraft, path: "summary", value: $0) }
         for (index, job) in cv.experience.enumerated() {
             let sentences = WrittenMeasure.sentences(of: job.description ?? "")
             if !sentences.isEmpty, sentences.allSatisfy({ RoleStub.isStub($0, jobWords: [], language: vocabulary) }) {
@@ -665,7 +684,10 @@ enum ReaderRules {
         found += selfPraiseTails(in: sentences).map { ReaderFinding(kind: .selfPraiseTail, path: "summary", value: $0) }
         found += unstatedProducts(in: sentences, of: cv, for: input)
             .map { ReaderFinding(kind: .unstatedProductInSummary, path: "summary", value: $0) }
-        found += copiedDuties(in: sentences, of: cv).map { ReaderFinding(kind: .copiedDutyInSummary, path: "summary", value: $0) }
+        let copied = copiedDuties(in: sentences, of: cv)
+        found += copied.map { ReaderFinding(kind: .copiedDutyInSummary, path: "summary", value: $0) }
+        found += restatedDuties(in: sentences.filter { !copied.contains($0) }, of: cv)
+            .map { ReaderFinding(kind: .restatedDutyInSummary, path: "summary", value: $0) }
         found += sentences.filter(guarantees).map { ReaderFinding(kind: .overclaimSummary, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
@@ -1611,6 +1633,83 @@ enum ReaderRules {
         guard abs(first.count - second.count) <= 2, shorter >= 5 else { return false }
         return zip(first, second).prefix { $0 == $1 }.count >= max(5, shorter - 2)
     }
+
+    /// Whether a sentence speaks of the person's own contact: an address with "@", or a possessive of the first person one or
+    /// two words before a word of a contact ("la mia email", "meu e-mail", "my phone number"), in the six languages.
+    static func givesAContact(_ sentence: String) -> Bool {
+        guard !sentence.contains("@") else { return true }
+        let words = letterWords(of: sentence)
+        return words.indices.contains { index in
+            contactWords.contains(where: words[index].hasPrefix)
+                && words[max(0, index - 2)..<index].contains { contactOwners.contains($0) }
+        }
+    }
+
+    static let contactOwners: Set<String> = [
+        "my", "mio", "mia", "miei", "mie", "mi", "mis", "mon", "mein", "meine", "meinen", "meiner", "meinem", "meu",
+        "minha", "meus", "minhas",
+    ]
+
+    static let contactWords = [
+        "email", "mail", "correo", "telefon", "phone", "cellulare", "celular", "telemovel", "handy", "linkedin", "whatsapp",
+    ]
+
+    /// The summary sentences that hold every word of four letters or more of a duty with three such words or more, in any order:
+    /// a duty restated with words added between its own.
+    static func restatedDuties(in sentences: [String], of cv: CVData) -> [String] {
+        let duties = cv.experience.flatMap { WrittenMeasure.sentences(of: $0.description ?? "") }
+            .map { Set(letterWords(of: $0).filter { $0.count >= 4 && !abstractStops.contains($0) }) }
+            .filter { $0.count >= 3 }
+        return sentences.filter { sentence in
+            let words = Set(letterWords(of: sentence))
+            return duties.contains { $0.isSubset(of: words) }
+        }
+    }
+
+    /// Whether every word of four letters or more of a duty but one (its verb) is an abstract noun or an empty modifier, with one
+    /// abstract noun at least: "I maintained the structural balance at all times", "Ich habe Teile verbunden". The reader's
+    /// own lists, partial.
+    static func isAbstract(_ duty: String) -> Bool {
+        let words = letterWords(of: duty).filter { $0.count >= 4 && !abstractStops.contains($0) }
+        let abstract = words.filter { abstractNouns.contains($0) }
+        guard !abstract.isEmpty else { return false }
+        return words.filter { !abstractNouns.contains($0) && !emptyModifiers.contains($0) }.count <= 1
+    }
+
+    static let abstractNouns: Set<String> = [
+        "flow", "flows", "workflow", "workflows", "balance", "environment", "environments", "distribution", "system", "systems", "part",
+        "parts", "element", "elements", "output", "outputs", "process", "processes", "operations", "activities", "aspects",
+        "structure", "structures", "things", "solutions", "resources", "work",
+        "flusso", "flussi", "equilibrio", "ambiente", "ambienti", "distribuzione", "sistema", "sistemi", "parti", "elementi",
+        "processi", "attivita", "aspetti", "struttura", "strutture", "soluzioni", "risorse", "operazioni", "lavoro",
+        "flujo", "flujos", "entorno", "entornos", "distribucion", "sistemas", "partes", "elementos", "procesos", "actividades",
+        "aspectos", "estructura", "soluciones", "recursos", "operaciones", "trabajo",
+        "flux", "equilibre", "environnement", "environnements", "systeme", "systemes", "parties", "processus", "activites",
+        "ressources", "travail",
+        "fluss", "ablauf", "ablaufe", "gleichgewicht", "umgebung", "umgebungen", "verteilung", "teile", "elemente",
+        "prozesse", "aktivitaten", "aspekte", "struktur", "strukturen", "losungen", "ressourcen", "arbeit",
+        "fluxo", "fluxos", "ambientes", "distribuicao", "processos", "atividades", "estrutura", "solucoes", "operacoes",
+        "trabalho",
+    ]
+
+    static let emptyModifiers: Set<String> = [
+        "overall", "general", "different", "various", "digital", "structural", "spatial", "narrative", "audio", "sound", "signals",
+        "times", "time", "always", "correct", "correctly", "proper", "properly", "manage", "managed", "ensure", "ensured",
+        "maintain", "maintained", "handle", "handled", "align", "aligned", "oversee", "oversaw",
+        "generale", "diversi", "diverse", "digitale", "digitali", "strutturale", "sempre", "tutti", "tutte", "complessivo",
+        "globale", "diferentes", "digitales", "estructural", "siempre", "todos", "todas", "global", "differents", "numerique",
+        "numeriques", "toujours", "tous", "toutes", "verschiedene", "digitalen", "immer", "alle", "allen",
+        "geral", "digitais", "estrutural",
+    ]
+
+    /// Words of four letters or more that are not words of the work: prepositions, auxiliaries and determiners.
+    static let abstractStops: Set<String> = [
+        "with", "from", "across", "within", "into", "over", "under", "before", "after", "each", "every", "their", "them", "they",
+        "this", "that", "these", "those", "have", "been", "were", "della", "delle", "degli", "dello", "nella", "nelle", "nello",
+        "alla", "alle", "allo", "sulla", "sulle", "dalla", "dalle", "ogni", "avevo", "sono", "para", "pela", "pelo", "pelas", "pelos",
+        "como", "cada", "avec", "pour", "dans", "sous", "chaque", "eine", "einen", "einem", "einer", "durch", "unter", "uber",
+        "beim", "habe", "hatte", "jede", "jeden", "jeder", "tenho", "tinha", "todo", "toda", "while", "during",
+    ]
 
     /// Whether a duty holds a phrase that names no task but a field of tasks, in the six languages; the reader's own list.
     static func isVague(_ duty: String) -> Bool {
