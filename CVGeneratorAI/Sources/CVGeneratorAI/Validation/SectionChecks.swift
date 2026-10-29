@@ -566,8 +566,8 @@ extension CVDataSanitizer {
             let language = source.explainer.language
             let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
             var verdict = SummaryVerdict()
-            var idle = 0
             var seen = Set<String>()
+            var idleFirst: String?
             var verbs = Set<String>()
             var endings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
@@ -605,13 +605,13 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(
                         sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
                     ))
-                } else if !workStems.isEmpty, !namesWork(sentence), idle >= 1 {
-                    verdict.rejected.append(Rejection(sentence: sentence, reason: "it says nothing of the work: name a duty or a tool of the lists"))
+                } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
                           let reason = written.rejection(of: sentence, ownWords: ownWords) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
-                    if !namesWork(sentence) { idle += 1 }
+                    if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
                     if let ending = Self.ending(of: sentence) { endings.insert(ending) }
                     verdict.kept.append(sentence)
@@ -639,6 +639,10 @@ extension CVDataSanitizer {
             if verdict.opening == nil, !verdict.kept.isEmpty, verdict.kept.count < 2 || verdict.kept.joined(separator: " ").count < 120 {
                 verdict.opening = opening
             }
+            if verdict.opening != nil, let idleFirst {
+                verdict.kept.removeAll { $0 == idleFirst }
+                verdict.rejected.append(Rejection(sentence: idleFirst, reason: Self.namesNoWork))
+            }
             if let verb = verdict.opening.flatMap(Self.leadingVerb) {
                 verdict.rejected += verdict.kept.filter { Self.leadingVerb(of: $0) == verb }
                     .map { Rejection(sentence: $0, reason: Self.startsAsAnEarlierOne) }
@@ -661,6 +665,9 @@ extension CVDataSanitizer {
         }
     }
 
+    /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
+    /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
+    static let namesNoWork = "it says nothing of the work: name a duty or a tool of the lists"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
@@ -843,10 +850,29 @@ extension CVDataSanitizer {
         letterWords(of: sentence).first { !["i", "ich", "je", "j", "io", "yo", "eu"].contains($0) }
     }
 
-    /// The first four letters of each word of 4 letters or more of `texts`: how a summary sentence is matched to the work.
+    /// The first five letters of each word of five letters or more of `texts` that says nothing of a work: how a summary sentence
+    /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354, round 6).
     private static func workStems(of texts: [String]) -> Set<String> {
-        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 4 }.map { String($0.prefix(4)) } })
+        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(5)) } })
+            .subtracting(idleStems)
     }
+
+    /// The words of five letters or more that say nothing of a work, in the six languages: quantifiers, connectives, auxiliaries.
+    private static let idleWords: Set<String> = [
+        "every", "their", "there", "which", "while", "where", "these", "those", "about", "after", "before", "other", "always",
+        "being", "ensure", "ensures", "through", "della", "delle", "degli", "dello", "nella", "nelle", "negli", "sulla", "sulle",
+        "sempre", "molto", "grande", "grandi", "mentre", "quando", "stato", "stata", "essere", "avere", "tutti", "tutte", "tutto",
+        "costante", "constant", "consistent", "chaque", "leurs", "toute", "toutes", "faire", "avoir", "toujours", "einer", "einem",
+        "einen", "eines", "jeden", "jedes", "jeder", "immer", "durch", "nicht", "sowie", "wobei", "damit", "dabei", "indem",
+        "siempre", "entre", "sobre", "desde", "hasta", "mediante", "todos", "todas", "muito",
+    ]
+
+    /// The stems of the words for work of any trade ("lavoro", "tâche", "Aufgabe", "process"): a sentence that shares only one of
+    /// them with the work names none of it.
+    private static let idleStems: Set<String> = [
+        "lavor", "attiv", "compi", "traba", "tarea", "taref", "trava", "tâche", "arbei", "aufga", "eleme", "proce", "activ",
+        "tasks", "teams", "works",
+    ]
 
     /// The opening of a summary that names no title: the current job's title, else the person's own, in the present; else the title
     /// of the job that ended last, in the past. Nil when the facts hold no title or the language is none of the six.

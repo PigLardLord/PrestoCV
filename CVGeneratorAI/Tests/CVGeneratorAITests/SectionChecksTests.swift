@@ -844,6 +844,34 @@ struct SectionChecksTests {
         #expect(verdict.kept.count == 3)
     }
 
+    @Test("A summary sentence that names no word of the work goes after the first; a first one stays unless an opening goes before it, and one that names a title or a duty stays (#354, round 6)")
+    func summaryNamingNoWork() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("fitter", "Harlow Mills", from: "2015")])
+        let description = "I live in Leeds. Since 2015 I have worked as a fitter at Harlow Mills, where I service each gearbox."
+        let check = { (summary: String) in
+            try english.summaryCheck(
+                of: facts, summary: summary, field: nil, work: ["I service each gearbox."], duties: [], qualities: ["patience"],
+                tools: [], against: description
+            )
+        }
+        let titled = "I work as a fitter at a busy mill and keep its lines running through every shift."
+        let duty = "I service the gearboxes of the mill with care and check every bearing."
+        let calm = "I stay calm with each new challenge."
+
+        let later = try check([titled, calm, duty].joined(separator: " "))
+        let first = try check([calm, titled, duty].joined(separator: " "))
+        let opened = try check([calm, duty].joined(separator: " "))
+
+        #expect(later.rejected.map(\.sentence) == [calm], "\(later.rejected)")
+        #expect(later.kept == [titled, duty])
+        #expect(first.rejected.isEmpty, "\(first.rejected)")
+        #expect(first.kept == [calm, titled, duty])
+        #expect(opened.opening == "I work as a fitter.")
+        #expect(opened.rejected.map(\.reason) == [CVDataSanitizer.namesNoWork], "\(opened.rejected)")
+        #expect(opened.kept == [duty])
+    }
+
     @Test("A summary sentence that ends with the last three words of an earlier one goes; one that shares fewer stays (#354, round 2)")
     func summaryWithARepeatedEnding() throws {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

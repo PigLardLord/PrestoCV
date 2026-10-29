@@ -327,9 +327,9 @@ struct SectionDraftTests {
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()
-        service.summaryResult = "He is a sound engineer. I keep every show running smoothly."
+        service.summaryResult = "He is a sound engineer. I keep every rehearsal running smoothly."
         service.summaryRepairResult = """
-            I work as a head of sound. I keep every show running smoothly. I plan the sound of each production and look after the \
+            I work as a head of sound. I keep every rehearsal running smoothly. I plan the sound of each production and look after the \
             mixing desks. I train the technicians. I check the stage monitors.
             """
 
@@ -337,7 +337,7 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.suffix(2) == ["summary", "repairSummary"])
         let repair = try #require(service.summaryRepairs.first)
-        #expect(repair.kept == ["I keep every show running smoothly."])
+        #expect(repair.kept == ["I keep every rehearsal running smoothly."])
         #expect(repair.rejected.contains { $0.hasPrefix("\"He is a sound engineer.\": it speaks of the person in the third person") })
         let summary = try #require(draft.summary)
         #expect(SentenceSplitter.sentences(in: summary).count <= 4)
