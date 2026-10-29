@@ -553,7 +553,7 @@ extension CVDataSanitizer {
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
-                let sentence = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                let sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
                 let lower = sentence.lowercased()
@@ -569,6 +569,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
                 } else if let language, Self.isAFragment(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
+                } else if let language, Self.dropsThePronoun.contains(language), !Self.speaksAsThePerson(sentence) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerbOfThePerson))
                 } else if language == .german, Self.putsTheVerbBeforeTheEnd(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.putsTheVerbBeforeTheEnd))
                 } else if Self.hasAQualitySubject(sentence, qualities: qualityWords) {
@@ -640,6 +642,7 @@ extension CVDataSanitizer {
     }
 
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
+    static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
@@ -762,6 +765,58 @@ extension CVDataSanitizer {
         .german: ["ich", "mich", "mir", "mein", "meine", "meinen", "meinem", "meiner", "meines"],
         .french: ["je", "j", "moi", "me", "m", "mon", "ma", "mes"],
     ]
+
+    /// The languages whose sentences drop the subject pronoun: the person speaks there by the verb.
+    private static let dropsThePronoun: Set<Vocabulary.Language> = [.italian, .spanish, .portuguese]
+
+    /// The words of the person and the auxiliaries of the first person in Italian, Spanish and Portuguese, folded as `letterWords`
+    /// writes them.
+    private static let wordsOfTheSpeaker: Set<String> = [
+        "io", "mi", "me", "mio", "mia", "miei", "mie", "ho", "sono", "sto", "posso", "yo", "mis", "conmigo", "he", "soy", "estoy",
+        "tengo", "puedo", "eu", "meu", "minha", "meus", "minhas", "comigo", "sou", "estou", "tenho",
+    ]
+
+    /// The words in "-o" that open a clause and are no verb of the person: articles, determiners, prepositions, adverbs.
+    private static let openersInO: Set<String> = [
+        "uno", "ogni", "questo", "quello", "nello", "dello", "allo", "dallo", "sullo", "como", "todo", "cada", "este", "ese", "aquello",
+        "esto", "eso", "durante", "dentro", "fuera", "nuestro", "vuestro", "nosso", "nao", "não", "cuando", "quando", "tanto", "molto",
+        "ciascuno", "isso", "isto", "aquilo", "ovunque", "solo", "o", "lo", "no", "do", "ao", "pelo", "neo", "dopo", "presso",
+    ]
+
+    /// The words that join a clause to the one before it, and come before its verb.
+    private static let clauseConnectors: Set<String> = [
+        "poi", "inoltre", "anche", "e", "quindi", "dopo", "luego", "también", "y", "después", "depois", "além", "ma", "pero", "mas",
+    ]
+
+    /// Whether an Italian, Spanish or Portuguese summary sentence speaks as the person (#354, round 5): it holds a word of the
+    /// person or an auxiliary of the first person ("mi", "tengo", "sou"), or its first word, or the first word after a comma, is a
+    /// verb of the first person, in "-o" ("Controllo …", "Con cura, verifico …") or in the past of the first person in Spanish and
+    /// Portuguese ("Revisé …", "Organizei …"). A rough rule: "Con cura verifico" is not read.
+    private static func speaksAsThePerson(_ sentence: String) -> Bool {
+        if letterWords(of: sentence).contains(where: wordsOfTheSpeaker.contains) { return true }
+        let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
+        return firsts.contains { word in
+            word.count >= 3 && !openersInO.contains(word) && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei")))
+        }
+    }
+
+    /// `sentence` as the person says it, in Italian, Spanish or Portuguese (#354, round 5): a sentence that opens with a verb of the
+    /// third person (`speaksInTheThirdPerson`), alone or after a lone word of the kept `qualities` ("Precisa gestisce la contabilità"),
+    /// opens with its first person in "-o" when the word list knows that form ("Gestisco la contabilità"). Any other sentence, one
+    /// with a title or a noun as its subject, and one whose first person the list does not know keep their words.
+    private func writtenAsThePerson(_ sentence: String, qualities: [[String]], language: Vocabulary.Language?) -> String {
+        guard let language, Self.dropsThePronoun.contains(language) else { return sentence }
+        var tokens = sentence.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if tokens.count > 2, let first = Word.words(in: tokens[0]).map(\.folded).first, qualities.contains([first]) {
+            tokens.removeFirst()
+        }
+        let candidate = tokens.joined(separator: " ")
+        guard let verb = tokens.first, verb.allSatisfy(\.isLetter), verb.count >= 4, verb.hasSuffix("a") || verb.hasSuffix("e"),
+              Self.speaksInTheThirdPerson(candidate, titles: [], language: language) else { return sentence }
+        let form = String(verb.dropLast()) + "o"
+        guard wordList.knows(form.lowercased(), inLanguage: language.rawValue) == true else { return sentence }
+        return ([String(form.prefix(1)).uppercased() + form.dropFirst()] + tokens.dropFirst()).joined(separator: " ")
+    }
 
     /// The first word of a sentence after a subject pronoun of the first person: its verb, in a summary written as the person.
     static func leadingVerb(of sentence: String) -> String? {

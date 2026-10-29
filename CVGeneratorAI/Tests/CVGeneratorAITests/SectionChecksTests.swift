@@ -856,17 +856,17 @@ struct SectionChecksTests {
         #expect(verdict.opening == nil)
     }
 
-    @Test("A summary sentence with a verb of the third person and no subject goes where the pronoun is dropped; one as the person stays (#354)",
+    @Test("A summary sentence with a title or a reflexive pronoun of the third person goes where the pronoun is dropped; a known verb of the third person is written as the person (#354)",
           arguments: [
               ("es", "Contable gestiona los registros con cuidado.", false), ("es", "El contable revisa las facturas.", false),
-              ("es", "Analiza los movimientos de caja.", false), ("es", "Se encarga de la contabilidad.", false),
+              ("es", "Analiza los movimientos de caja.", true), ("es", "Se encarga de la contabilidad.", false),
               ("es", "Analizo los movimientos de caja.", true), ("es", "Experiencia en contabilidad de pymes.", true),
               ("es", "Hice la contabilidad de tres empresas.", true), ("es", "Para la empresa llevo la contabilidad.", true),
               ("es", "Llevaba la contabilidad de la empresa.", true),
-              ("it", "Si occupa della contabilità.", false), ("it", "Gestisce la contabilità della ditta.", false),
+              ("it", "Si occupa della contabilità.", false), ("it", "Gestisce la contabilità della ditta.", true),
               ("it", "Mi occupo della contabilità.", true), ("it", "Durante il giorno seguo la contabilità.", true),
               ("it", "Gestire la contabilità mi piace.", true),
-              ("pt", "Analisa os movimentos de caixa.", false), ("pt", "Analiso os movimentos de caixa.", true),
+              ("pt", "Analisa os movimentos de caixa.", true), ("pt", "Analiso os movimentos de caixa.", true),
           ])
     func summaryInTheThirdPerson(language: String, sentence: String, stays: Bool) throws {
         let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -877,6 +877,68 @@ struct SectionChecksTests {
         let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
 
         #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.speaksInTheThirdPerson) == !stays, "\(verdict.rejected)")
+    }
+
+    /// A checker of `language` (Italian, Spanish or Portuguese), with the facts and the description of an accountant in it.
+    private static func accountant(
+        _ language: String, wordList: TableWordList = TableWordList()
+    ) -> (checker: CVDataSanitizer, facts: CVData, description: String) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: wordList)
+        switch language {
+        case "it":
+            return (checker, CVData(experience: [Self.job("contabile", "Mobili Brembo", from: "2017")]),
+                    "Vivo a Lecco. Dal 2017 lavoro come contabile alla Mobili Brembo, dove tengo la contabilità della ditta e analizzo i movimenti di cassa.")
+        case "pt":
+            return (checker, CVData(experience: [Self.job("contabilista", "Móveis Cávado", from: "2017")]),
+                    "Moro em Braga. Desde 2017 trabalho como contabilista na Móveis Cávado, onde faço a contabilidade e analiso os movimentos de caixa.")
+        default:
+            return (checker, CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")]),
+                    "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad y analizo los movimientos de caja.")
+        }
+    }
+
+    @Test("A summary sentence that opens with a verb of the third person the word list knows in the first person, after a quality or alone, is written as the person; a title or a quality noun as its subject still goes (#354, round 5)",
+          arguments: [
+              ("it", "Gestisce la contabilità della ditta.", "Gestisco la contabilità della ditta."),
+              ("it", "Precisa gestisce la contabilità della ditta.", "Gestisco la contabilità della ditta."),
+              ("es", "Analiza los movimientos de caja.", "Analizo los movimientos de caja."),
+              ("pt", "Analisa os movimentos de caixa.", "Analiso os movimentos de caixa."),
+              ("es", "Contable gestiona los registros con cuidado.", nil),
+              ("it", "La precisione guida ogni intervento.", nil),
+          ] as [(String, String, String?)])
+    func thirdPersonVerbWrittenAsThePerson(language: String, sentence: String, kept: String?) throws {
+        let (checker, facts, description) = Self.accountant(language)
+
+        let verdict = try checker.summaryCheck(
+            of: facts, summary: sentence, field: nil, work: [], duties: [], qualities: ["precisa"], against: description
+        )
+
+        #expect(verdict.kept == (kept.map { [$0] } ?? []), "\(verdict.rejected)")
+    }
+
+    @Test("A verb of the third person whose first person the word list does not know is not rewritten, and the sentence goes (#354, round 5)")
+    func unknownFirstPersonStaysOut() throws {
+        let (checker, facts, description) = Self.accountant("es", wordList: TableWordList(names: TableWordList.inventedNames.union(["analizo"])))
+
+        let verdict = try checker.summaryCheck(of: facts, summary: "Analiza los movimientos de caja.", field: nil, against: description)
+
+        #expect(verdict.kept.isEmpty)
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksInTheThirdPerson])
+    }
+
+    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays (#354, round 5)",
+          arguments: [
+              ("it", "Ogni azione è guidata dalla cura per i conti.", false), ("it", "Controllo i conti della ditta ogni giorno.", true),
+              ("it", "Con cura, verifico i movimenti di cassa.", true), ("it", "Il mio lavoro è tenere i conti in ordine.", true),
+              ("es", "Cada asiento exige atención constante.", false), ("es", "Reviso las facturas cada semana.", true),
+              ("pt", "Cada lançamento exige atenção constante.", false), ("pt", "Reviso as faturas todas as semanas.", true),
+          ])
+    func summaryWithNoVerbOfThePerson(language: String, sentence: String, stays: Bool) throws {
+        let (checker, facts, description) = Self.accountant(language)
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerbOfThePerson) == !stays, "\(verdict.rejected)")
     }
 
     @Test("A summary naming no title whole gets the opening; a sentence with its verb, an earlier verb or a duty goes (#354)")
