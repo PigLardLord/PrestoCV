@@ -139,6 +139,11 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// Two summary sentences whose last clause after a comma opens and ends with one word ("…, was meine Verlässlichkeit beweist."
     /// and "…, was meine Konzentration beweist."; #354, round 8).
     case repeatedTail
+    /// A technology the description does not state, nor the reader's list of the trade names as it is, whose head noun is a
+    /// generic system, software, machine, set of tools or equipment, with only words of a work object or an activity around it
+    /// and no product, name or device ("sistema di tracciamento dati", "máquina de escaneo de registros", "Montagesystem"; #354,
+    /// round 9). A bare head is a category (`categoryAsTechnology`).
+    case genericSystemTechnology
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -191,6 +196,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .gluedWord: "a noun glued to the next word"
         case .rewordedDuty: "one duty said twice in a job"
         case .repeatedTail: "two summary sentences with one closing clause"
+        case .genericSystemTechnology: "a generic system as a technology"
         }
     }
 }
@@ -256,6 +262,9 @@ enum ReaderRules {
             }
             if skill.kind == .technology, holdsAName(skill.name, of: input) {
                 found.append(ReaderFinding(kind: .employerWordTechnology, path: path, value: skill.name))
+            }
+            if skill.kind == .technology, isGenericSystem(skill.name, of: input) {
+                found.append(ReaderFinding(kind: .genericSystemTechnology, path: path, value: skill.name))
             }
         }
         found += clippedModifiers(in: cv, of: input)
@@ -1177,6 +1186,44 @@ enum ReaderRules {
     static let useVerbs: Set<String> = [
         "use", "using", "uso", "utilizzo", "adopero", "utilizo", "benutze", "nutze", "verwende", "utilise", "usei", "utilizei",
     ]
+
+    /// Whether a technology is a generic system (`ReaderClass.genericSystemTechnology`): the description does not state it and the
+    /// reader's list of the trade (`DraftingInputs.vocabularies`) does not hold it as it is; its head noun (the last word in English
+    /// and German, the first in the other languages, or the end of a German compound with a word before it) is in `genericHeads`;
+    /// it has another word, and none of its words is a name, an acronym, a number or a word of a device (`deviceWords`).
+    static func isGenericSystem(_ name: String, of input: DraftingInput) -> Bool {
+        let whole = fold(name)
+        guard !fold(input.description).contains(whole),
+              !(DraftingInputs.vocabularies[input.id] ?? []).contains(where: { fold($0) == whole }) else { return false }
+        let words = name.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let named = words.enumerated().contains { index, word in
+            word.count > 1 && word == word.uppercased() && word.contains(where: \.isLetter)
+                || word.dropFirst().contains(where: \.isUppercase)
+                || index > 0 && word.first?.isUppercase == true && input.language != "de"
+                || word.contains(where: \.isNumber)
+        }
+        let content = words.map(fold).filter { !linkWords.contains($0) && !shortLinkWords.contains($0) }
+        guard !named, !content.contains(where: deviceWords.contains) else { return false }
+        if input.language == "de", content.count == 1, let word = content.first {
+            return genericCompoundEnds.contains { word.count > $0.count + 2 && word.hasSuffix($0) }
+        }
+        guard content.count > 1, let head = ["en", "de"].contains(input.language) ? content.last : content.first else { return false }
+        return genericHeads.contains(head)
+    }
+
+    /// The head nouns of a generic system, software, machine, set of tools or equipment, folded, in the six languages.
+    static let genericHeads: Set<String> = [
+        "system", "systems", "sistema", "sistemi", "sistemas", "systeme", "systemes",
+        "software", "softwares", "logiciel", "logiciels", "programma", "programmi", "programa", "programas", "programme", "programm",
+        "machine", "machines", "maquina", "maquinas", "macchina", "macchine", "maschine", "maschinen",
+        "tool", "tools", "strumento", "strumenti", "herramienta", "herramientas", "outil", "outils", "werkzeug", "werkzeuge",
+        "ferramenta", "ferramentas", "device", "devices", "gerat", "gerate", "dispositivo", "dispositivi", "dispositivos", "dispositif",
+        "dispositifs", "equipment", "attrezzatura", "attrezzature", "apparecchiatura", "apparecchiature", "equipo", "equipos",
+        "equipement", "equipements", "equipamento", "equipamentos", "ausrustung",
+    ]
+
+    /// The ends of a German compound whose head is a generic system ("Montagesystem"), folded.
+    static let genericCompoundEnds = ["system", "systeme", "software", "gerat", "gerate", "maschine", "maschinen", "werkzeuge"]
 
     /// Whether a technology the description does not state holds a word of the name of a person, an employer or a school of
     /// `input`: a word the description writes only with a capital ("Kestrel" of "Kestrel Foods"; "Logistics" is also "logistics").

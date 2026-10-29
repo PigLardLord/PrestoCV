@@ -284,6 +284,33 @@ struct DraftingReaderTests {
         #expect(counted(used) == ["cuscinetti"])
     }
 
+    @Test("A generic system with a work word is counted; a stated one, one of the trade's list, a named or a device one is not (#354, round 9)")
+    func genericSystemTechnology() throws {
+        let maintainer = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
+        let engineer = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let accountant = try #require(DraftingInputs.written.first { $0.id == "es-traps" })
+        let electrician = try #require(DraftingInputs.written.first { $0.id == "de-plain" })
+        let stated = DraftingInput(
+            id: "jobs-it", kind: .jobs, language: "it", description: maintainer.description + " Uso il software di gestione impianti.",
+            facts: maintainer.facts, traps: []
+        )
+        let counted = { (names: [String], input: DraftingInput) in
+            let cv = CVData(skills: names.map { Skill(name: $0) })
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .genericSystemTechnology }.map(\.value)
+        }
+        let italian = ["sistema di tracciamento dati", "software di gestione impianti", "strumenti di diagnostica industriale", "PLC"]
+
+        #expect(counted(italian, maintainer) == ["sistema di tracciamento dati", "software di gestione impianti"])
+        #expect(counted(italian, stated) == ["sistema di tracciamento dati"])
+        #expect(counted([
+            "truck loading equipment", "PA system", "Audio editing software", "QLab playback system", "digital mixing system", "software",
+        ], engineer) == ["truck loading equipment"])
+        #expect(counted(["sistema de gestión de documentos", "máquina de escaneo de registros", "software de contabilidad", "Excel"],
+                        accountant) == ["sistema de gestión de documentos", "máquina de escaneo de registros"])
+        #expect(counted(["Montagesystem", "Steuerungssystem", "KNX", "Werkzeugkasten", "System"], electrician) == ["Montagesystem"])
+    }
+
     @Test("A technology with a word of an employer's name is counted; a stated one and a word also written in lowercase are not (#354, round 7)")
     func employerWordTechnology() throws {
         let supervisor = try #require(DraftingInputs.written.first { $0.id == "en-plain" })
