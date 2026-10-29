@@ -376,11 +376,19 @@ struct SectionDraftTests {
         #expect(SentenceSplitter.unchained(text) == cut)
     }
 
-    @Test("A request's text is cut at each semicolon the person's clause follows, a German separable verb split at a clause's end is joined, and a sentence loses the relative word it opens with (#354, rounds 4 and 12)", arguments: [
+    @Test("A request's text is cut at each semicolon the person's clause follows, a German separable verb split at a clause's end is joined, a sentence loses the relative word it opens with, and a verb loses the noun of its own action before its object (#354, rounds 4 and 12)", arguments: [
         ("Ich prüfe die Pulte; ich schule das Team, damit es die Mikrofone richtig an schließt.", "Ich prüfe die Pulte. Ich schule das Team, damit es die Mikrofone richtig anschließt."),
         ("Ich schule das Team und stelle die Pulte ein.", "Ich schule das Team und stelle die Pulte ein."),
         ("Je soigne les chevaux du haras. Où j'ai dressé 4 poulains.", "Je soigne les chevaux du haras. J'ai dressé 4 poulains."),
         ("Curo i cavalli. Dove serve, ferro gli zoccoli.", "Curo i cavalli. Dove serve, ferro gli zoccoli."),
+        ("Lavoro in cantina. Controllo il controllo delle botti con cura.", "Lavoro in cantina. Controllo le botti con cura."),
+        ("I schedule the scheduling of the night shifts.", "I schedule the night shifts."),
+        ("Planifico la planificación de las rutas del reparto.", "Planifico las rutas del reparto."),
+        ("Organizo a organização dos turnos da loja.", "Organizo os turnos da loja."),
+        ("J'organise l'organisation du stock.", "J'organise le stock."),
+        ("Controllo il controllo con cura.", "Controllo il controllo con cura."),
+        ("Insegno agli insegnanti nuovi.", "Insegno agli insegnanti nuovi."),
+        ("Riparo la riparazione dell'impianto.", "Riparo l'impianto."),
     ])
     func mended(text: String, expected: String) {
         #expect(SectionDraft.mended(text) == expected)
