@@ -1049,7 +1049,7 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksInTheThirdPerson])
     }
 
-    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays; a past participle first is no verb of the person (#354, rounds 5 and 6)",
+    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays; a past participle first, or a gerund, is no verb of the person (#354, rounds 5 and 6)",
           arguments: [
               ("it", "Ogni azione è guidata dalla cura per i conti.", false), ("it", "Controllo i conti della ditta ogni giorno.", true),
               ("it", "Con cura, verifico i movimenti di cassa.", true), ("it", "Il mio lavoro è tenere i conti in ordine.", true),
@@ -1061,6 +1061,13 @@ struct SectionChecksTests {
               ("it", "Curato ogni dettaglio delle registrazioni contabili.", false),
               ("it", "Abituato alle scadenze, controllo i conti ogni giorno.", true), ("it", "Valuto i rischi di ogni registrazione.", true),
               ("pt", "Mantido um controle rigoroso das faturas.", false), ("pt", "Decido a ordem dos fechamentos mensais.", true),
+              // A gerund after a comma is no verb of the person; a first person of the same ending is one (#354, round 6).
+              ("it", "Le scadenze richiedono cura, garantendo conti in ordine.", false),
+              ("it", "Con pazienza, comprendo le esigenze dei fornitori.", true),
+              ("es", "Mantenido un control riguroso de las facturas, evitando retrasos.", false),
+              ("es", "Atiendo a los proveedores con calma.", true), ("es", "Reviso las facturas, asegurando su exactitud.", true),
+              ("pt", "As faturas exigem cuidado, garantindo prazos cumpridos.", false),
+              ("pt", "Atendo os fornecedores com calma.", true),
           ])
     func summaryWithNoVerbOfThePerson(language: String, sentence: String, stays: Bool) throws {
         let (checker, facts, description) = Self.accountant(language)

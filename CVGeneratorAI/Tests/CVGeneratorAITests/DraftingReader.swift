@@ -531,8 +531,35 @@ enum ReaderRules {
         let words = letterWords(of: sentence)
         if words.contains(where: (speakerWords[language] ?? []).contains) { return true }
         let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
-        return firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) }
+        return firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) && !isGerund($0, language: language) }
     }
+
+    /// Whether a folded word of six letters or more ends as a gerund, "-ando" or "-endo", and "-indo" in Portuguese, and is no first
+    /// person of the same ending ("comprendo", "atiendo"): a gerund after a comma is no verb of the person ("…, garantendo …").
+    static func isGerund(_ word: String, language: String) -> Bool {
+        guard word.count >= 6, let endings = gerundEndings[language], endings.contains(where: word.hasSuffix) else { return false }
+        return !(firstPersonsAsGerunds[language] ?? []).contains(word)
+    }
+
+    private static let gerundEndings: [String: [String]] = ["it": ["ando", "endo"], "es": ["ando", "endo"], "pt": ["ando", "endo", "indo"]]
+
+    /// The first persons that end as a gerund, folded.
+    static let firstPersonsAsGerunds: [String: Set<String>] = [
+        "it": [
+            "mando", "comando", "domando", "raccomando", "rimando", "prendo", "comprendo", "apprendo", "riprendo", "sorprendo",
+            "intraprendo", "vendo", "rendo", "difendo", "attendo", "intendo", "pretendo", "estendo", "tendo", "stendo", "spendo",
+            "dipendo", "sospendo", "accendo", "scendo", "ascendo", "espando", "contendo", "offendo",
+        ],
+        "es": [
+            "mando", "comando", "demando", "ando", "atiendo", "entiendo", "extiendo", "defiendo", "enciendo", "desciendo", "asciendo",
+            "tiendo", "pretendo", "vendo", "comprendo", "aprendo", "emprendo", "sorprendo", "dependo", "suspendo", "ofendo",
+            "enmiendo", "recomiendo", "expando",
+        ],
+        "pt": [
+            "mando", "comando", "demando", "ando", "recomendo", "vendo", "entendo", "atendo", "defendo", "estendo", "aprendo",
+            "compreendo", "empreendo", "prendo", "surpreendo", "dependo", "suspendo", "acendo", "pretendo", "brindo", "expando",
+        ],
+    ]
 
     /// Whether an Italian, Spanish or Portuguese sentence opens with a past participle (`isParticiple`) and nothing else in it speaks
     /// as the person: no word of the person, and no verb of the first person first after a comma ("Abituato al rumore, controllo …"
@@ -542,7 +569,10 @@ enum ReaderRules {
         guard let first = words.first, isParticiple(first, language: language),
               !words.contains(where: (speakerWords[language] ?? []).contains) else { return false }
         let firsts = sentence.split(separator: ",").dropFirst().compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
-        return !firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) && !isParticiple($0, language: language) }
+        return !firsts.contains {
+            $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) && !isParticiple($0, language: language)
+                && !isGerund($0, language: language)
+        }
     }
 
     /// Whether a folded word of six letters or more ends as a past participle: "-ato", "-ito" or "-uto" in Italian, "-ado" or "-ido"

@@ -130,6 +130,21 @@ struct DraftingReaderTests {
         #expect(counted(CVData(summary: "The work asks for patience."), "en").isEmpty)
     }
 
+    @Test("A summary sentence whose only word in \"-o\" after a comma is a gerund speaks as no one; a first person of the same ending speaks (#354, round 6)")
+    func gerundSummary() {
+        let italian = CVData(summary: "Le consegne richiedono ordine, garantendo tempi certi. Con calma, comprendo le richieste dei clienti.")
+        let spanish = CVData(summary: "Mantenido un inventario preciso de las piezas, evitando faltas. Atiendo a los clientes con calma.")
+        let portuguese = CVData(summary: "As entregas exigem ordem, garantindo prazos certos. Atendo os clientes com calma.")
+        let counted = { (cv: CVData, language: String, kind: ReaderClass) in
+            Self.reader(cv, language).filter { $0.kind == kind }.map(\.value)
+        }
+
+        #expect(counted(italian, "it", .impersonalSummary) == ["Le consegne richiedono ordine, garantendo tempi certi."])
+        #expect(counted(spanish, "es", .participleSummary) == ["Mantenido un inventario preciso de las piezas, evitando faltas."])
+        #expect(counted(spanish, "es", .impersonalSummary).isEmpty)
+        #expect(counted(portuguese, "pt", .impersonalSummary) == ["As entregas exigem ordem, garantindo prazos certos."])
+    }
+
     @Test("An Italian, Spanish or Portuguese summary sentence that opens with a participle and has no person is counted; one with a verb of the person, or a first person of the same ending, is not (#354, round 6)")
     func participleSummary() {
         let italian = CVData(summary: "Curato ogni dettaglio delle cornici dorate. Abituato alla polvere, restauro le cornici antiche. "

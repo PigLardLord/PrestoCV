@@ -883,12 +883,13 @@ extension CVDataSanitizer {
     /// person or an auxiliary of the first person ("mi", "tengo", "sou"), or its first word, or the first word after a comma, is a
     /// verb of the first person, in "-o" ("Controllo …", "Con cura, verifico …") or in the past of the first person in Spanish and
     /// Portuguese ("Revisé …", "Organizei …"). A past participle (`isParticiple`) is no verb of the person (#354, round 6):
-    /// "Mantenido un control riguroso …" speaks as no one. A rough rule: "Con cura verifico" is not read.
+    /// "Mantenido un control riguroso …" speaks as no one, nor does a gerund (`isGerund`): "…, garantendo conti in ordine". A rough
+    /// rule: "Con cura verifico" is not read.
     private static func speaksAsThePerson(_ sentence: String, language: Vocabulary.Language) -> Bool {
         if letterWords(of: sentence).contains(where: wordsOfTheSpeaker.contains) { return true }
         let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
         return firsts.contains { word in
-            word.count >= 3 && !openersInO.contains(word) && !isParticiple(word, language: language)
+            word.count >= 3 && !openersInO.contains(word) && !isParticiple(word, language: language) && !isGerund(word, language: language)
                 && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei")))
         }
     }
@@ -900,6 +901,37 @@ extension CVDataSanitizer {
         guard word.count >= 6, let endings = participleEndings[language], endings.contains(where: word.hasSuffix) else { return false }
         return !(firstPersonsAsParticiples[language] ?? []).contains(word)
     }
+
+    /// Whether a folded word of six letters or more ends as a gerund, "-ando" or "-endo", and "-indo" in Portuguese, and is no first
+    /// person of the same ending that a summary writes ("comprendo", "atiendo"; #354, round 6). A rough rule: a first person missing
+    /// from the list reads as a gerund.
+    private static func isGerund(_ word: String, language: Vocabulary.Language) -> Bool {
+        guard word.count >= 6, let endings = gerundEndings[language], endings.contains(where: word.hasSuffix) else { return false }
+        return !(firstPersonsAsGerunds[language] ?? []).contains(word)
+    }
+
+    /// The endings of the gerund of the languages that drop the pronoun.
+    private static let gerundEndings: [Vocabulary.Language: [String]] = [
+        .italian: ["ando", "endo"], .spanish: ["ando", "endo"], .portuguese: ["ando", "endo", "indo"],
+    ]
+
+    /// The first persons of the present that end as a gerund, folded as `letterWords` writes them.
+    private static let firstPersonsAsGerunds: [Vocabulary.Language: Set<String>] = [
+        .italian: [
+            "mando", "comando", "domando", "raccomando", "rimando", "prendo", "comprendo", "apprendo", "riprendo", "sorprendo",
+            "intraprendo", "vendo", "rendo", "difendo", "attendo", "intendo", "pretendo", "estendo", "tendo", "stendo", "spendo",
+            "dipendo", "sospendo", "accendo", "scendo", "ascendo", "espando", "contendo", "offendo",
+        ],
+        .spanish: [
+            "mando", "comando", "demando", "ando", "atiendo", "entiendo", "extiendo", "defiendo", "enciendo", "desciendo", "asciendo",
+            "tiendo", "pretendo", "vendo", "comprendo", "aprendo", "emprendo", "sorprendo", "dependo", "suspendo", "ofendo",
+            "enmiendo", "recomiendo", "expando",
+        ],
+        .portuguese: [
+            "mando", "comando", "demando", "ando", "recomendo", "vendo", "entendo", "atendo", "defendo", "estendo", "aprendo",
+            "compreendo", "empreendo", "prendo", "surpreendo", "dependo", "suspendo", "acendo", "pretendo", "brindo", "expando",
+        ],
+    ]
 
     /// The endings of the past participle of the languages that drop the pronoun.
     private static let participleEndings: [Vocabulary.Language: [String]] = [
