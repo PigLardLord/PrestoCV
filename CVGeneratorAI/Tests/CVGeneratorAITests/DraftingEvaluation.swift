@@ -194,16 +194,14 @@ struct DraftingEvaluation {
             return qualities
         }
 
-        func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
-            let tools = try await model.writeToolsOfAKind(for: brief, roles: roles, kind: kind)
-            log("tools of a kind: " + kind.words, tools)
-            return tools
-        }
-
-        func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]? {
-            let qualities = try await model.writeMoreQualities(for: brief, count: count, listed: listed, rejected: rejected)
-            log("more qualities \(count)", qualities)
-            return qualities
+        func writeMoreSkills(
+            for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+        ) async throws -> DraftWriting? {
+            let more = try await model.writeMoreSkills(
+                for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities, rejected: rejected
+            )
+            log("more skills \(tools)+\(qualities)", more.map { $0.technologies + ["/"] + $0.softSkills })
+            return more
         }
 
         func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {

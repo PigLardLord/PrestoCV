@@ -32,18 +32,17 @@ public protocol CVGenerationService {
     /// out, and one more duty, none of `kept`.
     func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]?
 
-    /// `count` tools of the trade of the jobs of `brief` at `roles`, which share a title: 6 to 8 of the headline's, at most 1 of another.
+    /// `count` tools of the trade of the jobs of `brief` at `roles`, which share a title: 2 or 3 of a title among others.
     func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]?
 
     /// 3 to 5 personal qualities at work that fit the jobs of `brief`.
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]?
 
-    /// Up to 2 tools of `kind` of the title of the jobs of `brief` at `roles`, the headline's: none when the trade works with none
-    /// of that kind. It reads no tool the CV holds, which it would name again; the checks drop those.
-    func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]?
-
-    /// `count` more soft skills for the jobs of `brief`, none of those kept (`listed`) and none of `rejected` ("quality": reason).
-    func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]?
+    /// `tools` more technologies and `qualities` more soft skills for the jobs of `brief`, none of the tools and qualities kept
+    /// (`listedTools`, `listedQualities`) and none of `rejected` ("skill": reason), the skills the checks dropped.
+    func writeMoreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+    ) async throws -> DraftWriting?
 
     /// One sentence of the summary, on `topic` alone, after the sentences `written` so far: no duty, which it would copy (#354,
     /// round 13).
@@ -60,8 +59,9 @@ extension CVGenerationService {
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? { nil }
     public func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? { nil }
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { nil }
-    public func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? { nil }
-    public func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]? { nil }
+    public func writeMoreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+    ) async throws -> DraftWriting? { nil }
     public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? { nil }
     public func repairSummarySentence(
         for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String

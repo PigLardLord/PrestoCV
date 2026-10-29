@@ -96,10 +96,9 @@ struct SectionDraftTests {
 
         #expect(service.generateRequests.count == 1)
         #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "tools", "tools", "softSkills", "summary"])
-        // The two jobs of sound technician ask for their tools once (#354, round 6). The latest job's title asks first, 6 to 8, and
-        // each other title at most 1 (O1, #354, round 13).
-        #expect(service.toolsRequests == [[3], [0], [1, 2]])
-        #expect(service.toolsCounts == [6...8, 1...1, 1...1])
+        // The two jobs of sound technician ask for their tools once (#354, round 6).
+        #expect(service.toolsRequests == [[0], [1, 2], [3]])
+        #expect(service.toolsCounts == [2...3, 2...3, 2...3])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
@@ -139,25 +138,11 @@ struct SectionDraftTests {
         #expect(brief.roles.map(\.clausesNameWork) == [false, true])
     }
 
-    @Test("o1: the headline's title asks 6 to 8 tools; each other title, often of another trade, at most 1 (#354, round 13)",
-          arguments: [(true, 6...8), (false, 1...1)] as [(Bool, ClosedRange<Int>)])
-    func toolCount(isHeadline: Bool, count: ClosedRange<Int>) {
-        // Each title asked 2 or 3, and the past titles of another trade filled the CV with tools of no trade of the person's.
-        #expect(SectionDraft.toolCount(isHeadline: isHeadline) == count)
-    }
-
-    @Test("o1: the headline's title is the headline's, or the latest job's with none; the first title with neither (#354, round 13)")
-    func headlineGroup() {
-        let roles: [DraftBrief.Role] = [
-            .init(title: "stagehand", hasEnded: true), .init(title: "head of sound", hasEnded: false), .init(title: "", hasEnded: true),
-        ]
-        let brief = { (headline: String?) in DraftBrief(language: "English", headline: headline, roles: roles, studies: [], namedSkills: []) }
-        let groups = [[0], [1], [2]]
-
-        #expect(SectionDraft.headlineGroup(of: groups, brief: brief("Head of Sound"), latest: 0) == 1)
-        #expect(SectionDraft.headlineGroup(of: [[0], [1, 2]], brief: brief("stage manager"), latest: 0) == 1)
-        #expect(SectionDraft.headlineGroup(of: groups, brief: brief(nil), latest: 1) == 1)
-        #expect(SectionDraft.headlineGroup(of: groups, brief: brief(nil), latest: nil) == 0)
+    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6)",
+          arguments: [(1, false, 4...5), (1, true, 3...4), (2, false, 2...3), (2, true, 2...3), (3, false, 2...3)] as [(Int, Bool, ClosedRange<Int>)])
+    func toolCount(groups: Int, sparse: Bool, count: ClosedRange<Int>) {
+        // One title asked 2 or 3: the CV was always short, and the request for those missing named activities and bare kinds.
+        #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
     }
 
     @Test("o1: each summary request reads the opening code wrote, the sentences kept so far and one slot: the role, the current job's work, two qualities, then the ended jobs (#354, round 13)")
@@ -384,38 +369,28 @@ struct SectionDraftTests {
         #expect(duties.contains("I looked after the microphones and cables."))
     }
 
-    @Test("o1: too few tools kept ask the headline's title for 2 tools of one kind at a time, software, then devices, then instruments, until the CV has enough; a tool the CV holds goes again (#354, round 13)")
-    func toolsOfAKind() async throws {
+    @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
+    func moreSkills() async throws {
         let service = service()
-        service.toolsResult = [[], [], [], ["mixing desks", "frequency calibration"]]
-        service.toolsOfAKindResults = [.software: ["QLab", "mixing desks"], .device: ["PA systems", "stage monitors"], .instrument: ["SPL meter"]]
-
-        let draft = try await draft(service)
-
-        // Asked "N more" of any kind, the request named systems of no trade (#354, round 12).
-        #expect(service.toolsOfAKindRequests.map(\.kind) == [.software, .device])
-        let first = try #require(service.toolsOfAKindRequests.first)
-        #expect(first.roles == [3])
-        let tools = draft.skills.filter { $0.kind == .technology }.map(\.name)
-        #expect(["mixing desks", "QLab", "PA systems", "stage monitors"].allSatisfy(tools.contains))
-        #expect(!tools.contains("SPL meter"))
-        #expect(service.moreQualitiesRequests.isEmpty)
-    }
-
-    @Test("Too few qualities kept ask once for those missing and one more, none of the kept ones, with those dropped and why (#354, rounds 8 and 13)")
-    func moreQualities() async throws {
-        let service = service()
+        service.toolsResult = [["mixing desks", "frequency calibration"], [], [], []]
         service.softSkillsResult = ["teamwork"]
-        service.moreQualitiesResult = ["reliability", "patience"]
+        service.moreSkillsResult = DraftWriting(
+            summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "microphones"],
+            softSkills: ["reliability", "patience"]
+        )
 
         let draft = try await draft(service)
 
-        #expect(service.sectionCalls.filter { $0 == "moreQualities" }.count == 1)
-        // One more than missing, as a rule may drop one of them.
-        #expect(service.moreQualitiesRequests.map(\.count) == [3])
-        #expect(service.moreQualitiesRequests.first?.listed == ["teamwork"])
+        #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 2)
+        // One more of each kind short than missing, as a rule may drop one of them; asked with the qualities, the tools came back as
+        // an activity and a bare record, asked alone as a system.
+        #expect(service.moreSkillsRequests.map { [$0.tools, $0.qualities] } == [[4, 0], [0, 3]])
+        for request in service.moreSkillsRequests {
+            #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
+            #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
+        }
+        #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
-        #expect(service.toolsOfAKindRequests.isEmpty)
     }
 
     @Test("A written tool of the kind of a tool the person names goes; the named one stays (#354, round 2)")

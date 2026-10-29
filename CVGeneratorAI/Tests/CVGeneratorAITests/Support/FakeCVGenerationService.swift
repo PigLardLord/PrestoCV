@@ -34,9 +34,7 @@ final class FakeCVGenerationService: CVGenerationService {
     /// The tools of each job, by its number: a request for the jobs that share a title answers theirs, in order.
     var toolsResult: [[String]]?
     var softSkillsResult: [String]?
-    /// The tools each request for tools of one kind answers, by the kind; none for a kind not listed.
-    var toolsOfAKindResults: [ToolKind: [String]] = [:]
-    var moreQualitiesResult: [String]?
+    var moreSkillsResult: DraftWriting?
     /// The sentences the summary requests answer, in order; once they run out, `summaryResult` answers each.
     var summaryResults: [String?] = []
     var summaryResult: String?
@@ -48,7 +46,7 @@ final class FakeCVGenerationService: CVGenerationService {
     /// Told the name of each section request as it starts.
     var onSection: (@MainActor (String) -> Void)?
 
-    /// The section requests in the order they were made: "job 0", "repairJob 0", "tools", "toolsOfAKind", "softSkills", "moreQualities", "summary",
+    /// The section requests in the order they were made: "job 0", "repairJob 0", "tools", "softSkills", "moreSkills", "summary",
     /// "repairSummary".
     private(set) var sectionCalls: [String] = []
     /// The brief each section request read, one for one with `sectionCalls`.
@@ -57,8 +55,7 @@ final class FakeCVGenerationService: CVGenerationService {
     private(set) var toolsRequests: [[Int]] = []
     private(set) var toolsCounts: [ClosedRange<Int>] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
-    private(set) var toolsOfAKindRequests: [(roles: [Int], kind: ToolKind)] = []
-    private(set) var moreQualitiesRequests: [(count: Int, listed: [String], rejected: [String])] = []
+    private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String])] = []
     private(set) var summaryRequests: [(topic: SummaryTopic, written: [String])] = []
     private(set) var summaryRepairs: [(topic: SummaryTopic, written: [String], rejected: String)] = []
 
@@ -85,16 +82,12 @@ final class FakeCVGenerationService: CVGenerationService {
         return softSkillsResult
     }
 
-    func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
-        toolsOfAKindRequests.append((roles, kind))
-        try await section("toolsOfAKind", brief)
-        return toolsOfAKindResults[kind]
-    }
-
-    func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]? {
-        moreQualitiesRequests.append((count, listed, rejected))
-        try await section("moreQualities", brief)
-        return moreQualitiesResult
+    func writeMoreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+    ) async throws -> DraftWriting? {
+        moreSkillsRequests.append((tools, qualities, listedTools, listedQualities, rejected))
+        try await section("moreSkills", brief)
+        return moreSkillsResult
     }
 
     func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {

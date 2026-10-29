@@ -19,11 +19,8 @@ extension FoundationModelsService {
     /// The cap of a request for at most `most` tools of one title: 80 for 3.
     nonisolated static func toolsTokens(most: Int) -> Int { 80 + 20 * max(most - 3, 0) }
 
-    /// The cap of a request for up to 2 tools of one kind.
-    nonisolated static let toolsOfAKindTokens = 80
-
-    /// The cap of a request for `count` more qualities.
-    nonisolated static func moreQualitiesTokens(count: Int) -> Int { 40 + 12 * count }
+    /// The cap of a request for `count` more skills.
+    nonisolated static func moreSkillsTokens(count: Int) -> Int { 40 + 12 * count }
 
     // MARK: The jobs
 
@@ -82,14 +79,14 @@ extension FoundationModelsService {
         return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
 
-    /// `count` tools of one title: 6 to 8 of the headline's, 1 of another (#354, round 13, O1, T1); never an array of 0 to 1, which
-    /// the model fails before a word.
+    /// `count` tools of one title. A job may not go without tools: allowed none, the model answered none for a job with no lines of
+    /// its own, and the next request filled the gap with activities and roles (#354, round 5).
     nonisolated static func toolsSchema(count: ClosedRange<Int>) throws -> GenerationSchema {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: SectionPrompts.toolAmount(count) + " software, devices, machines, instruments or hand tools of the job's "
-                    + "trade, first those its lines name",
+                description: "\(count.lowerBound) or \(count.upperBound) software, equipment, machines or instruments of the job's trade, "
+                    + "first those its lines name",
                 schema: DynamicGenerationSchema(
                     arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count.lowerBound, maximumElements: count.upperBound
                 )
@@ -104,36 +101,34 @@ extension FoundationModelsService {
         return Self.whole(last.answer.content.qualities, isComplete: last.isComplete)
     }
 
-    public func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
-        guard roles.allSatisfy(brief.roles.indices.contains) else { return nil }
-        let prompt = SectionPrompts.toolsOfAKind(for: brief, roles: roles, kind: kind)
-        let answer = try await respond(prompt, schema: try Self.toolsOfAKindSchema(), tokens: Self.toolsOfAKindTokens)
-        return Self.clean(try? answer.value([String].self, forProperty: "tools"))
-    }
-
-    /// Up to 2 tools of one kind: none when the trade works with none of it (#354, round 13, O1, T2).
-    nonisolated static func toolsOfAKindSchema() throws -> GenerationSchema {
-        let root = DynamicGenerationSchema(name: "ToolsOfAKind", properties: [
+    public func writeMoreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+    ) async throws -> DraftWriting? {
+        let list = { (name: String, about: String, count: Int) in
             DynamicGenerationSchema.Property(
-                name: "tools", description: "0 to 2 tools of the kind given, of the job's trade",
-                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 0, maximumElements: 2)
-            ),
-        ])
-        return try GenerationSchema(root: root, dependencies: [])
-    }
-
-    public func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]? {
-        guard count > 0 else { return nil }
-        let root = DynamicGenerationSchema(name: "MoreQualities", properties: [
-            DynamicGenerationSchema.Property(
-                name: "qualities", description: "\(count) more personal qualities at work, in the language of the CV",
-                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count, maximumElements: count)
-            ),
-        ])
-        let schema = try GenerationSchema(root: root, dependencies: [])
-        let prompt = SectionPrompts.moreQualities(for: brief, count: count, listed: listed, rejected: rejected)
-        let answer = try await respond(prompt, schema: schema, tokens: Self.moreQualitiesTokens(count: count))
-        return Self.clean(try? answer.value([String].self, forProperty: "qualities"))
+                name: name, description: about,
+                schema: DynamicGenerationSchema(
+                    arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count, maximumElements: count
+                )
+            )
+        }
+        var properties: [DynamicGenerationSchema.Property] = []
+        if tools > 0 {
+            let about = "\(tools) more software, systems, machines or instruments of the trade, each of another kind; no activity, no material or part"
+            properties.append(list("tools", about, tools))
+        }
+        if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work, in the language of the CV", qualities)) }
+        guard !properties.isEmpty else { return nil }
+        let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "MoreSkills", properties: properties), dependencies: [])
+        let prompt = SectionPrompts.moreSkills(
+            for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities, rejected: rejected
+        )
+        let answer = try await respond(prompt, schema: schema, tokens: Self.moreSkillsTokens(count: tools + qualities))
+        return DraftWriting(
+            summary: nil, roleDescriptions: [],
+            technologies: tools > 0 ? Self.clean(try? answer.value([String].self, forProperty: "tools")) : [],
+            softSkills: qualities > 0 ? Self.clean(try? answer.value([String].self, forProperty: "qualities")) : []
+        )
     }
 
     // MARK: The summary
