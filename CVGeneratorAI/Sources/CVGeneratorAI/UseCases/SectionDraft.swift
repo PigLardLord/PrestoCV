@@ -256,7 +256,8 @@ final class SectionDraft {
         }
         let opened = Self.opened(written, by: brief.opening)
         guard let first = try? sanitizer.summaryCheck(
-            of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
+            of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities,
+            tools: keptTools, against: description
         ) else {
             return
         }
@@ -275,7 +276,8 @@ final class SectionDraft {
         let cut = Self.opened(repaired, by: brief.opening)
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
-            of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
+            of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities,
+            tools: keptTools, against: description
         ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
     }

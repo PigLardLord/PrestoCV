@@ -561,6 +561,24 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerb) == !stays, "\(verdict.rejected)")
     }
 
+    @Test("A summary sentence that lists three of the draft's own skills goes; one that names two inside the work stays (#354, round 3)")
+    func summaryListingSkills() throws {
+        let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("programador", "Loja Vidal", from: "2018")])
+        let description = "Moro em Braga. Desde 2018 trabalho como programador na Loja Vidal, onde desenvolvo aplicativos com Git e Figma para lojas."
+
+        let verdict = try portuguese.summaryCheck(
+            of: facts,
+            summary: "Trabalho como programador com terminal, scanner, codec e sensor. Desenvolvo aplicativos com Git e Figma para lojas.",
+            field: nil, work: ["aplicativos"], duties: [], qualities: ["paciência"],
+            tools: ["terminal", "scanner", "codec", "sensor", "Git", "Figma"], against: description
+        )
+
+        #expect(verdict.rejected.map(\.sentence) == ["Trabalho como programador com terminal, scanner, codec e sensor."])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.listsSkills])
+        #expect(verdict.kept == ["Desenvolvo aplicativos com Git e Figma para lojas."])
+    }
+
     @Test("A summary sentence whose subject is a quality goes; a quality the person works with, or one before a comma, stays (#354, round 2)")
     func summaryWithAQualitySubject() throws {
         let description = JobClausesTests.italian.replacingOccurrences(

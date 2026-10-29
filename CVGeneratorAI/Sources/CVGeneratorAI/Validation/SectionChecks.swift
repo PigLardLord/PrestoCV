@@ -506,6 +506,16 @@ extension CVDataSanitizer {
         of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String],
         against description: String
     ) throws(CVGenerationError) -> SummaryVerdict {
+        try summaryCheck(
+            of: cvData, summary: summary, field: field, work: work, duties: duties, qualities: qualities, tools: [], against: description
+        )
+    }
+
+    /// The summary check, where a sentence that lists three or more of the kept `tools` and `qualities` also goes (#354, round 3).
+    func summaryCheck(
+        of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String], tools: [String],
+        against description: String
+    ) throws(CVGenerationError) -> SummaryVerdict {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
             let entries = entries(of: cvData, source)
@@ -528,6 +538,7 @@ extension CVDataSanitizer {
             var verbs = Set<String>()
             var endings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 let sentence = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 let key = sentence.lowercased().filter(\.isLetter)
@@ -547,6 +558,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
                 } else if Self.hasAQualitySubject(sentence, qualities: qualityWords) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasAQualitySubject))
+                } else if Self.listsSkills(sentence, skills: skillWords) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.listsSkills))
                 } else if let verb, verbs.contains(verb) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
                 } else if let ending = Self.ending(of: sentence), endings.contains(ending) {
@@ -617,6 +630,7 @@ extension CVDataSanitizer {
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
     static let hasAQualitySubject = "its subject is a quality: write it as the person, with what they do and how"
     static let hasNoVerb = "it has no verb: write it as the person, with what they do"
+    static let listsSkills = "it lists skills: say how the person uses one or two of them in the work"
     static let endsAsAnEarlierOne = "it ends with the words of an earlier sentence: say something else"
 
     /// Whether `sentence` starts with the words of one of `qualities` (folded) in a clause of five words or more before its first
@@ -676,6 +690,14 @@ extension CVDataSanitizer {
     private static let withWords: [Vocabulary.Language: Set<String>] = [
         .english: ["with"], .italian: ["con"], .german: ["mit"], .spanish: ["con"], .french: ["avec"], .portuguese: ["com"],
     ]
+
+    /// Whether `sentence` holds three or more of `skills` (each its words, folded) whole: a list of the draft's skills, not the
+    /// person's work (#354, round 3). Two named inside the work ("…con la pala e il forno…") stay.
+    static func listsSkills(_ sentence: String, skills: [[String]]) -> Bool {
+        let words = Word.words(in: sentence).map(\.folded)
+        let held = Set(skills.filter { run in words.indices.contains { words[$0...].starts(with: run) } })
+        return held.count >= 3
+    }
 
     /// The articles and demonstratives that open a subject, folded, per language ("l" of "l'attività"; the English "I" is none).
     private static let subjectArticles: [Vocabulary.Language: Set<String>] = [
