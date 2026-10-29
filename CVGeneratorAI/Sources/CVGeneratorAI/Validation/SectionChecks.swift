@@ -728,6 +728,8 @@ extension CVDataSanitizer {
             if !Self.softStems.contains(where: lower.contains) {
                 if Self.namesAnActivity(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                } else if Self.namesAPart(item, language: language) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
                 } else if Self.namesAKindOfTool(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
@@ -774,6 +776,29 @@ extension CVDataSanitizer {
         "conoscenze", "comprensione", "conocimiento", "conocimientos", "comprension", "connaissance", "connaissances",
         "comprehension", "conhecimento", "conhecimentos", "compreensao",
     ]
+
+    /// Whether a technology's head noun is a part or a material a person installs or lays, by its key: a cable, a switch or a pipe
+    /// is what the work is done on, not a tool of it ("Leitungen", "Schalter"; #354, round 3). A tool named after one stays
+    /// ("Kabelschere", "cable tester": its head is the tool).
+    static func namesAPart(_ item: String, language: String?) -> Bool {
+        let words = item.lowercased().split { !$0.isLetter }.map(String.init)
+        guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
+        return partKeys.contains(skillKey(head))
+    }
+
+    /// The keys (`skillKey`) of the parts and materials of the trades that install them, singular and plural, in each language.
+    private static let partKeys: Set<String> = Set([
+        "cable", "cables", "wire", "wires", "wiring", "outlet", "outlets", "fuse", "fuses",
+        "pipe", "pipes", "screw", "screws", "bolt", "bolts", "nail", "nails",
+        "kabel", "leitung", "leitungen", "schalter", "steckdose", "steckdosen", "sicherung", "sicherungen", "rohr", "rohre",
+        "schraube", "schrauben", "dübel", "stecker",
+        "cavo", "cavi", "interruttore", "interruttori", "presa", "prese", "fusibile", "fusibili", "tubo", "tubi", "vite", "viti",
+        "tubatura", "tubature",
+        "cableado", "interruptor", "interruptores", "enchufe", "enchufes", "fusible", "fusibles", "tubería", "tuberías",
+        "tornillo", "tornillos",
+        "câble", "câbles", "interrupteur", "interrupteurs", "prise", "prises", "tuyau", "tuyaux",
+        "cabo", "cabos", "tomada", "tomadas", "fusível", "fusíveis", "parafuso", "parafusos",
+    ].map(skillKey))
 
     /// The words that say only that the person is a professional or has experience, folded: no quality a reader can weigh, so no
     /// soft skill (#354, round 3). A quality said with one of them ("atteggiamento professionale") stays.

@@ -261,6 +261,20 @@ struct SectionChecksTests {
         #expect(Set(verdict.dropped.map(\.reason)) == ["another language"])
     }
 
+    @Test("A part or a material the person installs goes from the technologies; a tool named after one, and one to measure with, stay (#354, round 3)")
+    func partIsNoTool() {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = german.skillCheck(
+            technologies: ["Rohre", "Rohrschneider", "Pressmaschine", "Rohrzange", "Druckprüfgerät", "Dübel"], softSkills: [],
+            against: "Seit 2020 bin ich Installateur bei Wasserwerk Lindtal, wo ich Rohre in Altbauten verlege."
+        )
+
+        #expect(verdict.technologies == ["Rohrschneider", "Pressmaschine", "Rohrzange", "Druckprüfgerät"])
+        #expect(verdict.dropped.map(\.sentence) == ["Rohre", "Dübel"])
+        #expect(Set(verdict.dropped.map(\.reason)) == ["a part or a material, not a tool"])
+    }
+
     @Test("A skill whose words are all of English, in a description of another language, goes")
     func skillInAnotherLanguage() {
         let englishOnly = Self.italian(ForcedLexicalTagger([:]), wordList: EnglishOnly())
