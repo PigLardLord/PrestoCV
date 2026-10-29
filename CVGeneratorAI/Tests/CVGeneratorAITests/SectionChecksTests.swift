@@ -421,7 +421,7 @@ struct SectionChecksTests {
 
         let verdict = english.skillCheck(
             technologies: ["audio mixing console", "sound mixer", "studio monitors", "line array systems", "digital mixing desk"],
-            softSkills: [], stated: ["digital consoles", "PA systems"], fewestTools: 0, against: "I mix on digital consoles and set up the PA systems in Hull."
+            softSkills: [], stated: ["digital consoles", "PA systems"], against: "I mix on digital consoles and set up the PA systems in Hull."
         )
 
         #expect(verdict.technologies == ["studio monitors"])
@@ -454,14 +454,15 @@ struct SectionChecksTests {
         #expect(plant.dropped.map(\.sentence) == ["software di tracciamento", "sistema di controllo remoto", "manutenzione preventiva"])
     }
 
-    @Test("A technology that names a kind of tool and no tool of it goes; a named one, with a capital, an acronym or a digit, stays (#354, round 2)",
+    @Test("A bare kind of tool goes; a kind with a word of its trade stays, as does a named one, with a capital, an acronym or a digit (#354, rounds 2 and 4)",
           arguments: [
-              ("en", ["Pro Tools", "sound design software", "digital sound workstation", "Logic Pro 11", "stage monitors"],
-               ["Pro Tools", "Logic Pro 11", "stage monitors"]),
-              ("it", ["software", "software CMMS", "piattaforma di stampa", "multimetro"], ["software CMMS", "multimetro"]),
-              ("es", ["editor de código", "Visual Studio Code", "hoja de cálculo"], ["Visual Studio Code", "hoja de cálculo"]),
-              ("pt", ["ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"],
-               ["Postman", "aplicativos Android"]),
+              ("en", ["Pro Tools", "software", "sound design software", "Logic Pro 11", "stage monitors"],
+               ["Pro Tools", "sound design software", "Logic Pro 11", "stage monitors"]),
+              ("it", ["software", "software CMMS", "piattaforma di stampa", "multimetro"], ["software CMMS", "piattaforma di stampa", "multimetro"]),
+              ("es", ["editor", "editor de código", "Visual Studio Code", "hoja de cálculo"],
+               ["editor de código", "Visual Studio Code", "hoja de cálculo"]),
+              ("pt", ["ferramenta", "ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"],
+               ["ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"]),
           ])
     func kindOfToolIsNoTechnology(language: String, technologies: [String], kept: [String]) {
         let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -469,29 +470,23 @@ struct SectionChecksTests {
         let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
 
         #expect(verdict.technologies == kept)
-        #expect(Set(verdict.dropped.map(\.reason)) == ["a kind of tool, not its name"])
+        #expect(verdict.dropped.map(\.reason) == ["a kind of tool, not its name"])
     }
 
-    @Test("A kind of tool with a word of its trade stays while the CV lists too few tools, after the named ones; a bare kind still goes (#354, round 4)")
-    func tradeKindFillsTooFewTools() {
+    @Test("A kind of tool with a word of its trade stays though the CV lists enough tools; a bare kind goes (#354, round 4)")
+    func tradeKindStays() {
         // No word tagged a verb: the device's tagger reads "teodolite" as a verb on one macOS and not on another.
         let checker = CVDataSanitizer(
             languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([.italian: .words([])]), wordList: TableWordList()
         )
-        let short = checker.skillCheck(
-            technologies: ["software", "software di rilievo", "teodolite", "piattaforma di cartografia", "programma di rilievo"],
-            softSkills: [], stated: [], fewestTools: 3, against: "Lavoro a Lecce dal 2019."
-        )
-        let enough = checker.skillCheck(
-            technologies: ["software di rilievo", "teodolite", "stazione totale", "GPS RTK"], softSkills: [], stated: [], fewestTools: 3,
+
+        let verdict = checker.skillCheck(
+            technologies: ["software", "software di rilievo", "teodolite", "stazione totale", "GPS RTK"], softSkills: [],
             against: "Lavoro a Lecce dal 2019."
         )
 
-        // In the order written; of two kinds that fill, those past the fewest go.
-        #expect(short.technologies == ["software di rilievo", "teodolite", "piattaforma di cartografia"])
-        #expect(short.dropped.map(\.sentence) == ["software", "programma di rilievo"])
-        #expect(enough.technologies == ["teodolite", "stazione totale", "GPS RTK"])
-        #expect(enough.dropped.map(\.sentence) == ["software di rilievo"])
+        #expect(verdict.technologies == ["software di rilievo", "teodolite", "stazione totale", "GPS RTK"])
+        #expect(verdict.dropped.map(\.sentence) == ["software"])
     }
 
     @Test("A German technology that is the infinitive of an activity goes; a machine stays (#354, round 2)")

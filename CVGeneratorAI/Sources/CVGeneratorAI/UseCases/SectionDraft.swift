@@ -185,7 +185,7 @@ final class SectionDraft {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
         var skills = sanitizer.skillCheck(
-            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated, fewestTools: fewestTools,
+            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated,
             against: description
         )
         keep(skills)
@@ -208,7 +208,7 @@ final class SectionDraft {
         guard let more else { return }
         skills = sanitizer.skillCheck(
             technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, stated: stated,
-            fewestTools: fewestTools, against: description
+            against: description
         )
         keep(skills)
     }

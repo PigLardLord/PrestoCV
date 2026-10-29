@@ -793,21 +793,17 @@ extension CVDataSanitizer {
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a technology that names an activity
     /// (`namesAnActivity`); the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
-    /// verb, a skill in another language and a soft skill that names a tool go; so does a technology that names a kind of tool and no
-    /// tool of it (`namesAKindOfTool`). A technology the verb it starts with leads ("usare i PLC") is
+    /// verb, a skill in another language and a soft skill that names a tool go; so does a technology that is a bare kind of tool
+    /// ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo") stays (#354, round 4). A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
     /// and a soft skill the description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
-        skillCheck(technologies: technologies, softSkills: softSkills, stated: [], fewestTools: 0, against: description)
+        skillCheck(technologies: technologies, softSkills: softSkills, stated: [], against: description)
     }
 
     /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
-    /// one of them, by its head noun, the written one goes (#354, round 2). While fewer than `fewestTools` technologies stay, a kind
-    /// of tool with a word of its trade ("software di rilievo") stays too, in the order written; a bare kind ("software") never
-    /// does (round 4).
-    func skillCheck(
-        technologies: [String], softSkills: [String], stated: [String], fewestTools: Int, against description: String
-    ) -> SkillVerdict {
+    /// one of them, by its head noun, the written one goes (#354, round 2).
+    func skillCheck(technologies: [String], softSkills: [String], stated: [String], against description: String) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
         var verdict = SkillVerdict()
@@ -863,10 +859,7 @@ extension CVDataSanitizer {
             return kept
         }
         var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
-        // The place each kept technology was written at, and the kinds of tool with a word of their trade, which may fill.
-        var places: [Int] = []
-        var tradeKinds: [(place: Int, raw: String, item: String)] = []
-        for (place, raw) in technologies.enumerated() {
+        for raw in technologies {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
             if !Self.softStems.contains(where: lower.contains) {
@@ -874,27 +867,18 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesAPart(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
-                } else if Self.namesAKindOfTool(item, language: language) {
+                } else if Self.namesAKindOfTool(item, language: language), !item.contains(" ") {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
-                    if item.split(separator: " ").count > 1 { tradeKinds.append((place, raw, item)) }
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
                     verdict.technologies.append(item)
-                    places.append(place)
                 }
             } else if Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords), !Self.namesATool(item, language: language) {
                 verdict.softSkills.append(item)
             } else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
             }
-        }
-        for kind in tradeKinds where verdict.technologies.count < fewestTools {
-            guard Self.headKey(of: kind.item, language: language).map({ heads.insert($0).inserted }) ?? true else { continue }
-            verdict.dropped.removeAll { $0.sentence == kind.raw && $0.reason == "a kind of tool, not its name" }
-            let at = places.firstIndex { $0 > kind.place } ?? places.endIndex
-            places.insert(kind.place, at: at)
-            verdict.technologies.insert(kind.item, at: at)
         }
         for raw in softSkills {
             guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
