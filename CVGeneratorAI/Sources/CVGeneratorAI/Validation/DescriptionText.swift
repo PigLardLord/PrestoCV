@@ -194,6 +194,15 @@ struct DescriptionText {
         Set(Word.words(in: text).map(\.folded))
     }
 
+    /// The words of the description, as `Word.folded` writes them, once each of `names` is taken out of it, whatever its case.
+    func foldedWords(outside names: [String]) -> Set<String> {
+        var rest = text
+        for name in names.sorted(by: { $0.count > $1.count }) where !name.isEmpty {
+            rest = rest.replacingOccurrences(of: Self.normalized(name), with: " ", options: [.caseInsensitive, .diacriticInsensitive])
+        }
+        return Set(Word.words(in: rest).map(\.folded))
+    }
+
     /// Addresses are read from the sentence as written, never with their digits folded: "alice١@example.com" is not
     /// "alice1@example.com". What is left once the addresses are taken out is read as words and numbers.
     private func isGrounded(_ sentence: String, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> Bool {

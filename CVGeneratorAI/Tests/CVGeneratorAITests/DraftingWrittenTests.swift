@@ -78,6 +78,23 @@ struct DraftingWrittenTests {
         #expect(right.otherLanguage.isEmpty)
     }
 
+    @Test("A written sentence the detector gives to a close language is the description's when its dictionary knows every word; one with a word it lacks is listed (#354, round 13, pt-traps)", arguments: [
+        (["desenvolvo", "aplicativos", "para", "lojas", "gerencio", "fluxos", "de", "dados", "internos"], 0),
+        (["desenvolvo", "aplicativos", "para", "lojas"], 1),
+    ])
+    func closeLanguageByTheDictionary(known: [String], listed: Int) throws {
+        let cv = CVData(experience: [Experience(
+            title: "programador", company: "Sulware Sistemas", startDate: "2019", current: true,
+            description: "Desenvolvo aplicativos para lojas. Gerencio fluxos de dados internos."
+        )])
+        let detected = try #require(AppLanguageDetector.languageTag(of: "Gerencio fluxos de dados internos."))
+        #expect(!detected.hasPrefix("pt"))
+
+        let measure = try Self.measure("pt-traps", cv, knowing: Set(known))
+
+        #expect(measure.otherLanguage.count == listed)
+    }
+
     @Test("A tool of another trade is an off-field hit as a whole word, and the trade's own tools are not")
     func offField() throws {
         let cv = CVData(skills: [Skill(name: "Java"), Skill(name: "JavaScript"), Skill(name: "SAP")])
@@ -696,9 +713,10 @@ struct DraftingWrittenTests {
 
     // MARK: - Helpers
 
-    private static func measure(_ id: String, _ cv: CVData) throws -> WrittenMeasure {
+    /// The measure of `cv` for the input `id`, with a dictionary that knows only `words`.
+    private static func measure(_ id: String, _ cv: CVData, knowing words: Set<String> = []) throws -> WrittenMeasure {
         let input = try InventedFactsTests.input(id)
-        return WrittenMeasure(cv, for: input, report: InventedFacts.count(cv, for: input), answers: [])
+        return WrittenMeasure(cv, for: input, report: InventedFacts.count(cv, for: input), answers: [], wordList: KnownWords(words: words))
     }
 
     /// The reader's findings in `cv` for an input of `language` with no field, whose description states `facts` alone.

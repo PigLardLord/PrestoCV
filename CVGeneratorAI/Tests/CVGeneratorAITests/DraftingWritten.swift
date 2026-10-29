@@ -21,8 +21,10 @@ struct WrittenMeasure: Codable, Equatable {
     let softSkills: Int
     /// The sentences of the summary and of the job descriptions.
     let sentences: Int
-    /// "<path>: <sentence>" for every written sentence the app's language detector puts in another language than the description's.
-    /// A sentence it cannot tell (too short to be sure) is not counted either way.
+    /// "<path>: <sentence>" for every written sentence the app's language detector puts in another language than the description's,
+    /// unless the description language's dictionary knows each of its words, as the app reads it (#354, round 13: "Gerencio fluxos
+    /// de dados internos." is Portuguese, and the detector says Spanish). A sentence it cannot tell (too short to be sure) is not
+    /// counted either way.
     let otherLanguage: [String]
     /// "<path> \"<value>\" (<why>)": a summary, a job description or a skill that holds a tool of another trade (`offField`), and,
     /// for a description with no role, anything written around the facts.
@@ -30,8 +32,10 @@ struct WrittenMeasure: Codable, Equatable {
     /// What a reader rejected in the drafts of b14ceda8 (#354), found by rough rules (`ReaderRules`): numbers to follow, not findings.
     let readerFindings: [ReaderFinding]
 
-    /// - Parameter answers: the raw answers of the draft's requests, for the words they glue (`ReaderRules.gluedWords`).
-    init(_ cv: CVData, for input: DraftingInput, report: InventedFacts.Report, answers: [String]) {
+    /// - Parameters:
+    ///   - answers: the raw answers of the draft's requests, for the words they glue (`ReaderRules.gluedWords`).
+    ///   - wordList: the dictionary that tells a sentence of a close language from one of the description's.
+    init(_ cv: CVData, for input: DraftingInput, report: InventedFacts.Report, answers: [String], wordList: any WordList) {
         let summary = cv.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let summarySentences = Self.sentences(of: summary)
         self.summarySentences = summarySentences.count
@@ -47,7 +51,8 @@ struct WrittenMeasure: Codable, Equatable {
         }
         sentences = written.count
         otherLanguage = written.compactMap { item in
-            guard let tag = AppLanguageDetector.languageTag(of: item.sentence), !tag.hasPrefix(input.language) else { return nil }
+            guard let tag = AppLanguageDetector.languageTag(of: item.sentence), !tag.hasPrefix(input.language),
+                  !Self.isKnown(item.sentence, inLanguage: input.language, by: wordList) else { return nil }
             return "\(item.path) (\(tag)): \(item.sentence)"
         }
 
@@ -101,6 +106,12 @@ struct WrittenMeasure: Codable, Equatable {
     /// Whether the draft has at least 4 tools of the trade (`tradeTools`) and 3 soft skills; 3 and 2 for a sparse description.
     func hasSkills(sparse: Bool) -> Bool {
         tradeTools >= (sparse ? 3 : 4) && softSkills >= (sparse ? 2 : 3)
+    }
+
+    /// Whether the dictionary of `language` knows each word of `sentence` that is no number, as written.
+    static func isKnown(_ sentence: String, inLanguage language: String, by wordList: any WordList) -> Bool {
+        let words = Word.words(in: sentence).filter { !$0.isNumber }
+        return !words.isEmpty && words.allSatisfy { wordList.knows($0.accented, inLanguage: language) == true }
     }
 
     /// The sentences of `text`, trimmed, as the system tells them apart.

@@ -256,6 +256,23 @@ struct SectionChecksTests {
         #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.repeatsWordsReason])
     }
 
+    @Test("A typical duty with a word of an employer's name, or a form of it, that the description writes nowhere else goes, with its reason; the same work in other words stays (#354, round 13, jobs-en)")
+    func typicalDutyWithAnEmployerWord() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 0,
+            duties: "Ordino gli articoli di ferramenta. Preparo i solleciti di pagamento.",
+            against: try Self.itTraps()
+        )
+
+        #expect(verdicts.kept == ["Preparo i solleciti di pagamento."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Ordino gli articoli di ferramenta."])
+        #expect(verdicts.rejected.first?.reason == "the word \"ferramenta\" comes from an employer's name: say the work in other words")
+        // A form of a word of the name, and a word the description writes outside the names, which stays.
+        #expect(CVDataSanitizer.employerWord(in: "I was managing the signal for each event.", names: ["Brightwater Events"], in: DescriptionText("I work at Brightwater Events.")) == "event")
+        #expect(CVDataSanitizer.employerWord(in: "I was managing the signal for each event.", names: ["Brightwater Events"], in: DescriptionText("I work at Brightwater Events and run each event.")) == nil)
+        #expect(CVDataSanitizer.employerWord(in: "I worked as a cook in a bakery.", names: ["bakery"], in: DescriptionText("I worked as a cook in a bakery.")) == nil)
+    }
+
     @Test("o1: a sentence the detector gives to a close language is in the description's when its dictionary knows each word; one with a word it lacks is not (#354, round 13, pt-traps)", arguments: [
         ("Gerencio fluxos de dados internos.", true),
         ("Manage the internal data flows.", false),
@@ -1730,11 +1747,4 @@ struct SectionChecksTests {
 /// A dictionary that knows every word in English and none in any other language.
 private struct EnglishOnly: WordList {
     func knows(_ word: String, inLanguage language: String) -> Bool? { language == "en" }
-}
-
-/// A dictionary of one language that knows only `words`, in lower case.
-private struct KnownWords: WordList {
-    let words: Set<String>
-
-    func knows(_ word: String, inLanguage language: String) -> Bool? { words.contains(word.lowercased()) }
 }

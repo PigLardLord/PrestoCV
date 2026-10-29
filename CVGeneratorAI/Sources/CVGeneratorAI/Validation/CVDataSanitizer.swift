@@ -611,6 +611,34 @@ public struct CVDataSanitizer: Sendable {
         words(of: otherEmployers).subtracting(own).filter { !Vocabulary.isNeutral($0, in: language) }
     }
 
+    /// The first word of `sentence` in lower case, outside the employers' `names` it holds whole, that is a word of 4 letters or more
+    /// of the names, or a form of one, and that the description writes nowhere outside the names: the model took it from a name
+    /// ("each event" at "Brightwater Events"; #354, round 13). A sentence that names an employer whole ("a cook in a bakery") is
+    /// not read for it. A word stands for its forms by its first 6 letters, as the reader of the evaluation reads it.
+    static func employerWord(in sentence: String, names: [String], in source: DescriptionText) -> String? {
+        let nameWords = Set(names.flatMap { Word.words(in: $0).map(\.folded) }.filter { $0.count >= 4 })
+        guard !nameWords.isEmpty else { return nil }
+        let outside = Set(source.foldedWords(outside: names).filter { $0.count >= 4 }.map { String($0.prefix(6)) })
+        var rest = sentence
+        for name in names.sorted(by: { $0.count > $1.count }) where !name.isEmpty {
+            rest = rest.replacingOccurrences(of: name, with: " ", options: [.caseInsensitive, .diacriticInsensitive])
+        }
+        let characters = Array(Digits.ascii(rest))
+        return Word.words(in: rest).first { word in
+            characters[word.range.lowerBound].isLowercase && word.folded.count >= 4
+                && nameWords.contains { isAForm(word.folded, of: $0) } && !outside.contains(String(word.folded.prefix(6)))
+        }?.folded
+    }
+
+    /// Whether two folded words are one, or forms of one: of 5 letters or more, at most 2 letters apart in length, and alike but
+    /// for their last 2 letters ("event", "events").
+    static func isAForm(_ word: String, of other: String) -> Bool {
+        guard word != other else { return true }
+        let shorter = min(word.count, other.count)
+        guard abs(word.count - other.count) <= 2, shorter >= 5 else { return false }
+        return zip(word, other).prefix { $0 == $1 }.count >= max(5, shorter - 2)
+    }
+
     /// ADR 0031, D4: the other jobs' titles that are not the job's own.
     static func otherTitles(_ titles: [String?], own: String?) -> [String] {
         let ownWords = Word.words(in: own ?? "").map(\.folded)

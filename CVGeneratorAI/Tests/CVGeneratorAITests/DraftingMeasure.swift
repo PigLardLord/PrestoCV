@@ -159,7 +159,9 @@ struct DraftMeasure: Encodable {
         let report = InventedFacts.count(result?.cvData ?? CVData(), for: input)
         self.report = report
         rawInvented = raw.map { InventedFacts.count($0, for: input).invented } ?? []
-        written = result.map { WrittenMeasure($0.cvData, for: input, report: report, answers: requests.flatMap { $0.answer ?? [] }) }
+        written = result.map { WrittenMeasure(
+            $0.cvData, for: input, report: report, answers: requests.flatMap { $0.answer ?? [] }, wordList: DeviceWordList()
+        ) }
 
         var misses: [String] = []
         if input.kind == .example, result != nil {

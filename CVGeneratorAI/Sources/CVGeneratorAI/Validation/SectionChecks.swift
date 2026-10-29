@@ -616,6 +616,9 @@ extension CVDataSanitizer {
             if let reason = written.rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords, allowing: allowing) {
                 return reason
             }
+            if let word = CVDataSanitizer.employerWord(in: sentence, names: [job.company].compactMap { $0 } + otherEmployers, in: source) {
+                return "the word \"\(word)\" comes from an employer's name: say the work in other words"
+            }
             if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 }) {
                 return "it says what the person did at another job"
             }
