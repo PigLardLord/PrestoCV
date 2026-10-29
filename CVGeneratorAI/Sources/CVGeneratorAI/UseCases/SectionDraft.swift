@@ -16,8 +16,6 @@ final class SectionDraft {
     static let softSkills = 5
     /// The most sentences a summary keeps.
     static let summarySentences = 4
-    /// The most qualities the summary request reads (#354, round 12).
-    static let summaryQualities = 2
 
     private let service: any CVGenerationService
     private let sanitizer: CVDataSanitizer
@@ -333,9 +331,7 @@ final class SectionDraft {
         // The summary reads only the tools the description states: one the draft wrote came back as the summary's own claim
         // (#354, round 11). The check still reads all the kept ones, for a sentence that lists them.
         let summaryTools = (try? sanitizer.statedTools(keptTools, against: description)) ?? []
-        // The summary reads the first qualities only: given four, it named three in one sentence, and the check dropped it (#354,
-        // round 12). The check still reads all the kept ones.
-        let summaryQualities = Array(keptQualities.prefix(Self.summaryQualities))
+        // It reads every kept quality: given the first two only, it ran one sentence on to its token cap (#354, round 12).
         let work = keptDuties + summaryTools
         var brief = brief
         let jobDuties = kept.experience.count == brief.roles.count ? kept.experience.map(\.description) : duties
@@ -360,7 +356,7 @@ final class SectionDraft {
         }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
         let written = try await request(.summary) { [brief] in
-            try await self.service.writeSummary(for: brief, tools: summaryTools, qualities: summaryQualities)
+            try await self.service.writeSummary(for: brief, tools: summaryTools, qualities: keptQualities)
         }
         // The text mended (`mended`), then the summary cut to its most sentences (#354, round 4).
         let opened = Self.opened(written.map(Self.mended), by: brief.opening)
@@ -380,7 +376,7 @@ final class SectionDraft {
         let rejected = first.rejected.map(Self.quoted)
         let repaired = try await request(.summary) { [brief] in
             try await self.service.repairSummary(
-                for: brief, tools: summaryTools, qualities: summaryQualities, kept: keptSentences, rejected: rejected, problems: problems
+                for: brief, tools: summaryTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
         let cut = Self.opened(repaired.map(Self.mended), by: brief.opening)

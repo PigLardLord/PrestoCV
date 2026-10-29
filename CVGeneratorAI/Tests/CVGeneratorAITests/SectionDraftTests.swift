@@ -146,7 +146,7 @@ struct SectionDraftTests {
         #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
     }
 
-    @Test("The summary request reads the opening code wrote, the topics of each job's kept duties, and the tools and the first two qualities the checks kept, apart (#354, rounds 3 and 12)")
+    @Test("The summary request reads the opening code wrote, the topics of each job's kept duties, and the tools and every quality the checks kept, apart (#354, rounds 3 and 12)")
     func summaryInputs() async throws {
         let service = service()
 
@@ -169,10 +169,10 @@ struct SectionDraftTests {
         #expect(!request.tools.contains("teamwork"))
         #expect(request.qualities.contains("teamwork"))
         #expect(!request.qualities.contains("mixing desks"))
-        // Two qualities at most: with four, the summary named three in one sentence, and the check dropped it (#354, round 12).
+        // Every kept quality: given the first two only, the request ran one sentence on to its token cap (#354, round 12).
         let qualities = draft.skills.filter { $0.kind == .softSkill }.map(\.name)
         #expect(qualities.count > 2)
-        #expect(request.qualities == Array(qualities.prefix(2)))
+        #expect(request.qualities == qualities)
     }
 
     // MARK: What reaches the draft
