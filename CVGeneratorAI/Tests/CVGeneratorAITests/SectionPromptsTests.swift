@@ -197,6 +197,27 @@ struct SectionPromptsTests {
         #expect(!SectionPrompts.moreSkillsInstructions.contains("technique"))
     }
 
+    @Test("The tools request reads the names of the CV as \"the company\", whole or by a word of theirs (#354, round 7)")
+    func toolsWithoutNames() {
+        var brief = DraftBrief(
+            language: "English", headline: nil,
+            roles: [.init(title: "warehouse operative", employer: "Kestrel Logistics", hasEnded: false, clauses: [
+                "I drive a reach truck at Kestrel Logistics", "I train new Kestrel staff for Dana Whitcombe",
+            ])],
+            studies: [], namedSkills: []
+        )
+        brief.own = ["At Kestrel I keep the stock tidy."]
+        brief.names = ["Kestrel Logistics", "Dana Whitcombe"]
+
+        let text = SectionPrompts.tools(for: brief, roles: [0], count: 4...5).text
+
+        #expect(!text.contains("Kestrel"), "\(text)")
+        #expect(!text.contains("Dana"))
+        #expect(!text.contains("Whitcombe"))
+        #expect(text.contains("I drive a reach truck at the company."))
+        #expect(text.contains("At the company I keep the stock tidy."))
+    }
+
     @Test("The soft skills request lists the jobs, and asks for qualities, never a tool")
     func softSkillsPrompt() {
         let prompt = SectionPrompts.softSkills(for: Self.brief)

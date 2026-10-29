@@ -67,6 +67,8 @@ final class SectionDraft {
             return nil
         }
         brief.own = context.own
+        brief.names = generated.experience.map(\.company) + generated.education.compactMap(\.institution)
+            + [generated.personalInfo.name].compactMap { $0 }
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)
             brief.roles[number].avoid = check?.avoid ?? []
@@ -197,7 +199,7 @@ final class SectionDraft {
         let liked = CVDataSanitizer.workLikings(in: description)
         var skills = sanitizer.skillCheck(
             technologies: tools, softSkills: liked + (qualities ?? []), stated: stated,
-            against: description
+            names: brief.names, against: description
         )
         keep(skills)
         let kept = try kept(around: dated).skills
@@ -219,7 +221,7 @@ final class SectionDraft {
         guard let more else { return }
         skills = sanitizer.skillCheck(
             technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, stated: stated,
-            against: description
+            names: brief.names, against: description
         )
         keep(skills)
     }
@@ -265,7 +267,7 @@ final class SectionDraft {
         "a kind of tool, not its name": "a kind of tool, not the name of one",
         "the same quality as an earlier one": "the same quality as one listed",
         "a part or a material, not a tool": "a part or a material the work is done on, not a tool",
-        "what the work is done on": "what the work is done on, not a tool",
+        "a word of a name": "named after a company, a school or a person", "what the work is done on": "what the work is done on, not a tool",
     ]
 
     private func keep(_ skills: CVDataSanitizer.SkillVerdict) {

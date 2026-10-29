@@ -588,6 +588,24 @@ struct SectionChecksTests {
         #expect(school.dropped.map(\.sentence) == ["correction des copies"])
     }
 
+    @Test("A tool that holds a word of the employer's name goes, unless the person writes it whole; one of a name the CV does not hold stays (#354, round 7)")
+    func toolNamedAfterTheEmployer() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let description = "I drive a reach truck at Kestrel Logistics in Hull and use the SAP Kestrel module for the stock."
+
+        let named = english.skillCheck(
+            technologies: ["Kestrel forklift", "SAP Kestrel module", "reach truck"], softSkills: [], stated: [],
+            names: ["Kestrel Logistics", "Dana Whitcombe"], against: description
+        )
+        let unnamed = english.skillCheck(
+            technologies: ["Kestrel forklift", "reach truck"], softSkills: [], stated: [], names: [], against: description
+        )
+
+        #expect(named.technologies == ["SAP Kestrel module", "reach truck"])
+        #expect(named.dropped.map(\.reason) == ["a word of a name"])
+        #expect(unnamed.technologies == ["Kestrel forklift", "reach truck"])
+    }
+
     @Test("A tool that is, by its head noun, what the person's work is done on goes; what the person uses stays (#354, round 7)")
     func toolThatIsAWorkObject() {
         let description = "Controllo i quadri elettrici e riparo i nastri trasportatori. Uso i PLC e il multimetro per trovare i guasti."

@@ -1,8 +1,9 @@
 import Foundation
 
 /// What the second pass of a draft writes from (ADR 0031): the facts that the rules kept from the first pass, and nothing of the
-/// description. It holds the titles, the employers, the studies and the skills the person named, and no school, place, person or
-/// date: the employer tells the trade of a role ("a nursery" is no school, #354), and the rules drop a written sentence that names it.
+/// description. It holds the titles, the employers, the studies and the skills the person named, and no place or date; the names
+/// of schools and people it holds (`names`) only for the tools request to mask them. The employer tells the trade of a role ("a
+/// nursery" is no school, #354), and the rules drop a written sentence that names it.
 public struct DraftBrief: Equatable, Sendable {
     /// A job of the draft, as the second pass sees it.
     public struct Role: Equatable, Sendable {
@@ -47,6 +48,9 @@ public struct DraftBrief: Equatable, Sendable {
     public var own: [String] = []
     /// The summary's first sentence, which code writes from the facts; the summary request writes what follows it (#354, round 3).
     public var opening: String?
+    /// The names of the draft (its employers, schools and person), which the tools request reads as "the company": it wrote a
+    /// tool named after the employer (#354, round 7). The checks drop a tool that holds a word of one.
+    public var names: [String] = []
 
     public init(language: String, headline: String?, roles: [Role], studies: [String], namedSkills: [String]) {
         self.language = language

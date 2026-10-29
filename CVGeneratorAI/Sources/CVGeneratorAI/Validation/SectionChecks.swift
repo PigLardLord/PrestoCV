@@ -1048,16 +1048,21 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
-    /// one of them, by its head noun, the written one goes (#354, round 2). So does one that is, by its head noun, what the
-    /// person's work is done on (`workObjectHeads`): "quadri elettrici" for a person who checks them (#354, round 7).
-    func skillCheck(technologies: [String], softSkills: [String], stated: [String], against description: String) -> SkillVerdict {
-        checkedSkills(technologies: technologies, softSkills: softSkills, stated: stated, against: description)
+    /// one of them, by its head noun, the written one goes (#354, round 2). A written technology that holds a word of one of the
+    /// `names` of the CV (an employer, a school, the person) goes unless the description writes it whole: the tools request read
+    /// "Kestrel Logistics" and wrote "Kestrel forklift" (#354, round 7). So does one that is, by its head noun, what the person's
+    /// work is done on (`workObjectHeads`): "quadri elettrici" for a person who checks them.
+    func skillCheck(
+        technologies: [String], softSkills: [String], stated: [String], names: [String] = [], against description: String
+    ) -> SkillVerdict {
+        checkedSkills(technologies: technologies, softSkills: softSkills, stated: stated, names: names, against: description)
     }
 
     /// The written skills, cleaned by code (`skillCheck`); a skill the person states keeps the object of its verb, which may be
     /// what the work is done on (`dropsWorkObjects` false: "I mix on digital desks").
     private func checkedSkills(
-        technologies: [String], softSkills: [String], stated: [String], dropsWorkObjects: Bool = true, against description: String
+        technologies: [String], softSkills: [String], stated: [String], names: [String], dropsWorkObjects: Bool = true,
+        against description: String
     ) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
@@ -1115,6 +1120,7 @@ extension CVDataSanitizer {
         }
         var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
         let objects = dropsWorkObjects ? Self.workObjectHeads(in: description, language: language).subtracting(heads) : []
+        let nameWords = nameWords(of: names, language: language)
         for raw in Self.joiningClippedModifiers(technologies, in: description, language: language) {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
@@ -1125,7 +1131,9 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
             } else if !soft || namesATool {
                 // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354, round 5).
-                if Self.namesAnActivity(item, language: language) {
+                if Self.holdsANameWord(item, of: nameWords, in: description) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
+                } else if Self.namesAnActivity(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesAPart(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
@@ -1166,7 +1174,30 @@ extension CVDataSanitizer {
         return verdict
     }
 
-    // MARK: Work objects among the tools
+    // MARK: Names and work objects among the tools
+
+    /// The words of `names` that name nothing else (#354, round 7): of 3 letters or more, with a capital, no word that links others
+    /// ("di", "of") and no legal form ("GmbH"). In German, whose nouns all take a capital, a name word is one the device's dictionary
+    /// does not know.
+    private func nameWords(of names: [String], language: String?) -> Set<String> {
+        Set(names.flatMap { $0.split { !$0.isLetter }.map(String.init) }.filter { word in
+            word.count >= 3 && word.first?.isUppercase == true && !Self.skillLinkWords.contains(word.lowercased())
+                && !Self.legalForms.contains(word.lowercased())
+                && (language != "de" || wordList.knows(word.lowercased(), inLanguage: "de") != true)
+        })
+    }
+
+    /// The legal forms of a company, lowercased.
+    private static let legalForms: Set<String> = [
+        "gmbh", "srl", "spa", "snc", "sas", "ltd", "llc", "inc", "plc", "sarl", "sa", "sl", "lda", "ag", "kg", "ohg", "co",
+    ]
+
+    /// Whether a technology holds one of `nameWords` as written, with its capital, and the description does not write it whole: a
+    /// tool named after the employer is the model's ("Kestrel forklift"), one the person names stays ("SAP Kestrel module").
+    private static func holdsANameWord(_ item: String, of nameWords: Set<String>, in description: String) -> Bool {
+        guard item.split(whereSeparator: { !$0.isLetter }).contains(where: { nameWords.contains(String($0)) }) else { return false }
+        return DescriptionText.spans(of: DescriptionText.normalized(item), in: DescriptionText.normalized(description)).isEmpty
+    }
 
     /// The head keys (`headKey`) of what the person's work is done on (#354, round 7): the topics of the description's clauses
     /// (`topic(of:opensTheSentence:)`) without their articles, none that holds a number, an acronym or, but in German, a name. A
@@ -1444,7 +1475,7 @@ extension CVDataSanitizer {
     func statedSkill(_ name: String, against description: String) -> String? {
         guard !Self.isTooLong(name.split(whereSeparator: \.isWhitespace).map(String.init)) else { return nil }
         let verdict = checkedSkills(
-            technologies: [name], softSkills: [], stated: [], dropsWorkObjects: false, against: description
+            technologies: [name], softSkills: [], stated: [], names: [], dropsWorkObjects: false, against: description
         )
         guard verdict.dropped.contains(where: { $0.reason == "verb cut" }) else { return name }
         return verdict.technologies.first ?? verdict.softSkills.first ?? name

@@ -71,14 +71,46 @@ enum SectionPrompts {
         let title = jobs.first?.title.presentValue ?? brief.headline ?? DraftWritingPrompt.noTitle
         var lines = header(brief) + ["Job title: \(title)"]
         var clauses: [String] = []
-        for clause in jobs.flatMap(\.clauses).map(asSentence) where !clauses.contains(clause) { clauses.append(clause) }
+        for clause in jobs.flatMap(\.clauses).map({ asSentence(masked($0, in: brief)) }) where !clauses.contains(clause) {
+            clauses.append(clause)
+        }
         if !clauses.isEmpty { lines.append("What the person said about this job:\n" + bullets(clauses)) }
         let objects = CVDataSanitizer.workObjects(of: clauses, capitalNouns: brief.language == "German")
         if !objects.isEmpty { lines.append("What the work is done on, which is no tool: " + objects.joined(separator: "; ")) }
-        lines += said(brief)
+        if !brief.own.isEmpty {
+            lines.append("What the person says of their work, with no job:\n" + bullets(brief.own.map { asSentence(masked($0, in: brief)) }))
+        }
         if !brief.namedSkills.isEmpty { lines.append("Skills already listed: " + brief.namedSkills.joined(separator: "; ")) }
         return Prompt(instructions: toolsInstructions(count: count), text: lines.joined(separator: "\n"))
     }
+
+    /// `text` with each of the brief's names, and each word of 4 letters or more of one that has a capital, written as "the company"
+    /// in the brief's language (#354, round 7): the request read "Kestrel Logistics" and wrote a "Kestrel forklift". In German,
+    /// whose nouns all take a capital, only the whole names go.
+    static func masked(_ text: String, in brief: DraftBrief) -> String {
+        let company = companyWords[brief.language] ?? "the company"
+        var masked = text
+        for name in brief.names.filter({ !$0.isEmpty }).sorted(by: { $0.count > $1.count }) {
+            masked = masked.replacingOccurrences(of: name, with: company, options: .caseInsensitive)
+        }
+        guard brief.language != "German" else { return masked }
+        let words = Set(brief.names.flatMap { $0.split { !$0.isLetter } }.map(String.init).filter {
+            $0.count >= 4 && $0.first?.isUppercase == true && !legalForms.contains($0.lowercased())
+        })
+        for word in words.sorted(by: { $0.count > $1.count }) {
+            let pattern = "\\b\(NSRegularExpression.escapedPattern(for: word))\\b"
+            masked = masked.replacingOccurrences(of: pattern, with: company, options: .regularExpression)
+        }
+        return masked
+    }
+
+    private static let companyWords = [
+        "English": "the company", "Italian": "l'azienda", "German": "die Firma", "French": "l'entreprise", "Spanish": "la empresa",
+        "Portuguese": "a empresa",
+    ]
+
+    /// The legal forms of a company of 4 letters or more, lowercased: no name of its own.
+    private static let legalForms: Set<String> = ["gmbh", "sarl", "ltda"]
 
     /// The tools request's rules, asking `count` tools.
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
