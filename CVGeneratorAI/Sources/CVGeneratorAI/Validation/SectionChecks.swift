@@ -543,6 +543,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.saysNothingOfThePerson))
                 } else if let language, Self.hasABareSubject(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
+                } else if let language, Self.isAFragment(sentence, workWords: workWords, language: language) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
                 } else if Self.hasAQualitySubject(sentence, qualities: qualityWords) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasAQualitySubject))
                 } else if let verb, verbs.contains(verb) {
@@ -614,6 +616,7 @@ extension CVDataSanitizer {
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
     static let hasAQualitySubject = "its subject is a quality: write it as the person, with what they do and how"
+    static let hasNoVerb = "it has no verb: write it as the person, with what they do"
     static let endsAsAnEarlierOne = "it ends with the words of an earlier sentence: say something else"
 
     /// Whether `sentence` starts with the words of one of `qualities` (folded) in a clause of five words or more before its first
@@ -657,6 +660,22 @@ extension CVDataSanitizer {
 
     /// The words of the person in another language that a language uses for something else, folded.
     private static let notOfThePerson: [Vocabulary.Language: Set<String>] = [.italian: ["i", "ma"]]
+
+    /// Whether `sentence` is a bare word of the person's work (`workWords`, folded) and the language's "with", with no comma, no
+    /// form of "to be" and no word of the person: a title with its qualities and no verb ("Fornaio con mani svelte e pazienza.",
+    /// #354, round 3). A comma may open the person's own clause ("Fornaio con calma, impasto…").
+    static func isAFragment(_ sentence: String, workWords: Set<String>, language: Vocabulary.Language) -> Bool {
+        let words = Word.words(in: sentence)
+        guard words.count > 2, workWords.contains(words[0].folded), withWords[language]?.contains(words[1].folded) == true,
+              !words.contains(where: \.endsWithABreak) else { return false }
+        let be = toBe[language] ?? []
+        return !words.contains { be.contains($0.accented) || isOfThePerson($0, in: language) }
+    }
+
+    /// The word for "with" that joins a title to its qualities, per language.
+    private static let withWords: [Vocabulary.Language: Set<String>] = [
+        .english: ["with"], .italian: ["con"], .german: ["mit"], .spanish: ["con"], .french: ["avec"], .portuguese: ["com"],
+    ]
 
     /// The articles and demonstratives that open a subject, folded, per language ("l" of "l'attività"; the English "I" is none).
     private static let subjectArticles: [Vocabulary.Language: Set<String>] = [

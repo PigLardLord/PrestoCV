@@ -543,6 +543,24 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasABareSubject) == !stays, "\(verdict.rejected)")
     }
 
+    @Test("A summary sentence of a bare word of the work joined by its language's with to qualities, and no verb, goes; one with a verb of the person stays (#354, round 3)",
+          arguments: [
+              ("es", "Contable con gran ojo para el detalle y mucha calma.", false), ("it", "Contable con occhio per i dettagli e calma.", false),
+              ("pt", "Contable com olho para os detalhes e calma.", false),
+              ("es", "Soy contable con buen ojo para los detalles.", true), ("es", "Contable de oficio, llevo las cuentas con calma.", true),
+              ("es", "Contable con calma, llevo las cuentas de cada cliente.", true),
+          ])
+    func summaryFragment(language: String, sentence: String, stays: Bool) throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")])
+        let description = "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad y "
+            + "analizo los movimientos de caja."
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerb) == !stays, "\(verdict.rejected)")
+    }
+
     @Test("A summary sentence whose subject is a quality goes; a quality the person works with, or one before a comma, stays (#354, round 2)")
     func summaryWithAQualitySubject() throws {
         let description = JobClausesTests.italian.replacingOccurrences(
