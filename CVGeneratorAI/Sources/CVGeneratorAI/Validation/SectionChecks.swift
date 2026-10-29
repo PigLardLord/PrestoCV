@@ -677,6 +677,9 @@ extension CVDataSanitizer {
     /// no floor or the facts give it no sentence.
     func summaryFloor(of facts: CVData, summary: String?, most: Int, against description: String) throws(CVGenerationError) -> String? {
         try reading(description) { source in
+            // The titles the description grounds, not those of the draft: "contabile" of "Studio Contabile Merlini" is no title of
+            // the person (#354, round 7).
+            let facts = Self.withGroundedTitles(facts, grounded: grounded(facts, writing: nil, in: source))
             let sentences = SentenceSplitter.sentences(in: summary ?? facts.summary ?? "")
             guard sentences.count < 2 || sentences.joined(separator: " ").count < 120,
                   let language = source.explainer.language else { return nil }
@@ -699,6 +702,19 @@ extension CVDataSanitizer {
             let floor = Array((head + sentences + tail).prefix(most))
             return floor.count > sentences.count ? floor.joined(separator: " ") : nil
         }
+    }
+
+    /// `facts` with no title for a job whose title the description does not ground (`grounded`), and its dates as they are.
+    private static func withGroundedTitles(_ facts: CVData, grounded: CVData) -> CVData {
+        let kept = ([grounded.personalInfo.title] + grounded.experience.map { Optional($0.title) }).compactMap { $0?.presentValue?.lowercased() }
+        return facts.with(experience: facts.experience.map { job in
+            let title = job.title.lowercased()
+            guard !title.isEmpty, !kept.contains(where: { $0.contains(title) || title.contains($0) }) else { return job }
+            return Experience(
+                title: "", company: job.company, location: job.location, startDate: job.startDate, endDate: job.endDate,
+                current: job.current, description: job.description, achievements: job.achievements
+            )
+        })
     }
 
     /// Whether `sentence` ends with `title` and its full stop: the opening that names it.

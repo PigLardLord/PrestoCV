@@ -1013,6 +1013,38 @@ struct SectionChecksTests {
         #expect(written == floor, "\(written ?? "nil")")
     }
 
+    @Test("The floor names the titles the description grounds, not a title of the draft read in an employer's name (#354, round 7)")
+    func summaryFloorOfGroundedTitles() throws {
+        let description = """
+            Dal 2017 lavoro alla Ferramenta Scaligera come impiegata amministrativa, dove gestisco le fatture dei fornitori. \
+            Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini.
+            """
+        let facts = CVData(experience: [
+            Self.job("impiegata amministrativa", "Ferramenta Scaligera", from: "2017"),
+            Self.job("contabile", "Studio Contabile Merlini", from: "2013", to: "2017"),
+        ])
+
+        let written = try sanitizer.summaryFloor(of: facts, summary: "Seguo i fornitori con cura.", most: 4, against: description)
+
+        #expect(written == "Lavoro come impiegata amministrativa. Seguo i fornitori con cura.", "\(written ?? "nil")")
+    }
+
+    @Test("A written summary sentence that says the person worked as what no kept title names goes; one of a kept title, or of a part of a team, stays (#354, round 7)")
+    func summaryOfAnUnkeptTitle() throws {
+        let description = "Dal 2015 sono geometra allo Studio Tecnico Ferri di Lecco, dove seguo i cantieri e preparo le pratiche catastali."
+        let facts = CVData(experience: [Self.job("geometra", "Studio Tecnico Ferri", from: "2015")])
+        let titled = "Lavoro come geometra e seguo i cantieri con cura."
+        let team = "Lavoro come parte di una squadra affiatata."
+        let writing = DraftWriting(
+            summary: [titled, "In passato ho lavorato come tecnico.", team].joined(separator: " "), roleDescriptions: [nil],
+            technologies: [], softSkills: []
+        )
+
+        let sanitized = try sanitizer.sanitize(facts, writing: writing, against: description)
+
+        #expect(sanitized.summary == [titled, team].joined(separator: " "), "\(sanitized.summary ?? "nil")")
+    }
+
     @Test("A summary sentence that ends with the last three words of an earlier one goes; one that shares fewer stays (#354, round 2)")
     func summaryWithARepeatedEnding() throws {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
