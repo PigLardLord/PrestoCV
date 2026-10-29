@@ -17,6 +17,9 @@ public struct DraftBrief: Equatable, Sendable {
         public var hasEnded: Bool
         /// The clauses of the description that belong to the job, which its own request reads (ADR 0031, "A request per section").
         public let clauses: [String]
+        /// Whether a clause of the job names some work, not only where the person worked: its request then asks first for what
+        /// the person said (#354, round 11).
+        public var clausesNameWork = true
         /// The words of the job's clauses that the check drops in a written duty: the job's request avoids them.
         public var avoid: [String] = []
         /// The duties the person said for the job, as the check reads them: its request writes them first.

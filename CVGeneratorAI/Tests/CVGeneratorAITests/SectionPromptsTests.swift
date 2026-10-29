@@ -80,6 +80,21 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.job(number: 0, of: silent).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
     }
 
+    @Test("A job whose clauses only say where the person worked asks for typical duties alone: asked for what the person said first, the model wrote that they worked there (#354, round 11)")
+    func jobWithClausesThatNameNoWork() {
+        var brief = DraftBrief(
+            language: "Italian", headline: nil,
+            roles: [.init(
+                title: "", employer: "Studio Contabile Merlini", hasEnded: true,
+                clauses: ["Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini."]
+            )],
+            studies: [], namedSkills: []
+        )
+        brief.roles[0].clausesNameWork = false
+
+        #expect(SectionPrompts.job(number: 0, of: brief).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
+    }
+
     @Test("A job with no title is written from the headline title")
     func jobWithNoTitle() {
         let brief = DraftBrief(

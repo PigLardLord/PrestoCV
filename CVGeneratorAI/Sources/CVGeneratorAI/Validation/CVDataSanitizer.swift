@@ -108,8 +108,9 @@ public struct CVDataSanitizer: Sendable {
         return false
     }
 
-    /// The forms of "to work" that a role follows ("lavoro come", "habe als ... gearbeitet"), folded.
-    private static let workVerbs: Set<String> = [
+    /// The forms of "to work" that a role follows ("lavoro come", "habe als ... gearbeitet"), folded: a duty that only says where
+    /// the person worked holds one and no other word of work (#354, round 11).
+    static let workVerbs: Set<String> = [
         "work", "worked", "working", "lavoro", "lavorato", "lavoravo", "arbeite", "arbeitete", "gearbeitet", "travaille",
         "travaillais", "trabajo", "trabaje", "trabajaba", "trabajado", "trabalho", "trabalhei", "trabalhava", "trabalhado",
     ]

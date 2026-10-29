@@ -116,6 +116,29 @@ struct SectionDraftTests {
         #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
     }
 
+    @Test("A job whose clauses only say where the person worked is marked so, and its request asks for typical duties alone (#354, round 11)")
+    func jobThatNamesNoWork() async throws {
+        let service = service()
+        service.generateResult = .success(CVData(experience: [
+            Experience(title: "sound technician", company: "Brightwater Events"),
+            Experience(title: "head of sound", company: "Orchard Lane Theatre", current: true),
+        ]))
+        service.jobResults = [
+            0: RoleWriting(startDate: "2016", endDate: "2021", duties: "I ran the sound checks with each band. I looked after the microphones."),
+            1: RoleWriting(startDate: "2021", endDate: nil, duties: "I run the technical rehearsals."),
+        ]
+        let text = """
+            From 2016 to 2021 I worked at Brightwater Events.
+            Since 2021 I have been head of sound at the Orchard Lane Theatre, where I train the junior technicians.
+            """
+
+        _ = try await draft(service, of: text)
+
+        let brief = try #require(service.sectionBriefs.first)
+        #expect(brief.roles[0].clauses.contains { $0.contains("Brightwater") })
+        #expect(brief.roles.map(\.clausesNameWork) == [false, true])
+    }
+
     @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6)",
           arguments: [(1, false, 4...5), (1, true, 3...4), (2, false, 2...3), (2, true, 2...3), (3, false, 2...3)] as [(Int, Bool, ClosedRange<Int>)])
     func toolCount(groups: Int, sparse: Bool, count: ClosedRange<Int>) {

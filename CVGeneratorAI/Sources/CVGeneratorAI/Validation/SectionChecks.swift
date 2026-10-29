@@ -157,6 +157,7 @@ extension CVDataSanitizer {
                 source.written(sentence, quoting: quotes, allowsNumbers: true) { _ in false } != nil ? nil : rule.rejection(of: sentence)
             }
             let current = job.entry.current && rule.evidence.statesCurrent
+            let names = Self.ownNames(of: cvData)
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
             // achievements stays an achievement, so it counts toward none of the job's text (#354).
@@ -181,6 +182,8 @@ extension CVDataSanitizer {
                 var rejection: String?
                 if words.count < 3 || words.last.map(Self.dutyConjunctions.contains) == true {
                     rejection = "it is not a whole sentence"
+                } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
+                    rejection = Self.onlyWhereReason
                 } else if let ruled = reason(sentence, quotes) {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
@@ -219,6 +222,46 @@ extension CVDataSanitizer {
     }
 
     static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
+
+    // MARK: Filler duties (#354, round 11)
+
+    /// Why a written duty that only says where the person worked goes ("Ho lavorato allo Studio Contabile Merlini.").
+    static let onlyWhereReason = "it says only where the person worked: name a task of the job"
+
+    /// The names of `cvData` that say no work: its employers, schools, person and places.
+    static func ownNames(of cvData: CVData) -> [String] {
+        cvData.experience.map(\.company) + cvData.experience.compactMap(\.location)
+            + cvData.education.compactMap(\.institution) + [cvData.personalInfo.name, cvData.personalInfo.location].compactMap { $0 }
+    }
+
+    /// Whether `text` names some work: a word of five letters or more that is no form of "to work" or "to start", no word of
+    /// `names`, of a time ("prima", "since") or of the idle words. "je pétris le pain au Fournil Delaunay" names work; "Prima, dal
+    /// 2013 al 2017, ho lavorato allo Studio Contabile Merlini." names none: asked for what the person said first, the model wrote
+    /// that they worked there (#354, round 11).
+    static func namesWork(_ text: String, names: [String]) -> Bool {
+        let named = words(of: names)
+        return Word.words(in: text).contains { word in
+            guard !word.isNumber, word.folded.count >= 5 else { return false }
+            return !workVerbs.contains(word.folded) && !named.contains(word.folded) && !notWorkWords.contains(word.folded)
+                && !idleWords.contains(word.accented) && !idleStems.contains(String(word.accented.prefix(5)))
+                && !idleStems.contains(String(word.folded.prefix(5)))
+        }
+    }
+
+    /// Whether `text` holds a form of "to work".
+    static func saysWorking(_ text: String) -> Bool {
+        Word.words(in: text).contains { workVerbs.contains($0.folded) }
+    }
+
+    /// The words of five letters or more of a clause on a job that name no work, folded: times and the start of a job.
+    private static let notWorkWords: Set<String> = [
+        "prima", "allora", "quindi", "precedentemente", "presso", "durante", "iniziato", "iniziata", "cominciato", "cominciata",
+        "later", "earlier", "previously", "since", "until", "years", "during", "start", "started", "began", "begun",
+        "davor", "danach", "zuvor", "vorher", "seitdem", "jahre", "jahren", "angefangen", "begonnen",
+        "avant", "ensuite", "auparavant", "depuis", "annees", "commence",
+        "antes", "despues", "luego", "anteriormente", "empece", "empezado", "comence", "comenzado",
+        "depois", "comecei", "comecado",
+    ]
 
     /// The first two words of a duty, folded, unless the second is an auxiliary ("J'ai formé…", "Ich habe…"), whose verb comes
     /// later: a job of three duties that open alike reads as a list, not as a person's work ("Je veillais à…", #354, round 2).

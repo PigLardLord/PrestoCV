@@ -71,6 +71,10 @@ final class SectionDraft {
         brief.own = context.own
         brief.names = generated.experience.map(\.company) + generated.education.compactMap(\.institution)
             + [generated.personalInfo.name].compactMap { $0 }
+        let names = CVDataSanitizer.ownNames(of: generated)
+        for number in brief.roles.indices {
+            brief.roles[number].clausesNameWork = brief.roles[number].clauses.contains { CVDataSanitizer.namesWork($0, names: names) }
+        }
         stated = Array(repeating: [], count: brief.roles.count)
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)

@@ -81,6 +81,46 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.opening(of: "Ich habe die Regale montiert.") == nil)
     }
 
+    // MARK: Filler duties (#354, round 11)
+
+    /// The jobs of it-traps: a current one with a duty the person said, and an ended one the person only named.
+    private static let itTrapsJobs = CVData(
+        personalInfo: PersonalInfo(name: "Chiara Benedetti", location: "Verona"),
+        experience: [
+            job("impiegata amministrativa", "Ferramenta Scaligera", from: "2017"),
+            job("", "Studio Contabile Merlini", from: "2013", to: "2017"),
+        ]
+    )
+
+    private static func itTraps() throws -> String {
+        try #require(DraftingInputs.written.first { $0.id == "it-traps" }).description
+    }
+
+    @Test("A clause names work by a word that is none of working, starting, a name, a place or a time: one that only says where the person worked names none (#354, round 11)", arguments: [
+        ("je pétris le pain au Fournil Delaunay", true),
+        ("Dal 2017 lavoro alla Ferramenta Scaligera, dove gestisco le fatture dei fornitori.", true),
+        ("Prima, dal 2013 al 2017, ho lavorato allo Studio Contabile Merlini.", false),
+        ("From 2013 to 2016 I worked at the Fenwick Playhouse.", false),
+        ("I started in 2013 at the Fenwick Playhouse.", false),
+        ("Seit 2018 arbeite ich bei Kranz in Erfurt.", false),
+    ])
+    func clauseNamesWork(clause: String, names: Bool) {
+        let named = ["Fournil Delaunay", "Ferramenta Scaligera", "Studio Contabile Merlini", "Fenwick Playhouse", "Kranz", "Erfurt"]
+        #expect(CVDataSanitizer.namesWork(clause, names: named) == names)
+    }
+
+    @Test("A written duty that only says where the person worked goes, with its reason; a task of the job stays (#354, round 11)")
+    func dutyThatOnlySaysWhere() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 1, duties: "Ho lavorato allo Studio Contabile Merlini. Archiviavo le pratiche dei clienti.",
+            against: try Self.itTraps()
+        )
+
+        #expect(verdicts.kept == ["Archiviavo le pratiche dei clienti."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Ho lavorato allo Studio Contabile Merlini."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.onlyWhereReason])
+    }
+
     // MARK: D6, the typical duties of a job the person described (#354, round 1)
 
     @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them")
@@ -1518,6 +1558,7 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.workTopics(of: "I sort the mail. I sort the mail. I fold the towels. I stack the chairs. I wipe the tables.")
             == ["the mail", "the towels", "the chairs", "the tables"])
     }
+
 }
 
 /// A dictionary that knows every word in English and none in any other language.
