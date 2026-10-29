@@ -1511,7 +1511,9 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "verb cut"))
             }
             if let language, language != "en" {
-                let letters = words.filter { $0.count >= 3 && $0.allSatisfy(\.isLetter) && $0 != $0.uppercased() }.map { $0.lowercased() }
+                // Each word as written: the device's German dictionary knows its nouns only with their capital ("Multimeter"), and
+                // read in lower case a tool of the trade went as English (#354, round 15).
+                let letters = words.filter { $0.count >= 3 && $0.allSatisfy(\.isLetter) && $0 != $0.uppercased() }
                 if !letters.isEmpty, letters.allSatisfy({
                     wordList.knows($0, inLanguage: "en") == true && wordList.knows($0, inLanguage: language) == false
                 }) {
@@ -1596,12 +1598,12 @@ extension CVDataSanitizer {
 
     /// The words of `names` that name nothing else (#354, round 7): of 3 letters or more, with a capital, no word that links others
     /// ("di", "of") and no legal form ("GmbH"). In German, whose nouns all take a capital, a name word is one the device's dictionary
-    /// does not know.
+    /// does not know as written: it knows a noun only with its capital (#354, round 15).
     private func nameWords(of names: [String], language: String?) -> Set<String> {
         Set(names.flatMap { $0.split { !$0.isLetter }.map(String.init) }.filter { word in
             word.count >= 3 && word.first?.isUppercase == true && !Self.skillLinkWords.contains(word.lowercased())
                 && !Self.legalForms.contains(word.lowercased())
-                && (language != "de" || wordList.knows(word.lowercased(), inLanguage: "de") != true)
+                && (language != "de" || wordList.knows(word, inLanguage: "de") != true)
         })
     }
 

@@ -1141,6 +1141,21 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["activity", "activity"])
     }
 
+    @Test("A German noun the device's dictionary knows only with its capital is no word of another language, nor of a name (#354, round 15)")
+    func germanNounReadWithItsCapital() {
+        // The device's German dictionary knows "Multimeter" and not "multimeter"; read in lower case, a tool of the trade went as
+        // English, and a noun of an employer's name was a name word.
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: CaseSensitiveWords())
+
+        let verdict = german.skillCheck(
+            technologies: ["Multimeter", "Holz-Feuchtemessgerät"], softSkills: [], stated: [], names: ["Holz Brandner"],
+            against: "Seit 2018 bin ich Elektriker bei Holz Brandner in Augsburg."
+        )
+
+        #expect(verdict.technologies == ["Multimeter", "Holz-Feuchtemessgerät"])
+        #expect(verdict.dropped.isEmpty)
+    }
+
     @Test("A fragment and a lone verb go from the skills")
     func fragmentsGo() {
         let verdict = sanitizer.skillCheck(
@@ -1910,4 +1925,14 @@ struct SectionChecksTests {
 /// A dictionary that knows every word in English and none in any other language.
 private struct EnglishOnly: WordList {
     func knows(_ word: String, inLanguage language: String) -> Bool? { language == "en" }
+}
+
+/// A dictionary that reads a word as written, as the device's does: German knows its nouns only with their capital.
+private struct CaseSensitiveWords: WordList {
+    func knows(_ word: String, inLanguage language: String) -> Bool? {
+        let words: [String: Set<String>] = [
+            "de": ["Multimeter", "Holz", "Feuchtemessgerät", "Elektriker"], "en": ["multimeter", "Multimeter"],
+        ]
+        return words[language]?.contains(word) ?? false
+    }
 }
