@@ -812,7 +812,7 @@ extension CVDataSanitizer {
         let check = { (raw: String, cutsVerb: Bool) -> String? in
             let item = raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
             let words = item.split(separator: " ").map(String.init)
-            guard let first = words.first?.lowercased(), words.count <= Self.mostSkillWords, !item.contains("."), !item.contains(":"),
+            guard let first = words.first?.lowercased(), !Self.isTooLong(words), !item.contains("."), !item.contains(":"),
                   let last = words.last, !Self.skillEndWords.contains(last.lowercased()) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "fragment"))
                 return nil
@@ -863,7 +863,13 @@ extension CVDataSanitizer {
         for raw in technologies {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
-            if !Self.softStems.contains(where: lower.contains) {
+            let soft = Self.softStems.contains(where: lower.contains)
+            let namesATool = !Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords) || Self.namesATool(item, language: language)
+            if soft, namesATool, !Self.hasAWordOfItsTrade(item) {
+                // A kind of tool named by a quality alone is no tool of a trade ("Präzisionswerkzeug").
+                verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
+            } else if !soft || namesATool {
+                // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354, round 5).
                 if Self.namesAnActivity(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesAPart(item, language: language) {
@@ -877,10 +883,8 @@ extension CVDataSanitizer {
                 } else {
                     verdict.technologies.append(item)
                 }
-            } else if Set(letterWordsKeepingCase(lower)).isDisjoint(with: Self.toolWords), !Self.namesATool(item, language: language) {
-                verdict.softSkills.append(item)
             } else {
-                verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                verdict.softSkills.append(item)
             }
         }
         for raw in softSkills {
@@ -1024,10 +1028,28 @@ extension CVDataSanitizer {
     /// The most words of a skill: a longer one is a clause ("edit the sound effects for the shows"), not the name of a skill.
     static let mostSkillWords = 4
 
+    /// Whether a skill's words are too many for the name of a skill: more than `mostSkillWords` besides its link words, or more than
+    /// two link words. The link words do not count up to two, so a name of a language that joins its words with them stays
+    /// ("logiciel de gestion de classe"; #354, round 5).
+    private static func isTooLong(_ words: [String]) -> Bool {
+        let links = words.filter { skillLinkWords.contains($0.lowercased()) }.count
+        return words.count - links > mostSkillWords || links > 2
+    }
+
+    /// Whether a kind of tool named with a quality has a word besides the kind, the quality and its link words: the trade it serves
+    /// ("classe" of "logiciel de gestion de classe"; #354, round 5).
+    private static func hasAWordOfItsTrade(_ item: String) -> Bool {
+        item.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).contains { word in
+            !skillLinkWords.contains(word) && !toolWords.contains(word) && !toolKinds.contains(DescriptionText.normalized(word))
+                && !softStems.contains(where: word.contains)
+                && !toolWords.contains(where: { word.count > $0.count && word.hasSuffix($0) })
+        }
+    }
+
     /// A skill the facts request quoted with its verb ("usare i PLC") as the object the verb names ("PLC"); none for one of more than
     /// `mostSkillWords` words, a clause of the person's that names no skill (#354); any other as it is.
     func statedSkill(_ name: String, against description: String) -> String? {
-        guard name.split(whereSeparator: \.isWhitespace).count <= Self.mostSkillWords else { return nil }
+        guard !Self.isTooLong(name.split(whereSeparator: \.isWhitespace).map(String.init)) else { return nil }
         let verdict = skillCheck(technologies: [name], softSkills: [], against: description)
         guard verdict.dropped.contains(where: { $0.reason == "verb cut" }) else { return name }
         return verdict.technologies.first ?? verdict.softSkills.first ?? name
@@ -1079,10 +1101,10 @@ extension CVDataSanitizer {
     }
 
     /// Whether a technology names an activity, not a tool: its head noun ends as a noun of an action does ("frequency calibration",
-    /// "manutenzione preventiva"), or it is a kind of tool (`toolWords`) named by such a noun ("software di tracciamento", "tracking
-    /// software"; #354, round 1). A skill with an acronym or a digit names a tool ("PLC programming"); a noun of a thing with such an
-    /// ending ("docking station", "stazione di saldatura") is no activity. German, whose nouns of actions and of machines share
-    /// their endings ("Steuerung"), is not read.
+    /// "manutenzione preventiva"). A kind of tool named by what it does is a tool ("software di tracciamento", "logiciel de gestion
+    /// de classe"; #354, round 5: dropping it left trades with too few tools). A skill with an acronym or a digit names a tool ("PLC
+    /// programming"); a noun of a thing with such an ending ("docking station", "stazione di saldatura") is no activity. German,
+    /// whose nouns of actions and of machines share their endings ("Steuerung"), is not read.
     static func namesAnActivity(_ item: String, language: String?) -> Bool {
         if language == "de" { return isGermanActivity(item) }
         guard let language, let endings = activityEndings[language] else { return false }
@@ -1092,11 +1114,7 @@ extension CVDataSanitizer {
         }) else { return false }
         let lower = words.map { $0.lowercased() }.filter { !skillLinkWords.contains($0) }
         guard let head = language == "en" ? lower.last : lower.first else { return false }
-        let isActivity = { (word: String) in
-            word.count >= 6 && endings.contains(where: word.hasSuffix) && !activityLookalikes.contains(where: word.hasSuffix)
-        }
-        let modifiers = language == "en" ? lower.dropLast() : lower.dropFirst()
-        return isActivity(head) || toolWords.contains(head) && modifiers.contains(where: isActivity)
+        return head.count >= 6 && endings.contains(where: head.hasSuffix) && !activityLookalikes.contains(where: head.hasSuffix)
     }
 
     /// Whether a German technology of one word is the infinitive of an activity written as a noun ("Messen", "Installieren"; #354,

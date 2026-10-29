@@ -340,7 +340,7 @@ struct SectionChecksTests {
 
     // MARK: The skills
 
-    @Test("A quality listed as a tool is a soft skill, and a tool named by an activity goes, even when the tagger reads its first word as a verb")
+    @Test("A quality listed as a tool is a soft skill, and a tool named by what it does stays, even when the tagger reads its first word as a verb (#354, round 5)")
     func skillsCleaned() {
         let tagging = Self.italian(ForcedLexicalTagger([.italian: .words(["software"])]), wordList: TableWordList())
         let description = "Dal 2020 lavoro al Birrificio Valtrigno, dove uso i PLC e gestisco i fermi impianto."
@@ -349,9 +349,9 @@ struct SectionChecksTests {
             technologies: ["PLC", "precisione", "software di gestione fermi", "PLC"], softSkills: ["lavoro di squadra"], against: description
         )
 
-        #expect(verdict.technologies == ["PLC"])
+        #expect(verdict.technologies == ["PLC", "software di gestione fermi"])
         #expect(verdict.softSkills == ["precisione", "lavoro di squadra"])
-        #expect(verdict.dropped.map(\.reason) == ["activity"])
+        #expect(verdict.dropped.isEmpty)
     }
 
     @Test("In Italian, a word of English that ends in a consonant goes though the device's dictionary knows it; a loanword Italian writes as its own, a product and an Italian word stay (#354, round 3)")
@@ -458,7 +458,7 @@ struct SectionChecksTests {
         #expect(Set(verdict.dropped.map(\.reason)) == ["same kind as an earlier tool"])
     }
 
-    @Test("A technology that names an activity, or a kind of tool by what it does, goes; equipment, a named tool and one with an acronym stay (#354, round 1)")
+    @Test("A technology that names an activity goes; equipment, a kind of tool named by what it does, a named tool and one with an acronym stay (#354, rounds 1 and 5)")
     func activityIsNoTechnology() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
@@ -477,11 +477,19 @@ struct SectionChecksTests {
             softSkills: [], against: JobClausesTests.italian
         )
 
-        #expect(sound.technologies == ["digital consoles", "PA systems", "PLC programming", "line arrays", "docking station"])
-        #expect(sound.dropped.map(\.sentence) == ["frequency calibration", "signal routing", "beam focusing", "tracking software"])
+        let french = CVDataSanitizer(languageOfText: { _ in "fr" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let school = french.skillCheck(
+            technologies: ["logiciel de gestion de classe", "correction des copies", "tableau numérique"],
+            softSkills: [], against: "J'enseigne dans une petite école de village près de Rodez."
+        )
+
+        #expect(sound.technologies == ["digital consoles", "PA systems", "tracking software", "PLC programming", "line arrays", "docking station"])
+        #expect(sound.dropped.map(\.sentence) == ["frequency calibration", "signal routing", "beam focusing"])
         #expect(Set(sound.dropped.map(\.reason)) == ["activity"])
-        #expect(plant.technologies == ["PLC", "stazione di saldatura", "multimetro", "programmazione PLC"])
-        #expect(plant.dropped.map(\.sentence) == ["software di tracciamento", "sistema di controllo remoto", "manutenzione preventiva"])
+        #expect(plant.technologies == ["PLC", "software di tracciamento", "sistema di controllo remoto", "stazione di saldatura", "multimetro", "programmazione PLC"])
+        #expect(plant.dropped.map(\.sentence) == ["manutenzione preventiva"])
+        #expect(school.technologies == ["logiciel de gestion de classe", "tableau numérique"])
+        #expect(school.dropped.map(\.sentence) == ["correction des copies"])
     }
 
     @Test("A bare kind of tool goes; a kind with a word of its trade stays, as does a named one, with a capital, an acronym or a digit (#354, rounds 2 and 4)",
@@ -535,11 +543,14 @@ struct SectionChecksTests {
     @Test("A fragment and a lone verb go from the skills")
     func fragmentsGo() {
         let verdict = sanitizer.skillCheck(
-            technologies: ["manutenzione di", "uso dei PLC: base"], softSkills: [], against: JobClausesTests.italian
+            technologies: [
+                "manutenzione di", "uso dei PLC: base", "controllo quadri elettrici clienti ditta", "gestione di un registro di classe",
+            ],
+            softSkills: [], against: JobClausesTests.italian
         )
 
         #expect(verdict.technologies.isEmpty)
-        #expect(verdict.dropped.map(\.reason) == ["fragment", "fragment"])
+        #expect(verdict.dropped.map(\.reason) == ["fragment", "fragment", "fragment", "fragment"])
     }
 
     @Test("A word that names a skill and no skill goes from the soft skills; a quality said with it stays (#354)")
