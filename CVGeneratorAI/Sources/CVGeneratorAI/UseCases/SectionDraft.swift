@@ -178,8 +178,10 @@ final class SectionDraft {
         let tools = try await request(.skills) { try await self.service.writeTools(for: brief) }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
         let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
+        // ADR 0031, D8: the work the person says they like doing is a soft skill in their own words, before those written.
+        let liked = CVDataSanitizer.workLikings(in: description)
         var skills = sanitizer.skillCheck(
-            technologies: (tools ?? []).flatMap { $0 }, softSkills: qualities ?? [], stated: stated, against: description
+            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated, against: description
         )
         keep(skills)
         let kept = try kept(around: dated).skills

@@ -455,6 +455,22 @@ struct SectionDraftTests {
         #expect(names.contains("digital desks"), "\(names)")
         #expect(!names.contains { $0.contains("voice tracks") }, "\(names)")
     }
+
+    @Test("D8: the work the person says they like doing is a soft skill in their own words; a pastime they like is none (#354, round 3)",
+          arguments: [
+              ("I stay calm under pressure and I like working closely with choreographers.", "working closely with choreographers"),
+              ("I stay calm under pressure and I like baking rye bread.", nil),
+          ])
+    func likedWorkIsASoftSkill(sentence: String, quality: String?) async throws {
+        let draft = try await generator(service()).generateCV(from: CVGenerationRequest(userPrompt: description + "\n" + sentence)).cvData
+
+        let qualities = draft.skills.filter { $0.kind == .softSkill }.map(\.name)
+        if let quality {
+            #expect(qualities.contains(quality), "\(qualities)")
+        } else {
+            #expect(!qualities.contains { $0.contains("baking") || $0.contains("bread") }, "\(qualities)")
+        }
+    }
 }
 
 /// The task of a draft under test, which a request of the fake service cancels.

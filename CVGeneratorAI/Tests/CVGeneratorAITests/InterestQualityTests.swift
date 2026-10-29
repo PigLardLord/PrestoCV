@@ -114,4 +114,19 @@ struct InterestQualityTests {
 
         #expect(result.interests == ["chess", "long walks with my dog", "hiking in the Alps"])
     }
+
+    @Test("D8: a liking of working or collaborating gives the work in the person's words; another liking, a wish or a title gives none (#354, round 3)",
+          arguments: [
+              ("I keep calm and I like working closely with choreographers.", ["working closely with choreographers"]),
+              ("Sono paziente e mi piace lavorare in squadra.", ["lavorare in squadra"]),
+              ("Me gusta colaborar con los proveedores.", ["colaborar con los proveedores"]),
+              ("Gosto de trabalhar em equipe, e sou calmo.", ["trabalhar em equipe"]),
+              ("I like baking rye bread.", []),
+              ("I would like to work closely with chefs.", []),
+              ("I'd like to work with chefs.", []),
+              ("J'aime travailler comme guide.", []),
+          ])
+    func workLikings(sentence: String, expected: [String]) {
+        #expect(CVDataSanitizer.workLikings(in: sentence) == expected)
+    }
 }
