@@ -72,7 +72,10 @@ final class SectionDraft {
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)
             brief.roles[number].avoid = check?.avoid ?? []
-            brief.roles[number].described = check?.saysEnough ?? false
+            if let check {
+                brief.roles[number].said = check.pinned.count
+                brief.roles[number].adding = check.saysEnough ? 0 : max(1, 2 - check.pinned.count)
+            }
         }
         duties = Array(repeating: nil, count: brief.roles.count)
 
@@ -150,11 +153,16 @@ final class SectionDraft {
 
     // MARK: - Jobs
 
-    /// A request per job, in order, its duties checked; a job whose check keeps fewer than two duties or under 40 characters gets
-    /// one repair, and what still fails goes. A job whose stated duties run to 40 characters keeps no typical duty and gets no
-    /// repair (ADR 0031, D6). A job keeps only its written duties: the person's own come back in the final check.
+    /// A request per job, in order, for the typical duties it needs (`DraftBrief.Role.adding`), its duties checked; a job whose
+    /// check keeps fewer than two duties or under 40 characters gets one repair, and what still fails goes. A job whose stated
+    /// duties run to 40 characters keeps no typical duty and gets no repair (ADR 0031, D6), and no request when the extraction read
+    /// its years. A job keeps only its written duties, no more than it needs: the person's own come back in the final check.
     private func writeJobs(of brief: DraftBrief, context: CVDataSanitizer.DraftContext, in located: CVData) async throws {
         for number in brief.roles.indices.prefix(Self.writtenJobs) {
+            // A job that needs no typical duty and whose years the extraction read gets no request: its own duties come back in
+            // the final check (#354, round 10).
+            let adding = brief.roles[number].adding
+            guard adding > 0 || !Self.hasItsYears(number, context: context, in: located) else { continue }
             let role = try await request(.jobs) { try await self.service.writeJob(number: number, of: brief) }
             if let role { years[number] = role }
             guard context.jobs.indices.contains(number) else { continue }
@@ -162,21 +170,29 @@ final class SectionDraft {
             guard let first = try? sanitizer.dutyCheck(
                 of: located, job: job, duties: role?.duties.map(Self.mended), against: description
             ) else { continue }
-            var kept = first.kept
-            let described = CVDataSanitizer.DutyVerdicts.describedLength
-            if !first.saysEnough, first.length < described || first.pinned.count + first.kept.count < 2 {
+            // No more typical duties than the job needs: an echo of the person's own duty goes in the check, and does not count.
+            var kept = Array(first.kept.prefix(adding))
+            let length = (first.pinned + kept).joined(separator: " ").count
+            if !first.saysEnough, length < CVDataSanitizer.DutyVerdicts.describedLength || first.pinned.count + kept.count < 2 {
                 let rejected = first.rejected.map(Self.quoted)
-                let repaired = try await request(.jobs) {
-                    try await self.service.repairJob(number: number, of: brief, kept: first.pinned + first.kept, rejected: rejected)
+                let repaired = try await request(.jobs) { [kept] in
+                    try await self.service.repairJob(number: number, of: brief, kept: first.pinned + kept, rejected: rejected)
                 }
                 if let repaired, let second = try? sanitizer.dutyCheck(
-                    of: located, job: job, duties: Self.mended(repaired.joined(separator: " ")), keeping: first.kept, against: description
+                    of: located, job: job, duties: Self.mended(repaired.joined(separator: " ")), keeping: kept, against: description
                 ) {
-                    kept += second.kept
+                    kept += second.kept.prefix(max(adding - kept.count, 1))
                 }
             }
             duties[number] = kept.joined(separator: " ").presentValue
         }
+    }
+
+    /// Whether the extraction read the years of the job at `number`: its start, and its end unless it is current.
+    private static func hasItsYears(_ number: Int, context: CVDataSanitizer.DraftContext, in located: CVData) -> Bool {
+        guard context.jobs.indices.contains(number), located.experience.indices.contains(context.jobs[number].job) else { return false }
+        let job = located.experience[context.jobs[number].job]
+        return job.startDate.presentValue != nil && (job.current || job.endDate.presentValue != nil)
     }
 
     // MARK: - Skills

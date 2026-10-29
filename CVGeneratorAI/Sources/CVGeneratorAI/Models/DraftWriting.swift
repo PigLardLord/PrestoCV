@@ -18,9 +18,13 @@ public struct DraftBrief: Equatable, Sendable {
         public let clauses: [String]
         /// The words of the job's clauses that the check drops in a written duty: the job's request avoids them.
         public var avoid: [String] = []
-        /// Whether the duties the person said for the job run to 40 characters: its request then asks for no typical duty (ADR 0031,
-        /// D6).
-        public var described = false
+        /// The duties the person said for the job, as the check reads them: its request writes them first.
+        public var said = 0
+        /// The duties typical of its title the job's request writes after the person's: none when the person said 40 characters of
+        /// it (ADR 0031, D6), else enough to reach two duties, and at least one (#354, round 10). A job that needs none gets no
+        /// request: asked for 2 to 4 duties, the request padded a job of one short stated duty with three typical ones, one of them
+        /// the same duty said again.
+        public var adding = 2
         /// The topics of the duties the checks kept for the job, which the summary request reads in place of the duties, which it
         /// would copy (#354, round 3).
         public var work: [String] = []

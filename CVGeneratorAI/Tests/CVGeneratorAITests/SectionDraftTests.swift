@@ -173,7 +173,7 @@ struct SectionDraftTests {
         let service = service()
         service.jobResults[3] = RoleWriting(
             startDate: "2021", endDate: nil,
-            duties: "I run the technical rehearsals. I mixed 40 shows at the Royal Albert Hall. I look after the mixing desks."
+            duties: "I mixed 40 shows at the Royal Albert Hall. I look after the mixing desks."
         )
         service.toolsResult = Self.tools.dropLast() + [Self.tools[3] + ["Dante Level 3 certification"]]
         service.softSkillsResult = Self.qualities + ["leadership of 12 technicians"]
@@ -198,7 +198,7 @@ struct SectionDraftTests {
 
         let draft = try await draft(service, of: JobClausesTests.english)
 
-        #expect(service.sectionBriefs.first?.roles.allSatisfy(\.described) == true)
+        #expect(service.sectionBriefs.first?.roles.allSatisfy { $0.adding == 0 } == true)
         #expect(service.jobRepairs.isEmpty)
         #expect(job("Orchard Lane Theatre", in: draft)?.description
             == "I plan the sound design for each production and train the junior technicians.")
@@ -209,12 +209,37 @@ struct SectionDraftTests {
         }
     }
 
-    @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them (#354, round 1)")
-    func d6ShortJobsKeepTypicalDuties() async throws {
-        let draft = try await draft(service())
+    @Test("d6: a described job whose years the extraction read gets no request, and keeps its own duties and years (#354, round 10)")
+    func describedJobsWithTheirYearsAskNothing() async throws {
+        let service = service()
+        service.generateResult = .success(CVData(experience: [
+            Experience(title: "stagehand", company: "Fenwick Playhouse", startDate: "2013", endDate: "2016"),
+            Experience(title: "sound technician", company: "Brightwater Events", startDate: "2016", endDate: "2019"),
+            Experience(title: "sound technician", company: "Copperfield Arena", startDate: "2019", endDate: "2021"),
+            Experience(title: "head of sound", company: "Orchard Lane Theatre", startDate: "2021", current: true),
+        ]))
 
-        #expect(job("Fenwick Playhouse", in: draft)?.description
-            == "I rigged the lights. I moved the scenery between scenes. I kept the backstage area clear and safe.")
+        let draft = try await draft(service, of: JobClausesTests.english)
+
+        #expect(!service.sectionCalls.contains { $0.hasPrefix("job ") })
+        #expect(job("Fenwick Playhouse", in: draft)?.description == "I rigged the lights and loaded the trucks.")
+        #expect(job("Fenwick Playhouse", in: draft)?.startDate == "2013")
+        #expect(job("Orchard Lane Theatre", in: draft)?.current == true)
+    }
+
+    @Test("d6: a job whose stated duties are under 40 characters keeps them and the typical duties it needs to reach two, no more (#354, rounds 1 and 10)")
+    func d6ShortJobsKeepTypicalDuties() async throws {
+        let service = service()
+        service.jobResults[0] = RoleWriting(
+            startDate: "2013", endDate: "2016",
+            duties: "I rigged the lights. I moved the scenery between scenes. I kept the backstage area clear and safe."
+        )
+
+        let draft = try await draft(service)
+
+        let role = try #require(service.sectionBriefs.first?.roles.first)
+        #expect(role.said == 1 && role.adding == 1)
+        #expect(job("Fenwick Playhouse", in: draft)?.description == "I rigged the lights. I moved the scenery between scenes.")
     }
 
     // MARK: Repairs
@@ -231,7 +256,10 @@ struct SectionDraftTests {
         let repair = try #require(service.jobRepairs.first)
         // The duty in -ing is put in the person's own form first, so the repair reads the sentence as the draft would have it.
         #expect(repair.rejected == ["\"I was mixing at 3 festivals.\": it holds a number"])
-        #expect(job("Brightwater Events", in: draft)?.description?.contains("I looked after the microphones and cables.") == true)
+        // The job said one short duty, so it needs one typical duty: the repair's second one goes (#354, round 10).
+        let duties = try #require(job("Brightwater Events", in: draft)?.description)
+        #expect(duties.contains("I ran the sound checks with each band."))
+        #expect(!duties.contains("microphones"))
     }
 
     @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
@@ -323,15 +351,15 @@ struct SectionDraftTests {
     @Test("A job's duties written as clauses joined by semicolons are cut into sentences (#354, round 4)")
     func chainedDutiesAreCut() async throws {
         let service = service()
-        service.jobResults[3] = RoleWriting(
-            startDate: "2021", endDate: nil, duties: "I run the technical rehearsals; I look after the mixing desks and the stage monitors."
+        service.jobResults[1] = RoleWriting(
+            startDate: "2016", endDate: "2019", duties: "I ran the sound checks with each band; I looked after the microphones and cables."
         )
 
         let draft = try await draft(service)
 
-        let head = try #require(job("Orchard Lane Theatre", in: draft)?.description)
-        #expect(!head.contains(";"))
-        #expect(head.contains("I run the technical rehearsals. I look after the mixing desks and the stage monitors."))
+        let duties = try #require(job("Brightwater Events", in: draft)?.description)
+        #expect(!duties.contains(";"))
+        #expect(duties.contains("I ran the sound checks with each band."))
     }
 
     @Test("A summary whose every sentence and repair went is written by code from the titles, and the draft keeps it (#354, round 6)")

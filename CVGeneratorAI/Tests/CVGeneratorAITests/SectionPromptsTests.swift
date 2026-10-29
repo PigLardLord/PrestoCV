@@ -37,22 +37,29 @@ struct SectionPromptsTests {
             - Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018.
             - Controllando i quadri elettrici.
             Words to avoid: Valtrigno, capoturno
+            Write exactly 2 duties typical of this job.
             """)
         #expect(!prompt.text.contains("tre tecnici"))
     }
 
-    @Test("d6: a job whose stated duties run to 40 characters asks for no typical duty; the instructions ask for typical duties only otherwise, and none vague (#354, round 1)")
-    func describedJobAsksForNoTypicalDuty() {
+    @Test("A job's request asks for exactly the typical duties the job needs after the person's: none for a described job, one after one short duty, two for a job with none (#354, rounds 1 and 10)",
+          arguments: [
+              (1, 0, "Write only the duty the person said, and add none."),
+              (2, 0, "Write only the duties the person said, and add none."),
+              (1, 1, "Write the duty the person said, then exactly 1 more duty typical of this job."),
+              (0, 2, "Write exactly 2 duties typical of this job."),
+          ])
+    func jobAsksForTheDutiesItNeeds(said: Int, adding: Int, line: String) {
         var brief = Self.brief
-        brief.roles[0].described = true
+        brief.roles[0].said = said
+        brief.roles[0].adding = adding
 
-        let described = SectionPrompts.job(number: 0, of: brief).text
-        let short = SectionPrompts.job(number: 0, of: Self.brief).text
+        let text = SectionPrompts.job(number: 0, of: brief).text
 
-        #expect(described.contains("\nThe person said enough of this job: write only the duties they said, and add none."))
-        #expect(!short.contains("add none"))
-        #expect(SectionPrompts.jobInstructions.contains("unless the request says to add none"))
+        #expect(text.hasSuffix("\n" + line))
+        #expect(SectionPrompts.jobInstructions.contains("then exactly as many more as the request asks"))
         #expect(SectionPrompts.jobInstructions.contains("a concrete task of that trade, never one that fits any job"))
+        #expect(!SectionPrompts.jobInstructions.contains("2 to 4"))
     }
 
     @Test("A job with no title is written from the headline title")
@@ -97,12 +104,12 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.job(number: 0, of: brief).text.contains("Job: no title given; employer: Estúdio Ventania; ended"))
     }
 
-    @Test("A job's instructions ask for the years the person said, 2 to 4 whole duties and no fact of their own")
+    @Test("A job's instructions ask for the years the person said, the whole duties the request asks for and no fact of their own")
     func jobInstructions() {
         let instructions = SectionPrompts.jobInstructions
 
         #expect(instructions.contains("The years: only those the person said for this job."))
-        #expect(instructions.contains("2 to 4 duties, each one whole sentence"))
+        #expect(instructions.contains("The duties the request asks for, each one whole sentence"))
         #expect(instructions.contains("No number, date, name of a company, place or person."))
         #expect(instructions.contains("Never add a job, study, certification, achievement or result."))
     }

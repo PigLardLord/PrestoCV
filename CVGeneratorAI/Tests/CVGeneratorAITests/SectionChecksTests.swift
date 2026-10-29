@@ -189,6 +189,34 @@ struct SectionChecksTests {
     private static let clerkJob = CVData(experience: [job("impiegata contabile", "Studio Ferretti", from: "2013", to: "2017")])
     private static let clerkJobNow = CVData(experience: [job("impiegata contabile", "Studio Ferretti", from: "2017")])
 
+    @Test("A written duty about the object of an earlier one, qualified another way, goes; one that shares only a plain word stays (#354, round 10)")
+    func dutyAboutAnEarlierObject() throws {
+        let again = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0,
+            duties: "Registravo le scadenze fiscali dei clienti. Aggiornavo il calendario delle scadenze tributarie.", against: Self.clerk
+        )
+        let other = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0,
+            duties: "Registravo le fatture dei clienti. Sollecitavo i pagamenti dei clienti.", against: Self.clerk
+        )
+
+        #expect(again.kept == ["Registravo le scadenze fiscali dei clienti."])
+        #expect(again.rejected.map(\.reason) == [CVDataSanitizer.namesAgainReason])
+        #expect(other.kept == ["Registravo le fatture dei clienti.", "Sollecitavo i pagamenti dei clienti."])
+    }
+
+    @Test("The object of a duty is qualified after it in the Romance languages and before it in English and German (#354, round 10)",
+          arguments: [
+              ("I answer formal correspondence.", "I sort the official correspondence.", .english, true),
+              ("I repair the electrical sockets.", "I check the electrical panels.", .english, false),
+              ("Ich plane die täglichen Lieferungen.", "Ich prüfe die eingehenden Lieferungen.", .german, true),
+              ("Tramito los expedientes urgentes.", "Archivo los expedientes cerrados.", .spanish, true),
+              ("Tramito los expedientes urgentes.", "Archivo las facturas de los proveedores.", .spanish, false),
+          ] as [(String, String, Vocabulary.Language, Bool)])
+    func objectOfADuty(sentence: String, earlier: String, language: Vocabulary.Language, isAgain: Bool) {
+        #expect(CVDataSanitizer.namesAgain(sentence, earlier, language: language) == isAgain)
+    }
+
     @Test("A duty that starts with an infinitive goes, also as the job's first one; a duty in the first person stays (#354)")
     func infinitiveDuty() throws {
         let verdicts = try sanitizer.dutyCheck(

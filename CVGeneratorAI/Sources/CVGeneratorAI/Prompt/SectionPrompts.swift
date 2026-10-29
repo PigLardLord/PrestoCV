@@ -14,16 +14,26 @@ enum SectionPrompts {
 
     /// The request of the job at `number`: its title, employer and end, its own clauses and the words its duties avoid.
     static func job(number: Int, of brief: DraftBrief) -> Prompt {
-        Prompt(instructions: jobInstructions, text: jobLines(number: number, of: brief).joined(separator: "\n"))
+        Prompt(instructions: jobInstructions, text: (jobLines(number: number, of: brief) + [count(of: brief.roles[number])]).joined(separator: "\n"))
+    }
+
+    /// How many duties the job's request writes: the person's, then exactly the typical ones the job needs (#354, round 10).
+    private static func count(of role: DraftBrief.Role) -> String {
+        let more = role.adding == 1 ? "1 more duty" : "\(role.adding) more duties"
+        switch (role.said, role.adding) {
+        case (0, _): return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties") typical of this job."
+        case (_, 0): return "Write only the \(role.said == 1 ? "duty" : "duties") the person said, and add none."
+        default: return "Write the \(role.said == 1 ? "duty" : "duties") the person said, then exactly \(more) typical of this job."
+        }
     }
 
     static let jobInstructions = """
         You write the years and the duties of one job of a CV, from what the person said about it. Write in the language named on \
         the first line.
         - The years: only those the person said for this job.
-        - 2 to 4 duties, each one whole sentence that starts with a capital letter and ends with a full stop.
-        - First the duties the person said for this job; then, to reach at least 2, unless the request says to add none, duties \
-        typical of its title at that employer, each a concrete task of that trade, never one that fits any job.
+        - The duties the request asks for, each one whole sentence that starts with a capital letter and ends with a full stop.
+        - First the duties the person said for this job; then exactly as many more as the request asks, typical of its title at \
+        that employer, each a concrete task of that trade, never one that fits any job, and none that says a duty already written.
         - No number, date, name of a company, place or person.
         - Never add a job, study, certification, achievement or result.
         """
@@ -56,7 +66,6 @@ enum SectionPrompts {
         if !role.clauses.isEmpty {
             lines.append("What the person said about this job:\n" + bullets(role.clauses.map(asSentence)))
         }
-        if role.described { lines.append("The person said enough of this job: write only the duties they said, and add none.") }
         if avoiding, !role.avoid.isEmpty { lines.append("Words to avoid: " + role.avoid.joined(separator: ", ")) }
         return lines
     }

@@ -185,6 +185,8 @@ extension CVDataSanitizer {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
                     rejection = "it repeats a duty already written"
+                } else if held.contains(where: { Self.namesAgain(sentence, $0, language: language) }) {
+                    rejection = Self.namesAgainReason
                 } else if let own = Self.form(sentence, language: language) {
                     if let form, form != own {
                         rejection = "it is written in another form: " + form.advice
@@ -325,6 +327,36 @@ extension CVDataSanitizer {
         let other = Set(letterWords(of: earlier).filter { $0.count >= 4 }.map { String($0.prefix(4)) })
         let shared = tail.intersection(other)
         return shared.count >= 2 && shared.count * 3 >= tail.count * 2
+    }
+
+    static let namesAgainReason = "it says a duty already written with other words"
+
+    /// Whether `sentence` is about what `earlier` is about, said another way: a word of 7 letters or more of both, its object, comes
+    /// with a word of 5 letters or more that qualifies it in each, after it in the Romance languages and before it in English and
+    /// German ("Monitoro l'invio delle comunicazioni formali" after "Organizzo la gestione delle comunicazioni ufficiali", #354,
+    /// round 10). A word the two share alone ("le fatture dei fornitori", "i pagamenti dei fornitori") is no such object. Two kinds
+    /// of one thing read the same ("gli impianti elettrici", "gli impianti idraulici"): the second goes, and the repair asks another.
+    static func namesAgain(_ sentence: String, _ earlier: String, language: Vocabulary.Language?) -> Bool {
+        let after = language != .english && language != .german
+        let objects = { (duty: String) -> Set<String> in
+            let words = objectWords(of: duty)
+            return Set(words.indices.compactMap { index -> String? in
+                let word = words[index]
+                let other = after ? index + 1 : index - 1
+                guard word.count >= 7, !idleWords.contains(word), words.indices.contains(other),
+                      words[other].count >= 5, !idleWords.contains(words[other]) else { return nil }
+                return word
+            })
+        }
+        return !objects(sentence).isDisjoint(with: objects(earlier))
+    }
+
+    /// The words of a duty after its subject, auxiliary and verb, lowercased.
+    private static func objectWords(of duty: String) -> ArraySlice<String> {
+        var words = letterWords(of: duty)[...]
+        while let first = words.first, subjectWords.contains(first) { words = words.dropFirst() }
+        guard let first = words.first else { return words }
+        return words.dropFirst(auxiliaries.contains(first) || germanAuxiliaries.contains(first) ? 2 : 1)
     }
 
     /// The form a duty starts with (ADR 0031): one job's text keeps one.

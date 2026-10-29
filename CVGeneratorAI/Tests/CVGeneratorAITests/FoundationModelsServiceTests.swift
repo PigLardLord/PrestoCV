@@ -118,4 +118,20 @@ struct FoundationModelsServiceTests {
         #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) software") == true)
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
     }
+
+    @Test("A job's request writes exactly the person's duties and the typical ones the job needs, 1 to 4, and its years only if said (#354, round 10)",
+          arguments: [(0, 2, 2), (1, 1, 2), (2, 1, 3), (3, 0, 3), (5, 1, 4), (0, 0, 1)] as [(Int, Int, Int)])
+    func dutiesOfAJob(said: Int, adding: Int, duties: Int) throws {
+        #expect(FoundationModelsService.jobDuties(said: said, adding: adding) == duties)
+        let data = try JSONEncoder().encode(FoundationModelsService.jobSchema(duties: duties))
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let properties = try #require(root["properties"] as? [String: Any])
+        let list = try #require(properties["duties"] as? [String: Any])
+
+        // Asked for 2 to 4, the request wrote 4 for a job that needed one more, and the extra ones said a duty again.
+        #expect(list["minItems"] as? Int == duties)
+        #expect(list["maxItems"] as? Int == duties)
+        #expect(Set(properties.keys) == ["startYear", "endYear", "duties"])
+        #expect((root["required"] as? [String]).map(Set.init) == ["duties"])
+    }
 }

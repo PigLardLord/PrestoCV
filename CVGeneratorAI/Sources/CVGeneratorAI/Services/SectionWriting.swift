@@ -7,7 +7,7 @@ import FoundationModels
 extension FoundationModelsService {
     // MARK: The token caps
 
-    /// A job's years and 2 to 4 duties.
+    /// A job's years and 1 to 4 duties.
     nonisolated static let jobTokens = 220
     /// A job's repair: up to 3 duties.
     nonisolated static let jobRepairTokens = 180
@@ -29,15 +29,42 @@ extension FoundationModelsService {
     // MARK: The jobs
 
     public func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
-        guard let last = try await streamed(SectionPrompts.job(number: number, of: brief), JobAnswer.self, tokens: Self.jobTokens) else {
+        guard brief.roles.indices.contains(number) else { return nil }
+        let role = brief.roles[number]
+        let schema = try Self.jobSchema(duties: Self.jobDuties(said: role.said, adding: role.adding))
+        guard let last = try await streamed(SectionPrompts.job(number: number, of: brief), schema: schema, tokens: Self.jobTokens) else {
             return nil
         }
         let content = last.answer.content
-        let duties = Self.whole(content.duties, isComplete: last.isComplete)
+        let duties = Self.whole(try? content.value([String].self, forProperty: "duties"), isComplete: last.isComplete)
+        let year = { (name: String) in (try? content.value(String.self, forProperty: name))?.presentValue }
         return RoleWriting(
-            startDate: content.startYear?.presentValue, endDate: content.endYear?.presentValue,
+            startDate: year("startYear"), endDate: year("endYear"),
             duties: duties.map(Self.sentence).joined(separator: " ").presentValue
         )
+    }
+
+    /// The duties a job's request writes: the person's own, then the typical ones it needs, 1 to 4 (#354, round 10).
+    nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(4, max(1, said + adding)) }
+
+    /// A job's years and exactly `duties` duties. A range let the model pad: asked for 2 to 4, it wrote 4 for a job that needed one
+    /// more, and the extra ones said a duty again with other words (#354, round 10).
+    nonisolated static func jobSchema(duties: Int) throws -> GenerationSchema {
+        let year = { (name: String, about: String) in
+            DynamicGenerationSchema.Property(name: name, description: about, schema: DynamicGenerationSchema(type: String.self), isOptional: true)
+        }
+        let root = DynamicGenerationSchema(name: "Job", properties: [
+            year("startYear", "The year the person started this job, as they wrote it; null if they did not say it"),
+            year("endYear", "The year the person left this job, as they wrote it; null if they did not say it or still work there"),
+            DynamicGenerationSchema.Property(
+                name: "duties",
+                description: "\(duties) duties of the job, one short whole sentence each",
+                schema: DynamicGenerationSchema(
+                    arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: duties, maximumElements: duties
+                )
+            ),
+        ])
+        return try GenerationSchema(root: root, dependencies: [])
     }
 
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
@@ -148,6 +175,26 @@ extension FoundationModelsService {
         }
     }
 
+    private func streamed(
+        _ prompt: SectionPrompts.Prompt, schema: GenerationSchema, tokens: Int
+    ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<GeneratedContent>.Snapshot>? {
+        let session = LanguageModelSession(instructions: prompt.instructions)
+        do {
+            let stream = session.streamResponse(
+                to: prompt.text, schema: schema, includeSchemaInPrompt: true,
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokens)
+            )
+            return try await StreamedAnswer.last(of: stream, keepingPartialAfter: Self.leavesAnAnswer(failure:))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+            throw Self.map(failure: error)
+        }
+    }
+
     private func streamed<Answer: Generable>(
         _ prompt: SectionPrompts.Prompt, _ type: Answer.Type, tokens: Int
     ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<Answer>.Snapshot>? {
@@ -189,18 +236,6 @@ extension FoundationModelsService {
         guard let end = text.lastIndex(where: { ".!?…".contains($0) }) else { return nil }
         return String(text[...end]).trimmingCharacters(in: .whitespacesAndNewlines).presentValue
     }
-}
-
-@Generable
-struct JobAnswer {
-    @Guide(description: "The year the person started this job, as they wrote it; null if they did not say it")
-    let startYear: String?
-
-    @Guide(description: "The year the person left this job, as they wrote it; null if they did not say it or still work there")
-    let endYear: String?
-
-    @Guide(description: "The duties of the job, one short whole sentence each", .count(2...4))
-    let duties: [String]
 }
 
 @Generable
