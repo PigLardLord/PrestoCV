@@ -118,6 +118,7 @@ struct DraftingEvaluation {
         let checks = await log.events
         return DraftMeasure(
             input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, writing: service.writing,
+            requests: service.requests,
             grounded: grounded,
             result: result, error: failure, checks: checks
         )
@@ -153,6 +154,8 @@ struct DraftingEvaluation {
         private(set) var writing: DraftWriting?
         /// The facts the sections were written around, with the years the jobs' requests read.
         private(set) var dated: CVData?
+        /// Each request of the sections and its answer before the rules.
+        private(set) var requests: [RequestRecord] = []
 
         func record(_ writing: DraftWriting, around draft: CVData) {
             self.writing = writing
@@ -168,29 +171,53 @@ struct DraftingEvaluation {
         }
 
         func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
-            try await model.writeJob(number: number, of: brief)
+            let job = try await model.writeJob(number: number, of: brief)
+            log("job \(number)", job.map { [$0.startDate ?? "-", $0.endDate ?? "-", $0.duties ?? ""] })
+            return job
         }
 
         func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
-            try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+            let duties = try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+            log("job \(number) repair", duties)
+            return duties
         }
 
-        func writeTools(for brief: DraftBrief) async throws -> [[String]]? { try await model.writeTools(for: brief) }
+        func writeTools(for brief: DraftBrief) async throws -> [[String]]? {
+            let tools = try await model.writeTools(for: brief)
+            log("tools", tools.map { $0.map { $0.joined(separator: " | ") } })
+            return tools
+        }
 
-        func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { try await model.writeSoftSkills(for: brief) }
+        func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
+            let qualities = try await model.writeSoftSkills(for: brief)
+            log("soft skills", qualities)
+            return qualities
+        }
 
         func writeMoreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) async throws -> DraftWriting? {
-            try await model.writeMoreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept)
+            let more = try await model.writeMoreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept)
+            log("more skills \(tools)+\(qualities)", more.map { $0.technologies + ["/"] + $0.softSkills })
+            return more
         }
 
         func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
-            try await model.writeSummary(for: brief, duties: duties, skills: skills)
+            let summary = try await model.writeSummary(for: brief, duties: duties, skills: skills)
+            log("summary", summary.map { [$0] })
+            return summary
         }
 
         func repairSummary(
             for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
         ) async throws -> String? {
-            try await model.repairSummary(for: brief, duties: duties, skills: skills, kept: kept, rejected: rejected, problems: problems)
+            let summary = try await model.repairSummary(
+                for: brief, duties: duties, skills: skills, kept: kept, rejected: rejected, problems: problems
+            )
+            log("summary repair", [summary ?? "none", "kept: " + kept.joined(separator: " "), "rejected: " + rejected.joined(separator: " ")] + problems)
+            return summary
+        }
+
+        private func log(_ step: String, _ answer: [String]?) {
+            requests.append(RequestRecord(step: step, answer: answer))
         }
     }
 }

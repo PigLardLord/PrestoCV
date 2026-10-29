@@ -80,6 +80,14 @@ enum UncheckedCause: Equatable, Sendable, CustomStringConvertible {
     }
 }
 
+// MARK: - One request
+
+/// One request of the sections and the model's answer to it, before the rules: nil when it gave none.
+struct RequestRecord: Encodable, Equatable {
+    let step: String
+    let answer: [String]?
+}
+
 // MARK: - One run
 
 /// One input drafted once: the three drafts, what the check did, and the counts of the final one.
@@ -96,6 +104,9 @@ struct DraftMeasure: Encodable {
     let raw: CVData?
     /// What the second pass wrote around the facts, before the rules (ADR 0031); nil when it was not asked, failed or wrote nothing.
     let writing: DraftWriting?
+    /// Each request of the sections in the order it ran, with what the model answered before any rule: a rejected summary or a
+    /// dropped skill shows here and nowhere else.
+    let requests: [RequestRecord]
     /// The model's draft after the rules of ADR 0023, before the claim check.
     let grounded: CVData?
     /// What the use case returns, and the app shows.
@@ -123,7 +134,7 @@ struct DraftMeasure: Encodable {
     let failure: String?
 
     init(
-        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, writing: DraftWriting? = nil,
+        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, writing: DraftWriting? = nil, requests: [RequestRecord] = [],
         grounded: CVData?, result: GeneratedDraft?, error: (any Error)?, checks: [CheckEvent]
     ) {
         self.revision = revision
@@ -135,6 +146,7 @@ struct DraftMeasure: Encodable {
         self.load = load
         self.raw = raw
         self.writing = writing
+        self.requests = requests
         self.grounded = grounded
         self.final = result?.cvData
         unchecked = result?.personalItemsUnchecked ?? false
