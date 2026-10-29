@@ -148,7 +148,11 @@ extension CVDataSanitizer {
             let written = WrittenText(source: source, claimed: entries.claimed(in: source), wordList: wordList, tagger: lexicalClasses)
             let job = entries.jobs[index]
             let language = source.explainer.language
-            let rule = DutyRule(job: job, among: entries.jobs, source: source, entries: entries, written: written)
+            let kept = keptJobs(entries.jobs, source, entries)
+            let isGeneral = Self.generalDutyJob(among: kept.map(\.experience)).map { kept[$0].job.subject == job.subject } ?? false
+            let rule = DutyRule(
+                job: job, among: entries.jobs, source: source, entries: entries, written: written, takesGeneralDuties: isGeneral
+            )
             let reason = { (sentence: String, quotes: ProseQuotes) -> String? in
                 source.written(sentence, quoting: quotes, allowsNumbers: true) { _ in false } != nil ? nil : rule.rejection(of: sentence)
             }
@@ -156,7 +160,8 @@ extension CVDataSanitizer {
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
             // achievements stays an achievement, so it counts toward none of the job's text (#354).
-            verdicts.pinned = entries.pinnedDuties(of: job.subject).flatMap { $0.kept { reason($0, rule.evidence.quotable) == nil ? $0 : nil } }
+            let said = entries.pinnedDuties(of: job.subject) + (isGeneral ? entries.generalDuties() : [])
+            verdicts.pinned = said.flatMap { $0.kept { reason($0, rule.evidence.quotable) == nil ? $0 : nil } }
                 .map { FirstPersonDuty.written($0, current: current, language: language, wordList: wordList) }
             verdicts.avoid = rule.wordsToAvoid()
 
@@ -375,12 +380,19 @@ extension CVDataSanitizer {
         private let otherEmployers: [String]
         private let source: DescriptionText
         private let written: WrittenText
+        private let generalQuotes: ProseQuotes?
 
-        init(job: Entries.Job, among jobs: [Entries.Job], source: DescriptionText, entries: Entries, written: WrittenText) {
+        /// `takesGeneralDuties` when the job is the current one, which takes the duties the person said with no job (ADR 0031, D7):
+        /// a sentence that quotes them is then the person's own too.
+        init(
+            job: Entries.Job, among jobs: [Entries.Job], source: DescriptionText, entries: Entries, written: WrittenText,
+            takesGeneralDuties: Bool
+        ) {
             let title = entries.jobTitle(of: job)
             let otherJobs = jobs.filter { $0.subject != job.subject }
             self.job = job
             evidence = entries.evidence(of: job.subject)
+            generalQuotes = takesGeneralDuties ? entries.generalDutyQuotes : nil
             ownWords = CVDataSanitizer.words(of: [title])
             foreignWords = CVDataSanitizer.foreignWords(of: otherJobs.map(\.company), own: ownWords, language: source.explainer.language)
             otherTitles = CVDataSanitizer.otherTitles(otherJobs.map(\.title), own: title)
@@ -391,8 +403,9 @@ extension CVDataSanitizer {
 
         /// Whether `sentence` quotes, with no number, the clauses of this job alone: then it is the person's own.
         func quotesOwnClauses(_ sentence: String) -> Bool {
-            guard let attributed = evidence.quotableByAttribution else { return false }
-            return source.written(sentence, quoting: attributed, allowsNumbers: false, orPlain: { _ in false }) != nil
+            [evidence.quotableByAttribution, generalQuotes].compactMap { $0 }.contains { quotes in
+                source.written(sentence, quoting: quotes, allowsNumbers: false, orPlain: { _ in false }) != nil
+            }
         }
 
         /// Why `sentence` goes from the job's text; nil when it stays.

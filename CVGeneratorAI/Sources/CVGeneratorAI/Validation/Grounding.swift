@@ -790,10 +790,22 @@ extension Grounding {
     /// place or title, one of them claims something, and the sentence holds no number and no word of wish, doubt, future or search
     /// ("I am now looking for a technical manager role"): the skills requests read them, which no job's request reads.
     func ownSentences() -> [String] {
+        ownSentencePlaces().compactMap(text(of:))
+    }
+
+    /// The text of the clauses at `places`, whole, or nil when it is empty.
+    private func text(of places: [Place]) -> String? {
+        let text = places.map { clauses.clause(at: $0).source }.joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+        return text.isEmpty ? nil : text
+    }
+
+    /// The clauses of each of the person's own sentences (`ownSentences`), in their order.
+    private func ownSentencePlaces() -> [[Place]] {
         let language = explainer.language
         let personWords = Set(reading.ofPerson.flatMap { $0 })
         let bySentence = Dictionary(grouping: clauses.places, by: \.sentence)
-        return bySentence.keys.sorted().compactMap { sentence -> String? in
+        return bySentence.keys.sorted().compactMap { sentence -> [Place]? in
             let places = bySentence[sentence, default: []].sorted { $0.clause < $1.clause }
             let words = places.flatMap { clauses.clause(at: $0).words }
             guard !places.isEmpty, Vocabulary.modality(in: words, language: language).isEmpty,
@@ -809,10 +821,28 @@ extension Grounding {
                   places.allSatisfy({ place in
                       reading.speaks(at: place) && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
                   }) else { return nil }
-            let text = places.map { clauses.clause(at: $0).source }.joined()
-                .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
-            return text.isEmpty ? nil : text
+            return places
         }
+    }
+
+    /// ADR 0031, D7: the person's own sentences (`ownSentences`) that say, in the present and in the first person, what they do at
+    /// work (`GeneralDuty`), each a duty of the current job, word for word.
+    func generalDuties() -> [PinnedDuty] {
+        generalDutyPlaces().compactMap(text(of:)).map { sentence in
+            let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            let duty = text.prefix(1).uppercased() + text.dropFirst() + "."
+            return PinnedDuty(text: duty, parts: [duty])
+        }
+    }
+
+    /// The clauses of the duties the person said with no job (`generalDuties`), as the current job's own quotes: the job's rule
+    /// keeps them as it keeps the clauses attributed to it.
+    var generalDutyQuotes: ProseQuotes {
+        ProseQuotes(sources: generalDutyPlaces().flatMap { $0 }.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language)
+    }
+
+    private func generalDutyPlaces() -> [[Place]] {
+        ownSentencePlaces().filter { places in text(of: places).map { GeneralDuty.holds($0, language: explainer.language) } ?? false }
     }
 
     /// The words that say the person looks for something, in the six languages: what follows is no work of theirs.

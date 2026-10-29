@@ -102,6 +102,16 @@ struct Entries {
         grounding.pinnedDuties(of: subject)
     }
 
+    /// The duties the person said with no job, for the current job (`Grounding.generalDuties`, ADR 0031, D7).
+    func generalDuties() -> [Grounding.PinnedDuty] {
+        grounding.generalDuties()
+    }
+
+    /// The clauses of those duties, as the current job's own quotes (`Grounding.generalDutyQuotes`).
+    var generalDutyQuotes: ProseQuotes {
+        grounding.generalDutyQuotes
+    }
+
     /// The job's title the description supports, or, for a job named only in an employer clause coordinated after
     /// another job's ("a technician at Alpha from 2016 to 2019, then at Beta from 2019 to 2021"), the head job's supported title,
     /// when the job's own title is empty or a part of it.

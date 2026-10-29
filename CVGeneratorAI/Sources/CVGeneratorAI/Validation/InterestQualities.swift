@@ -8,7 +8,13 @@ extension CVDataSanitizer {
         let subjects = language.map { interestSubjects[$0] ?? [] } ?? interestSubjects.values.reduce(into: []) { $0.formUnion($1) }
         if words.contains(where: subjects.contains) { return true }
         if words.contains(where: likingWords.contains), words.contains(where: workWords.contains) { return true }
-        let normalized = DescriptionText.normalized(interest)
+        return holdsAQualityAtWork(interest)
+    }
+
+    /// Whether `text` holds the words of a quality at work (`qualityStems`): "calm", "patience", "teamwork".
+    static func holdsAQualityAtWork(_ text: String) -> Bool {
+        let normalized = DescriptionText.normalized(text)
+        let words = Word.words(in: text).map(\.folded)
         return qualityStems.contains { stem in
             stem.contains(" ") ? normalized.contains(stem) : words.contains { $0.hasPrefix(stem) }
         }

@@ -207,9 +207,13 @@ public struct CVDataSanitizer: Sendable {
     private func sanitize(
         _ jobs: [Entries.Job], _ source: DescriptionText, _ entries: Entries, written: WrittenText, duties: [String?]
     ) -> [Experience] {
-        keptJobs(jobs, source, entries).enumerated().map { position, kept in
+        let retained = keptJobs(jobs, source, entries)
+        let general = Self.generalDutyJob(among: retained.map(\.experience))
+        return retained.enumerated().map { position, kept in
             let (job, experience) = kept
-            let rule = DutyRule(job: job, among: jobs, source: source, entries: entries, written: written)
+            let rule = DutyRule(
+                job: job, among: jobs, source: source, entries: entries, written: written, takesGeneralDuties: position == general
+            )
             let evidence = rule.evidence
             let description = { (text: String?, quotes: ProseQuotes) in
                 source.written(text, quoting: quotes, allowsNumbers: true) { rule.rejection(of: $0) == nil }
@@ -219,7 +223,8 @@ public struct CVDataSanitizer: Sendable {
             let quoteWords = Set(Self.letterWords(of: description(experience.description, evidence.quotable) ?? ""))
             // The duties the person said for the job (ADR 0031), copied from its clauses, pass the same check and come first, in
             // the job's first person (`FirstPersonDuty`); one the job's own quote already holds is not said twice.
-            let pinned = entries.pinnedDuties(of: job.subject).flatMap { $0.kept { description($0, evidence.quotable) } }.filter { duty in
+            let said = entries.pinnedDuties(of: job.subject) + (position == general ? entries.generalDuties() : [])
+            let pinned = said.flatMap { $0.kept { description($0, evidence.quotable) } }.filter { duty in
                 !Self.letterWords(of: duty).filter { $0.count >= 3 }.allSatisfy(quoteWords.contains)
             }.map { FirstPersonDuty.written($0, current: experience.current, language: source.explainer.language, wordList: wordList) }
             // A written duty that restates a said one (the same words, by their first four letters) goes.
@@ -255,6 +260,21 @@ public struct CVDataSanitizer: Sendable {
                 achievements: experience.achievements
             )
         }
+    }
+
+    /// ADR 0031, D7: the position among `jobs` of the current job, which takes the duties the person said with no job: the only job
+    /// with no end date; when every job has one, the job with the latest end year. None when two jobs or more have no end date, or
+    /// when two share the latest end year. None either when a job has no date at all, whose dates the description does not back:
+    /// it may be the current one.
+    static func generalDutyJob(among jobs: [Experience]) -> Int? {
+        guard jobs.allSatisfy({ $0.current || $0.startDate.presentValue != nil || $0.endDate.presentValue != nil }) else { return nil }
+        let open = jobs.indices.filter { jobs[$0].endDate.presentValue == nil }
+        if !open.isEmpty { return open.count == 1 ? open[0] : nil }
+        let years = jobs.map { job in
+            Word.words(in: job.endDate ?? "").filter { $0.isNumber && $0.folded.count == 4 }.compactMap { Int($0.folded) }.max()
+        }
+        guard let latest = years.compactMap({ $0 }).max(), years.filter({ $0 == latest }).count == 1 else { return nil }
+        return years.firstIndex(of: latest)
     }
 
     /// The jobs of `jobs` the rules keep, in their order, each with its grounded entry before its text is written: a job needs a

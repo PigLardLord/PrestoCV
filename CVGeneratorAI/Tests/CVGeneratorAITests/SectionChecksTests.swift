@@ -198,6 +198,95 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.tense(of: "I plan the menus.", language: .english) == nil)
     }
 
+    // MARK: The duties said with no job (ADR 0031, D7)
+
+    /// Two jobs, the later current, and what the person says with no job after them (ADR 0031, D7).
+    private static let fitter = "Dal 2009 al 2015 ho lavorato come magazziniere alla Ditta Ponzio. Dal 2015 sono frigorista alla Gelateria Morandi."
+    private static let fitterJobs = CVData(experience: [
+        job("magazziniere", "Ditta Ponzio", from: "2009", to: "2015"), job("frigorista", "Gelateria Morandi", from: "2015"),
+    ])
+
+    @Test(
+        "ADR 0031, D7: a present sentence of work with no job is a duty of the current job, in the step and the final check alike; one in the past, a quality, a pastime and one that names another employer are none",
+        arguments: [
+            ("Taro le valvole e smonto i riduttori delle linee.", true),
+            ("Taravo le valvole e smontavo i riduttori delle linee.", false),
+            ("Sono paziente e mi piace lavorare in gruppo.", false),
+            ("Gioco a calcetto con gli amici.", false),
+            ("Taro le valvole per la Ditta Ponzio.", false),
+        ]
+    )
+    func generalDutyOfTheCurrentJob(sentence: String, moves: Bool) throws {
+        let description = Self.fitter + " " + sentence
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, nil], technologies: [], softSkills: [])
+
+        let current = try sanitizer.dutyCheck(of: Self.fitterJobs, job: 1, duties: nil, against: description)
+        let ended = try sanitizer.dutyCheck(of: Self.fitterJobs, job: 0, duties: nil, against: description)
+        let final = try sanitizer.sanitize(Self.fitterJobs, writing: writing, against: description).experience
+        let opening = String(sentence.prefix { $0 != " " })
+
+        let currentText = final.first { $0.company == "Gelateria Morandi" }?.description ?? ""
+        let endedText = final.first { $0.company == "Ditta Ponzio" }?.description ?? ""
+
+        #expect(current.pinned.contains(sentence) == moves, "pinned \(current.pinned)")
+        #expect(!ended.pinned.contains { $0.contains(opening) }, "pinned \(ended.pinned)")
+        #expect(currentText.contains(sentence) == moves, "final \(final)")
+        #expect(!endedText.contains(opening), "final \(final)")
+    }
+
+    @Test("ADR 0031, D7: with two current jobs, a present sentence of work with no job is a duty of neither")
+    func generalDutyOfTwoCurrentJobs() throws {
+        let description = "Dal 2009 sono magazziniere alla Ditta Ponzio. Dal 2015 sono frigorista alla Gelateria Morandi. "
+            + "Taro le valvole e smonto i riduttori delle linee."
+        let jobs = CVData(experience: [Self.job("magazziniere", "Ditta Ponzio", from: "2009"), Self.job("frigorista", "Gelateria Morandi", from: "2015")])
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, nil], technologies: [], softSkills: [])
+
+        let final = try sanitizer.sanitize(jobs, writing: writing, against: description).experience
+
+        #expect(!final.contains { ($0.description ?? "").contains("Taro") }, "final \(final)")
+    }
+
+    #if canImport(NaturalLanguage)
+    // English verbs are read with the device's language data, which only an Apple platform has.
+    @Test(
+        "ADR 0031, D7: in English too, a present sentence of work with no job is a duty of the current job; one in the past and a pastime are none",
+        arguments: [
+            ("I rebuild the carburettors and tune the fuel pumps.", true),
+            ("I rebuilt the carburettors and tuned the fuel pumps.", false),
+            ("I play football.", false),
+        ]
+    )
+    func generalDutyInEnglish(sentence: String, moves: Bool) throws {
+        let description = "From 2012 to 2019 I was a deckhand at Pelican Ferries. Since 2019 I have been a boat mechanic at Gullwing Marina. "
+            + sentence
+        let jobs = CVData(experience: [
+            Self.job("deckhand", "Pelican Ferries", from: "2012", to: "2019"), Self.job("boat mechanic", "Gullwing Marina", from: "2019"),
+        ])
+        let english = CVDataSanitizer(languageOfText: { _ in "en" })
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, nil], technologies: [], softSkills: [])
+
+        let final = try english.sanitize(jobs, writing: writing, against: description).experience
+
+        let currentText = final.first { $0.company == "Gullwing Marina" }?.description ?? ""
+        let endedText = final.first { $0.company == "Pelican Ferries" }?.description ?? ""
+
+        #expect(currentText.contains(sentence) == moves, "final \(final)")
+        #expect(!endedText.contains("carburettors"), "final \(final)")
+    }
+    #endif
+
+    @Test("ADR 0031, D7: the current job is the only one with no end date, or the one with the latest end year; two open jobs, a tie or an undated job give none")
+    func currentJobOfTheGeneralDuties() {
+        let ended = { (end: String) in Self.job("tecnico", "Officina Breda", from: "2001", to: end) }
+        let open = Self.job("tecnico", "Officina Breda", from: "2001")
+
+        #expect(CVDataSanitizer.generalDutyJob(among: [ended("2010"), open, ended("2015")]) == 1)
+        #expect(CVDataSanitizer.generalDutyJob(among: [open, ended("2015"), open]) == nil)
+        #expect(CVDataSanitizer.generalDutyJob(among: [Experience(title: "tecnico", company: "Officina Breda"), open]) == nil)
+        #expect(CVDataSanitizer.generalDutyJob(among: [ended("2010"), ended("marzo 2019"), ended("2015")]) == 1)
+        #expect(CVDataSanitizer.generalDutyJob(among: [ended("2019"), ended("2015"), ended("2019")]) == nil)
+    }
+
     // MARK: The context of each job
 
     @Test("Each job the facts keep gets the clauses of the description that belong to it, in the order of the facts, and the field the person states")
