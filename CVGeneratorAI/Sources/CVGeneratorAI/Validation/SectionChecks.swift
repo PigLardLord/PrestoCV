@@ -182,6 +182,8 @@ extension CVDataSanitizer {
                 var rejection: String?
                 if words.count < 3 || words.last.map(Self.dutyConjunctions.contains) == true {
                     rejection = "it is not a whole sentence"
+                } else if Self.isVague(sentence) {
+                    rejection = Self.vagueReason
                 } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
                     rejection = Self.onlyWhereReason
                 } else if let ruled = reason(sentence, quotes) {
@@ -223,10 +225,12 @@ extension CVDataSanitizer {
 
     static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
 
-    // MARK: Filler duties (#354, round 11)
+    // MARK: Filler and vague duties (#354, round 11)
 
     /// Why a written duty that only says where the person worked goes ("Ho lavorato allo Studio Contabile Merlini.").
     static let onlyWhereReason = "it says only where the person worked: name a task of the job"
+    /// Why a written duty that names its task through a vague phrase goes ("Ho svolto compiti legati alla gestione dei documenti.").
+    static let vagueReason = "it names no task, only what the tasks relate to: name the task itself"
 
     /// The names of `cvData` that say no work: its employers, schools, person and places.
     static func ownNames(of cvData: CVData) -> [String] {
@@ -252,6 +256,20 @@ extension CVDataSanitizer {
     static func saysWorking(_ text: String) -> Bool {
         Word.words(in: text).contains { workVerbs.contains($0.folded) }
     }
+
+    /// Whether `duty` names its task only through what it relates to ("tasks related to", "compiti legati a"), in the six
+    /// languages: the reader rejects it as a duty of any job (#354, round 11).
+    static func isVague(_ duty: String) -> Bool {
+        let folded = " " + Word.words(in: duty).map(\.folded).joined(separator: " ") + " "
+        return vaguePhrases.contains { folded.contains(" \($0) ") }
+    }
+
+    /// The vague phrases of a duty, folded.
+    private static let vaguePhrases = [
+        "compiti legati", "compito legato", "attivita relative", "attivita relativa", "attivita legate", "mansioni legate",
+        "tasks related to", "task related to", "duties related to", "duty related to", "tareas relacionadas", "tarea relacionada",
+        "taches liees", "tache liee", "aufgaben im bereich", "tarefas relacionadas", "tarefa relacionada",
+    ]
 
     /// The words of five letters or more of a clause on a job that name no work, folded: times and the start of a job.
     private static let notWorkWords: Set<String> = [

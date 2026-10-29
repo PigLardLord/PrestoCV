@@ -81,7 +81,7 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.opening(of: "Ich habe die Regale montiert.") == nil)
     }
 
-    // MARK: Filler duties (#354, round 11)
+    // MARK: Filler and vague duties (#354, round 11)
 
     /// The jobs of it-traps: a current one with a duty the person said, and an ended one the person only named.
     private static let itTrapsJobs = CVData(
@@ -119,6 +119,35 @@ struct SectionChecksTests {
         #expect(verdicts.kept == ["Archiviavo le pratiche dei clienti."])
         #expect(verdicts.rejected.map(\.sentence) == ["Ho lavorato allo Studio Contabile Merlini."])
         #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.onlyWhereReason])
+    }
+
+    @Test("A written duty that names its task only through a vague phrase goes, with its reason; one that names the task stays (#354, round 11)")
+    func vagueDuty() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 0,
+            duties: "Ho svolto compiti legati alla gestione dei documenti. Gestisco l'archivio dei documenti dei clienti.",
+            against: try Self.itTraps()
+        )
+
+        #expect(verdicts.kept == ["Gestisco l'archivio dei documenti dei clienti."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Ho svolto compiti legati alla gestione dei documenti."])
+        #expect(verdicts.rejected.first?.reason.contains("name the task itself") == true)
+    }
+
+    @Test("The vague phrases of a duty, in the six languages; a duty that names its task has none (#354, round 11)", arguments: [
+        ("Ho svolto compiti legati alla gestione dei documenti.", true),
+        ("Seguivo attività relative alla contabilità.", true),
+        ("I handled tasks related to the archive.", true),
+        ("I carried out duties related to payroll.", true),
+        ("Realizaba tareas relacionadas con la contabilidad.", true),
+        ("J'effectuais des tâches liées à la comptabilité.", true),
+        ("Ich übernahm Aufgaben im Bereich der Buchhaltung.", true),
+        ("Realizava tarefas relacionadas com a contabilidade.", true),
+        ("Gestisco l'archivio dei documenti dei clienti.", false),
+        ("I sort the tasks of the day by urgency.", false),
+    ])
+    func vaguePhrase(duty: String, vague: Bool) {
+        #expect(CVDataSanitizer.isVague(duty) == vague)
     }
 
     // MARK: D6, the typical duties of a job the person described (#354, round 1)
