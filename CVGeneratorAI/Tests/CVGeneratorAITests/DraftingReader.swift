@@ -144,6 +144,18 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// and no product, name or device ("sistema di tracciamento dati", "máquina de escaneo de registros", "Montagesystem"; #354,
     /// round 9). A bare head is a category (`categoryAsTechnology`).
     case genericSystemTechnology
+    /// A summary sentence in the present tense, after the opening, whose words of the work come mostly from the duties of an ended
+    /// job and from no current one, while a job is current ("I maintain the machinery…" of an ended forklift driver; #354, round 10).
+    case endedDutyInSummary
+    /// A summary clause after a comma that praises the person's own quality ("…, was meine Präzision zeigt", "…, which shows my
+    /// care"), after the first one of the summary (#354, round 10).
+    case selfPraiseTail
+    /// A word of how often ("daily", "mensuales", "annuel") in the summary or a job's duties, of a frequency the description does
+    /// not say (#354, round 10).
+    case inventedFrequency
+    /// A soft skill of three words or more that opens with a gerund, a clause of the description ("working closely with directors";
+    /// #354, round 10).
+    case gerundSoftSkill
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -197,6 +209,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .rewordedDuty: "one duty said twice in a job"
         case .repeatedTail: "two summary sentences with one closing clause"
         case .genericSystemTechnology: "a generic system as a technology"
+        case .endedDutyInSummary: "a duty of an ended job in the present in the summary"
+        case .selfPraiseTail: "a self-praise closing clause after the first"
+        case .inventedFrequency: "a frequency the description does not say"
+        case .gerundSoftSkill: "a clause with a gerund as a soft skill"
         }
     }
 }
@@ -292,6 +308,10 @@ enum ReaderRules {
             found.append(ReaderFinding(kind: .toolAsSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
         found += sameQualities(in: cv)
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && isGerundClause(skill.name, language: language) {
+            found.append(ReaderFinding(kind: .gerundSoftSkill, path: "skills[\(index)].name", value: skill.name))
+        }
+        found += inventedFrequencies(in: cv, of: input.description)
         for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
         }
@@ -549,6 +569,9 @@ enum ReaderRules {
         }
         found += floorCollisions(in: sentences).map { ReaderFinding(kind: .floorVerbCollision, path: "summary", value: $0) }
         found += repeatedTails(in: sentences).map { ReaderFinding(kind: .repeatedTail, path: "summary", value: $0) }
+        found += endedDuties(in: sentences, of: cv, language: input.language)
+            .map { ReaderFinding(kind: .endedDutyInSummary, path: "summary", value: $0) }
+        found += selfPraiseTails(in: sentences).map { ReaderFinding(kind: .selfPraiseTail, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -1347,6 +1370,73 @@ enum ReaderRules {
             return !tails.insert([first, last]).inserted
         }
     }
+
+    /// The summary sentences after the opening, in the present tense, whose words of the work (`anchorStems`) are at least three
+    /// and at least half from the duties of the ended jobs and not from the titles and duties of the current ones, when a job is
+    /// current and one has ended.
+    static func endedDuties(in sentences: [String], of cv: CVData, language: String) -> [String] {
+        let ended = cv.experience.filter { !$0.current }
+        let current = cv.experience.filter(\.current)
+        guard !ended.isEmpty, !current.isEmpty else { return [] }
+        let endedStems = anchorStems(of: ended.map { $0.description ?? "" })
+        let currentStems = anchorStems(of: current.map { $0.description ?? "" } + current.map(\.title))
+        return sentences.dropFirst().filter { sentence in
+            guard tense(of: withoutConnector(sentence), language: language) == .present else { return false }
+            let stems = anchorStems(of: [sentence])
+            let only = stems.intersection(endedStems).subtracting(currentStems)
+            return only.count >= 3 && only.count * 2 >= stems.count
+        }
+    }
+
+    /// The summary sentences with a clause after a comma that praises the person's own quality, after the first such sentence.
+    static func selfPraiseTails(in sentences: [String]) -> [String] {
+        Array(sentences.filter { sentence in
+            let folded = " " + letterWords(of: sentence).joined(separator: " ") + " "
+            return sentence.contains(",") && selfPraise.contains { folded.range(of: $0, options: .regularExpression) != nil }
+        }.dropFirst())
+    }
+
+    /// The patterns of a self-praise clause over a sentence's folded words, joined by single spaces, in the six languages.
+    static let selfPraise = [
+        " was mein(e|en|er|em)? [a-z]+ [a-z]+ $", " which [a-z]+ my ", " che [a-z]+ (la mia|il mio|le mie|i miei) ",
+        " ce qui [a-z]+ (mon|ma|mes) ", " lo que [a-z]+ (mi|mis) ", " o que [a-z]+ (o meu|a minha|os meus|as minhas) ",
+    ]
+
+    /// Whether a soft skill of three words or more opens with a gerund ("working closely with directors", "gestendo i rapporti
+    /// con i clienti"), not followed by a conjunction ("planning and organising" is a pair of skills).
+    static func isGerundClause(_ name: String, language: String) -> Bool {
+        let words = letterWords(of: name)
+        guard words.count >= 3, let first = words.first, !["and", "e", "y", "et", "und", "o", "or"].contains(words[1]) else { return false }
+        switch language {
+        case "en": return first.count > 5 && first.hasSuffix("ing")
+        case "fr": return first == "en" && words[1].hasSuffix("ant")
+        default: return isGerund(first, language: language)
+        }
+    }
+
+    /// The words of how often in the summary and the job descriptions of `cv` whose frequency no word of `description` says.
+    static func inventedFrequencies(in cv: CVData, of description: String) -> [ReaderFinding] {
+        let said = Set(letterWords(of: description).compactMap(frequency(of:)))
+        let texts = [("summary", cv.summary ?? "")]
+            + cv.experience.enumerated().map { ("experience[\($0.offset)].description", $0.element.description ?? "") }
+        return texts.flatMap { path, text in
+            letterWords(of: text).filter { word in frequency(of: word).map { !said.contains($0) } ?? false }
+                .map { ReaderFinding(kind: .inventedFrequency, path: path, value: $0) }
+        }
+    }
+
+    /// The frequency a folded word says, by the beginnings of its words in the six languages.
+    static func frequency(of word: String) -> String? {
+        frequencyWords.first { _, beginnings in beginnings.contains(where: word.hasPrefix) }?.key
+    }
+
+    static let frequencyWords: [String: [String]] = [
+        "daily": ["daily", "quotidian", "quotidien", "giornalier", "giornalment", "diari", "taglich"],
+        "weekly": ["weekly", "settimanal", "semanal", "hebdomadaire", "wochentlich"],
+        "monthly": ["monthly", "mensil", "mensual", "mensal", "mensais", "mensuel", "monatlich"],
+        "yearly": ["yearly", "annual", "annuel", "anual", "jahrlich"],
+        "quarterly": ["quarterly", "trimestr", "quartalsweise", "vierteljahrlich"],
+    ]
 
     /// The summary sentences that open with the verb of a sentence that opens as code writes the opening ("Lavoro come X."):
     /// the opening repeats the verb of the person's own sentence.

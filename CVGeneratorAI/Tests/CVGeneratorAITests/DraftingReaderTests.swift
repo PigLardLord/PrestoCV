@@ -396,6 +396,62 @@ struct DraftingReaderTests {
         #expect(counted("Ich baue Regale auf. Ich messe Wände aus, was meine Geduld zeigt.") == [])
     }
 
+    @Test("A present summary sentence of an ended job's duties is counted; one of a current job, and one in the past, are not (#354, round 10)")
+    func endedDutyInSummary() {
+        let jobs = [
+            Experience(title: "caposala", company: "Ostello Pino", current: true, description: "Organizzo i turni del personale di sala."),
+            Experience(title: "cameriere", company: "Trattoria Faggio", description: "Ho servito i piatti ai tavoli. Ho apparecchiato i coperti serali."),
+        ]
+        let counted = { (summary: String) in
+            Self.reader(CVData(summary: summary, experience: jobs), "it").filter { $0.kind == .endedDutyInSummary }.map(\.value)
+        }
+
+        #expect(counted("Lavoro come caposala. Servo i piatti ai tavoli e apparecchio i coperti serali.")
+            == ["Servo i piatti ai tavoli e apparecchio i coperti serali."])
+        #expect(counted("Lavoro come caposala. Organizzo i turni del personale di sala con cura.") == [])
+        #expect(counted("Lavoro come caposala. Ho servito i piatti ai tavoli e apparecchiato i coperti serali.") == [])
+    }
+
+    @Test("A self-praise closing clause after the first is counted; the first one and a clause on the work are not (#354, round 10)")
+    func selfPraiseTail() {
+        let counted = { (summary: String, language: String) in
+            Self.reader(CVData(summary: summary), language).filter { $0.kind == .selfPraiseTail }.map(\.value)
+        }
+
+        #expect(counted("Ich baue Regale auf, was meine Sorgfalt zeigt. Ich messe Wände aus, was meine Geduld beweist.", "de")
+            == ["Ich messe Wände aus, was meine Geduld beweist."])
+        #expect(counted("Ich baue Regale auf, was meine Sorgfalt zeigt. Ich messe Wände aus, was die Stabilität erhöht.", "de") == [])
+        #expect(counted("I pack the orders, which shows my care. I label the boxes, which shows my focus.", "en")
+            == ["I label the boxes, which shows my focus."])
+        #expect(counted("Preparo gli ordini, che dimostra la mia cura. Etichetto le scatole, che dimostra la mia attenzione.", "it")
+            == ["Etichetto le scatole, che dimostra la mia attenzione."])
+    }
+
+    @Test("A frequency the description does not say is counted; one it says is not (#354, round 10)")
+    func inventedFrequency() {
+        let counted = { (description: String, said: String) in
+            let input = DraftingInput(id: "reader-es", kind: .plain, language: "es", description: said, facts: [], traps: [])
+            let cv = CVData(experience: [Experience(title: "contable", company: "Taller Olmo", description: description)])
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .inventedFrequency }.map(\.value)
+        }
+
+        #expect(counted("Reviso los pagos semanales. Archivo los recibos mensuales.", "Llevo las cuentas del taller.") == ["semanales", "mensuales"])
+        #expect(counted("Reviso los pagos semanales.", "Reviso cada semana los pagos semanales del taller.") == [])
+    }
+
+    @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")
+    func gerundSoftSkill() {
+        let counted = { (names: [String], language: String) in
+            Self.reader(CVData(skills: names.map { Skill(name: $0, kind: .softSkill) }), language)
+                .filter { $0.kind == .gerundSoftSkill }.map(\.value)
+        }
+
+        #expect(counted(["talking openly with clients", "calm", "planning and organising", "active listening"], "en")
+            == ["talking openly with clients"])
+        #expect(counted(["ascoltando con cura i colleghi", "precisa"], "it") == ["ascoltando con cura i colleghi"])
+    }
+
     @Test("A role, the noun of an activity or a document as a technology is counted; a tool, a tool with an acronym and a kind of model are not (#354, round 5)")
     func nonToolTechnology() {
         let counted = { (names: [String], language: String) in
