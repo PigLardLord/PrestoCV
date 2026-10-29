@@ -793,7 +793,8 @@ extension CVDataSanitizer {
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a technology that names an activity
     /// (`namesAnActivity`); the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
-    /// verb, a skill in another language and a soft skill that names a tool go; so does a technology that is a bare kind of tool
+    /// verb, a skill in another language and a soft skill that names a tool go, and so does stationery, furniture or protective wear
+    /// (`namesAnEverydayObject`); so does a technology that is a bare kind of tool
     /// ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo") stays (#354, round 4). A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
     /// and a soft skill the description writes only as a name goes (`namesAName`).
@@ -867,6 +868,8 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesAPart(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
+                } else if Self.namesAnEverydayObject(item) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "an everyday object, not a tool of the trade"))
                 } else if Self.namesAKindOfTool(item, language: language), !item.contains(" ") {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
@@ -935,6 +938,33 @@ extension CVDataSanitizer {
         "tornillo", "tornillos",
         "câble", "câbles", "interrupteur", "interrupteurs", "prise", "prises", "tuyau", "tuyaux",
         "cabo", "cabos", "tomada", "tomadas", "fusível", "fusíveis", "parafuso", "parafusos",
+    ].map(skillKey))
+
+    /// Whether a technology, as a whole, is stationery, furniture or protective wear, which a person of any trade uses: the tools
+    /// request named a teacher's pen and notebooks and a warehouse's safety harness though it asks for none (#354, round 4). It
+    /// reads the whole item, not its head: a tool named with such a word stays ("tableau numérique", "Rigging Harness").
+    static func namesAnEverydayObject(_ item: String) -> Bool {
+        everydayObjectKeys.contains(skillKey(item))
+    }
+
+    /// The keys (`skillKey`) of stationery, furniture and protective wear, singular and plural, in each language.
+    private static let everydayObjectKeys: Set<String> = Set([
+        "pen", "ballpoint pen", "pencil", "paper", "sticky notes", "stapler", "ring binder", "blackboard", "chalkboard", "chalk",
+        "desk", "chair", "office chair", "table", "gloves", "safety gloves", "work gloves", "safety helmet", "hard hat",
+        "safety shoes", "safety boots", "safety vest", "hi-vis vest", "safety harness", "safety glasses", "goggles",
+        "stylo", "stylos", "crayon", "crayons", "cahier", "carnet", "papier", "classeur", "tableau noir", "tableau blanc", "craie",
+        "feutres", "chaise", "gants", "gants de protection", "casque de protection", "chaussures de sécurité", "gilet de sécurité",
+        "harnais de sécurité", "lunettes de protection",
+        "penna", "penne", "matita", "matite", "quaderno", "quaderni", "taccuino", "carta", "raccoglitore", "lavagna", "gesso",
+        "gessetti", "scrivania", "sedia", "guanti", "guanti da lavoro", "casco", "casco di protezione", "scarpe antinfortunistiche",
+        "gilet ad alta visibilità", "imbracatura", "occhiali protettivi",
+        "bolígrafo", "lápiz", "lápices", "cuaderno", "libreta", "papel", "carpeta", "archivador", "pizarra", "tiza", "escritorio",
+        "silla", "guantes", "guantes de trabajo", "botas de seguridad", "chaleco reflectante", "arnés", "gafas de protección",
+        "caneta", "lápis", "caderno", "fichário", "quadro negro", "quadro branco", "giz", "cadeira", "luvas", "capacete",
+        "botas de segurança", "colete refletor", "arnês", "óculos de proteção",
+        "kugelschreiber", "stift", "stifte", "bleistift", "heft", "hefte", "notizblock", "ordner", "tafel", "kreide",
+        "schreibtisch", "stuhl", "handschuhe", "schutzhandschuhe", "arbeitshandschuhe", "helm", "schutzhelm", "sicherheitsschuhe",
+        "warnweste", "auffanggurt", "schutzbrille",
     ].map(skillKey))
 
     /// The words that say only that the person is a professional or has experience, folded: no quality a reader can weigh, so no

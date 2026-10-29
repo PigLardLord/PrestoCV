@@ -383,6 +383,36 @@ struct SectionChecksTests {
         #expect(Set(verdict.dropped.map(\.reason)) == ["a part or a material, not a tool"])
     }
 
+    @Test("Stationery, furniture or protective wear goes from the technologies in each language; a tool of the trade stays (#354, round 4)")
+    func everydayObjectIsNoTool() {
+        let rows: [(language: String, technologies: [String], kept: [String], description: String)] = [
+            ("fr", ["tableau noir", "tableau numérique", "stylo", "vidéoprojecteur", "cahiers"], ["tableau numérique", "vidéoprojecteur"],
+             "Depuis 2019, je suis institutrice à l'école Les Tilleuls, où j'enseigne en classe de CM1."),
+            ("en", ["ballpoint pen", "label printer", "office chair", "barcode scanner", "safety gloves"], ["label printer", "barcode scanner"],
+             "Since 2021 I run the dispatch bay at Harrowgate Freight."),
+            ("it", ["penna", "multimetro", "casco di protezione", "termocamera"], ["multimetro", "termocamera"],
+             "Dal 2018 sono manutentore alle Officine Brenta, dove riparo le linee."),
+            ("es", ["bolígrafo", "Excel", "archivador", "ContaPlus"], ["Excel", "ContaPlus"],
+             "Desde 2017 soy contable en Almacenes Turia y cierro las cuentas del mes."),
+            ("pt", ["caneta", "Visual Studio Code", "cadeira", "Git"], ["Visual Studio Code", "Git"],
+             "Desde 2020 sou programador na Ribeira Digital, onde crio aplicações."),
+            ("de", ["Kugelschreiber", "Abisolierzange", "Schutzhandschuhe", "Spannungsprüfer"], ["Abisolierzange", "Spannungsprüfer"],
+             "Seit 2016 bin ich Elektriker bei Elektro Saalfeld und verlege Leitungen in Neubauten."),
+        ]
+        for row in rows {
+            let language = row.language
+            // The tagger tags no verb: the device's differs by macOS, and the row is not about verbs.
+            let tagger = ForcedLexicalTagger(Vocabulary.Language(tag: language).map { [$0: .words([])] } ?? [:])
+            let sanitizer = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: tagger, wordList: TableWordList())
+
+            let verdict = sanitizer.skillCheck(technologies: row.technologies, softSkills: [], against: row.description)
+
+            #expect(verdict.technologies == row.kept, "\(language)")
+            #expect(verdict.dropped.map(\.sentence) == row.technologies.filter { !row.kept.contains($0) }, "\(language)")
+            #expect(Set(verdict.dropped.map(\.reason)) == ["an everyday object, not a tool of the trade"], "\(language)")
+        }
+    }
+
     @Test("A skill whose words are all of English, in a description of another language, goes")
     func skillInAnotherLanguage() {
         let englishOnly = Self.italian(ForcedLexicalTagger([:]), wordList: EnglishOnly())
