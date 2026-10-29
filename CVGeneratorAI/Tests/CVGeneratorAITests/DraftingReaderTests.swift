@@ -147,6 +147,20 @@ struct DraftingReaderTests {
         #expect(counted(CVData(summary: "Trained the new staff."), "en").isEmpty)
     }
 
+    @Test("Stationery as a technology is counted, also with a word after or before its noun; a board or a pen that is a device is not (#354, round 6)")
+    func stationeryTechnology() {
+        let counted = { (names: [String], language: String) in
+            Self.reader(CVData(skills: names.map { Skill(name: $0) }), language).filter { $0.kind == .stationeryTechnology }.map(\.value)
+        }
+
+        #expect(counted(["cahiers de brouillon", "tableau interactif", "stylo"], "fr") == ["cahiers de brouillon", "stylo"])
+        #expect(counted(["quaderni di lavoro", "lavagna interattiva"], "it") == ["quaderni di lavoro"])
+        #expect(counted(["cuadernos de ejercicios", "lápiz óptico"], "es") == ["cuadernos de ejercicios"])
+        #expect(counted(["cadernos de atividades", "quadro interativo"], "pt") == ["cadernos de atividades"])
+        #expect(counted(["rote Stifte", "digitale Tafel"], "de") == ["rote Stifte"])
+        #expect(counted(["gel pens", "digital pens"], "en") == ["gel pens"])
+    }
+
     @Test("A German subordinate clause that ends with a noun after its verb is counted; one that ends with its verb is not (#354, round 5)")
     func germanVerbPosition() {
         let cv = CVData(summary: "Ich arbeite als Schleusenwärter. Ich prüfe, dass alle Tore schließen sauber nach jeder Fahrt. "

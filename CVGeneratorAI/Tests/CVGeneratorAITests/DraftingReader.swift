@@ -110,6 +110,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An Italian, Spanish or Portuguese summary sentence that opens with a past participle, as a note, and has no verb or word of
     /// the person: the participle's "-o" read as the first person ("Mantenido un enfoque preciso…"; #354, round 6).
     case participleSummary
+    /// Stationery as a technology, named alone or with a word after or before its noun ("cahiers d'exercices"); a pen that is a
+    /// device ("penna ottica") is none (#354, round 6).
+    case stationeryTechnology
     /// A German subordinate clause after "dass", "weil", "sodass" or "ob" whose finite verb is not its last word: the clause ends
     /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354, round 5).
     case germanVerbPosition
@@ -156,6 +159,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .clippedModifier: "a modifier cut from its noun as a technology"
         case .impersonalSummary: "a summary sentence with no person speaking"
         case .participleSummary: "a summary sentence that opens with a participle"
+        case .stationeryTechnology: "stationery as a technology"
         case .germanVerbPosition: "a German finite verb before the end of its subordinate clause"
         }
     }
@@ -205,6 +209,9 @@ enum ReaderRules {
                 } else if isCategory(skill.name, language: language) {
                     found.append(ReaderFinding(kind: .categoryAsTechnology, path: path, value: skill.name))
                 }
+            }
+            if skill.kind == .technology, isStationery(skill.name, language: language) {
+                found.append(ReaderFinding(kind: .stationeryTechnology, path: path, value: skill.name))
             }
             if language != "en", isEnglish(skill.name, language: language) {
                 found.append(ReaderFinding(kind: .skillInAnotherLanguage, path: path, value: skill.name))
@@ -604,6 +611,32 @@ enum ReaderRules {
         return nonToolHeads.contains(head)
             || folded.count > 1 && ["zione", "cion", "cao", "tion", "sione", "sion", "sao"].contains(where: head.hasSuffix)
     }
+
+    /// Whether a technology is stationery: its head noun (the last word in English and German, the first in the other languages)
+    /// is in `stationeryHeads`, and no word of it makes it a device (`deviceWords`).
+    static func isStationery(_ name: String, language: String) -> Bool {
+        let folded = name.split { !$0.isLetter && !$0.isNumber }.map { fold(String($0)) }
+            .filter { !linkWords.contains($0) && $0.count > 1 }
+        guard let head = ["en", "de"].contains(language) ? folded.last : folded.first else { return false }
+        return stationeryHeads.contains(head) && folded.allSatisfy { !deviceWords.contains($0) }
+    }
+
+    /// The head nouns of stationery, folded, singular and plural, in the six languages.
+    static let stationeryHeads: Set<String> = [
+        "pen", "pens", "pencil", "pencils", "paper", "notepad", "notepads",
+        "cahier", "cahiers", "carnet", "carnets", "stylo", "stylos", "crayon", "crayons", "feutre", "feutres", "papier",
+        "quaderno", "quaderni", "penna", "penne", "matita", "matite", "taccuino", "taccuini", "pennarello", "pennarelli",
+        "cuaderno", "cuadernos", "libreta", "libretas", "boligrafo", "boligrafos", "lapiz", "lapices", "rotulador", "rotuladores",
+        "caderno", "cadernos", "caneta", "canetas", "lapis", "caderneta", "cadernetas",
+        "heft", "hefte", "stift", "stifte", "bleistift", "bleistifte", "kugelschreiber", "notizblock",
+    ]
+
+    /// The words, folded, that make a pen a device of a trade ("penna ottica", "digital pens").
+    static let deviceWords: Set<String> = [
+        "digital", "digitale", "digitali", "numerique", "numeriques", "optique", "ottica", "ottiche", "optico", "opticos", "optica",
+        "otica", "otico", "optical", "electronic", "elettronica", "electronico", "eletronica", "elektronisch", "elektronische",
+        "interactive", "interattiva", "interactivo", "interativa", "interaktiv", "interaktive", "smart", "3d",
+    ]
 
     /// The head nouns of a role, an activity or a document, folded, in the six languages.
     static let nonToolHeads: Set<String> = [

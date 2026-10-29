@@ -1087,7 +1087,7 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesAPart(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
-                } else if Self.namesAnEverydayObject(item) {
+                } else if Self.namesAnEverydayObject(item) || Self.namesStationery(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "an everyday object, not a tool of the trade"))
                 } else if Self.namesABareKind(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
@@ -1163,6 +1163,31 @@ extension CVDataSanitizer {
     static func namesAnEverydayObject(_ item: String) -> Bool {
         everydayObjectKeys.contains(skillKey(item))
     }
+
+    /// Whether a technology is stationery named with a word after or before its noun ("cahiers d'exercices", "gel pens"): the tools
+    /// request named a teacher's exercise books once the whole-item list kept them out (#354, round 6). A board is no stationery
+    /// ("tableau interactif"), and a pen that is a device stays ("lápiz óptico", "digital pens").
+    static func namesStationery(_ item: String, language: String?) -> Bool {
+        guard let head = headKey(of: item, language: language), stationeryHeadKeys.contains(head) else { return false }
+        return item.lowercased().split { !$0.isLetter && !$0.isNumber }.allSatisfy { !deviceWords.contains(String($0)) }
+    }
+
+    /// The keys (`skillKey`) of the head nouns of stationery in each language.
+    private static let stationeryHeadKeys: Set<String> = Set([
+        "pens", "pencil", "pencils", "paper",
+        "cahier", "cahiers", "carnet", "carnets", "stylo", "stylos", "crayon", "crayons", "feutre", "feutres", "papier",
+        "quaderno", "quaderni", "penna", "penne", "matita", "matite", "taccuino", "taccuini", "pennarello", "pennarelli",
+        "cuaderno", "cuadernos", "libreta", "libretas", "bolígrafo", "bolígrafos", "lápiz", "lápices", "rotulador", "rotuladores",
+        "caderno", "cadernos", "caneta", "canetas", "lápis", "caderneta", "cadernetas",
+        "heft", "hefte", "stift", "stifte", "bleistift", "bleistifte", "kugelschreiber", "notizblock",
+    ].map(skillKey))
+
+    /// The words that make a pen or a pencil a device of a trade ("penna ottica", "Digitalstift" is one word and no stationery head).
+    private static let deviceWords: Set<String> = [
+        "digital", "digitale", "digitali", "numérique", "numériques", "optique", "optiques", "ottica", "ottiche", "óptico", "ópticos",
+        "óptica", "ótica", "ótico", "optical", "electronic", "elettronica", "electrónico", "eletrônica", "elektronisch", "elektronische",
+        "interactive", "interattiva", "interactivo", "interativa", "interaktiv", "interaktive", "smart", "3d",
+    ]
 
     /// The keys (`skillKey`) of stationery, furniture and protective wear, singular and plural, in each language.
     private static let everydayObjectKeys: Set<String> = Set([

@@ -471,6 +471,27 @@ struct SectionChecksTests {
         }
     }
 
+    @Test("Stationery named with a word after or before its noun goes as an everyday object; a board or a pen that is a device stays (#354, round 6)",
+          arguments: [
+              ("fr", "cahiers de brouillon", "tableau interactif", "Depuis 2019, je suis institutrice à l'école Les Tilleuls, où j'enseigne en classe de CM1."),
+              ("it", "quaderni di lavoro", "lavagna interattiva", "Dal 2018 insegno alla scuola Collodi di Prato, dove preparo le lezioni."),
+              ("es", "cuadernos de ejercicios", "lápiz óptico", "Desde 2017 soy profesora en el colegio Turia y preparo las clases."),
+              ("pt", "cadernos de atividades", "quadro interativo", "Desde 2020 sou professora na escola Ribeira, onde preparo as aulas."),
+              ("de", "rote Stifte", "digitale Tafel", "Seit 2016 bin ich Lehrerin an der Grundschule Saalfeld und bereite den Unterricht vor."),
+              ("en", "gel pens", "digital pens", "Since 2021 I run the dispatch bay at Harrowgate Freight."),
+          ] as [(String, String, String, String)])
+    func stationeryWithAWordIsNoTool(language: String, stationery: String, tool: String, description: String) {
+        // The tagger tags no verb: the device's differs by macOS, and the row is not about verbs.
+        let tagger = ForcedLexicalTagger(Vocabulary.Language(tag: language).map { [$0: .words([])] } ?? [:])
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: tagger, wordList: TableWordList())
+
+        let verdict = sanitizer.skillCheck(technologies: [stationery, tool], softSkills: [], against: description)
+
+        #expect(verdict.technologies == [tool])
+        #expect(verdict.dropped.map(\.sentence) == [stationery])
+        #expect(verdict.dropped.map(\.reason) == ["an everyday object, not a tool of the trade"])
+    }
+
     @Test("A skill whose words are all of English, in a description of another language, goes")
     func skillInAnotherLanguage() {
         let englishOnly = Self.italian(ForcedLexicalTagger([:]), wordList: EnglishOnly())
