@@ -13,6 +13,9 @@ struct SeparableVerbsTests {
         ("Ich sorge dafür, dass die Pumpen sicher laufen.", "Ich sorge dafür, dass die Pumpen sicher laufen."),
         ("Ich arbeite als Teil des Teams mit Kollegen.", "Ich arbeite als Teil des Teams mit Kollegen."),
         ("Ich halte die Ersatzteile bereit, damit wir bereit sind.", "Ich halte die Ersatzteile bereit, damit wir bereit sind."),
+        // A noun before a verb is no particle, though a particle is spelt as it is ("Teil"; #354, round 8).
+        ("Ich prüfe die Schleuse, indem ich auf jedes Teil achte.", "Ich prüfe die Schleuse, indem ich auf jedes Teil achte."),
+        ("Ich arbeite gern, weil ich an jeder Übung teil nehme.", "Ich arbeite gern, weil ich an jeder Übung teilnehme."),
         ("I check the gates before the barges come in.", "I check the gates before the barges come in."),
     ])
     func joined(text: String, expected: String) {

@@ -20,13 +20,14 @@ enum SeparableVerbs {
     }
 
     /// `clause` with its last two words joined when a subordinating word opens it into a subordinate clause and they are a particle
-    /// and a finite verb, written lower case as a verb is, with only spaces between them.
+    /// and a finite verb, both written lower case, with only spaces between them. A word with a capital is a noun, and no particle
+    /// ("jedes Teil achte"; #354, round 8).
     private static func joinedAtItsEnd(_ clause: String) -> String {
         let words = clause.split { !$0.isLetter }
         guard words.count >= 3, let verb = words.last else { return clause }
         let particle = words[words.count - 2]
         guard !subordinators.isDisjoint(with: words.map { $0.lowercased() }), isFiniteVerb(verb),
-              joins(particle.lowercased(), verb.lowercased()),
+              particle.first?.isLowercase == true, joins(String(particle), verb.lowercased()),
               clause[particle.endIndex..<verb.startIndex].allSatisfy({ $0 == " " }) else { return clause }
         return String(clause[..<particle.endIndex]) + String(clause[verb.startIndex...])
     }
