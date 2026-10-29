@@ -61,6 +61,23 @@ enum StatedTitle {
         return title
     }
 
+    /// Whether a clause of `claimed` says `title` as what the person is now, after the lead-in and the present of "to be" in the first
+    /// person, with at most an indefinite article ("sono impiegata amministrativa a Lecco"); "ero impiegata" and "I was a nurse" do
+    /// not (ADR 0031, D9). What follows the title is not read: the headline it is is already the person's.
+    static func isSaidNow(_ title: String, in claimed: DescriptionText) -> Bool {
+        let wanted = EntryEvidence.foldedWords(of: title)
+        let language = claimed.explainer.language
+        guard !wanted.isEmpty else { return false }
+        return claimed.sentences.contains { sentence in
+            let words = Word.words(in: sentence.raw)
+            guard words.count > wanted.count else { return false }
+            return (1...(words.count - wanted.count)).contains { start in
+                words[start..<(start + wanted.count)].map(\.folded) == wanted
+                    && isSaid(before: start, in: words, from: clauseStart(before: start, in: words, language: language), language: language)
+            }
+        }
+    }
+
     /// Whether a clause of `sentence` says the title as above, with nothing after it in the sentence but "and" and a clause of the person.
     private static func states(_ wanted: [String], in sentence: String, language: Vocabulary.Language?) -> Bool {
         let clauses = DescriptionClauses(sentences: [sentence], protecting: [wanted], language: language).sentences.first ?? []

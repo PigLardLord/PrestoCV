@@ -109,7 +109,9 @@ public struct CVDataSanitizer: Sendable {
             sanitize(cvData.personalInfo, jobTitles: jobTitles, spoken, claimed: claimed, contacts: entries.contacts(in: source)),
             from: cvData.experience, claimed, said: source
         ), claimed)
-        let experience = sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? [])
+        let experience = Self.withCurrentTitle(
+            sanitize(entries.jobs, source, entries, written: written, duties: writing?.roleDescriptions ?? []), from: personalInfo, claimed
+        )
         let education = sanitize(entries.studies, source, entries)
         // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
         // or a skill of its own would say who the person is with nothing the person said.
@@ -181,6 +183,21 @@ public struct CVDataSanitizer: Sendable {
             name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
             linkedin: info.linkedin, github: info.github, title: title
         )
+    }
+
+    /// ADR 0031, D9: `jobs` with the person's own title, said in the present (`StatedTitle.isSaidNow`: "sono impiegata
+    /// amministrativa"), as the title of the current job (`generalDutyJob`) when that job has none. Nothing changes when there is no
+    /// current job, when the title is said only in the past, or when the current job already has a title; an ended job keeps its own.
+    private static func withCurrentTitle(_ jobs: [Experience], from info: PersonalInfo, _ claimed: DescriptionText) -> [Experience] {
+        guard let title = info.title.presentValue, let current = generalDutyJob(among: jobs), jobs[current].title.presentValue == nil,
+              StatedTitle.isSaidNow(title, in: claimed) else { return jobs }
+        var filled = jobs
+        let job = jobs[current]
+        filled[current] = Experience(
+            title: title, company: job.company, location: job.location, startDate: job.startDate, endDate: job.endDate,
+            current: job.current, description: job.description, achievements: job.achievements
+        )
+        return filled
     }
 
     /// The person's headline as the whole title the person states (`StatedTitle.whole`): not a part of it the model cut (#354).

@@ -306,6 +306,35 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.generalDutyJob(among: [ended("2019"), ended("2015"), ended("2019")]) == nil)
     }
 
+    // MARK: The title of the current job from the person's own (ADR 0031, D9)
+
+    @Test(
+        "ADR 0031, D9: the person's own title said in the present fills the blank title of the current job; an ended job, two current jobs, a title said in the past and a title already found give nothing",
+        arguments: [
+            ("Mi chiamo Maria Rossi e sono impiegata amministrativa a Lecco. Dal 2013 al 2018 ho lavorato alla Ferramenta Brivio. "
+                + "Dal 2018 lavoro allo Studio Valsecchi, dove tengo la prima nota.", "", "Studio Valsecchi", "impiegata amministrativa"),
+            ("Mi chiamo Maria Rossi e sono impiegata amministrativa a Lecco. Dal 2013 lavoro alla Ferramenta Brivio. "
+                + "Dal 2018 lavoro anche allo Studio Valsecchi, dove tengo la prima nota.", "", "Studio Valsecchi", ""),
+            ("Mi chiamo Maria Rossi. Ero impiegata amministrativa a Lecco. Dal 2013 al 2018 ho lavorato alla Ferramenta Brivio. "
+                + "Dal 2018 lavoro allo Studio Valsecchi, dove tengo la prima nota.", "", "Studio Valsecchi", ""),
+            ("Mi chiamo Maria Rossi e sono impiegata amministrativa a Lecco. Dal 2013 al 2018 ho lavorato alla Ferramenta Brivio. "
+                + "Dal 2018 lavoro come contabile allo Studio Valsecchi.", "contabile", "Studio Valsecchi", "contabile"),
+        ]
+    )
+    func currentTitleFromTheOwnTitle(description: String, title: String, employer: String, kept: String) throws {
+        let ongoing = description.contains("Dal 2013 lavoro")
+        let facts = CVData(
+            personalInfo: PersonalInfo(name: "Maria Rossi", title: "impiegata amministrativa"),
+            experience: [Self.job("", "Ferramenta Brivio", from: "2013", to: ongoing ? nil : "2018"), Self.job(title, employer, from: "2018")]
+        )
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, nil], technologies: [], softSkills: [])
+
+        let final = try sanitizer.sanitize(facts, writing: writing, against: description).experience
+
+        #expect(final.first { $0.company == employer }?.title == kept, "final \(final)")
+        #expect(final.first { $0.company == "Ferramenta Brivio" }?.title == "", "final \(final)")
+    }
+
     // MARK: The context of each job
 
     @Test("Each job the facts keep gets the clauses of the description that belong to it, in the order of the facts, and the field the person states")
