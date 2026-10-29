@@ -606,6 +606,12 @@ extension CVDataSanitizer {
     /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
     /// and a soft skill the description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
+        skillCheck(technologies: technologies, softSkills: softSkills, stated: [], against: description)
+    }
+
+    /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
+    /// one of them, by its head noun, the written one goes (#354, round 2).
+    func skillCheck(technologies: [String], softSkills: [String], stated: [String], against description: String) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
         var verdict = SkillVerdict()
@@ -652,7 +658,7 @@ extension CVDataSanitizer {
             }
             return kept
         }
-        var heads = Set<String>()
+        var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
         for raw in technologies {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
@@ -713,12 +719,16 @@ extension CVDataSanitizer {
 
     /// The key of a tool's head noun, the word that names its kind ("monitors" of "studio monitors", "pince" of "pince à dénuder"):
     /// the last word in English and German, the first in the other languages, past an elided article ("l'oscilloscope"); none when
-    /// that word has fewer than 4 letters ("Logic Pro").
+    /// that word has fewer than 4 letters ("Logic Pro"). A mixer, a desk and a console are one kind (#354, round 2).
     private static func headKey(of item: String, language: String?) -> String? {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first, head.count >= 4 else { return nil }
-        return skillKey(head)
+        let key = skillKey(head)
+        return headGroups[key] ?? key
     }
+
+    /// The keys of head nouns that name one tool, by the key that stands for them: a mixer and a desk are a mixing console.
+    private static let headGroups = ["mixer": "consol", "desk": "consol"]
 
     /// Whether a skill's head noun is a tool word ("communication tools", "strumenti di misura"), or, in German, ends with one
     /// ("Präzisionswerkzeug"): a tool is no quality of the person (#354). A skill that only starts with a tool word ("Systemdenken",

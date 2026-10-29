@@ -222,6 +222,19 @@ struct SectionChecksTests {
         #expect(wiring.dropped.map(\.sentence) == ["pinces coupantes"])
     }
 
+    @Test("A written technology of the kind of a tool the person names goes, a console, a mixer and a desk one kind; a tool of another kind stays (#354, round 2)")
+    func toolOfAStatedKind() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = english.skillCheck(
+            technologies: ["audio mixing console", "sound mixer", "studio monitors", "line array systems", "digital mixing desk"],
+            softSkills: [], stated: ["digital consoles", "PA systems"], against: "I mix on digital consoles and set up the PA systems in Hull."
+        )
+
+        #expect(verdict.technologies == ["studio monitors"])
+        #expect(Set(verdict.dropped.map(\.reason)) == ["same kind as an earlier tool"])
+    }
+
     @Test("A technology that names an activity, or a kind of tool by what it does, goes; equipment, a named tool and one with an acronym stay (#354, round 1)")
     func activityIsNoTechnology() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

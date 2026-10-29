@@ -171,13 +171,16 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job and the soft skills, cleaned by code, then one request for those missing, and one more of each kind,
+    /// The tools of each job and the soft skills, cleaned by code against the tools the person names, then one request for those missing, and one more of each kind,
     /// when the final check would keep fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); it reads the
     /// skills the checks dropped, with the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let tools = try await request(.skills) { try await self.service.writeTools(for: brief) }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
-        var skills = sanitizer.skillCheck(technologies: (tools ?? []).flatMap { $0 }, softSkills: qualities ?? [], against: description)
+        let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
+        var skills = sanitizer.skillCheck(
+            technologies: (tools ?? []).flatMap { $0 }, softSkills: qualities ?? [], stated: stated, against: description
+        )
         keep(skills)
         let kept = try kept(around: dated).skills
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
@@ -196,7 +199,8 @@ final class SectionDraft {
         }
         guard let more else { return }
         skills = sanitizer.skillCheck(
-            technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, against: description
+            technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, stated: stated,
+            against: description
         )
         keep(skills)
     }

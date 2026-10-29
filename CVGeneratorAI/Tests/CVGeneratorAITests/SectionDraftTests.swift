@@ -236,6 +236,19 @@ struct SectionDraftTests {
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
     }
 
+    @Test("A written tool of the kind of a tool the person names goes; the named one stays (#354, round 2)")
+    func toolOfAStatedKind() async throws {
+        let service = service()
+        service.generateResult = .success(CVData(experience: Self.extracted.experience, skills: [Skill(name: "PA systems", kind: .technology)]))
+        service.toolsResult = [["scenery flats"], ["line array systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
+
+        let draft = try await draft(service)
+
+        #expect(draft.skills.contains { $0.name == "PA systems" })
+        #expect(!draft.skills.contains { $0.name == "line array systems" })
+        #expect(draft.skills.contains { $0.name == "microphones" })
+    }
+
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()
