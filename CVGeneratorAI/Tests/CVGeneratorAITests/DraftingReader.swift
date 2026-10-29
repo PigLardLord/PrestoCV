@@ -698,8 +698,29 @@ enum ReaderRules {
     static func speaksAsThePerson(_ sentence: String, language: String) -> Bool {
         let words = letterWords(of: sentence)
         if words.contains(where: (speakerWords[language] ?? []).contains) { return true }
-        let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
-        return firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) && !isGerund($0, language: language) }
+        let firsts = sentence.split(separator: ",").compactMap { part in
+            part.lowercased().split { !$0.isLetter }.map(String.init).first { !connectors.contains(fold($0)) }
+        }
+        return firsts.contains { word in
+            let folded = fold(word)
+            // A third person of the simple past ("controló", "controllò") folds to "-o" and speaks as no one (#354, round 13).
+            guard !word.hasSuffix("ó"), !word.hasSuffix("ò") else { return false }
+            if isFirstPersonPast(word, language: language) { return true }
+            return folded.count >= 3 && folded.hasSuffix("o") && !determiners.contains(folded) && !isGerund(folded, language: language)
+        }
+    }
+
+    /// Whether a lowercased word, as written, is a first person of the simple past: "-é" or "-í" in Spanish ("controlé", "atendí"),
+    /// "-ei" in Portuguese ("gerenciei"), "-ai" or "-ii" in Italian ("lavorai", "gestii"). A rough rule, read only first in a
+    /// sentence or after a comma (#354, round 13).
+    static func isFirstPersonPast(_ word: String, language: String) -> Bool {
+        guard word.count >= 5 else { return false }
+        switch language {
+        case "es": return word.hasSuffix("é") || word.hasSuffix("í")
+        case "pt": return word.hasSuffix("ei")
+        case "it": return word.hasSuffix("ai") || word.hasSuffix("ii")
+        default: return false
+        }
     }
 
     /// Whether a folded word of six letters or more ends as a gerund, "-ando" or "-endo", and "-indo" in Portuguese, and is no first

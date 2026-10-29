@@ -194,12 +194,13 @@ enum SectionPrompts {
 
     // MARK: The summary
 
-    /// One sentence of the summary, written last on one slot (#354, round 13, O1): the job's title and whether it ended, with the
+    /// One sentence of the summary, written last on one slot (#354, round 13, O1): the job's title and its tense, past when it ended
+    /// and present otherwise (told only the past, a current job's sentence came in the past), with the
     /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
     /// whole summary from every job, the request ran short.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
-        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + (topic.hasEnded ? "; ended, write in the past" : ""))
+        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + (topic.hasEnded ? "; ended, write in the past" : "; write in the present"))
         if let field = topic.field { lines.append("Field: " + field) }
         if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }

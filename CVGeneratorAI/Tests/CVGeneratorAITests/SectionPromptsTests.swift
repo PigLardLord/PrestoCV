@@ -385,7 +385,7 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("A summary sentence's request reads the job's title and whether it ended, its slot (the field, the topics or the qualities) and the summary so far, and no employer (#354, round 13)")
+    @Test("A summary sentence's request reads the job's title and its tense, past when it ended and present otherwise (a current job's sentence came in the past), its slot (the field, the topics or the qualities) and the summary so far, and no employer (#354, round 13)")
     func summarySentencePrompt() {
         let topic = SummaryTopic(
             title: "capoturno della manutenzione", field: "manutenzione industriale", work: ["i turni", "i quadri elettrici"],
@@ -398,7 +398,7 @@ struct SectionPromptsTests {
         #expect(prompt.text == """
             Language: Italian
             Scrivi in italiano.
-            Job: capoturno della manutenzione
+            Job: capoturno della manutenzione; write in the present
             Field: manutenzione industriale
             Topics: i turni; i quadri elettrici
             Qualities: precisione
@@ -413,7 +413,7 @@ struct SectionPromptsTests {
             """))
         let untitled = SummaryTopic(title: nil, qualities: ["precisione"], hasEnded: false)
         #expect(SectionPrompts.summarySentence(for: Self.brief, topic: untitled, written: []).text.hasSuffix("""
-            Job: no title given
+            Job: no title given; write in the present
             Qualities: precisione
             """))
     }

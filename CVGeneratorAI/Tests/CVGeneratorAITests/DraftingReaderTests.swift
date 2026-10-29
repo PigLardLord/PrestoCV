@@ -129,6 +129,15 @@ struct DraftingReaderTests {
         #expect(counted(spanish, "es") == ["Cada cerradura exige un ajuste fino."])
         #expect(counted(portuguese, "pt") == ["O ofício exige paciência."])
         #expect(counted(CVData(summary: "The work asks for patience."), "en").isEmpty)
+        // A first person of the simple past speaks; a third person, whose accent folds to "-o", does not (#354, round 13).
+        let pasts = [
+            ("es", "Controlé los registros y elaboré los impuestos. Controló los registros. Atendí a los clientes."),
+            ("pt", "Gerenciei o estoque da loja. Controlou o estoque."),
+            ("it", "Gestii i conti del negozio. Controllò i conti."),
+        ]
+        #expect(pasts.map { counted(CVData(summary: $0.1), $0.0) } == [
+            ["Controló los registros."], ["Controlou o estoque."], ["Controllò i conti."],
+        ])
     }
 
     @Test("A summary sentence whose only word in \"-o\" after a comma is a gerund speaks as no one; a first person of the same ending speaks (#354, round 6)")
