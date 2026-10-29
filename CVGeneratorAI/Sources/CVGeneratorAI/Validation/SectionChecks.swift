@@ -190,6 +190,9 @@ extension CVDataSanitizer {
                 if rejection == nil, verdicts.saysEnough, !rule.quotesOwnClauses(sentence) {
                     rejection = DutyVerdicts.describedReason
                 }
+                if rejection == nil, let opening = Self.opening(of: sentence), held.count { Self.opening(of: $0) == opening } >= 2 {
+                    rejection = Self.opensAsTwoEarlierOnes
+                }
                 if let rejection {
                     verdicts.rejected.append(Rejection(sentence: sentence, reason: rejection))
                 } else {
@@ -201,6 +204,22 @@ extension CVDataSanitizer {
             return verdicts
         }
     }
+
+    static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
+
+    /// The first two words of a duty, folded, unless the second is an auxiliary ("J'ai formé…", "Ich habe…"), whose verb comes
+    /// later: a job of three duties that open alike reads as a list, not as a person's work ("Je veillais à…", #354, round 2).
+    static func opening(of duty: String) -> [String]? {
+        let words = Word.words(in: duty).prefix(2).map(\.folded)
+        guard words.count == 2, !auxiliaries.contains(words[1]) else { return nil }
+        return words
+    }
+
+    /// The auxiliaries a past or a perfect tense opens with after its subject, folded.
+    private static let auxiliaries: Set<String> = [
+        "have", "has", "had", "am", "was", "were", "habe", "hat", "hatte", "bin", "war", "wurde", "ai", "avais", "suis", "etais",
+        "ho", "avevo", "sono", "ero", "he", "habia", "tengo", "tenho", "tinha",
+    ]
 
     /// The words that end a fragment of a duty ("Riparavo i motori e").
     static let dutyConjunctions: Set<String> = [

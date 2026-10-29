@@ -60,6 +60,27 @@ struct SectionChecksTests {
         #expect(verdicts.avoid.contains("Valtrigno") || verdicts.avoid.contains("valtrigno"))
     }
 
+    @Test("A third duty of a job that opens with the two words of two earlier ones goes; a second one stays (#354, round 2)")
+    func dutiesWithOneOpening() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.italianJobs, job: 0,
+            duties: "Riparavo i motori elettrici. Riparavo i macchinari usurati. Eseguivo la lubrificazione dei macchinari.",
+            keeping: [], against: JobClausesTests.italian
+        )
+
+        #expect(verdicts.pinned == ["Riparavo i nastri trasportatori."])
+        #expect(verdicts.kept == ["Riparavo i motori elettrici.", "Eseguivo la lubrificazione dei macchinari."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Riparavo i macchinari usurati."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.opensAsTwoEarlierOnes])
+    }
+
+    @Test("Duties that open with the subject and an auxiliary are no repeated opening: the verb comes later (#354, round 2)")
+    func dutiesPastAnAuxiliary() {
+        #expect(CVDataSanitizer.opening(of: "J'ai formé les stagiaires.") == nil)
+        #expect(CVDataSanitizer.opening(of: "Je veillais à leur hygiène.") == ["je", "veillais"])
+        #expect(CVDataSanitizer.opening(of: "Ich habe die Regale montiert.") == nil)
+    }
+
     // MARK: D6, the typical duties of a job the person described (#354, round 1)
 
     @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them")
