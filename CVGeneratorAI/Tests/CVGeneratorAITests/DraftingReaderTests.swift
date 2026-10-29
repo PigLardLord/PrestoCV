@@ -87,18 +87,19 @@ struct DraftingReaderTests {
         ])
     }
 
-    @Test("A German separable verb split at the end of a subordinate clause is counted; one split in a main clause, or joined, is not (#354, round 4)")
+    @Test("A German separable verb split at the end of a subordinate clause is counted; one split in a main clause, or joined, is not, nor a noun before the verb (#354, rounds 4 and 8)")
     func splitSeparableVerb() {
         let cv = CVData(
             summary: "Ich arbeite als Schleusenwärter. Ich achte darauf, dass ich die Funktion der Tore sicher stelle. "
-                + "Ich öle die Tore, bevor die Kähne ein fahren.",
+                + "Ich öle die Tore, bevor die Kähne ein fahren. Ich arbeite ruhig, indem ich auf jedes Teil achte. "
+                + "Ich lerne viel, weil ich an jeder Übung teil nehme.",
             experience: [Experience(
                 title: "Schleusenwärter", company: "Kanal Brindle",
                 description: "Ich stelle die Funktion der Tore sicher. Ich prüfe, ob die Schleuse richtig zumacht."
             )]
         )
 
-        #expect(Self.reader(cv, "de").filter { $0.kind == .splitVerb }.map(\.value) == ["sicher stelle", "ein fahren"])
+        #expect(Self.reader(cv, "de").filter { $0.kind == .splitVerb }.map(\.value) == ["sicher stelle", "ein fahren", "teil nehme"])
     }
 
     @Test("A summary sentence that shares only a word for work of any trade with the work is counted; one that names a duty is not (#354, round 5)")

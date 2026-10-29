@@ -767,7 +767,10 @@ enum ReaderRules {
     static func splitVerbs(in text: String) -> [String] {
         text.split { ",;.!?".contains($0) }.compactMap { clause in
             let words = letterWords(of: String(clause))
+            // A particle is in lower case: "jedes Teil achte" is a noun before the verb (#354, round 8).
+            let particle = clause.split { !$0.isLetter }.dropLast().last
             guard words.count >= 3, !subordinators.isDisjoint(with: words), let verb = words.last, verb.count >= 4,
+                  particle?.first?.isLowercase == true,
                   verbParticles.contains(words[words.count - 2]), ["e", "t", "en", "st"].contains(where: verb.hasSuffix) else { return nil }
             return words.suffix(2).joined(separator: " ")
         }
