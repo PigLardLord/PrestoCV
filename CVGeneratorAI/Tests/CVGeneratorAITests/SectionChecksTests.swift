@@ -246,6 +246,21 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["activity"])
     }
 
+    @Test("In Italian, a word of English that ends in a consonant goes though the device's dictionary knows it; a loanword Italian writes as its own, a product and an Italian word stay (#354, round 3)")
+    func englishWordInItalian() {
+        let bothLanguages = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = bothLanguages.skillCheck(
+            technologies: ["plotter", "stampante", "Excel", "folder", "registratore di cassa", "drawing board"], softSkills: ["problem solving"],
+            against: JobClausesTests.italian
+        )
+
+        #expect(verdict.technologies == ["plotter", "stampante", "Excel", "registratore di cassa"])
+        #expect(verdict.softSkills == ["problem solving"])
+        #expect(verdict.dropped.map(\.sentence) == ["folder", "drawing board"])
+        #expect(Set(verdict.dropped.map(\.reason)) == ["another language"])
+    }
+
     @Test("A skill whose words are all of English, in a description of another language, goes")
     func skillInAnotherLanguage() {
         let englishOnly = Self.italian(ForcedLexicalTagger([:]), wordList: EnglishOnly())

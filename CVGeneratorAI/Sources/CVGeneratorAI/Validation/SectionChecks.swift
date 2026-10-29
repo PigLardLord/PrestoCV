@@ -707,6 +707,14 @@ extension CVDataSanitizer {
                     return nil
                 }
             }
+            if let language, let loanwords = Self.loanwords[language], words.contains(where: { word in
+                word.count >= 4 && word.first?.isLowercase == true && word.allSatisfy(\.isLetter)
+                    && !Self.vowels.contains(word.last?.lowercased() ?? "") && !loanwords.contains(word)
+                    && wordList.knows(word, inLanguage: "en") == true
+            }) {
+                verdict.dropped.append(Rejection(sentence: raw, reason: "another language"))
+                return nil
+            }
             guard !Self.skillWords.contains(DescriptionText.normalized(kept)) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a word for a skill"))
                 return nil
@@ -776,6 +784,25 @@ extension CVDataSanitizer {
         "qualified", "qualificato", "qualificata", "qualifiziert", "qualifie", "qualifiee",
         "cualificado", "cualificada", "qualificado", "qualificada",
     ]
+
+    /// The languages whose own words end in a vowel, each with the words of English it writes as its own: there, a lower-case word
+    /// of English of four letters or more that ends in a consonant and is none of them is a word of another language, though the
+    /// device's dictionary of the language lists it ("printer"; #354, round 3).
+    static let loanwords: [String: Set<String>] = [
+        "it": [
+            "computer", "scanner", "server", "router", "tablet", "laptop", "desktop", "notebook", "mixer", "timer", "laser",
+            "container", "tester", "plotter", "monitor", "display", "email", "chat", "internet", "account", "password", "backup",
+            "budget", "check", "chip", "click", "cloud", "cluster", "controller", "cutter", "dimmer", "driver", "flyer", "jack",
+            "leasing", "link", "marketing", "meeting", "network", "pallet", "planning", "podcast", "poster", "report", "reset",
+            "scooter", "social", "spot", "staff", "stand", "standard", "team", "test", "ticket", "toner", "tour", "trailer",
+            "transpallet", "tutor", "workshop", "freezer", "bulldozer", "dumper", "joystick", "flash", "film", "sport", "camion",
+            "virus", "problem", "solving", "leadership", "working", "teamwork", "multitasking", "management", "public", "speaking",
+            "feedback", "coaching", "networking", "hardware", "software", "badge", "mouse", "file", "smartphone", "touch", "screen",
+            "touchscreen", "editor", "format", "layout", "design", "designer", "webinar", "blog", "post", "brand", "branding",
+        ],
+    ]
+
+    private static let vowels: Set<String> = ["a", "e", "i", "o", "u", "y", "à", "è", "é", "ì", "ò", "ù"]
 
     /// The beginnings of the words of one quality, by quality: two soft skills with a word of one group say one quality twice
     /// ("precisione", "attenzione ai dettagli"; #354, round 2).
