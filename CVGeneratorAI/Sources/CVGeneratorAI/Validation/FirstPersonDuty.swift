@@ -6,7 +6,7 @@ import Foundation
 /// Portuguese write each gerund that starts the duty or follows a conjunction or a comma in the first person of the imperfect (a past
 /// job) or of the present (the current one), when the word list knows that form. Any other duty, and one with a form the list does
 /// not know, keeps its words; each duty starts with a capital letter. A duty that starts with an Italian infinitive in -are or a
-/// Portuguese one in -ar is written the same way (#354, round 10).
+/// Portuguese one in -ar is written the same way (#354, round 10), and one in -ere or -ire of an ended Italian job (round 14).
 enum FirstPersonDuty {
     private struct Endings {
         /// The endings of the form the rewrite reads: a gerund's, or an infinitive's.
@@ -38,11 +38,16 @@ enum FirstPersonDuty {
     ]
 
     /// The Italian infinitives in -are and the Portuguese ones in -ar, which the rewrite reads as it reads a gerund (#354, round 10):
-    /// asked for one more duty, the model wrote "Criar um sistema" and wrote it again in the repair. The infinitives in -ere, -ire,
-    /// -er and -ir ("manter" is "mantenho", "pedir" is "peço") and the Spanish ones, whose present often changes the stem ("jugar"
-    /// is "juego", and "jugo" is another word), stay as they are, and the duty check drops them.
+    /// asked for one more duty, the model wrote "Criar um sistema" and wrote it again in the repair. The Italian ones in -ere and -ire
+    /// are written in the imperfect of an ended job, whose endings do not change the stem ("seguire" is "seguivo", #354, round 14),
+    /// but for "essere"; in the current job they stay as they are, as their present often changes the stem ("tenere" is "tengo",
+    /// and "volere" is not "volo"). The Portuguese ones in -er and -ir ("manter" is "mantenho", "pedir" is "peço") and the Spanish
+    /// ones ("jugar" is "juego", and "jugo" is another word) stay as they are, and the duty check drops them.
     private static let infinitives: [Vocabulary.Language: Endings] = [
-        .italian: Endings(gerunds: ["are"], past: ["are": ["avo"]], present: ["are": ["o"]], exceptions: ["fare"], unwritten: ["ere", "ire"]),
+        .italian: Endings(
+            gerunds: ["are", "ere", "ire"], past: ["are": ["avo"], "ere": ["evo"], "ire": ["ivo"]], present: ["are": ["o"]],
+            exceptions: ["fare", "essere"]
+        ),
         .portuguese: Endings(gerunds: ["ar"], past: ["ar": ["ava"]], present: ["ar": ["o"]], exceptions: ["estar"], unwritten: ["er", "ir"]),
     ]
 

@@ -45,7 +45,7 @@ struct SectionChecksTests {
     func dutiesOfAJob() throws {
         let written = """
             Riparavo i motori elettrici. Coordinavo i turni al Birrificio Valtrigno. Eseguivo la lubrificazione dei macchinari. \
-            Sostituire i cuscinetti usurati. Riparavo i nastri trasportatori. Riparavo i motori e
+            Essere addetto ai cuscinetti usurati. Riparavo i nastri trasportatori. Riparavo i motori e
             """
 
         let verdicts = try sanitizer.dutyCheck(of: Self.italianJobs, job: 0, duties: written, against: JobClausesTests.italian)
@@ -55,7 +55,7 @@ struct SectionChecksTests {
         let reasons = Dictionary(uniqueKeysWithValues: verdicts.rejected.map { ($0.sentence, $0.reason) })
         #expect(reasons["Riparavo i nastri trasportatori."] == "it repeats a duty already written")
         #expect(reasons["Coordinavo i turni al Birrificio Valtrigno."] != nil)
-        #expect(reasons["Sostituire i cuscinetti usurati."]?.hasPrefix("it is written in another form") == true)
+        #expect(reasons["Essere addetto ai cuscinetti usurati."]?.hasPrefix("it is written in another form") == true)
         #expect(reasons["Riparavo i motori e"] == "it is not a whole sentence")
         #expect(verdicts.avoid.contains("Valtrigno") || verdicts.avoid.contains("valtrigno"))
     }
@@ -462,9 +462,13 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.namesAgain(sentence, earlier, language: language) == isAgain)
     }
 
-    @Test("A duty that starts with an infinitive in -ere or -ire goes, also as the job's first one; one in -are is written in the first person and stays, as does a duty in the first person (#354, round 10)")
+    @Test("A duty that starts with an infinitive whose first person is not written (\"essere\") goes, also as the job's first one; one in -ere or -ire is written in the imperfect of an ended job and one in -are in its first person, and both stay, as does a duty in the first person (#354, rounds 10 and 14)")
     func infinitiveDuty() throws {
         let verdicts = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Essere addetta alle fatture dei clienti. Controllavo i pagamenti dei fornitori.",
+            against: Self.clerk
+        )
+        let ended = try sanitizer.dutyCheck(
             of: Self.clerkJob, job: 0, duties: "Ricevere le fatture dei clienti. Controllavo i pagamenti dei fornitori.",
             against: Self.clerk
         )
@@ -474,8 +478,9 @@ struct SectionChecksTests {
         )
 
         #expect(verdicts.kept == ["Controllavo i pagamenti dei fornitori."])
-        #expect(verdicts.rejected.map(\.sentence) == ["Ricevere le fatture dei clienti."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Essere addetta alle fatture dei clienti."])
         #expect(verdicts.rejected.first?.reason.hasPrefix("it starts with an infinitive") == true)
+        #expect(ended.kept == ["Ricevevo le fatture dei clienti.", "Controllavo i pagamenti dei fornitori."])
         #expect(written.kept == ["Registravo le fatture dei clienti.", "Controllavo i pagamenti dei fornitori."])
     }
 

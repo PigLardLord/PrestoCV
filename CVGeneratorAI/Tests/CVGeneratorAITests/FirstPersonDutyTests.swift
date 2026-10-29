@@ -68,6 +68,21 @@ struct FirstPersonDutyTests {
         ) == "Criar um sistema para os pedidos.")
     }
 
+    @Test("An Italian infinitive in -ere or -ire is written in the imperfect of an ended job; in the current job, whose present often changes the stem, and for an exception, it keeps the duty (#354, round 14)")
+    func italianPastOfEveryInfinitive() {
+        #expect(FirstPersonDuty.written("seguire i turni del magazzino.", current: false, language: .italian, wordList: words)
+            == "Seguivo i turni del magazzino.")
+        #expect(FirstPersonDuty.written("leggere le bolle e smistare i resi.", current: false, language: .italian, wordList: words)
+            == "Leggevo le bolle e smistavo i resi.")
+        #expect(FirstPersonDuty.written("tenere i conti del negozio.", current: true, language: .italian, wordList: words)
+            == "Tenere i conti del negozio.")
+        #expect(FirstPersonDuty.written("essere il referente del turno.", current: false, language: .italian, wordList: words)
+            == "Essere il referente del turno.")
+        #expect(FirstPersonDuty.written(
+            "seguire i turni del magazzino.", current: false, language: .italian, wordList: TableWordList(names: ["seguivo"])
+        ) == "Seguire i turni del magazzino.")
+    }
+
     @Test("An imperfect duty takes the compound past in Italian and the perfect in Portuguese when the job's earlier duties use it; any other duty, or a form the word list does not know, keeps its words (#354, round 12)")
     func pastOfTheHeldDuties() {
         #expect(FirstPersonDuty.inThePast(of: ["Ho riparato le pompe."], "Preparavo le bolle e controllavo i carichi.", language: .italian, wordList: words)
