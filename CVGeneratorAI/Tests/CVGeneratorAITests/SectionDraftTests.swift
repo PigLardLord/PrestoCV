@@ -324,6 +324,17 @@ struct SectionDraftTests {
         #expect(head.contains("I run the technical rehearsals. I look after the mixing desks and the stage monitors."))
     }
 
+    @Test("A summary whose every sentence and repair went is written by code from the titles, and the draft keeps it (#354, round 6)")
+    func summaryFloor() async throws {
+        let service = service()
+        service.summaryResult = "He is a sound engineer."
+        service.summaryRepairResult = "She runs the desk."
+
+        let draft = try await draft(service)
+
+        #expect(draft.summary == "I work as a head of sound. Before that, I worked as a sound technician and a stagehand.")
+    }
+
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()

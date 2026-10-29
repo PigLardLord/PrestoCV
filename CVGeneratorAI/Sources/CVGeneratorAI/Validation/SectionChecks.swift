@@ -665,6 +665,65 @@ extension CVDataSanitizer {
         }
     }
 
+    /// The summary with a floor written by code from the grounded `facts` (#354, round 6): a summary of fewer than 2 sentences or
+    /// 120 characters, as the requests left it, else the person's own, gets the opening (`opening(of:language:)`) when it names no
+    /// title, and a sentence of the earlier titles it does not name, the latest first, within `most` sentences. Every impersonal
+    /// sentence of a summary and of its repair went, and the draft kept the person's own sentence alone. Nil when the summary needs
+    /// no floor or the facts give it no sentence.
+    func summaryFloor(of facts: CVData, summary: String?, most: Int, against description: String) throws(CVGenerationError) -> String? {
+        try reading(description) { source in
+            let sentences = SentenceSplitter.sentences(in: summary ?? facts.summary ?? "")
+            guard sentences.count < 2 || sentences.joined(separator: " ").count < 120,
+                  let language = source.explainer.language else { return nil }
+            let text = Word.words(in: sentences.joined(separator: " ")).map(\.folded)
+            let named = { (title: String) in
+                let run = EntryEvidence.foldedWords(of: title)
+                return !run.isEmpty && text.indices.contains { text[$0...].prefix(run.count).elementsEqual(run) }
+            }
+            var seen = Set<String>()
+            let end = { (job: Experience) in job.current ? "~" : job.endDate ?? "" }
+            let latest = facts.experience.enumerated()
+                .sorted { (end($0.element), $1.offset) > (end($1.element), $0.offset) }
+                .map(\.element.title)
+            let titles = ([facts.personalInfo.title] + latest).compactMap { $0?.presentValue }
+                .filter { seen.insert($0.lowercased()).inserted }
+            let opening = titles.contains(where: named) ? nil : Self.opening(of: facts, language: language)
+            let earlier = titles.filter { title in !named(title) && opening.map { !Self.endsWithTitle($0, title) } ?? true }
+            let head = opening.map { [$0] } ?? []
+            let tail = earlier.isEmpty ? [] : [Self.earlier(as: earlier, after: !(head + sentences).isEmpty, language: language)]
+            let floor = Array((head + sentences + tail).prefix(most))
+            return floor.count > sentences.count ? floor.joined(separator: " ") : nil
+        }
+    }
+
+    /// Whether `sentence` ends with `title` and its full stop: the opening that names it.
+    private static func endsWithTitle(_ sentence: String, _ title: String) -> Bool {
+        sentence.lowercased().hasSuffix(" \(title.lowercased()).")
+    }
+
+    /// The sentence of the earlier titles of a summary's floor, after another sentence or alone: "Before that, I worked as a
+    /// fitter and an electrician."
+    static func earlier(as titles: [String], after: Bool, language: Vocabulary.Language) -> String {
+        let ands: [Vocabulary.Language: String] = [.english: "and", .german: "und", .spanish: "y", .french: "et"]
+        let and = ands[language] ?? "e"
+        let named = language == .english ? titles.map { ("aeiou".contains($0.lowercased().first ?? "x") ? "an " : "a ") + $0 } : titles
+        let list = named.count < 2 ? named.joined() : named.dropLast().joined(separator: ", ") + " \(and) " + (named.last ?? "")
+        switch (language, after) {
+        case (.english, true): return "Before that, I worked as \(list)."
+        case (.english, false): return "I worked as \(list)."
+        case (.italian, true): return "In passato ho lavorato come \(list)."
+        case (.italian, false): return "Ho lavorato come \(list)."
+        case (.german, true): return "Davor habe ich als \(list) gearbeitet."
+        case (.german, false): return "Ich habe als \(list) gearbeitet."
+        case (.french, true): return "Auparavant, j'ai travaillé comme \(list)."
+        case (.french, false): return "J'ai travaillé comme \(list)."
+        case (.spanish, true): return "Antes trabajé como \(list)."
+        case (.spanish, false): return "Trabajé como \(list)."
+        case (.portuguese, true): return "Antes trabalhei como \(list)."
+        case (.portuguese, false): return "Trabalhei como \(list)."
+        }
+    }
+
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty or a tool of the lists"

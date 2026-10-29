@@ -872,6 +872,22 @@ struct SectionChecksTests {
         #expect(opened.kept == [duty])
     }
 
+    @Test("A short summary gets the opening when it names no title and a sentence of the earlier titles it does not name, the latest first; a full one gets none (#354, round 6)", arguments: [
+        ("Mi piace il lavoro fatto bene.",
+         "Lavoro come capoturno della manutenzione. Mi piace il lavoro fatto bene. "
+            + "In passato ho lavorato come manutentore elettromeccanico e operaio manutentore."),
+        ("Sono capoturno della manutenzione da anni.",
+         "Sono capoturno della manutenzione da anni. In passato ho lavorato come manutentore elettromeccanico e operaio manutentore."),
+        ("Coordino i tecnici della manutenzione in ogni turno. Seguo gli impianti con cura e controllo che le linee girino bene "
+            + "dal primo all'ultimo turno.", nil),
+    ] as [(String, String?)])
+    func summaryFloor(summary: String, floor: String?) throws {
+        let description = JobClausesTests.italian
+        let written = try sanitizer.summaryFloor(of: Self.italianJobs, summary: summary, most: 4, against: description)
+
+        #expect(written == floor, "\(written ?? "nil")")
+    }
+
     @Test("A summary sentence that ends with the last three words of an earlier one goes; one that shares fewer stays (#354, round 2)")
     func summaryWithARepeatedEnding() throws {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

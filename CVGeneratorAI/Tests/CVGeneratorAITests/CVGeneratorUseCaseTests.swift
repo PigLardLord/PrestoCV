@@ -8,6 +8,11 @@ struct CVGeneratorUseCaseTests {
     private let validRequest = CVGenerationRequest(
         userPrompt: "I am John Doe, an engineer at Tech Corp since 2020"
     )
+    /// The fake's sample as the draft gives it: the model wrote no summary, so the summary floor names the title (#354, round 6).
+    private static let flooredSample = CVData(
+        personalInfo: FakeCVGenerationService.sample.personalInfo, summary: "I worked as an Engineer.",
+        experience: FakeCVGenerationService.sample.experience
+    )
 
     @Test("availability reports what the service reports")
     func availabilityComesFromTheService() {
@@ -45,7 +50,7 @@ struct CVGeneratorUseCaseTests {
 
         let draft = try await useCase.generateCV(from: validRequest)
 
-        #expect(draft == GeneratedDraft(cvData: FakeCVGenerationService.sample, personalItemsUnchecked: false))
+        #expect(draft == GeneratedDraft(cvData: Self.flooredSample, personalItemsUnchecked: false))
         #expect(service.generateRequests == [validRequest])
     }
 
@@ -258,7 +263,7 @@ struct CVGeneratorUseCaseTests {
         #expect(draft == GeneratedDraft(
             cvData: CVData(
                 personalInfo: PersonalInfo(name: "Maria Rossi"),
-                summary: survivors.summary,
+                summary: "I work as a primary school teacher. \(survivors.summary ?? "") Before that, I worked as an assistant.",
                 experience: survivors.experience,
                 education: survivors.education
             ),
@@ -305,7 +310,7 @@ struct CVGeneratorUseCaseTests {
             .generateCV(from: CVGenerationRequest(userPrompt: example.description))
 
         #expect(draft.cvData.skills.isEmpty)
-        #expect(draft.cvData.summary == example.survivors.summary)
+        #expect(draft.cvData.summary == "I work as a primary school teacher. \(example.survivors.summary ?? "") Before that, I worked as an assistant.")
         #expect(draft.personalItemsUnchecked)
     }
 
@@ -316,7 +321,7 @@ struct CVGeneratorUseCaseTests {
         let draft = try await generator(drafting: FakeCVGenerationService.sample, checker: checker).generateCV(from: validRequest)
 
         #expect(await checker.calls.isEmpty)
-        #expect(draft == GeneratedDraft(cvData: FakeCVGenerationService.sample, personalItemsUnchecked: false))
+        #expect(draft == GeneratedDraft(cvData: Self.flooredSample, personalItemsUnchecked: false))
     }
 
     @Test("A draft that the failed check leaves empty is still a draft, with its notice")

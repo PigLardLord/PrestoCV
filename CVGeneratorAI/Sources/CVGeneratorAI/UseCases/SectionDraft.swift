@@ -78,6 +78,12 @@ final class SectionDraft {
             try await writeJobs(of: brief, context: context, in: located)
             try await writeSkills(of: brief, around: dated(located, context: context))
             try await writeSummary(of: brief, field: context.field, around: dated(located, context: context))
+            // A summary too short to read as one gets the titles the person held, latest first by the dates of the draft, written by
+            // the code (ADR 0031).
+            let held = facts.with(experience: dated(located, context: context).experience)
+            if let floor = try? sanitizer.summaryFloor(of: held, summary: summary, most: Self.summarySentences, against: description) {
+                summary = floor
+            }
         } catch is Stopped {
             // The log said where; the draft keeps what the earlier requests wrote.
         }
