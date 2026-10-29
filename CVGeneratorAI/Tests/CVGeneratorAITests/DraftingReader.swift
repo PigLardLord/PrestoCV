@@ -116,6 +116,19 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A German subordinate clause after "dass", "weil", "sodass" or "ob" whose finite verb is not its last word: the clause ends
     /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354, round 5).
     case germanVerbPosition
+    /// A summary sentence that says the person works or worked as something no title of the draft and not its headline is
+    /// ("In passato ho lavorato come contabile" of the employer "Studio Contabile Merlini"; #354, round 7). A sentence that says
+    /// the person is something counts only when it holds a word of a name, an employer or a school, a trap or a title not kept.
+    case inventedSummaryTitle
+    /// A technology the description does not state that holds a word of the name of an employer, a school or a person
+    /// ("Kestrel forklift" of the employer "Kestrel Foods"; #354, round 7).
+    case employerWordTechnology
+    /// A technology whose head noun is a part, a material or a work object the person handles (`DraftingInputs.parts`), and not
+    /// the object of a verb of use in the description ("quadri elettrici" of "controllando i quadri elettrici"; #354, round 7).
+    case workObjectTechnology
+    /// Two summary sentences that open with one verb, one of them the opening code writes ("Lavoro come capoturno." and "Lavoro
+    /// da sedici anni…"; #354, round 7).
+    case floorVerbCollision
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -161,6 +174,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .participleSummary: "a summary sentence that opens with a participle"
         case .stationeryTechnology: "stationery as a technology"
         case .germanVerbPosition: "a German finite verb before the end of its subordinate clause"
+        case .inventedSummaryTitle: "a summary sentence with a title the draft does not keep"
+        case .employerWordTechnology: "a technology with a word of a name"
+        case .workObjectTechnology: "a work object as a technology"
+        case .floorVerbCollision: "the opening's verb opening another summary sentence"
         }
     }
 }
@@ -202,7 +219,9 @@ enum ReaderRules {
             if skill.kind == .technology {
                 if isQuality(skill.name) {
                     found.append(ReaderFinding(kind: .softAsTechnology, path: path, value: skill.name))
-                } else if isNoTool(skill.name) || isActivity(skill.name, language: language) || isPart(skill.name, of: input) {
+                } else if isPart(skill.name, of: input) {
+                    found.append(ReaderFinding(kind: .workObjectTechnology, path: path, value: skill.name))
+                } else if isNoTool(skill.name) || isActivity(skill.name, language: language) {
                     found.append(ReaderFinding(kind: .noToolOfTheTrade, path: path, value: skill.name))
                 } else if isNonTool(skill.name, language: language) {
                     found.append(ReaderFinding(kind: .nonToolTechnology, path: path, value: skill.name))
@@ -221,6 +240,9 @@ enum ReaderRules {
             }
             if isClause(skill.name, language: language) {
                 found.append(ReaderFinding(kind: .clauseAsSkill, path: path, value: skill.name))
+            }
+            if skill.kind == .technology, holdsAName(skill.name, of: input) {
+                found.append(ReaderFinding(kind: .employerWordTechnology, path: path, value: skill.name))
             }
         }
         found += clippedModifiers(in: cv, of: input)
@@ -499,6 +521,10 @@ enum ReaderRules {
             found += sentences.filter { opensWithAParticiple($0, language: input.language) }
                 .map { ReaderFinding(kind: .participleSummary, path: "summary", value: $0) }
         }
+        found += sentences.flatMap { sentence in
+            inventedTitles(in: sentence, of: cv, for: input).map { _ in ReaderFinding(kind: .inventedSummaryTitle, path: "summary", value: sentence) }
+        }
+        found += floorCollisions(in: sentences).map { ReaderFinding(kind: .floorVerbCollision, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -1110,12 +1136,119 @@ enum ReaderRules {
         "qualified", "qualificato", "qualifiziert", "qualifie", "qualifiee", "cualificado", "qualificado",
     ]
 
-    /// Whether a technology is a part or a material the person installs or handles (`DraftingInputs.parts`), by the stem of its
-    /// head noun: a part is no tool of the trade.
+    /// Whether a technology is a part, a material or a work object the person handles (`DraftingInputs.parts`), by the stem of its
+    /// head noun (the last word in English and German, the first in the other languages), unless the description writes it after
+    /// a verb of use ("uso i PLC"): a work object is no tool of the trade.
     static func isPart(_ name: String, of input: DraftingInput) -> Bool {
-        guard let parts = DraftingInputs.parts[input.id] else { return false }
-        let stems = Set(parts.flatMap { letterWords(of: $0) }.map(stem))
-        return letterWords(of: name).contains { stems.contains(stem($0)) }
+        guard let parts = DraftingInputs.parts[input.id], let head = headWord(of: name, language: input.language) else { return false }
+        let heads = Set(parts.compactMap { headWord(of: $0, language: input.language) }.map(stem))
+        guard heads.contains(stem(head)) else { return false }
+        let words = letterWords(of: input.description)
+        return !words.indices.contains { index in
+            useVerbs.contains(words[index]) && words[(index + 1)...].prefix(3).contains { stem($0) == stem(head) }
+        }
+    }
+
+    /// The head noun of a name: its last word in English and German, its first in the other languages.
+    static func headWord(of name: String, language: String) -> String? {
+        let words = letterWords(of: name).filter { $0.count >= 3 }
+        return ["en", "de"].contains(language) ? words.last : words.first
+    }
+
+    /// The verbs of use of the first person, folded: their object is a tool the person uses.
+    static let useVerbs: Set<String> = [
+        "use", "using", "uso", "utilizzo", "adopero", "utilizo", "benutze", "nutze", "verwende", "utilise", "usei", "utilizei",
+    ]
+
+    /// Whether a technology the description does not state holds a word of the name of a person, an employer or a school of
+    /// `input`: a word the description writes only with a capital ("Kestrel" of "Kestrel Foods"; "Logistics" is also "logistics").
+    static func holdsAName(_ name: String, of input: DraftingInput) -> Bool {
+        guard !fold(input.description).contains(fold(name)) else { return false }
+        let lowered = Set(input.description.split { !$0.isLetter }.filter { $0.first?.isLowercase == true }.map { fold(String($0)) })
+        let names = Set(input.facts.filter { [.name, .employer, .school].contains($0.kind) }
+            .flatMap(\.forms).flatMap { $0.split { !$0.isLetter } }
+            .filter { $0.count >= 3 && $0.first?.isUppercase == true }.map { fold(String($0)) })
+            .subtracting(lowered)
+        return name.split { !$0.isLetter }.contains { $0.first?.isUppercase == true && names.contains(fold(String($0))) }
+    }
+
+    /// The titles a summary sentence says the person works or worked as ("I worked as a forklift driver at…") that are no title
+    /// the draft keeps nor a part of one; of a sentence that says the person is something ("Sono X"), only those with a word of a
+    /// name, an employer, a school or a trap, or of a title the input states and the draft does not keep.
+    static func inventedTitles(in sentence: String, of cv: CVData, for input: DraftingInput) -> [String] {
+        let joined = { (text: String) in letterWords(of: text).joined(separator: " ") }
+        let stated = input.facts.filter { $0.kind == .title }.flatMap(\.forms)
+        let kept = ([cv.personalInfo.title ?? ""] + cv.experience.map(\.title) + stated).map(joined).filter { !$0.isEmpty }
+        let isKept = { (title: String) in kept.contains { " \($0) ".contains(" \(title) ") } }
+        let unkept = input.facts.filter { $0.kind == .title }.map(\.forms[0])
+            .filter { form in !([cv.personalInfo.title ?? ""] + cv.experience.map(\.title)).map(joined).contains(joined(form)) }
+        let foreign = Set((input.facts.filter { [.name, .employer, .school].contains($0.kind) }.flatMap(\.forms) + input.traps + unkept)
+            .flatMap(letterWords(of:)).filter { $0.count >= 4 })
+        let words = sentence.replacingOccurrences(of: ",", with: " , ").split(whereSeparator: \.isWhitespace)
+            .flatMap { $0 == "," ? [","] : letterWords(of: String($0)) }
+        var found: [String] = []
+        for (index, word) in words.enumerated() {
+            let next = index + 1 < words.count ? words[index + 1] : ""
+            let isWork = workAs[input.language]?.contains { $0 == [word, next] } ?? false
+            let isBeing = beingAs[input.language]?.contains(word) ?? false
+            guard isWork || isBeing,
+                  isWork || index == 0 || pronouns.union(["e", "and", "y", "et", "und"]).contains(words[index - 1]) else { continue }
+            var rest = Array(words[(index + (isWork ? 2 : 1))...])
+            while let first = rest.first, ["stato", "stata", "a", "an", "un", "una", "uno", "une", "um", "uma", "ein", "eine"].contains(first) {
+                rest.removeFirst()
+            }
+            // A title after the last "and" is one of a list ("A, B and C") or ends the sentence: "programador e crio soluções
+            // para…" joins a verb, not a title.
+            let cut = Array(rest.prefix { !titleEnds.contains($0) })
+            let parts = cut.split { [",", "e", "and", "y", "et", "und"].contains($0) }.map { $0.joined(separator: " ") }
+            let isAList = cut.contains(",") || cut.count == rest.count
+            let titles = isAList ? parts : Array(parts.prefix(1))
+            for title in titles where !title.isEmpty && !isKept(title) {
+                if isWork || !Set(title.split(separator: " ").map(String.init)).isDisjoint(with: foreign) { found.append(title) }
+            }
+        }
+        return found
+    }
+
+    /// The two words that say the person works or worked as a title ("lavorato come"), folded, by language.
+    static let workAs: [String: [[String]]] = [
+        "en": [["work", "as"], ["worked", "as"], ["working", "as"]],
+        "it": [["lavoro", "come"], ["lavorato", "come"], ["lavoravo", "come"]],
+        "de": [["arbeite", "als"], ["habe", "als"], ["arbeitete", "als"]],
+        "fr": [["travaille", "comme"], ["travaillais", "comme"]],
+        "es": [["trabajo", "como"], ["trabaje", "como"], ["trabajado", "como"]],
+        "pt": [["trabalho", "como"], ["trabalhei", "como"], ["trabalhado", "como"]],
+    ]
+
+    /// The verbs that say the person is or was something, folded, by language.
+    static let beingAs: [String: Set<String>] = [
+        "en": ["am", "was"], "it": ["sono", "ero"], "de": ["bin", "war"], "fr": ["suis", "etais"], "es": ["soy", "era"],
+        "pt": ["sou", "era"],
+    ]
+
+    /// The words a title in a sentence ends before: a place, an employer, a time or a clause.
+    static let titleEnds: Set<String> = [
+        "at", "in", "for", "with", "since", "from", "during", "where", "who", "that", "gearbeitet", "presso", "alla", "al", "allo", "ai",
+        "a", "nel", "nella", "per", "da", "dal", "dalla", "con", "dove", "che", "bei", "fur", "seit", "im", "wo", "und", "chez",
+        "au", "en", "dans", "depuis", "pour", "avec", "ou", "qui", "que", "em", "na", "no", "desde", "para", "durante", "onde",
+        "donde", "con",
+    ]
+
+    /// The summary sentences that open with the verb of a sentence that opens as code writes the opening ("Lavoro come X."):
+    /// the opening repeats the verb of the person's own sentence.
+    static func floorCollisions(in sentences: [String]) -> [String] {
+        let openings = sentences.filter { sentence in
+            let words = letterWords(of: sentence)
+            return workAs.values.flatMap { $0 }.contains { pair in
+                words.starts(with: pair) || (pronouns.contains(words.first ?? "") && words.dropFirst().starts(with: pair))
+                    || (words.first == "ho" && words.dropFirst().starts(with: pair))
+                    || (words.starts(with: ["j", "ai"]) && words.dropFirst(2).starts(with: pair))
+            }
+        }
+        let verb = { (sentence: String) in letterWords(of: sentence).first { !pronouns.contains($0) } }
+        return sentences.filter { sentence in
+            openings.contains { $0 != sentence && verb($0) == verb(sentence) }
+        }
     }
 
     /// The jobs whose final description is under 40 characters while the step that writes a job pins a duty (`dutyCheck`) that the

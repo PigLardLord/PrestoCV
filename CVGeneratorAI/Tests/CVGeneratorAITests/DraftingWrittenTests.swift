@@ -267,9 +267,10 @@ struct DraftingWrittenTests {
             experience: [job]
         )
 
-        #expect(Self.reader(cv, "fr").map(\.value) == [
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .repeatedSentence }.map(\.value) == [
             "Je travaille avec des fleurs fraîches.", "Je compose des bouquets de saison.",
         ])
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .floorVerbCollision }.map(\.value) == ["Je travaille avec des fleurs fraîches."])
     }
 
     @Test("A job that writes a run of five words twice is counted once, and words of one duty said once are not")

@@ -150,7 +150,8 @@ enum DraftingInputs {
     /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354,
     /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
     /// The list is the reader's, independent of the rules of the draft: no stationery a person of any trade uses ("cahiers"), and
-    /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4).
+    /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4), and the tools of
+    /// round 6's answers the reader accepted ("ordinateur portable", "Java"; round 7).
     static let vocabularies: [String: [String]] = [
         "jobs-en": [
             "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
@@ -158,7 +159,7 @@ enum DraftingInputs {
             "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
             "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
             "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com", "sound mixers", "lighting rigs",
-            "follow spot rig", "lighting rig", "audio distribution box",
+            "follow spot rig", "lighting rig", "audio distribution box", "sound mixing software",
         ],
         "jobs-it": [
             "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
@@ -170,11 +171,12 @@ enum DraftingInputs {
         "en-plain": [
             "warehouse management system", "WMS", "reach truck", "pallet jack", "pallet truck", "order picker", "barcode scanner",
             "handheld scanner", "RF scanner", "label printer", "stretch wrapper", "conveyor", "Microsoft Outlook", "Microsoft Word",
-            "hand truck",
+            "hand truck", "digital scheduling software",
         ],
         "it-traps": [
             "Excel", "Word", "Outlook", "Microsoft Office", "gestionale", "TeamSystem", "Zucchetti", "Danea Easyfatt", "PEC",
             "Sistema di Interscambio", "home banking", "database", "stampante", "scanner", "fotocopiatrice", "fax", "calcolatrice",
+            "foglio di calcolo",
         ],
         "de-plain": [
             "Multimeter", "Spannungsprüfer", "Duspol", "Isolationsmessgerät", "Installationstester", "Schaltschrank", "Verteiler",
@@ -188,18 +190,21 @@ enum DraftingInputs {
         "pt-traps": [
             "Git", "GitHub", "GitLab", "Visual Studio Code", "Android Studio", "JavaScript", "TypeScript", "React", "Node.js", "PHP",
             "Python", "SQL", "PostgreSQL", "MySQL", "Docker", "Figma", "Postman", "Jira", "terminal", "editor de código", "IDE",
-            "plataforma de teste",
+            "plataforma de teste", "Java",
         ],
         "example-fr": [
             "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
             "tableau", "ENT", "logiciels éducatifs", "matériel de manipulation", "tableau numérique", "logiciel d'apprentissage",
+            "ordinateur portable",
         ],
     ]
 
-    /// The parts and materials a person of the trade installs or handles, which are no tool of it (#354, round 3): a technology of
-    /// the draft that is one is no tool of the trade (`ReaderClass.noToolOfTheTrade`). The list is the reader's.
+    /// The parts, materials and work objects a person of the trade installs, repairs or handles, which are no tool of it (#354,
+    /// rounds 3 and 7): a technology of the draft whose head noun is one is a work object (`ReaderClass.workObjectTechnology`).
+    /// The list is the reader's.
     static let parts: [String: [String]] = [
         "de-plain": ["Schalter", "Leitungen", "Kabel", "Steckdosen", "Sicherungen"],
+        "jobs-it": ["quadri elettrici", "nastri trasportatori", "cuscinetti", "ricambi", "impianti industriali"],
     ]
 
     // MARK: - The app's examples

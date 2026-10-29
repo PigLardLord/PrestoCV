@@ -235,14 +235,84 @@ struct DraftingReaderTests {
         #expect(counted(["lighting rig", "truck load"], sound) == ["truck load"])
     }
 
-    @Test("A part the electrician installs is no tool of the trade; a measuring tool is one")
+    @Test("A part the electrician installs is a work object; a measuring tool is not")
     func partsAreNoTools() throws {
         let electrician = try #require(DraftingInputs.written.first { $0.id == "de-plain" })
-        let cv = CVData(skills: ["Schalter", "Leitungen", "Multimeter", "KNX"].map { Skill(name: $0) })
+        let cv = CVData(skills: ["Schalter", "Elektrische Leitungen", "Multimeter", "KNX"].map { Skill(name: $0) })
 
         let found = ReaderRules.findings(in: cv, for: electrician, report: InventedFacts.count(cv, for: electrician))
 
-        #expect(found.filter { $0.kind == .noToolOfTheTrade }.map(\.value) == ["Schalter", "Leitungen"])
+        #expect(found.filter { $0.kind == .workObjectTechnology }.map(\.value) == ["Schalter", "Elektrische Leitungen"])
+    }
+
+    @Test("A work object of the maintainer is counted; a tool named after a verb of use and a tool whose head is a tool are not (#354, round 7)")
+    func workObjectTechnology() throws {
+        let maintainer = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
+        let used = DraftingInput(
+            id: "jobs-it", kind: .jobs, language: "it", description: "Uso i quadri elettrici di prova.", facts: [], traps: []
+        )
+        let names = ["quadri elettrici", "PLC", "software di gestione impianti", "cuscinetti"]
+        let counted = { (input: DraftingInput) in
+            let cv = CVData(skills: names.map { Skill(name: $0) })
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .workObjectTechnology }.map(\.value)
+        }
+
+        #expect(counted(maintainer) == ["quadri elettrici", "cuscinetti"])
+        #expect(counted(used) == ["cuscinetti"])
+    }
+
+    @Test("A technology with a word of an employer's name is counted; a stated one and a word also written in lowercase are not (#354, round 7)")
+    func employerWordTechnology() throws {
+        let supervisor = try #require(DraftingInputs.written.first { $0.id == "en-plain" })
+        let names = ["Kestrel forklift", "Logistics software", "SAP", "pallet jack"]
+        let cv = CVData(skills: names.map { Skill(name: $0) })
+        let stated = DraftingInput(
+            id: "en-plain", kind: .plain, language: "en", description: supervisor.description + " I use the SAP Kestrel module.",
+            facts: supervisor.facts, traps: []
+        )
+        let counted = { (input: DraftingInput, cv: CVData) in
+            ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .employerWordTechnology }.map(\.value)
+        }
+
+        #expect(counted(supervisor, cv) == ["Kestrel forklift"])
+        #expect(counted(stated, CVData(skills: [Skill(name: "SAP Kestrel module")])) == [])
+    }
+
+    // MARK: Summary titles
+
+    @Test("A summary that says the person worked as no kept title is counted; a kept title, a part of one and a quality are not (#354, round 7)")
+    func inventedSummaryTitle() throws {
+        let clerk = try #require(DraftingInputs.written.first { $0.id == "it-traps" })
+        let counted = { (summary: String) in
+            let cv = CVData(
+                personalInfo: PersonalInfo(title: "impiegata amministrativa"), summary: summary,
+                experience: [Experience(title: "impiegata amministrativa", company: "Ferramenta Scaligera", startDate: "2017", current: true)]
+            )
+            return ReaderRules.findings(in: cv, for: clerk, report: InventedFacts.count(cv, for: clerk))
+                .filter { $0.kind == .inventedSummaryTitle }.count
+        }
+
+        #expect(counted("Sono impiegata amministrativa a Verona. In passato ho lavorato come contabile.") == 1)
+        #expect(counted("Lavoro come impiegata amministrativa alla Ferramenta Scaligera.") == 0)
+        #expect(counted("Lavoro come impiegata in amministrazione.") == 0)
+        #expect(counted("Sono precisa e organizzata.") == 0)
+        #expect(counted("Sono consulente fiscale.") == 1)
+        #expect(counted("Lavoro come impiegata e studio i bilanci per il mio ufficio.") == 0)
+        #expect(counted("In passato ho lavorato come magazziniera, cassiera e contabile.") == 3)
+    }
+
+    @Test("The opening's verb opening another summary sentence is counted; two verbs are not (#354, round 7)")
+    func floorVerbCollision() {
+        let counted = { (summary: String) in
+            Self.reader(CVData(summary: summary), "it").filter { $0.kind == .floorVerbCollision }.map(\.value)
+        }
+
+        #expect(counted("Lavoro come capoturno della manutenzione. Lavoro da sedici anni nella manutenzione.")
+            == ["Lavoro da sedici anni nella manutenzione."])
+        #expect(counted("Sono capoturno della manutenzione. Lavoro da sedici anni nella manutenzione.") == [])
+        #expect(counted("Lavoro come capoturno. Coordino tre tecnici.") == [])
     }
 
     @Test("A role, the noun of an activity or a document as a technology is counted; a tool, a tool with an acronym and a kind of model are not (#354, round 5)")
