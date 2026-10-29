@@ -84,7 +84,7 @@ struct SectionPromptsTests {
         )
 
         for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
-                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: []).text] {
+                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: [], rejected: []).text] {
             #expect(text.contains("Jobs:\n1. programador; ended"))
             #expect(text.contains("\n2. analista de testes"))
         }
@@ -165,10 +165,13 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.softSkillsInstructions.contains("No tool, no technique, no level."))
     }
 
-    @Test("The request for more skills asks for the counts missing, and none of the skills kept")
+    @Test("The request for more skills asks for the counts given, none of the skills kept, and none of those rejected, with the reason")
     func moreSkillsPrompt() {
-        let both = SectionPrompts.moreSkills(for: Self.brief, tools: 2, qualities: 1, excluding: ["PLC", "precisione"]).text
-        let toolsOnly = SectionPrompts.moreSkills(for: Self.brief, tools: 1, qualities: 0, excluding: []).text
+        let both = SectionPrompts.moreSkills(
+            for: Self.brief, tools: 2, qualities: 1, excluding: ["PLC", "precisione"],
+            rejected: ["\"manutenzione preventiva\": an activity, not a tool"]
+        ).text
+        let toolsOnly = SectionPrompts.moreSkills(for: Self.brief, tools: 1, qualities: 0, excluding: [], rejected: []).text
 
         #expect(both.contains(
             "The CV lists too few tools for its trade: name 2 more pieces of equipment, machines or software that a person with these "
@@ -180,6 +183,8 @@ struct SectionPromptsTests {
         #expect(both.contains("Already listed, do not repeat: PLC; precisione"))
         #expect(!toolsOnly.contains("personal qualities"))
         #expect(!toolsOnly.contains("Already listed"))
+        #expect(both.contains("Rejected, with the reason; write none of them again:\n- \"manutenzione preventiva\": an activity, not a tool"))
+        #expect(!toolsOnly.contains("Rejected"))
     }
 
     @Test("The skills requests read what the person says of their work with no job, and put the person's own tools and qualities first (#354, round 1)")
@@ -193,7 +198,7 @@ struct SectionPromptsTests {
             """
 
         for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
-                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: []).text] {
+                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: [], rejected: []).text] {
             #expect(text.contains(said), "\(text)")
         }
         #expect(!SectionPrompts.tools(for: Self.brief).text.contains("with no job"))

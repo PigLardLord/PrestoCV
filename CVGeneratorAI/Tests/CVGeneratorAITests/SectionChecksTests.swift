@@ -294,6 +294,33 @@ struct SectionChecksTests {
         #expect(verdict.technologies == ["Drehmaschine"])
     }
 
+    @Test("A one-word English soft skill in -ed is an adjective and stays; another verb goes (#354, round 2)")
+    func edAdjectiveStays() {
+        let english = CVDataSanitizer(
+            languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([.english: .words(["organized", "motivate"])]),
+            wordList: TableWordList()
+        )
+
+        let verdict = english.skillCheck(
+            technologies: [], softSkills: ["organized", "motivate"], against: "I mix the sound for a small theatre in Hull."
+        )
+
+        #expect(verdict.softSkills == ["organized"])
+        #expect(verdict.dropped.map(\.reason) == ["verb"])
+    }
+
+    @Test("A soft skill the description writes only as a name goes; the same word said as a quality stays (#354, round 2)",
+          arguments: [
+              ("Mi chiamo Serena Gallo e lavoro a Lecce. Scrivetemi a serena.gallo@example.com.", false),
+              ("Mi chiamo Ada Neri e lavoro a Lecce. Sono serena sotto pressione.", true),
+          ])
+    func nameIsNoQuality(description: String, stays: Bool) {
+        let verdict = sanitizer.skillCheck(technologies: [], softSkills: ["serena", "precisione"], against: description)
+
+        #expect(verdict.softSkills == (stays ? ["serena", "precisione"] : ["precisione"]))
+        #expect(verdict.dropped.map(\.reason) == (stays ? [] : ["a name"]))
+    }
+
     // MARK: The summary
 
     @Test("A summary sentence about the person in the third person goes, and a short summary with no title gets an opening from the facts")

@@ -194,8 +194,10 @@ struct DraftingEvaluation {
             return qualities
         }
 
-        func writeMoreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) async throws -> DraftWriting? {
-            let more = try await model.writeMoreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept)
+        func writeMoreSkills(
+            for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]
+        ) async throws -> DraftWriting? {
+            let more = try await model.writeMoreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept, rejected: rejected)
             log("more skills \(tools)+\(qualities)", more.map { $0.technologies + ["/"] + $0.softSkills })
             return more
         }

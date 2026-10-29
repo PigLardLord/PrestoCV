@@ -171,8 +171,9 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job and the soft skills, cleaned by code, then one request for those missing when the final check would
-    /// keep fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job).
+    /// The tools of each job and the soft skills, cleaned by code, then one request for those missing, and one more of each kind,
+    /// when the final check would keep fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); it reads the
+    /// skills the checks dropped, with the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let tools = try await request(.skills) { try await self.service.writeTools(for: brief) }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
@@ -184,8 +185,14 @@ final class SectionDraft {
         let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
         guard missingTools > 0 || missingQualities > 0 else { return }
         let names = kept.map(\.name)
+        // One more of each kind short, as the checks may drop one; the answer is cut to the most of each kind.
+        let toolsAsked = missingTools > 0 ? missingTools + 1 : 0
+        let qualitiesAsked = missingQualities > 0 ? missingQualities + 1 : 0
+        let rejected = Self.rejectedSkills(skills.dropped)
         let more = try await request(.skills) {
-            try await self.service.writeMoreSkills(for: brief, tools: missingTools, qualities: missingQualities, excluding: names)
+            try await self.service.writeMoreSkills(
+                for: brief, tools: toolsAsked, qualities: qualitiesAsked, excluding: names, rejected: rejected
+            )
         }
         guard let more else { return }
         skills = sanitizer.skillCheck(
@@ -193,6 +200,20 @@ final class SectionDraft {
         )
         keep(skills)
     }
+
+    /// The skills the checks dropped as the request for more skills reads them: the skill in quotes, then why it went, in words the
+    /// model reads; a verb cut to its object kept the object, and is none.
+    static func rejectedSkills(_ dropped: [CVDataSanitizer.Rejection]) -> [String] {
+        dropped.filter { $0.reason != "verb cut" }.map {
+            quoted(CVDataSanitizer.Rejection(sentence: $0.sentence, reason: skillReasons[$0.reason] ?? $0.reason))
+        }
+    }
+
+    private static let skillReasons = [
+        "activity": "an activity, not a tool", "a word for a skill": "names no skill", "verb": "a verb, not a noun",
+        "fragment": "not a whole name", "another language": "in another language", "a tool": "a tool, not a quality",
+        "a name": "a name, not a quality", "same kind as an earlier tool": "a tool of a kind already listed",
+    ]
 
     private func keep(_ skills: CVDataSanitizer.SkillVerdict) {
         technologies = Array(skills.technologies.prefix(Self.technologies))

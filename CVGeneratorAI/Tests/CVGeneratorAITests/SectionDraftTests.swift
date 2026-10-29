@@ -214,10 +214,10 @@ struct SectionDraftTests {
         #expect(job("Brightwater Events", in: draft)?.description?.contains("I looked after the microphones and cables.") == true)
     }
 
-    @Test("Too few skills kept ask once for those missing, none of the kept ones")
+    @Test("Too few skills kept ask once for those missing and one more, none of the kept ones, with those dropped and why")
     func moreSkills() async throws {
         let service = service()
-        service.toolsResult = [["mixing desks"], [], [], []]
+        service.toolsResult = [["mixing desks", "frequency calibration"], [], [], []]
         service.softSkillsResult = ["teamwork"]
         service.moreSkillsResult = DraftWriting(
             summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "microphones"],
@@ -228,8 +228,10 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 1)
         let request = try #require(service.moreSkillsRequests.first)
-        #expect(request.tools == 3 && request.qualities == 2)
+        // One more of each kind short than missing, as a rule may drop one of them.
+        #expect(request.tools == 4 && request.qualities == 3)
         #expect(request.excluding == ["mixing desks", "teamwork"])
+        #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
     }

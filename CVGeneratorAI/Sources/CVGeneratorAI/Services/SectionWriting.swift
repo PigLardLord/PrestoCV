@@ -88,7 +88,9 @@ extension FoundationModelsService {
         return Self.whole(last.answer.content.qualities, isComplete: last.isComplete)
     }
 
-    public func writeMoreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) async throws -> DraftWriting? {
+    public func writeMoreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]
+    ) async throws -> DraftWriting? {
         let list = { (name: String, about: String, count: Int) in
             DynamicGenerationSchema.Property(
                 name: name, description: about,
@@ -105,7 +107,7 @@ extension FoundationModelsService {
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work", qualities)) }
         guard !properties.isEmpty else { return nil }
         let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "MoreSkills", properties: properties), dependencies: [])
-        let prompt = SectionPrompts.moreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept)
+        let prompt = SectionPrompts.moreSkills(for: brief, tools: tools, qualities: qualities, excluding: kept, rejected: rejected)
         let answer = try await respond(prompt, schema: schema, tokens: Self.moreSkillsTokens(count: tools + qualities))
         return DraftWriting(
             summary: nil, roleDescriptions: [],

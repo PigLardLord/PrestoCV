@@ -96,8 +96,9 @@ enum SectionPrompts {
         those that fit the jobs.
         """
 
-    /// The request for the skills a draft still misses: `tools` more tools and `qualities` more qualities, none of `kept`.
-    static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) -> Prompt {
+    /// The request for the skills a draft still misses: `tools` more tools and `qualities` more qualities, none of `kept` and
+    /// none of `rejected` ("skill": reason).
+    static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if tools > 0 {
             lines.append(
@@ -107,6 +108,7 @@ enum SectionPrompts {
         }
         if qualities > 0 { lines.append("Name \(qualities) more personal qualities at work.") }
         if !kept.isEmpty { lines.append("Already listed, do not repeat: " + kept.joined(separator: "; ")) }
+        if !rejected.isEmpty { lines.append("Rejected, with the reason; write none of them again:\n" + bullets(rejected)) }
         return Prompt(instructions: moreSkillsInstructions, text: lines.joined(separator: "\n"))
     }
 

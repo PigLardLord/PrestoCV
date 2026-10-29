@@ -602,7 +602,8 @@ extension CVDataSanitizer {
     /// (`namesAnActivity`); the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
     /// verb, a skill in another language and a soft skill that names a tool go. A technology the verb it starts with leads ("usare i PLC") is
-    /// cut to its object; a tool word ("software") never leads as a verb.
+    /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
+    /// and a soft skill the description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
@@ -617,7 +618,10 @@ extension CVDataSanitizer {
                 return nil
             }
             let second = words.count > 1 ? words[1].lowercased() : nil
-            let taggedVerb = tagsVerbs && language.flatMap { lexicalClasses.verbs(in: item, language: $0).first?.lowerBound } == 0
+            // A lone English quality in -ed is an adjective the tagger reads as a past verb ("organized"; #354, round 2).
+            let adjective = !cutsVerb && second == nil && language == "en" && first.hasSuffix("ed")
+            let taggedVerb = tagsVerbs && !adjective
+                && language.flatMap { lexicalClasses.verbs(in: item, language: $0).first?.lowerBound } == 0
                 && (second == nil || !first.hasSuffix("ing") && Self.skillLinkWords.contains(second ?? ""))
             let saidVerb = second != nil && Self.saysAfterSubject(first, in: description, language: language)
             let infinitive = words.count > 2 && Self.skillArticles.contains(second ?? "")
@@ -671,6 +675,10 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
                 continue
             }
+            guard !Self.namesAName(item, in: description) else {
+                verdict.dropped.append(Rejection(sentence: raw, reason: "a name"))
+                continue
+            }
             verdict.softSkills.append(item)
         }
         return verdict
@@ -716,6 +724,25 @@ extension CVDataSanitizer {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init)
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
         return toolWords.contains(head) || language == "de" && toolWords.contains { head.count > $0.count && head.hasSuffix($0) }
+    }
+
+    /// Whether a soft skill of one word is written in the description only as a name: with a capital past the start of a sentence,
+    /// and never in lower case ("Chiara" of "Mi chiamo Chiara Riva"). An address ("chiara.riva@...") is no word of the text. The
+    /// final check drops such a word as a claim about the person, after the request for missing skills (#354, round 2).
+    static func namesAName(_ item: String, in description: String) -> Bool {
+        let key = DescriptionText.normalized(item)
+        guard !key.isEmpty, !key.contains(" ") else { return false }
+        var capitalised = false
+        var sentenceStart = true
+        for token in description.split(whereSeparator: \.isWhitespace).map(String.init) {
+            defer { sentenceStart = token.last.map { ".!?".contains($0) } ?? false }
+            guard !token.contains("@"), !token.contains("://"), !token.lowercased().hasPrefix("www.") else { continue }
+            let word = token.trimmingCharacters(in: .punctuationCharacters)
+            guard DescriptionText.normalized(word) == key else { continue }
+            guard word.first?.isUppercase == true else { return false }
+            capitalised = capitalised || !sentenceStart
+        }
+        return capitalised
     }
 
     /// Whether a technology names an activity, not a tool: its head noun ends as a noun of an action does ("frequency calibration",
