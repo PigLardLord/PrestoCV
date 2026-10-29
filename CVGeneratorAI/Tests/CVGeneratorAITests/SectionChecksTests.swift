@@ -1054,38 +1054,41 @@ struct SectionChecksTests {
         #expect(opened.kept == [duty])
     }
 
-    @Test("A summary sentence that names a kept tool of fewer than five letters, in capitals, names the work and no name, and the same sentence without it goes (#354, round 10)")
+    @Test("A summary sentence that names a kept tool of fewer than five letters names the work, and one the description states is no name; the same sentence without it, or with a tool the description does not state, goes, in the summary check and in the final check (#354, round 10)")
     func summaryNamingAShortTool() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Self.job("fitter", "Harlow Mills", from: "2015")])
-        let description = "I live in Leeds. Since 2015 I have worked as a fitter at Harlow Mills, where I service each gearbox."
+        let description = "I live in Leeds. Since 2015 I have worked as a fitter at Harlow Mills, where I service each gearbox and keep my notes in SAP."
         let check = { (summary: String) in
             try english.summaryCheck(
-                of: facts, summary: summary, field: nil, work: ["I service each gearbox.", "SAP"], duties: [], qualities: [],
-                tools: ["SAP"], against: description
+                of: facts, summary: summary, field: nil, work: ["I service each gearbox.", "SAP", "Maximo"], duties: [], qualities: [],
+                tools: ["SAP", "Maximo"], against: description
             )
         }
         let titled = "I work as a fitter at a busy mill and keep its lines running through every shift."
         let tool = "I log each repair in SAP before the end of the day."
         let bare = "I log each repair before the end of the day."
+        let inferred = "I log each repair in Maximo before the end of the day."
 
         let named = try check([titled, tool].joined(separator: " "))
         let unnamed = try check([titled, bare].joined(separator: " "))
+        let unstated = try check([titled, inferred].joined(separator: " "))
 
         #expect(named.rejected.isEmpty, "\(named.rejected)")
         #expect(named.kept == [titled, tool])
         #expect(unnamed.rejected.first { $0.sentence == bare }?.reason == CVDataSanitizer.namesNoWork, "\(unnamed.rejected)")
+        #expect(unstated.rejected.first { $0.sentence == inferred }?.reason.hasSuffix("reads as a name") == true, "\(unstated.rejected)")
 
-        // The final check reads the draft's kept technologies as the person's words too; a tool the draft does not keep is a name.
-        let summary = [titled, tool].joined(separator: " ")
-        let kept = try english.sanitize(
-            facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: ["SAP"], softSkills: []), against: description
-        )
-        let unkept = try english.sanitize(
-            facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: [], softSkills: []), against: description
-        )
-        #expect(kept.summary == summary)
-        #expect(unkept.summary == titled)
+        // The final check reads the stated technologies the draft keeps as the person's words too: a summary names no tool the
+        // description lacks, as no other name (ADR 0031, "inferred").
+        let final = { (summary: String, technologies: [String]) in
+            try english.sanitize(
+                facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: technologies, softSkills: []),
+                against: description
+            ).summary
+        }
+        #expect(try final([titled, tool].joined(separator: " "), ["SAP"]) == [titled, tool].joined(separator: " "))
+        #expect(try final([titled, inferred].joined(separator: " "), ["SAP", "Maximo"]) == titled)
     }
 
     @Test("A short summary gets the opening when it names no title and a sentence of the earlier titles it does not name, the latest first; a full one gets none (#354, round 6)", arguments: [

@@ -601,9 +601,11 @@ extension CVDataSanitizer {
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
-            // A kept tool names the work whole, however short, and is no name: "Java" and "SAP" have no stem of five letters, and the
-            // request asks for a tool of the lists (#354, round 10).
+            // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters, and the request asks
+            // for a tool of the lists (#354, round 10). One the description states is no name; one it lacks is, as in the final
+            // check, since a summary names nothing the description lacks (ADR 0031).
             let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            let statedTools = Self.words(of: tools.filter { source.named($0) != nil })
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
                 return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
@@ -665,7 +667,7 @@ extension CVDataSanitizer {
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(toolRuns.joined())) {
+                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(statedTools)) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
