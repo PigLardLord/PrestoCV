@@ -36,8 +36,10 @@ struct UseCaseSurfaceTests {
         // final check reads them.
         let sections: Set = [
             "requireLanguageData", "grounded", "keptJobs", "joined", "foreignWords", "otherTitles", "namedTitle", "quotedWords",
-            "letterWords", "stems", "words",
+            "letterWords", "stems", "words", "generalDutyJob",
         ]
-        #expect(functions == Set(["sanitize", "languageCheck", "require"]).union(sections))
+        // The reading of an interest's verb, which the sanitising of an interest and its rows call.
+        let interests: Set = ["isConjugated"]
+        #expect(functions == Set(["sanitize", "languageCheck", "require"]).union(sections).union(interests))
     }
 }

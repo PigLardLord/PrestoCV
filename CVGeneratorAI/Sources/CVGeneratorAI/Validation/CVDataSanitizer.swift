@@ -310,7 +310,7 @@ public struct CVDataSanitizer: Sendable {
     /// English verb with no "-s" and no "-ed" ("play football", "bake bread"), a gerund ("hiking in the Alps") and a German infinitive
     /// ("wandern gehen"). An interest of one word stays whole, and so does one whose rest holds no word of 3 letters or more, or, in
     /// German, no noun.
-    func pastime(of interest: String, in source: DescriptionText) -> String {
+    private func pastime(of interest: String, in source: DescriptionText) -> String {
         let language = source.explainer.language
         let words = Word.words(in: interest)
         guard let language, VerbForms.readsVerbsByTags(in: language), lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue),
@@ -378,7 +378,7 @@ public struct CVDataSanitizer: Sendable {
     /// three or more of them, of three letters or more, all words of that duty ("dando una mano con gli ordini dei ricambi" and the
     /// person's own "Davo anche una mano con gli ordini dei ricambi"), so that the job's text says the duty once, in the person's
     /// words (#354). A clause with a word that no one of them has stays.
-    static func withoutClausesSaid(_ sentence: String, in duties: [String]) -> String {
+    private static func withoutClausesSaid(_ sentence: String, in duties: [String]) -> String {
         let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
         let end = trimmed.last.map { ".!?…".contains($0) ? String($0) : "" } ?? ""
         let clauses = trimmed.dropLast(end.count).components(separatedBy: ", ")
@@ -582,7 +582,7 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// `text` with its first letter in lower case, the rest as written.
-    static func lowercasingFirst(_ text: String) -> String {
+    private static func lowercasingFirst(_ text: String) -> String {
         text.prefix(1).lowercased() + text.dropFirst()
     }
 
