@@ -222,6 +222,32 @@ struct SectionChecksTests {
         #expect(wiring.dropped.map(\.sentence) == ["pinces coupantes"])
     }
 
+    @Test("A technology that names an activity, or a kind of tool by what it does, goes; equipment, a named tool and one with an acronym stay (#354, round 1)")
+    func activityIsNoTechnology() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let sound = english.skillCheck(
+            technologies: [
+                "digital consoles", "frequency calibration", "PA systems", "signal routing", "beam focusing", "tracking software",
+                "PLC programming", "line arrays", "docking station",
+            ],
+            softSkills: [], against: "I mix the sound for a small theatre in Hull."
+        )
+        let plant = sanitizer.skillCheck(
+            technologies: [
+                "PLC", "software di tracciamento", "sistema di controllo remoto", "stazione di saldatura", "manutenzione preventiva",
+                "multimetro", "programmazione PLC",
+            ],
+            softSkills: [], against: JobClausesTests.italian
+        )
+
+        #expect(sound.technologies == ["digital consoles", "PA systems", "PLC programming", "line arrays", "docking station"])
+        #expect(sound.dropped.map(\.sentence) == ["frequency calibration", "signal routing", "beam focusing", "tracking software"])
+        #expect(Set(sound.dropped.map(\.reason)) == ["activity"])
+        #expect(plant.technologies == ["PLC", "stazione di saldatura", "multimetro", "programmazione PLC"])
+        #expect(plant.dropped.map(\.sentence) == ["software di tracciamento", "sistema di controllo remoto", "manutenzione preventiva"])
+    }
+
     @Test("A fragment and a lone verb go from the skills")
     func fragmentsGo() {
         let verdict = sanitizer.skillCheck(

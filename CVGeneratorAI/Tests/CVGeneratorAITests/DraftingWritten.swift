@@ -220,6 +220,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A summary sentence whose subject is a bare word of the person's work, a word of a title or of the field with no article,
     /// followed by a verb "to be" and no word of the person before it ("Manutenzione è la mia attività principale."; #354, round 1).
     case bareSubjectSummary
+    /// A technology with a word in neither the description nor the reader's tools of the input's trade (`DraftingInputs.vocabularies`):
+    /// a tool of another trade, an activity, or jargon ("frequency calibration", "software di tracciamento"; #354, round 1).
+    case offTradeTechnology
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -246,6 +249,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .unwrittenStatement: "a stated duty or quality the draft does not hold"
         case .fillerDuty: "a duty not said, in a job the person described"
         case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
+        case .offTradeTechnology: "a technology neither stated nor of the trade"
         }
     }
 }
@@ -281,6 +285,7 @@ enum ReaderRules {
     static func findings(in cv: CVData, for input: DraftingInput, report: InventedFacts.Report) -> [ReaderFinding] {
         let language = input.language
         var found: [ReaderFinding] = []
+        let tradeStems = DraftingInputs.vocabularies[input.id].map { stems(of: ([input.description] + $0).joined(separator: " ")) }
         for (index, skill) in cv.skills.enumerated() {
             let path = "skills[\(index)].name"
             if skill.kind == .technology {
@@ -292,6 +297,9 @@ enum ReaderRules {
             }
             if language != "en", isEnglish(skill.name) {
                 found.append(ReaderFinding(kind: .skillInAnotherLanguage, path: path, value: skill.name))
+            }
+            if skill.kind == .technology, let known = tradeStems, !stems(of: skill.name).isSubset(of: known) {
+                found.append(ReaderFinding(kind: .offTradeTechnology, path: path, value: skill.name))
             }
             if letterWords(of: skill.name).count > 4 {
                 found.append(ReaderFinding(kind: .clauseAsSkill, path: path, value: skill.name))
@@ -657,6 +665,17 @@ enum ReaderRules {
     }
 
     /// The words of `text`, lowered, folded and split at anything not a letter.
+    /// The first five letters of each word of `text` of three letters or more that links no other ("della", "and"): how a technology
+    /// is matched to the description and to the tools of a trade.
+    static func stems(of text: String) -> Set<String> {
+        Set(letterWords(of: text).filter { $0.count >= 3 && !linkWords.contains($0) }.map { String($0.prefix(5)) })
+    }
+
+    private static let linkWords: Set<String> = [
+        "the", "and", "for", "with", "del", "dei", "della", "delle", "degli", "dello", "per", "con", "und", "von", "der", "die", "das",
+        "des", "les", "pour", "avec", "los", "las", "para", "com", "dos",
+    ]
+
     static func letterWords(of text: String) -> [String] {
         fold(text).split { !$0.isLetter }.map(String.init)
     }

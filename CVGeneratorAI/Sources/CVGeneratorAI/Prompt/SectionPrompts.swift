@@ -63,7 +63,7 @@ enum SectionPrompts {
 
     // MARK: The skills
 
-    /// The tools request: 2 or 3 tools of the trade for each job, in order.
+    /// The tools request: up to 3 tools for each job, in order, first those its own lines name, none when none fits.
     static func tools(for brief: DraftBrief) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if !brief.namedSkills.isEmpty { lines.append("Skills already listed: " + brief.namedSkills.joined(separator: "; ")) }
@@ -71,15 +71,16 @@ enum SectionPrompts {
     }
 
     static let toolsInstructions = """
-        For each job, in order, name 2 or 3 tools, machines, software or techniques that a person in that trade uses, each of \
-        another kind. \
+        For each job, in order, name up to 3 pieces of equipment, machines or software that a person with that job's title uses, \
+        each of another kind. \
         Write in the language named on the first line.
         - job: the job's title as written.
-        - First the tools the person names in what they say of their work with no job, under the job they fit, as the person \
-        names them; then those of the trade.
-        - tools: the specific equipment, machines, software or methods a CV of that trade lists, 1 to 3 words each; no material, \
-        part or supply, no everyday object a person of any trade uses; no personal quality, no activity, no level, none of the \
-        skills already listed.
+        - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
+        what they say of their work with no job, under the job they fit, as the person names them; then those of the trade, \
+        only when they fit the job's title and the tools the person names. Name none for a job when none fits.
+        - tools: the name a CV of that trade lists for a piece of equipment, a machine or a software, 1 to 3 words each; no \
+        activity or task, also when written as a noun; no material, part or supply, no everyday object a person of any trade \
+        uses; no personal quality, no level, none of the skills already listed.
         """
 
     /// The soft skills request.
@@ -99,7 +100,10 @@ enum SectionPrompts {
     static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if tools > 0 {
-            lines.append("Name \(tools) more tools, machines, software or techniques of the trade, each of another kind than those listed.")
+            lines.append(
+                "The CV lists too few tools for its trade: name \(tools) more pieces of equipment, machines or software that a person "
+                    + "with these job titles uses, of the trade of those listed, each of another kind than those listed."
+            )
         }
         if qualities > 0 { lines.append("Name \(qualities) more personal qualities at work.") }
         if !kept.isEmpty { lines.append("Already listed, do not repeat: " + kept.joined(separator: "; ")) }
@@ -108,7 +112,7 @@ enum SectionPrompts {
 
     static let moreSkillsInstructions = """
         You add skills to a CV, for the person's trade. Write in the language named on the first line.
-        - Nouns of 1 to 3 words; no level, no activity, none of those already listed.
+        - Nouns of 1 to 3 words; no level, no activity or task, also when written as a noun, none of those already listed.
         - First those the person names in what they say of their work with no job; then those of the trade.
         """
 

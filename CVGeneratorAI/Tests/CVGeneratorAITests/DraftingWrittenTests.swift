@@ -327,6 +327,27 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .bareSubjectSummary }.map(\.value) == ["Manutenzione è la mia attività principale."])
     }
 
+    @Test("A technology with a word in neither the description nor the tools of the trade is counted; a stated or a typical tool is not (#354, round 1)")
+    func offTradeTechnology() throws {
+        let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
+        let counted = { (names: [String], input: DraftingInput) in
+            let cv = CVData(skills: names.map { Skill(name: $0) } + [Skill(name: "precisione", kind: .softSkill)])
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .offTradeTechnology }.map(\.value)
+        }
+        let jargon = [
+            "sound mapping", "audio layering", "frequency calibration", "noise dampening", "signal routing", "amplitude modulation",
+            "beam focusing",
+        ]
+
+        #expect(counted(["digital consoles"] + jargon, english) == jargon)
+        #expect(counted(["PLC", "scanner", "software di tracciamento", "sistema di controllo remoto"], italian)
+            == ["scanner", "software di tracciamento", "sistema di controllo remoto"])
+        #expect(counted(["digital consoles", "PA systems", "Dante", "QLab", "Smaart", "in-ear monitors"], english).isEmpty)
+        #expect(counted(["PLC", "quadri elettrici", "multimetro", "termocamera", "inverter"], italian).isEmpty)
+    }
+
     @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
     func toolAsSoftSkill() {
         let cv = CVData(skills: [

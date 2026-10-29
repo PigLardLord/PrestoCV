@@ -598,7 +598,8 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
-    /// skill, and a tool named by an activity ("software di gestione fermi") goes; the singular and the plural of one skill count
+    /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a technology that names an activity
+    /// (`namesAnActivity`); the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
     /// verb, a skill in another language and a soft skill that names a tool go. A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb.
@@ -651,7 +652,9 @@ extension CVDataSanitizer {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
             if !Self.softStems.contains(where: lower.contains) {
-                if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
+                if Self.namesAnActivity(item, language: language) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
                     verdict.technologies.append(item)
@@ -714,6 +717,41 @@ extension CVDataSanitizer {
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
         return toolWords.contains(head) || language == "de" && toolWords.contains { head.count > $0.count && head.hasSuffix($0) }
     }
+
+    /// Whether a technology names an activity, not a tool: its head noun ends as a noun of an action does ("frequency calibration",
+    /// "manutenzione preventiva"), or it is a kind of tool (`toolWords`) named by such a noun ("software di tracciamento", "tracking
+    /// software"; #354, round 1). A skill with an acronym or a digit names a tool ("PLC programming"); a noun of a thing with such an
+    /// ending ("docking station", "stazione di saldatura") is no activity. German, whose nouns of actions and of machines share
+    /// their endings ("Steuerung"), is not read.
+    static func namesAnActivity(_ item: String, language: String?) -> Bool {
+        guard let language, let endings = activityEndings[language] else { return false }
+        let words = item.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        guard !words.contains(where: { word in
+            word.contains(where: \.isNumber) || word.count >= 2 && word.allSatisfy(\.isUppercase)
+        }) else { return false }
+        let lower = words.map { $0.lowercased() }.filter { !skillLinkWords.contains($0) }
+        guard let head = language == "en" ? lower.last : lower.first else { return false }
+        let isActivity = { (word: String) in
+            word.count >= 6 && endings.contains(where: word.hasSuffix) && !activityLookalikes.contains(where: word.hasSuffix)
+        }
+        let modifiers = language == "en" ? lower.dropLast() : lower.dropFirst()
+        return isActivity(head) || toolWords.contains(head) && modifiers.contains(where: isActivity)
+    }
+
+    /// The endings of the nouns of an action, by language: "-ing" and "-tion" of English, "-zione" and "-mento" of Italian.
+    private static let activityEndings: [String: [String]] = [
+        "en": ["ing", "tion", "sion", "control"],
+        "it": ["zione", "sione", "mento", "aggio", "controllo"],
+        "es": ["ción", "sión", "miento", "control"],
+        "fr": ["tion", "sion", "contrôle"],
+        "pt": ["ção", "são", "controle"],
+    ]
+
+    /// The nouns of a thing that end as a noun of an action does.
+    private static let activityLookalikes = [
+        "station", "stazione", "postazione", "estación", "estação", "strumento", "instrumento", "equipamento", "equipaggiamento",
+        "string", "ceiling", "building", "bearing", "housing", "casing", "fitting", "coupling",
+    ]
 
     /// The key by which two skills are one: their words without a plural ending or a last vowel ("PLC" and "PLCs").
     private static func skillKey(_ item: String) -> String {

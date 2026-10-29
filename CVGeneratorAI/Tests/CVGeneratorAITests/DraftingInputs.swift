@@ -147,6 +147,26 @@ enum DraftingInputs {
         "jobs-fr": ("accueil hôtelier", []), "jobs-pt": ("carpintaria", []),
     ]
 
+    /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354,
+    /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
+    /// The list is the reader's, independent of the rules of the draft.
+    static let vocabularies: [String: [String]] = [
+        "jobs-en": [
+            "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
+            "DI boxes", "Dante", "QLab", "Pro Tools", "Logic Pro", "Reaper", "Ableton Live", "Smaart", "Yamaha CL", "DiGiCo",
+            "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
+            "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
+            "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com",
+        ],
+        "jobs-it": [
+            "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
+            "termocamera", "analizzatore di vibrazioni", "allineatore laser", "inverter", "motori elettrici", "schemi pneumatici",
+            "pneumatica", "oleodinamica", "saldatrice", "trapano", "chiave dinamometrica", "avvitatore", "estrattore per cuscinetti",
+            "riduttori", "pompe", "compressori", "software CMMS", "SAP PM", "lubrificanti", "carrello elevatore", "sensori",
+            "encoder", "valvole",
+        ],
+    ]
+
     // MARK: - The app's examples
 
     static func examples() throws -> [DraftingInput] {

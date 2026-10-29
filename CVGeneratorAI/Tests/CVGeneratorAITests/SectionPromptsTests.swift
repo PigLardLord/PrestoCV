@@ -143,6 +143,18 @@ struct SectionPromptsTests {
             """)
     }
 
+    @Test("The tools request puts the equipment of a job's own lines first, allows none for a job, and asks for no activity (#354, round 1)")
+    func toolsOfEachJob() {
+        let rules = SectionPrompts.toolsInstructions
+
+        #expect(rules.contains("First the equipment, machines and software the job's own lines name, as written;"))
+        #expect(rules.contains("only when they fit the job's title and the tools the person names"))
+        #expect(rules.contains("Name none for a job when none fits."))
+        #expect(rules.contains("no activity or task, also when written as a noun"))
+        #expect(!rules.contains("technique"))
+        #expect(!SectionPrompts.moreSkillsInstructions.contains("technique"))
+    }
+
     @Test("The soft skills request lists the jobs, and asks for qualities, never a tool")
     func softSkillsPrompt() {
         let prompt = SectionPrompts.softSkills(for: Self.brief)
@@ -158,7 +170,10 @@ struct SectionPromptsTests {
         let both = SectionPrompts.moreSkills(for: Self.brief, tools: 2, qualities: 1, excluding: ["PLC", "precisione"]).text
         let toolsOnly = SectionPrompts.moreSkills(for: Self.brief, tools: 1, qualities: 0, excluding: []).text
 
-        #expect(both.contains("Name 2 more tools, machines, software or techniques of the trade, each of another kind than those listed."))
+        #expect(both.contains(
+            "The CV lists too few tools for its trade: name 2 more pieces of equipment, machines or software that a person with these "
+                + "job titles uses, of the trade of those listed, each of another kind than those listed."
+        ))
         #expect(!both.contains("material"))
         #expect(!SectionPrompts.toolsInstructions.contains("materials or"))
         #expect(both.contains("Name 1 more personal qualities at work."))
@@ -182,7 +197,7 @@ struct SectionPromptsTests {
             #expect(text.contains(said), "\(text)")
         }
         #expect(!SectionPrompts.tools(for: Self.brief).text.contains("with no job"))
-        #expect(SectionPrompts.toolsInstructions.contains("First the tools the person names"))
+        #expect(SectionPrompts.toolsInstructions.contains("then the tools the person names in what they say of their work with no job"))
         #expect(SectionPrompts.softSkillsInstructions.contains("First the qualities the person says of themselves"))
         #expect(SectionPrompts.moreSkillsInstructions.contains("First those the person names"))
     }

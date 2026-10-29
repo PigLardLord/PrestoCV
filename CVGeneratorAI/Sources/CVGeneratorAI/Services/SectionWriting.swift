@@ -58,15 +58,17 @@ extension FoundationModelsService {
         return jobs.map { Self.clean(try? $0.value([String].self, forProperty: "tools")) }
     }
 
-    /// One entry of 2 or 3 tools for each of `count` jobs, in order; the entry's type is a dependency the array refers to.
+    /// One entry of up to 3 tools for each of `count` jobs, in order, none for a job when none fits; the entry's type is a
+    /// dependency the array refers to.
     nonisolated static func toolsSchema(count: Int) throws -> GenerationSchema {
         let job = DynamicGenerationSchema(name: "JobTools", properties: [
             DynamicGenerationSchema.Property(
                 name: "job", description: "The job's title", schema: DynamicGenerationSchema(type: String.self)
             ),
             DynamicGenerationSchema.Property(
-                name: "tools", description: "2 or 3 specific equipment, machines, software or methods of the trade",
-                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 2, maximumElements: 3)
+                name: "tools",
+                description: "Up to 3 pieces of equipment, machines or software of the job, first those its lines name; none when none fits",
+                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 0, maximumElements: 3)
             ),
         ])
         let root = DynamicGenerationSchema(name: "Tools", properties: [
@@ -97,7 +99,7 @@ extension FoundationModelsService {
         }
         var properties: [DynamicGenerationSchema.Property] = []
         if tools > 0 {
-            let about = "\(tools) more tools, machines, software or techniques of the trade, each of another kind; no material or part"
+            let about = "\(tools) more pieces of equipment, machines or software of the trade, each of another kind; no activity, no material or part"
             properties.append(list("tools", about, tools))
         }
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work", qualities)) }
