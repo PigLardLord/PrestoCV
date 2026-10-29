@@ -1075,6 +1075,17 @@ struct SectionChecksTests {
         #expect(named.rejected.isEmpty, "\(named.rejected)")
         #expect(named.kept == [titled, tool])
         #expect(unnamed.rejected.first { $0.sentence == bare }?.reason == CVDataSanitizer.namesNoWork, "\(unnamed.rejected)")
+
+        // The final check reads the draft's kept technologies as the person's words too; a tool the draft does not keep is a name.
+        let summary = [titled, tool].joined(separator: " ")
+        let kept = try english.sanitize(
+            facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: ["SAP"], softSkills: []), against: description
+        )
+        let unkept = try english.sanitize(
+            facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: [], softSkills: []), against: description
+        )
+        #expect(kept.summary == summary)
+        #expect(unkept.summary == titled)
     }
 
     @Test("A short summary gets the opening when it names no title and a sentence of the earlier titles it does not name, the latest first; a full one gets none (#354, round 6)", arguments: [

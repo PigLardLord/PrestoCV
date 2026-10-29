@@ -150,15 +150,24 @@ public struct CVDataSanitizer: Sendable {
         // The model writes around the facts only when it has one to write around (ADR 0031): with no title, job or school, a summary
         // or a skill of its own would say who the person is with nothing the person said.
         let hasAFact = personalInfo.title != nil || !experience.isEmpty || !education.isEmpty
-        let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree))
+        let roleSkills = (writing?.technologies ?? []).map { Skill(name: $0, kind: .technology) }
+            + (writing?.softSkills ?? []).map { Skill(name: $0, kind: .softSkill) }
+        let skills = sanitize(
+            cvData.skills + roleSkills, source, claimed: claimed, interests: interests,
+            titles: ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue), entries,
+            inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
+        )
+        // A kept technology is the person's word in the summary, as the summary check reads it: "Java" and "SAP" name the work and
+        // no one (#354, round 10).
+        let ownWords = Self.words(
+            of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + skills.filter { $0.kind == .technology }.map(\.name)
+        )
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let summary = { (text: String?) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {
                 written.isPlain($0, ownWords: ownWords) && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
             }
         }
-        let roleSkills = (writing?.technologies ?? []).map { Skill(name: $0, kind: .technology) }
-            + (writing?.softSkills ?? []).map { Skill(name: $0, kind: .softSkill) }
 
         return CVData(
             personalInfo: personalInfo,
@@ -167,11 +176,7 @@ public struct CVDataSanitizer: Sendable {
                 : Self.withoutLiking(source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false), source),
             experience: experience,
             education: education,
-            skills: sanitize(
-                cvData.skills + roleSkills, source, claimed: claimed, interests: interests,
-                titles: ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue), entries,
-                inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
-            ),
+            skills: skills,
             languages: sanitize(cvData.languages, claimed),
             certifications: sanitize(entries.certifications, entries),
             interests: interests
