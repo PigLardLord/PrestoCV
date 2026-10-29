@@ -20,6 +20,8 @@ final class SectionDraft {
     static let summaryRequests = 4
     /// A summary of this many sentences and characters asks no more (#354, round 13).
     static let summaryEnough = (sentences: 2, characters: 120)
+    /// Why a sentence on the current job's work that says one of its duties again goes, which its repair reads (#354, round 15).
+    static let restatesADutyReason = "describe what the work involves, not the same task"
 
     private let service: any CVGenerationService
     private let sanitizer: CVDataSanitizer
@@ -390,7 +392,18 @@ final class SectionDraft {
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
         let order = isDated ? Self.latestFirst(kept.experience) : Array(brief.roles.indices)
         let jobDuties = (isDated ? kept.experience.map(\.description) : duties).map { SentenceSplitter.sentences(in: $0 ?? "") }
-        var topics = Self.summaryTopics(of: brief, duties: jobDuties, qualities: keptQualities, field: field, order: order)[...]
+        // The typical duties each job keeps: the sentences its own request wrote, not the person's (#354, round 15).
+        let typical = jobDuties.indices.map { number -> [String] in
+            let written = DescriptionText.normalized(duties.indices.contains(number) ? duties[number] ?? "" : "")
+            return written.isEmpty ? [] : jobDuties[number].filter { written.contains(DescriptionText.normalized($0)) }
+        }
+        var topics = Self.summaryTopics(
+            of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order
+        )[...]
+        // The current job's work slot, whose sentence must not say one of its duties again (`CVDataSanitizer.nearlyCopies`).
+        let workSlot = Self.currentJob(of: brief, order: order).flatMap { current in
+            Self.workTopic(of: brief, current: current, duties: jobDuties, typical: typical).map { (topic: $0, current: current) }
+        }
         var lead = brief.opening
         var accepted: [String] = []
         var asked = 0
@@ -409,6 +422,19 @@ final class SectionDraft {
             let opening = lead ?? verdict.opening
             return Array(verdict.kept.filter { $0 != opening && $0 != verdict.opening }.prefix(Self.summarySentences - 1))
         }
+        // `verdict` without a new sentence on the current job's work that says one of its duties again, which then leads its
+        // rejections (#354, round 15): the check reads a copy word for word, not one in other words ("Ich installiere elektrische
+        // Anlagen in Neubauten" after "Ich installiere Anlagen in Neubauten").
+        func withoutCopies(_ verdict: CVDataSanitizer.SummaryVerdict?, on topic: SummaryTopic) -> CVDataSanitizer.SummaryVerdict? {
+            guard var verdict, let workSlot, topic == workSlot.topic else { return verdict }
+            let duties = jobDuties.indices.contains(workSlot.current) ? jobDuties[workSlot.current] : []
+            let copies = following(verdict).filter { sentence in
+                !accepted.contains(sentence) && CVDataSanitizer.nearlyCopies(sentence, duties: duties, title: topic.title)
+            }
+            verdict.kept.removeAll(where: copies.contains)
+            verdict.rejected.insert(contentsOf: copies.map { .init(sentence: $0, reason: Self.restatesADutyReason) }, at: 0)
+            return verdict
+        }
 
         while asked < Self.summaryRequests, !Self.isEnough(lead, accepted), accepted.count < Self.summarySentences - 1,
               let topic = topics.popFirst() {
@@ -417,7 +443,7 @@ final class SectionDraft {
             let answer = try await request(.summary) { [brief] in
                 try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
             }
-            var verdict = checked(answer)
+            var verdict = withoutCopies(checked(answer), on: topic)
             if let first = verdict, let rejection = first.rejected.first, asked < Self.summaryRequests,
                !Self.isEnough(lead ?? first.opening, following(first)) {
                 asked += 1
@@ -426,7 +452,9 @@ final class SectionDraft {
                         for: brief, topic: topic, written: written, rejected: Self.quoted(rejection)
                     )
                 }
-                if let second = checked(repaired), following(second).count >= following(first).count { verdict = second }
+                if let second = withoutCopies(checked(repaired), on: topic), following(second).count >= following(first).count {
+                    verdict = second
+                }
             }
             // A request that wrote nothing the check reads leaves the summary as it was.
             guard let verdict else { continue }
@@ -437,22 +465,21 @@ final class SectionDraft {
     }
 
     /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1): the current job's title and the
-    /// `field`; the topics of the first two kept `duties` of the current job; its title with the first two `qualities`; then the
-    /// first kept duty of each ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no
-    /// title reads the headline title.
+    /// `field`; the topics of its work (`workTopic`); its title with the first two `qualities`; then the first kept duty of each
+    /// ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no title reads the
+    /// headline title.
     static func summaryTopics(
-        of brief: DraftBrief, duties: [[String]], qualities: [String], field: String?, order: [Int]
+        of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int]
     ) -> [SummaryTopic] {
         let roles = order.filter(brief.roles.indices.contains)
-        guard let current = roles.first(where: { !brief.roles[$0].hasEnded }) ?? roles.first else {
+        guard let current = currentJob(of: brief, order: order) else {
             return qualities.isEmpty ? [] : [SummaryTopic(title: brief.headline, qualities: Array(qualities.prefix(2)), hasEnded: false)]
         }
         let title = { (number: Int) in brief.roles[number].title.presentValue ?? brief.headline }
         let kept = { (number: Int) in duties.indices.contains(number) ? duties[number] : [] }
         let hasEnded = brief.roles[current].hasEnded
         var topics = [SummaryTopic(title: title(current), field: field?.presentValue, hasEnded: hasEnded)]
-        let work = CVDataSanitizer.workTopics(of: kept(current).prefix(2).joined(separator: " "), limit: 2)
-        if !work.isEmpty { topics.append(SummaryTopic(title: title(current), work: work, hasEnded: hasEnded)) }
+        if let work = workTopic(of: brief, current: current, duties: duties, typical: typical) { topics.append(work) }
         if !qualities.isEmpty {
             topics.append(SummaryTopic(title: title(current), qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
         }
@@ -461,6 +488,24 @@ final class SectionDraft {
             if !work.isEmpty { topics.append(SummaryTopic(title: title(number), work: work, hasEnded: brief.roles[number].hasEnded)) }
         }
         return topics
+    }
+
+    /// The job the summary speaks of first: the first one of `order` that goes on, else the latest.
+    static func currentJob(of brief: DraftBrief, order: [Int]) -> Int? {
+        let roles = order.filter(brief.roles.indices.contains)
+        return roles.first(where: { !brief.roles[$0].hasEnded }) ?? roles.first
+    }
+
+    /// The slot of the `current` job's work: the topics of its first two `typical` duties, those its own request wrote (#354,
+    /// round 15). The duties the person said are already in the job, and a sentence on them said one again; they stand for the
+    /// work only when the job has no typical duty. Nil when its kept `duties` have no topic.
+    static func workTopic(of brief: DraftBrief, current: Int, duties: [[String]], typical: [[String]]) -> SummaryTopic? {
+        let own = typical.indices.contains(current) ? typical[current] : []
+        let kept = own.isEmpty ? (duties.indices.contains(current) ? duties[current] : []) : own
+        let work = CVDataSanitizer.workTopics(of: kept.prefix(2).joined(separator: " "), limit: 2)
+        guard !work.isEmpty else { return nil }
+        let title = brief.roles[current].title.presentValue ?? brief.headline
+        return SummaryTopic(title: title, work: work, hasEnded: brief.roles[current].hasEnded)
     }
 
     /// The numbers of `jobs`, the latest first: the current ones, then by end and start, the earlier in the draft first on a tie.

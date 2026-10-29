@@ -218,8 +218,9 @@ struct SectionDraftTests {
         )
         let duties = [["I rigged the lights."], [], ["I train the junior technicians.", "I plan the rehearsals.", "I mix the shows."]]
 
+        // The current job's duties are all its own: its work slot falls back on them.
         let topics = SectionDraft.summaryTopics(
-            of: brief, duties: duties, qualities: ["teamwork", "calm", "care"], field: "live sound", order: [2, 1, 0]
+            of: brief, duties: duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: "live sound", order: [2, 1, 0]
         )
 
         #expect(topics == [
@@ -228,11 +229,17 @@ struct SectionDraftTests {
             SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
             SummaryTopic(title: "stagehand", work: ["the lights"], hasEnded: true),
         ])
+        // Round 15: with typical duties, the work slot reads them, never the duty the person said and the job already shows.
+        let typical = SectionDraft.summaryTopics(
+            of: brief, duties: duties, typical: [[], [], ["I plan the rehearsals.", "I mix the shows."]], qualities: [],
+            field: nil, order: [2, 1, 0]
+        )
+        #expect(typical.dropFirst().first == SummaryTopic(title: "head of sound", work: ["the rehearsals", "the shows"], hasEnded: false))
         // The pair: no duty and no quality leave the role alone; no role leaves the qualities with the headline.
-        #expect(SectionDraft.summaryTopics(of: brief, duties: [[], [], []], qualities: [], field: nil, order: [2, 1, 0]) == [
+        #expect(SectionDraft.summaryTopics(of: brief, duties: [[], [], []], typical: [], qualities: [], field: nil, order: [2, 1, 0]) == [
             SummaryTopic(title: "head of sound", hasEnded: false),
         ])
-        #expect(SectionDraft.summaryTopics(of: brief, duties: [], qualities: ["teamwork", "calm"], field: nil, order: []) == [
+        #expect(SectionDraft.summaryTopics(of: brief, duties: [], typical: [], qualities: ["teamwork", "calm"], field: nil, order: []) == [
             SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
         ])
     }
@@ -549,6 +556,24 @@ struct SectionDraftTests {
         #expect(repair.written == [Self.opening])
         #expect(repair.rejected.hasPrefix("\"He is a sound engineer.\": it speaks of the person in the third person"))
         #expect(draft.summary == Self.opening + " " + Self.summary)
+    }
+
+    @Test("The current job's work slot reads its typical duties, and a sentence on it that says a duty again gets one repair (#354, round 15)")
+    func summaryNearCopy() async throws {
+        let service = service()
+        let first = "I keep the sound of every show clear and balanced."
+        let copy = "I train junior technicians in every rehearsal and show."
+        service.summaryResults = [first, copy]
+        service.summaryRepairResult = Self.summary
+
+        let draft = try await draft(service)
+
+        let work = try #require(service.summaryRequests.dropFirst().first?.topic.work)
+        #expect(!work.isEmpty && !work.contains("the junior technicians"))
+        #expect(service.sectionCalls.filter { $0.hasSuffix("ummary") } == ["summary", "summary", "repairSummary"])
+        let repair = try #require(service.summaryRepairs.first)
+        #expect(repair.rejected == "\"\(copy)\": \(SectionDraft.restatesADutyReason)")
+        #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 
     @Test("The summary asks one sentence at a time, each after those kept, until it has 2 sentences and 120 characters (#354, round 13)")
