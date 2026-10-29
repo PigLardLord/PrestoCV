@@ -173,6 +173,54 @@ struct ClaimWithdrawalTests {
         return Set(was.keys.filter { was[$0] != now[$0] })
     }
 
+    // MARK: - A title the person writes of themselves (D5)
+
+    @Test("d5: a headline the person writes word for word as what they are stays when the check judges it no fact (#354, D5)",
+          arguments: [
+              ("Mi chiamo Chiara e sono impiegata amministrativa a Verona.", "impiegata amministrativa"),
+              ("Lavoro come magazziniere, di notte.", "magazziniere"), ("I am a nurse.", "nurse"), ("I'm a nurse in Leeds.", "nurse"),
+              ("I work as a plumber and I fix pipes.", "plumber"), ("Ich bin Bäckerin bei Müller.", "Bäckerin"),
+              ("Je suis comptable.", "comptable"), ("Soy camarero en Sevilla.", "camarero"), ("Sou motorista de caminhão.", "motorista de caminhão"),
+          ])
+    func selfTitleStays(description: String, title: String) async throws {
+        let grounded = CVData(personalInfo: PersonalInfo(title: title))
+        let checker = FakeClaimChecker(stances: [title: .wish])
+
+        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker)
+
+        #expect(draft.cvData.personalInfo.title == title)
+    }
+
+    @Test("d5: a wish, another person's title, a denial, a limit, a title after a word that opens no clause of the person, or one not written word for word goes when the check judges it no fact (#354, D5)",
+          arguments: [
+              ("Vorrei essere impiegata amministrativa.", "impiegata amministrativa"),
+              ("Mia sorella è impiegata amministrativa.", "impiegata amministrativa"),
+              ("Sono impiegata a Verona.", "impiegata amministrativa"), ("Non sono infermiere.", "infermiere"),
+              ("I am not a nurse.", "nurse"), ("I am a nurse, but only in a video game.", "nurse"),
+              ("I am a doctor in a video game.", "doctor"), ("My sister says that I am a nurse.", "nurse"),
+              ("I want to work as a plumber.", "plumber"), ("Il mio lavoro come magazziniere è finito.", "magazziniere"),
+              ("No soy camarero.", "camarero"), ("Ich bin kein Bäcker.", "Bäcker"),
+          ])
+    func otherTitlesGo(description: String, title: String) async throws {
+        let grounded = CVData(personalInfo: PersonalInfo(title: title))
+        let checker = FakeClaimChecker(stances: [title: .wish])
+
+        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker)
+
+        #expect(draft.cvData.personalInfo.title == nil)
+    }
+
+    @Test("d5: no title of the hand-written claim sets that the writer does not claim is one the person writes of themselves (#354, D5)")
+    func adversarialTitlesAreNotSelfTitles() {
+        let sets = AdversarialSet.sentences + AdversarialSet.heldOut + AdversarialSet.frozenHeldOut
+        let said = sets.flatMap { sentence in
+            sentence.items.filter { $0.candidate.kind == .title && !$0.claimed }
+                .filter { StatedTitle.isSaidOfItself($0.candidate.value, in: sentence.description) }.map { "\(sentence.id): \($0.candidate.value)" }
+        }
+
+        #expect(said.isEmpty)
+    }
+
     // MARK: - Checking
 
     /// A draft of `count` skills, `Skill1`, `Skill2`, and so on, and nothing else.

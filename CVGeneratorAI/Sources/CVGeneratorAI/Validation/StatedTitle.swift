@@ -200,3 +200,71 @@ enum StatedTitle {
         language.map { table[$0] ?? [] } ?? table.values.reduce(into: []) { $0.formUnion($1) }
     }
 }
+
+// MARK: A title the person writes of themselves (D5)
+
+extension StatedTitle {
+    /// Whether the person writes `title` word for word as what they are (the lead's decision D5 of #354): a clause of their own that
+    /// opens with the present of "to be" or of "to work as" in the first person ("sono", "lavoro come", "I am a", "I work as a", "ich
+    /// bin", "je suis", "soy", "sou"), at the start of its sentence or after "and" or a comma, then at most an indefinite article,
+    /// then the title, then the end of the clause, or a preposition and a name ("a Verona"); no negation or word that limits follows
+    /// in the sentence. Such a headline stays when the claim check does not confirm it (`ClaimWithdrawal`). A wish ("vorrei essere"),
+    /// another person's title ("mia sorella è"), a title after a word that is no opening ("che sono", "non sono", "il mio lavoro come")
+    /// and a title not written word for word state none.
+    static func isSaidOfItself(_ title: String, in description: String) -> Bool {
+        let wanted = EntryEvidence.foldedWords(of: title)
+        guard !wanted.isEmpty else { return false }
+        let denials = Vocabulary.Language.allCases.reduce(into: Set<String>()) { all, language in
+            all.formUnion(WrittenTextWords.of(language).negations)
+            all.formUnion(limiters[language] ?? [])
+        }
+        return SentenceSplitter.sentences(in: description).contains { sentence in
+            let written = Array(Digits.ascii(sentence))
+            let words = Word.words(in: sentence)
+            let folded = words.map(\.folded)
+            return folded.indices.contains { start in
+                guard start == 0 || selfOpenings.contains(folded[start - 1]) || words[start - 1].endsWithABreak,
+                      let lead = selfLeads.first(where: { folded[start...].starts(with: $0) }) else { return false }
+                var first = start + lead.count
+                if first < folded.count, indefiniteArticles.contains(folded[first]) { first += 1 }
+                guard folded[first...].starts(with: wanted), !folded[start...].contains(where: denials.contains) else { return false }
+                return endsTheClause(at: first + wanted.count, of: words, written: written)
+            }
+        }
+    }
+
+    /// Whether the clause ends at `index`: the end of the sentence, a comma after the word before, "and", or a preposition and a name
+    /// written with a capital to the end of the clause.
+    private static func endsTheClause(at index: Int, of words: [Word], written: [Character]) -> Bool {
+        guard index < words.count, !words[index - 1].endsWithABreak, !selfOpenings.contains(words[index].folded) else { return true }
+        guard placePrepositions.contains(words[index].folded) else { return false }
+        let rest = words[(index + 1)...].prefix { !selfOpenings.contains($0.folded) }
+        guard let first = rest.first, startsWithACapital(first, in: written) else { return false }
+        let clause = rest[...(rest.firstIndex(where: \.endsWithABreak) ?? rest.index(before: rest.endIndex))]
+        return clause.allSatisfy { startsWithACapital($0, in: written) || nameLinks.contains($0.folded) }
+    }
+
+    private static func startsWithACapital(_ word: Word, in written: [Character]) -> Bool {
+        written.indices.contains(word.range.lowerBound) && written[word.range.lowerBound].isUppercase
+    }
+
+    /// The openings of a clause in which the person says what they are, as `Word.folded` writes them.
+    private static let selfLeads: [[String]] = [
+        ["i", "am"], ["i", "m"], ["i", "work", "as"], ["io", "sono"], ["sono"], ["lavoro", "come"], ["ich", "bin"],
+        ["ich", "arbeite", "als"], ["je", "suis"], ["je", "travaille", "comme"], ["yo", "soy"], ["soy"], ["trabajo", "como"],
+        ["eu", "sou"], ["sou"], ["trabalho", "como"],
+    ]
+
+    /// The words after which a clause of the person may open: "and" and "but", as `Word.folded` writes them.
+    private static let selfOpenings: Set<String> = ["and", "but", "e", "ed", "ma", "und", "aber", "et", "mais", "y", "pero", "mas"]
+
+    private static let indefiniteArticles: Set<String> = ["a", "an", "un", "uno", "una", "ein", "eine", "une", "um", "uma"]
+
+    /// The prepositions of a place or an employer after the title ("a Verona", "in Leeds", "bei Müller").
+    private static let placePrepositions: Set<String> = [
+        "a", "in", "at", "for", "presso", "per", "bei", "fur", "für", "à", "chez", "en", "pour", "para", "em", "no", "na",
+    ]
+
+    /// The small words inside a name ("Studio di Verona", "Banco do Brasil").
+    private static let nameLinks: Set<String> = ["di", "de", "del", "della", "da", "do", "dos", "das", "von", "der", "of", "the", "la", "le"]
+}

@@ -34,15 +34,34 @@ enum ClaimWithdrawal {
 
         do {
             let judgements = try await judgementsInBatches(of: candidates, in: description, with: checker, within: limits)
-            return GeneratedDraft(cvData: keepingFacts(of: grounded, candidates: candidates, judgements: judgements),
+            let checked = keepingFacts(of: grounded, candidates: candidates, judgements: judgements)
+            return GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: checked, description: description),
                                   personalItemsUnchecked: false)
         } catch let cancellation as CancellationError {
             throw cancellation
         } catch {
             // A check stopped by a cancellation may report it with an error of its own.
             try Task.checkCancellation()
-            return GeneratedDraft(cvData: withdrawingAll(from: grounded), personalItemsUnchecked: true)
+            return GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: withdrawingAll(from: grounded), description: description),
+                                  personalItemsUnchecked: true)
         }
+    }
+
+    /// `checked` with the headline of `grounded` again when the person writes it word for word as what they are
+    /// (`StatedTitle.isSaidOfItself`, the lead's decision D5 of #354): the check may judge "sono impiegata amministrativa a Verona"
+    /// no fact, and the person's own words are the headline.
+    static func keepingTheSelfTitle(of grounded: CVData, in checked: CVData, description: String) -> CVData {
+        guard checked.personalInfo.title == nil, let title = grounded.personalInfo.title,
+              StatedTitle.isSaidOfItself(title, in: description) else { return checked }
+        let info = checked.personalInfo
+        return CVData(
+            personalInfo: PersonalInfo(
+                name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
+                linkedin: info.linkedin, github: info.github, title: title
+            ),
+            summary: checked.summary, experience: checked.experience, education: checked.education, skills: checked.skills,
+            languages: checked.languages, certifications: checked.certifications, interests: checked.interests
+        )
     }
 
     /// The judgement of each candidate, from one call of `checker` for each batch, within `limits.time`.
