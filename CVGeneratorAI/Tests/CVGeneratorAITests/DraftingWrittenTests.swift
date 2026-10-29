@@ -264,6 +264,16 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "pt").map(\.path) == ["experience[0].description"])
     }
 
+    @Test("An ended job whose French verbs are reflexive is in one tense, and one in two tenses is counted (#354, round 11)")
+    func mixedTenseOfAReflexiveVerb() {
+        let cv = CVData(experience: [
+            Experience(company: "A", endDate: "2016", description: "Je m'occupais des enfants. Je veillais à leur sécurité."),
+            Experience(company: "B", endDate: "2016", description: "Je m'occupe des enfants. Je veillais à leur sécurité."),
+        ])
+
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .mixedTense }.map(\.path) == ["experience[1].description"])
+    }
+
     @Test("The word for a skill listed as a soft skill is counted, and a quality is not")
     func skillWordAsQuality() {
         let cv = CVData(skills: [Skill(name: "Compétences", kind: .softSkill), Skill(name: "Patience", kind: .softSkill)])

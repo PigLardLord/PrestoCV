@@ -421,6 +421,11 @@ enum ReaderRules {
 
     enum Tense: Hashable { case past, present }
 
+    /// The French pronouns and the negation that stand between "je" and its verb.
+    private static let frenchPronounsBeforeTheVerb: Set<String> = [
+        "m", "me", "t", "te", "s", "se", "l", "le", "la", "les", "lui", "leur", "nous", "vous", "y", "en", "ne", "n",
+    ]
+
     /// The tense of a duty said in the first person, by the endings of its verb: a rough rule, nil when it cannot tell.
     static func tense(of sentence: String, language: String) -> Tense? {
         let words = letterWords(of: sentence)
@@ -442,8 +447,9 @@ enum ReaderRules {
             if ["habe", "hatte", "war", "bin"].contains(verb) || verb.hasSuffix("te") { return .past }
             return .present
         case "fr":
-            guard first == "je" || first == "j", words.count > 1 else { return nil }
-            let verb = words[1]
+            // The verb follows its object and reflexive pronouns: "je m'occupais" is in the past (#354, round 11).
+            guard first == "je" || first == "j",
+                  let verb = words.dropFirst().first(where: { !Self.frenchPronounsBeforeTheVerb.contains($0) }) else { return nil }
             if ["ai", "avais", "étais"].contains(verb) || verb.hasSuffix("ais") { return .past }
             return verb == "suis" ? nil : .present
         case "it":
