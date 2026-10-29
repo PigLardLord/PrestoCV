@@ -128,6 +128,35 @@ struct SectionChecksTests {
         #expect(step.pinned.allSatisfy { final.contains($0) }, "step \(step.pinned), final \(final)")
         #expect(!step.saysEnough || final.count >= CVDataSanitizer.DutyVerdicts.describedLength, "final \(final)")
     }
+
+    @Test("A count the person gave in digits that a duty writes in words stays, in digits, in the step and the final check; another count goes (#354, round 6)",
+          arguments: [
+              ("J'ai formé quatre stagiaires.", "J'ai formé 4 stagiaires.", nil),
+              ("J'ai formé cinq stagiaires.", nil, "the word \"cinq\" is a number"),
+          ] as [(String, String?, String?)])
+    func countInWords(duty: String, kept: String?, reason: String?) throws {
+        let description = """
+            Depuis 2018, je travaille comme bibliothécaire à la médiathèque de Rouen, où j'ai formé 4 stagiaires. \
+            Avant, de 2014 à 2018, j'ai travaillé comme libraire dans une librairie.
+            """
+        let cv = CVData(experience: [
+            Experience(title: "libraire", company: "librairie", startDate: "2014", endDate: "2018"),
+            Experience(
+                title: "bibliothécaire", company: "médiathèque de Rouen", startDate: "2018", current: true,
+                achievements: ["j'ai formé 4 stagiaires"]
+            ),
+        ])
+        let french = CVDataSanitizer(languageOfText: { _ in "fr" })
+
+        let step = try french.dutyCheck(of: cv, job: 1, duties: duty, against: description)
+        let writing = DraftWriting(summary: nil, roleDescriptions: [nil, step.kept.joined(separator: " ")], technologies: [], softSkills: [])
+        let final = try french.sanitize(cv, writing: writing, against: description).experience
+            .first { $0.company == "médiathèque de Rouen" }?.description ?? ""
+
+        #expect(step.kept == (kept.map { [$0] } ?? []), "\(step.rejected)")
+        #expect(step.rejected.map(\.reason) == (reason.map { [$0] } ?? []))
+        #expect(kept.map(final.contains) ?? true, "final \(final)")
+    }
     #endif
 
     @Test("A job's plain stated duties of 40 characters are pinned by the step and kept by the final check alike (#354, round 3)")

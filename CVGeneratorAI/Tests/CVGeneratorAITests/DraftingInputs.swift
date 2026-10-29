@@ -249,6 +249,8 @@ enum DraftingInputs {
         "fr": [
             .name("Maria Rossi"), .title("institutrice"), .employer("Don Milani"), .employer("crèche"),
             .school("université de Bologne"), .language("italien"), .language("anglais"), .duty("enseigne"),
+            // The person trained new teachers: a job's text keeps it, its count is theirs (#354, round 6).
+            .duty("nouveaux enseignants"),
         ],
         "pt": [
             .name("Maria Rossi"), .title("professora do ensino fundamental", "professora"), .employer("Don Milani"),

@@ -180,3 +180,33 @@ struct WrittenTextWords: Sendable {
         """
     )
 }
+
+// MARK: - Counts in words
+
+extension WrittenTextWords {
+    /// The counts from two to twelve written as words, folded, language by language: "trois" is 3. One is an article as often.
+    private static let counts: [Vocabulary.Language: [String: Int]] = [
+        .english: table("two three four five six seven eight nine ten eleven twelve"),
+        .italian: table("due tre quattro cinque sei sette otto nove dieci undici dodici"),
+        .german: table("zwei drei vier funf sechs sieben acht neun zehn elf zwolf"),
+        .spanish: table("dos tres cuatro cinco seis siete ocho nueve diez once doce"),
+        .french: table("deux trois quatre cinq six sept huit neuf dix onze douze"),
+        .portuguese: table("dois tres quatro cinco seis sete oito nove dez onze doze").merging(["duas": 2]) { first, _ in first },
+    ]
+
+    private static func table(_ words: String) -> [String: Int] {
+        Dictionary(uniqueKeysWithValues: words.split(separator: " ").enumerated().map { (String($1), $0 + 2) })
+    }
+
+    /// `sentence` with each count from two to twelve it writes in words written in digits: "J'ai formé trois enseignants" is
+    /// "J'ai formé 3 enseignants". How a count the person gave in digits is matched when the model spells it (#354, round 6).
+    static func inDigits(_ sentence: String, language: Vocabulary.Language?) -> String {
+        guard let language, let counts = counts[language] else { return sentence }
+        var characters = Array(Digits.ascii(sentence))
+        for word in Word.words(in: sentence).reversed() where !word.isNumber {
+            guard let count = counts[word.folded] else { continue }
+            characters.replaceSubrange(word.range, with: Array(String(count)))
+        }
+        return String(characters)
+    }
+}

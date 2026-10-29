@@ -167,16 +167,21 @@ extension CVDataSanitizer {
 
             var held = earlier + verdicts.pinned
             var form = held.first.flatMap { Self.form($0, language: language) }.flatMap { $0 == .infinitive ? nil : $0 }
+            let quotes = rule.evidence.quotable.adding(rule.evidence.quotableByAchievements)
             for raw in SentenceSplitter.sentences(in: duties ?? "") {
-                let sentence = FirstPersonDuty.written(
+                var sentence = FirstPersonDuty.written(
                     raw.trimmingCharacters(in: .whitespacesAndNewlines), current: current, language: language, wordList: wordList
                 )
                 guard !sentence.isEmpty else { continue }
+                // A count the person gave in digits that the model wrote in words is the person's: a sentence that goes for it is
+                // written as they wrote it, and stays (#354, round 6). Another count still goes.
+                let counted = WrittenTextWords.inDigits(sentence, language: language)
+                if counted != sentence, reason(sentence, quotes) != nil, reason(counted, quotes) == nil { sentence = counted }
                 let words = Self.letterWords(of: sentence)
                 var rejection: String?
                 if words.count < 3 || words.last.map(Self.dutyConjunctions.contains) == true {
                     rejection = "it is not a whole sentence"
-                } else if let ruled = reason(sentence, rule.evidence.quotable.adding(rule.evidence.quotableByAchievements)) {
+                } else if let ruled = reason(sentence, quotes) {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
                     rejection = "it repeats a duty already written"
