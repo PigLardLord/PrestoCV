@@ -217,16 +217,21 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.namesAgain(sentence, earlier, language: language) == isAgain)
     }
 
-    @Test("A duty that starts with an infinitive goes, also as the job's first one; a duty in the first person stays (#354)")
+    @Test("A duty that starts with an infinitive in -ere or -ire goes, also as the job's first one; one in -are is written in the first person and stays, as does a duty in the first person (#354, round 10)")
     func infinitiveDuty() throws {
         let verdicts = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Ricevere le fatture dei clienti. Controllavo i pagamenti dei fornitori.",
+            against: Self.clerk
+        )
+        let written = try sanitizer.dutyCheck(
             of: Self.clerkJob, job: 0, duties: "Registrare le fatture dei clienti. Controllavo i pagamenti dei fornitori.",
             against: Self.clerk
         )
 
         #expect(verdicts.kept == ["Controllavo i pagamenti dei fornitori."])
-        #expect(verdicts.rejected.map(\.sentence) == ["Registrare le fatture dei clienti."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Ricevere le fatture dei clienti."])
         #expect(verdicts.rejected.first?.reason.hasPrefix("it starts with an infinitive") == true)
+        #expect(written.kept == ["Registravo le fatture dei clienti.", "Controllavo i pagamenti dei fornitori."])
     }
 
     @Test("An ended job's duty in the present goes after one in the past; the current job's duties in the present stay (#354)")

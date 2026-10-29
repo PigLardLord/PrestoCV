@@ -47,6 +47,27 @@ struct FirstPersonDutyTests {
         #expect(duty == "Usavo il comando del quadro.")
     }
 
+    @Test("A duty that opens with a Portuguese infinitive in -ar or an Italian one in -are is written in the job's first person, each part; another infinitive, a Spanish one, an exception or one the word list does not know keeps the duty (#354, round 10)")
+    func infinitiveDuty() {
+        #expect(FirstPersonDuty.written("criar um sistema para os pedidos das lojas.", current: true, language: .portuguese, wordList: words)
+            == "Crio um sistema para os pedidos das lojas.")
+        #expect(FirstPersonDuty.written("revisar as notas e organizar o arquivo.", current: false, language: .portuguese, wordList: words)
+            == "Revisava as notas e organizava o arquivo.")
+        #expect(FirstPersonDuty.written("revisar las facturas del taller.", current: true, language: .spanish, wordList: words)
+            == "Revisar las facturas del taller.")
+        #expect(FirstPersonDuty.written("preparare le bolle di consegna.", current: false, language: .italian, wordList: words)
+            == "Preparavo le bolle di consegna.")
+        #expect(FirstPersonDuty.written("manter os equipamentos da loja.", current: true, language: .portuguese, wordList: words)
+            == "Manter os equipamentos da loja.")
+        #expect(FirstPersonDuty.written("estar com os clientes da loja.", current: true, language: .portuguese, wordList: words)
+            == "Estar com os clientes da loja.")
+        #expect(FirstPersonDuty.written("revisar as notas e manter o arquivo.", current: true, language: .portuguese, wordList: words)
+            == "Revisar as notas e manter o arquivo.")
+        #expect(FirstPersonDuty.written(
+            "criar um sistema para os pedidos.", current: true, language: .portuguese, wordList: TableWordList(names: ["crio"])
+        ) == "Criar um sistema para os pedidos.")
+    }
+
     @Test("A duty in the first person only gets its capital letter")
     func firstPersonKept() {
         #expect(FirstPersonDuty.written("gestisco le fatture dei fornitori.", current: true, language: .italian, wordList: words)
