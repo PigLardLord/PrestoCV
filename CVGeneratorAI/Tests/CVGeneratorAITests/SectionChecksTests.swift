@@ -539,9 +539,10 @@ struct SectionChecksTests {
 
     @Test("A one-word technology clipped from a phrase of two joined by a conjunction is joined back; two tools joined by one stay apart (#354, round 5)",
           arguments: [
-              ("it", "Leggo schemi elettrici e pneumatici e programmo PLC e HMI.", ["PLC", "schemi elettrici", "pneumatici", "HMI"],
+              // What the person works with: what the work is done on is no tool (round 7).
+              ("it", "Lavoro con schemi elettrici e pneumatici e programmo PLC e HMI.", ["PLC", "schemi elettrici", "pneumatici", "HMI"],
                ["PLC", "schemi elettrici e pneumatici", "HMI"]),
-              ("en", "I service hydraulic and pneumatic valves and test PLC and HMI panels.", ["hydraulic", "pneumatic valves", "PLC", "HMI panels"],
+              ("en", "I work with hydraulic and pneumatic valves and use PLC and HMI panels.", ["hydraulic", "pneumatic valves", "PLC", "HMI panels"],
                ["hydraulic and pneumatic valves", "PLC", "HMI panels"]),
           ])
     func clippedModifierJoined(language: String, description: String, technologies: [String], kept: [String]) {
@@ -585,6 +586,29 @@ struct SectionChecksTests {
         #expect(plant.dropped.map(\.sentence) == ["manutenzione preventiva"])
         #expect(school.technologies == ["logiciel de gestion de classe", "tableau numérique"])
         #expect(school.dropped.map(\.sentence) == ["correction des copies"])
+    }
+
+    @Test("A tool that is, by its head noun, what the person's work is done on goes; what the person uses stays (#354, round 7)")
+    func toolThatIsAWorkObject() {
+        let description = "Controllo i quadri elettrici e riparo i nastri trasportatori. Uso i PLC e il multimetro per trovare i guasti."
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = sanitizer.skillCheck(
+            technologies: ["quadri elettrici", "PLC", "nastri trasportatori", "multimetro"], softSkills: [], against: description
+        )
+        let stated = sanitizer.skillCheck(
+            technologies: ["quadro elettrico"], softSkills: [], stated: ["quadri elettrici"], against: description
+        )
+        let driven = english.skillCheck(
+            technologies: ["forklift", "pallet jack", "loading dock"], softSkills: [],
+            against: "I work with forklifts and a pallet jack, and I clean the loading docks."
+        )
+
+        #expect(verdict.technologies == ["PLC", "multimetro"])
+        #expect(verdict.dropped.map(\.reason) == ["what the work is done on", "what the work is done on"])
+        #expect(stated.dropped.map(\.reason) != ["what the work is done on"])
+        #expect(driven.technologies == ["forklift", "pallet jack"])
+        #expect(driven.dropped.map(\.reason) == ["what the work is done on"])
     }
 
     @Test("An application of a trade is a tool, though its noun ends as an activity's does; the activity of that trade goes (#354, round 7)")

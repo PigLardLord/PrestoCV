@@ -1048,8 +1048,17 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
-    /// one of them, by its head noun, the written one goes (#354, round 2).
+    /// one of them, by its head noun, the written one goes (#354, round 2). So does one that is, by its head noun, what the
+    /// person's work is done on (`workObjectHeads`): "quadri elettrici" for a person who checks them (#354, round 7).
     func skillCheck(technologies: [String], softSkills: [String], stated: [String], against description: String) -> SkillVerdict {
+        checkedSkills(technologies: technologies, softSkills: softSkills, stated: stated, against: description)
+    }
+
+    /// The written skills, cleaned by code (`skillCheck`); a skill the person states keeps the object of its verb, which may be
+    /// what the work is done on (`dropsWorkObjects` false: "I mix on digital desks").
+    private func checkedSkills(
+        technologies: [String], softSkills: [String], stated: [String], dropsWorkObjects: Bool = true, against description: String
+    ) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
         var verdict = SkillVerdict()
@@ -1105,6 +1114,7 @@ extension CVDataSanitizer {
             return kept
         }
         var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
+        let objects = dropsWorkObjects ? Self.workObjectHeads(in: description, language: language).subtracting(heads) : []
         for raw in Self.joiningClippedModifiers(technologies, in: description, language: language) {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
@@ -1123,6 +1133,8 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "an everyday object, not a tool of the trade"))
                 } else if Self.namesABareKind(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
+                } else if let head = Self.headKey(of: item, language: language), objects.contains(head) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "what the work is done on"))
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
@@ -1153,6 +1165,80 @@ extension CVDataSanitizer {
         verdict.dropped += qualities.dropped
         return verdict
     }
+
+    // MARK: Work objects among the tools
+
+    /// The head keys (`headKey`) of what the person's work is done on (#354, round 7): the topics of the description's clauses
+    /// (`topic(of:opensTheSentence:)`) without their articles, none that holds a number, an acronym or, but in German, a name. A
+    /// clause whose verb is one of using (`useVerbs`: "uso i PLC") names a tool, and so does a clause it leads with no verb of its
+    /// own ("e il multimetro").
+    private static func workObjectHeads(in description: String, language: String?) -> Set<String> {
+        var heads = Set<String>()
+        for sentence in SentenceSplitter.sentences(in: description) {
+            let characters = Array(Digits.ascii(sentence))
+            var pieces: [[Word]] = [[]]
+            for word in Word.words(in: sentence) {
+                if dutyConjunctions.contains(word.folded), !word.isHyphenated {
+                    pieces.append([])
+                    continue
+                }
+                pieces[pieces.count - 1].append(word)
+                if word.endsWithABreak { pieces.append([]) }
+            }
+            var using = false
+            for (index, raw) in pieces.enumerated() {
+                guard let opening = raw.first else { continue }
+                // What follows a verb of using in its sentence is a tool too ("Uso i PLC e il multimetro"), until a subject opens a
+                // clause of its own ("and I clean the loading docks").
+                if using, !subjectWords.contains(opening.folded) || opening.folded == "i" && language != "en" { continue }
+                let topic: ArraySlice<Word>
+                if index > 0, skillLinkWords.contains(opening.folded), opening.folded != "i" || language != "en" {
+                    // An article and no verb: the clause goes on with the verb of the one before it ("e i nastri").
+                    topic = raw[...]
+                } else {
+                    let piece = Array(raw.drop { subjectWords.contains($0.folded) || relativeOpenings.contains($0.folded) })
+                    let words = Self.topic(of: piece, opensTheSentence: true)
+                    // "Lavoro con il muletto": what the work is done with is a tool too.
+                    using = useVerbs.contains(verb(of: piece)?.folded ?? "") || instrumentWords.contains(words?.first?.folded ?? "")
+                    guard !using, let words else { continue }
+                    topic = words
+                }
+                // The object itself, up to the first word that links another to it: "panels" of "panels for the line".
+                let words = topic.drop { skillLinkWords.contains($0.folded) }.prefix { !skillLinkWords.contains($0.folded) }
+                guard !words.contains(where: \.isNumber) else { continue }
+                let written = words.map { String(characters[$0.range]) }
+                let named = written.contains { word in
+                    word.filter(\.isUppercase).count > 1 || language != "de" && word.first?.isUppercase == true
+                }
+                // A topic of a kind of tool ("the CNC machines", "il gestionale di sistema") names what the person works with.
+                let ofATool = words.contains { toolKinds.contains($0.folded) || toolWords.contains($0.folded) }
+                if !named, !ofATool, let head = headKey(of: written.joined(separator: " "), language: language) { heads.insert(head) }
+            }
+        }
+        return heads
+    }
+
+    /// The verb of a clause after its subject: the word after an auxiliary, the last word after a German one, else the first.
+    private static func verb(of piece: [Word]) -> Word? {
+        guard let first = piece.first else { return nil }
+        if germanAuxiliaries.contains(first.folded) { return piece.last }
+        if auxiliaries.contains(first.folded) { return piece.dropFirst().first }
+        return first
+    }
+
+    /// The prepositions of what the work is done with, folded.
+    private static let instrumentWords: Set<String> = ["with", "con", "mit", "avec", "com"]
+
+    /// The verbs of using, operating or driving a tool, folded, in the six languages: what they lead is a tool, not what the work
+    /// is done on.
+    private static let useVerbs: Set<String> = [
+        "use", "uses", "used", "using", "operate", "operates", "operated", "drive", "drove", "driven", "run", "runs", "ran",
+        "uso", "usavo", "usato", "utilizzo", "utilizzavo", "utilizzato", "adopero", "guido", "guidavo", "manovro", "conduco",
+        "usaba", "usado", "utilizo", "utilizaba", "utilizado", "manejo", "manejaba", "opero", "conduzco",
+        "usava", "utilizava", "conduzo", "manuseio", "operado",
+        "utilise", "utilisais", "conduis", "manie", "pilote",
+        "benutze", "benutzt", "nutze", "genutzt", "verwende", "verwendet", "bediene", "bedient", "fahre", "gefahren",
+    ]
 
     /// The words that name a skill or a knowledge and no skill ("compétence", "skills", "Wissen"), without accents: alone, they are
     /// no quality (#354).
@@ -1357,7 +1443,9 @@ extension CVDataSanitizer {
     /// `mostSkillWords` words, a clause of the person's that names no skill (#354); any other as it is.
     func statedSkill(_ name: String, against description: String) -> String? {
         guard !Self.isTooLong(name.split(whereSeparator: \.isWhitespace).map(String.init)) else { return nil }
-        let verdict = skillCheck(technologies: [name], softSkills: [], against: description)
+        let verdict = checkedSkills(
+            technologies: [name], softSkills: [], stated: [], dropsWorkObjects: false, against: description
+        )
         guard verdict.dropped.contains(where: { $0.reason == "verb cut" }) else { return name }
         return verdict.technologies.first ?? verdict.softSkills.first ?? name
     }
