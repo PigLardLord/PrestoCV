@@ -539,7 +539,8 @@ extension CVDataSanitizer {
     }
 
     /// The summary check, where a sentence whose subject is one of the kept `qualities` also goes (`hasAQualitySubject`), and so
-    /// does every sentence that ends with the last three words of an earlier one kept (#354, round 2).
+    /// does every sentence that ends with the last three words of an earlier one kept (#354, round 2), or whose closing clause
+    /// opens and ends as an earlier one's (`closing`; round 8).
     func summaryCheck(
         of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String],
         against description: String
@@ -575,6 +576,7 @@ extension CVDataSanitizer {
             var idleFirst: String?
             var verbs = Set<String>()
             var endings = Set<[String]>()
+            var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
@@ -606,6 +608,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
                 } else if let ending = Self.ending(of: sentence), endings.contains(ending) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
+                } else if let closing = Self.closing(of: sentence), closings.contains(closing) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if dutySentences.contains(where: own.isSubset) {
                     verdict.rejected.append(Rejection(
                         sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
@@ -619,6 +623,7 @@ extension CVDataSanitizer {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
                     if let ending = Self.ending(of: sentence) { endings.insert(ending) }
+                    if let closing = Self.closing(of: sentence) { closings.insert(closing) }
                     verdict.kept.append(sentence)
                 }
             }
@@ -788,6 +793,15 @@ extension CVDataSanitizer {
         let clause = Word.words(in: String(sentence.prefix { $0 != "," }))
         guard clause.count >= 5, let first = words.first, !wordsOfThePerson.contains(first) else { return false }
         return qualities.contains { words.starts(with: $0) }
+    }
+
+    /// The first and the last word of the last clause of `sentence` after a comma, folded, when it has three or more: two sentences
+    /// that close alike tie each a quality to the work in one phrase ("…, was meine Geduld zeigt."; #354, round 8).
+    static func closing(of sentence: String) -> [String]? {
+        guard let comma = sentence.lastIndex(of: ",") else { return nil }
+        let words = Word.words(in: String(sentence[sentence.index(after: comma)...])).map(\.folded)
+        guard words.count >= 3, let first = words.first, let last = words.last else { return nil }
+        return [first, last]
     }
 
     /// The last three words of `sentence`, folded, when it has five or more: two sentences that end alike repeat a phrase

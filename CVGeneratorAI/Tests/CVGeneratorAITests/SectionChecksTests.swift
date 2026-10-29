@@ -1095,6 +1095,27 @@ struct SectionChecksTests {
         ])
     }
 
+    @Test("A summary sentence whose closing clause opens and ends as an earlier one's goes; one that ends otherwise stays (#354, round 8)")
+    func summaryWithARepeatedClosing() throws {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("Tischler", "Holzwerk Brenner", from: "2018")])
+        let description = "Ich wohne in Gera. Seit 2018 arbeite ich als Tischler bei Holzwerk Brenner, wo ich Regale baue und Räume ausmesse."
+
+        let verdict = try german.summaryCheck(
+            of: facts,
+            summary: "Ich arbeite als Tischler und baue Regale für jeden Raum, was meine Sorgfalt zeigt. "
+                + "Ich messe jeden Raum genau aus, was meine Geduld zeigt. Ich plane jedes Regal mit dem Kunden, was meine Ruhe stärkt.",
+            field: nil, work: ["Regale", "Räume"], duties: [], qualities: [], against: description
+        )
+
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.endsAsAnEarlierOne])
+        #expect(verdict.rejected.map(\.sentence) == ["Ich messe jeden Raum genau aus, was meine Geduld zeigt."])
+        #expect(verdict.kept == [
+            "Ich arbeite als Tischler und baue Regale für jeden Raum, was meine Sorgfalt zeigt.",
+            "Ich plane jedes Regal mit dem Kunden, was meine Ruhe stärkt.",
+        ])
+    }
+
     @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")
     func summaryOfThePerson() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
