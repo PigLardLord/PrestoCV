@@ -95,6 +95,53 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.job(number: 0, of: brief).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
     }
 
+    @Test("A job's request reads its employer masked, and a name of its own masked in its clauses: the duties of an accountant at a haulier were about transport (#354, round 11)")
+    func jobWithItsEmployerMasked() {
+        var brief = DraftBrief(
+            language: "Spanish", headline: nil,
+            roles: [.init(
+                title: "contable", employer: "Transportes Ebro Norte", hasEnded: false,
+                clauses: ["Desde 2018 trabajo en Transportes Ebro Norte, donde llevo la contabilidad de la empresa"]
+            )],
+            studies: [], namedSkills: []
+        )
+        brief.names = ["Transportes Ebro Norte", "gestoría Aranda y Molina", "Universidad del Moncayo", "Diego Salcedo"]
+
+        let text = SectionPrompts.job(number: 0, of: brief).text
+
+        #expect(!text.contains("Transportes") && !text.contains("Ebro"))
+        #expect(text.split(separator: "\n").contains("Job: contable; employer: la empresa"))
+        #expect(text.contains("- Desde 2018 trabajo en la empresa, donde llevo la contabilidad de la empresa."))
+        #expect(SectionPrompts.jobInstructions.contains("typical of its title, each"))
+        #expect(!SectionPrompts.jobInstructions.contains("employer"))
+    }
+
+    @Test("A job's clauses keep an employer whose name opens with a word of the trade, as the person said it (#354, round 11)")
+    func jobWithAnEmployerOfTheTrade() {
+        var brief = DraftBrief(
+            language: "French", headline: nil,
+            roles: [
+                .init(
+                    title: "institutrice", employer: "école Don Milani", hasEnded: false,
+                    clauses: ["Depuis 2016, j'enseigne à l'école Don Milani, où j'ai formé 3 nouveaux enseignants"]
+                ),
+                .init(
+                    title: "assistante", employer: "crèche", hasEnded: true,
+                    clauses: ["Avant, de 2012 à 2016, j'ai travaillé comme assistante dans une crèche"]
+                ),
+            ],
+            studies: [], namedSkills: []
+        )
+        brief.names = ["école Don Milani", "crèche", "université de Bologne", "Maria Rossi"]
+
+        let first = SectionPrompts.job(number: 0, of: brief).text.split(separator: "\n")
+        let second = SectionPrompts.job(number: 1, of: brief).text.split(separator: "\n")
+
+        #expect(first.contains("- Depuis 2016, j'enseigne à l'école Don Milani, où j'ai formé 3 nouveaux enseignants."))
+        #expect(first.contains("Job: institutrice; employer: l'entreprise"))
+        #expect(second.contains("- Avant, de 2012 à 2016, j'ai travaillé comme assistante dans une crèche."))
+    }
+
     @Test("A job with no title is written from the headline title")
     func jobWithNoTitle() {
         let brief = DraftBrief(

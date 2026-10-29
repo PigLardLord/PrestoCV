@@ -37,8 +37,8 @@ enum SectionPrompts {
         the first line.
         - The years: only those the person said for this job.
         - The duties the request asks for, each one whole sentence that starts with a capital letter and ends with a full stop.
-        - First the duties the person said for this job; then exactly as many more as the request asks, typical of its title at \
-        that employer, each a concrete task of that trade, never one that fits any job, and none that says a duty already written.
+        - First the duties the person said for this job; then exactly as many more as the request asks, typical of its title, each \
+        a concrete task of that trade, never one that fits any job, and none that says a duty already written.
         - No number, date, name of a company, place or person.
         - Never add a job, study, certification, achievement or result.
         """
@@ -67,9 +67,13 @@ enum SectionPrompts {
         let role = brief.roles[number]
         var lines = header(brief)
         if role.title.presentValue == nil, let headline = brief.headline { lines.append("Headline title: \(headline)") }
-        lines.append("Job: " + roleLine(role, employer: true))
+        // The employer is masked, and so is a name of its own in the job's clauses: asked for duties typical of an accountant at
+        // "Transportes Ebro Norte", the model wrote that they calculated the monthly transport costs (#354, round 11).
+        var masking = brief
+        masking.names = brief.names.filter { $0.first?.isUppercase == true }
+        lines.append("Job: " + roleLine(role, employer: true, masked: brief))
         if !role.clauses.isEmpty {
-            lines.append("What the person said about this job:\n" + bullets(role.clauses.map(asSentence)))
+            lines.append("What the person said about this job:\n" + bullets(role.clauses.map { asSentence(masked($0, in: masking)) }))
         }
         if avoiding, !role.avoid.isEmpty { lines.append("Words to avoid: " + role.avoid.joined(separator: ", ")) }
         return lines
@@ -254,9 +258,11 @@ enum SectionPrompts {
         brief.headline.map { ["Headline title: \($0)"] } ?? []
     }
 
-    /// A role's line: its title, or `standIn` for a role with none, then its employer when asked and whether it ended.
-    private static func roleLine(_ role: DraftBrief.Role, employer: Bool, standIn: String? = nil) -> String {
-        ([role.title.presentValue ?? standIn ?? DraftWritingPrompt.noTitle] + (employer ? role.employer.map { ["employer: \($0)"] } ?? [] : [])
+    /// A role's line: its title, or `standIn` for a role with none, then its employer when asked, masked with the names of
+    /// `masked` when given, and whether it ended.
+    private static func roleLine(_ role: DraftBrief.Role, employer: Bool, standIn: String? = nil, masked brief: DraftBrief? = nil) -> String {
+        let named = role.employer.map { name in brief.map { masked(name, in: $0) } ?? name }
+        return ([role.title.presentValue ?? standIn ?? DraftWritingPrompt.noTitle] + (employer ? named.map { ["employer: \($0)"] } ?? [] : [])
             + (role.hasEnded ? ["ended"] : [])).joined(separator: "; ")
     }
 
