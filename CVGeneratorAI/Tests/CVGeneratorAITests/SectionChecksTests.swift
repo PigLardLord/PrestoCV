@@ -150,6 +150,73 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.isVague(duty) == vague)
     }
 
+    // MARK: How often (#354, round 11)
+
+    /// The jobs of es-traps: a current one with a duty the person said, and an ended one the person only named.
+    private static let esTrapsJobs = CVData(
+        personalInfo: PersonalInfo(name: "Diego Salcedo", location: "Zaragoza"),
+        experience: [
+            job("contable", "Transportes Ebro Norte", from: "2018"),
+            job("", "gestoría Aranda y Molina", from: "2014", to: "2018"),
+        ]
+    )
+
+    @Test("How often a text says its work is done, by a word or a phrase, in the six languages (#354, round 11)", arguments: [
+        ("Calculo los gastos mensuales de transporte.", ["monthly"]),
+        ("Ogni mese preparo le buste paga.", ["monthly"]),
+        ("Preparo le buste paga mensili.", ["monthly"]),
+        ("I check the stock every day and send the weekly report.", ["daily", "weekly"]),
+        ("Je range la salle tous les jours.", ["daily"]),
+        ("Ich prüfe die Anlagen täglich und schreibe den Jahresbericht jährlich.", ["daily", "yearly"]),
+        ("Faço o balanço anual e a conferência todos os meses.", ["monthly", "yearly"]),
+        ("Revisaba las cuentas cada semana.", ["weekly"]),
+        ("Llevo la contabilidad de la empresa.", []),
+        ("Trabajé todo el día en la gestoría.", []),
+    ] as [(String, Set<String>)])
+    func frequencies(text: String, said: Set<String>) {
+        #expect(CVDataSanitizer.frequencies(in: text) == said)
+    }
+
+    @Test("A written duty that says how often the work is done, which the description does not, goes with its reason (#354, round 11)")
+    func dutyThatSaysHowOften() throws {
+        let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.esTrapsJobs, job: 0, duties: "Calculo los gastos mensuales de transporte.",
+            against: description
+        )
+
+        #expect(verdicts.rejected.map(\.sentence) == ["Calculo los gastos mensuales de transporte."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.howOftenReason])
+        #expect(CVDataSanitizer.howOftenReason.hasSuffix("do not say how often"))
+    }
+
+    @Test("A written duty keeps how often the work is done when the description says it, in other words (#354, round 11)")
+    func dutyThatSaysHowOftenAsThePerson() throws {
+        let description = "Sono Chiara Benedetti, impiegata amministrativa a Verona. Dal 2017 lavoro alla Ferramenta Scaligera, dove ogni mese "
+            + "preparo le buste paga."
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 0, duties: "Verifico i contributi mensili dei dipendenti. Archivio le fatture settimanali dei fornitori.",
+            against: description
+        )
+
+        #expect(!verdicts.rejected.contains { $0.sentence.contains("mensili") })
+        #expect(verdicts.rejected.map(\.sentence) == ["Archivio le fatture settimanali dei fornitori."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.howOftenReason])
+    }
+
+    @Test("A summary sentence that says how often the work is done, which the description does not, goes with its reason (#354, round 11)")
+    func summaryThatSaysHowOften() throws {
+        let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.esTrapsJobs,
+            summary: "Llevo la contabilidad de la empresa con atención al detalle. Controlo los gastos mensuales de transporte.",
+            field: nil, against: description
+        )
+
+        #expect(verdict.rejected.contains { $0.sentence.contains("mensuales") && $0.reason == CVDataSanitizer.howOftenReason })
+        #expect(!verdict.kept.contains { $0.contains("mensuales") })
+    }
+
     // MARK: D6, the typical duties of a job the person described (#354, round 1)
 
     @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them")

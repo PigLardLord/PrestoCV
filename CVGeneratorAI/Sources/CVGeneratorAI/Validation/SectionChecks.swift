@@ -158,6 +158,7 @@ extension CVDataSanitizer {
             }
             let current = job.entry.current && rule.evidence.statesCurrent
             let names = Self.ownNames(of: cvData)
+            let often = Self.frequencies(in: description)
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
             // achievements stays an achievement, so it counts toward none of the job's text (#354).
@@ -186,6 +187,8 @@ extension CVDataSanitizer {
                     rejection = Self.vagueReason
                 } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
                     rejection = Self.onlyWhereReason
+                } else if !Self.frequencies(in: sentence).isSubset(of: often) {
+                    rejection = Self.howOftenReason
                 } else if let ruled = reason(sentence, quotes) {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
@@ -231,6 +234,50 @@ extension CVDataSanitizer {
     static let onlyWhereReason = "it says only where the person worked: name a task of the job"
     /// Why a written duty that names its task through a vague phrase goes ("Ho svolto compiti legati alla gestione dei documenti.").
     static let vagueReason = "it names no task, only what the tasks relate to: name the task itself"
+
+    /// Why a written sentence that says how often the work is done, which the person did not say, goes ("Calculo los gastos
+    /// mensuales" of a person who never said "mensual").
+    static let howOftenReason = "it says how often the work is done, which the person did not say: do not say how often"
+
+    /// How often `text` says its work is done ("daily", "weekly", "monthly", "yearly"), by a word ("mensuales", "täglich") or by
+    /// a phrase ("ogni mese", "tous les jours"), in the six languages. A written duty or summary sentence that says it, when the
+    /// description does not, invents it (#354, round 11).
+    static func frequencies(in text: String) -> Set<String> {
+        let words = Word.words(in: text).map(\.folded)
+        var said = Set<String>()
+        for (index, word) in words.enumerated() {
+            if let often = frequencyStems.first(where: { _, stems in stems.contains(where: word.hasPrefix) })?.key { said.insert(often) }
+            guard let often = frequencyUnits[word], index > 0 else { continue }
+            let before = words[index - 1]
+            if everyWords.contains(before) || (index > 1 && everyWords.contains(words[index - 2]) && everyArticles.contains(before)) {
+                said.insert(often)
+            }
+        }
+        return said
+    }
+
+    /// The beginnings of the words that say how often, folded.
+    private static let frequencyStems: [String: [String]] = [
+        "daily": ["daily", "quotidian", "quotidien", "giornalier", "giornalment", "diari", "taglich"],
+        "weekly": ["weekly", "settimanal", "semanal", "hebdomadaire", "wochentlich"],
+        "monthly": ["monthly", "mensil", "mensual", "mensal", "mensais", "mensuel", "monatlich"],
+        "yearly": ["yearly", "annual", "annuel", "anual", "jahrlich"],
+    ]
+
+    /// The units of time of a phrase that says how often ("ogni mese", "every day"), folded.
+    private static let frequencyUnits: [String: String] = [
+        "day": "daily", "giorno": "daily", "dia": "daily", "dias": "daily", "jour": "daily", "jours": "daily", "tag": "daily",
+        "week": "weekly", "settimana": "weekly", "semana": "weekly", "semanas": "weekly", "semaine": "weekly", "semaines": "weekly",
+        "woche": "weekly",
+        "month": "monthly", "mese": "monthly", "mes": "monthly", "meses": "monthly", "mois": "monthly", "monat": "monthly",
+        "year": "yearly", "anno": "yearly", "ano": "yearly", "anos": "yearly", "annee": "yearly", "ans": "yearly", "jahr": "yearly",
+    ]
+
+    /// The words before a unit of time that say "every" ("ogni", "cada", "jeden"), and the articles between ("tous les jours").
+    private static let everyWords: Set<String> = [
+        "every", "each", "ogni", "cada", "chaque", "tous", "toutes", "jeden", "jede", "jedes", "todo", "toda", "todos", "todas",
+    ]
+    private static let everyArticles: Set<String> = ["les", "los", "las", "os", "as"]
 
     /// The names of `cvData` that say no work: its employers, schools, person and places.
     static func ownNames(of cvData: CVData) -> [String] {
@@ -694,6 +741,7 @@ extension CVDataSanitizer {
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
+            let often = Self.frequencies(in: description)
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 var sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
                 // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays (round 10).
@@ -729,6 +777,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if let closing = Self.closing(of: sentence), closings.contains(closing) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
+                } else if !Self.frequencies(in: sentence).isSubset(of: often) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.howOftenReason))
                 } else if dutySentences.contains(where: own.isSubset) {
                     verdict.rejected.append(Rejection(
                         sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
