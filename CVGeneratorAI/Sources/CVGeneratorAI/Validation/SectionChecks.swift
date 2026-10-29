@@ -1533,8 +1533,9 @@ extension CVDataSanitizer {
             }
             return kept
         }
-        var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
-        let objects = dropsWorkObjects ? Self.workObjectHeads(in: description, language: language).subtracting(heads) : []
+        let statedHeads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
+        var kinds = Set(stated.compactMap { Self.kindKey(of: $0, language: language) })
+        let objects = dropsWorkObjects ? Self.workObjectHeads(in: description, language: language).subtracting(statedHeads) : []
         let nameWords = nameWords(of: names, language: language)
         for raw in Self.joiningClippedModifiers(technologies, in: description, language: language) {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
@@ -1560,7 +1561,7 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
                 } else if let head = Self.headKey(of: item, language: language), objects.contains(head) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "what the work is done on"))
-                } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
+                } else if let kind = Self.kindKey(of: item, language: language), !kinds.insert(kind).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
                     verdict.technologies.append(item)
@@ -1938,6 +1939,24 @@ extension CVDataSanitizer {
         let key = skillKey(head)
         return headGroups[key] ?? key
     }
+
+    /// The key by which two tools are of one kind: their head key (`headKey`) and, in the languages whose head comes first, the
+    /// first 6 letters of the key of the first word after it past the link words ("strumenti di misura", "software contabile").
+    /// Read by its head alone, an Italian CV kept one "strumenti di" or "software di" and dropped the tools of its other kinds
+    /// (#354, round 15). English and German read the head alone: their modifiers come first, and name no other kind ("studio
+    /// monitors").
+    static func kindKey(of item: String, language: String?) -> String? {
+        guard let head = headKey(of: item, language: language) else { return nil }
+        guard ["it", "es", "fr", "pt"].contains(language ?? "") else { return head }
+        let words = item.split { !$0.isLetter }.map { DescriptionText.normalized(String($0)) }.filter { $0.count > 1 }
+        guard let modifier = words.dropFirst().first(where: { !skillLinkWords.contains($0) && !kindLinkWords.contains($0) }) else {
+            return head
+        }
+        return head + " " + skillKey(modifier).prefix(6)
+    }
+
+    /// The prepositions between a head and its modifier past `skillLinkWords`, without accents.
+    private static let kindLinkWords: Set<String> = ["per", "para", "pour", "al", "alla", "ai", "au", "aux", "en", "dal", "della"]
 
     /// The keys of head nouns that name one tool, by the key that stands for them: a mixer and a desk are a mixing console.
     private static let headGroups = ["mixer": "consol", "desk": "consol"]

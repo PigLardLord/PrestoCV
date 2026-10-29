@@ -871,8 +871,45 @@ struct SectionChecksTests {
 
         #expect(sound.technologies == ["studio monitors", "digital mixing desk", "Shure microphones", "Logic Pro", "Premiere Pro"])
         #expect(sound.dropped.map(\.reason) == ["same kind as an earlier tool"])
-        #expect(wiring.technologies == ["pince à dénuder", "multimètre", "l'oscilloscope"])
-        #expect(wiring.dropped.map(\.sentence) == ["pinces coupantes"])
+        // Wire strippers and cutting pliers are two kinds: in French the head comes first, and its first modifier names the kind
+        // (#354, round 15).
+        #expect(wiring.technologies == ["pince à dénuder", "multimètre", "pinces coupantes", "l'oscilloscope"])
+        #expect(wiring.dropped.isEmpty)
+    }
+
+    @Test("In Italian, Spanish, French and Portuguese a tool's kind is its head and its first modifier: two tools of one head and of other modifiers stay, two of one modifier are one (#354, round 15)",
+          arguments: [
+              ("it", ["strumenti di diagnostica", "strumenti di misura"], ["strumenti di diagnostica", "strumenti di misura"]),
+              ("it", ["software di gestione impianti", "software di controllo"], ["software di gestione impianti", "software di controllo"]),
+              ("it", ["software di contabilità", "software contabile"], ["software di contabilità"]),
+              ("es", ["hoja de cálculo", "hojas de cálculo"], ["hoja de cálculo"]),
+              ("pt", ["chave de fenda", "chave inglesa"], ["chave de fenda", "chave inglesa"]),
+              // English and German read the head alone, as before.
+              ("en", ["studio monitors", "stage monitors"], ["studio monitors"]),
+              ("de", ["digitales Messgerät", "analoges Messgerät"], ["digitales Messgerät"]),
+          ])
+    func kindIsHeadAndModifier(language: String, technologies: [String], kept: [String]) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
+
+        #expect(verdict.technologies == kept)
+    }
+
+    @Test("A tool's kind key is its head and the first letters of its first modifier, past the link words, so an adjective and its noun are one",
+          arguments: [
+              ("it", "software di gestione", "software gestionale", true),
+              ("it", "strumenti di diagnostica", "strumenti di misura", false),
+              ("it", "software di gestione impianti", "software di controllo", false),
+              ("es", "hoja de cálculo", "hojas de cálculo", true),
+              ("fr", "pince à dénuder", "pinces coupantes", false),
+              ("en", "studio monitors", "stage monitors", true),
+          ])
+    func kindKey(language: String, first: String, second: String, same: Bool) {
+        let one = CVDataSanitizer.kindKey(of: first, language: language)
+
+        #expect(one != nil)
+        #expect((one == CVDataSanitizer.kindKey(of: second, language: language)) == same)
     }
 
     @Test("A written technology of the kind of a tool the person names goes, a console, a mixer and a desk one kind; a tool of another kind stays (#354, round 2)")
