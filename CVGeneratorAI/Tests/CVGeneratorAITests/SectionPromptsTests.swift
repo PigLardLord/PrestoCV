@@ -368,6 +368,9 @@ struct SectionPromptsTests {
             #expect(instructions.contains("no list of tools or qualities"))
             // Asked for a quality in each sentence, the summary closed each with the person's own praise (#354, round 10).
             #expect(!instructions.contains("quality of the lists"))
+            // The check drops a sentence that names no duty and no tool (`namesNoWork`): the request says so, or the summary of a
+            // job with one duty is written of nothing and falls under its floor (#354, round 10).
+            #expect(instructions.contains("each naming a duty of the roles or a tool of the lists"))
         }
     }
 
