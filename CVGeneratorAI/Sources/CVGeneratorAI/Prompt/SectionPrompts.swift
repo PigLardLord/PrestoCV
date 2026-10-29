@@ -120,15 +120,15 @@ enum SectionPrompts {
 
     // MARK: The summary
 
-    /// The summary, written last from the duties and the skills the checks kept, one for one with the brief's jobs.
-    static func summary(for brief: DraftBrief, duties: [String?], skills: [String]) -> Prompt {
+    /// The summary, written last from the brief's job titles and the tools and qualities the checks kept. It reads no duty: a duty
+    /// it read came back word for word, and the check drops a copied duty (#354, round 2).
+    static func summary(for brief: DraftBrief, tools: [String], qualities: [String]) -> Prompt {
         var lines = header(brief) + headline(brief)
-        let roles = brief.roles.enumerated().map { index, role in
-            "- " + roleLine(role, employer: false) + (duties.indices.contains(index) ? duties[index].map { "\n  " + $0 } ?? "" : "")
-        }
+        let roles = brief.roles.map { "- " + roleLine($0, employer: false) }
         if !roles.isEmpty { lines.append("Roles:\n" + roles.joined(separator: "\n")) }
         if !brief.studies.isEmpty { lines.append("Studies: " + brief.studies.joined(separator: "; ")) }
-        if !skills.isEmpty { lines.append("Skills: " + skills.joined(separator: "; ")) }
+        if !tools.isEmpty { lines.append("Tools: " + tools.joined(separator: "; ")) }
+        if !qualities.isEmpty { lines.append("Qualities: " + qualities.joined(separator: "; ")) }
         return Prompt(instructions: summaryInstructions, text: lines.joined(separator: "\n"))
     }
 
@@ -142,9 +142,9 @@ enum SectionPrompts {
 
     /// The summary's repair: what the check kept, what it rejected and why, and what the summary misses.
     static func summaryRepair(
-        for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
     ) -> Prompt {
-        var lines = [summary(for: brief, duties: duties, skills: skills).text]
+        var lines = [summary(for: brief, tools: tools, qualities: qualities).text]
         if !kept.isEmpty { lines.append("Summary sentences kept:\n" + bullets(kept)) }
         if !rejected.isEmpty { lines.append("Summary sentences rejected, with the reason:\n" + bullets(rejected)) }
         if !problems.isEmpty { lines.append("What the summary misses: " + problems.joined(separator: "; ")) }

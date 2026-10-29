@@ -428,6 +428,46 @@ struct SectionChecksTests {
         #expect(verdict.kept == ["La manutenzione degli impianti è il mio lavoro di ogni giorno.", "Mi occupo degli impianti con cura."])
     }
 
+    @Test("A summary sentence whose subject is a quality goes; a quality the person works with, or one before a comma, stays (#354, round 2)")
+    func summaryWithAQualitySubject() throws {
+        let description = JobClausesTests.italian.replacingOccurrences(
+            of: "Birrificio Valtrigno di Campobasso, dove coordino tre tecnici.", with: "Birrificio Valtrigno."
+        )
+
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.italianJobs,
+            summary: "Lavoro come capoturno della manutenzione degli impianti. Precisione e calma sono le mie doti in ogni turno. "
+                + "Seguo gli impianti con precisione e calma in ogni turno di lavoro. Calmo e attento, seguo ogni impianto fino alla fine.",
+            field: nil, work: ["impianti"], duties: [], qualities: ["precisione", "calma"], against: description
+        )
+
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.hasAQualitySubject])
+        #expect(verdict.rejected.map(\.sentence) == ["Precisione e calma sono le mie doti in ogni turno."])
+        #expect(verdict.kept.count == 3)
+    }
+
+    @Test("A summary sentence that ends with the last three words of an earlier one goes; one that shares fewer stays (#354, round 2)")
+    func summaryWithARepeatedEnding() throws {
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")])
+        let description = "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo las cuentas y "
+            + "preparo las facturas."
+
+        let verdict = try spanish.summaryCheck(
+            of: facts,
+            summary: "Trabajo como contable y cuido las cuentas de cada cliente con enfoque ordenado. "
+                + "Llevo las cuentas de la empresa con enfoque ordenado. Preparo las facturas de los clientes con un enfoque claro y ordenado.",
+            field: nil, work: ["cuentas", "facturas"], duties: [], qualities: [], against: description
+        )
+
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.endsAsAnEarlierOne])
+        #expect(verdict.rejected.map(\.sentence) == ["Llevo las cuentas de la empresa con enfoque ordenado."])
+        #expect(verdict.kept == [
+            "Trabajo como contable y cuido las cuentas de cada cliente con enfoque ordenado.",
+            "Preparo las facturas de los clientes con un enfoque claro y ordenado.",
+        ])
+    }
+
     @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")
     func summaryOfThePerson() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

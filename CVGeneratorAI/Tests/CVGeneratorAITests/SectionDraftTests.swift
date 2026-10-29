@@ -102,17 +102,17 @@ struct SectionDraftTests {
         #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
     }
 
-    @Test("The summary request reads the duties and the skills the checks kept, one for one with the jobs")
+    @Test("The summary request reads the tools and the qualities the checks kept, apart, and no duty (#354, round 2)")
     func summaryInputs() async throws {
         let service = service()
 
         _ = try await draft(service)
 
         let request = try #require(service.summaryRequests.first)
-        #expect(request.duties.count == 4)
-        #expect(request.duties[3]?.contains("I run the technical rehearsals.") == true)
-        #expect(request.skills.contains("mixing desks"))
-        #expect(request.skills.contains("teamwork"))
+        #expect(request.tools.contains("mixing desks"))
+        #expect(!request.tools.contains("teamwork"))
+        #expect(request.qualities.contains("teamwork"))
+        #expect(!request.qualities.contains("mixing desks"))
     }
 
     // MARK: What reaches the draft

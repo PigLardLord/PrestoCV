@@ -202,17 +202,17 @@ struct DraftingEvaluation {
             return more
         }
 
-        func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
-            let summary = try await model.writeSummary(for: brief, duties: duties, skills: skills)
+        func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
+            let summary = try await model.writeSummary(for: brief, tools: tools, qualities: qualities)
             log("summary", summary.map { [$0] })
             return summary
         }
 
         func repairSummary(
-            for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+            for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
         ) async throws -> String? {
             let summary = try await model.repairSummary(
-                for: brief, duties: duties, skills: skills, kept: kept, rejected: rejected, problems: problems
+                for: brief, tools: tools, qualities: qualities, kept: kept, rejected: rejected, problems: problems
             )
             log("summary repair", [summary ?? "none", "kept: " + kept.joined(separator: " "), "rejected: " + rejected.joined(separator: " ")] + problems)
             return summary

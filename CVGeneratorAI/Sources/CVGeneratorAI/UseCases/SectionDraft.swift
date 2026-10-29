@@ -239,14 +239,15 @@ final class SectionDraft {
     /// repair, kept when it misses no more than the first.
     private func writeSummary(of brief: DraftBrief, field: String?, around dated: CVData) async throws {
         let kept = try kept(around: dated)
-        let keptDuties = kept.experience.map(\.description)
-        let keptSkills = kept.skills.map(\.name)
-        let work = keptDuties.compactMap { $0 } + technologies
+        let keptDuties = kept.experience.compactMap(\.description)
+        let keptTools = kept.skills.filter { $0.kind != .softSkill }.map(\.name)
+        let keptQualities = kept.skills.filter { $0.kind == .softSkill }.map(\.name)
+        let work = keptDuties + technologies
         let written = try await request(.summary) {
-            try await self.service.writeSummary(for: brief, duties: keptDuties, skills: keptSkills)
+            try await self.service.writeSummary(for: brief, tools: keptTools, qualities: keptQualities)
         }
         guard let first = try? sanitizer.summaryCheck(
-            of: dated, summary: written, field: field, work: work, duties: keptDuties.compactMap { $0 }, against: description
+            of: dated, summary: written, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
         ) else {
             return
         }
@@ -259,12 +260,12 @@ final class SectionDraft {
         let rejected = first.rejected.map(Self.quoted)
         let repaired = try await request(.summary) {
             try await self.service.repairSummary(
-                for: brief, duties: keptDuties, skills: keptSkills, kept: keptSentences, rejected: rejected, problems: problems
+                for: brief, tools: keptTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
         let cut = repaired.map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
-            of: dated, summary: cut, field: field, work: work, duties: keptDuties.compactMap { $0 }, against: description
+            of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities, against: description
         ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
     }

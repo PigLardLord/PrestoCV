@@ -50,7 +50,7 @@ final class FakeCVGenerationService: CVGenerationService {
     private(set) var sectionBriefs: [DraftBrief] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
     private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, excluding: [String], rejected: [String])] = []
-    private(set) var summaryRequests: [(duties: [String?], skills: [String])] = []
+    private(set) var summaryRequests: [(tools: [String], qualities: [String])] = []
     private(set) var summaryRepairs: [(kept: [String], rejected: [String], problems: [String])] = []
 
     func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
@@ -82,14 +82,14 @@ final class FakeCVGenerationService: CVGenerationService {
         return moreSkillsResult
     }
 
-    func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
-        summaryRequests.append((duties, skills))
+    func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
+        summaryRequests.append((tools, qualities))
         try await section("summary", brief)
         return summaryResult
     }
 
     func repairSummary(
-        for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
     ) async throws -> String? {
         summaryRepairs.append((kept, rejected, problems))
         try await section("repairSummary", brief)

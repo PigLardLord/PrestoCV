@@ -216,9 +216,9 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("The summary request reads each job with its kept duties, without its employer, the studies and the kept skills")
+    @Test("The summary request reads each job's title, the studies, the kept tools and the kept qualities, and no duty or employer (#354, round 2)")
     func summaryPrompt() {
-        let prompt = SectionPrompts.summary(for: Self.brief, duties: ["Controllavo i quadri elettrici.", nil], skills: ["PLC", "precisione"])
+        let prompt = SectionPrompts.summary(for: Self.brief, tools: ["PLC", "inverter"], qualities: ["precisione"])
 
         #expect(prompt.instructions == SectionPrompts.summaryInstructions)
         #expect(prompt.text == """
@@ -226,10 +226,10 @@ struct SectionPromptsTests {
             Scrivi in italiano.
             Roles:
             - manutentore elettromeccanico; ended
-              Controllavo i quadri elettrici.
             - capoturno della manutenzione
             Studies: Perito elettrotecnico
-            Skills: PLC; precisione
+            Tools: PLC; inverter
+            Qualities: precisione
             """)
         #expect(!prompt.text.contains("Cerreto"))
     }
@@ -237,12 +237,12 @@ struct SectionPromptsTests {
     @Test("The summary repair reads the summary request, the sentences kept, those rejected with their reasons and what it misses")
     func summaryRepair() {
         let prompt = SectionPrompts.summaryRepair(
-            for: Self.brief, duties: [nil, nil], skills: [], kept: ["Lavoro come capoturno della manutenzione."],
+            for: Self.brief, tools: [], qualities: [], kept: ["Lavoro come capoturno della manutenzione."],
             rejected: ["\"Lui è un tecnico.\": it speaks of the person in the third person"], problems: ["it is shorter than 120 characters"]
         )
 
         #expect(prompt.instructions == SectionPrompts.summaryRepairInstructions)
-        #expect(prompt.text.hasPrefix(SectionPrompts.summary(for: Self.brief, duties: [nil, nil], skills: []).text))
+        #expect(prompt.text.hasPrefix(SectionPrompts.summary(for: Self.brief, tools: [], qualities: []).text))
         #expect(prompt.text.hasSuffix("""
             Summary sentences kept:
             - Lavoro come capoturno della manutenzione.

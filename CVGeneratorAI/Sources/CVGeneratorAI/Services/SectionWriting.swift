@@ -118,18 +118,18 @@ extension FoundationModelsService {
 
     // MARK: The summary
 
-    public func writeSummary(for brief: DraftBrief, duties: [String?], skills: [String]) async throws -> String? {
-        let prompt = SectionPrompts.summary(for: brief, duties: duties, skills: skills)
+    public func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
+        let prompt = SectionPrompts.summary(for: brief, tools: tools, qualities: qualities)
         guard let last = try await streamed(prompt, SummaryAnswer.self, tokens: Self.summaryTokens),
               let summary = last.answer.content.summary else { return nil }
         return last.isComplete ? summary.presentValue : Self.wholeSentences(of: summary)
     }
 
     public func repairSummary(
-        for brief: DraftBrief, duties: [String?], skills: [String], kept: [String], rejected: [String], problems: [String]
+        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
     ) async throws -> String? {
         let prompt = SectionPrompts.summaryRepair(
-            for: brief, duties: duties, skills: skills, kept: kept, rejected: rejected, problems: problems
+            for: brief, tools: tools, qualities: qualities, kept: kept, rejected: rejected, problems: problems
         )
         guard let last = try await streamed(prompt, SummaryAnswer.self, tokens: Self.summaryRepairTokens),
               let summary = last.answer.content.summary,

@@ -427,6 +427,15 @@ extension CVDataSanitizer {
     func summaryCheck(
         of cvData: CVData, summary: String?, field: String?, work: [String] = [], duties: [String] = [], against description: String
     ) throws(CVGenerationError) -> SummaryVerdict {
+        try summaryCheck(of: cvData, summary: summary, field: field, work: work, duties: duties, qualities: [], against: description)
+    }
+
+    /// The summary check, where a sentence whose subject is one of the kept `qualities` also goes (`hasAQualitySubject`), and so
+    /// does every sentence that ends with the last three words of an earlier one kept (#354, round 2).
+    func summaryCheck(
+        of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String],
+        against description: String
+    ) throws(CVGenerationError) -> SummaryVerdict {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
             let entries = entries(of: cvData, source)
@@ -447,6 +456,8 @@ extension CVDataSanitizer {
             var idle = 0
             var seen = Set<String>()
             var verbs = Set<String>()
+            var endings = Set<[String]>()
+            let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 let sentence = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 let key = sentence.lowercased().filter(\.isLetter)
@@ -462,8 +473,12 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.saysNothingOfThePerson))
                 } else if let language, Self.hasABareSubject(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
+                } else if Self.hasAQualitySubject(sentence, qualities: qualityWords) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasAQualitySubject))
                 } else if let verb, verbs.contains(verb) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
+                } else if let ending = Self.ending(of: sentence), endings.contains(ending) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if dutySentences.contains(where: own.isSubset) {
                     verdict.rejected.append(Rejection(
                         sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
@@ -476,6 +491,7 @@ extension CVDataSanitizer {
                 } else {
                     if !namesWork(sentence) { idle += 1 }
                     if let verb { verbs.insert(verb) }
+                    if let ending = Self.ending(of: sentence) { endings.insert(ending) }
                     verdict.kept.append(sentence)
                 }
             }
@@ -519,6 +535,25 @@ extension CVDataSanitizer {
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
+    static let hasAQualitySubject = "its subject is a quality: write it as the person, with what they do and how"
+    static let endsAsAnEarlierOne = "it ends with the words of an earlier sentence: say something else"
+
+    /// Whether `sentence` starts with the words of one of `qualities` (folded) in a clause of five words or more before its first
+    /// comma: a quality spoken of as the subject ("Precisione e calma sono le mie doti."), a summary made of a list of qualities
+    /// (#354, round 2). A quality before a comma ("Calma e attenta, seguo…") describes the person who speaks after it.
+    static func hasAQualitySubject(_ sentence: String, qualities: [[String]]) -> Bool {
+        let words = Word.words(in: sentence).map(\.folded)
+        let clause = Word.words(in: String(sentence.prefix { $0 != "," }))
+        guard clause.count >= 5, let first = words.first, !wordsOfThePerson.contains(first) else { return false }
+        return qualities.contains { words.starts(with: $0) }
+    }
+
+    /// The last three words of `sentence`, folded, when it has five or more: two sentences that end alike repeat a phrase
+    /// ("…con enfoque organizado.", #354, round 2).
+    static func ending(of sentence: String) -> [String]? {
+        let words = Word.words(in: sentence).map(\.folded)
+        return words.count >= 5 ? Array(words.suffix(3)) : nil
+    }
 
     /// Whether `sentence` starts with a word of the person's work (`workWords`, folded) with no article, and has a form of "to be"
     /// of `language` among its next three words with no word of the person before it: the work spoken of as a thing
