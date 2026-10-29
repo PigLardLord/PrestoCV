@@ -904,6 +904,11 @@ struct SectionChecksTests {
               ("es", "hoja de cálculo", "hojas de cálculo", true),
               ("fr", "pince à dénuder", "pinces coupantes", false),
               ("en", "studio monitors", "stage monitors", true),
+              // A word of form names no other kind: a digital board and an interactive one are one board (#354, round 15).
+              ("fr", "tableau interactif", "tableau numérique", true),
+              ("it", "lavagna interattiva", "lavagna digitale", true),
+              ("es", "escáner portátil", "escáner", true),
+              ("pt", "quadro interativo", "quadro de avisos", false),
           ])
     func kindKey(language: String, first: String, second: String, same: Bool) {
         let one = CVDataSanitizer.kindKey(of: first, language: language)

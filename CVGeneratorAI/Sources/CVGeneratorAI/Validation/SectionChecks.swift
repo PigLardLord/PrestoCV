@@ -1946,12 +1946,14 @@ extension CVDataSanitizer {
     /// first 6 letters of the key of the first word after it past the link words ("strumenti di misura", "software contabile").
     /// Read by its head alone, an Italian CV kept one "strumenti di" or "software di" and dropped the tools of its other kinds
     /// (#354, round 15). English and German read the head alone: their modifiers come first, and name no other kind ("studio
-    /// monitors").
+    /// monitors"). A word of form (`formWords`) names no other kind: a digital board and an interactive one are one board.
     static func kindKey(of item: String, language: String?) -> String? {
         guard let head = headKey(of: item, language: language) else { return nil }
         guard ["it", "es", "fr", "pt"].contains(language ?? "") else { return head }
         let words = item.split { !$0.isLetter }.map { DescriptionText.normalized(String($0)) }.filter { $0.count > 1 }
-        guard let modifier = words.dropFirst().first(where: { !skillLinkWords.contains($0) && !kindLinkWords.contains($0) }) else {
+        guard let modifier = words.dropFirst().first(where: {
+            !skillLinkWords.contains($0) && !kindLinkWords.contains($0) && !formWords.contains($0)
+        }) else {
             return head
         }
         return head + " " + skillKey(modifier).prefix(6)
@@ -1959,6 +1961,19 @@ extension CVDataSanitizer {
 
     /// The prepositions between a head and its modifier past `skillLinkWords`, without accents.
     private static let kindLinkWords: Set<String> = ["per", "para", "pour", "al", "alla", "ai", "au", "aux", "en", "dal", "della"]
+
+    /// The words of a tool's form in the languages whose head comes first, without accents: digital, interactive, portable,
+    /// electronic, touch, wireless.
+    private static let formWords: Set<String> = [
+        "digitale", "digitali", "digital", "digitales", "numerique", "numeriques", "numerico", "numerica", "numericos", "numericas",
+        "interattivo", "interattiva", "interattivi", "interattive", "interactif", "interactive", "interactifs", "interactives",
+        "interactivo", "interactiva", "interactivos", "interactivas", "interativo", "interativa", "interativos", "interativas",
+        "portatile", "portatili", "portable", "portables", "portatil", "portatiles", "portateis",
+        "elettronico", "elettronica", "elettronici", "elettroniche", "electronique", "electroniques", "electronico", "electronica",
+        "electronicos", "electronicas", "eletronico", "eletronica", "eletronicos", "eletronicas",
+        "tattile", "tattili", "tactile", "tactiles", "tactil", "tateis", "inalambrico", "inalambrica", "inalambricos",
+        "inalambricas", "wireless",
+    ]
 
     /// The keys of head nouns that name one tool, by the key that stands for them: a mixer and a desk are a mixing console.
     private static let headGroups = ["mixer": "consol", "desk": "consol"]
