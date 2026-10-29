@@ -1016,17 +1016,31 @@ extension CVDataSanitizer {
 
     /// Whether a German sentence has a clause after dass, weil, sodass or ob whose verb stands before its end: the clause ends on a
     /// noun while an earlier lowercase word of four letters or more ends as a verb ("dass alle Maschinen laufen ruhig durch genaue
-    /// Pflege"). A clause with a comparison ("wie am ersten Tag", "als je") may end on a noun after its verb, and it stays.
+    /// Pflege"), or ends on an adverb right after that verb ("dass die Anlagen funktionieren zuverlässig"; #354, round 12). A clause
+    /// with a comparison ("wie am ersten Tag", "als je") may end on a noun after its verb, and it stays.
     private static func putsTheVerbBeforeTheEnd(_ sentence: String) -> Bool {
         sentence.split { ",;.!?".contains($0) }.contains { clause in
             let words = clause.split { !$0.isLetter }.map(String.init)
             guard let start = words.firstIndex(where: { ["dass", "weil", "sodass", "ob"].contains($0.lowercased()) }) else { return false }
             let rest = words[(start + 1)...]
-            guard rest.count >= 3, let last = rest.last, last.first?.isUppercase == true,
-                  !rest.contains(where: { ["wie", "als"].contains($0) }) else { return false }
-            return rest.dropLast().contains { $0.count >= 4 && $0.first?.isLowercase == true && ($0.hasSuffix("en") || $0.hasSuffix("t")) }
+            guard rest.count >= 3, let last = rest.last, !rest.contains(where: { ["wie", "als"].contains($0) }) else { return false }
+            let isVerb = { (word: String) in word.count >= 4 && word.first?.isLowercase == true && (word.hasSuffix("en") || word.hasSuffix("t")) }
+            return last.first?.isUppercase == true ? rest.dropLast().contains(where: isVerb)
+                : isGermanAdverb(last) && isVerb(rest[rest.endIndex - 2])
         }
     }
+
+    /// Whether a German word in lower case is an adverb of manner: by its ending, or one of the short ones.
+    private static func isGermanAdverb(_ word: String) -> Bool {
+        guard word.first?.isLowercase == true else { return false }
+        return ["ig", "lich", "los", "bar", "sam", "isch", "frei", "haft"].contains { word.count > $0.count + 2 && word.hasSuffix($0) }
+            || germanShortAdverbs.contains(word)
+    }
+
+    /// The German adverbs of manner with no adverb ending.
+    private static let germanShortAdverbs: Set<String> = [
+        "gut", "schnell", "sicher", "genau", "ruhig", "stabil", "korrekt", "exakt", "immer", "sofort", "richtig", "sauber", "gern", "gerne",
+    ]
     static let listsSkills = "it lists skills: say how the person uses one or two of them in the work"
     static let endsAsAnEarlierOne = "it ends with the words of an earlier sentence: say something else"
 

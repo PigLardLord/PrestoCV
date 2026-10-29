@@ -1097,6 +1097,10 @@ struct SectionChecksTests {
               ("Ich achte darauf, dass alle Maschinen laufen ruhig durch genaue Pflege der Lager.", false),
               ("Ich pflege die Maschinen gern, weil jede Anlage läuft durch gute Pflege der Lager.", false),
               ("Ich sorge dafür, dass jede Maschine läuft wie am ersten Tag.", true),
+              // An adverb right after the verb ends the clause (#354, round 12); the clause that puts it before the verb stays.
+              ("Ich achte darauf, dass die Spulen laufen gleichmäßig.", false),
+              ("Ich achte darauf, dass die Spulen gleichmäßig laufen.", true),
+              ("Ich prüfe jeden Morgen, ob die Lager sauber sind.", true),
           ])
     func germanVerbBeforeTheEnd(sentence: String, stays: Bool) throws {
         let checker = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
