@@ -601,7 +601,14 @@ extension CVDataSanitizer {
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
-            let namesWork = { (sentence: String) in !Self.workStems(of: [sentence]).isDisjoint(with: workStems) }
+            // A kept tool names the work whole, however short, and is no name: "Java" and "SAP" have no stem of five letters, and the
+            // request asks for a tool of the lists (#354, round 10).
+            let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            let namesWork = { (sentence: String) in
+                let words = Word.words(in: sentence).map(\.folded)
+                return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
+                    || toolRuns.contains { run in words.indices.contains { words[$0...].prefix(run.count).elementsEqual(run) } }
+            }
 
             let language = source.explainer.language
             let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
@@ -658,7 +665,7 @@ extension CVDataSanitizer {
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                          let reason = written.rejection(of: sentence, ownWords: ownWords) {
+                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(toolRuns.joined())) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
