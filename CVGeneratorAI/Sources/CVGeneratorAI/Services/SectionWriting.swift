@@ -122,10 +122,10 @@ extension FoundationModelsService {
             // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
             let who = title.map { "a person working as \($0)" } ?? "the person"
             properties.append(DynamicGenerationSchema.Property(
-                name: "trade", description: "The trade of \(who) and the kinds of named software, devices and instruments it uses, in a few words",
+                name: "trade", description: "The trade of \(who) and the kinds of software, systems, machines and instruments it uses, in a few words",
                 schema: DynamicGenerationSchema(type: String.self)
             ))
-            let about = "\(tools) more named software products, named devices or instruments, each new and of another kind; "
+            let about = "\(tools) more software, systems, machines or instruments of the trade, each new and of another kind; "
                 + "no general kind, no activity, no material or part"
             properties.append(list("tools", about, tools))
         }

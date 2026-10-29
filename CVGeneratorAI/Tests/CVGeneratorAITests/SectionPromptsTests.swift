@@ -325,7 +325,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.softSkillsInstructions.contains("No tool, no technique, no level."))
     }
 
-    @Test("The request for more skills asks for the counts given, named tools of the headline title, each new, in the CV's language, none of the skills kept, and none of those rejected, with the reason")
+    @Test("The request for more skills asks for the counts given, tools of the trade of the tools listed for the headline title, each new, in the CV's language, none of the skills kept, and none of those rejected, with the reason")
     func moreSkillsPrompt() {
         let both = SectionPrompts.moreSkills(
             for: Self.brief, title: "manutentore elettromeccanico", tools: 2, qualities: 1, listedTools: ["PLC"],
@@ -335,18 +335,18 @@ struct SectionPromptsTests {
             for: Self.brief, title: nil, tools: 1, qualities: 0, listedTools: [], listedQualities: [], rejected: []
         ).text
 
-        // Asked for "software, systems, machines" of the trade of the jobs, the request wrote general kinds of the work
-        // ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
+        // Asked for the tools of the jobs, the request wrote the tools of a trade the person left (#354, round 15); asked for "named
+        // software products, named devices", it wrote devices of any trade ("scanner portable", "Tableta táctil").
         #expect(both.contains(
-            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more named software products, "
-                + "named devices or instruments that a person working as manutentore elettromeccanico uses, each new, none of the "
-                + "tools listed or rejected, and each of another kind than those listed."
+            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more software, systems, "
+                + "machines or instruments of the trade of the tools listed, that a person working as manutentore elettromeccanico "
+                + "uses, each new, none of the tools listed or rejected, and each of another kind than those listed."
         ))
         #expect(toolsOnly.contains(
-            "The CV lists too few tools for a person with these jobs: name 1 more named software products, named devices or "
-                + "instruments that a person with these jobs uses, each of another kind."
+            "The CV lists too few tools for a person with these jobs: name 1 more software, systems, machines or instruments of "
+                + "the trade, that a person with these jobs uses, each of another kind."
         ))
-        #expect(!both.contains("systems, machines"))
+        #expect(!both.contains("named devices"))
         #expect(!both.contains("material"))
         #expect(!both.contains("pieces of equipment"))
         #expect(!SectionPrompts.toolsInstructions(count: 2...3).contains("materials or"))
