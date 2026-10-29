@@ -151,7 +151,9 @@ final class SectionDraft {
             if let role { years[number] = role }
             guard context.jobs.indices.contains(number) else { continue }
             let job = context.jobs[number].job
-            guard let first = try? sanitizer.dutyCheck(of: located, job: job, duties: role?.duties, against: description) else { continue }
+            guard let first = try? sanitizer.dutyCheck(
+                of: located, job: job, duties: role?.duties.map(Self.mended), against: description
+            ) else { continue }
             var kept = first.kept
             let described = CVDataSanitizer.DutyVerdicts.describedLength
             if !first.saysEnough, first.length < described || first.pinned.count + first.kept.count < 2 {
@@ -160,7 +162,7 @@ final class SectionDraft {
                     try await self.service.repairJob(number: number, of: brief, kept: first.pinned + first.kept, rejected: rejected)
                 }
                 if let repaired, let second = try? sanitizer.dutyCheck(
-                    of: located, job: job, duties: repaired.joined(separator: " "), keeping: first.kept, against: description
+                    of: located, job: job, duties: Self.mended(repaired.joined(separator: " ")), keeping: first.kept, against: description
                 ) {
                     kept += second.kept
                 }
@@ -260,8 +262,8 @@ final class SectionDraft {
         let written = try await request(.summary) { [brief] in
             try await self.service.writeSummary(for: brief, tools: keptTools, qualities: keptQualities)
         }
-        // A sentence of clauses joined by semicolons is cut into sentences, then the summary to its most (#354, round 4).
-        let opened = Self.opened(written.map(SentenceSplitter.unchained), by: brief.opening)
+        // The text mended (`mended`), then the summary cut to its most sentences (#354, round 4).
+        let opened = Self.opened(written.map(Self.mended), by: brief.opening)
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let first = try? sanitizer.summaryCheck(
             of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities,
@@ -281,13 +283,19 @@ final class SectionDraft {
                 for: brief, tools: keptTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
-        let cut = Self.opened(repaired.map(SentenceSplitter.unchained), by: brief.opening)
+        let cut = Self.opened(repaired.map(Self.mended), by: brief.opening)
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
             of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities,
             tools: keptTools, against: description
         ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
+    }
+
+    /// `text` as a request wrote it, with each semicolon the person's own clause follows as a full stop and each German separable
+    /// verb written apart at the end of a subordinate clause joined (#354, round 4): the checks then read the sentences the draft keeps.
+    static func mended(_ text: String) -> String {
+        SeparableVerbs.joined(in: SentenceSplitter.unchained(text))
     }
 
     /// The sentences a summary request wrote after `opening`, which code wrote: nil when it wrote none. The check drops a sentence

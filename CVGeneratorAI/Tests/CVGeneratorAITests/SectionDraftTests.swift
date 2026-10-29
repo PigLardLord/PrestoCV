@@ -297,6 +297,28 @@ struct SectionDraftTests {
         #expect(SentenceSplitter.unchained(text) == cut)
     }
 
+    @Test("A request's text is cut at each semicolon the person's clause follows, and a German separable verb split at a clause's end is joined (#354, round 4)", arguments: [
+        ("Ich prüfe die Pulte; ich schule das Team, damit es die Mikrofone richtig an schließt.", "Ich prüfe die Pulte. Ich schule das Team, damit es die Mikrofone richtig anschließt."),
+        ("Ich schule das Team und stelle die Pulte ein.", "Ich schule das Team und stelle die Pulte ein."),
+    ])
+    func mended(text: String, expected: String) {
+        #expect(SectionDraft.mended(text) == expected)
+    }
+
+    @Test("A job's duties written as clauses joined by semicolons are cut into sentences (#354, round 4)")
+    func chainedDutiesAreCut() async throws {
+        let service = service()
+        service.jobResults[3] = RoleWriting(
+            startDate: "2021", endDate: nil, duties: "I run the technical rehearsals; I look after the mixing desks and the stage monitors."
+        )
+
+        let draft = try await draft(service)
+
+        let head = try #require(job("Orchard Lane Theatre", in: draft)?.description)
+        #expect(!head.contains(";"))
+        #expect(head.contains("I run the technical rehearsals. I look after the mixing desks and the stage monitors."))
+    }
+
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()
