@@ -94,9 +94,10 @@ struct WrittenTextTests {
         #expect(written(teacher, wordList: TableWordList(names: [])).isPlain("Uses the globex method.", ownWords: []))
     }
 
-    @Test("A sentence the detector reads in another language than the description's is not plain")
+    @Test("A sentence the detector reads in another language than the description's, with words the description's dictionary lacks, is not plain")
     func anotherLanguage() {
-        let text = written(teacher, languageOfText: { $0.contains("paziente") ? "it" : "en" })
+        let english = TableWordList(names: ["insegnante", "paziente", "che", "prepara", "le", "lezioni"])
+        let text = written(teacher, wordList: english, languageOfText: { $0.contains("paziente") ? "it" : "en" })
 
         #expect(!text.isPlain("Insegnante paziente che prepara le lezioni.", ownWords: []))
         #expect(text.isPlain("A patient teacher who plans lessons.", ownWords: []))

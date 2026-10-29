@@ -243,6 +243,31 @@ struct SectionChecksTests {
         #expect(verdicts.rejected.map(\.sentence) == ["Riparavo le linee Krones per il cliente Peroni."])
     }
 
+    @Test("o1: a typical duty that holds five words of an earlier duty of its job in a row goes, with its reason; one in other words stays (#354, round 13, jobs-en)")
+    func typicalDutyThatRepeatsFiveWords() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 0,
+            duties: "Archivio le pratiche dei clienti in cartelle. Archivio le pratiche dei clienti in ordine alfabetico. Preparo i solleciti di pagamento.",
+            against: try Self.itTraps()
+        )
+
+        #expect(verdicts.kept == ["Archivio le pratiche dei clienti in cartelle.", "Preparo i solleciti di pagamento."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Archivio le pratiche dei clienti in ordine alfabetico."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.repeatsWordsReason])
+    }
+
+    @Test("o1: a sentence the detector gives to a close language is in the description's when its dictionary knows each word; one with a word it lacks is not (#354, round 13, pt-traps)", arguments: [
+        ("Gerencio fluxos de dados internos.", true),
+        ("Manage the internal data flows.", false),
+    ])
+    func closeLanguageByTheDictionary(sentence: String, isPortuguese: Bool) {
+        let text = DescriptionText("Sou programador e desenvolvo aplicativos para lojas.", languageOfText: { $0.hasPrefix("Sou") ? "pt" : "es" })
+        let portuguese = KnownWords(words: ["gerencio", "fluxos", "de", "dados", "internos", "the", "internal", "data", "flows"])
+
+        #expect(text.isInTheLanguageOfTheDescription(sentence, wordList: portuguese) == isPortuguese)
+        #expect(text.isInTheLanguageOfTheDescription(sentence, wordList: nil) == false)
+    }
+
     #if canImport(NaturalLanguage)
     // The French clauses are read with the device's language data, which only an Apple platform has.
     @Test("The step that writes a job pins the duties the final check pins: an achievement of the job counts toward neither (#354, round 3)")
@@ -1705,4 +1730,11 @@ struct SectionChecksTests {
 /// A dictionary that knows every word in English and none in any other language.
 private struct EnglishOnly: WordList {
     func knows(_ word: String, inLanguage language: String) -> Bool? { language == "en" }
+}
+
+/// A dictionary of one language that knows only `words`, in lower case.
+private struct KnownWords: WordList {
+    let words: Set<String>
+
+    func knows(_ word: String, inLanguage language: String) -> Bool? { words.contains(word.lowercased()) }
 }

@@ -197,7 +197,7 @@ struct DescriptionText {
     /// Addresses are read from the sentence as written, never with their digits folded: "alice١@example.com" is not
     /// "alice1@example.com". What is left once the addresses are taken out is read as words and numbers.
     private func isGrounded(_ sentence: String, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> Bool {
-        guard isInTheLanguageOfTheDescription(sentence) else { return false }
+        guard isInTheLanguageOfTheDescription(sentence, wordList: nil) else { return false }
 
         let addresses = AddressTokens(sentence)
         guard !addresses.hasAmbiguousAddress,
@@ -209,10 +209,16 @@ struct DescriptionText {
         return (allowsNumbers || !words.contains(where: \.isNumber)) && proseClauses.allSatisfy { quotes.quotes($0.words) }
     }
 
-    /// A sentence is in another language only when the detector is sure of both languages and they differ.
-    func isInTheLanguageOfTheDescription(_ sentence: String) -> Bool {
-        guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage) else { return true }
-        return sentenceLanguage == descriptionLanguage
+    /// A sentence is in another language only when the detector is sure of both languages and they differ, and, given a `wordList`,
+    /// the dictionary of the description's language lacks one of its words: a short sentence the detector gives to a close language
+    /// ("Gerencio fluxos de dados internos." read as Spanish in a Portuguese description) whose words are all Portuguese stays
+    /// (#354, round 13).
+    func isInTheLanguageOfTheDescription(_ sentence: String, wordList: (any WordList)?) -> Bool {
+        guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage),
+              sentenceLanguage != descriptionLanguage else { return true }
+        let words = Word.words(in: sentence).filter { !$0.isNumber }
+        guard let wordList, !words.isEmpty else { return false }
+        return words.allSatisfy { wordList.knows($0.accented, inLanguage: descriptionLanguage) == true }
     }
 
     /// "pt-PT" and "pt-BR" are both Portuguese.

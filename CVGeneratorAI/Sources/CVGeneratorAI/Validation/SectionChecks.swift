@@ -181,6 +181,8 @@ extension CVDataSanitizer {
                     rejection = ruled
                 } else if held.contains(where: { Self.saysAgain(sentence, $0) }) {
                     rejection = "it repeats a duty already written"
+                } else if Self.holdsARun(sentence, of: Self.copiedRuns(of: held)) {
+                    rejection = Self.repeatsWordsReason
                 } else if held.contains(where: { Self.namesAgain(sentence, $0, language: language) }) {
                     rejection = Self.namesAgainReason
                 } else if let own = Self.form(sentence, language: language) {
@@ -434,6 +436,22 @@ extension CVDataSanitizer {
 
     /// Whether `sentence` says again what `earlier` says: the words of one, by their first four letters, are all words of the other,
     /// or it says it with another verb (`restates`).
+    /// Why a duty that holds five words of an earlier duty of its job in a row goes ("I was setting up the sound equipment." after "I
+    /// was setting up the PA systems."): the job would say the same words twice (#354, round 13).
+    static let repeatsWordsReason = "it repeats five words of a duty already written: write it in other words"
+
+    /// The runs of five words in a row of `duties`, folded, each sentence on its own; a sentence of fewer words is a run whole.
+    static func copiedRuns(of duties: [String]) -> [[String]] {
+        duties.flatMap { SentenceSplitter.sentences(in: $0) }.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            .flatMap { duty in duty.count < 5 ? [duty] : (0...(duty.count - 5)).map { Array(duty[$0..<($0 + 5)]) } }
+    }
+
+    /// Whether `sentence` holds one of the `runs` word for word.
+    static func holdsARun(_ sentence: String, of runs: [[String]]) -> Bool {
+        let words = Word.words(in: sentence).map(\.folded)
+        return runs.contains { run in words.indices.contains { words[$0...].prefix(run.count).elementsEqual(run) } }
+    }
+
     static func saysAgain(_ sentence: String, _ earlier: String) -> Bool {
         let own = stems(of: sentence)
         let other = stems(of: earlier)

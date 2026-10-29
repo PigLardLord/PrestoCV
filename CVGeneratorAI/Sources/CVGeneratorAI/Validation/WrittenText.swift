@@ -60,7 +60,7 @@ struct WrittenText {
     /// ADR 0031, D3: `allowing` holds the words of a duty that quotes its own job's clause word for word: there its acronyms,
     /// number words and seniority words are the person's own. Digits and another job's words still reject it.
     func rejection(of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = []) -> String? {
-        guard source.isInTheLanguageOfTheDescription(sentence) else { return "it is not in the language of the description" }
+        guard source.isInTheLanguageOfTheDescription(sentence, wordList: wordList) else { return "it is not in the language of the description" }
 
         let addresses = AddressTokens(sentence)
         guard addresses.emails.isEmpty, addresses.links.isEmpty, !addresses.hasAmbiguousAddress else { return "it holds an address" }
