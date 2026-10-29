@@ -248,6 +248,37 @@ struct SectionChecksTests {
         #expect(plant.dropped.map(\.sentence) == ["software di tracciamento", "sistema di controllo remoto", "manutenzione preventiva"])
     }
 
+    @Test("A technology that names a kind of tool and no tool of it goes; a named one, with a capital, an acronym or a digit, stays (#354, round 2)",
+          arguments: [
+              ("en", ["Pro Tools", "sound design software", "digital sound workstation", "Logic Pro 11", "stage monitors"],
+               ["Pro Tools", "Logic Pro 11", "stage monitors"]),
+              ("it", ["software", "software CMMS", "piattaforma di stampa", "multimetro"], ["software CMMS", "multimetro"]),
+              ("es", ["editor de código", "Visual Studio Code", "hoja de cálculo"], ["Visual Studio Code", "hoja de cálculo"]),
+              ("pt", ["ferramenta de teste", "plataforma de desenvolvimento", "Postman", "aplicativos Android"],
+               ["Postman", "aplicativos Android"]),
+          ])
+    func kindOfToolIsNoTechnology(language: String, technologies: [String], kept: [String]) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
+
+        #expect(verdict.technologies == kept)
+        #expect(Set(verdict.dropped.map(\.reason)) == ["a kind of tool, not its name"])
+    }
+
+    @Test("A German technology that is the infinitive of an activity goes; a machine stays (#354, round 2)")
+    func germanActivityIsNoTechnology() {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = german.skillCheck(
+            technologies: ["Messen", "Drehmaschine", "Installieren", "Multimeter", "Abisolierzange"], softSkills: [],
+            against: "Feinmechanik, Suhl, 2019."
+        )
+
+        #expect(verdict.technologies == ["Drehmaschine", "Multimeter", "Abisolierzange"])
+        #expect(verdict.dropped.map(\.reason) == ["activity", "activity"])
+    }
+
     @Test("A fragment and a lone verb go from the skills")
     func fragmentsGo() {
         let verdict = sanitizer.skillCheck(

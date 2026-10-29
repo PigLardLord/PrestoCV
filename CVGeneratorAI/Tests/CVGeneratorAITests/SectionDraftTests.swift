@@ -46,7 +46,7 @@ struct SectionDraftTests {
         2: RoleWriting(startDate: "2019", endDate: "2021", duties: "I ran the sound checks before each concert. I looked after the stage monitors."),
         3: RoleWriting(startDate: "2021", endDate: nil, duties: "I run the technical rehearsals. I look after the mixing desks and the stage monitors."),
     ]
-    private static let tools = [["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"], ["mixing desks", "sound design software"]]
+    private static let tools = [["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
     private static let qualities = ["teamwork", "calm under pressure", "attention to detail"]
     private static let summary = """
         I work as head of sound in theatres and on tours. I plan the sound of each production, run the rehearsals and look after the \

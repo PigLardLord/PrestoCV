@@ -601,7 +601,8 @@ extension CVDataSanitizer {
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a technology that names an activity
     /// (`namesAnActivity`); the singular and the plural of one skill count
     /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
-    /// verb, a skill in another language and a soft skill that names a tool go. A technology the verb it starts with leads ("usare i PLC") is
+    /// verb, a skill in another language and a soft skill that names a tool go; so does a technology that names a kind of tool and no
+    /// tool of it (`namesAKindOfTool`). A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
     /// and a soft skill the description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
@@ -658,6 +659,8 @@ extension CVDataSanitizer {
             if !Self.softStems.contains(where: lower.contains) {
                 if Self.namesAnActivity(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                } else if Self.namesAKindOfTool(item, language: language) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
                 } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
@@ -751,6 +754,7 @@ extension CVDataSanitizer {
     /// ending ("docking station", "stazione di saldatura") is no activity. German, whose nouns of actions and of machines share
     /// their endings ("Steuerung"), is not read.
     static func namesAnActivity(_ item: String, language: String?) -> Bool {
+        if language == "de" { return isGermanActivity(item) }
         guard let language, let endings = activityEndings[language] else { return false }
         let words = item.split { !$0.isLetter && !$0.isNumber }.map(String.init)
         guard !words.contains(where: { word in
@@ -764,6 +768,46 @@ extension CVDataSanitizer {
         let modifiers = language == "en" ? lower.dropLast() : lower.dropFirst()
         return isActivity(head) || toolWords.contains(head) && modifiers.contains(where: isActivity)
     }
+
+    /// Whether a German technology of one word is the infinitive of an activity written as a noun ("Messen", "Installieren"; #354,
+    /// round 2): a word of `germanActivities`, or one of more than 7 letters ending in "-ieren".
+    static func isGermanActivity(_ item: String) -> Bool {
+        let words = DescriptionText.normalized(item.replacingOccurrences(of: "ß", with: "ss")).split { !$0.isLetter }.map(String.init)
+        guard words.count == 1, let word = words.first else { return false }
+        return germanActivities.contains(word) || word.count > 7 && word.hasSuffix("ieren")
+    }
+
+    /// German infinitives of the trades' activities, without accents.
+    static let germanActivities: Set<String> = [
+        "messen", "prufen", "bohren", "loten", "schweissen", "verdrahten", "montieren", "schneiden", "planen", "kochen", "backen",
+        "reinigen", "reparieren", "warten", "verlegen", "anschliessen", "einbauen", "frasen", "schleifen",
+    ]
+
+    /// Whether a technology names a kind of tool and no tool of it ("sound design software", "editor de código", "software"; #354,
+    /// round 2): its head noun (the last word in English and German, the first in the other languages) is a word of `toolKinds`,
+    /// and none of its words is a name, an acronym or a number ("Pro Tools", "software CMMS", "aplicativos Android"). In German,
+    /// whose nouns all have a capital, a capital past the first word names nothing.
+    static func namesAKindOfTool(_ item: String, language: String?) -> Bool {
+        let words = item.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let folded = words.map { DescriptionText.normalized($0) }
+        guard let head = ["en", "de"].contains(language ?? "") ? folded.last : folded.first, toolKinds.contains(head) else { return false }
+        return !words.enumerated().contains { index, word in
+            word.count > 1 && word == word.uppercased() && word.contains(where: \.isLetter)
+                || word.dropFirst().contains(where: \.isUppercase)
+                || index > 0 && word.first?.isUppercase == true && language != "de"
+                || word.contains(where: \.isNumber)
+        }
+    }
+
+    /// The nouns of a kind of tool, without accents: a system names a whole of tools ("PA systems") and is none of them.
+    static let toolKinds: Set<String> = [
+        "software", "softwares", "program", "programs", "programma", "programmi", "programa", "programas", "programm", "programme",
+        "application", "applications", "app", "apps", "applicazione", "applicazioni", "aplicacion", "aplicaciones", "aplicacao",
+        "aplicativo", "aplicativos", "anwendung", "anwendungen", "logiciel", "logiciels", "platform", "platforms", "piattaforma",
+        "plataforma", "plataformas", "plattform", "plateforme", "editor", "editors", "editeur", "workstation", "workstations",
+        "tool", "tools", "ferramenta", "ferramentas", "herramienta", "herramientas", "strumento", "strumenti", "outil", "outils",
+        "werkzeug", "werkzeuge",
+    ]
 
     /// The endings of the nouns of an action, by language: "-ing" and "-tion" of English, "-zione" and "-mento" of Italian.
     private static let activityEndings: [String: [String]] = [
