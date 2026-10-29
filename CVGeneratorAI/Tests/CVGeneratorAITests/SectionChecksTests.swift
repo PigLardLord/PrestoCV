@@ -313,6 +313,32 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["a word for a skill", "a word for a skill", "a word for a skill"])
     }
 
+    @Test("A word for knowledge goes from the soft skills; a quality said with it stays (#354, round 2)")
+    func knowledgeIsNoQuality() {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = german.skillCheck(
+            technologies: [], softSkills: ["Wissen", "Verständnis", "Sorgfalt", "Fachwissen", "Verständnis für Kunden"],
+            against: "Feinmechanik, Suhl, 2019."
+        )
+
+        #expect(verdict.softSkills == ["Sorgfalt", "Verständnis für Kunden"])
+        #expect(verdict.dropped.map(\.reason) == ["a word for a skill", "a word for a skill", "a word for a skill"])
+    }
+
+    @Test("Of two soft skills of one quality, care or teamwork, the second goes; qualities of other kinds stay (#354, round 2)")
+    func oneQualityOnce() {
+        let verdict = sanitizer.skillCheck(
+            technologies: [],
+            softSkills: ["precisione", "lavoro di squadra", "attenzione ai dettagli", "affidabilità", "collaborazione", "calma"],
+            against: JobClausesTests.italian
+        )
+
+        #expect(verdict.softSkills == ["precisione", "lavoro di squadra", "affidabilità", "calma"])
+        #expect(verdict.dropped.map(\.sentence) == ["attenzione ai dettagli", "collaborazione"])
+        #expect(Set(verdict.dropped.map(\.reason)) == ["the same quality as an earlier one"])
+    }
+
     @Test("A soft skill whose head noun is a tool goes; one that only starts with a tool word stays (#354)",
           arguments: [
               ("de", "Präzisionswerkzeug", false), ("de", "Systemdenken", true), ("de", "Sorgfalt", true),

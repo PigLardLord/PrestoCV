@@ -218,6 +218,7 @@ final class SectionDraft {
         "fragment": "not a whole name", "another language": "in another language", "a tool": "a tool, not a quality",
         "a name": "a name, not a quality", "same kind as an earlier tool": "a tool of a kind already listed",
         "a kind of tool, not its name": "a kind of tool, not the name of one",
+        "the same quality as an earlier one": "the same quality as one listed",
     ]
 
     private func keep(_ skills: CVDataSanitizer.SkillVerdict) {

@@ -690,16 +690,48 @@ extension CVDataSanitizer {
             }
             verdict.softSkills.append(item)
         }
+        let qualities = Self.oneOfEachQuality(verdict.softSkills)
+        verdict.softSkills = qualities.kept
+        verdict.dropped += qualities.dropped
         return verdict
     }
 
-    /// The words that name a skill and no skill ("compétence", "skills"), without accents: alone, they are no quality (#354).
+    /// The words that name a skill or a knowledge and no skill ("compétence", "skills", "Wissen"), without accents: alone, they are
+    /// no quality (#354).
     static let skillWords: Set<String> = [
         "skill", "skills", "ability", "abilities", "competence", "competences", "competencies", "competenza", "competenze", "abilita",
         "capacita", "kompetenz", "kompetenzen", "fahigkeit", "fahigkeiten", "competencia", "competencias", "habilidad",
         "habilidades", "capacidad", "capacidades", "capacite", "capacites", "aptitude", "aptitudes", "habilidade", "capacidade",
         "soft skill", "soft skills", "qualita", "qualities", "quality",
+        "knowledge", "understanding", "expertise", "wissen", "verstandnis", "kenntnis", "kenntnisse", "fachwissen", "conoscenza",
+        "conoscenze", "comprensione", "conocimiento", "conocimientos", "comprension", "connaissance", "connaissances",
+        "comprehension", "conhecimento", "conhecimentos", "compreensao",
     ]
+
+    /// The beginnings of the words of one quality, by quality: two soft skills with a word of one group say one quality twice
+    /// ("precisione", "attenzione ai dettagli"; #354, round 2).
+    static let qualityGroups: [[String]] = [
+        ["precis", "präzis", "prazis", "attent", "attenz", "atenc", "atenç", "accura", "genau", "sorgf", "exact", "rigor",
+         "rigueur", "meticul", "minuz", "esmero", "cuidad"],
+        ["teamw", "teamf", "collab", "colab", "coope", "zusammenarb", "squadra", "equipo", "équipe", "equipe"],
+    ]
+
+    /// The soft skills without the second of one quality (`qualityGroups`), and those dropped, with the reason.
+    static func oneOfEachQuality(_ softSkills: [String]) -> (kept: [String], dropped: [Rejection]) {
+        var seen = Set<Int>()
+        var kept: [String] = []
+        var dropped: [Rejection] = []
+        for skill in softSkills {
+            let words = skill.lowercased().split { !$0.isLetter }.map(String.init)
+            let group = qualityGroups.indices.first { group in words.contains { word in qualityGroups[group].contains(where: word.hasPrefix) } }
+            if let group, !seen.insert(group).inserted {
+                dropped.append(Rejection(sentence: skill, reason: "the same quality as an earlier one"))
+            } else {
+                kept.append(skill)
+            }
+        }
+        return (kept, dropped)
+    }
 
     /// The most words of a skill: a longer one is a clause ("edit the sound effects for the shows"), not the name of a skill.
     static let mostSkillWords = 4
