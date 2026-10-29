@@ -73,6 +73,34 @@ struct DraftingReaderTests {
         ])
     }
 
+    @Test("A summary sentence past the opening with no word of the description, the titles, the duties or the skills is counted; one with a word of the work is not (#354, round 4)")
+    func unanchoredSummary() {
+        let cv = CVData(
+            personalInfo: PersonalInfo(title: "lock keeper"),
+            summary: "I work as a lock keeper. I grease every gate before the barges arrive. "
+                + "I guarantee every action follows the established pattern with deliberate intention.",
+            experience: [Experience(title: "lock keeper", company: "Brindle Canal", description: "I grease the gates of the lock.")]
+        )
+
+        #expect(Self.reader(cv, "en").filter { $0.kind == .unanchoredSummary }.map(\.value) == [
+            "I guarantee every action follows the established pattern with deliberate intention.",
+        ])
+    }
+
+    @Test("A German separable verb split at the end of a subordinate clause is counted; one split in a main clause, or joined, is not (#354, round 4)")
+    func splitSeparableVerb() {
+        let cv = CVData(
+            summary: "Ich arbeite als Schleusenwärter. Ich achte darauf, dass ich die Funktion der Tore sicher stelle. "
+                + "Ich öle die Tore, bevor die Kähne ein fahren.",
+            experience: [Experience(
+                title: "Schleusenwärter", company: "Kanal Brindle",
+                description: "Ich stelle die Funktion der Tore sicher. Ich prüfe, ob die Schleuse richtig zumacht."
+            )]
+        )
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .splitVerb }.map(\.value) == ["sicher stelle", "ein fahren"])
+    }
+
     // MARK: Skills
 
     @Test("A soft skill that is an empty word of experience or of being a professional is counted; a quality and the word for a skill are not")
@@ -104,6 +132,22 @@ struct DraftingReaderTests {
 
         #expect(counted(["follow spot rig", "lighting rig", "audio distribution box"], sound).isEmpty)
         #expect(counted(["SAP", "pallet jack", "safety harness", "load balancer"], warehouse) == ["safety harness", "load balancer"])
+    }
+
+    @Test("Stationery and a quantity are no tools of a trade; a digital board, learning software, a terminal and a code editor are (#354, round 4)")
+    func everydayThingsAreOffTrade() throws {
+        let teacher = try #require(try DraftingInputs.examples().first { $0.id == "example-fr" })
+        let programmer = try #require(DraftingInputs.written.first { $0.id == "pt-traps" })
+        let sound = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let counted = { (names: [String], input: DraftingInput) in
+            let cv = CVData(skills: names.map { Skill(name: $0) })
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .offTradeTechnology }.map(\.value)
+        }
+
+        #expect(counted(["tableau numérique", "logiciel d'apprentissage", "cahiers", "stylo"], teacher) == ["cahiers", "stylo"])
+        #expect(counted(["terminal", "editor de código", "codec", "sensor"], programmer) == ["codec", "sensor"])
+        #expect(counted(["lighting rig", "truck load"], sound) == ["truck load"])
     }
 
     @Test("A part the electrician installs is no tool of the trade; a measuring tool is one")

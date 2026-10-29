@@ -91,6 +91,13 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A summary sentence of three clauses or more joined by semicolons ("I manage the flow; I ensure …; I adapt …."; #354, round
     /// 3, at 0608938b).
     case chainedSummary
+    /// A summary sentence past the opening with no word of five letters or more in common with the description, the kept titles,
+    /// the duties or the skills: a sentence of the person's work that says none of it ("I guarantee every action follows the
+    /// established pattern"; #354, round 4, at d1d09c81).
+    case unanchoredSummary
+    /// A German separable verb written apart at the end of a subordinate clause, where it is one word ("dass ich … sicher stelle";
+    /// #354, round 4, at d1d09c81), in the summary or a job's description.
+    case splitVerb
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -128,6 +135,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .emptySoftSkill: "an empty word as a soft skill"
         case .stepVsFinalPinned: "a short job with a pinned duty it does not hold"
         case .chainedSummary: "a summary sentence of clauses joined by semicolons"
+        case .unanchoredSummary: "a summary sentence with no word of the work"
+        case .splitVerb: "a German separable verb split in a subordinate clause"
         }
     }
 }
@@ -215,6 +224,10 @@ enum ReaderRules {
             found.append(ReaderFinding(kind: .bareInterest, path: "interests[\(index)]", value: interest))
         }
         found += shortDescribedJobs(in: cv, for: input)
+        if language == "de" {
+            let texts = [("summary", cv.summary ?? "")] + cv.experience.enumerated().map { ("experience[\($0).description", $1.description ?? "") }
+            found += texts.flatMap { path, text in splitVerbs(in: text).map { ReaderFinding(kind: .splitVerb, path: path, value: $0) } }
+        }
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         found += report.lost.filter { [.duty, .quality].contains($0.kind) }
             .map { ReaderFinding(kind: .unwrittenStatement, path: $0.kind.rawValue, value: $0.forms[0]) }
@@ -440,6 +453,10 @@ enum ReaderRules {
         let qualities = cv.skills.filter { $0.kind == .softSkill }.map { letterWords(of: $0.name) }.filter { !$0.isEmpty }
         found += sentences.filter { hasQualitySubject($0, qualities: qualities) }
             .map { ReaderFinding(kind: .qualitySubjectSummary, path: "summary", value: $0) }
+        let anchors = anchorStems(of: [input.description, cv.personalInfo.title ?? ""] + cv.experience.map(\.title)
+            + cv.experience.map { $0.description ?? "" } + cv.skills.map(\.name))
+        found += sentences.dropFirst().filter { anchorStems(of: [$0]).isDisjoint(with: anchors) }
+            .map { ReaderFinding(kind: .unanchoredSummary, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -450,6 +467,43 @@ enum ReaderRules {
         }
         return found
     }
+
+    /// The first five letters of the words of five letters or more of `texts` that say nothing of a work ("every", "always",
+    /// "sempre"): what a summary sentence shares with the work it is about.
+    static func anchorStems(of texts: [String]) -> Set<String> {
+        Set(texts.flatMap(letterWords(of:)).filter { $0.count >= 5 && !commonWords.contains($0) }.map { String($0.prefix(5)) })
+    }
+
+    /// Words of five letters or more of any text, folded.
+    private static let commonWords: Set<String> = [
+        "every", "their", "there", "which", "while", "where", "these", "those", "about", "after", "before", "other", "always",
+        "being", "ensure", "ensures", "della", "delle", "degli", "dello", "nella", "nelle", "negli", "sulla", "sulle", "sempre",
+        "molto", "grande", "grandi", "mentre", "quando", "stato", "stata", "essere", "avere", "tutti", "tutte", "tutto", "costante",
+        "constant", "consistent", "chaque", "leurs", "toute", "toutes", "faire", "avoir", "einer", "einem", "einen", "eines",
+        "jeden", "jedes", "immer", "durch", "nicht", "sowie", "wobei", "damit", "dabei", "indem", "siempre", "entre", "sobre",
+        "desde", "hasta", "mediante", "todos", "todas", "muito",
+    ]
+
+    /// The separable verbs of German written apart at the end of a subordinate clause ("dass ich die Leitungen sicher stelle"): a
+    /// clause with a subordinating word whose last two words are a verb particle and a finite verb. In a main clause the particle
+    /// ends the clause apart ("Ich stelle die Funktion sicher"), and is no finding.
+    static func splitVerbs(in text: String) -> [String] {
+        text.split { ",;.!?".contains($0) }.compactMap { clause in
+            let words = letterWords(of: String(clause))
+            guard words.count >= 3, !subordinators.isDisjoint(with: words), let verb = words.last, verb.count >= 4,
+                  verbParticles.contains(words[words.count - 2]), ["e", "t", "en", "st"].contains(where: verb.hasSuffix) else { return nil }
+            return words.suffix(2).joined(separator: " ")
+        }
+    }
+
+    private static let subordinators: Set<String> = [
+        "dass", "weil", "wenn", "indem", "ob", "damit", "als", "wobei", "sodass", "nachdem", "bevor", "wahrend", "obwohl", "falls",
+    ]
+
+    private static let verbParticles: Set<String> = [
+        "sicher", "fest", "her", "dar", "an", "auf", "aus", "ein", "mit", "vor", "zuruck", "fort", "weiter", "bereit",
+        "instand", "statt", "teil", "nach", "ab", "zusammen", "vorbei", "hin", "los",
+    ]
 
     /// Whether `sentence` starts with the words of a soft skill of the draft, or with a word for a quality at work, in a clause of
     /// five words or more: a quality spoken of as the subject, not the person speaking. A quality that opens a sentence before a

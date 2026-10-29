@@ -149,7 +149,8 @@ enum DraftingInputs {
 
     /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354,
     /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
-    /// The list is the reader's, independent of the rules of the draft.
+    /// The list is the reader's, independent of the rules of the draft: no stationery a person of any trade uses ("cahiers"), and
+    /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4).
     static let vocabularies: [String: [String]] = [
         "jobs-en": [
             "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
@@ -178,19 +179,20 @@ enum DraftingInputs {
         "de-plain": [
             "Multimeter", "Spannungsprüfer", "Duspol", "Isolationsmessgerät", "Installationstester", "Schaltschrank", "Verteiler",
             "Sicherungskasten", "Abisolierzange", "Crimpzange", "Seitenschneider", "Kabelschere", "Bohrhammer", "Akkuschrauber",
-            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme",
+            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme", "Steuerungssystem", "Messgerät",
         ],
         "es-traps": [
             "Excel", "Word", "ContaPlus", "A3", "Sage", "Holded", "Factusol", "hoja de cálculo", "base de datos", "calculadora",
-            "banca electrónica",
+            "banca electrónica", "software de contabilidad", "sistema de gestión contable",
         ],
         "pt-traps": [
             "Git", "GitHub", "GitLab", "Visual Studio Code", "Android Studio", "JavaScript", "TypeScript", "React", "Node.js", "PHP",
-            "Python", "SQL", "PostgreSQL", "MySQL", "Docker", "Figma", "Postman", "Jira",
+            "Python", "SQL", "PostgreSQL", "MySQL", "Docker", "Figma", "Postman", "Jira", "terminal", "editor de código", "IDE",
+            "plataforma de teste",
         ],
         "example-fr": [
             "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
-            "tableau", "cahiers", "ENT", "logiciels éducatifs", "matériel de manipulation",
+            "tableau", "ENT", "logiciels éducatifs", "matériel de manipulation", "tableau numérique", "logiciel d'apprentissage",
         ],
     ]
 
