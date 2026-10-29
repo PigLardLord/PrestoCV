@@ -370,6 +370,21 @@ struct SectionChecksTests {
         #expect(written.kept == ["Registravo le fatture dei clienti.", "Controllavo i pagamenti dei fornitori."])
     }
 
+    @Test("An infinitive duty of an ended job takes the past its earlier duties use: the compound past after Ho, the imperfect otherwise (#354, round 12)")
+    func pastOfAnInfinitiveDuty() throws {
+        let compound = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Ho controllato i pagamenti dei fornitori. Registrare le fatture dei clienti.",
+            against: Self.clerk
+        )
+        let imperfect = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Controllavo i pagamenti dei fornitori. Registrare le fatture dei clienti.",
+            against: Self.clerk
+        )
+
+        #expect(compound.kept == ["Ho controllato i pagamenti dei fornitori.", "Ho registrato le fatture dei clienti."])
+        #expect(imperfect.kept == ["Controllavo i pagamenti dei fornitori.", "Registravo le fatture dei clienti."])
+    }
+
     @Test("An ended job's duty in the present goes after one in the past; the current job's duties in the present stay (#354)")
     func tenseOfAnEndedJob() throws {
         let duties = "Controllavo i pagamenti dei fornitori. Registro le fatture dei clienti. Preparavo i documenti per la banca."

@@ -175,6 +175,7 @@ extension CVDataSanitizer {
                     raw.trimmingCharacters(in: .whitespacesAndNewlines), current: current, language: language, wordList: wordList
                 )
                 guard !sentence.isEmpty else { continue }
+                if !current { sentence = FirstPersonDuty.inThePast(of: held, sentence, language: language, wordList: wordList) }
                 // A count the person gave in digits that the model wrote in words is the person's: a sentence that goes for it is
                 // written as they wrote it, and stays (#354, round 6). Another count still goes.
                 let counted = WrittenTextWords.inDigits(sentence, language: language)

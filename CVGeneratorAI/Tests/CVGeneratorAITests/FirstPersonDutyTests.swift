@@ -68,6 +68,21 @@ struct FirstPersonDutyTests {
         ) == "Criar um sistema para os pedidos.")
     }
 
+    @Test("An imperfect duty takes the compound past in Italian and the perfect in Portuguese when the job's earlier duties use it; any other duty, or a form the word list does not know, keeps its words (#354, round 12)")
+    func pastOfTheHeldDuties() {
+        #expect(FirstPersonDuty.inThePast(of: ["Ho riparato le pompe."], "Preparavo le bolle e controllavo i carichi.", language: .italian, wordList: words)
+            == "Ho preparato le bolle e controllato i carichi.")
+        #expect(FirstPersonDuty.inThePast(of: ["Riparavo le pompe."], "Preparavo le bolle.", language: .italian, wordList: words)
+            == "Preparavo le bolle.")
+        #expect(FirstPersonDuty.inThePast(of: ["Reparei as bombas."], "Revisava as notas e organizava o arquivo.", language: .portuguese, wordList: words)
+            == "Revisei as notas e organizei o arquivo.")
+        #expect(FirstPersonDuty.inThePast(of: ["Ho riparato le pompe."], "Leggevo i contatori.", language: .italian, wordList: words)
+            == "Leggevo i contatori.")
+        #expect(FirstPersonDuty.inThePast(
+            of: ["Ho riparato le pompe."], "Preparavo le bolle.", language: .italian, wordList: TableWordList(names: ["preparato"])
+        ) == "Preparavo le bolle.")
+    }
+
     @Test("A duty in the first person only gets its capital letter")
     func firstPersonKept() {
         #expect(FirstPersonDuty.written("gestisco le fatture dei fornitori.", current: true, language: .italian, wordList: words)
