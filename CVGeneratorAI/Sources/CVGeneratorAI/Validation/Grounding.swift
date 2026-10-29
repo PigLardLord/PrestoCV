@@ -784,6 +784,43 @@ extension Grounding {
         return String(head).uppercased() + text.dropFirst() + "."
     }
 
+    /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): "I mix on
+    /// digital consoles and edit the sound effects for the shows.", "Sono preciso e mi piace lavorare in squadra." Each clause of
+    /// them speaks for the person, belongs to no job, names no entry and gives no link or capitalised word of the person's name,
+    /// place or title, one of them claims something, and the sentence holds no number and no word of wish, doubt, future or search
+    /// ("I am now looking for a technical manager role"): the skills requests read them, which no job's request reads.
+    func ownSentences() -> [String] {
+        let language = explainer.language
+        let personWords = Set(reading.ofPerson.flatMap { $0 })
+        let bySentence = Dictionary(grouping: clauses.places, by: \.sentence)
+        return bySentence.keys.sorted().compactMap { sentence -> String? in
+            let places = bySentence[sentence, default: []].sorted { $0.clause < $1.clause }
+            let words = places.flatMap { clauses.clause(at: $0).words }
+            guard !places.isEmpty, Vocabulary.modality(in: words, language: language).isEmpty,
+                  !words.contains(where: { Self.searchWords.contains($0.folded) || $0.isNumber }),
+                  // A clause that names the person ("Je suis Maria Rossi") or gives a link says nothing of their work.
+                  places.allSatisfy({ place in
+                      let clause = clauses.clause(at: place)
+                      return clause.links.isEmpty && !clause.words.indices.dropFirst().contains { i in
+                          personWords.contains(clause.words[i].folded) && clause.isCapitalised(i)
+                      }
+                  }),
+                  places.contains(where: { !reading.claimedWords(at: $0).isEmpty }),
+                  places.allSatisfy({ place in
+                      reading.speaks(at: place) && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
+                  }) else { return nil }
+            let text = places.map { clauses.clause(at: $0).source }.joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+            return text.isEmpty ? nil : text
+        }
+    }
+
+    /// The words that say the person looks for something, in the six languages: what follows is no work of theirs.
+    private static let searchWords: Set<String> = [
+        "looking", "seeking", "searching", "cerco", "cercando", "suche", "suchen", "busco", "buscando", "procuro", "procurando",
+        "cherche", "recherche",
+    ]
+
     /// The first clause that speaks for the person, starts its sentence, names no entry and belongs to no job: what the
     /// person says their field is ("I have worked in live sound for theatres").
     func fieldClause() -> String? {

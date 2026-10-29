@@ -354,6 +354,39 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .clauseAsInterest }.isEmpty)
     }
 
+    @Test("A duty or a quality the person states and no job description or skill holds is counted; one a skill or a description holds is not (#354, round 1)")
+    func unwrittenStatement() throws {
+        let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
+        let unwritten = { (cv: CVData, input: DraftingInput) in
+            ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .unwrittenStatement }.map(\.value)
+        }
+        let missing = CVData(
+            experience: [Experience(title: "head of sound", company: "Orchard Lane Theatre", description: "I plan the sound design.")],
+            skills: [Skill(name: "digital consoles"), Skill(name: "calm under pressure", kind: .softSkill)]
+        )
+        let held = CVData(
+            experience: [Experience(title: "head of sound", company: "Orchard Lane Theatre", description: "I plan the sound design.")],
+            skills: [
+                Skill(name: "digital consoles"), Skill(name: "sound effects editing"), Skill(name: "stress resistance under pressure", kind: .softSkill),
+                Skill(name: "collaboration with directors", kind: .softSkill),
+            ]
+        )
+        let described = CVData(
+            experience: [Experience(
+                title: "capoturno della manutenzione", company: "Birrificio Valtrigno",
+                description: "Leggo gli schemi elettrici e uso i PLC per trovare i guasti."
+            )],
+            skills: [Skill(name: "PLC"), Skill(name: "lavoro di squadra", kind: .softSkill)]
+        )
+
+        #expect(unwritten(missing, english) == ["sound effects", "working closely with directors"])
+        #expect(unwritten(held, english).isEmpty)
+        #expect(unwritten(described, italian).isEmpty)
+        #expect(unwritten(CVData(skills: [Skill(name: "PLC")]), italian) == ["schemi elettrici", "trovare i guasti", "lavorare in squadra"])
+    }
+
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])

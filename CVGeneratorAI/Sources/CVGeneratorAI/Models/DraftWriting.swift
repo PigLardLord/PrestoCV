@@ -36,6 +36,9 @@ public struct DraftBrief: Equatable, Sendable {
     public let studies: [String]
     /// The skills the person named, which the second pass does not repeat.
     public let namedSkills: [String]
+    /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): the
+    /// skills requests read them.
+    public var own: [String] = []
 
     public init(language: String, headline: String?, roles: [Role], studies: [String], namedSkills: [String]) {
         self.language = language

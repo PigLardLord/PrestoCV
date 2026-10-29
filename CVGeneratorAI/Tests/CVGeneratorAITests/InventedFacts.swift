@@ -287,7 +287,9 @@ enum InventedFacts {
         private let named: [(kind: ExpectedFact.Kind, words: [String])]
 
         init(cv: CVData, facts: [ExpectedFact]) {
-            var named = facts.flatMap { fact in fact.forms.map { (kind: fact.kind, words: InventedFacts.words(of: $0)) } }
+            // A duty or a quality is no name: a skill may hold its words.
+            var named = facts.filter { ![.duty, .quality].contains($0.kind) }
+                .flatMap { fact in fact.forms.map { (kind: fact.kind, words: InventedFacts.words(of: $0)) } }
             named.append((.name, InventedFacts.words(of: cv.personalInfo.name ?? "")))
             named.append((.title, InventedFacts.words(of: cv.personalInfo.title ?? "")))
             named += cv.experience.flatMap { [(kind: ExpectedFact.Kind.employer, words: InventedFacts.words(of: $0.company)),
@@ -1031,7 +1033,8 @@ enum InventedFacts {
         case .employer: ["experience.company"]
         case .school: ["education.institution"]
         case .language: ["languages.name"]
-        case .skill: ["skills.name"]
+        case .skill, .quality: ["skills.name"]
+        case .duty: ["experience.description", "skills.name"]
         }
         let forms = fact.forms.map(words(of:))
         return zip(leaves, findings).compactMap { leaf, finding in

@@ -131,6 +131,24 @@ struct SectionChecksTests {
         #expect(context.jobs[3].clauses.contains { $0.contains("coordino tre tecnici") })
     }
 
+    @Test("The sentences in which the person says what they do and what they are like, with no job, reach the skills; a search, a job's sentence and a number do not (#354, round 1)")
+    func ownSentences() throws {
+        let description = JobClausesTests.italian + """
+
+            Leggo gli schemi elettrici e pneumatici e uso i PLC per trovare i guasti.
+            Sono preciso e mi piace lavorare in squadra.
+            Cerco un posto da responsabile della manutenzione in un'azienda più grande.
+            Seguo 3 linee di imbottigliamento.
+            """
+
+        let context = try sanitizer.draftContext(of: Self.italianJobs, against: description)
+
+        #expect(context.own.contains("Leggo gli schemi elettrici e pneumatici e uso i PLC per trovare i guasti."))
+        #expect(context.own.contains("Sono preciso e mi piace lavorare in squadra."))
+        #expect(!context.own.contains { $0.contains("Cerco") || $0.contains("imbottigliamento") || $0.contains("Valtrigno") })
+        #expect(!context.own.contains { $0.contains("Pastificio") || $0.contains("Albarella") })
+    }
+
     // MARK: The skills
 
     @Test("A quality listed as a tool is a soft skill, and a tool named by an activity goes, even when the tagger reads its first word as a verb")

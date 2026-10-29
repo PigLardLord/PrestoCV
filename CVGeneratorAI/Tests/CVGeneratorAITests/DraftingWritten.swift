@@ -210,6 +210,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An interest of one noun that the description says after a verb in its infinitive form ("football" of "I play football"): the
     /// pastime's phrase without its verb (#354, round 1).
     case bareInterest
+    /// A duty or a quality the person states that no job description and no skill of the draft holds (`ExpectedFact.duty`,
+    /// `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra" (#354, round 1).
+    case unwrittenStatement
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -233,6 +236,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .toolAsSoftSkill: "a tool as a soft skill"
         case .thirdPersonSummary: "a summary in the third person"
         case .bareInterest: "an interest without the verb of its phrase"
+        case .unwrittenStatement: "a stated duty or quality the draft does not hold"
         }
     }
 }
@@ -309,6 +313,8 @@ enum ReaderRules {
             found.append(ReaderFinding(kind: .bareInterest, path: "interests[\(index)]", value: interest))
         }
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
+        found += report.lost.filter { [.duty, .quality].contains($0.kind) }
+            .map { ReaderFinding(kind: .unwrittenStatement, path: $0.kind.rawValue, value: $0.forms[0]) }
         return found
     }
 

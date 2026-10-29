@@ -5,6 +5,11 @@ import Testing
 struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
     enum Kind: String, Codable, CaseIterable, Sendable {
         case name, title, employer, school, language, skill
+        /// A duty the person states in no job's sentence ("I mix on digital consoles"): kept by a job's description or a skill
+        /// (#354, round 1).
+        case duty
+        /// A quality the person states of themselves ("calm under pressure"): kept by a skill.
+        case quality
     }
 
     let kind: Kind
@@ -19,6 +24,8 @@ struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvert
     static func school(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .school, forms: forms) }
     static func language(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .language, forms: forms) }
     static func skill(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .skill, forms: forms) }
+    static func duty(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .duty, forms: forms) }
+    static func quality(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .quality, forms: forms) }
 }
 
 /// A description the drafting evaluation gives the model, with what a faithful draft of it keeps and must not hold.
@@ -495,6 +502,8 @@ enum DraftingInputs {
                 .title("head of sound"), .title("sound technician"), .title("stagehand"),
                 .employer("Fenwick Playhouse", "Fenwick"), .employer("Brightwater Events", "Brightwater"),
                 .employer("Copperfield Arena", "Copperfield"), .employer("Orchard Lane Theatre", "Orchard Lane"),
+                .duty("digital consoles"), .duty("sound effects"), .quality("calm under pressure", "pressure", "calm"),
+                .quality("working closely with directors", "directors"),
             ],
             traps: ["technical manager"]
         ),
@@ -514,7 +523,8 @@ enum DraftingInputs {
                 .title("capoturno della manutenzione", "capoturno"), .title("manutentore elettromeccanico"),
                 .title("operaio manutentore"), .employer("Conserve Albarella", "Albarella"),
                 .employer("Pastificio Cerreto", "Cerreto"), .employer("Molino Fontebasso", "Fontebasso"),
-                .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"),
+                .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"), .duty("schemi elettrici", "schemi"),
+                .duty("trovare i guasti", "guasti"), .quality("lavorare in squadra", "squadra"),
             ],
             traps: ["responsabile della manutenzione"]
         ),

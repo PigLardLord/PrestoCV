@@ -153,6 +153,26 @@ struct SectionPromptsTests {
         #expect(!toolsOnly.contains("Already listed"))
     }
 
+    @Test("The skills requests read what the person says of their work with no job, and put the person's own tools and qualities first (#354, round 1)")
+    func ownSentencesInTheSkillsRequests() {
+        var brief = Self.brief
+        brief.own = ["Leggo gli schemi elettrici e uso i PLC per trovare i guasti.", "Sono preciso e mi piace lavorare in squadra."]
+        let said = """
+            What the person says of their work, with no job:
+            - Leggo gli schemi elettrici e uso i PLC per trovare i guasti.
+            - Sono preciso e mi piace lavorare in squadra.
+            """
+
+        for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
+                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, excluding: []).text] {
+            #expect(text.contains(said), "\(text)")
+        }
+        #expect(!SectionPrompts.tools(for: Self.brief).text.contains("with no job"))
+        #expect(SectionPrompts.toolsInstructions.contains("First the tools the person names"))
+        #expect(SectionPrompts.softSkillsInstructions.contains("First the qualities the person says of themselves"))
+        #expect(SectionPrompts.moreSkillsInstructions.contains("First those the person names"))
+    }
+
     @Test("No rule of the skills quotes a word: the model copies a quoted example into drafts of other trades (#354)")
     func skillRulesQuoteNoWord() {
         for instructions in [SectionPrompts.toolsInstructions, SectionPrompts.softSkillsInstructions, SectionPrompts.moreSkillsInstructions] {

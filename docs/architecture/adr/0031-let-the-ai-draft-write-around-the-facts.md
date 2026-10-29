@@ -74,6 +74,7 @@ A streamed answer cut by its cap keeps its whole parts (`StreamedAnswer`), as th
 
 **The first measured fix round (#354).** Each class the reader found is first a measure of the evaluation (`ReaderRules`, a class with no threshold), then fixed at its root:
 - **An interest keeps the verb of its phrase.** An interest said with a verb in the form of its infinitive stays whole ("play football", "bake bread", "hiking in the Alps", "wandern gehen"); only a conjugated verb first goes ("spiele Schach" is "Schach"), by its ending (`CVDataSanitizer.isConjugated`). Measure: an interest of one noun said right after a verb that is not inflected (`bareInterest`).
+- **What the person says of their work with no job reaches the skills requests.** A sentence that names no employer belongs to no job (the attribution is per sentence), so the duties and qualities it states reached no request. Such a sentence of the person's own (no wish, no search, no number, no name, no other person) is now given to the requests for technologies, soft skills and more skills, which take what it names first (`Entries.ownSentences`). No rule of the facts changes. Measure: a stated duty or quality, an expected fact of the input (`ExpectedFact.Kind.duty`, `.quality`), that no description and no skill holds (`unwrittenStatement`).
 
 ### What it supersedes
 

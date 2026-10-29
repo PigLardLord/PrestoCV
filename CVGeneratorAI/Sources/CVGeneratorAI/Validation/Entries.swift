@@ -116,6 +116,9 @@ struct Entries {
     /// The clause that says the person's field (`Grounding.fieldClause`).
     func fieldClause() -> String? { grounding.fieldClause() }
 
+    /// The sentences in which the person says what they do and what they are like, with no job (`Grounding.ownSentences`).
+    func ownSentences() -> [String] { grounding.ownSentences() }
+
     func evidence(of subject: Int) -> EntryEvidence {
         grounding.evidence(of: subject)
     }

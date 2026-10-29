@@ -19,6 +19,9 @@ extension CVDataSanitizer {
         /// One for one with the jobs that `sanitize(cvData, against: description)` keeps, in their order.
         let jobs: [Job]
         let field: String?
+        /// The sentences in which the person says what they do and what they are like at work, with no job: the skills requests
+        /// read them (#354, round 1).
+        var own: [String] = []
     }
 
     func draftContext(of cvData: CVData, against description: String) throws(CVGenerationError) -> DraftContext {
@@ -28,7 +31,7 @@ extension CVDataSanitizer {
                 guard let index = entries.jobs.firstIndex(where: { $0.subject == kept.job.subject }) else { return nil }
                 return DraftContext.Job(job: index, clauses: entries.evidence(of: kept.job.subject).context)
             }
-            return DraftContext(jobs: jobs, field: entries.fieldClause())
+            return DraftContext(jobs: jobs, field: entries.fieldClause(), own: entries.ownSentences())
         }
     }
 

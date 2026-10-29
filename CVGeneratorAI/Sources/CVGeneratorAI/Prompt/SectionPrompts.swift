@@ -63,7 +63,7 @@ enum SectionPrompts {
 
     /// The tools request: 2 or 3 tools of the trade for each job, in order.
     static func tools(for brief: DraftBrief) -> Prompt {
-        var lines = header(brief) + headline(brief) + [jobList(brief)]
+        var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if !brief.namedSkills.isEmpty { lines.append("Skills already listed: " + brief.namedSkills.joined(separator: "; ")) }
         return Prompt(instructions: toolsInstructions, text: lines.joined(separator: "\n"))
     }
@@ -73,6 +73,8 @@ enum SectionPrompts {
         another kind. \
         Write in the language named on the first line.
         - job: the job's title as written.
+        - First the tools the person names in what they say of their work with no job, under the job they fit, as the person \
+        names them; then those of the trade.
         - tools: the specific equipment, machines, software or methods a CV of that trade lists, 1 to 3 words each; no material, \
         part or supply, no everyday object a person of any trade uses; no personal quality, no activity, no level, none of the \
         skills already listed.
@@ -80,17 +82,20 @@ enum SectionPrompts {
 
     /// The soft skills request.
     static func softSkills(for brief: DraftBrief) -> Prompt {
-        Prompt(instructions: softSkillsInstructions, text: (header(brief) + headline(brief) + [jobList(brief)]).joined(separator: "\n"))
+        Prompt(
+            instructions: softSkillsInstructions, text: (header(brief) + headline(brief) + [jobList(brief)] + said(brief)).joined(separator: "\n")
+        )
     }
 
     static let softSkillsInstructions = """
         You name 3 to 5 personal qualities at work that fit the person's jobs, as nouns of 1 to 3 words. Write in the language named \
-        on the first line. No tool, no technique, no level.
+        on the first line. No tool, no technique, no level. First the qualities the person says of themselves, as nouns; then \
+        those that fit the jobs.
         """
 
     /// The request for the skills a draft still misses: `tools` more tools and `qualities` more qualities, none of `kept`.
     static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String]) -> Prompt {
-        var lines = header(brief) + headline(brief) + [jobList(brief)]
+        var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if tools > 0 {
             lines.append("Name \(tools) more tools, machines, software or techniques of the trade, each of another kind than those listed.")
         }
@@ -102,6 +107,7 @@ enum SectionPrompts {
     static let moreSkillsInstructions = """
         You add skills to a CV, for the person's trade. Write in the language named on the first line.
         - Nouns of 1 to 3 words; no level, no activity, none of those already listed.
+        - First those the person names in what they say of their work with no job; then those of the trade.
         """
 
     // MARK: The summary
@@ -177,6 +183,11 @@ enum SectionPrompts {
             "\(index + 1). " + roleLine(role, employer: false, standIn: brief.headline)
                 + (role.clauses.isEmpty ? "" : "\n   " + role.clauses.map(asSentence).joined(separator: " "))
         }.joined(separator: "\n")
+    }
+
+    /// What the person says of their work with no job (`DraftBrief.own`), which the skills requests read: none when they say none.
+    private static func said(_ brief: DraftBrief) -> [String] {
+        brief.own.isEmpty ? [] : ["What the person says of their work, with no job:\n" + bullets(brief.own.map(asSentence))]
     }
 
     private static func bullets(_ lines: [String]) -> String {
