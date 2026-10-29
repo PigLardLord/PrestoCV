@@ -744,6 +744,23 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasABareSubject) == !stays, "\(verdict.rejected)")
     }
 
+    @Test("A German summary sentence whose clause after dass, weil or ob puts its verb before the end goes; one with the verb last, or with a comparison after it, stays (#354, round 5)",
+          arguments: [
+              ("Ich achte darauf, dass alle Maschinen der Halle sauber laufen.", true),
+              ("Ich achte darauf, dass alle Maschinen laufen ruhig durch genaue Pflege der Lager.", false),
+              ("Ich pflege die Maschinen gern, weil jede Anlage läuft durch gute Pflege der Lager.", false),
+              ("Ich sorge dafür, dass jede Maschine läuft wie am ersten Tag.", true),
+          ])
+    func germanVerbBeforeTheEnd(sentence: String, stays: Bool) throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("Mechaniker", "Spulerei Wendt", from: "2016")])
+        let description = "Ich wohne in Gera. Seit 2016 arbeite ich als Mechaniker bei der Spulerei Wendt, wo ich die Maschinen der Halle pflege."
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.putsTheVerbBeforeTheEnd) == !stays, "\(verdict.rejected)")
+    }
+
     @Test("A summary sentence of a bare word of the work joined by its language's with to qualities, and no verb, goes; one with a verb of the person stays (#354, round 3)",
           arguments: [
               ("es", "Contable con gran ojo para el detalle y mucha calma.", false), ("it", "Contable con occhio per i dettagli e calma.", false),

@@ -569,6 +569,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
                 } else if let language, Self.isAFragment(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
+                } else if language == .german, Self.putsTheVerbBeforeTheEnd(sentence) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.putsTheVerbBeforeTheEnd))
                 } else if Self.hasAQualitySubject(sentence, qualities: qualityWords) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasAQualitySubject))
                 } else if Self.listsSkills(sentence, skills: skillWords) {
@@ -643,6 +645,21 @@ extension CVDataSanitizer {
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
     static let hasAQualitySubject = "its subject is a quality: write it as the person, with what they do and how"
     static let hasNoVerb = "it has no verb: write it as the person, with what they do"
+    static let putsTheVerbBeforeTheEnd = "the verb of a clause after dass, weil or ob comes last: write it at the end of that clause"
+
+    /// Whether a German sentence has a clause after dass, weil, sodass or ob whose verb stands before its end: the clause ends on a
+    /// noun while an earlier lowercase word of four letters or more ends as a verb ("dass alle Maschinen laufen ruhig durch genaue
+    /// Pflege"). A clause with a comparison ("wie am ersten Tag", "als je") may end on a noun after its verb, and it stays.
+    private static func putsTheVerbBeforeTheEnd(_ sentence: String) -> Bool {
+        sentence.split { ",;.!?".contains($0) }.contains { clause in
+            let words = clause.split { !$0.isLetter }.map(String.init)
+            guard let start = words.firstIndex(where: { ["dass", "weil", "sodass", "ob"].contains($0.lowercased()) }) else { return false }
+            let rest = words[(start + 1)...]
+            guard rest.count >= 3, let last = rest.last, last.first?.isUppercase == true,
+                  !rest.contains(where: { ["wie", "als"].contains($0) }) else { return false }
+            return rest.dropLast().contains { $0.count >= 4 && $0.first?.isLowercase == true && ($0.hasSuffix("en") || $0.hasSuffix("t")) }
+        }
+    }
     static let listsSkills = "it lists skills: say how the person uses one or two of them in the work"
     static let endsAsAnEarlierOne = "it ends with the words of an earlier sentence: say something else"
 

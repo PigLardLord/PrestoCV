@@ -99,6 +99,7 @@ A streamed answer cut by its cap keeps its whole parts (`StreamedAnswer`), as th
 
 **The fifth measured fix round (#354).** Each class is first a measure of the evaluation, then fixed at its root, structure first; the tools changes of this round are in the bullets of the first, second and fourth rounds above. No rule of the facts changes.
 - **A tool clipped from a phrase of two is joined back.** The model listed "pneumatici" from "schemi elettrici e pneumatici", which alone reads as tyres. A one-word technology the description writes only as the conjunct of another technology's phrase, sharing the ending of its last word (Romance languages) or with an adjective's ending before it (English, German), is joined back to that phrase as the description writes it; two tools joined by a conjunction stay apart ("PLC e HMI"; `CVDataSanitizer.joiningClippedModifiers`). Rows: `SectionChecksTests.clippedModifierJoined`. Measure: `clippedModifier`.
+- **A German summary sentence whose verb is not last in its clause goes.** The model wrote a clause after "dass" with its verb in the middle and a noun at the end. A German summary sentence with a clause after dass, weil, sodass or ob that ends on a noun while an earlier lowercase word ends as a verb is dropped with a reason that says where the verb goes; a clause with a comparison ("wie", "als") may end on a noun, and it stays (`CVDataSanitizer.putsTheVerbBeforeTheEnd`). Rows: `SectionChecksTests.germanVerbBeforeTheEnd`. Measure: `germanVerbPosition`.
 
 ### What it supersedes
 
