@@ -421,7 +421,7 @@ struct SectionChecksTests {
 
         let verdict = english.skillCheck(
             technologies: ["audio mixing console", "sound mixer", "studio monitors", "line array systems", "digital mixing desk"],
-            softSkills: [], stated: ["digital consoles", "PA systems"], against: "I mix on digital consoles and set up the PA systems in Hull."
+            softSkills: [], stated: ["digital consoles", "PA systems"], fewestTools: 0, against: "I mix on digital consoles and set up the PA systems in Hull."
         )
 
         #expect(verdict.technologies == ["studio monitors"])
@@ -470,6 +470,28 @@ struct SectionChecksTests {
 
         #expect(verdict.technologies == kept)
         #expect(Set(verdict.dropped.map(\.reason)) == ["a kind of tool, not its name"])
+    }
+
+    @Test("A kind of tool with a word of its trade stays while the CV lists too few tools, after the named ones; a bare kind still goes (#354, round 4)")
+    func tradeKindFillsTooFewTools() {
+        // No word tagged a verb: the device's tagger reads "teodolite" as a verb on one macOS and not on another.
+        let checker = CVDataSanitizer(
+            languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([.italian: .words([])]), wordList: TableWordList()
+        )
+        let short = checker.skillCheck(
+            technologies: ["software", "software di rilievo", "teodolite", "piattaforma di cartografia", "programma di rilievo"],
+            softSkills: [], stated: [], fewestTools: 3, against: "Lavoro a Lecce dal 2019."
+        )
+        let enough = checker.skillCheck(
+            technologies: ["software di rilievo", "teodolite", "stazione totale", "GPS RTK"], softSkills: [], stated: [], fewestTools: 3,
+            against: "Lavoro a Lecce dal 2019."
+        )
+
+        // In the order written; of two kinds that fill, those past the fewest go.
+        #expect(short.technologies == ["software di rilievo", "teodolite", "piattaforma di cartografia"])
+        #expect(short.dropped.map(\.sentence) == ["software", "programma di rilievo"])
+        #expect(enough.technologies == ["teodolite", "stazione totale", "GPS RTK"])
+        #expect(enough.dropped.map(\.sentence) == ["software di rilievo"])
     }
 
     @Test("A German technology that is the infinitive of an activity goes; a machine stays (#354, round 2)")

@@ -67,7 +67,7 @@ extension FoundationModelsService {
             ),
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "Up to 3 pieces of equipment, machines or software of the job, first those its lines name; none when none fits",
+                description: "Up to 3 software, systems, machines or instruments of the job's trade, first those its lines name; none when none fits",
                 schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 0, maximumElements: 3)
             ),
         ])

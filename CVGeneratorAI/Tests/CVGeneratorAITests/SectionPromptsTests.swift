@@ -151,6 +151,10 @@ struct SectionPromptsTests {
         #expect(rules.contains("only when they fit the job's title and the tools the person names"))
         #expect(rules.contains("Name none for a job when none fits."))
         #expect(rules.contains("no activity or task, also when written as a noun"))
+        // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4).
+        #expect(rules.contains("name up to 3 tools of the trade that a person with that job's title uses: its software, systems, machines or instruments"))
+        #expect(rules.contains("no stationery, furniture or protective wear"))
+        #expect(!rules.contains("pieces of equipment"))
         #expect(!rules.contains("technique"))
         #expect(!SectionPrompts.moreSkillsInstructions.contains("technique"))
     }

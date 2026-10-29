@@ -180,13 +180,15 @@ final class SectionDraft {
         let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
         // ADR 0031, D8: the work the person says they like doing is a soft skill in their own words, before those written.
         let liked = CVDataSanitizer.workLikings(in: description)
+        let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
+        let fewestTools = sparse ? 3 : 4
         var skills = sanitizer.skillCheck(
-            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated, against: description
+            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated, fewestTools: fewestTools,
+            against: description
         )
         keep(skills)
         let kept = try kept(around: dated).skills
-        let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
-        let missingTools = max((sparse ? 3 : 4) - kept.count { $0.kind == .technology }, 0)
+        let missingTools = max(fewestTools - kept.count { $0.kind == .technology }, 0)
         let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
         guard missingTools > 0 || missingQualities > 0 else { return }
         let names = kept.map(\.name)
@@ -202,7 +204,7 @@ final class SectionDraft {
         guard let more else { return }
         skills = sanitizer.skillCheck(
             technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, stated: stated,
-            against: description
+            fewestTools: fewestTools, against: description
         )
         keep(skills)
     }

@@ -259,6 +259,17 @@ struct SectionDraftTests {
         #expect(draft.skills.contains { $0.name == "microphones" })
     }
 
+    @Test("A kind of tool with a word of its trade stays when the CV would list too few tools; a bare kind goes (#354, round 4)")
+    func tradeKindFillsTooFewTools() async throws {
+        let service = service()
+        service.toolsResult = [["software"], ["stage monitors"], ["cue playback software"], []]
+
+        let draft = try await draft(service)
+
+        #expect(draft.skills.contains(Skill(name: "cue playback software", kind: .technology)))
+        #expect(!draft.skills.contains { $0.name == "software" })
+    }
+
     @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
     func summaryRepair() async throws {
         let service = service()

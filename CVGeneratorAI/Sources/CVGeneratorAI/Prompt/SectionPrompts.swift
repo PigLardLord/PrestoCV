@@ -71,16 +71,16 @@ enum SectionPrompts {
     }
 
     static let toolsInstructions = """
-        For each job, in order, name up to 3 pieces of equipment, machines or software that a person with that job's title uses, \
-        each of another kind. \
+        For each job, in order, name up to 3 tools of the trade that a person with that job's title uses: its software, systems, \
+        machines or instruments, each of another kind. \
         Write in the language named on the first line.
         - job: the job's title as written.
         - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
         what they say of their work with no job, under the job they fit, as the person names them; then those of the trade, \
         only when they fit the job's title and the tools the person names. Name none for a job when none fits.
-        - tools: the name a CV of that trade lists for a piece of equipment, a machine or a software, 1 to 3 words each; no \
-        activity or task, also when written as a noun; no material, part or supply, no everyday object a person of any trade \
-        uses; no personal quality, no level, none of the skills already listed.
+        - tools: the name a CV of that trade lists for a software, a system, a machine or an instrument, 1 to 3 words each; no \
+        activity or task, also when written as a noun; no material, part or supply, no stationery, furniture or protective wear, \
+        no everyday object a person of any trade uses; no personal quality, no level, none of the skills already listed.
         """
 
     /// The soft skills request.
