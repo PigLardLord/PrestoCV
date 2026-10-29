@@ -103,7 +103,12 @@ struct SectionDraftTests {
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
         summaryBrief.opening = nil
-        for number in summaryBrief.roles.indices { summaryBrief.roles[number].work = [] }
+        // The summary reads a job as ended by the years its own request read (#354, round 10).
+        #expect(summaryBrief.roles.map(\.hasEnded) == [true, true, true, false])
+        for number in summaryBrief.roles.indices {
+            summaryBrief.roles[number].work = []
+            summaryBrief.roles[number].hasEnded = brief.roles[number].hasEnded
+        }
         #expect(summaryBrief == brief)
         #expect(brief.roles.map(\.title) == ["stagehand", "sound technician", "sound technician", "head of sound"])
         #expect(brief.roles[0].clauses.contains { $0.contains("rigged the lights") })
@@ -127,6 +132,9 @@ struct SectionDraftTests {
         let brief = try #require(service.sectionCalls.firstIndex(of: "summary").map { service.sectionBriefs[$0] })
         #expect(brief.opening == Self.opening)
         #expect(brief.roles[3].work.contains("the technical rehearsals"))
+        // The jobs that ended, by the years their requests read, are titles alone (#354, round 10).
+        #expect(brief.roles.prefix(3).allSatisfy { $0.hasEnded && $0.work.isEmpty })
+        #expect(!brief.roles[3].hasEnded)
         #expect(!brief.roles.flatMap(\.work).contains { $0.hasPrefix("I ") })
         let request = try #require(service.summaryRequests.first)
         #expect(request.tools.contains("mixing desks"))

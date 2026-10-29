@@ -582,10 +582,12 @@ extension CVDataSanitizer {
         )
     }
 
-    /// The summary check, where a sentence that lists three or more of the kept `tools` and `qualities` also goes (#354, round 3).
+    /// The summary check, where a sentence that lists three or more of the kept `tools` and `qualities` also goes (#354, round 3),
+    /// and, when a job of `cvData` is current, a sentence in the present about the duties of the ended jobs, `endedDuties`
+    /// (`speaksOfAnEndedJob`; round 10).
     func summaryCheck(
         of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String], tools: [String],
-        against description: String
+        endedDuties: [String] = [], against description: String
     ) throws(CVGenerationError) -> SummaryVerdict {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
@@ -602,6 +604,8 @@ extension CVDataSanitizer {
             let namesWork = { (sentence: String) in !Self.workStems(of: [sentence]).isDisjoint(with: workStems) }
 
             let language = source.explainer.language
+            let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
+            let currentStems = Self.workStems(of: duties.filter { !endedDuties.contains($0) } + titles.compactMap { $0 })
             let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
             var verdict = SummaryVerdict()
             var seen = Set<String>()
@@ -628,6 +632,8 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasABareSubject))
                 } else if let language, Self.isAFragment(sentence, workWords: workWords, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerb))
+                } else if Self.speaksOfAnEndedJob(sentence, endedStems: endedStems, currentStems: currentStems, language: language) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.speaksOfAnEndedJob))
                 } else if let language, Self.dropsThePronoun.contains(language), !Self.speaksAsThePerson(sentence, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.hasNoVerbOfThePerson))
                 } else if language == .german, Self.putsTheVerbBeforeTheEnd(sentence) {
@@ -797,6 +803,56 @@ extension CVDataSanitizer {
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
     static let startsAsAnEarlierOne = "it starts with the verb of an earlier sentence: say something else"
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
+
+    static let speaksOfAnEndedJob = "it says in the present a duty of a job that has ended: say what the person does now"
+
+    /// Whether a summary sentence says in the present the duties of an ended job (#354, round 10): in the present
+    /// (`isInThePresent`), with at least three stems of `endedStems` that are not of `currentStems`, the current jobs' titles and
+    /// duties, and these at least half of its own. The summary read the topics of every job's duties and wrote a forklift
+    /// driver's machinery as a supervisor's present work. A sentence in the past, or about the current work, stays.
+    static func speaksOfAnEndedJob(
+        _ sentence: String, endedStems: Set<String>, currentStems: Set<String>, language: Vocabulary.Language?
+    ) -> Bool {
+        guard !endedStems.isEmpty, isInThePresent(sentence, language: language) else { return false }
+        let stems = workStems(of: [sentence])
+        let ended = stems.intersection(endedStems).subtracting(currentStems)
+        return ended.count >= 3 && ended.count * 2 >= stems.count
+    }
+
+    /// Whether a sentence said in the first person is in the present, by its verb after the words that join it to the one before
+    /// ("Inoltre", "Then"): in English, German and French the verb after "I", "ich" or "je", in the past when it is an auxiliary
+    /// of the past or ends as a past ("-ed", "-te", "-ais"); in Italian, Spanish and Portuguese the first word (`tense(of:language:)`).
+    /// A rough rule: false when it cannot tell.
+    static func isInThePresent(_ sentence: String, language: Vocabulary.Language?) -> Bool {
+        let words = Array(letterWords(of: sentence).drop(while: summaryConnectors.contains))
+        guard let first = words.first else { return false }
+        let verb = words.count > 1 ? words[1] : ""
+        switch language {
+        case .english:
+            guard first == "i", !verb.isEmpty, !["am", "have", "also"].contains(verb) else { return false }
+            return !verb.hasSuffix("ed") && !englishPasts.contains(verb)
+        case .german:
+            return first == "ich" && !verb.isEmpty && !["habe", "hatte", "war", "bin"].contains(verb) && !verb.hasSuffix("te")
+        case .french:
+            return (first == "je" || first == "j") && !verb.isEmpty && !["ai", "avais", "étais", "suis"].contains(verb)
+                && !verb.hasSuffix("ais")
+        case .italian, .spanish, .portuguese:
+            return tense(of: words.joined(separator: " "), language: language) == .present
+        case nil:
+            return false
+        }
+    }
+
+    /// The words that join a summary sentence to the one before, in lower case.
+    private static let summaryConnectors: Set<String> = [
+        "then", "also", "and", "poi", "inoltre", "anche", "quindi", "dann", "auch", "und", "zudem", "puis", "aussi", "ensuite",
+        "luego", "también", "además", "depois", "também", "além", "disso",
+    ]
+
+    /// English verbs of the past with no "-ed".
+    private static let englishPasts: Set<String> = [
+        "was", "were", "had", "did", "made", "led", "ran", "kept", "built", "taught", "took", "drove", "sold", "brought", "wrote",
+    ]
     static let hasAQualitySubject = "its subject is a quality: write it as the person, with what they do and how"
     static let hasNoVerb = "it has no verb: write it as the person, with what they do"
     static let putsTheVerbBeforeTheEnd = "the verb of a clause after dass, weil or ob comes last: write it at the end of that clause"

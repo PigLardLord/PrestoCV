@@ -25,6 +25,8 @@ final class SectionDraft {
 
     /// What the requests wrote so far, as their checks kept it: what the draft keeps when a later request fails.
     private var duties: [String?] = []
+    /// The duties the person said for each job, as the check pins them: the summary reads them alone of an ended job.
+    private var stated: [[String]] = []
     private var years: [Int: RoleWriting] = [:]
     private var technologies: [String] = []
     private var softSkills: [String] = []
@@ -69,9 +71,11 @@ final class SectionDraft {
         brief.own = context.own
         brief.names = generated.experience.map(\.company) + generated.education.compactMap(\.institution)
             + [generated.personalInfo.name].compactMap { $0 }
+        stated = Array(repeating: [], count: brief.roles.count)
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)
             brief.roles[number].avoid = check?.avoid ?? []
+            stated[number] = check?.pinned ?? []
             if let check {
                 brief.roles[number].said = check.pinned.count
                 brief.roles[number].adding = check.saysEnough ? 0 : max(1, 2 - check.pinned.count)
@@ -319,11 +323,23 @@ final class SectionDraft {
         let keptDuties = kept.experience.compactMap(\.description)
         let keptTools = kept.skills.filter { $0.kind != .softSkill }.map(\.name)
         let keptQualities = kept.skills.filter { $0.kind == .softSkill }.map(\.name)
+        let endedDuties = kept.experience.filter { !$0.current && $0.endDate.presentValue != nil }.compactMap(\.description)
         let work = keptDuties + technologies
         var brief = brief
         let jobDuties = kept.experience.count == brief.roles.count ? kept.experience.map(\.description) : duties
+        // The work of the current jobs, the person's own duties first: an ended job's duties came back in the present as the
+        // person's work now (#354, round 10). With no current job, an ended one gives what the person said of it.
+        // A job ends by the years its own request read, which the extraction may have left out.
+        if kept.experience.count == brief.roles.count {
+            for (number, job) in kept.experience.enumerated() where !job.current && job.endDate.presentValue != nil {
+                brief.roles[number].hasEnded = true
+            }
+        }
+        let isCurrent = brief.roles.contains { !$0.hasEnded }
         for number in brief.roles.indices where jobDuties.indices.contains(number) {
-            brief.roles[number].work = jobDuties[number].map { CVDataSanitizer.workTopics(of: $0) } ?? []
+            let role = brief.roles[number]
+            let topics = role.hasEnded ? (isCurrent ? nil : stated[number].joined(separator: " ")) : jobDuties[number]
+            brief.roles[number].work = topics.map { CVDataSanitizer.workTopics(of: $0) } ?? []
         }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
         let written = try await request(.summary) { [brief] in
@@ -334,7 +350,7 @@ final class SectionDraft {
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let first = try? sanitizer.summaryCheck(
             of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities,
-            tools: keptTools, against: description
+            tools: keptTools, endedDuties: endedDuties, against: description
         ) else {
             return
         }
@@ -354,7 +370,7 @@ final class SectionDraft {
             .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
         guard let second = try? sanitizer.summaryCheck(
             of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities,
-            tools: keptTools, against: description
+            tools: keptTools, endedDuties: endedDuties, against: description
         ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
         summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
     }

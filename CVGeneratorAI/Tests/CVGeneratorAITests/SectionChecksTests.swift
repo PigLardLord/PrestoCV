@@ -1144,6 +1144,75 @@ struct SectionChecksTests {
         ])
     }
 
+    /// A summary of a current job and an ended one: the summary sentence it keeps and the one it drops.
+    struct EndedJobRow: Sendable {
+        let language: String
+        let description: String
+        let jobs: [Experience]
+        let ended: String
+        let current: String
+        let keeps: String
+        let drops: String
+    }
+
+    static let endedJobRows: [EndedJobRow] = [
+        EndedJobRow(
+            language: "it",
+            description: "Abito a Rieti. Dal 2012 al 2016 ho lavorato come cameriere alla Locanda Ginepro, dove servivo i piatti ai "
+                + "tavoli e apparecchiavo la sala prima del servizio. Dal 2016 lavoro come caposala all'Albergo Sorbo, dove organizzo "
+                + "i turni dei camerieri e accolgo i clienti all'ingresso.",
+            jobs: [job("cameriere", "Locanda Ginepro", from: "2012", to: "2016"), job("caposala", "Albergo Sorbo", from: "2016")],
+            ended: "Servivo i piatti ai tavoli. Apparecchiavo la sala prima del servizio.",
+            current: "Organizzo i turni dei camerieri. Accolgo i clienti all'ingresso.",
+            keeps: "Organizzo i turni della sala e accolgo i clienti con cortesia.",
+            drops: "Apparecchio i tavoli e servo i piatti con precisione."
+        ),
+        EndedJobRow(
+            language: "en",
+            description: "I live in Hull. From 2011 to 2017 I was a baker at Wheatley Bakehouse, where I kneaded the dough by hand "
+                + "and baked the bread loaves before dawn. Since 2017 I am a shop manager at Corn Exchange Deli, where I order the "
+                + "flour stock and train the new staff at the counter.",
+            jobs: [job("baker", "Wheatley Bakehouse", from: "2011", to: "2017"), job("shop manager", "Corn Exchange Deli", from: "2017")],
+            ended: "I kneaded the dough by hand. I baked the bread loaves before dawn.",
+            current: "I order the flour stock. I train the new staff at the counter.",
+            keeps: "I order the flour stock and train the counter staff with patience.",
+            drops: "I knead the dough by hand and bake the bread loaves before dawn."
+        ),
+    ]
+
+    @Test("A summary sentence in the present about the duties of an ended job goes; one about the current job stays (#354, round 10)",
+          arguments: endedJobRows)
+    func summaryOfAnEndedJob(row: EndedJobRow) throws {
+        let checker = CVDataSanitizer(
+            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
+        )
+
+        let verdict = try checker.summaryCheck(
+            of: CVData(experience: row.jobs), summary: row.keeps + " " + row.drops, field: nil, work: [row.ended, row.current],
+            duties: [row.ended, row.current], qualities: [], tools: [], endedDuties: [row.ended], against: row.description
+        )
+
+        #expect(verdict.rejected.map(\.sentence) == [row.drops])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksOfAnEndedJob])
+        #expect(verdict.kept == [row.keeps])
+    }
+
+    @Test("With no current job, a summary sentence in the present about an ended job's duties stays (#354, round 10)")
+    func summaryWithNoCurrentJob() throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let ended = "I kneaded the dough by hand. I baked the bread loaves before dawn."
+        let description = "I live in Hull. From 2011 to 2017 I was a baker at Wheatley Bakehouse, where I kneaded the dough by hand and "
+            + "baked the bread loaves before dawn."
+
+        let verdict = try checker.summaryCheck(
+            of: CVData(experience: [Self.job("baker", "Wheatley Bakehouse", from: "2011", to: "2017")]),
+            summary: "I work as a baker. I knead the dough by hand and bake the bread loaves before dawn.", field: nil,
+            work: [ended], duties: [ended], qualities: [], tools: [], endedDuties: [ended], against: description
+        )
+
+        #expect(!verdict.rejected.contains { $0.reason == CVDataSanitizer.speaksOfAnEndedJob })
+    }
+
     @Test("A summary sentence with no word of the person goes where the pronoun is kept; one about the person stays (#354)")
     func summaryOfThePerson() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

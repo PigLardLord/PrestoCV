@@ -12,8 +12,9 @@ public struct DraftBrief: Equatable, Sendable {
         public let title: String
         /// The employer the rules kept, if any.
         public let employer: String?
-        /// Whether the description says the job is over: its text then speaks of it in the past.
-        public let hasEnded: Bool
+        /// Whether the description says the job is over: its text then speaks of it in the past. The summary request also reads a
+        /// job as over by the end year its own request read (#354, round 10).
+        public var hasEnded: Bool
         /// The clauses of the description that belong to the job, which its own request reads (ADR 0031, "A request per section").
         public let clauses: [String]
         /// The words of the job's clauses that the check drops in a written duty: the job's request avoids them.
