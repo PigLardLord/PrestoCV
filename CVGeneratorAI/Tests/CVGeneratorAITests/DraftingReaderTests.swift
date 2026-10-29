@@ -429,50 +429,55 @@ struct DraftingReaderTests {
             == ["Etichetto le scatole, che dimostra la mia attenzione."])
     }
 
-    @Test("A frequency the description does not say is counted; one it says is not (#354, round 10)")
-    func inventedFrequency() {
-        let counted = { (description: String, said: String) in
-            let input = DraftingInput(id: "reader-es", kind: .plain, language: "es", description: said, facts: [], traps: [])
-            let cv = CVData(experience: [Experience(title: "contable", company: "Taller Olmo", description: description)])
+    @Test("A summary sentence with a product the description does not state is counted; a stated product and a kind of tool are not (#354, rounds 11 and 13)")
+    func unstatedProductInSummary() {
+        let counted = { (language: String, said: String, summary: String) in
+            let input = DraftingInput(id: "reader-\(language)", kind: .plain, language: language, description: said, facts: [], traps: [])
+            let cv = CVData(summary: summary)
             return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
-                .filter { $0.kind == .inventedFrequency }.map(\.value)
+                .filter { $0.kind == .unstatedProductInSummary }.map(\.value)
         }
 
-        #expect(counted("Reviso los pagos semanales. Archivo los recibos mensuales.", "Llevo las cuentas del taller.") == ["semanales", "mensuales"])
-        #expect(counted("Reviso los pagos semanales.", "Reviso cada semana los pagos semanales del taller.") == [])
+        #expect(counted(
+            "de", "Ich bin Elektriker und kenne mich mit KNX aus.",
+            "Ich arbeite als Elektriker. Ich programmiere die Gebäude mit KNX. Ich sichere alle Schritte mit dem Werkzeugkasten ab. "
+                + "Ich plane die Anlagen mit AutoCAD."
+        ) == ["Ich plane die Anlagen mit AutoCAD."])
+        #expect(counted(
+            "it", "Sono impiegata amministrativa.",
+            "Lavoro come impiegata amministrativa. Registro le fatture con il gestionale contabile. Preparo i bilanci con Zucchetti."
+        ) == ["Preparo i bilanci con Zucchetti."])
     }
 
-    @Test("A summary sentence with a kept tool the description does not state is counted; one with a stated tool is not (#354, round 11)")
-    func unstatedToolInSummary() {
-        let input = DraftingInput(
-            id: "reader-de", kind: .plain, language: "de", description: "Ich bin Elektriker und kenne mich mit KNX aus.", facts: [], traps: []
-        )
-        let cv = CVData(
-            summary: "Ich arbeite als Elektriker. Ich programmiere die Gebäude mit KNX. Ich sichere alle Schritte mit dem Werkzeugkasten ab.",
-            skills: ["KNX", "Werkzeugkasten"].map { Skill(name: $0) }
-        )
-
-        #expect(ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
-            .filter { $0.kind == .unstatedToolInSummary }.map(\.value) == ["Ich sichere alle Schritte mit dem Werkzeugkasten ab."])
-    }
-
-    @Test("A summary sentence from a duty the draft wrote is counted; one from a stated duty is not (#354, round 11)")
-    func writtenDutyInSummary() {
-        let input = DraftingInput(
-            id: "reader-it", kind: .plain, language: "it", description: "Sono impiegata amministrativa e gestisco le fatture dei fornitori.",
-            facts: [], traps: []
-        )
+    @Test("A summary sentence that copies five words of a duty in a row, or a whole shorter duty, is counted; one in other words is not (#354, rounds 11 and 13)")
+    func copiedDutyInSummary() {
         let cv = CVData(
             summary: "Lavoro come impiegata amministrativa. Controllo le fatture dei fornitori con precisione. "
-                + "Rispondo alle comunicazioni con i corrieri.",
+                + "Rispondo alle comunicazioni con i corrieri ogni giorno. Archivio i documenti. Seguo la contabilità dei clienti.",
             experience: [Experience(
                 title: "impiegata amministrativa", company: "Ferramenta Olmo",
-                description: "Gestisco le fatture dei fornitori. Organizzo le comunicazioni con i corrieri."
+                description: "Gestisco le fatture dei fornitori. Rispondo alle comunicazioni con i corrieri. Archivio i documenti."
             )]
         )
 
-        #expect(ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
-            .filter { $0.kind == .writtenDutyInSummary }.map(\.value) == ["Rispondo alle comunicazioni con i corrieri."])
+        #expect(Self.reader(cv, "it").filter { $0.kind == .copiedDutyInSummary }.map(\.value) == [
+            "Rispondo alle comunicazioni con i corrieri ogni giorno.", "Archivio i documenti.",
+        ])
+    }
+
+    @Test("A summary sentence with a verb that guarantees is counted in the six languages; the noun of a warranty is not (#354, round 13)")
+    func overclaimSummary() {
+        let counted = { (summary: String, language: String) in
+            Self.reader(CVData(summary: summary), language).filter { $0.kind == .overclaimSummary }.map(\.value)
+        }
+
+        #expect(counted("Ich verkabele die Schaltschränke. Ich garantiere, dass jede Verbindung funktioniert.", "de")
+            == ["Ich garantiere, dass jede Verbindung funktioniert."])
+        #expect(counted("I guarantee every delivery on time. I handle the warranty claims.", "en") == ["I guarantee every delivery on time."])
+        #expect(counted("Garantisco la qualità del servizio. Gestisco le garanzie dei clienti.", "it") == ["Garantisco la qualità del servizio."])
+        #expect(counted("Garantizo la entrega de cada pedido. Tramito las garantías.", "es") == ["Garantizo la entrega de cada pedido."])
+        #expect(counted("Je garantis la sécurité des élèves. Je gère la garantie des appareils.", "fr") == ["Je garantis la sécurité des élèves."])
+        #expect(counted("Garanto a qualidade das peças. Trato das garantias.", "pt") == ["Garanto a qualidade das peças."])
     }
 
     @Test("A duty word in lower case that the description has only in an employer's name is counted; the name and a word said elsewhere are not (#354, round 11)")
@@ -602,17 +607,17 @@ struct DraftingReaderTests {
 
     #if canImport(NaturalLanguage)
     // The duty check reads the description's clauses with the device's language data, which only an Apple platform has.
-    @Test("A job under 40 characters whose step pins a duty it does not hold is counted; one of 40 characters is not")
+    @Test("A job whose description lost a duty its step pins is counted, also beside typical duties; a job that holds it beside typical duties is not (#354, rounds 3 and 13)")
     func stepVsFinalPinned() throws {
         let sound = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
         let cv = CVData(experience: [
             Experience(
                 title: "head of sound", company: "Orchard Lane Theatre", startDate: "2021", current: true,
-                description: "I plan the sound design."
+                description: "I plan the sound design. I tune the speaker systems before each show. I check the wireless microphones."
             ),
             Experience(
                 title: "stagehand", company: "Fenwick Playhouse", startDate: "2013", endDate: "2016",
-                description: "I rigged the lights and loaded the trucks."
+                description: "I rigged the lights and loaded the trucks. I set up the scenery before each show."
             ),
         ])
 

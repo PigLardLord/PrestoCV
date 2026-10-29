@@ -580,37 +580,6 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A sentence that quotes little of the description, in a job whose quoting sentences run to 40 characters, is counted; none in a job the person said little of (#354, round 1, D6)")
-    func fillerDuty() throws {
-        let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
-        let fillers = { (cv: CVData) in
-            ReaderRules.findings(in: cv, for: english, report: InventedFacts.count(cv, for: english))
-                .filter { $0.kind == .fillerDuty }.map(\.value)
-        }
-        let head = "I plan the sound design for each production and train the junior technicians."
-        let filled = CVData(experience: [
-            Experience(title: "head of sound", company: "Orchard Lane Theatre", description: head + " I manage the audio flow across all areas."),
-            Experience(
-                title: "stagehand", company: "Fenwick Playhouse",
-                description: "I rigged the lights and loaded the trucks. I ensured the lighting systems functioned correctly. "
-                    + "I coordinated the movement of heavy equipment."
-            ),
-        ])
-        let said = CVData(experience: [
-            Experience(title: "head of sound", company: "Orchard Lane Theatre", description: head),
-            Experience(
-                title: "stagehand", company: "Fenwick Playhouse",
-                description: "I rigged the lights. I coordinated the movement of heavy equipment."
-            ),
-        ])
-
-        #expect(fillers(filled) == [
-            "I manage the audio flow across all areas.", "I ensured the lighting systems functioned correctly.",
-            "I coordinated the movement of heavy equipment.",
-        ])
-        #expect(fillers(said).isEmpty)
-    }
-
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])

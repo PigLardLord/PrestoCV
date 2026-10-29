@@ -53,10 +53,6 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A duty or a quality the person states that no job description and no skill of the draft holds (`ExpectedFact.duty`,
     /// `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra" (#354, round 1).
     case unwrittenStatement
-    /// A job sentence that quotes less than half of its words from the description, in a job whose sentences that quote it run to 40
-    /// characters or more: a duty the person did not say, in a job they described ("I coordinated the movement of heavy equipment";
-    /// ADR 0031, D6).
-    case fillerDuty
     /// A summary sentence whose subject is the person's work, not the person: a bare word of a title or of the field followed by a
     /// verb "to be" ("Manutenzione è la mia attività principale."; #354, round 1), or a word of the work after an article, with any
     /// verb ("O trabalho exige…", "La manutenzione è…"; #354, round 3).
@@ -85,8 +81,8 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A soft skill that is an empty word, of experience or of being a professional, and names no quality ("professional",
     /// "Erfahrung"; #354, round 3).
     case emptySoftSkill
-    /// A job whose final description is under 40 characters while the step that writes the job pins a duty the description does not
-    /// hold: the step counted that duty toward the job and asked for nothing more, and the final check moved it out (#354, round 3).
+    /// A job whose final description does not hold a duty the step that writes the job pins, a duty the person said: the final
+    /// check moved it out (#354, round 3). The typical duties beside it count for nothing (O1, round 13).
     case stepVsFinalPinned
     /// A summary sentence of three clauses or more joined by semicolons ("I manage the flow; I ensure …; I adapt …."; #354, round
     /// 3, at 0608938b).
@@ -150,17 +146,17 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A summary clause after a comma that praises the person's own quality ("…, was meine Präzision zeigt", "…, which shows my
     /// care"), after the first one of the summary (#354, round 10).
     case selfPraiseTail
-    /// A word of how often ("daily", "mensuales", "annuel") in the summary or a job's duties, of a frequency the description does
-    /// not say (#354, round 10).
-    case inventedFrequency
     /// A soft skill of three words or more that opens with a gerund, a clause of the description ("working closely with directors";
     /// #354, round 10).
     case gerundSoftSkill
-    /// A summary sentence that names a kept technology the description does not state ("mit dem Werkzeugkasten"; #354, round 11).
-    case unstatedToolInSummary
-    /// A summary sentence past the opening whose words of the work come from a duty the draft wrote, not from the description, at
-    /// least as many as from the description ("Rispondo alle comunicazioni con i fornitori"; #354, round 11).
-    case writtenDutyInSummary
+    /// A fact: a summary sentence that names a product, a word with a capital past the sentence's first or an acronym, that the
+    /// description does not hold ("con SAP"; #354, rounds 11 and 13). A kind of tool of the trade is draft content (O1).
+    case unstatedProductInSummary
+    /// A summary sentence that copies a kept duty: five words of it in a row, or all of a shorter one ("Rispondo alle comunicazioni
+    /// con i corrieri"; #354, rounds 11 and 13).
+    case copiedDutyInSummary
+    /// A summary sentence that guarantees an outcome ("Ich garantiere, dass jede Verbindung funktioniert"; #354, round 13).
+    case overclaimSummary
     /// A word of a job's description, in lower case, that the description writes only inside the name of an employer
     /// ("transporte" of "Transportes Ebro Norte"; #354, round 11).
     case employerWordInDuty
@@ -200,7 +196,6 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .thirdPersonSummary: "a summary in the third person"
         case .bareInterest: "an interest without the verb of its phrase"
         case .unwrittenStatement: "a stated duty or quality the draft does not hold"
-        case .fillerDuty: "a duty not said, in a job the person described"
         case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
         case .offTradeTechnology: "a technology neither stated nor of the trade"
         case .categoryAsTechnology: "a category as a technology"
@@ -211,7 +206,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .fragmentSummary: "a summary sentence with no verb"
         case .listySummary: "a summary sentence that lists skills"
         case .emptySoftSkill: "an empty word as a soft skill"
-        case .stepVsFinalPinned: "a short job with a pinned duty it does not hold"
+        case .stepVsFinalPinned: "a job without a duty its step pinned"
         case .chainedSummary: "a summary sentence of clauses joined by semicolons"
         case .unanchoredSummary: "a summary sentence with no word of the work"
         case .splitVerb: "a German separable verb split in a subordinate clause"
@@ -231,10 +226,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .genericSystemTechnology: "a generic system as a technology"
         case .endedDutyInSummary: "a duty of an ended job in the present in the summary"
         case .selfPraiseTail: "a self-praise closing clause after the first"
-        case .inventedFrequency: "a frequency the description does not say"
         case .gerundSoftSkill: "a clause with a gerund as a soft skill"
-        case .unstatedToolInSummary: "a summary sentence with a tool the description does not state"
-        case .writtenDutyInSummary: "a summary sentence from a duty the draft wrote"
+        case .unstatedProductInSummary: "a summary sentence with a product the description does not state"
+        case .copiedDutyInSummary: "a summary sentence that copies a duty"
+        case .overclaimSummary: "a summary sentence that guarantees an outcome"
         case .employerWordInDuty: "a duty with a word of an employer's name"
         case .vagueDuty: "a duty of a vague phrase"
         case .bareWorkDescription: "a description that only says the person worked"
@@ -320,7 +315,6 @@ enum ReaderRules {
                 found.append(ReaderFinding(kind: .twoForms, path: "experience[\(index)].description", value: description))
             }
             found += duties(of: job, at: index, language: language)
-            found += fillers(in: job, at: index, of: input.description)
             found += rewordedDuties(in: description).map { ReaderFinding(kind: .rewordedDuty, path: "experience[\(index)].description", value: $0) }
         }
         found += sharedHeads(in: cv, language: language)
@@ -339,7 +333,6 @@ enum ReaderRules {
         for (index, skill) in cv.skills.enumerated() where skill.kind == .softSkill && isGerundClause(skill.name, language: language) {
             found.append(ReaderFinding(kind: .gerundSoftSkill, path: "skills[\(index)].name", value: skill.name))
         }
-        found += inventedFrequencies(in: cv, of: input.description)
         found += employerWords(in: cv, for: input)
         for (index, job) in cv.experience.enumerated() {
             found += WrittenMeasure.sentences(of: job.description ?? "").filter(isVague)
@@ -553,21 +546,6 @@ enum ReaderRules {
         }
     }
 
-    /// The sentences of a job that quote less than half of their words of five letters and more from `description`, when its
-    /// sentences that quote three in four of them run to 40 characters or more. A word is quoted when the description has a word
-    /// of its first five letters, so an inflection still quotes it.
-    static func fillers(in job: Experience, at index: Int, of description: String) -> [ReaderFinding] {
-        let said = Set(longWords(of: description).map { $0.prefix(5) })
-        let share = { (sentence: String) -> Double in
-            let words = longWords(of: sentence)
-            return words.isEmpty ? 1 : Double(words.count { said.contains($0.prefix(5)) }) / Double(words.count)
-        }
-        let sentences = WrittenMeasure.sentences(of: job.description ?? "")
-        guard sentences.filter({ share($0) >= 0.75 }).joined(separator: " ").count >= 40 else { return [] }
-        return sentences.filter { share($0) < 0.5 }
-            .map { ReaderFinding(kind: .fillerDuty, path: "experience[\(index)].description", value: $0) }
-    }
-
     private static func longWords(of text: String) -> [String] {
         letterWords(of: text).filter { $0.count >= 5 }
     }
@@ -685,10 +663,10 @@ enum ReaderRules {
         found += endedDuties(in: sentences, of: cv, language: input.language)
             .map { ReaderFinding(kind: .endedDutyInSummary, path: "summary", value: $0) }
         found += selfPraiseTails(in: sentences).map { ReaderFinding(kind: .selfPraiseTail, path: "summary", value: $0) }
-        found += unstatedTools(in: sentences, of: cv, for: input)
-            .map { ReaderFinding(kind: .unstatedToolInSummary, path: "summary", value: $0) }
-        found += writtenDutySentences(in: sentences, of: cv, for: input)
-            .map { ReaderFinding(kind: .writtenDutyInSummary, path: "summary", value: $0) }
+        found += unstatedProducts(in: sentences, of: cv, for: input)
+            .map { ReaderFinding(kind: .unstatedProductInSummary, path: "summary", value: $0) }
+        found += copiedDuties(in: sentences, of: cv).map { ReaderFinding(kind: .copiedDutyInSummary, path: "summary", value: $0) }
+        found += sentences.filter(guarantees).map { ReaderFinding(kind: .overclaimSummary, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -1542,51 +1520,47 @@ enum ReaderRules {
         }
     }
 
-    /// The words of how often in the summary and the job descriptions of `cv` whose frequency no word of `description` says.
-    static func inventedFrequencies(in cv: CVData, of description: String) -> [ReaderFinding] {
-        let said = Set(letterWords(of: description).compactMap(frequency(of:)))
-        let texts = [("summary", cv.summary ?? "")]
-            + cv.experience.enumerated().map { ("experience[\($0.offset)].description", $0.element.description ?? "") }
-        return texts.flatMap { path, text in
-            letterWords(of: text).filter { word in frequency(of: word).map { !said.contains($0) } ?? false }
-                .map { ReaderFinding(kind: .inventedFrequency, path: path, value: $0) }
-        }
-    }
-
     // MARK: Round 11
 
-    /// The summary sentences that name a kept technology whose words the description does not hold in a row.
-    static func unstatedTools(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
-        let described = InventedFacts.words(of: input.description)
-        let unstated = cv.skills.filter { $0.kind == .technology }.map { InventedFacts.words(of: $0.name) }
-            .filter { !$0.isEmpty && !InventedFacts.holds(described, run: $0) }
+    /// The summary sentences that name a product the description does not hold: a word with a capital past the sentence's first,
+    /// or with a capital past its own first letter ("SAP", "AutoCAD"), that is no word of the description, of a title or of the
+    /// person's name. German writes every noun with a capital, so there only the second kind is a product; a kind of tool written
+    /// in lower case is draft content (O1).
+    static func unstatedProducts(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
+        let known = Set(InventedFacts.words(of: [input.description, cv.personalInfo.title ?? "", cv.personalInfo.name ?? ""]
+            .joined(separator: " ") + " " + cv.experience.map(\.title).joined(separator: " ")))
+        return sentences.filter { sentence in
+            let words = sentence.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+            return words.enumerated().contains { index, word in
+                guard word.count >= 2, !known.contains(InventedFacts.words(of: word).first ?? "") else { return false }
+                let innerCapital = word.dropFirst().contains(where: \.isUppercase)
+                return innerCapital || (input.language != "de" && index > 0 && word.first?.isUppercase == true)
+            }
+        }
+    }
+
+    /// The summary sentences that copy a duty of the draft's jobs: five of its words in a row, or all the words of a duty of fewer.
+    static func copiedDuties(in sentences: [String], of cv: CVData) -> [String] {
+        let duties = cv.experience.flatMap { WrittenMeasure.sentences(of: $0.description ?? "") }.map(InventedFacts.words(of:))
+            .filter { !$0.isEmpty }
+        let runs = duties.flatMap { duty in
+            duty.count < 5 ? [duty] : (0...(duty.count - 5)).map { Array(duty[$0..<($0 + 5)]) }
+        }
         return sentences.filter { sentence in
             let words = InventedFacts.words(of: sentence)
-            return unstated.contains { InventedFacts.holds(words, run: $0) }
+            return runs.contains { InventedFacts.holds(words, run: $0) }
         }
     }
 
-    /// The summary sentences past the opening that share a word of the work with a duty the draft wrote (one of whose words of five
-    /// letters or more fewer than half are in the description) and not with the description, at least as many as they share with
-    /// the description. A description with no word of the work has no duty to tell apart.
-    static func writtenDutySentences(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
-        let said = Set(longWords(of: input.description).map { $0.prefix(5) })
-        let stated = anchorStems(of: [input.description])
-        guard !stated.isEmpty else { return [] }
-        let written = cv.experience.flatMap { WrittenMeasure.sentences(of: $0.description ?? "") }.filter { sentence in
-            let words = longWords(of: sentence)
-            return !words.isEmpty && Double(words.count { said.contains($0.prefix(5)) }) / Double(words.count) < 0.5
-        }
-        let writtenStems = anchorStems(of: written).subtracting(stated).subtracting(idleSummaryStems)
-        return sentences.dropFirst().filter { sentence in
-            let own = anchorStems(of: [sentence])
-            let fromWritten = own.intersection(writtenStems)
-            return !fromWritten.isEmpty && fromWritten.count >= own.intersection(stated).count
-        }
+    /// Whether a summary sentence guarantees an outcome: a form of "to guarantee" in the six languages, not its noun.
+    static func guarantees(_ sentence: String) -> Bool {
+        letterWords(of: sentence).contains { word in guaranteeForms.contains(where: word.hasPrefix) }
     }
 
-    /// Stems of words that say nothing of a duty ("during", "ensuring").
-    static let idleSummaryStems: Set<String> = ["durin", "ensur"]
+    static let guaranteeForms = [
+        "guarantee", "garantisc", "garantire", "garantend", "garantit", "garantiz", "garanto", "garantim", "garantind", "garantir",
+        "garantis", "garantier",
+    ]
 
     /// The words of the job descriptions of `cv`, in lower case, that are a word of an employer's name of `input`, or one of its
     /// forms, and that the description writes nowhere outside the employers' names.
@@ -1629,19 +1603,6 @@ enum ReaderRules {
         "taches relatives", "aufgaben im bereich", "aufgaben rund um", "tarefas relacionadas", "atividades relacionadas",
     ]
 
-    /// The frequency a folded word says, by the beginnings of its words in the six languages.
-    static func frequency(of word: String) -> String? {
-        frequencyWords.first { _, beginnings in beginnings.contains(where: word.hasPrefix) }?.key
-    }
-
-    static let frequencyWords: [String: [String]] = [
-        "daily": ["daily", "quotidian", "quotidien", "giornalier", "giornalment", "diari", "taglich"],
-        "weekly": ["weekly", "settimanal", "semanal", "hebdomadaire", "wochentlich"],
-        "monthly": ["monthly", "mensil", "mensual", "mensal", "mensais", "mensuel", "monatlich"],
-        "yearly": ["yearly", "annual", "annuel", "anual", "jahrlich"],
-        "quarterly": ["quarterly", "trimestr", "quartalsweise", "vierteljahrlich"],
-    ]
-
     /// The summary sentences that open with the verb of a sentence that opens as code writes the opening ("Lavoro come X."):
     /// the opening repeats the verb of the person's own sentence.
     static func floorCollisions(in sentences: [String]) -> [String] {
@@ -1659,16 +1620,15 @@ enum ReaderRules {
         }
     }
 
-    /// The jobs whose final description is under 40 characters while the step that writes a job pins a duty (`dutyCheck`) that the
-    /// description does not hold: the step took the job for described with a duty the final check then moved out of it.
+    /// The jobs whose final description does not hold a duty the step that writes a job pins (`dutyCheck`), whatever its length:
+    /// the typical duties beside the stated ones count for nothing (O1, #354, round 13).
     static func shortDescribedJobs(in cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
         let language = input.language
         let sanitizer = CVDataSanitizer(languageOfText: { _ in language })
         let letters = { (text: String) in fold(text).filter(\.isLetter) }
         return cv.experience.indices.compactMap { index in
             let description = cv.experience[index].description ?? ""
-            guard description.count < CVDataSanitizer.DutyVerdicts.describedLength,
-                  let check = try? sanitizer.dutyCheck(of: cv, job: index, duties: nil, against: input.description),
+            guard let check = try? sanitizer.dutyCheck(of: cv, job: index, duties: nil, against: input.description),
                   check.pinned.contains(where: { !letters(description).contains(letters($0)) }) else { return nil }
             return ReaderFinding(kind: .stepVsFinalPinned, path: "experience[\(index)].description", value: description)
         }
