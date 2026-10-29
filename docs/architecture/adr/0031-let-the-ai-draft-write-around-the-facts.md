@@ -71,6 +71,9 @@ A streamed answer cut by its cap keeps its whole parts (`StreamedAnswer`), as th
 - **D3.** A duty that quotes one of its job's own clauses word for word, with no number, may keep that clause's acronyms, number words and words of seniority, also when the clause is a tail several jobs share; a quote that holds another employer goes.
 - **D4.** A common noun of another job's title ("manutenzione") does not block a duty; another job's whole title does.
 
+**The first measured fix round (#354).** Each class the reader found is first a measure of the evaluation (`ReaderRules`, a class with no threshold), then fixed at its root:
+- **An interest keeps the verb of its phrase.** An interest said with a verb in the form of its infinitive stays whole ("play football", "bake bread", "hiking in the Alps", "wandern gehen"); only a conjugated verb first goes ("spiele Schach" is "Schach"), by its ending (`CVDataSanitizer.isConjugated`). Measure: an interest of one noun said right after a verb that is not inflected (`bareInterest`).
+
 ### What it supersedes
 
 - **The single second call of "Two passes".** The text around the facts is written by a request per section ("A request per section"); the second call's limit (45 s) and bounds (400 tokens, one schema for every section) are replaced by the caps and deadlines there.

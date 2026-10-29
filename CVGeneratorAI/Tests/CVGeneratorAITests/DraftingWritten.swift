@@ -207,6 +207,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A summary sentence in Spanish, Italian or Portuguese that starts, after a title of the person, with a verb of the third person
     /// ("Contable gestiona los registros.", "Si occupa della contabilità."): the person spoken of, not speaking.
     case thirdPersonSummary
+    /// An interest of one noun that the description says after a verb in its infinitive form ("football" of "I play football"): the
+    /// pastime's phrase without its verb (#354, round 1).
+    case bareInterest
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -229,6 +232,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .clauseAsSkill: "a clause as a skill"
         case .toolAsSoftSkill: "a tool as a soft skill"
         case .thirdPersonSummary: "a summary in the third person"
+        case .bareInterest: "an interest without the verb of its phrase"
         }
     }
 }
@@ -300,6 +304,9 @@ enum ReaderRules {
         }
         for (index, interest) in cv.interests.enumerated() where isClause(interest) || startsWithVerb(interest, in: input) {
             found.append(ReaderFinding(kind: .clauseAsInterest, path: "interests[\(index)]", value: interest))
+        }
+        for (index, interest) in cv.interests.enumerated() where losesItsVerb(interest, in: input) {
+            found.append(ReaderFinding(kind: .bareInterest, path: "interests[\(index)]", value: interest))
         }
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         return found
@@ -549,18 +556,45 @@ enum ReaderRules {
             || CVDataSanitizer.softStems.contains { lowered.contains($0) }
     }
 
-    /// Whether an interest of more than one word starts with the finite verb of its clause ("spiele Schach" of "und spiele Schach"),
-    /// as the device tags the description, or, in German, "ich" and the interest, in English and German; a gerund ("hiking") and a German infinitive ("wandern") are none.
+    /// Whether an interest of more than one word starts with an inflected verb of its clause ("spiele Schach" of "und spiele Schach"),
+    /// as the device tags the description, or, in German, "ich" and the interest, in English and German; a verb in the form of its
+    /// infinitive ("play football", "hiking", "wandern") is the pastime's phrase.
     static func startsWithVerb(_ interest: String, in input: DraftingInput) -> Bool {
         let words = letterWords(of: interest)
-        guard ["en", "de"].contains(input.language), words.count > 1, let first = words.first, !first.hasSuffix("ing"),
-              !(input.language == "de" && first.hasSuffix("n")),
+        guard ["en", "de"].contains(input.language), words.count > 1, let first = words.first, isInflected(first, language: input.language),
               let range = input.description.range(of: interest, options: [.caseInsensitive, .diacriticInsensitive]) else { return false }
         let start = input.description.distance(from: input.description.startIndex, to: range.lowerBound)
         let tagger = DeviceLexicalTagger()
         return tagger.verbs(in: input.description, language: input.language).contains { $0.contains(start) }
             || input.language == "de" && tagger.verbs(in: "ich " + interest.prefix(1).lowercased() + interest.dropFirst(), language: "de")
                 .contains { $0.contains(4) }
+    }
+
+    /// Whether a lowered verb is inflected, by its ending: in English "-s" or "-ed", in German anything but "-n".
+    static func isInflected(_ verb: String, language: String) -> Bool {
+        language == "de" ? !verb.hasSuffix("n") : verb.hasSuffix("ed") || verb.hasSuffix("s") && !verb.hasSuffix("ss")
+    }
+
+    /// Whether an interest of one noun is said in the description right after a verb that is not inflected ("football" of "I play
+    /// football"), as the device tags the description, in English and German; a gerund or a German infinitive is no noun.
+    static func losesItsVerb(_ interest: String, in input: DraftingInput) -> Bool {
+        let words = letterWords(of: interest)
+        guard ["en", "de"].contains(input.language), words.count == 1, let noun = words.first, !noun.hasSuffix("ing"),
+              !(input.language == "de" && interest.first?.isLowercase == true) else { return false }
+        let said = input.description
+        let verbs = DeviceLexicalTagger().verbs(in: said, language: input.language)
+        var spoken: [(word: String, start: Int)] = []
+        var start: Int?
+        for (offset, character) in said.enumerated() {
+            if character.isLetter { if start == nil { start = offset } } else if let first = start {
+                spoken.append((fold(String(Array(said)[first..<offset])), first)); start = nil
+            }
+        }
+        if let first = start { spoken.append((fold(String(Array(said)[first...])), first)) }
+        return spoken.indices.dropFirst().contains { index in
+            spoken[index].word == noun && verbs.contains { $0.contains(spoken[index - 1].start) }
+                && !isInflected(spoken[index - 1].word, language: input.language)
+        }
     }
 
     /// The words of `text`, lowered, folded and split at anything not a letter.

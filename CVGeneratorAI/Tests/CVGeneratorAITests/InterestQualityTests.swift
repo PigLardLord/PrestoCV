@@ -54,7 +54,7 @@ struct InterestQualityTests {
 
     static let sundays = "I have been a waiter at the Lantern Bistro in Exeter since 2019. On Sundays I play chess and go hiking in the Alps."
 
-    @Test("An interest quoted with the finite verb of its clause is the pastime the verb names; one that starts with an adjective, an infinitive or a gerund stays whole (#354)")
+    @Test("An interest quoted with a conjugated verb of its clause is the pastime the verb names; one that starts with an adjective, a verb in the form of its infinitive or a gerund stays whole (#354)")
     func verbOfAnInterestGoes() throws {
         let german = CVDataSanitizer(
             languageOfText: { _ in "de" },
@@ -69,7 +69,30 @@ struct InterestQualityTests {
         let sundays = try english.sanitize(CVData(interests: ["play chess", "hiking in the Alps"]), against: Self.sundays)
 
         #expect(leisure.interests == ["klettern", "klassische Musik", "Schach"])
-        #expect(sundays.interests == ["chess", "hiking in the Alps"])
+        #expect(sundays.interests == ["play chess", "hiking in the Alps"])
+    }
+
+    @Test("An English interest whose verb is in the form the person says after \"I\" keeps its verb, and a German one conjugated loses it (#354, round 1)",
+          arguments: [("play football", "en", "play football"), ("bake bread", "en", "bake bread"), ("spiele Schach", "de", "Schach")])
+    func infinitiveOfAnInterestStays(interest: String, language: String, kept: String) throws {
+        let description = language == "en"
+            ? "I have been a waiter at the Lantern Bistro in Exeter since 2019. I play football and I bake bread."
+            : Self.german
+        let sanitizer = CVDataSanitizer(
+            languageOfText: { _ in language },
+            lexicalClasses: ForcedLexicalTagger([.english: .words(["have", "been", "play", "bake"]), .german: .words(["arbeite", "gehe", "hore", "spiele", "klettern"])]),
+            wordList: TableWordList()
+        )
+
+        let result = try sanitizer.sanitize(CVData(interests: [interest]), against: description)
+
+        #expect(result.interests == [kept])
+    }
+
+    @Test("A verb is conjugated by its ending: \"-s\" or \"-ed\" in English, anything but \"-n\" in German (#354, round 1)",
+          arguments: [("play", "en", false), ("plays", "en", true), ("baked", "en", true), ("dress", "en", false), ("spiele", "de", true), ("spielen", "de", false)])
+    func conjugatedVerb(verb: String, language: String, conjugated: Bool) throws {
+        #expect(CVDataSanitizer.isConjugated(verb, in: try #require(Vocabulary.Language(rawValue: language))) == conjugated)
     }
 
     #if canImport(NaturalLanguage)

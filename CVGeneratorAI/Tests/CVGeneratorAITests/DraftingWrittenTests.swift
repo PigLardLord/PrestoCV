@@ -339,6 +339,21 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .clauseAsInterest }.map(\.value) == [clause])
     }
 
+    @Test("An interest of one noun said after a verb in the form of its infinitive is counted; the whole phrase, and a noun said after a conjugated verb, are not (#354, round 1)")
+    func bareInterest() {
+        let input = DraftingInput(
+            id: "reader-en", kind: .plain, language: "en",
+            description: "I have been a waiter in Exeter since 2019. I play football, I bake bread and my brother plays chess.",
+            facts: [], traps: []
+        )
+        let cv = CVData(interests: ["football", "bake bread", "chess"])
+
+        let found = ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+
+        #expect(found.filter { $0.kind == .bareInterest }.map(\.value) == ["football"])
+        #expect(found.filter { $0.kind == .clauseAsInterest }.isEmpty)
+    }
+
     @Test("A year the description gives a school and the draft does not hold is counted")
     func lostYear() throws {
         let kept = CVData(education: [Education(degree: "logistics", institution: "Leeds City College", endDate: "2013")])

@@ -283,17 +283,18 @@ public struct CVDataSanitizer: Sendable {
         return unique(cleaned) { "\($0.experience.title)|\($0.experience.company)" }
     }
 
-    /// An interest quoted with the finite verb of its clause ("spiele Schach" of "... und spiele Schach", "play chess" of "I play
-    /// chess") as the pastime the verb names ("Schach", "chess"): a verb is no pastime (#354). The verb is the interest's first word
-    /// where the description's sentence that quotes the interest tags it as one, or, in German, where "ich" and the interest do, in
-    /// English and German, whose verbs grounding reads by their tags; an interest of one word, and one whose first word is a gerund ("hiking in the Alps") or a German infinitive
-    /// ("wandern gehen"), stays whole, and so does one whose rest holds no word of 3 letters or more, or, in German, no noun.
+    /// An interest quoted with a conjugated verb of its clause first ("spiele Schach" of "... und spiele Schach") as the pastime the
+    /// verb names ("Schach"): a conjugated verb is no pastime (#354). The verb is the interest's first word where the description's
+    /// sentence that quotes the interest tags it as one, or, in German, where "ich" and the interest do, in English and German, whose
+    /// verbs grounding reads by their tags. A verb in the form of its infinitive is the pastime's phrase and stays (#354, round 1): an
+    /// English verb with no "-s" and no "-ed" ("play football", "bake bread"), a gerund ("hiking in the Alps") and a German infinitive
+    /// ("wandern gehen"). An interest of one word stays whole, and so does one whose rest holds no word of 3 letters or more, or, in
+    /// German, no noun.
     func pastime(of interest: String, in source: DescriptionText) -> String {
         let language = source.explainer.language
         let words = Word.words(in: interest)
         guard let language, VerbForms.readsVerbsByTags(in: language), lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue),
-              words.count > 1, let first = words.first?.folded,
-              !first.hasSuffix("ing"), !(language == .german && first.hasSuffix("n")) else { return interest }
+              words.count > 1, let first = words.first?.folded, Self.isConjugated(first, in: language) else { return interest }
         let folded = words.map(\.folded)
         for sentence in source.sentences {
             let said = Word.words(in: sentence.raw)
@@ -551,12 +552,21 @@ public struct CVDataSanitizer: Sendable {
         return Set(Word.words(in: sentence).map(\.folded))
     }
 
-    /// The lowercased runs of letters of `text`.
+    /// Whether `verb`, folded, is in a form other than its infinitive: in English one with "-s" or "-ed" ("plays", "baked"), never
+    /// the bare form a person says after "I" ("play") nor a gerund; in German one that does not end in "n" ("spiele", not "spielen").
+    static func isConjugated(_ verb: String, in language: Vocabulary.Language) -> Bool {
+        switch language {
+        case .german: !verb.hasSuffix("n")
+        default: verb.hasSuffix("ed") || verb.hasSuffix("s") && !verb.hasSuffix("ss")
+        }
+    }
+
     /// `text` with its first letter in lower case, the rest as written.
     static func lowercasingFirst(_ text: String) -> String {
         text.prefix(1).lowercased() + text.dropFirst()
     }
 
+    /// The lowercased runs of letters of `text`.
     static func letterWords(of text: String) -> [String] {
         text.lowercased().split { !$0.isLetter }.map(String.init)
     }
