@@ -175,6 +175,8 @@ extension CVDataSanitizer {
                     rejection = "it is not a whole sentence"
                 } else if Self.isVague(sentence) {
                     rejection = Self.vagueReason
+                } else if Self.isAbstract(sentence) {
+                    rejection = Self.abstractReason
                 } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
                     rejection = Self.onlyWhereReason
                 } else if let ruled = reason(sentence, quotes) {
@@ -253,6 +255,51 @@ extension CVDataSanitizer {
         let folded = " " + Word.words(in: duty).map(\.folded).joined(separator: " ") + " "
         return vaguePhrases.contains { folded.contains(" \($0) ") }
     }
+
+    /// Why a written duty whose work is only abstract nouns goes ("I managed the processes.", #354, round 14).
+    static let abstractReason = "it names no thing the work is done on, only abstract words: name what the person works on"
+
+    /// Whether `duty` says its work only through abstract nouns ("processes", "flows", "systems", "parts"): it holds one, and,
+    /// of its other words of four letters or more, one at most is no stop word or empty modifier, and that one is its verb. A
+    /// duty that names what the work is done on ("the brake systems of the trucks") has more, and stays. The person's own duties
+    /// are pinned before this check, so it drops only a written one (#354, round 14).
+    static func isAbstract(_ duty: String) -> Bool {
+        let words = Word.words(in: duty).map(\.folded).filter { $0.count >= 4 && !abstractStops.contains($0) }
+        guard words.contains(where: abstractNouns.contains) else { return false }
+        return words.count { !abstractNouns.contains($0) && !emptyModifiers.contains($0) } <= 1
+    }
+
+    /// The abstract nouns of a duty, folded, in the six languages.
+    private static let abstractNouns: Set<String> = [
+        "flow", "flows", "workflow", "workflows", "balance", "system", "systems", "part", "parts", "element", "elements", "process",
+        "processes", "operations", "activities", "aspects", "structure", "structures", "things", "solutions", "resources", "work",
+        "flusso", "flussi", "equilibrio", "sistema", "sistemi", "parti", "elementi", "processi", "attivita", "aspetti", "struttura",
+        "strutture", "soluzioni", "risorse", "operazioni", "lavoro",
+        "flujo", "flujos", "sistemas", "partes", "elementos", "procesos", "actividades", "aspectos", "estructura", "soluciones",
+        "recursos", "operaciones", "trabajo",
+        "flux", "equilibre", "systeme", "systemes", "parties", "processus", "activites", "ressources", "travail",
+        "fluss", "ablauf", "ablaufe", "gleichgewicht", "teile", "elemente", "prozesse", "aktivitaten", "aspekte",
+        "struktur", "strukturen", "losungen", "ressourcen", "arbeit",
+        "fluxo", "fluxos", "processos", "atividades", "estrutura", "solucoes", "operacoes", "trabalho",
+    ]
+
+    /// The words of a duty that say nothing of what the work is done on, folded: adjectives and adverbs of any work.
+    private static let emptyModifiers: Set<String> = [
+        "overall", "general", "different", "various", "digital", "structural", "times", "always", "correct", "correctly", "proper",
+        "properly", "generale", "generali", "diversi", "diverse", "digitale", "digitali", "strutturale", "sempre", "tutti", "tutte",
+        "complessivo", "globale", "generales", "diferentes", "digitales", "estructural", "siempre", "todos", "todas",
+        "global", "generaux", "differents", "numerique", "numeriques", "toujours", "tous", "toutes", "allgemeine", "verschiedene",
+        "digitalen", "immer", "alle", "allen", "geral", "gerais", "digitais", "estrutural",
+    ]
+
+    /// The words of four letters or more of a duty that are no words of the work, folded: prepositions, auxiliaries, determiners.
+    private static let abstractStops: Set<String> = [
+        "with", "from", "across", "within", "into", "over", "under", "before", "after", "each", "every", "their", "them", "they",
+        "this", "that", "these", "those", "have", "been", "were", "while", "during", "della", "delle", "degli", "dello", "nella",
+        "nelle", "nello", "alla", "alle", "allo", "sulla", "sulle", "dalla", "dalle", "ogni", "avevo", "sono", "para", "pela", "pelo",
+        "pelas", "pelos", "como", "cada", "avec", "pour", "dans", "sous", "chaque", "eine", "einen", "einem", "einer", "durch",
+        "unter", "uber", "beim", "habe", "hatte", "jede", "jeden", "jeder", "tenho", "tinha", "todo", "toda",
+    ]
 
     /// The vague phrases of a duty, folded.
     private static let vaguePhrases = [

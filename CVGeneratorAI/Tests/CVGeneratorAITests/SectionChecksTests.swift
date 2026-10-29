@@ -150,6 +150,35 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.isVague(duty) == vague)
     }
 
+    @Test("A written duty whose work is only abstract nouns goes, with its reason; one that names what the work is done on stays, also beside an abstract noun (#354, round 14)")
+    func abstractDuty() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.itTrapsJobs, job: 0, duties: "Gestisco i flussi digitali. Seguo i processi di chiusura delle fatture.",
+            against: try Self.itTraps()
+        )
+
+        #expect(verdicts.kept == ["Seguo i processi di chiusura delle fatture."])
+        #expect(verdicts.rejected.map(\.sentence) == ["Gestisco i flussi digitali."])
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.abstractReason])
+    }
+
+    @Test("A duty of abstract words, in the six languages: an abstract noun with one other word of the work at most; a duty that names what it is done on is none (#354, round 14)", arguments: [
+        ("Ho gestito i processi.", true),
+        ("I maintained the overall balance at all times.", true),
+        ("Ich habe Systeme betreut.", true),
+        ("Gerenciei os fluxos de trabalho.", true),
+        ("Gestionaba los procesos generales.", true),
+        ("Je gérais les flux de travail.", true),
+        ("Ho montato i sistemi frenanti dei camion.", false),
+        ("I repaired the hydraulic systems of the presses.", false),
+        ("Ich habe die Teile der Pumpen geprüft.", false),
+        ("Organizei o fluxo de pedidos da loja.", false),
+        ("Riparavo le pompe.", false),
+    ])
+    func abstractWords(duty: String, abstract: Bool) {
+        #expect(CVDataSanitizer.isAbstract(duty) == abstract)
+    }
+
     // MARK: How often (#354, round 11)
 
     /// The jobs of es-traps: a current one with a duty the person said, and an ended one the person only named.
