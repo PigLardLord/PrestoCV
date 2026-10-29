@@ -101,6 +101,45 @@ struct DraftingReaderTests {
         #expect(Self.reader(cv, "de").filter { $0.kind == .splitVerb }.map(\.value) == ["sicher stelle", "ein fahren"])
     }
 
+    @Test("A summary sentence that shares only a word for work of any trade with the work is counted; one that names a duty is not (#354, round 5)")
+    func workWordIsNoAnchor() {
+        let cv = CVData(
+            personalInfo: PersonalInfo(title: "fabbro"),
+            summary: "Lavoro come fabbro in officina. Ogni giorno il lavoro richiede costanza e cura. Saldo cancelli con attenzione alla forma.",
+            experience: [Experience(title: "fabbro", company: "Officina Merla", description: "Nel mio lavoro saldo cancelli in ferro battuto.")]
+        )
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .unanchoredSummary }.map(\.value) == [
+            "Ogni giorno il lavoro richiede costanza e cura.",
+        ])
+    }
+
+    @Test("An Italian, Spanish or Portuguese summary sentence with no first person is counted; one with a verb or a word of the person is not (#354, round 5)")
+    func impersonalSummary() {
+        let italian = CVData(summary: "Lavoro come fabbro da molti anni. Ogni cancello richiede pazienza e misura. "
+            + "Con calma, saldo le cerniere ai telai. La precisione guida ogni intervento. Mi piace il ferro battuto.")
+        let spanish = CVData(summary: "Soy cerrajero en un taller pequeño. Cada cerradura exige un ajuste fino.")
+        let portuguese = CVData(summary: "Conserto relógios antigos com cuidado. O ofício exige paciência.")
+        let counted = { (cv: CVData, language: String) in
+            Self.reader(cv, language).filter { $0.kind == .impersonalSummary }.map(\.value)
+        }
+
+        #expect(counted(italian, "it") == ["Ogni cancello richiede pazienza e misura.", "La precisione guida ogni intervento."])
+        #expect(counted(spanish, "es") == ["Cada cerradura exige un ajuste fino."])
+        #expect(counted(portuguese, "pt") == ["O ofício exige paciência."])
+        #expect(counted(CVData(summary: "The work asks for patience."), "en").isEmpty)
+    }
+
+    @Test("A German subordinate clause that ends with a noun after its verb is counted; one that ends with its verb is not (#354, round 5)")
+    func germanVerbPosition() {
+        let cv = CVData(summary: "Ich arbeite als Schleusenwärter. Ich prüfe, dass alle Tore schließen sauber nach jeder Fahrt. "
+            + "Ich achte darauf, dass die Tore sauber schließen. Ich weiß, ob die Pumpe läuft.")
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .germanVerbPosition }.map(\.value) == [
+            "dass alle Tore schließen sauber nach jeder Fahrt",
+        ])
+    }
+
     // MARK: Skills
 
     @Test("A soft skill that is an empty word of experience or of being a professional is counted; a quality and the word for a skill are not")
@@ -158,6 +197,34 @@ struct DraftingReaderTests {
         let found = ReaderRules.findings(in: cv, for: electrician, report: InventedFacts.count(cv, for: electrician))
 
         #expect(found.filter { $0.kind == .noToolOfTheTrade }.map(\.value) == ["Schalter", "Leitungen"])
+    }
+
+    @Test("A role, the noun of an activity or a document as a technology is counted; a tool, a tool with an acronym and a kind of model are not (#354, round 5)")
+    func nonToolTechnology() {
+        let counted = { (names: [String], language: String) in
+            Self.reader(CVData(skills: names.map { Skill(name: $0) }), language).filter { $0.kind == .nonToolTechnology }.map(\.value)
+        }
+
+        #expect(counted(["Registros", "programación de turnos", "hoja de cálculo", "análisis FMEA"], "es")
+            == ["Registros", "programación de turnos"])
+        #expect(counted(["operador", "faturas", "gerador de relatórios", "modelo de simulação"], "pt") == ["operador", "faturas"])
+        #expect(counted(["contratti", "registratore di cassa"], "it") == ["contratti"])
+        #expect(counted(["data analysis", "invoice", "label printer", "SQL reporting"], "en") == ["data analysis", "invoice"])
+    }
+
+    @Test("A modifier cut from the noun of another technology is counted; a noun joined to another technology is not (#354, round 5)")
+    func clippedModifier() {
+        let counted = { (description: String, names: [String], language: String) in
+            let input = DraftingInput(id: "reader-\(language)", kind: .plain, language: language, description: description, facts: [], traps: [])
+            let cv = CVData(skills: names.map { Skill(name: $0) })
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .clippedModifier }.map(\.value)
+        }
+
+        #expect(counted("Leggo disegni meccanici e idraulici e monto tubi flessibili e valvole.",
+                        ["disegni meccanici", "idraulici", "tubi flessibili", "valvole"], "it") == ["idraulici"])
+        #expect(counted("I read hydraulic and electric diagrams and fit valves and flexible hoses.",
+                        ["electric diagrams", "hydraulic", "flexible hoses", "valves"], "en") == ["hydraulic"])
     }
 
     // MARK: Duties

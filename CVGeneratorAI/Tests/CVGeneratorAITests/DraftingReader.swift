@@ -98,6 +98,18 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A German separable verb written apart at the end of a subordinate clause, where it is one word ("dass ich … sicher stelle";
     /// #354, round 4, at d1d09c81), in the summary or a job's description.
     case splitVerb
+    /// A technology that names a person, an activity or a document, and no tool: a role ("intérprete", "analista"), the noun of an
+    /// activity ("Escaneo", "análisis de datos") or what the work produces ("fatture"; #354, round 5, at 0a135a4b).
+    case nonToolTechnology
+    /// A technology of one word that the description writes as the second of two modifiers of another technology's noun: the
+    /// adjective cut from its noun ("pneumatici" of "schemi elettrici e pneumatici"; #354, round 5).
+    case clippedModifier
+    /// An Italian, Spanish or Portuguese summary sentence with no verb of the first person and no word of the person: the work
+    /// spoken of, not the person speaking ("Ogni azione è guidata dalla cura…"; #354, round 5).
+    case impersonalSummary
+    /// A German subordinate clause after "dass", "weil", "sodass" or "ob" whose finite verb is not its last word: the clause ends
+    /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354, round 5).
+    case germanVerbPosition
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -137,6 +149,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .chainedSummary: "a summary sentence of clauses joined by semicolons"
         case .unanchoredSummary: "a summary sentence with no word of the work"
         case .splitVerb: "a German separable verb split in a subordinate clause"
+        case .nonToolTechnology: "a person, an activity or a document as a technology"
+        case .clippedModifier: "a modifier cut from its noun as a technology"
+        case .impersonalSummary: "a summary sentence with no person speaking"
+        case .germanVerbPosition: "a German finite verb before the end of its subordinate clause"
         }
     }
 }
@@ -180,6 +196,8 @@ enum ReaderRules {
                     found.append(ReaderFinding(kind: .softAsTechnology, path: path, value: skill.name))
                 } else if isNoTool(skill.name) || isActivity(skill.name, language: language) || isPart(skill.name, of: input) {
                     found.append(ReaderFinding(kind: .noToolOfTheTrade, path: path, value: skill.name))
+                } else if isNonTool(skill.name, language: language) {
+                    found.append(ReaderFinding(kind: .nonToolTechnology, path: path, value: skill.name))
                 } else if isCategory(skill.name, language: language) {
                     found.append(ReaderFinding(kind: .categoryAsTechnology, path: path, value: skill.name))
                 }
@@ -194,6 +212,7 @@ enum ReaderRules {
                 found.append(ReaderFinding(kind: .clauseAsSkill, path: path, value: skill.name))
             }
         }
+        found += clippedModifiers(in: cv, of: input)
         let vocabulary = Vocabulary.Language(rawValue: language)
         for (index, job) in cv.experience.enumerated() {
             let description = job.description ?? ""
@@ -227,6 +246,9 @@ enum ReaderRules {
         if language == "de" {
             let texts = [("summary", cv.summary ?? "")] + cv.experience.enumerated().map { ("experience[\($0).description", $1.description ?? "") }
             found += texts.flatMap { path, text in splitVerbs(in: text).map { ReaderFinding(kind: .splitVerb, path: path, value: $0) } }
+            found += texts.flatMap { path, text in
+                verbsBeforeTheEnd(in: text).map { ReaderFinding(kind: .germanVerbPosition, path: path, value: $0) }
+            }
         }
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         found += report.lost.filter { [.duty, .quality].contains($0.kind) }
@@ -453,10 +475,17 @@ enum ReaderRules {
         let qualities = cv.skills.filter { $0.kind == .softSkill }.map { letterWords(of: $0.name) }.filter { !$0.isEmpty }
         found += sentences.filter { hasQualitySubject($0, qualities: qualities) }
             .map { ReaderFinding(kind: .qualitySubjectSummary, path: "summary", value: $0) }
-        let anchors = anchorStems(of: [input.description, cv.personalInfo.title ?? ""] + cv.experience.map(\.title)
-            + cv.experience.map { $0.description ?? "" } + cv.skills.map(\.name))
+        // The anchors are the work itself: the titles, the duties the draft keeps and its tools, not the whole description (whose
+        // "lavoro" anchored any sentence) and not the qualities (#354, round 5).
+        let anchors = anchorStems(of: [cv.personalInfo.title ?? "", input.field ?? ""] + cv.experience.map(\.title)
+            + input.facts.filter { $0.kind == .title }.flatMap(\.forms) + cv.experience.map { $0.description ?? "" }
+            + cv.skills.filter { $0.kind == .technology }.map(\.name))
         found += sentences.dropFirst().filter { anchorStems(of: [$0]).isDisjoint(with: anchors) }
             .map { ReaderFinding(kind: .unanchoredSummary, path: "summary", value: $0) }
+        if ["it", "es", "pt"].contains(input.language) {
+            found += sentences.filter { !speaksAsThePerson($0, language: input.language) }
+                .map { ReaderFinding(kind: .impersonalSummary, path: "summary", value: $0) }
+        }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -472,6 +501,107 @@ enum ReaderRules {
     /// "sempre"): what a summary sentence shares with the work it is about.
     static func anchorStems(of texts: [String]) -> Set<String> {
         Set(texts.flatMap(letterWords(of:)).filter { $0.count >= 5 && !commonWords.contains($0) }.map { String($0.prefix(5)) })
+            .subtracting(workStopStems)
+    }
+
+    /// The stems of the words for work of any trade ("lavoro", "tâche", "Aufgabe", "element", "process"): a sentence that shares
+    /// only one of them with the work names none of it (#354, round 5).
+    static let workStopStems: Set<String> = [
+        "lavor", "attiv", "compi", "traba", "tarea", "taref", "trava", "tache", "arbei", "aufga", "eleme", "proce", "activ", "tasks",
+        "teams",
+    ]
+
+    /// Whether an Italian, Spanish or Portuguese sentence speaks as the person: a word of the person ("mi", "yo", "meu"), an
+    /// auxiliary of the first person ("ho", "sono", "tengo"), or a verb in "-o" first, or first after a comma ("Gestisco …",
+    /// "Con cura, verifico …"). A rough rule: "Con cura verifico" is not read.
+    static func speaksAsThePerson(_ sentence: String, language: String) -> Bool {
+        let words = letterWords(of: sentence)
+        if words.contains(where: (speakerWords[language] ?? []).contains) { return true }
+        let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !connectors.contains($0) } }
+        return firsts.contains { $0.count >= 3 && $0.hasSuffix("o") && !determiners.contains($0) }
+    }
+
+    /// The words of the person, and the auxiliaries of the first person, by language, folded.
+    private static let speakerWords: [String: Set<String>] = [
+        "it": ["io", "mi", "me", "mio", "mia", "miei", "mie", "ho", "sono", "sto", "posso"],
+        "es": ["yo", "me", "mi", "mis", "mio", "mia", "conmigo", "he", "soy", "estoy", "tengo", "puedo"],
+        "pt": ["eu", "me", "meu", "minha", "meus", "minhas", "comigo", "sou", "estou", "tenho", "posso"],
+    ]
+
+    /// The words in "-o" that open a sentence and are no verb: articles, determiners, prepositions.
+    private static let determiners: Set<String> = [
+        "uno", "ogni", "questo", "quello", "nello", "dello", "allo", "dallo", "sullo", "como", "todo", "cada", "este", "ese", "aquello",
+        "esto", "eso", "durante", "dentro", "fuera", "nuestro", "vuestro", "nosso", "nao", "cuando", "quando", "tanto", "molto", "ciascuno",
+        "isso", "isto", "aquilo", "ovunque", "solo",
+    ]
+
+    /// The clauses of German `text` after "dass", "weil", "sodass" or "ob" that end with a noun, a word with a capital, while
+    /// a word in lower case in "-en" or "-t" before it is the verb: the finite verb stands before the end ("dass alle Anlagen funktionieren
+    /// einwandfrei durch die Prüfung"; #354, round 5). A clause of fewer than three words is not read.
+    static func verbsBeforeTheEnd(in text: String) -> [String] {
+        text.split { ",;.!?".contains($0) }.compactMap { clause in
+            let words = clause.split { !$0.isLetter }.map(String.init)
+            guard let start = words.firstIndex(where: { ["dass", "weil", "sodass", "ob"].contains($0.lowercased()) }) else { return nil }
+            let rest = words[(start + 1)...]
+            guard rest.count >= 3, let last = rest.last, last.first?.isUppercase == true,
+                  rest.dropLast().contains(where: { $0.count >= 4 && $0.first?.isLowercase == true && ($0.hasSuffix("en") || $0.hasSuffix("t")) })
+            else { return nil }
+            return clause.trimmingCharacters(in: .whitespaces)
+        }
+    }
+
+    /// Whether a technology names a person, an activity or a document: its head noun (the last word in English and German, the
+    /// first in the other languages) is a role, the noun of an activity, or a document (`nonToolHeads`), or, of two words or more,
+    /// ends as the noun of an action ("generación de informes"). A name or an acronym in it names a tool ("analisi FMEA").
+    static func isNonTool(_ name: String, language: String) -> Bool {
+        let words = name.split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        guard !words.contains(where: { $0.count >= 2 && $0 == $0.uppercased() || $0.contains(where: \.isNumber) }) else { return false }
+        let folded = words.map(fold).filter { !linkWords.contains($0) && $0.count > 1 }
+        guard let head = ["en", "de"].contains(language) ? folded.last : folded.first else { return false }
+        return nonToolHeads.contains(head)
+            || folded.count > 1 && ["zione", "cion", "cao", "tion", "sione", "sion", "sao"].contains(where: head.hasSuffix)
+    }
+
+    /// The head nouns of a role, an activity or a document, folded, in the six languages.
+    static let nonToolHeads: Set<String> = [
+        "interprete", "analista", "analyst", "programmatore", "programador", "developer", "entwickler", "tecnico", "technician",
+        "techniker", "operatore", "operador", "operator", "assistente", "assistant", "consulente", "consultor", "consultant",
+        "escaneo", "scansione", "escaneamento", "scanning", "registro", "registros", "registrazione", "analisi", "analisis", "analise",
+        "analysis", "analyse", "monitoraggio", "monitoreo", "monitoramento", "monitoring", "riparazione", "reparacion", "reparo",
+        "repair", "pulizia", "limpieza", "limpeza", "cleaning", "nettoyage", "reinigung",
+        "fatture", "fattura", "facturas", "factura", "faturas", "fatura", "invoices", "invoice", "rechnungen", "rechnung", "factures",
+        "facture", "report", "reports", "rapporti", "informes", "informe", "relatorios", "relatorio", "rapports", "berichte", "bericht",
+        "contratti", "contratos", "contracts", "contrats", "vertrage", "documentos", "dokumente",
+    ]
+
+    /// The technologies of one word that the description writes as the second of two modifiers of another technology's noun, cut
+    /// from it: after "and" and the other's last word, with the same ending, in the languages that put the modifier after its noun
+    /// ("pneumatici" of "schemi elettrici e pneumatici", with "schemi elettrici" listed; #354, round 5); before "and" and the
+    /// other's first word in English (an adjective: "hydraulic" of "hydraulic and electric diagrams") and German (in lower case).
+    /// A noun joined to another technology ("tubi flessibili e valvole", "valves and flexible hoses") is not one.
+    static func clippedModifiers(in cv: CVData, of input: DraftingInput) -> [ReaderFinding] {
+        let technologies = cv.skills.enumerated().filter { $0.element.kind == .technology }
+        let phrases = technologies.map { letterWords(of: $0.element.name) }.filter { $0.count > 1 }
+        let raw = input.description.split { !$0.isLetter }.map(String.init)
+        let said = raw.map(fold)
+        let joins: Set<String> = ["e", "ed", "and", "und", "y", "et", "ou", "oder", "or", "o"]
+        let adjectiveEndings = ["ic", "al", "ive", "ous", "able", "ible", "ary", "ful"]
+        let first = ["en", "de"].contains(input.language)
+        return technologies.compactMap { index, skill in
+            let words = letterWords(of: skill.name)
+            guard words.count == 1, let word = words.first, skill.name != skill.name.uppercased() else { return nil }
+            let clipped = said.indices.contains { at in
+                guard said[at] == word else { return false }
+                if first {
+                    guard at + 2 < said.count, joins.contains(said[at + 1]), phrases.contains(where: { $0.first == said[at + 2] })
+                    else { return false }
+                    return input.language == "de" ? raw[at].first?.isLowercase == true : adjectiveEndings.contains(where: word.hasSuffix)
+                }
+                return at >= 2 && joins.contains(said[at - 1])
+                    && phrases.contains { $0.last == said[at - 2] && said[at - 2].suffix(2) == word.suffix(2) }
+            }
+            return clipped ? ReaderFinding(kind: .clippedModifier, path: "skills[\(index)].name", value: skill.name) : nil
+        }
     }
 
     /// Words of five letters or more of any text, folded.
@@ -712,7 +842,7 @@ enum ReaderRules {
         Set(letterWords(of: text).filter { $0.count >= 3 && !linkWords.contains($0) }.map { String($0.prefix(5)) })
     }
 
-    private static let linkWords: Set<String> = [
+    static let linkWords: Set<String> = [
         "the", "and", "for", "with", "del", "dei", "della", "delle", "degli", "dello", "per", "con", "und", "von", "der", "die", "das",
         "des", "les", "pour", "avec", "los", "las", "para", "com", "dos",
     ]
@@ -821,8 +951,20 @@ enum ReaderRules {
                 || index > 0 && word.first?.isUppercase == true && language != "de"
                 || word.contains(where: \.isNumber)
         }
-        return !named
+        // A kind with a word of its trade names what it is for ("software de contabilidad", "editor de código"); a bare kind, or one
+        // with only a word of any trade ("editor de texto", "development platform"), names none (#354, round 5).
+        let modifiers = folded.filter { $0 != head && !linkWords.contains($0) && !shortLinkWords.contains($0) }
+        return !named && modifiers.allSatisfy(genericModifiers.contains)
     }
+
+    /// The link words of two letters or less of the six languages ("de", "di", "of"), folded.
+    static let shortLinkWords: Set<String> = ["de", "di", "da", "do", "du", "of", "d", "l", "a", "e", "y", "et", "el", "la", "le", "il"]
+
+    /// The words that tell no trade's kind of tool from another, folded.
+    static let genericModifiers: Set<String> = [
+        "texto", "text", "testo", "texte", "desenvolvimento", "desarrollo", "development", "sviluppo", "developpement", "entwicklung",
+        "dados", "datos", "data", "dati", "donnees", "daten",
+    ]
 
     static func isEnglish(_ name: String, language: String) -> Bool {
         guard name.unicodeScalars.allSatisfy(\.isASCII) else { return false }

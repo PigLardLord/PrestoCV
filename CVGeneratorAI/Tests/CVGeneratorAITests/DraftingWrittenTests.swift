@@ -350,18 +350,18 @@ struct DraftingWrittenTests {
         #expect(counted(["PLC", "quadri elettrici", "multimetro", "termocamera", "inverter"], italian).isEmpty)
     }
 
-    @Test("A technology that names a kind of tool and no tool of it is counted; one with a name, an acronym or a head of its own is not (#354, round 2)")
+    @Test("A kind of tool alone or with a word of any trade is counted; one with a word of its trade, a name or an acronym is not (#354, rounds 2 and 5)")
     func categoryAsTechnology() {
-        let english = CVData(skills: ["accounting software", "Sage 50", "PA system", "ticketing platform", "QuickBooks software"]
-            .map { Skill(name: $0) })
-        let portuguese = CVData(skills: ["editor de texto", "Visual Studio Code", "ferramenta de versionamento", "plataforma AWS"]
-            .map { Skill(name: $0) })
+        let english = CVData(skills: ["accounting software", "Sage 50", "PA system", "ticketing platform", "QuickBooks software",
+                                      "software", "development platform"].map { Skill(name: $0) })
+        let portuguese = CVData(skills: ["editor de texto", "Visual Studio Code", "ferramenta de versionamento", "plataforma AWS",
+                                         "editor de código", "plataforma de desenvolvimento"].map { Skill(name: $0) })
         let counted = { (cv: CVData, language: String) in
             Self.reader(cv, language).filter { $0.kind == .categoryAsTechnology }.map(\.value)
         }
 
-        #expect(counted(english, "en") == ["accounting software", "ticketing platform"])
-        #expect(counted(portuguese, "pt") == ["editor de texto", "ferramenta de versionamento"])
+        #expect(counted(english, "en") == ["software", "development platform"])
+        #expect(counted(portuguese, "pt") == ["editor de texto", "plataforma de desenvolvimento"])
     }
 
     @Test("A German technology that is an activity in its infinitive is no tool of the trade; the tool of that activity is one (#354, round 2)")
