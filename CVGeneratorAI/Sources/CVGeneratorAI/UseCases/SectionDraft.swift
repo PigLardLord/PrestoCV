@@ -390,7 +390,7 @@ final class SectionDraft {
     /// `text` as a request wrote it, with each semicolon the person's own clause follows as a full stop and each German separable
     /// verb written apart at the end of a subordinate clause joined (#354, round 4): the checks then read the sentences the draft keeps.
     static func mended(_ text: String) -> String {
-        SeparableVerbs.joined(in: SentenceSplitter.unchained(text))
+        SeparableVerbs.joined(in: CVDataSanitizer.withoutRelativeOpenings(SentenceSplitter.unchained(text)))
     }
 
     /// The sentences a summary request wrote after `opening`, which code wrote: nil when it wrote none. The check drops a sentence

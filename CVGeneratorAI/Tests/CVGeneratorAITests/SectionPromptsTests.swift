@@ -207,7 +207,7 @@ struct SectionPromptsTests {
             Scrivi in italiano.
             Job: capoturno della manutenzione; employer: Birrificio Valtrigno
             What the person said about this job:
-            - Dove coordino tre tecnici.
+            - Coordino tre tecnici.
             Duties kept:
             - Coordino tre tecnici.
             Sentences rejected, with the reason:
@@ -441,9 +441,12 @@ struct SectionPromptsTests {
 
     // MARK: A clause as a sentence
 
-    @Test("A clause reads as a whole sentence: a capital first letter and a full stop, its joining punctuation gone")
+    @Test("A clause reads as a whole sentence: a capital first letter and a full stop, its joining punctuation and the relative word that tied it to the employer gone (#354, round 12)")
     func clauseAsSentence() {
-        #expect(SectionPrompts.asSentence(", dove coordino tre tecnici;") == "Dove coordino tre tecnici.")
+        #expect(SectionPrompts.asSentence(", dove coordino tre tecnici;") == "Coordino tre tecnici.")
+        #expect(SectionPrompts.asSentence("où je range 12 rayons de livres") == "Je range 12 rayons de livres.")
+        #expect(SectionPrompts.asSentence("where needed, I mend the nets") == "Where needed, I mend the nets.")
+        #expect(SectionPrompts.asSentence("wo ich die Netze flicke") == "Wo ich die Netze flicke.")
         #expect(SectionPrompts.asSentence("I train the juniors!") == "I train the juniors!")
         #expect(SectionPrompts.asSentence(" ") == "")
     }

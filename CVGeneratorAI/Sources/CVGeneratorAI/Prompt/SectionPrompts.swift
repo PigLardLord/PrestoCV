@@ -242,9 +242,13 @@ enum SectionPrompts {
 
     // MARK: The parts of a request
 
-    /// A clause of the description as a whole sentence: a capital first letter and a full stop, its joining punctuation gone.
+    /// A clause of the description as a whole sentence: a capital first letter and a full stop, its joining punctuation gone, and
+    /// the relative word that tied it to the employer (`CVDataSanitizer.withoutRelativeOpening`): the model wrote "Où j'ai formé…"
+    /// back as a duty (#354, round 12).
     static func asSentence(_ clause: String) -> String {
-        let trimmed = clause.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+        let trimmed = CVDataSanitizer.withoutRelativeOpening(
+            clause.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+        )
         guard let first = trimmed.first else { return trimmed }
         let capital = first.uppercased() + trimmed.dropFirst()
         return capital.last.map { ".!?".contains($0) } == true ? capital : capital + "."

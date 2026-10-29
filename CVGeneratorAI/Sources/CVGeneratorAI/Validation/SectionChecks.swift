@@ -391,6 +391,29 @@ extension CVDataSanitizer {
     /// The words that tie a job's line to its employer, folded.
     private static let relativeOpenings: Set<String> = ["where", "dove", "wo", "ou", "donde", "onde"]
 
+    /// `sentence` without the relative word it opens with, its next letter in capital ("où j'ai formé 3 nouveaux enseignants" is
+    /// "j'ai formé 3 nouveaux enseignants"; #354, round 12): a clause cut from the sentence that named the employer reads as a
+    /// fragment, and the model wrote it back as one. A relative word in a phrase of three words or fewer before a comma ("Where
+    /// needed, I…") opens the sentence of its own, and the German "wo" stays: its clause puts the verb last.
+    static func withoutRelativeOpening(_ sentence: String) -> String {
+        let words = Word.words(in: sentence)
+        guard let first = words.first, first.folded != "wo", relativeOpenings.contains(first.folded) else { return sentence }
+        let head = sentence.prefix { $0 != "," }
+        guard head.count == sentence.count || Word.words(in: String(head)).count > 3 else { return sentence }
+        let opening = sentence.drop { !$0.isLetter }.drop { $0.isLetter }
+        let rest = opening.drop { $0 == " " || $0 == "," }
+        guard let letter = rest.first, letter.isLetter else { return sentence }
+        return letter.uppercased() + rest.dropFirst()
+    }
+
+    /// `text` with each of its sentences without the relative word it opens with (`withoutRelativeOpening`).
+    static func withoutRelativeOpenings(_ text: String) -> String {
+        SentenceSplitter.sentences(in: text).reduce(text) { mended, sentence in
+            let kept = withoutRelativeOpening(sentence)
+            return kept == sentence ? mended : mended.replacingOccurrences(of: sentence, with: kept)
+        }
+    }
+
     /// The words of a clause of a duty after its subject, auxiliary and verb; a single word after a conjunction is a topic as it
     /// is ("le fatture e i preventivi"). The German perfect has its participle last ("Ich habe die Regale montiert").
     private static func topic(of piece: [Word], opensTheSentence: Bool) -> ArraySlice<Word>? {

@@ -376,9 +376,11 @@ struct SectionDraftTests {
         #expect(SentenceSplitter.unchained(text) == cut)
     }
 
-    @Test("A request's text is cut at each semicolon the person's clause follows, and a German separable verb split at a clause's end is joined (#354, round 4)", arguments: [
+    @Test("A request's text is cut at each semicolon the person's clause follows, a German separable verb split at a clause's end is joined, and a sentence loses the relative word it opens with (#354, rounds 4 and 12)", arguments: [
         ("Ich prüfe die Pulte; ich schule das Team, damit es die Mikrofone richtig an schließt.", "Ich prüfe die Pulte. Ich schule das Team, damit es die Mikrofone richtig anschließt."),
         ("Ich schule das Team und stelle die Pulte ein.", "Ich schule das Team und stelle die Pulte ein."),
+        ("Je soigne les chevaux du haras. Où j'ai dressé 4 poulains.", "Je soigne les chevaux du haras. J'ai dressé 4 poulains."),
+        ("Curo i cavalli. Dove serve, ferro gli zoccoli.", "Curo i cavalli. Dove serve, ferro gli zoccoli."),
     ])
     func mended(text: String, expected: String) {
         #expect(SectionDraft.mended(text) == expected)
