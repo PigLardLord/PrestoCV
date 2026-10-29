@@ -150,20 +150,28 @@ struct SectionDraftTests {
     func mergedTools() {
         // Each tool counts as one of the trade but "trailer", which the check drops.
         let count = { (tools: [String]) in tools.filter { $0 != "trailer" }.count }
+        let none = { (_: String) in false }
         // The headline title's answer is short of 4: the past title's adds its first kept tool, not the 2 after it.
-        #expect(SectionDraft.mergedTools([["SAP", "Excel", "barcode scanner"], ["trailer", "forklift", "GPS"]], fewest: 4, tradeTools: count)
+        #expect(SectionDraft.mergedTools([["SAP", "Excel", "barcode scanner"], ["trailer", "forklift", "GPS"]], fewest: 4, isKind: none, tradeTools: count)
             == ["SAP", "Excel", "barcode scanner", "forklift"])
         // The headline title's answer already reaches the floor: the past title's adds nothing.
         #expect(SectionDraft.mergedTools(
             [["digital console", "QLab", "stage monitors", "wireless microphones"], ["truck loading equipment", "rigging hardware"]],
-            fewest: 4, tradeTools: count
+            fewest: 4, isKind: none, tradeTools: count
         ) == ["digital console", "QLab", "stage monitors", "wireless microphones"])
         // Two past titles each add one, the second only while the first left the CV short.
-        #expect(SectionDraft.mergedTools([["SAP"], ["forklift", "GPS"], ["pallet jack", "RF gun"], ["shrink wrapper"]], fewest: 3, tradeTools: count)
+        #expect(SectionDraft.mergedTools([["SAP"], ["forklift", "GPS"], ["pallet jack", "RF gun"], ["shrink wrapper"]], fewest: 3, isKind: none, tradeTools: count)
             == ["SAP", "forklift", "pallet jack"])
         // A single title's answer stays as it was.
-        #expect(SectionDraft.mergedTools([["SAP", "trailer", "GPS"]], fewest: 4, tradeTools: count) == ["SAP", "trailer", "GPS"])
-        #expect(SectionDraft.mergedTools([], fewest: 4, tradeTools: count).isEmpty)
+        #expect(SectionDraft.mergedTools([["SAP", "trailer", "GPS"]], fewest: 4, isKind: none, tradeTools: count) == ["SAP", "trailer", "GPS"])
+        #expect(SectionDraft.mergedTools([], fewest: 4, isKind: none, tradeTools: count).isEmpty)
+
+        // A past title's answer adds a tool before a kind of system it lists first ("Montagesystem"), and the kind when it has no
+        // other.
+        let kind = { (tool: String) in CVDataSanitizer.endsInAKindOfTool(tool, language: "de") }
+        #expect(SectionDraft.mergedTools([["KNX"], ["Montagesystem", "Werkzeugkasten", "Sicherheitsgurte"]], fewest: 4, isKind: kind, tradeTools: count)
+            == ["KNX", "Werkzeugkasten"])
+        #expect(SectionDraft.mergedTools([["KNX"], ["Montagesystem"]], fewest: 4, isKind: kind, tradeTools: count) == ["KNX", "Montagesystem"])
     }
 
     @Test("The headline title's tools are asked first: the job of the headline title, else the latest job (#354, round 15)")

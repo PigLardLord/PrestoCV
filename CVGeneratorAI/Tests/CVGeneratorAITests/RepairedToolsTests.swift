@@ -19,6 +19,17 @@ struct RepairedToolsTests {
         #expect(Self.checker(language).repairedTools(tools, against: "Lavoro a Lecce dal 2019.") == kept)
     }
 
+    @Test("A tool ends in a kind of tool when it names one, or is a German compound that ends in one (#354, round 15)",
+          arguments: [
+              ("de", "Montagesystem", true), ("de", "Messgeräte", true), ("de", "Werkzeugkasten", false), ("de", "KNX", false),
+              ("de", "System", true), ("en", "truck loading equipment", true), ("en", "PA system", false),
+              ("en", "digital console", false), ("it", "software di controllo", true), ("it", "chiave dinamometrica", false),
+              ("it", "Sistema di Interscambio", false),
+          ])
+    func endsInAKindOfTool(language: String, tool: String, kind: Bool) {
+        #expect(CVDataSanitizer.endsInAKindOfTool(tool, language: language) == kind)
+    }
+
     @Test("A repaired general kind the description writes stays")
     func statedGeneralKindStays() {
         let description = "Uso ogni giorno il sistema di tracciamento dati del magazzino."

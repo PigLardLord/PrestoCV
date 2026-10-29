@@ -8,12 +8,17 @@ extension CVDataSanitizer {
     /// registros"; #354, round 15), goes unless the description writes it. Only these answers are checked so: the first answers'
     /// kinds with a word of their trade stay ("software di rilievo").
     func repairedTools(_ tools: [String], against description: String) -> [String] {
-        let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
+        let language = language(of: description)
         let text = DescriptionText.normalized(description)
         return tools.filter { tool in
             !Self.namesAGeneralKind(tool, language: language)
                 || !DescriptionText.spans(of: DescriptionText.normalized(tool), in: text).isEmpty
         }
+    }
+
+    /// The language code of `description` ("de"), as the checks read it.
+    func language(of description: String) -> String? {
+        DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
     }
 
     /// Whether `item` is a general kind of the work: its head noun (the last word in English and German, the first in the other
@@ -35,6 +40,17 @@ extension CVDataSanitizer {
         let others = ["en", "de"].contains(language ?? "") ? content.dropLast() : content.dropFirst()
         return others.contains(where: purposeWords.contains)
             && others.allSatisfy { purposeWords.contains($0) || purposeObjects.contains($0) }
+    }
+
+    /// Whether a tool names a kind of tool (`namesAKindOfTool`: "truck loading equipment", "software di controllo") or, in German,
+    /// is one word that ends in a kind of tool with a word before it ("Montagesystem", "Messgeräte"): a past title's answer adds a
+    /// tool before such a kind (`SectionDraft.mergedTools`; #354, round 15).
+    static func endsInAKindOfTool(_ item: String, language: String?) -> Bool {
+        if namesAKindOfTool(item, language: language) { return true }
+        let words = item.split { !$0.isLetter && !$0.isNumber }
+        guard language == "de", words.count == 1, let word = words.first, word.dropFirst().allSatisfy(\.isLowercase) else { return false }
+        let folded = DescriptionText.normalized(String(word))
+        return toolKinds.contains { folded.count > $0.count + 2 && folded.hasSuffix($0) }
     }
 
     /// The nouns of a store or a device of no trade, without accents.

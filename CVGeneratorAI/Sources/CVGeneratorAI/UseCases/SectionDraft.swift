@@ -227,7 +227,9 @@ final class SectionDraft {
             answers.append(try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles, count: count) } ?? [])
         }
         let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
-        let tools = try Self.mergedTools(answers, fewest: fewestTools) { tools in
+        let language = sanitizer.language(of: description)
+        let isKind = { (tool: String) in CVDataSanitizer.endsInAKindOfTool(tool, language: language) }
+        let tools = try Self.mergedTools(answers, fewest: fewestTools, isKind: isKind) { tools in
             let checked = sanitizer.skillCheck(technologies: tools, softSkills: [], stated: stated, names: brief.names, against: description)
             let writing = DraftWriting(
                 summary: nil, roleDescriptions: duties, technologies: Array(checked.technologies.prefix(Self.technologies)), softSkills: []
@@ -289,16 +291,18 @@ final class SectionDraft {
     /// The tools of the title groups' answers, the headline title's first (`headlineFirst`): its answer whole, then of each past
     /// title's answer the first item the check keeps, and only while the CV has fewer than `fewest` tools of the trade, as
     /// `tradeTools` counts them. A past title's request padded the CV with the tools of a trade the person left ("trailer",
-    /// "truck loading equipment"; #354, round 15). A single title's answer is the tools as they were.
-    static func mergedTools(_ answers: [[String]], fewest: Int, tradeTools: ([String]) throws -> Int) rethrows -> [String] {
+    /// "truck loading equipment"; #354, round 15). A past title's first kept tool that is no kind of tool (`isKind`) comes before
+    /// those that are: the first kept, "Montagesystem", left out the "Werkzeugkasten" of the trade. A single title's answer is the
+    /// tools as they were.
+    static func mergedTools(
+        _ answers: [[String]], fewest: Int, isKind: (String) -> Bool, tradeTools: ([String]) throws -> Int
+    ) rethrows -> [String] {
         guard var tools = answers.first else { return [] }
         for past in answers.dropFirst() {
             let have = try tradeTools(tools)
             guard have < fewest else { break }
-            for item in past where try tradeTools(tools + [item]) > have {
-                tools.append(item)
-                break
-            }
+            let raising = try past.filter { try tradeTools(tools + [$0]) > have }
+            if let item = raising.first(where: { !isKind($0) }) ?? raising.first { tools.append(item) }
         }
         return tools
     }
