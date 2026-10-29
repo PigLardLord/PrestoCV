@@ -96,18 +96,26 @@ enum SectionPrompts {
         those that fit the jobs.
         """
 
-    /// The request for the skills a draft still misses: `tools` more tools and `qualities` more qualities, none of `kept` and
-    /// none of `rejected` ("skill": reason).
-    static func moreSkills(for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]) -> Prompt {
+    /// The request for the skills a draft still misses: `tools` more tools, of the trade of the tools kept or, with none kept, of the
+    /// jobs (#354, round 4), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`
+    /// ("skill": reason).
+    static func moreSkills(
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+    ) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
+        if !listedTools.isEmpty { lines.append("Tools listed, do not repeat: " + listedTools.joined(separator: "; ")) }
+        if !listedQualities.isEmpty { lines.append("Qualities listed, do not repeat: " + listedQualities.joined(separator: "; ")) }
         if tools > 0 {
+            let trade = listedTools.isEmpty ? "jobs above" : "tools listed"
             lines.append(
-                "The CV lists too few tools for its trade: name \(tools) more pieces of equipment, machines or software that a person "
-                    + "with these job titles uses, of the trade of those listed, each of another kind than those listed."
+                "The CV lists too few tools for its trade: name \(tools) more software, systems, machines or instruments of the trade of "
+                    + "the \(trade), that a person with these jobs uses, each of another kind"
+                    + (listedTools.isEmpty ? "." : " than those listed.")
             )
         }
-        if qualities > 0 { lines.append("Name \(qualities) more personal qualities at work.") }
-        if !kept.isEmpty { lines.append("Already listed, do not repeat: " + kept.joined(separator: "; ")) }
+        if qualities > 0 {
+            lines.append("Name \(qualities) more personal qualities at work that fit these jobs, as nouns in the language named on the first line.")
+        }
         if !rejected.isEmpty { lines.append("Rejected, with the reason; write none of them again:\n" + bullets(rejected)) }
         return Prompt(instructions: moreSkillsInstructions, text: lines.joined(separator: "\n"))
     }

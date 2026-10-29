@@ -38,10 +38,10 @@ public protocol CVGenerationService {
     /// 3 to 5 personal qualities at work that fit the jobs of `brief`.
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]?
 
-    /// `tools` more technologies and `qualities` more soft skills for the jobs of `brief`, none of `kept` and none of `rejected`
-    /// ("skill": reason), the skills the checks dropped.
+    /// `tools` more technologies and `qualities` more soft skills for the jobs of `brief`, none of the tools and qualities kept
+    /// (`listedTools`, `listedQualities`) and none of `rejected` ("skill": reason), the skills the checks dropped.
     func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
     ) async throws -> DraftWriting?
 
     /// The summary, from the job titles of `brief`, the tools kept and the qualities kept: no duty, which it would copy (#354).
@@ -61,7 +61,7 @@ extension CVGenerationService {
     public func writeTools(for brief: DraftBrief) async throws -> [[String]]? { nil }
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { nil }
     public func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
     ) async throws -> DraftWriting? { nil }
     public func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? { nil }
     public func repairSummary(

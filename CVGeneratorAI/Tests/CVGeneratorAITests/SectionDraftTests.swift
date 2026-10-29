@@ -240,7 +240,7 @@ struct SectionDraftTests {
         let request = try #require(service.moreSkillsRequests.first)
         // One more of each kind short than missing, as a rule may drop one of them.
         #expect(request.tools == 4 && request.qualities == 3)
-        #expect(request.excluding == ["mixing desks", "teamwork"])
+        #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
         #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))

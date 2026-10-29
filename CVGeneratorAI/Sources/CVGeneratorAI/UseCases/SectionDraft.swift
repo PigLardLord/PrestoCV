@@ -191,14 +191,16 @@ final class SectionDraft {
         let missingTools = max(fewestTools - kept.count { $0.kind == .technology }, 0)
         let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
         guard missingTools > 0 || missingQualities > 0 else { return }
-        let names = kept.map(\.name)
+        let listedTools = kept.filter { $0.kind != .softSkill }.map(\.name)
+        let listedQualities = kept.filter { $0.kind == .softSkill }.map(\.name)
         // One more of each kind short, as the checks may drop one; the answer is cut to the most of each kind.
         let toolsAsked = missingTools > 0 ? missingTools + 1 : 0
         let qualitiesAsked = missingQualities > 0 ? missingQualities + 1 : 0
         let rejected = Self.rejectedSkills(skills.dropped)
         let more = try await request(.skills) {
             try await self.service.writeMoreSkills(
-                for: brief, tools: toolsAsked, qualities: qualitiesAsked, excluding: names, rejected: rejected
+                for: brief, tools: toolsAsked, qualities: qualitiesAsked, listedTools: listedTools, listedQualities: listedQualities,
+                rejected: rejected
             )
         }
         guard let more else { return }

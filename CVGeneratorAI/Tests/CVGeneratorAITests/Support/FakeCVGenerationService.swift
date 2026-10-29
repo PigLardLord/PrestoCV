@@ -49,7 +49,7 @@ final class FakeCVGenerationService: CVGenerationService {
     /// The brief each section request read, one for one with `sectionCalls`.
     private(set) var sectionBriefs: [DraftBrief] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
-    private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, excluding: [String], rejected: [String])] = []
+    private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String])] = []
     private(set) var summaryRequests: [(tools: [String], qualities: [String])] = []
     private(set) var summaryRepairs: [(kept: [String], rejected: [String], problems: [String])] = []
 
@@ -75,9 +75,9 @@ final class FakeCVGenerationService: CVGenerationService {
     }
 
     func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, excluding kept: [String], rejected: [String]
+        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
     ) async throws -> DraftWriting? {
-        moreSkillsRequests.append((tools, qualities, kept, rejected))
+        moreSkillsRequests.append((tools, qualities, listedTools, listedQualities, rejected))
         try await section("moreSkills", brief)
         return moreSkillsResult
     }
