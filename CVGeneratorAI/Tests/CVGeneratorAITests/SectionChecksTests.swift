@@ -458,6 +458,22 @@ struct SectionChecksTests {
         #expect(Set(verdict.dropped.map(\.reason)) == ["same kind as an earlier tool"])
     }
 
+    @Test("A one-word technology clipped from a phrase of two joined by a conjunction is joined back; two tools joined by one stay apart (#354, round 5)",
+          arguments: [
+              ("it", "Leggo schemi elettrici e pneumatici e programmo PLC e HMI.", ["PLC", "schemi elettrici", "pneumatici", "HMI"],
+               ["PLC", "schemi elettrici e pneumatici", "HMI"]),
+              ("en", "I service hydraulic and pneumatic valves and test PLC and HMI panels.", ["hydraulic", "pneumatic valves", "PLC", "HMI panels"],
+               ["hydraulic and pneumatic valves", "PLC", "HMI panels"]),
+          ])
+    func clippedModifierJoined(language: String, description: String, technologies: [String], kept: [String]) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: description)
+
+        #expect(verdict.technologies == kept)
+        #expect(verdict.dropped.isEmpty)
+    }
+
     @Test("A technology that names an activity goes; equipment, a kind of tool named by what it does, a named tool and one with an acronym stay (#354, rounds 1 and 5)")
     func activityIsNoTechnology() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

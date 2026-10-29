@@ -860,7 +860,7 @@ extension CVDataSanitizer {
             return kept
         }
         var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
-        for raw in technologies {
+        for raw in Self.joiningClippedModifiers(technologies, in: description, language: language) {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
             let lower = item.lowercased()
             let soft = Self.softStems.contains(where: lower.contains)
@@ -1024,6 +1024,43 @@ extension CVDataSanitizer {
         }
         return (kept, dropped)
     }
+
+    /// The technologies with a one-word one clipped from a phrase of two joined by a conjunction joined back to the phrase it was
+    /// cut from, as the description writes it ("schemi elettrici e pneumatici", "hydraulic and pneumatic valves"; #354, round 5):
+    /// alone, the clipped word reads as another thing ("pneumatici", tyres). The word is clipped when it shares the ending of the
+    /// phrase's last word (Romance languages) or has an adjective's ending and comes before the phrase (English, German, in lower
+    /// case); two tools joined by a conjunction stay apart ("PLC e HMI").
+    private static func joiningClippedModifiers(_ technologies: [String], in description: String, language: String?) -> [String] {
+        let text = " " + description.split { !$0.isLetter && !$0.isNumber }.joined(separator: " ") + " "
+        let lowered = text.lowercased()
+        let before = ["en", "de"].contains(language ?? "")
+        var joined = technologies
+        var clipped = Set<Int>()
+        for (index, word) in technologies.enumerated() {
+            let lower = word.lowercased()
+            guard !word.contains(" "), word.count >= 4, word != word.uppercased(), !word.contains(where: \.isNumber) else { continue }
+            for (other, phrase) in joined.enumerated() where other != index && !clipped.contains(other) && phrase.contains(" ") {
+                let words = phrase.lowercased().split(separator: " ").map(String.init)
+                guard let edge = before ? words.first : words.last else { continue }
+                let agrees = before
+                    ? clippedEndings.contains(where: lower.hasSuffix) && (language != "de" || text.contains(" \(lower) "))
+                    : edge.count >= 4 && edge.suffix(2) == lower.suffix(2)
+                guard agrees, let conjunction = clippedConjunctions.first(where: { conjunction in
+                    lowered.contains(before ? " \(lower) \(conjunction) \(words.joined(separator: " ")) "
+                                            : " \(words.joined(separator: " ")) \(conjunction) \(lower) ")
+                }) else { continue }
+                joined[other] = before ? "\(word) \(conjunction) \(phrase)" : "\(phrase) \(conjunction) \(word)"
+                clipped.insert(index)
+                break
+            }
+        }
+        return joined.enumerated().filter { !clipped.contains($0.offset) }.map(\.element)
+    }
+
+    private static let clippedConjunctions = ["e", "ed", "and", "und", "y", "et"]
+
+    /// The endings of an English or German adjective.
+    private static let clippedEndings = ["ic", "al", "ive", "ous", "able", "ible", "ary", "ful", "ische", "ischen", "liche", "lichen"]
 
     /// The most words of a skill: a longer one is a clause ("edit the sound effects for the shows"), not the name of a skill.
     static let mostSkillWords = 4
