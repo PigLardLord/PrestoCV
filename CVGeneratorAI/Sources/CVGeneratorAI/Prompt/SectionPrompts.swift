@@ -22,7 +22,8 @@ enum SectionPrompts {
         the first line.
         - The years: only those the person said for this job.
         - 2 to 4 duties, each one whole sentence that starts with a capital letter and ends with a full stop.
-        - First the duties the person said for this job; then, to reach at least 2, duties typical of its title at that employer.
+        - First the duties the person said for this job; then, to reach at least 2, unless the request says to add none, duties \
+        typical of its title at that employer, each a concrete task of that trade, never one that fits any job.
         - No number, date, name of a company, place or person.
         - Never add a job, study, certification, achievement or result.
         """
@@ -55,6 +56,7 @@ enum SectionPrompts {
         if !role.clauses.isEmpty {
             lines.append("What the person said about this job:\n" + bullets(role.clauses.map(asSentence)))
         }
+        if role.described { lines.append("The person said enough of this job: write only the duties they said, and add none.") }
         if avoiding, !role.avoid.isEmpty { lines.append("Words to avoid: " + role.avoid.joined(separator: ", ")) }
         return lines
     }

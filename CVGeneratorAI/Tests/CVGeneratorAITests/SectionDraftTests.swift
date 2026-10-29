@@ -19,7 +19,17 @@ struct SectionDraftTests {
         "have", "has", "been", "was", "is", "am", "are", "worked", "work", "started", "rigged", "loaded", "setting", "set", "mixing",
         "mixed", "helping", "plan", "train", "looking", "moved", "kept", "keep", "ran", "run", "looked", "look", "won", "check",
     ]
-    private let description = JobClausesTests.english
+    /// The jobs of `JobClausesTests.english`, each said in fewer than 40 characters, so each job's request writes duties of its own
+    /// (ADR 0031, D6).
+    private static let briefly = """
+        I have worked in live sound for theatres and touring shows for thirteen years.
+        I started in 2013 as a stagehand at the Fenwick Playhouse in Norwich, where I rigged the lights until 2016.
+        Then I was a sound technician at Brightwater Events from 2016 to 2019, then at Copperfield Arena from 2019 to 2021, \
+        setting up the PA systems.
+        Since 2021 I have been head of sound at the Orchard Lane Theatre, where I train the junior technicians.
+        I am now looking for a technical manager role at a larger venue.
+        """
+    private let description = Self.briefly
 
     /// The jobs of the description as the extraction gives them: the titles, the employers and which job goes on, and no date.
     private static let extracted = CVData(experience: [
@@ -63,9 +73,11 @@ struct SectionDraftTests {
     }
 
     private func draft(
-        _ service: FakeCVGenerationService, limits: DraftingLimits = .standard, logger: any DiagnosticLogger = SilentLogger()
+        _ service: FakeCVGenerationService, limits: DraftingLimits = .standard, logger: any DiagnosticLogger = SilentLogger(),
+        of text: String? = nil
     ) async throws -> CVData {
-        try await generator(service, limits: limits, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: description)).cvData
+        let request = CVGenerationRequest(userPrompt: text ?? description)
+        return try await generator(service, limits: limits, logger: logger).generateCV(from: request).cvData
     }
 
     private func job(_ company: String, in draft: CVData) -> Experience? {
@@ -87,7 +99,7 @@ struct SectionDraftTests {
         #expect(brief.roles.map(\.title) == ["stagehand", "sound technician", "sound technician", "head of sound"])
         #expect(brief.roles[0].clauses.contains { $0.contains("rigged the lights") })
         #expect(!brief.roles[0].clauses.contains { $0.contains("Orchard Lane") })
-        #expect(brief.roles[3].clauses.contains { $0.contains("sound design") })
+        #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
     }
 
     @Test("The summary request reads the duties and the skills the checks kept, one for one with the jobs")
@@ -121,7 +133,7 @@ struct SectionDraftTests {
 
         #expect(job("Copperfield Arena", in: draft)?.title == "sound technician")
         let head = try #require(job("Orchard Lane Theatre", in: draft)?.description)
-        #expect(head.hasPrefix("I plan the sound design for each production and train the junior technicians."))
+        #expect(head.hasPrefix("I train the junior technicians."))
         #expect(head.contains("I run the technical rehearsals."))
         #expect(job("Fenwick Playhouse", in: draft)?.location == "Norwich")
     }
@@ -155,6 +167,34 @@ struct SectionDraftTests {
             #expect(!text.contains(invented), "\(invented)")
         }
         #expect(job("Orchard Lane Theatre", in: draft)?.description?.contains("I look after the mixing desks.") == true)
+    }
+
+    // MARK: D6
+
+    @Test("d6: a job whose stated duties run to 40 characters keeps them alone: its request asks for no typical duty, a typical duty goes, and no repair is asked (#354, round 1)")
+    func d6DescribedJobsKeepTheirOwnDuties() async throws {
+        let service = service()
+        service.jobResults[1] = RoleWriting(startDate: "2016", endDate: "2019", duties: "Mixing at 3 festivals.")
+
+        let draft = try await draft(service, of: JobClausesTests.english)
+
+        #expect(service.sectionBriefs.first?.roles.allSatisfy(\.described) == true)
+        #expect(service.jobRepairs.isEmpty)
+        #expect(job("Orchard Lane Theatre", in: draft)?.description
+            == "I plan the sound design for each production and train the junior technicians.")
+        #expect(job("Fenwick Playhouse", in: draft)?.description == "I rigged the lights and loaded the trucks.")
+        let text = draft.experience.compactMap(\.description).joined(separator: " ")
+        for typical in ["scenery", "backstage", "sound checks", "microphones", "technical rehearsals"] {
+            #expect(!text.contains(typical), "\(typical)")
+        }
+    }
+
+    @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them (#354, round 1)")
+    func d6ShortJobsKeepTypicalDuties() async throws {
+        let draft = try await draft(service())
+
+        #expect(job("Fenwick Playhouse", in: draft)?.description
+            == "I rigged the lights. I moved the scenery between scenes. I kept the backstage area clear and safe.")
     }
 
     // MARK: Repairs

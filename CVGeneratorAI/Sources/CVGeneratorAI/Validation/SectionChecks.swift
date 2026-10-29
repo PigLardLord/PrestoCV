@@ -124,12 +124,21 @@ extension CVDataSanitizer {
 
         /// The characters of the job's text once kept.
         var length: Int { (pinned + kept).joined(separator: " ").count }
+
+        /// The characters of a job's text from which it is described: under them, it gets typical duties (ADR 0031, D6).
+        static let describedLength = 40
+        /// Why a typical duty goes from a job the person described.
+        static let describedReason = "the person said what they did in this job: write only that"
+
+        /// Whether the duties the person said for the job run to `describedLength`: it then keeps no typical duty (D6).
+        var saysEnough: Bool { pinned.joined(separator: " ").count >= Self.describedLength }
     }
 
     /// The duties of the job at `index` of `cvData.experience`, sentence by sentence: a sentence that is no whole sentence, that the
     /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, or that is written in
-    /// another form than the job's first duty (`DutyForm`) goes with its reason. A duty said with a gerund is read, and kept, in the
-    /// job's first person (`FirstPersonDuty`).
+    /// another form than the job's first duty (`DutyForm`) goes with its reason, and so does any duty that quotes none of the job's
+    /// own clauses when its stated duties run to 40 characters (D6). A duty said with a gerund is read, and kept, in the job's first
+    /// person (`FirstPersonDuty`).
     func dutyCheck(
         of cvData: CVData, job index: Int, duties: String?, keeping earlier: [String] = [], against description: String
     ) throws(CVGenerationError) -> DutyVerdicts {
@@ -177,6 +186,9 @@ extension CVDataSanitizer {
                 if rejection == nil, !current, Self.tense(of: sentence, language: language) == .present,
                    held.contains(where: { Self.tense(of: $0, language: language) == .past }) {
                     rejection = "it is in the present, and the job has ended: write it in the past, as the other duties"
+                }
+                if rejection == nil, verdicts.saysEnough, !rule.quotesOwnClauses(sentence) {
+                    rejection = DutyVerdicts.describedReason
                 }
                 if let rejection {
                     verdicts.rejected.append(Rejection(sentence: sentence, reason: rejection))
@@ -307,12 +319,15 @@ extension CVDataSanitizer {
             self.written = written
         }
 
+        /// Whether `sentence` quotes, with no number, the clauses of this job alone: then it is the person's own.
+        func quotesOwnClauses(_ sentence: String) -> Bool {
+            guard let attributed = evidence.quotableByAttribution else { return false }
+            return source.written(sentence, quoting: attributed, allowsNumbers: false, orPlain: { _ in false }) != nil
+        }
+
         /// Why `sentence` goes from the job's text; nil when it stays.
         func rejection(of sentence: String) -> String? {
-            if let attributed = evidence.quotableByAttribution,
-               source.written(sentence, quoting: attributed, allowsNumbers: false, orPlain: { _ in false }) != nil {
-                return nil
-            }
+            if quotesOwnClauses(sentence) { return nil }
             if let other = CVDataSanitizer.namedTitle(in: sentence, among: otherTitles) {
                 return "the words \"\(other)\" are another job's title"
             }

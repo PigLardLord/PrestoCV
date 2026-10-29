@@ -213,6 +213,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A duty or a quality the person states that no job description and no skill of the draft holds (`ExpectedFact.duty`,
     /// `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra" (#354, round 1).
     case unwrittenStatement
+    /// A job sentence that quotes less than half of its words from the description, in a job whose sentences that quote it run to 40
+    /// characters or more: a duty the person did not say, in a job they described ("I coordinated the movement of heavy equipment";
+    /// ADR 0031, D6).
+    case fillerDuty
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -237,6 +241,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .thirdPersonSummary: "a summary in the third person"
         case .bareInterest: "an interest without the verb of its phrase"
         case .unwrittenStatement: "a stated duty or quality the draft does not hold"
+        case .fillerDuty: "a duty not said, in a job the person described"
         }
     }
 }
@@ -296,6 +301,7 @@ enum ReaderRules {
                 found.append(ReaderFinding(kind: .twoForms, path: "experience[\(index)].description", value: description))
             }
             found += duties(of: job, at: index, language: language)
+            found += fillers(in: job, at: index, of: input.description)
         }
         found += sharedHeads(in: cv, language: language)
         found += headline(of: cv, for: input)
@@ -411,6 +417,25 @@ enum ReaderRules {
         default:
             return nil
         }
+    }
+
+    /// The sentences of a job that quote less than half of their words of five letters and more from `description`, when its
+    /// sentences that quote three in four of them run to 40 characters or more. A word is quoted when the description has a word
+    /// of its first five letters, so an inflection still quotes it.
+    static func fillers(in job: Experience, at index: Int, of description: String) -> [ReaderFinding] {
+        let said = Set(longWords(of: description).map { $0.prefix(5) })
+        let share = { (sentence: String) -> Double in
+            let words = longWords(of: sentence)
+            return words.isEmpty ? 1 : Double(words.count { said.contains($0.prefix(5)) }) / Double(words.count)
+        }
+        let sentences = WrittenMeasure.sentences(of: job.description ?? "")
+        guard sentences.filter({ share($0) >= 0.75 }).joined(separator: " ").count >= 40 else { return [] }
+        return sentences.filter { share($0) < 0.5 }
+            .map { ReaderFinding(kind: .fillerDuty, path: "experience[\(index)].description", value: $0) }
+    }
+
+    private static func longWords(of text: String) -> [String] {
+        letterWords(of: text).filter { $0.count >= 5 }
     }
 
     // MARK: Technologies

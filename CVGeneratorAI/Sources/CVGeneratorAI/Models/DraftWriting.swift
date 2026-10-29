@@ -17,6 +17,9 @@ public struct DraftBrief: Equatable, Sendable {
         public let clauses: [String]
         /// The words of the job's clauses that the check drops in a written duty: the job's request avoids them.
         public var avoid: [String] = []
+        /// Whether the duties the person said for the job run to 40 characters: its request then asks for no typical duty (ADR 0031,
+        /// D6).
+        public var described = false
 
         public init(title: String, employer: String? = nil, hasEnded: Bool, clauses: [String] = []) {
             self.title = title

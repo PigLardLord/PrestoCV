@@ -44,20 +44,45 @@ struct SectionChecksTests {
     @Test("A job's written duties keep the duties the person said in front, and drop a repeat, another job's name, another form and a fragment, each with its reason")
     func dutiesOfAJob() throws {
         let written = """
-            Controllavo i quadri elettrici. Coordinavo i turni al Birrificio Valtrigno. Eseguivo la lubrificazione dei macchinari. \
-            Sostituire i cuscinetti usurati. Riparavo i motori e
+            Riparavo i motori elettrici. Coordinavo i turni al Birrificio Valtrigno. Eseguivo la lubrificazione dei macchinari. \
+            Sostituire i cuscinetti usurati. Riparavo i nastri trasportatori. Riparavo i motori e
             """
 
-        let verdicts = try sanitizer.dutyCheck(of: Self.italianJobs, job: 1, duties: written, against: JobClausesTests.italian)
+        let verdicts = try sanitizer.dutyCheck(of: Self.italianJobs, job: 0, duties: written, against: JobClausesTests.italian)
 
-        #expect(verdicts.pinned == ["Controllavo i quadri elettrici e programmavo la manutenzione preventiva."])
-        #expect(verdicts.kept == ["Eseguivo la lubrificazione dei macchinari."])
+        #expect(verdicts.pinned == ["Riparavo i nastri trasportatori."])
+        #expect(verdicts.kept == ["Riparavo i motori elettrici.", "Eseguivo la lubrificazione dei macchinari."])
         let reasons = Dictionary(uniqueKeysWithValues: verdicts.rejected.map { ($0.sentence, $0.reason) })
-        #expect(reasons["Controllavo i quadri elettrici."] == "it repeats a duty already written")
+        #expect(reasons["Riparavo i nastri trasportatori."] == "it repeats a duty already written")
         #expect(reasons["Coordinavo i turni al Birrificio Valtrigno."] != nil)
         #expect(reasons["Sostituire i cuscinetti usurati."]?.hasPrefix("it is written in another form") == true)
         #expect(reasons["Riparavo i motori e"] == "it is not a whole sentence")
         #expect(verdicts.avoid.contains("Valtrigno") || verdicts.avoid.contains("valtrigno"))
+    }
+
+    // MARK: D6, the typical duties of a job the person described (#354, round 1)
+
+    @Test("d6: a job whose stated duties are under 40 characters keeps a typical duty after them")
+    func d6TypicalDutyOfAShortJobStays() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.italianJobs, job: 3, duties: "Pianifico i turni della squadra.", against: JobClausesTests.italian
+        )
+
+        #expect(verdicts.pinned == ["Coordino tre tecnici."])
+        #expect(verdicts.kept == ["Pianifico i turni della squadra."])
+        #expect(!verdicts.saysEnough)
+    }
+
+    @Test("d6: a job whose stated duties run to 40 characters keeps them and drops a typical duty, with its reason")
+    func d6TypicalDutyOfADescribedJobGoes() throws {
+        let verdicts = try sanitizer.dutyCheck(
+            of: Self.italianJobs, job: 1, duties: "Eseguivo la lubrificazione dei macchinari.", against: JobClausesTests.italian
+        )
+
+        #expect(verdicts.pinned == ["Controllavo i quadri elettrici e programmavo la manutenzione preventiva."])
+        #expect(verdicts.kept.isEmpty)
+        #expect(verdicts.rejected.map(\.reason) == [CVDataSanitizer.DutyVerdicts.describedReason])
+        #expect(verdicts.saysEnough)
     }
 
     @Test("A repair's duties are checked against the duties kept before it, and the duties of a job past the draft's are none")

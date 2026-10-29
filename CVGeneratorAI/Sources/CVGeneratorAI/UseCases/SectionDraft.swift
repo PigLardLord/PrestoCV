@@ -70,6 +70,7 @@ final class SectionDraft {
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)
             brief.roles[number].avoid = check?.avoid ?? []
+            brief.roles[number].described = check?.saysEnough ?? false
         }
         duties = Array(repeating: nil, count: brief.roles.count)
 
@@ -142,7 +143,8 @@ final class SectionDraft {
     // MARK: - Jobs
 
     /// A request per job, in order, its duties checked; a job whose check keeps fewer than two duties or under 40 characters gets
-    /// one repair, and what still fails goes. A job keeps only its written duties: the person's own come back in the final check.
+    /// one repair, and what still fails goes. A job whose stated duties run to 40 characters keeps no typical duty and gets no
+    /// repair (ADR 0031, D6). A job keeps only its written duties: the person's own come back in the final check.
     private func writeJobs(of brief: DraftBrief, context: CVDataSanitizer.DraftContext, in located: CVData) async throws {
         for number in brief.roles.indices.prefix(Self.writtenJobs) {
             let role = try await request(.jobs) { try await self.service.writeJob(number: number, of: brief) }
@@ -151,7 +153,8 @@ final class SectionDraft {
             let job = context.jobs[number].job
             guard let first = try? sanitizer.dutyCheck(of: located, job: job, duties: role?.duties, against: description) else { continue }
             var kept = first.kept
-            if first.length < 40 || first.pinned.count + first.kept.count < 2 {
+            let described = CVDataSanitizer.DutyVerdicts.describedLength
+            if !first.saysEnough, first.length < described || first.pinned.count + first.kept.count < 2 {
                 let rejected = first.rejected.map(Self.quoted)
                 let repaired = try await request(.jobs) {
                     try await self.service.repairJob(number: number, of: brief, kept: first.pinned + first.kept, rejected: rejected)
