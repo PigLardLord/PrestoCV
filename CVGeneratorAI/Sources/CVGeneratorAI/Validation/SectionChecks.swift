@@ -601,11 +601,12 @@ extension CVDataSanitizer {
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
-            // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters, and the request asks
-            // for a tool of the lists (#354, round 10). One the description states is no name; one it lacks is, as in the final
-            // check, since a summary names nothing the description lacks (ADR 0031).
-            let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
-            let statedTools = Self.words(of: tools.filter { source.named($0) != nil })
+            // A kept tool the description states names the work whole, however short: "Java" and "SAP" have no stem of five
+            // letters (#354, round 10). One it lacks names no work: the summary said "Werkzeugkasten" of a person who never named
+            // it (round 11). A stated tool is no name; one it lacks is, as in the final check (ADR 0031).
+            let stated = tools.filter { source.named($0) != nil }
+            let toolRuns = stated.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            let statedTools = Self.words(of: stated)
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
                 return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
@@ -810,7 +811,7 @@ extension CVDataSanitizer {
 
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
-    static let namesNoWork = "it says nothing of the work: name a duty or a tool of the lists"
+    static let namesNoWork = "it says nothing of the work: name a duty of the roles"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"
@@ -1886,6 +1887,11 @@ extension CVDataSanitizer {
     ])
 
     // MARK: - Helpers
+
+    /// The tools of `names` the description states, each a run of its whole words: the only ones the summary reads (#354, round 11).
+    func statedTools(_ names: [String], against description: String) throws(CVGenerationError) -> [String] {
+        try reading(description) { source in names.filter { source.named($0) != nil } }
+    }
 
     /// `body` with the description read, and its language data required, as the final check reads it.
     private func reading<Result>(_ description: String, _ body: (DescriptionText) -> Result) throws(CVGenerationError) -> Result {

@@ -137,7 +137,10 @@ struct SectionDraftTests {
         #expect(!brief.roles[3].hasEnded)
         #expect(!brief.roles.flatMap(\.work).contains { $0.hasPrefix("I ") })
         let request = try #require(service.summaryRequests.first)
-        #expect(request.tools.contains("mixing desks"))
+        // The summary reads only the tools the description states: one the draft wrote came back as the summary's own claim
+        // (#354, round 11).
+        #expect(request.tools.contains("PA systems"))
+        #expect(!request.tools.contains("mixing desks"))
         #expect(!request.tools.contains("teamwork"))
         #expect(request.qualities.contains("teamwork"))
         #expect(!request.qualities.contains("mixing desks"))

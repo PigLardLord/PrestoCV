@@ -1091,6 +1091,31 @@ struct SectionChecksTests {
         #expect(try final([titled, inferred].joined(separator: " "), ["SAP", "Maximo"]) == titled)
     }
 
+    @Test("A summary sentence names the work by a kept tool only when the description states the tool: one with a tool the person never named and no duty goes (#354, round 11)")
+    func summaryNamingAnUnstatedTool() throws {
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("Elektriker", "Kranz", from: "2018")])
+        let description = "Seit 2018 arbeite ich als Elektriker bei Kranz in Erfurt und programmiere die Steuerungen mit KNX."
+        let check = { (summary: String) in
+            try german.summaryCheck(
+                of: facts, summary: summary, field: nil, work: ["Ich programmiere die Steuerungen mit KNX.", "KNX"], duties: [],
+                qualities: [], tools: ["KNX", "Werkzeugkasten"], against: description
+            )
+        }
+        let titled = "Ich arbeite als Elektriker in neuen Wohnhäusern und halte jede Baustelle in Ordnung."
+        let stated = "Ich sichere alle Schritte mit KNX ab."
+        let unstated = "Ich sichere alle Schritte mit dem Werkzeugkasten ab."
+
+        let keep = try check([titled, stated].joined(separator: " "))
+        let drop = try check([titled, unstated].joined(separator: " "))
+
+        #expect(keep.rejected.isEmpty, "\(keep.rejected)")
+        #expect(keep.kept == [titled, stated])
+        #expect(drop.rejected.map(\.sentence) == [unstated], "\(drop.rejected)")
+        #expect(drop.rejected.map(\.reason) == [CVDataSanitizer.namesNoWork])
+        #expect(CVDataSanitizer.namesNoWork == "it says nothing of the work: name a duty of the roles")
+    }
+
     @Test("A short summary gets the opening when it names no title and a sentence of the earlier titles it does not name, the latest first; a full one gets none (#354, round 6)", arguments: [
         ("Mi piace il lavoro fatto bene.",
          "Lavoro come capoturno della manutenzione. Mi piace il lavoro fatto bene. "

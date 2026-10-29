@@ -324,7 +324,10 @@ final class SectionDraft {
         let keptTools = kept.skills.filter { $0.kind != .softSkill }.map(\.name)
         let keptQualities = kept.skills.filter { $0.kind == .softSkill }.map(\.name)
         let endedDuties = kept.experience.filter { !$0.current && $0.endDate.presentValue != nil }.compactMap(\.description)
-        let work = keptDuties + technologies
+        // The summary reads only the tools the description states: one the draft wrote came back as the summary's own claim
+        // (#354, round 11). The check still reads all the kept ones, for a sentence that lists them.
+        let summaryTools = (try? sanitizer.statedTools(keptTools, against: description)) ?? []
+        let work = keptDuties + summaryTools
         var brief = brief
         let jobDuties = kept.experience.count == brief.roles.count ? kept.experience.map(\.description) : duties
         // The work of the current jobs, the person's own duties first: an ended job's duties came back in the present as the
@@ -343,7 +346,7 @@ final class SectionDraft {
         }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
         let written = try await request(.summary) { [brief] in
-            try await self.service.writeSummary(for: brief, tools: keptTools, qualities: keptQualities)
+            try await self.service.writeSummary(for: brief, tools: summaryTools, qualities: keptQualities)
         }
         // The text mended (`mended`), then the summary cut to its most sentences (#354, round 4).
         let opened = Self.opened(written.map(Self.mended), by: brief.opening)
@@ -363,7 +366,7 @@ final class SectionDraft {
         let rejected = first.rejected.map(Self.quoted)
         let repaired = try await request(.summary) { [brief] in
             try await self.service.repairSummary(
-                for: brief, tools: keptTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
+                for: brief, tools: summaryTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
             )
         }
         let cut = Self.opened(repaired.map(Self.mended), by: brief.opening)
