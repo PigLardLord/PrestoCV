@@ -267,7 +267,9 @@ final class SectionDraft {
         "a kind of tool, not its name": "a kind of tool, not the name of one",
         "the same quality as an earlier one": "the same quality as one listed",
         "a part or a material, not a tool": "a part or a material the work is done on, not a tool",
-        "a word of a name": "named after a company, a school or a person", "what the work is done on": "what the work is done on, not a tool",
+        "a word of a name": "named after a company, a school or a person",
+        "a record or a document, not a tool": "a record, a document or its scan, not a tool",
+        "what the work is done on": "what the work is done on, not a tool",
     ]
 
     private func keep(_ skills: CVDataSanitizer.SkillVerdict) {

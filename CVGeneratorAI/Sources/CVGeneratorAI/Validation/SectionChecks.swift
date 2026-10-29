@@ -1174,6 +1174,8 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
                 } else if Self.namesAnActivity(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                } else if Self.namesARecord(item, language: language) {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "a record or a document, not a tool"))
                 } else if Self.namesAPart(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a part or a material, not a tool"))
                 } else if Self.namesAnEverydayObject(item) || Self.namesStationery(item, language: language) {
@@ -1330,6 +1332,33 @@ extension CVDataSanitizer {
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
         return partKeys.contains(skillKey(head))
     }
+
+    /// Whether a technology is a record or a document alone, or the scan or audit of one (#354, round 8): the request for more
+    /// tools filled the count with "Escaneo", "Registro" and "archivio", and the tools request listed "Documenti". A record named
+    /// with its system or device stays ("registro elettronico", "archivio digitale", "document scanner").
+    static func namesARecord(_ item: String, language: String?) -> Bool {
+        if recordKeys.contains(skillKey(item)) { return true }
+        let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { !skillLinkWords.contains($0) }
+        guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
+        return scanKeys.contains(skillKey(head))
+    }
+
+    /// The keys (`skillKey`) of a record or a document named alone, singular and plural, in each language.
+    private static let recordKeys: Set<String> = Set([
+        "document", "documents", "record", "records", "file", "files", "paperwork", "invoices", "reports",
+        "documento", "documenti", "registro", "registri", "pratiche", "fatture", "verbali",
+        "documentos", "registros", "expedientes", "facturas", "informes",
+        "registres", "dossiers", "factures", "rapports",
+        "registos", "faturas", "relatórios",
+        "dokument", "dokumente", "unterlagen", "akten", "register", "rechnungen", "berichte",
+        "archive", "archives", "archivio", "archivi", "archivo", "archivos", "arquivo", "arquivos", "archiv",
+    ].map(skillKey))
+
+    /// The keys (`skillKey`) of the scan or audit of a record, the head noun of an activity that ends as no other does.
+    private static let scanKeys: Set<String> = Set([
+        "scan", "scans", "audit", "audits", "scansione", "scansioni", "escaneo", "escaneos", "auditoría", "auditorías",
+        "escaneamento", "auditoria", "auditorias", "numérisation", "scannen",
+    ].map(skillKey))
 
     /// The keys (`skillKey`) of the parts and materials of the trades that install them, singular and plural, in each language.
     private static let partKeys: Set<String> = Set([

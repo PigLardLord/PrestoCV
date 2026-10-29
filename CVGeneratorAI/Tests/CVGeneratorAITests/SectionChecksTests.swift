@@ -662,6 +662,30 @@ struct SectionChecksTests {
         #expect(store.dropped.map(\.reason) == ["activity"])
     }
 
+    @Test("A record or a document alone, or its scan, goes; a record named with its system or device stays (#354, round 8)",
+          arguments: [
+              ("es", ["Escaneo", "Registros", "escaneo de albaranes", "lector de albaranes"], ["lector de albaranes"]),
+              ("it", ["Documenti", "archivio", "registro elettronico", "archivio digitale", "scanner piano"],
+               ["registro elettronico", "archivio digitale", "scanner piano"]),
+              ("en", ["paperwork", "records", "document scanner", "QuickBooks"], ["document scanner", "QuickBooks"]),
+              ("fr", ["registres", "dossiers", "logiciel de paie"], ["logiciel de paie"]),
+              ("pt", ["Documentos", "auditoria", "relógio de ponto"], ["relógio de ponto"]),
+              ("de", ["Unterlagen", "Dokumentenscanner", "Register"], ["Dokumentenscanner"]),
+          ])
+    func recordIsNoTechnology(language: String, technologies: [String], kept: [String]) throws {
+        // The device's tagger read "escaneo" as a verb on one host and not on another; this row reads the record rule alone.
+        let language = try #require(Vocabulary.Language(rawValue: language))
+        let checker = CVDataSanitizer(
+            languageOfText: { _ in language.rawValue }, lexicalClasses: ForcedLexicalTagger([language: .noAssets]), wordList: TableWordList()
+        )
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
+
+        #expect(verdict.technologies == kept)
+        #expect(Set(verdict.dropped.map(\.reason)) == ["a record or a document, not a tool"])
+        #expect(verdict.dropped.count == technologies.count - kept.count)
+    }
+
     @Test("A bare kind of tool goes; a kind with a word of its trade stays, as does a named one, with a capital, an acronym or a digit (#354, rounds 2 and 4)",
           arguments: [
               ("en", ["Pro Tools", "software", "sound design software", "Logic Pro 11", "stage monitors"],

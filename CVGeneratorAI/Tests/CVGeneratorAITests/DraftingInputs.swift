@@ -151,7 +151,8 @@ enum DraftingInputs {
     /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
     /// The list is the reader's, independent of the rules of the draft: no stationery a person of any trade uses ("cahiers"), and
     /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4), and the tools of
-    /// round 6's answers the reader accepted ("ordinateur portable", "Java"; round 7).
+    /// round 6's answers the reader accepted ("ordinateur portable", "Java"; round 7), and those of round 7's answers ("Google Sheets",
+    /// "Werkzeugkasten"; round 8).
     static let vocabularies: [String: [String]] = [
         "jobs-en": [
             "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
@@ -159,14 +160,14 @@ enum DraftingInputs {
             "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
             "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
             "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com", "sound mixers", "lighting rigs",
-            "follow spot rig", "lighting rig", "audio distribution box", "sound mixing software",
+            "follow spot rig", "lighting rig", "audio distribution box", "sound mixing software", "audio editing software",
         ],
         "jobs-it": [
             "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
             "termocamera", "analizzatore di vibrazioni", "allineatore laser", "inverter", "motori elettrici", "schemi pneumatici",
             "pneumatica", "oleodinamica", "saldatrice", "trapano", "chiave dinamometrica", "avvitatore", "estrattore per cuscinetti",
             "riduttori", "pompe", "compressori", "software CMMS", "SAP PM", "lubrificanti", "carrello elevatore", "sensori",
-            "encoder", "valvole",
+            "encoder", "valvole", "strumenti di diagnostica industriale", "sensori di temperatura",
         ],
         "en-plain": [
             "warehouse management system", "WMS", "reach truck", "pallet jack", "pallet truck", "order picker", "barcode scanner",
@@ -176,16 +177,16 @@ enum DraftingInputs {
         "it-traps": [
             "Excel", "Word", "Outlook", "Microsoft Office", "gestionale", "TeamSystem", "Zucchetti", "Danea Easyfatt", "PEC",
             "Sistema di Interscambio", "home banking", "database", "stampante", "scanner", "fotocopiatrice", "fax", "calcolatrice",
-            "foglio di calcolo",
+            "foglio di calcolo", "Google Calendar",
         ],
         "de-plain": [
             "Multimeter", "Spannungsprüfer", "Duspol", "Isolationsmessgerät", "Installationstester", "Schaltschrank", "Verteiler",
             "Sicherungskasten", "Abisolierzange", "Crimpzange", "Seitenschneider", "Kabelschere", "Bohrhammer", "Akkuschrauber",
-            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme", "Steuerungssystem", "Messgerät",
+            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme", "Steuerungssystem", "Messgerät", "Werkzeugkasten",
         ],
         "es-traps": [
             "Excel", "Word", "ContaPlus", "A3", "Sage", "Holded", "Factusol", "hoja de cálculo", "base de datos", "calculadora",
-            "banca electrónica", "software de contabilidad", "sistema de gestión contable",
+            "banca electrónica", "software de contabilidad", "sistema de gestión contable", "Google Sheets",
         ],
         "pt-traps": [
             "Git", "GitHub", "GitLab", "Visual Studio Code", "Android Studio", "JavaScript", "TypeScript", "React", "Node.js", "PHP",
@@ -195,7 +196,7 @@ enum DraftingInputs {
         "example-fr": [
             "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
             "tableau", "ENT", "logiciels éducatifs", "matériel de manipulation", "tableau numérique", "logiciel d'apprentissage",
-            "ordinateur portable",
+            "ordinateur portable", "logiciel de gestion de classe", "système de suivi des progrès", "imprimante multifonction scolaire",
         ],
     ]
 

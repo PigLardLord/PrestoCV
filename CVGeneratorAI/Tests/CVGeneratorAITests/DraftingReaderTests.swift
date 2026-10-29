@@ -235,6 +235,27 @@ struct DraftingReaderTests {
         #expect(counted(["lighting rig", "truck load"], sound) == ["truck load"])
     }
 
+    @Test("The office, class and workshop tools a reader accepted in round 7's answers are of their trade; a forklift in a classroom, a trailer and a scan are not (#354, round 8)")
+    func roundSevenToolsAreOfTheirTrade() throws {
+        let inputs = DraftingInputs.written + DraftingInputs.jobs + (try DraftingInputs.examples())
+        let byId = Dictionary(uniqueKeysWithValues: inputs.map { ($0.id, $0) })
+        let counted = { (names: [String], id: String) in
+            guard let input = byId[id] else { return ["no input \(id)"] }
+            let cv = CVData(skills: names.map { Skill(name: $0) })
+            return ReaderRules.findings(in: cv, for: input, report: InventedFacts.count(cv, for: input))
+                .filter { $0.kind == .offTradeTechnology }.map(\.value)
+        }
+
+        #expect(counted(["logiciel de gestion de classe", "système de suivi des progrès", "imprimante multifonction scolaire"], "example-fr") == [])
+        #expect(counted(["logiciel de gestion de classe", "chariot élévateur"], "example-fr") == ["chariot élévateur"])
+        #expect(counted(["Google Calendar", "Documenti"], "it-traps") == ["Documenti"])
+        #expect(counted(["Google Sheets", "Escaneo"], "es-traps") == ["Escaneo"])
+        #expect(counted(["audio editing software", "trailer"], "jobs-en") == ["trailer"])
+        #expect(counted(["strumenti di diagnostica industriale", "sensori di temperatura", "navigatore GPS"], "jobs-it") == ["navigatore GPS"])
+        #expect(counted(["Werkzeugkasten", "Gabelstapler"], "de-plain") == ["Gabelstapler"])
+        #expect(counted(["barcode scanner", "trailer", "GPS"], "en-plain") == ["trailer", "GPS"])
+    }
+
     @Test("A part the electrician installs is a work object; a measuring tool is not")
     func partsAreNoTools() throws {
         let electrician = try #require(DraftingInputs.written.first { $0.id == "de-plain" })
