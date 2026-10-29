@@ -95,7 +95,9 @@ struct SectionDraftTests {
         _ = try await draft(service)
 
         #expect(service.generateRequests.count == 1)
-        #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "softSkills", "summary"])
+        #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "tools", "tools", "softSkills", "summary"])
+        // The two jobs of sound technician ask for their tools once (#354, round 6).
+        #expect(service.toolsRequests == [[0], [1, 2], [3]])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
@@ -165,7 +167,7 @@ struct SectionDraftTests {
             startDate: "2021", endDate: nil,
             duties: "I run the technical rehearsals. I mixed 40 shows at the Royal Albert Hall. I look after the mixing desks."
         )
-        service.toolsResult = Self.tools + [["Dante Level 3 certification"]]
+        service.toolsResult = Self.tools.dropLast() + [Self.tools[3] + ["Dante Level 3 certification"]]
         service.softSkillsResult = Self.qualities + ["leadership of 12 technicians"]
         service.summaryResult = Self.summary + " I won the Best Venue award in 2019."
 
@@ -395,7 +397,7 @@ struct SectionDraftTests {
 
         let draft = try await draft(service)
 
-        #expect(service.sectionCalls.filter { $0 == "tools" }.count == 2)
+        #expect(service.sectionCalls.filter { $0 == "tools" }.count == 4)
         #expect(service.sectionCalls.last == "summary")
         #expect(draft.summary == Self.opening + " " + Self.summary)
     }

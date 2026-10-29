@@ -83,12 +83,17 @@ struct SectionPromptsTests {
             studies: [], namedSkills: []
         )
 
-        for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
+        for text in [SectionPrompts.softSkills(for: brief).text,
                      SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
             #expect(text.contains("Jobs:\n1. programador; ended"))
             #expect(text.contains("\n2. analista de testes"))
         }
-        #expect(SectionPrompts.tools(for: noHeadline).text.contains("1. no title given; ended"))
+        let titleLine = { (brief: DraftBrief, role: Int) in
+            SectionPrompts.tools(for: brief, roles: [role]).text.split(separator: "\n").first { $0.hasPrefix("Job title: ") }
+        }
+        #expect(titleLine(brief, 0) == "Job title: programador")
+        #expect(titleLine(brief, 1) == "Job title: analista de testes")
+        #expect(titleLine(noHeadline, 0) == "Job title: no title given")
         #expect(SectionPrompts.job(number: 0, of: brief).text.contains("Job: no title given; employer: Estúdio Ventania; ended"))
     }
 
@@ -126,21 +131,48 @@ struct SectionPromptsTests {
 
     // MARK: The skills
 
-    @Test("The tools request lists each job in order, with its clauses, and the skills the person named")
+    @Test("A tools request reads one job: its title, its own lines, what its work is done on as no tool, and the skills the person named (#354, round 6)")
     func toolsPrompt() {
-        let prompt = SectionPrompts.tools(for: Self.brief)
+        let prompt = SectionPrompts.tools(for: Self.brief, roles: [0])
 
         #expect(prompt.instructions == SectionPrompts.toolsInstructions)
         #expect(prompt.text == """
             Language: Italian
             Scrivi in italiano.
-            Jobs:
-            1. manutentore elettromeccanico; ended
-               Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018. Controllando i quadri elettrici.
-            2. capoturno della manutenzione
-               Dove coordino tre tecnici.
+            Job title: manutentore elettromeccanico
+            What the person said about this job:
+            - Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018.
+            - Controllando i quadri elettrici.
+            What the work is done on, which is no tool: i quadri elettrici
             Skills already listed: PLC
             """)
+        // The "where" that ties a line to its employer is no work.
+        #expect(SectionPrompts.tools(for: Self.brief, roles: [1]).text.contains("What the work is done on, which is no tool: tre tecnici\n"))
+    }
+
+    @Test("The jobs that share a title ask for their tools once, with the lines of each, each line once (#354, round 6)")
+    func toolsOfJobsThatShareATitle() {
+        let brief = DraftBrief(
+            language: "English", headline: nil,
+            roles: [
+                .init(title: "sound technician", employer: "Brightwater Events", hasEnded: true, clauses: ["setting up the PA systems"]),
+                .init(title: "sound technician", employer: "Copperfield Arena", hasEnded: true, clauses: [
+                    "setting up the PA systems", "I was also helping the lighting crew with the follow spots",
+                ]),
+            ],
+            studies: [], namedSkills: []
+        )
+
+        let text = SectionPrompts.tools(for: brief, roles: [0, 1]).text
+
+        #expect(text.contains("""
+            Job title: sound technician
+            What the person said about this job:
+            - Setting up the PA systems.
+            - I was also helping the lighting crew with the follow spots.
+            """))
+        // An acronym names a tool or a name: the work is done on the crew, not on the PA systems.
+        #expect(text.hasSuffix("What the work is done on, which is no tool: helping the lighting crew with the follow spots"))
     }
 
     @Test("The tools request puts the equipment of a job's own lines first, asks 2 or 3 for every job, and asks for no activity (#354, rounds 1 and 5)")
@@ -151,10 +183,12 @@ struct SectionPromptsTests {
         #expect(rules.contains("only when they fit the job's title and the tools the person names"))
         // Allowed none, a job with no lines of its own got none, and the next request filled it with roles (#354, round 5).
         #expect(!rules.contains("none fits"))
-        #expect(rules.contains("no activity or task, also when written as a noun"))
+        #expect(rules.contains("Not a tool: what the work is done on; an activity or task, also when written as a noun; a document;"))
         // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4).
-        #expect(rules.contains("name 2 or 3 tools of the trade that a person with that job's title uses: its software, systems, machines or instruments"))
-        #expect(rules.contains("no stationery, furniture or protective wear"))
+        #expect(rules.contains("2 or 3 software, equipment, machines or instruments that a person with the job's title uses at work"))
+        #expect(rules.contains("stationery, furniture or protective wear; an everyday object a person of any trade uses"))
+        // A bare kind is no tool; with a word of its trade it is one (#354, round 4).
+        #expect(rules.contains("A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not."))
         #expect(!rules.contains("pieces of equipment"))
         #expect(!rules.contains("technique"))
         #expect(!SectionPrompts.moreSkillsInstructions.contains("technique"))
@@ -211,11 +245,11 @@ struct SectionPromptsTests {
             - Sono preciso e mi piace lavorare in squadra.
             """
 
-        for text in [SectionPrompts.tools(for: brief).text, SectionPrompts.softSkills(for: brief).text,
+        for text in [SectionPrompts.tools(for: brief, roles: [0]).text, SectionPrompts.softSkills(for: brief).text,
                      SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
             #expect(text.contains(said), "\(text)")
         }
-        #expect(!SectionPrompts.tools(for: Self.brief).text.contains("with no job"))
+        #expect(!SectionPrompts.tools(for: Self.brief, roles: [0]).text.contains("with no job"))
         #expect(SectionPrompts.toolsInstructions.contains("then the tools the person names in what they say of their work with no job"))
         #expect(SectionPrompts.softSkillsInstructions.contains("First the qualities the person says of themselves"))
         #expect(SectionPrompts.moreSkillsInstructions.contains("First those the person names"))

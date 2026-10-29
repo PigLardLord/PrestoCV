@@ -249,6 +249,26 @@ extension CVDataSanitizer {
         return Array(topics.prefix(limit))
     }
 
+    /// What the work of a job's own lines is done on, which its tools request reads as no tool (#354, round 6): their topics,
+    /// none that names a tool or its kind, holds an acronym or, but in German, whose nouns all take a capital, a name. Asked for
+    /// the tools of all jobs at once, the request listed the panels and the belts the person repairs.
+    static func workObjects(of lines: [String], capitalNouns: Bool) -> [String] {
+        let clauses = lines.map { line -> String in
+            // A job's line may open with the "where" that tied it to the employer ("dove coordino tre tecnici").
+            guard let first = Word.words(in: line).first, relativeOpenings.contains(first.folded) else { return line }
+            return String(Array(Digits.ascii(line))[first.range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
+        return workTopics(of: clauses.joined(separator: " "), limit: 4).filter { topic in
+            let named = topic.split { !$0.isLetter }.contains { word in
+                word.filter(\.isUppercase).count > 1 || !capitalNouns && word.first?.isUppercase == true
+            }
+            return !named && !Word.words(in: topic).contains { toolKinds.contains($0.folded) }
+        }
+    }
+
+    /// The words that tie a job's line to its employer, folded.
+    private static let relativeOpenings: Set<String> = ["where", "dove", "wo", "ou", "donde", "onde"]
+
     /// The words of a clause of a duty after its subject, auxiliary and verb; a single word after a conjunction is a topic as it
     /// is ("le fatture e i preventivi"). The German perfect has its participle last ("Ich habe die Regale montiert").
     private static func topic(of piece: [Word], opensTheSentence: Bool) -> ArraySlice<Word>? {

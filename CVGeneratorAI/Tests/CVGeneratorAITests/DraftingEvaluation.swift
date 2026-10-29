@@ -182,9 +182,9 @@ struct DraftingEvaluation {
             return duties
         }
 
-        func writeTools(for brief: DraftBrief) async throws -> [[String]]? {
-            let tools = try await model.writeTools(for: brief)
-            log("tools", tools.map { $0.map { $0.joined(separator: " | ") } })
+        func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]? {
+            let tools = try await model.writeTools(for: brief, roles: roles)
+            log("tools " + roles.map(String.init).joined(separator: ","), tools.map { [$0.joined(separator: " | ")] })
             return tools
         }
 

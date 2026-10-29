@@ -173,11 +173,14 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job and the soft skills, cleaned by code against the tools the person names, then one request for those missing, and one more of each kind,
-    /// when the final check would keep fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); it reads the
-    /// skills the checks dropped, with the reason.
+    /// The tools of each job title, a request each, and the soft skills, cleaned by code against the tools the person names, then
+    /// one request for those missing, and one more of each kind, when the final check would keep fewer than 4 technologies or 3
+    /// soft skills (3 and 2 for a single short job); it reads the skills the checks dropped, with the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
-        let tools = try await request(.skills) { try await self.service.writeTools(for: brief) }
+        var tools: [String] = []
+        for roles in Self.toolGroups(of: brief) {
+            tools += try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles) } ?? []
+        }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
         let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
         // ADR 0031, D8: the work the person says they like doing is a soft skill in their own words, before those written.
@@ -185,7 +188,7 @@ final class SectionDraft {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
         var skills = sanitizer.skillCheck(
-            technologies: (tools ?? []).flatMap { $0 }, softSkills: liked + (qualities ?? []), stated: stated,
+            technologies: tools, softSkills: liked + (qualities ?? []), stated: stated,
             against: description
         )
         keep(skills)
@@ -211,6 +214,23 @@ final class SectionDraft {
             against: description
         )
         keep(skills)
+    }
+
+    /// The jobs of `brief` by their title, in the order of the first of each, a job with no title by the headline: each title asks
+    /// for its tools once (#354, round 6).
+    static func toolGroups(of brief: DraftBrief) -> [[Int]] {
+        var groups: [[Int]] = []
+        var titles: [String: Int] = [:]
+        for (index, role) in brief.roles.enumerated() {
+            let title = (role.title.presentValue ?? brief.headline ?? "").lowercased()
+            if let group = titles[title] {
+                groups[group].append(index)
+            } else {
+                titles[title] = groups.count
+                groups.append([index])
+            }
+        }
+        return groups
     }
 
     /// The skills the checks dropped as the request for more skills reads them: the skill in quotes, then why it went, in words the

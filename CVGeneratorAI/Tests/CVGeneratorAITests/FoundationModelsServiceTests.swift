@@ -105,17 +105,15 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.writingTokens == 400)
     }
 
-    @Test("The tools request asks 2 or 3 tools for every job, a job with no lines of its own too (#354, round 5)", arguments: [1, 3])
-    func twoOrThreeToolsForEveryJob(count: Int) throws {
-        let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
+    @Test("A tools request asks 2 or 3 tools of its job, never none (#354, rounds 5 and 6)")
+    func twoOrThreeToolsForEveryJob() throws {
+        let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema())
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let jobs = try #require((root["properties"] as? [String: Any])?["jobs"] as? [String: Any])
-        let entry = try #require((root["$defs"] as? [String: Any])?["JobTools"] as? [String: Any])
-        let tools = try #require((entry["properties"] as? [String: Any])?["tools"] as? [String: Any])
+        let tools = try #require((root["properties"] as? [String: Any])?["tools"] as? [String: Any])
 
-        #expect(jobs["minItems"] as? Int == count && jobs["maxItems"] as? Int == count, "one entry for each of \(count) jobs")
         // Allowed none, the request answered none for a job with no lines of its own, and the next one filled it with roles.
         #expect(tools["minItems"] as? Int == 2, "no job goes without tools")
         #expect(tools["maxItems"] as? Int == 3)
+        #expect(FoundationModelsService.toolsTokens == 80)
     }
 }

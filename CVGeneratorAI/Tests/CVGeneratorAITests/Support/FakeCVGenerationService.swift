@@ -31,6 +31,7 @@ final class FakeCVGenerationService: CVGenerationService {
     var jobResults: [Int: RoleWriting] = [:]
     /// The duties each job's repair answers, by the job's number.
     var jobRepairResults: [Int: [String]] = [:]
+    /// The tools of each job, by its number: a request for the jobs that share a title answers theirs, in order.
     var toolsResult: [[String]]?
     var softSkillsResult: [String]?
     var moreSkillsResult: DraftWriting?
@@ -48,6 +49,8 @@ final class FakeCVGenerationService: CVGenerationService {
     private(set) var sectionCalls: [String] = []
     /// The brief each section request read, one for one with `sectionCalls`.
     private(set) var sectionBriefs: [DraftBrief] = []
+    /// The jobs of each tools request, by their numbers.
+    private(set) var toolsRequests: [[Int]] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
     private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String])] = []
     private(set) var summaryRequests: [(tools: [String], qualities: [String])] = []
@@ -64,9 +67,10 @@ final class FakeCVGenerationService: CVGenerationService {
         return jobRepairResults[number]
     }
 
-    func writeTools(for brief: DraftBrief) async throws -> [[String]]? {
+    func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]? {
+        toolsRequests.append(roles)
         try await section("tools", brief)
-        return toolsResult
+        return toolsResult.map { tools in roles.filter(tools.indices.contains).flatMap { tools[$0] } }
     }
 
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {

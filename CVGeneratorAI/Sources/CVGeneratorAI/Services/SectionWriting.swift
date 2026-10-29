@@ -20,8 +20,8 @@ extension FoundationModelsService {
     /// The longest summary a repair keeps, in sentences: a repair that runs on is cut, not thrown away.
     nonisolated static let summaryRepairSentences = 4
 
-    /// The tools' cap grows with the jobs: an entry of 2 or 3 tools for each.
-    nonisolated static func toolsTokens(jobs: Int) -> Int { 60 + 40 * jobs }
+    /// 2 or 3 tools of one job.
+    nonisolated static let toolsTokens = 80
 
     /// The cap of a request for `count` more skills.
     nonisolated static func moreSkillsTokens(count: Int) -> Int { 40 + 12 * count }
@@ -48,39 +48,24 @@ extension FoundationModelsService {
 
     // MARK: The skills
 
-    public func writeTools(for brief: DraftBrief) async throws -> [[String]]? {
-        let count = brief.roles.count
-        guard count > 0 else { return nil }
-        let answer = try await respond(
-            SectionPrompts.tools(for: brief), schema: try Self.toolsSchema(count: count), tokens: Self.toolsTokens(jobs: count)
-        )
-        guard let jobs = try? answer.value([GeneratedContent].self, forProperty: "jobs") else { return nil }
-        return jobs.map { Self.clean(try? $0.value([String].self, forProperty: "tools")) }
+    public func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]? {
+        guard !roles.isEmpty, roles.allSatisfy(brief.roles.indices.contains) else { return nil }
+        let prompt = SectionPrompts.tools(for: brief, roles: roles)
+        let answer = try await respond(prompt, schema: try Self.toolsSchema(), tokens: Self.toolsTokens)
+        return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
 
-    /// One entry of 2 or 3 tools for each of `count` jobs, in order; the entry's type is a dependency the array refers to. A job
-    /// may not go without tools: allowed none, the model answered none for a job with no lines of its own, and the next request
-    /// filled the gap with activities and roles (#354, round 5).
-    nonisolated static func toolsSchema(count: Int) throws -> GenerationSchema {
-        let job = DynamicGenerationSchema(name: "JobTools", properties: [
-            DynamicGenerationSchema.Property(
-                name: "job", description: "The job's title", schema: DynamicGenerationSchema(type: String.self)
-            ),
+    /// 2 or 3 tools of one job. A job may not go without tools: allowed none, the model answered none for a job with no lines of
+    /// its own, and the next request filled the gap with activities and roles (#354, round 5).
+    nonisolated static func toolsSchema() throws -> GenerationSchema {
+        let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "2 or 3 software, systems, machines or instruments of the job's trade, first those its lines name",
+                description: "2 or 3 software, equipment, machines or instruments of the job's trade, first those its lines name",
                 schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 2, maximumElements: 3)
             ),
         ])
-        let root = DynamicGenerationSchema(name: "Tools", properties: [
-            DynamicGenerationSchema.Property(
-                name: "jobs", description: "One entry for each job, in order",
-                schema: DynamicGenerationSchema(
-                    arrayOf: DynamicGenerationSchema(referenceTo: "JobTools"), minimumElements: count, maximumElements: count
-                )
-            ),
-        ])
-        return try GenerationSchema(root: root, dependencies: [job])
+        return try GenerationSchema(root: root, dependencies: [])
     }
 
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
