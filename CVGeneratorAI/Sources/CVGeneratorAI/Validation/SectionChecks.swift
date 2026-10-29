@@ -823,10 +823,12 @@ extension CVDataSanitizer {
                 verdict.kept.removeAll { $0 == idleFirst }
                 verdict.rejected.append(Rejection(sentence: idleFirst, reason: Self.namesNoWork))
             }
-            if let verb = verdict.opening.flatMap(Self.leadingVerb) {
-                verdict.rejected += verdict.kept.filter { Self.leadingVerb(of: $0) == verb }
-                    .map { Rejection(sentence: $0, reason: Self.startsAsAnEarlierOne) }
-                verdict.kept.removeAll { Self.leadingVerb(of: $0) == verb }
+            // A sentence that opens with the opening's verb goes, but not the opening itself, which code wrote in front of the
+            // summary: a summary that kept only it lost it, and its repair was told to drop the opening (#354, round 11).
+            if let opening = verdict.opening, let verb = Self.leadingVerb(of: opening) {
+                let opensAsIt = { (sentence: String) in sentence != opening && Self.leadingVerb(of: sentence) == verb }
+                verdict.rejected += verdict.kept.filter(opensAsIt).map { Rejection(sentence: $0, reason: Self.startsAsAnEarlierOne) }
+                verdict.kept.removeAll(where: opensAsIt)
             }
             var sizes: [String] = []
             if verdict.kept.count < 2 { sizes.append("it keeps fewer than 2 sentences") }

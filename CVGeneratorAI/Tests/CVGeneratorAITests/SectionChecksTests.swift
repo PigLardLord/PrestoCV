@@ -1601,6 +1601,22 @@ struct SectionChecksTests {
         #expect(verdict.problems.first == "it keeps fewer than 2 sentences")
     }
 
+    @Test("A summary that keeps only the opening keeps it: the opening's verb does not reject the opening itself (#354, round 11)")
+    func summaryKeepingOnlyTheOpening() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("sound technician", "Copperfield Arena", from: "2019")])
+        let description = "I am a sound technician at Copperfield Arena since 2019. I set up the PA systems and mix the support acts."
+
+        let verdict = try english.summaryCheck(
+            of: facts, summary: "I work as a sound technician. I set up the PA systems and mix the support acts.",
+            field: nil, duties: ["I set up the PA systems and mix the support acts."], against: description
+        )
+
+        #expect(verdict.opening == "I work as a sound technician.")
+        #expect(verdict.kept == ["I work as a sound technician."])
+        #expect(verdict.rejected.map(\.reason) == ["it says again a duty of a job: say what the person's work has in common"])
+    }
+
     @Test("A summary naming a title whole gets no opening; its sentences with other verbs, and one joining duties, stay (#354)")
     func summaryNamingATitle() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
