@@ -1497,6 +1497,7 @@ extension CVDataSanitizer {
     private static let activityLookalikes = [
         "station", "stazione", "postazione", "estación", "estação", "strumento", "instrumento", "equipamento", "equipaggiamento",
         "string", "ceiling", "building", "bearing", "housing", "casing", "fitting", "coupling",
+        "applicazione", "applicazioni", "application", "applications", "aplicación", "aplicaciones", "aplicação", "aplicações",
     ]
 
     /// The key by which two skills are one: their words without a plural ending or a last vowel ("PLC" and "PLCs").

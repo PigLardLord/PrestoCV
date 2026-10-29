@@ -587,6 +587,39 @@ struct SectionChecksTests {
         #expect(school.dropped.map(\.sentence) == ["correction des copies"])
     }
 
+    @Test("An application of a trade is a tool, though its noun ends as an activity's does; the activity of that trade goes (#354, round 7)")
+    func applicationIsNoActivity() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let office = sanitizer.skillCheck(
+            technologies: ["applicazione di contabilità", "riparazione delle stampanti"], softSkills: [],
+            against: "Lavoro come impiegata amministrativa a Bari dal 2018."
+        )
+        let shop = english.skillCheck(
+            technologies: ["stock tracking application", "stock reconciliation"], softSkills: [],
+            against: "I run the stockroom of a hardware shop in Leeds."
+        )
+        let clinic = spanish.skillCheck(
+            technologies: ["aplicaciones de facturación", "reparación de equipos"], softSkills: [],
+            against: "Trabajo en la recepción de una clínica dental en Murcia."
+        )
+        let store = portuguese.skillCheck(
+            technologies: ["aplicação de inventário", "programação de entregas"], softSkills: [],
+            against: "Trabalho no armazém de uma loja em Braga."
+        )
+
+        #expect(office.technologies == ["applicazione di contabilità"])
+        #expect(office.dropped.map(\.reason) == ["activity"])
+        #expect(shop.technologies == ["stock tracking application"])
+        #expect(shop.dropped.map(\.reason) == ["activity"])
+        #expect(clinic.technologies == ["aplicaciones de facturación"])
+        #expect(clinic.dropped.map(\.reason) == ["activity"])
+        #expect(store.technologies == ["aplicação de inventário"])
+        #expect(store.dropped.map(\.reason) == ["activity"])
+    }
+
     @Test("A bare kind of tool goes; a kind with a word of its trade stays, as does a named one, with a capital, an acronym or a digit (#354, rounds 2 and 4)",
           arguments: [
               ("en", ["Pro Tools", "software", "sound design software", "Logic Pro 11", "stage monitors"],
