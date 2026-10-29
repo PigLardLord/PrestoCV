@@ -508,7 +508,7 @@ struct SectionChecksTests {
         #expect(verdict.opening == "Lavoro come capoturno della manutenzione.")
     }
 
-    @Test("A summary sentence whose subject is a bare word of the person's work goes; one with its article or as the person stays (#354, round 1)")
+    @Test("A summary sentence whose subject is a bare word of the person's work, with or without its article, goes; one as the person stays (#354, rounds 1 and 3)")
     func summaryWithABareSubject() throws {
         let description = JobClausesTests.italian.replacingOccurrences(
             of: "Birrificio Valtrigno di Campobasso, dove coordino tre tecnici.", with: "Birrificio Valtrigno."
@@ -521,8 +521,26 @@ struct SectionChecksTests {
             field: nil, against: description
         )
 
-        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.hasABareSubject])
-        #expect(verdict.kept == ["La manutenzione degli impianti è il mio lavoro di ogni giorno.", "Mi occupo degli impianti con cura."])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.hasABareSubject, CVDataSanitizer.hasABareSubject])
+        #expect(verdict.kept == ["Mi occupo degli impianti con cura."])
+    }
+
+    @Test("A summary sentence that opens with an article and a word of the work, or of work itself, has the work as its subject and goes; one with the person's word after the article, or none, stays (#354, round 3)",
+          arguments: [
+              ("es", "El trabajo pide orden y calma en cada cierre.", false), ("pt", "O trabalho pede calma e ordem em cada entrega.", false),
+              ("it", "Il lavoro di squadra lo curo in ogni chiusura.", false), ("es", "La contable de la oficina cuida cada cierre.", false),
+              ("es", "Mi trabajo de cada día son las cuentas de la oficina.", true), ("es", "En el trabajo llevo las cuentas con calma.", true),
+              ("it", "Il mio lavoro mi porta ogni giorno tra i conti.", true),
+          ])
+    func summaryWithTheWorkAsItsSubject(language: String, sentence: String, stays: Bool) throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")])
+        let description = "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad y "
+            + "analizo los movimientos de caja."
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasABareSubject) == !stays, "\(verdict.rejected)")
     }
 
     @Test("A summary sentence whose subject is a quality goes; a quality the person works with, or one before a comma, stays (#354, round 2)")

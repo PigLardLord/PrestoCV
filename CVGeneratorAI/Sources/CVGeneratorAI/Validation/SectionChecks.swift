@@ -635,13 +635,38 @@ extension CVDataSanitizer {
 
     /// Whether `sentence` starts with a word of the person's work (`workWords`, folded) with no article, and has a form of "to be"
     /// of `language` among its next three words with no word of the person before it: the work spoken of as a thing
-    /// ("Manutenzione è la mia attività principale.", #354). The language that drops the pronoun has no other sign of it.
+    /// ("Manutenzione è la mia attività principale.", #354). The language that drops the pronoun has no other sign of it. After an
+    /// article, the work or a word of it is the subject with any verb ("Il lavoro richiede…", round 3).
     static func hasABareSubject(_ sentence: String, workWords: Set<String>, language: Vocabulary.Language) -> Bool {
         let words = Word.words(in: sentence)
+        if let first = words.first, subjectArticles[language]?.contains(first.folded) == true, words.count > 2 {
+            // "La manutenzione è…", "O trabalho exige…": the work after its article, and no word of the person right after it.
+            return (workWords.contains(words[1].folded) || workNouns.contains(words[1].folded))
+                && !words[2...].prefix(2).contains { isOfThePerson($0, in: language) }
+        }
         guard let first = words.first, workWords.contains(first.folded), let be = toBe[language],
               let verb = words.dropFirst().prefix(3).firstIndex(where: { be.contains($0.accented) }) else { return false }
-        return !words[..<verb].contains { wordsOfThePerson.contains($0.folded) }
+        return !words[..<verb].contains { isOfThePerson($0, in: language) }
     }
+
+    /// Whether `word` is a word of the person in `language`: the Italian "i" is an article and "ma" a "but" ("con occhio per i
+    /// dettagli", #354, round 3), not the English "I" or the French "ma".
+    private static func isOfThePerson(_ word: Word, in language: Vocabulary.Language) -> Bool {
+        wordsOfThePerson.contains(word.folded) && !(notOfThePerson[language]?.contains(word.folded) ?? false)
+    }
+
+    /// The words of the person in another language that a language uses for something else, folded.
+    private static let notOfThePerson: [Vocabulary.Language: Set<String>] = [.italian: ["i", "ma"]]
+
+    /// The articles and demonstratives that open a subject, folded, per language ("l" of "l'attività"; the English "I" is none).
+    private static let subjectArticles: [Vocabulary.Language: Set<String>] = [
+        .english: ["the", "this"], .italian: ["il", "lo", "la", "l", "i", "gli", "le", "questo", "questa"], .german: ["der", "die", "das"],
+        .spanish: ["el", "la", "los", "las", "este", "esta"], .portuguese: ["o", "a", "os", "as", "este", "esta"],
+        .french: ["le", "la", "l", "les", "ce", "cette"],
+    ]
+
+    /// The words for work itself, folded, which after an article are the work as a subject ("Il lavoro", "O trabalho").
+    private static let workNouns: Set<String> = ["work", "job", "lavoro", "arbeit", "travail", "trabajo", "trabalho"]
 
     /// The forms of "to be" of the third person, accented: the Italian "è" is a verb, "e" is "and".
     private static let toBe: [Vocabulary.Language: Set<String>] = [
