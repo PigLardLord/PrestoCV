@@ -206,17 +206,24 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job title, a request each, and the soft skills, cleaned by code against the tools the person names, then
-    /// a request for the tools missing and one for the qualities missing, each asking one more, when the final check would keep
-    /// fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); each reads the skills the checks dropped, with
-    /// the reason.
+    /// The tools of each job title, a request each, the headline's first, and the soft skills, cleaned by code against the tools
+    /// the person names (#354, round 13, O1). The headline's title asks 6 to 8 tools and each other title at most 1: each title
+    /// asked 2 or 3, and the past titles of another trade filled the CV with tools of no trade of the person's. When the final
+    /// check would keep fewer than 4 technologies (3 for a single short job), the headline's title is asked for up to 2 tools of
+    /// one kind at a time, software, then devices, then instruments, until the CV has enough; and with fewer than 3 soft skills
+    /// (2), one request asks the qualities missing and one more. Each reads the skills kept and those the checks dropped, with the
+    /// reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
         let groups = Self.toolGroups(of: brief)
-        let count = Self.toolCount(groups: groups.count, sparse: sparse)
+        let latest = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience).first : nil
+        let headline = Self.headlineGroup(of: groups, brief: brief, latest: latest)
+        let headlineRoles = groups.indices.contains(headline) ? groups[headline] : []
+        let others = groups.enumerated().filter { $0.offset != headline }.map(\.element)
         var tools: [String] = []
-        for roles in groups {
+        for (index, roles) in ((headlineRoles.isEmpty ? [] : [headlineRoles]) + others).enumerated() {
+            let count = Self.toolCount(isHeadline: index == 0)
             tools += try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles, count: count) } ?? []
         }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
@@ -228,45 +235,57 @@ final class SectionDraft {
             names: brief.names, against: description
         )
         keep(skills)
-        let kept = try kept(around: dated).skills
-        let missingTools = max(fewestTools - kept.count { $0.kind == .technology }, 0)
-        let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
-        guard missingTools > 0 || missingQualities > 0 else { return }
-        let listedTools = kept.filter { $0.kind != .softSkill }.map(\.name)
-        let listedQualities = kept.filter { $0.kind == .softSkill }.map(\.name)
-        // One more of each kind short, as the checks may drop one; the answer is cut to the most of each kind.
-        let toolsAsked = missingTools > 0 ? missingTools + 1 : 0
-        let qualitiesAsked = missingQualities > 0 ? missingQualities + 1 : 0
-        let rejected = Self.rejectedSkills(skills.dropped)
-        // The tools are asked apart from the qualities: asked together, the tools came back as an activity and a bare record,
-        // asked alone as a system of the trade (#354, round 8).
-        var moreTools: [String] = []
-        var moreQualities: [String] = []
-        for (tools, qualities) in [(toolsAsked, 0), (0, qualitiesAsked)] where tools + qualities > 0 {
+        for kind in ToolKind.allCases {
+            let kept = try kept(around: dated).skills
+            guard kept.count(where: { $0.kind == .technology }) < fewestTools else { break }
+            let listed = kept.filter { $0.kind != .softSkill }.map(\.name)
+            let rejected = Self.rejectedSkills(skills.dropped)
             let more = try await request(.skills) {
-                try await self.service.writeMoreSkills(
-                    for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities,
-                    rejected: rejected
+                try await self.service.writeToolsOfAKind(
+                    for: brief, roles: headlineRoles, kind: kind, listed: listed, rejected: rejected
                 )
-            }
-            if tools > 0 { moreTools += more?.technologies ?? [] }
-            if qualities > 0 { moreQualities += more?.softSkills ?? [] }
+            } ?? []
+            guard !more.isEmpty else { continue }
+            skills = sanitizer.skillCheck(
+                technologies: skills.technologies + more, softSkills: skills.softSkills, stated: stated, names: brief.names,
+                against: description
+            )
+            keep(skills)
         }
-        guard !moreTools.isEmpty || !moreQualities.isEmpty else { return }
+        let kept = try kept(around: dated).skills
+        let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
+        guard missingQualities > 0 else { return }
+        // One more than missing, as the checks may drop one; the answer is cut to the most.
+        let listed = kept.filter { $0.kind == .softSkill }.map(\.name)
+        let rejected = Self.rejectedSkills(skills.dropped)
+        let more = try await request(.skills) {
+            try await self.service.writeMoreQualities(for: brief, count: missingQualities + 1, listed: listed, rejected: rejected)
+        } ?? []
+        guard !more.isEmpty else { return }
         skills = sanitizer.skillCheck(
-            technologies: skills.technologies + moreTools, softSkills: skills.softSkills + moreQualities, stated: stated,
-            names: brief.names, against: description
+            technologies: skills.technologies, softSkills: skills.softSkills + more, stated: stated, names: brief.names,
+            against: description
         )
         keep(skills)
     }
 
-    /// How many tools each title's request asks: a single title asks the fewest the CV needs (4, or 3 for a sparse description)
-    /// and one more, as a check may drop one; a title among others asks 2 or 3. One title asked 2 or 3 left the CV short every
-    /// time, and the request for those missing named activities and bare kinds (#354, round 6).
-    static func toolCount(groups: Int, sparse: Bool) -> ClosedRange<Int> {
-        guard groups == 1 else { return 2...3 }
-        let fewest = sparse ? 3 : 4
-        return fewest...(fewest + 1)
+    /// How many tools a title's request asks: 6 to 8 for the headline's, at most 1 for another, often of another trade (#354,
+    /// round 13, O1, T1).
+    static func toolCount(isHeadline: Bool) -> ClosedRange<Int> {
+        isHeadline ? 6...8 : 0...1
+    }
+
+    /// The group of `groups` of the headline's title: the one whose job holds the headline, or has no title and so reads it; else
+    /// the one of the `latest` job; else the first (#354, round 13, O1).
+    static func headlineGroup(of groups: [[Int]], brief: DraftBrief, latest: Int?) -> Int {
+        let titles = brief.roles.map { $0.title.presentValue?.lowercased() }
+        if let headline = brief.headline?.presentValue?.lowercased(), let group = groups.firstIndex(where: { roles in
+            roles.contains { brief.roles.indices.contains($0) && (titles[$0] == nil || titles[$0] == headline) }
+        }) {
+            return group
+        }
+        if let latest, let group = groups.firstIndex(where: { $0.contains(latest) }) { return group }
+        return 0
     }
 
     /// The jobs of `brief` by their title, in the order of the first of each, a job with no title by the headline: each title asks

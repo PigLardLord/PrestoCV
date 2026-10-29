@@ -105,18 +105,29 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.writingTokens == 400)
     }
 
-    @Test("A tools request asks the tools its count says, 2 or 3 of a job among others, never none (#354, rounds 5 and 6)",
-          arguments: [(2...3, 80), (3...4, 100), (4...5, 120)] as [(ClosedRange<Int>, Int)])
+    @Test("A tools request asks the tools its count says: 6 to 8 of the headline's title, at most 1 of another (#354, rounds 5, 6 and 13)",
+          arguments: [(0...1, 80), (6...8, 180)] as [(ClosedRange<Int>, Int)])
     func toolsOfACount(count: ClosedRange<Int>, tokens: Int) throws {
         let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let tools = try #require((root["properties"] as? [String: Any])?["tools"] as? [String: Any])
 
-        // Allowed none, the request answered none for a job with no lines of its own, and the next one filled it with roles.
-        #expect(tools["minItems"] as? Int == count.lowerBound, "no job goes without tools")
+        #expect(tools["minItems"] as? Int == count.lowerBound)
         #expect(tools["maxItems"] as? Int == count.upperBound)
-        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) software") == true)
+        #expect((tools["description"] as? String)?.hasPrefix(SectionPrompts.toolAmount(count) + " ") == true)
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
+    }
+
+    @Test("o1: a request for tools of one kind asks 0 to 2, so a trade with none of that kind answers none (#354, round 13)")
+    func toolsOfAKindSchema() throws {
+        let data = try JSONEncoder().encode(FoundationModelsService.toolsOfAKindSchema())
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let tools = try #require((root["properties"] as? [String: Any])?["tools"] as? [String: Any])
+
+        #expect(tools["minItems"] as? Int == 0)
+        #expect(tools["maxItems"] as? Int == 2)
+        #expect(FoundationModelsService.toolsOfAKindTokens == 80)
+        #expect(FoundationModelsService.moreQualitiesTokens(count: 3) == 76)
     }
 
     @Test("A job's request writes exactly the person's duties and the typical ones the job needs, 1 to 4, and its years only if said (#354, round 10)",

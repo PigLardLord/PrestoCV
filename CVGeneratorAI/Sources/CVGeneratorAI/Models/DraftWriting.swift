@@ -116,6 +116,21 @@ public struct SummaryTopic: Equatable, Sendable {
     }
 }
 
+/// A kind of tool the draft asks the headline's title for when its tools are few (#354, round 13, O1, T2): asked for "N more" tools
+/// of any kind, the request named systems and tools of other trades.
+public enum ToolKind: CaseIterable, Sendable, Hashable {
+    case software, device, instrument
+
+    /// The kind as a request names it.
+    public var words: String {
+        switch self {
+        case .software: "software or apps"
+        case .device: "devices or machines"
+        case .instrument: "instruments or hand tools"
+        }
+    }
+}
+
 /// What the second pass of a draft writes around the facts (ADR 0031). None of it is a fact: the rules keep only the sentences and
 /// the skills that state no fact of their own (`WrittenText`, `InferredSkills`).
 public struct DraftWriting: Codable, Equatable, Sendable {

@@ -133,21 +133,43 @@ enum SectionPrompts {
     /// The legal forms of a company of 4 letters or more, lowercased: no name of its own.
     private static let legalForms: Set<String> = ["gmbh", "sarl", "ltda"]
 
-    /// The tools request's rules, asking `count` tools.
+    /// The tools request's rules, asking `count` tools: a short positive definition of a tool (#354, round 13, O1, T3). The long
+    /// list of what is no tool read as a list of things to name, and the check drops those (`skillCheck`).
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
         """
-        You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
-        instruments that a person with the job's title uses at work, each of another kind, as a CV of that trade names them. \
-        Write in the language named on the first line.
-        - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
-        what they say of their work with no job, when they fit this job; then those of the trade, only when they fit the job's \
-        title and the tools the person names.
-        - A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not.
-        - 1 to 3 words each. Not a tool: what the work is done on; an activity or task, also when written as a noun; a document; \
-        a material, part or supply; stationery, furniture or protective wear; an everyday object a person of any trade uses; a \
-        personal quality; a level; a skill already listed.
+        You name the tools of one job for a CV: \(toolAmount(count)) \(count.upperBound == 1 ? "tool" : "tools") that a person with \
+        the job's title works with, as a CV of that trade names them, each of another kind. Write in the language named on the \
+        first line.
+        - A tool is software or an app, a device or a machine, or an instrument or a hand tool of the job's trade; a product name \
+        is fine.
+        - First the tools the job's own lines name, as written; then the tools the person names in what they say of their work \
+        with no job, when they fit this job's title; then those of the trade.
+        - 1 to 3 words each, none of the skills already listed.
         """
     }
+
+    /// How many tools a request asks: "6 to 8", or "at most 1" when it may ask none.
+    static func toolAmount(_ count: ClosedRange<Int>) -> String {
+        count.lowerBound == 0 ? "at most \(count.upperBound)" : "\(count.lowerBound) to \(count.upperBound)"
+    }
+
+    /// The request for up to 2 tools of one kind of the headline's title (`roles`, #354, round 13, O1, T2): the kind, the tools
+    /// kept and those dropped with why. Asked for "N more" tools of any kind, the request named systems and tools of other trades.
+    static func toolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]) -> Prompt {
+        let title = roles.filter(brief.roles.indices.contains).first.flatMap { brief.roles[$0].title.presentValue }
+            ?? brief.headline ?? DraftWritingPrompt.noTitle
+        var lines = header(brief) + ["Job title: \(title)", "Kind: \(kind.words)"]
+        if !listed.isEmpty { lines.append("Tools listed, do not repeat: " + listed.joined(separator: "; ")) }
+        if !rejected.isEmpty { lines.append("Rejected, with the reason; write none of them again:\n" + bullets(rejected)) }
+        return Prompt(instructions: toolsOfAKindInstructions, text: lines.joined(separator: "\n"))
+    }
+
+    static let toolsOfAKindInstructions = """
+        You add tools to a CV, for the job's title. Write in the language named on the first line.
+        - Name up to 2 tools of the kind given that a person with this title works with, as a CV of that trade names them; a \
+        product name is fine. None when the trade works with none of that kind.
+        - 1 to 3 words each, none of those listed.
+        """
 
     /// The soft skills request.
     static func softSkills(for brief: DraftBrief) -> Prompt {
@@ -162,34 +184,20 @@ enum SectionPrompts {
         those that fit the jobs.
         """
 
-    /// The request for the skills a draft still misses: `tools` more tools, of the trade of the tools kept or, with none kept, of the
-    /// jobs (#354, round 4), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`
-    /// ("skill": reason).
-    static func moreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
-    ) -> Prompt {
+    /// The request for `count` more qualities, in the CV's language (#354, round 4); none of those kept (`listed`) and none of
+    /// `rejected` ("quality": reason). Tools have their own requests, one kind each (`toolsOfAKind`, round 13).
+    static func moreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
-        if !listedTools.isEmpty { lines.append("Tools listed, do not repeat: " + listedTools.joined(separator: "; ")) }
-        if !listedQualities.isEmpty { lines.append("Qualities listed, do not repeat: " + listedQualities.joined(separator: "; ")) }
-        if tools > 0 {
-            let trade = listedTools.isEmpty ? "jobs above" : "tools listed"
-            lines.append(
-                "The CV lists too few tools for its trade: name \(tools) more software, systems, machines or instruments of the trade of "
-                    + "the \(trade), that a person with these jobs uses, each of another kind"
-                    + (listedTools.isEmpty ? "." : " than those listed.")
-            )
-        }
-        if qualities > 0 {
-            lines.append("Name \(qualities) more personal qualities at work that fit these jobs, as nouns in the language named on the first line.")
-        }
+        if !listed.isEmpty { lines.append("Qualities listed, do not repeat: " + listed.joined(separator: "; ")) }
+        lines.append("Name \(count) more personal qualities at work that fit these jobs, as nouns in the language named on the first line.")
         if !rejected.isEmpty { lines.append("Rejected, with the reason; write none of them again:\n" + bullets(rejected)) }
-        return Prompt(instructions: moreSkillsInstructions, text: lines.joined(separator: "\n"))
+        return Prompt(instructions: moreQualitiesInstructions, text: lines.joined(separator: "\n"))
     }
 
-    static let moreSkillsInstructions = """
-        You add skills to a CV, for the person's trade. Write in the language named on the first line.
-        - Nouns of 1 to 3 words; no level, no activity or task, also when written as a noun, none of those already listed.
-        - First those the person names in what they say of their work with no job; then those of the trade.
+    static let moreQualitiesInstructions = """
+        You add personal qualities at work to a CV. Write in the language named on the first line.
+        - Nouns of 1 to 3 words; no tool, no level, no activity or task, none of those already listed.
+        - First those the person says of themselves in what they say of their work with no job; then those that fit the jobs.
         """
 
     // MARK: The summary
