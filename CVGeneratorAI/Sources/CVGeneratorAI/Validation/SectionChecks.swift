@@ -695,11 +695,18 @@ extension CVDataSanitizer {
                 .map(\.element.title)
             let titles = ([facts.personalInfo.title] + latest).compactMap { $0?.presentValue }
                 .filter { seen.insert($0.lowercased()).inserted }
-            let opening = titles.contains(where: named) ? nil : Self.opening(of: facts, language: language)
+            var opening = titles.contains(where: named) ? nil : Self.opening(of: facts, language: language)
+            // "Lavoro come capoturno." before "Lavoro da sedici anni…" opens two sentences with one verb: the opening then says what
+            // the person is (#354, round 7).
+            if let first = sentences.first, let said = opening, Self.leadingVerb(of: first) == Self.leadingVerb(of: said) {
+                opening = Self.beingOpening(of: facts, language: language) ?? said
+            }
             let earlier = titles.filter { title in !named(title) && opening.map { !Self.endsWithTitle($0, title) } ?? true }
             let head = opening.map { [$0] } ?? []
             let tail = earlier.isEmpty ? [] : [Self.earlier(as: earlier, after: !(head + sentences).isEmpty, language: language)]
-            let floor = Array((head + sentences + tail).prefix(most))
+            var verbs = Set<String>()
+            let floor = Array((head + sentences + tail).filter { Self.leadingVerb(of: $0).map { verbs.insert($0).inserted } ?? true }
+                .prefix(most))
             return floor.count > sentences.count ? floor.joined(separator: " ") : nil
         }
     }
@@ -1038,6 +1045,22 @@ extension CVDataSanitizer {
         case (.spanish, false): return "Trabajé como \(title)."
         case (.portuguese, true): return "Trabalho como \(title)."
         case (.portuguese, false): return "Trabalhei como \(title)."
+        }
+    }
+
+    /// The opening of a summary that says what the person is now, by the title of their current job or their headline: "Sono
+    /// capoturno.", "I am a fitter.". Nil with no current title.
+    private static func beingOpening(of facts: CVData, language: Vocabulary.Language) -> String? {
+        guard let title = facts.experience.first(where: { $0.current && $0.title.presentValue != nil })?.title.presentValue
+            ?? facts.personalInfo.title?.presentValue else { return nil }
+        let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
+        switch language {
+        case .english: return "I am \(article) \(title)."
+        case .italian: return "Sono \(title)."
+        case .german: return "Ich bin \(title)."
+        case .french: return "Je suis \(title)."
+        case .spanish: return "Soy \(title)."
+        case .portuguese: return "Sou \(title)."
         }
     }
 

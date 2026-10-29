@@ -1005,6 +1005,10 @@ struct SectionChecksTests {
          "Sono capoturno della manutenzione da anni. In passato ho lavorato come manutentore elettromeccanico e operaio manutentore."),
         ("Coordino i tecnici della manutenzione in ogni turno. Seguo gli impianti con cura e controllo che le linee girino bene "
             + "dal primo all'ultimo turno.", nil),
+        // The floor's opening and the first sentence opened with one verb (#354, round 7).
+        ("Lavoro da sedici anni nella manutenzione di impianti industriali.",
+         "Sono capoturno della manutenzione. Lavoro da sedici anni nella manutenzione di impianti industriali. "
+            + "In passato ho lavorato come manutentore elettromeccanico e operaio manutentore."),
     ] as [(String, String?)])
     func summaryFloor(summary: String, floor: String?) throws {
         let description = JobClausesTests.italian
