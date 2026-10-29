@@ -315,6 +315,38 @@ struct DraftingReaderTests {
         #expect(counted("Lavoro come capoturno. Coordino tre tecnici.") == [])
     }
 
+    @Test("A noun glued to the next word of an answer is counted; a particle joined to its verb and two words without a capital are not (#354, round 8)")
+    func gluedWord() {
+        let cv = CVData(summary: "Ich prüfe jede Schleuse, indem ich auf jedes Stückachte. Ich lerne gern, weil ich an jeder Übung teilnehme.")
+
+        #expect(ReaderRules.gluedWords(in: cv, answers: ["Ich prüfe jede Schleuse, indem ich auf jedes Stück achte."]).map(\.value) == ["Stückachte"])
+        #expect(ReaderRules.gluedWords(in: cv, answers: ["Ich lerne gern, weil ich an jeder Übung teil nehme."]).isEmpty)
+        #expect(ReaderRules.gluedWords(in: cv, answers: ["auf jedes stück achte"]).isEmpty)
+    }
+
+    @Test("One noun with two adjectives in two sentences of a job is counted; one noun with one adjective, and two nouns, are not (#354, round 8)")
+    func rewordedDuty() {
+        let counted = { (description: String) in
+            Self.reader(CVData(experience: [Experience(title: "segretaria", company: "Vetreria Olmo", description: description)]), "it")
+                .filter { $0.kind == .rewordedDuty }.map(\.value)
+        }
+
+        #expect(counted("Preparo le spedizioni nazionali. Controllo le spedizioni urgenti del mattino.")
+            == ["spedizioni nazionali / spedizioni urgenti"])
+        #expect(counted("Preparo le spedizioni nazionali. Archivio le spedizioni nazionali.") == [])
+        #expect(counted("Preparo le spedizioni nazionali. Controllo le consegne urgenti.") == [])
+    }
+
+    @Test("Two summary sentences closing with one clause are counted; one closing clause, and two clauses with other words, are not (#354, round 8)")
+    func repeatedTail() {
+        let counted = { (summary: String) in Self.reader(CVData(summary: summary), "de").filter { $0.kind == .repeatedTail }.map(\.value) }
+
+        #expect(counted("Ich baue Regale auf, was meine Sorgfalt zeigt. Ich messe Wände aus, was meine Geduld zeigt.")
+            == ["Ich messe Wände aus, was meine Geduld zeigt."])
+        #expect(counted("Ich baue Regale auf, was meine Sorgfalt zeigt. Ich messe Wände aus, damit alles passt.") == [])
+        #expect(counted("Ich baue Regale auf. Ich messe Wände aus, was meine Geduld zeigt.") == [])
+    }
+
     @Test("A role, the noun of an activity or a document as a technology is counted; a tool, a tool with an acronym and a kind of model are not (#354, round 5)")
     func nonToolTechnology() {
         let counted = { (names: [String], language: String) in

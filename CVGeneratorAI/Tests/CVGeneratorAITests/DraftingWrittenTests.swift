@@ -700,7 +700,7 @@ struct DraftingWrittenTests {
 
     private static func measure(_ id: String, _ cv: CVData) throws -> WrittenMeasure {
         let input = try InventedFactsTests.input(id)
-        return WrittenMeasure(cv, for: input, report: InventedFacts.count(cv, for: input))
+        return WrittenMeasure(cv, for: input, report: InventedFacts.count(cv, for: input), answers: [])
     }
 
     /// The reader's findings in `cv` for an input of `language` with no field, whose description states `facts` alone.

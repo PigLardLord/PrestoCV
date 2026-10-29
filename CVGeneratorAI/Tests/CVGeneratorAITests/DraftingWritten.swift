@@ -28,7 +28,8 @@ struct WrittenMeasure: Codable, Equatable {
     /// What a reader rejected in the drafts of b14ceda8 (#354), found by rough rules (`ReaderRules`): numbers to follow, not findings.
     let readerFindings: [ReaderFinding]
 
-    init(_ cv: CVData, for input: DraftingInput, report: InventedFacts.Report) {
+    /// - Parameter answers: the raw answers of the draft's requests, for the words they glue (`ReaderRules.gluedWords`).
+    init(_ cv: CVData, for input: DraftingInput, report: InventedFacts.Report, answers: [String]) {
         let summary = cv.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let summarySentences = Self.sentences(of: summary)
         self.summarySentences = summarySentences.count
@@ -69,7 +70,7 @@ struct WrittenMeasure: Codable, Equatable {
             hits += report.inferred.map { "\($0.path) \"\($0.value)\" (written around a description with no role)" }
         }
         offField = hits
-        readerFindings = ReaderRules.findings(in: cv, for: input, report: report)
+        readerFindings = ReaderRules.findings(in: cv, for: input, report: report) + ReaderRules.gluedWords(in: cv, answers: answers)
     }
 
     /// The first seven letters of each single-word trap of 6 letters or more ("auditor" of a wish to become one): a skill with a

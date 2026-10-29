@@ -129,6 +129,16 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// Two summary sentences that open with one verb, one of them the opening code writes ("Lavoro come capoturno." and "Lavoro
     /// da sedici anni…"; #354, round 7).
     case floorVerbCollision
+    /// A word of the final draft that is two adjacent words of a raw answer, the first with a capital: a noun joined to the word
+    /// after it as if it were a particle ("Teilachte" of "jedes Teil achte"; #354, round 8). Counted by `gluedWords`, which needs the
+    /// answers.
+    case gluedWord
+    /// A job whose two sentences name one duty with one noun and two adjectives ("comunicazioni ufficiali" and "comunicazioni
+    /// formali"; #354, round 8): the same duty said twice.
+    case rewordedDuty
+    /// Two summary sentences whose last clause after a comma opens and ends with one word ("…, was meine Verlässlichkeit beweist."
+    /// and "…, was meine Konzentration beweist."; #354, round 8).
+    case repeatedTail
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -178,6 +188,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .employerWordTechnology: "a technology with a word of a name"
         case .workObjectTechnology: "a work object as a technology"
         case .floorVerbCollision: "the opening's verb opening another summary sentence"
+        case .gluedWord: "a noun glued to the next word"
+        case .rewordedDuty: "one duty said twice in a job"
+        case .repeatedTail: "two summary sentences with one closing clause"
         }
     }
 }
@@ -255,6 +268,7 @@ enum ReaderRules {
             }
             found += duties(of: job, at: index, language: language)
             found += fillers(in: job, at: index, of: input.description)
+            found += rewordedDuties(in: description).map { ReaderFinding(kind: .rewordedDuty, path: "experience[\(index)].description", value: $0) }
         }
         found += sharedHeads(in: cv, language: language)
         found += headline(of: cv, for: input)
@@ -525,6 +539,7 @@ enum ReaderRules {
             inventedTitles(in: sentence, of: cv, for: input).map { _ in ReaderFinding(kind: .inventedSummaryTitle, path: "summary", value: sentence) }
         }
         found += floorCollisions(in: sentences).map { ReaderFinding(kind: .floorVerbCollision, path: "summary", value: $0) }
+        found += repeatedTails(in: sentences).map { ReaderFinding(kind: .repeatedTail, path: "summary", value: $0) }
         var endings: Set<String> = []
         for sentence in sentences {
             let words = letterWords(of: sentence)
@@ -1233,6 +1248,55 @@ enum ReaderRules {
         "au", "en", "dans", "depuis", "pour", "avec", "ou", "qui", "que", "em", "na", "no", "desde", "para", "durante", "onde",
         "donde", "con",
     ]
+
+    /// The words of the summary and of the job descriptions of `cv` that are two adjacent words of one of `answers` (the raw answers
+    /// of the requests, with the sentences a repair request was given), the first with a capital and the second without.
+    static func gluedWords(in cv: CVData, answers: [String]) -> [ReaderFinding] {
+        let split = { (text: String) in text.split { !$0.isLetter }.map(String.init) }
+        var joined: Set<String> = []
+        for answer in answers {
+            let words = split(answer)
+            for (first, second) in zip(words, words.dropFirst())
+            where first.first?.isUppercase == true && second.first?.isLowercase == true && first.count >= 2 && second.count >= 2 {
+                joined.insert((first + second).lowercased())
+            }
+        }
+        let texts = [("summary", cv.summary ?? "")] + cv.experience.enumerated().map { ("experience[\($0.offset)].description", $0.element.description ?? "") }
+        return texts.flatMap { path, text in
+            split(text).filter { joined.contains($0.lowercased()) }
+                .map { ReaderFinding(kind: .gluedWord, path: path, value: $0) }
+        }
+    }
+
+    /// "<noun> <adjective> / <noun> <other adjective>" for each noun of 7 letters or more, not a sentence's first word, that two
+    /// sentences of `description` follow with two different words of 5 letters or more.
+    static func rewordedDuties(in description: String) -> [String] {
+        var seen: [String: (next: String, sentence: Int)] = [:]
+        var found: [String] = []
+        for (number, sentence) in WrittenMeasure.sentences(of: description).enumerated() {
+            let words = letterWords(of: sentence)
+            for (first, second) in zip(words.dropFirst(), words.dropFirst(2)) where first.count >= 7 && second.count >= 5 {
+                if let earlier = seen[first], earlier.sentence != number, earlier.next != second {
+                    found.append("\(first) \(earlier.next) / \(first) \(second)")
+                } else if seen[first] == nil {
+                    seen[first] = (second, number)
+                }
+            }
+        }
+        return found
+    }
+
+    /// The summary sentences whose last clause after a comma, of 3 words or more, opens and ends with the words of such a clause
+    /// of an earlier sentence.
+    static func repeatedTails(in sentences: [String]) -> [String] {
+        var tails: Set<[String]> = []
+        return sentences.filter { sentence in
+            guard sentence.contains(","), let clause = sentence.split(separator: ",").last else { return false }
+            let words = letterWords(of: String(clause))
+            guard words.count >= 3, let first = words.first, let last = words.last else { return false }
+            return !tails.insert([first, last]).inserted
+        }
+    }
 
     /// The summary sentences that open with the verb of a sentence that opens as code writes the opening ("Lavoro come X."):
     /// the opening repeats the verb of the person's own sentence.
