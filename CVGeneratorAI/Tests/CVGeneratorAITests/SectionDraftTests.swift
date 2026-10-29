@@ -97,7 +97,8 @@ struct SectionDraftTests {
         #expect(service.generateRequests.count == 1)
         #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "tools", "tools", "softSkills", "summary"])
         // The two jobs of sound technician ask for their tools once (#354, round 6).
-        #expect(service.toolsRequests == [[0], [1, 2], [3]])
+        // The headline title's first: the current job's (#354, round 15).
+        #expect(service.toolsRequests == [[3], [0], [1, 2]])
         #expect(service.toolsCounts == [2...3, 2...3, 2...3])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
@@ -143,6 +144,43 @@ struct SectionDraftTests {
     func toolCount(groups: Int, sparse: Bool, count: ClosedRange<Int>) {
         // One title asked 2 or 3: the CV was always short, and the request for those missing named activities and bare kinds.
         #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
+    }
+
+    @Test("A past title's answer adds only its first kept tool, and only while the CV is short of tools of the trade (#354, round 15)")
+    func mergedTools() {
+        // Each tool counts as one of the trade but "trailer", which the check drops.
+        let count = { (tools: [String]) in tools.filter { $0 != "trailer" }.count }
+        // The headline title's answer is short of 4: the past title's adds its first kept tool, not the 2 after it.
+        #expect(SectionDraft.mergedTools([["SAP", "Excel", "barcode scanner"], ["trailer", "forklift", "GPS"]], fewest: 4, tradeTools: count)
+            == ["SAP", "Excel", "barcode scanner", "forklift"])
+        // The headline title's answer already reaches the floor: the past title's adds nothing.
+        #expect(SectionDraft.mergedTools(
+            [["digital console", "QLab", "stage monitors", "wireless microphones"], ["truck loading equipment", "rigging hardware"]],
+            fewest: 4, tradeTools: count
+        ) == ["digital console", "QLab", "stage monitors", "wireless microphones"])
+        // Two past titles each add one, the second only while the first left the CV short.
+        #expect(SectionDraft.mergedTools([["SAP"], ["forklift", "GPS"], ["pallet jack", "RF gun"], ["shrink wrapper"]], fewest: 3, tradeTools: count)
+            == ["SAP", "forklift", "pallet jack"])
+        // A single title's answer stays as it was.
+        #expect(SectionDraft.mergedTools([["SAP", "trailer", "GPS"]], fewest: 4, tradeTools: count) == ["SAP", "trailer", "GPS"])
+        #expect(SectionDraft.mergedTools([], fewest: 4, tradeTools: count).isEmpty)
+    }
+
+    @Test("The headline title's tools are asked first: the job of the headline title, else the latest job (#354, round 15)")
+    func headlineFirst() {
+        let roles: [DraftBrief.Role] = [
+            .init(title: "stagehand", hasEnded: true), .init(title: "sound technician", hasEnded: true),
+            .init(title: "sound technician", hasEnded: true), .init(title: "Head of Sound", hasEnded: false),
+        ]
+        let titled = DraftBrief(language: "English", headline: "head of sound", roles: roles, studies: [], namedSkills: [])
+        let untitled = DraftBrief(language: "English", headline: nil, roles: roles, studies: [], namedSkills: [])
+        let groups = [[0], [1, 2], [3]]
+        #expect(SectionDraft.headlineRole(of: titled, order: [0, 1, 2, 3]) == 3)
+        #expect(SectionDraft.headlineRole(of: untitled, order: [2, 1, 0, 3]) == 2)
+        #expect(SectionDraft.headlineFirst(groups, headline: 3) == [[3], [0], [1, 2]])
+        #expect(SectionDraft.headlineFirst(groups, headline: 2) == [[1, 2], [0], [3]])
+        #expect(SectionDraft.headlineFirst(groups, headline: nil) == groups)
+        #expect(SectionDraft.headlineFirst([[0]], headline: 0) == [[0]])
     }
 
     @Test("o1: each summary request reads the opening code wrote, the sentences kept so far and one slot: the role, the current job's work, two qualities, then the ended jobs (#354, round 13)")
@@ -372,7 +410,7 @@ struct SectionDraftTests {
     @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
     func moreSkills() async throws {
         let service = service()
-        service.toolsResult = [["mixing desks", "frequency calibration"], [], [], []]
+        service.toolsResult = [[], [], [], ["mixing desks", "frequency calibration"]]
         service.softSkillsResult = ["teamwork"]
         service.moreSkillsResult = DraftWriting(
             summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "microphones"],
@@ -397,7 +435,8 @@ struct SectionDraftTests {
     func toolOfAStatedKind() async throws {
         let service = service()
         service.generateResult = .success(CVData(experience: Self.extracted.experience, skills: [Skill(name: "PA systems", kind: .technology)]))
-        service.toolsResult = [["scenery flats"], ["line array systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
+        // The headline title's answer: a past title's adds only one while the CV is short (#354, round 15).
+        service.toolsResult = [["scenery flats"], ["stage monitors"], [], ["line array systems", "microphones", "mixing desks"]]
 
         let draft = try await draft(service)
 
@@ -410,8 +449,8 @@ struct SectionDraftTests {
     func tradeKindStays() async throws {
         let service = service()
         service.toolsResult = [
-            ["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["software", "stage monitors"],
-            ["mixing desks", "QLab", "cue playback software"],
+            ["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"],
+            ["mixing desks", "QLab", "software", "cue playback software"],
         ]
 
         let draft = try await draft(service)
@@ -613,7 +652,8 @@ struct SectionDraftTests {
 
         _ = try await draft(service(), logger: logger)
 
-        #expect(logger.entry("draft.written")?.line == "draft.written summary=true roles=4 technologies=7 softSkills=3")
+        // The headline title's 2 tools, then a past title's first while the CV is short of 4 (#354, round 15).
+        #expect(logger.entry("draft.written")?.line == "draft.written summary=true roles=4 technologies=4 softSkills=3")
         #expect(logger.entry("draft.written")?.level == .info)
         #expect(logger.entry("draft.unwritten") == nil)
         for line in logger.entries("draft.written").map(\.line) {

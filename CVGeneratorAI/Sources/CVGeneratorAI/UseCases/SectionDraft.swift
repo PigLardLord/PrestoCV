@@ -206,21 +206,30 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job title, a request each, and the soft skills, cleaned by code against the tools the person names, then
+    /// The tools of each job title, a request each, the headline title first and a past title's only while the CV is short of
+    /// tools (`mergedTools`), and the soft skills, cleaned by code against the tools the person names, then
     /// a request for the tools missing and one for the qualities missing, each asking one more, when the final check would keep
     /// fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); each reads the skills the checks dropped, with
     /// the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
-        let groups = Self.toolGroups(of: brief)
+        let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
+        let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: Self.headlineRole(of: brief, order: order))
         let count = Self.toolCount(groups: groups.count, sparse: sparse)
-        var tools: [String] = []
+        var answers: [[String]] = []
         for roles in groups {
-            tools += try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles, count: count) } ?? []
+            answers.append(try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles, count: count) } ?? [])
+        }
+        let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
+        let tools = try Self.mergedTools(answers, fewest: fewestTools) { tools in
+            let checked = sanitizer.skillCheck(technologies: tools, softSkills: [], stated: stated, names: brief.names, against: description)
+            let writing = DraftWriting(
+                summary: nil, roleDescriptions: duties, technologies: Array(checked.technologies.prefix(Self.technologies)), softSkills: []
+            )
+            return try sanitizer.sanitize(dated, writing: writing, against: description).skills.count { $0.kind == .technology }
         }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
-        let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
         // ADR 0031, D8: the work the person says they like doing is a soft skill in their own words, before those written.
         let liked = CVDataSanitizer.workLikings(in: description)
         var skills = sanitizer.skillCheck(
@@ -267,6 +276,38 @@ final class SectionDraft {
         guard groups == 1 else { return 2...3 }
         let fewest = sparse ? 3 : 4
         return fewest...(fewest + 1)
+    }
+
+    /// The tools of the title groups' answers, the headline title's first (`headlineFirst`): its answer whole, then of each past
+    /// title's answer the first item the check keeps, and only while the CV has fewer than `fewest` tools of the trade, as
+    /// `tradeTools` counts them. A past title's request padded the CV with the tools of a trade the person left ("trailer",
+    /// "truck loading equipment"; #354, round 15). A single title's answer is the tools as they were.
+    static func mergedTools(_ answers: [[String]], fewest: Int, tradeTools: ([String]) throws -> Int) rethrows -> [String] {
+        guard var tools = answers.first else { return [] }
+        for past in answers.dropFirst() {
+            let have = try tradeTools(tools)
+            guard have < fewest else { break }
+            for item in past where try tradeTools(tools + [item]) > have {
+                tools.append(item)
+                break
+            }
+        }
+        return tools
+    }
+
+    /// The headline role of `brief`: the first job of the headline title, else the latest by `order` (`latestFirst`).
+    static func headlineRole(of brief: DraftBrief, order: [Int]) -> Int? {
+        let title = { (text: String?) in text?.presentValue?.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        if let headline = title(brief.headline), let number = brief.roles.indices.first(where: { title(brief.roles[$0].title) == headline }) {
+            return number
+        }
+        return order.first(where: brief.roles.indices.contains)
+    }
+
+    /// `groups` with the group of the job at `headline` first, the others in their order.
+    static func headlineFirst(_ groups: [[Int]], headline: Int?) -> [[Int]] {
+        guard let headline, let first = groups.firstIndex(where: { $0.contains(headline) }) else { return groups }
+        return [groups[first]] + groups.enumerated().filter { $0.offset != first }.map(\.element)
     }
 
     /// The jobs of `brief` by their title, in the order of the first of each, a job with no title by the headline: each title asks
