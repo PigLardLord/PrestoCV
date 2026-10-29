@@ -21,6 +21,10 @@ enum SectionPrompts {
     private static func count(of role: DraftBrief.Role) -> String {
         let more = role.adding == 1 ? "1 more duty" : "\(role.adding) more duties"
         switch (role.said, role.adding) {
+        // Clauses that pin no duty (a name or a number in each) still say the person's work: the request writes it first, or the
+        // model writes typical duties in its place (#354, round 10).
+        case (0, _) where !role.clauses.isEmpty:
+            return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties"): first the duties the person said above, then typical ones of this job."
         case (0, _): return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties") typical of this job."
         case (_, 0): return "Write only the \(role.said == 1 ? "duty" : "duties") the person said, and add none."
         default: return "Write the \(role.said == 1 ? "duty" : "duties") the person said, then exactly \(more) typical of this job."

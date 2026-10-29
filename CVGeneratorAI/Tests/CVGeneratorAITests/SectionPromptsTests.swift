@@ -37,7 +37,7 @@ struct SectionPromptsTests {
             - Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018.
             - Controllando i quadri elettrici.
             Words to avoid: Valtrigno, capoturno
-            Write exactly 2 duties typical of this job.
+            Write exactly 2 duties: first the duties the person said above, then typical ones of this job.
             """)
         #expect(!prompt.text.contains("tre tecnici"))
     }
@@ -47,7 +47,7 @@ struct SectionPromptsTests {
               (1, 0, "Write only the duty the person said, and add none."),
               (2, 0, "Write only the duties the person said, and add none."),
               (1, 1, "Write the duty the person said, then exactly 1 more duty typical of this job."),
-              (0, 2, "Write exactly 2 duties typical of this job."),
+              (0, 2, "Write exactly 2 duties: first the duties the person said above, then typical ones of this job."),
           ])
     func jobAsksForTheDutiesItNeeds(said: Int, adding: Int, line: String) {
         var brief = Self.brief
@@ -60,6 +60,24 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.jobInstructions.contains("then exactly as many more as the request asks"))
         #expect(SectionPrompts.jobInstructions.contains("a concrete task of that trade, never one that fits any job"))
         #expect(!SectionPrompts.jobInstructions.contains("2 to 4"))
+    }
+
+    @Test("A job whose clauses pin no duty asks first for what the person said, and only a job that said nothing asks for typical duties alone (#354, round 10)")
+    func jobWithClausesThatPinNoDuty() {
+        let said = DraftBrief(
+            language: "French", headline: nil,
+            roles: [.init(title: "boulangère", employer: "Fournil Delaunay", hasEnded: false, clauses: ["je pétris le pain au Fournil Delaunay depuis 2019"])],
+            studies: [], namedSkills: []
+        )
+        let silent = DraftBrief(
+            language: "French", headline: nil, roles: [.init(title: "boulangère", employer: "Fournil Delaunay", hasEnded: false)],
+            studies: [], namedSkills: []
+        )
+
+        #expect(SectionPrompts.job(number: 0, of: said).text.hasSuffix(
+            "\nWrite exactly 2 duties: first the duties the person said above, then typical ones of this job."
+        ))
+        #expect(SectionPrompts.job(number: 0, of: silent).text.hasSuffix("\nWrite exactly 2 duties typical of this job."))
     }
 
     @Test("A job with no title is written from the headline title")
