@@ -234,7 +234,7 @@ struct SectionDraftTests {
         #expect(job("Brightwater Events", in: draft)?.description?.contains("I looked after the microphones and cables.") == true)
     }
 
-    @Test("Too few skills kept ask once for those missing and one more, none of the kept ones, with those dropped and why")
+    @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
     func moreSkills() async throws {
         let service = service()
         service.toolsResult = [["mixing desks", "frequency calibration"], [], [], []]
@@ -246,12 +246,14 @@ struct SectionDraftTests {
 
         let draft = try await draft(service)
 
-        #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 1)
-        let request = try #require(service.moreSkillsRequests.first)
-        // One more of each kind short than missing, as a rule may drop one of them.
-        #expect(request.tools == 4 && request.qualities == 3)
-        #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
-        #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
+        #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 2)
+        // One more of each kind short than missing, as a rule may drop one of them; asked with the qualities, the tools came back as
+        // an activity and a bare record, asked alone as a system.
+        #expect(service.moreSkillsRequests.map { [$0.tools, $0.qualities] } == [[4, 0], [0, 3]])
+        for request in service.moreSkillsRequests {
+            #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
+            #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
+        }
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
     }

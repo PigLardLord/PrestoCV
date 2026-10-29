@@ -182,8 +182,9 @@ final class SectionDraft {
     // MARK: - Skills
 
     /// The tools of each job title, a request each, and the soft skills, cleaned by code against the tools the person names, then
-    /// one request for those missing, and one more of each kind, when the final check would keep fewer than 4 technologies or 3
-    /// soft skills (3 and 2 for a single short job); it reads the skills the checks dropped, with the reason.
+    /// a request for the tools missing and one for the qualities missing, each asking one more, when the final check would keep
+    /// fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); each reads the skills the checks dropped, with
+    /// the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
@@ -212,15 +213,23 @@ final class SectionDraft {
         let toolsAsked = missingTools > 0 ? missingTools + 1 : 0
         let qualitiesAsked = missingQualities > 0 ? missingQualities + 1 : 0
         let rejected = Self.rejectedSkills(skills.dropped)
-        let more = try await request(.skills) {
-            try await self.service.writeMoreSkills(
-                for: brief, tools: toolsAsked, qualities: qualitiesAsked, listedTools: listedTools, listedQualities: listedQualities,
-                rejected: rejected
-            )
+        // The tools are asked apart from the qualities: asked together, the tools came back as an activity and a bare record,
+        // asked alone as a system of the trade (#354, round 8).
+        var moreTools: [String] = []
+        var moreQualities: [String] = []
+        for (tools, qualities) in [(toolsAsked, 0), (0, qualitiesAsked)] where tools + qualities > 0 {
+            let more = try await request(.skills) {
+                try await self.service.writeMoreSkills(
+                    for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities,
+                    rejected: rejected
+                )
+            }
+            if tools > 0 { moreTools += more?.technologies ?? [] }
+            if qualities > 0 { moreQualities += more?.softSkills ?? [] }
         }
-        guard let more else { return }
+        guard !moreTools.isEmpty || !moreQualities.isEmpty else { return }
         skills = sanitizer.skillCheck(
-            technologies: skills.technologies + more.technologies, softSkills: skills.softSkills + more.softSkills, stated: stated,
+            technologies: skills.technologies + moreTools, softSkills: skills.softSkills + moreQualities, stated: stated,
             names: brief.names, against: description
         )
         keep(skills)
