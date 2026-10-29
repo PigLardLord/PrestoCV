@@ -238,15 +238,35 @@ struct SectionChecksTests {
     }
 
     @Test("o1: a summary's floor still short ends with a sentence of the person's strengths: the title and two qualities, one form per language", arguments: [
-        (Vocabulary.Language.english, "As an office clerk, I work with precision and reliability."),
-        (.italian, "Come office clerk lavoro con precision e reliability."),
-        (.german, "Als office clerk arbeite ich mit Precision und Reliability."),
-        (.french, "En tant que office clerk, je travaille avec precision et reliability."),
-        (.spanish, "Como office clerk, trabajo con precision y reliability."),
-        (.portuguese, "Como office clerk, trabalho com precision e reliability."),
-    ])
-    func strengths(language: Vocabulary.Language, sentence: String) {
-        #expect(CVDataSanitizer.strengths(title: "office clerk", qualities: ["Precision", "Reliability"], language: language) == sentence)
+        (Vocabulary.Language.english, ["Precision", "Reliability"], "As an office clerk, I work with precision and reliability."),
+        (.italian, ["Precisione", "Affidabilità"], "Come office clerk, lavoro con precisione e affidabilità."),
+        (.german, ["Präzision", "Zuverlässigkeit"], "Als office clerk arbeite ich mit Präzision und Zuverlässigkeit."),
+        (.french, ["Rigueur", "Patience"], "En tant que office clerk, je travaille avec rigueur et patience."),
+        (.spanish, ["Precisión", "Responsabilidad"], "Como office clerk, trabajo con precisión y responsabilidad."),
+        (.portuguese, ["Precisão", "Organização"], "Como office clerk, trabalho com precisão e organização."),
+    ] as [(Vocabulary.Language, [String], String)])
+    func strengths(language: Vocabulary.Language, qualities: [String], sentence: String) {
+        #expect(CVDataSanitizer.strengths(title: "office clerk", qualities: qualities, language: language) == sentence)
+    }
+
+    // "Come impiegata amministrativa lavoro con organizzata e puntuale.": the qualities a person says of themselves are often
+    // adjectives, which "I work with" does not read (#354, round 13).
+    @Test("o1: the strengths sentence says what the person is when the qualities are adjectives, and keeps two of one form", arguments: [
+        (Vocabulary.Language.english, ["reliable", "organized"], "As an office clerk, I am reliable and organized."),
+        (.italian, ["organizzata", "puntuale"], "Come office clerk, sono organizzata e puntuale."),
+        (.italian, ["organizzata", "precisione", "affidabilità"], "Come office clerk, lavoro con precisione e affidabilità."),
+        (.german, ["zuverlässig", "ruhig"], "Als office clerk bin ich zuverlässig und ruhig."),
+        (.french, ["organisée", "ponctuelle"], "En tant que office clerk, je suis organisée et ponctuelle."),
+        (.spanish, ["organizada", "puntual"], "Como office clerk, soy organizada y puntual."),
+        (.portuguese, ["organizada", "pontual"], "Como office clerk, sou organizada e pontual."),
+    ] as [(Vocabulary.Language, [String], String)])
+    func strengthsOfAdjectives(language: Vocabulary.Language, qualities: [String], sentence: String) {
+        #expect(CVDataSanitizer.strengths(title: "office clerk", qualities: qualities, language: language) == sentence)
+    }
+
+    @Test("o1: no strengths sentence from one noun and one adjective")
+    func strengthsOfMixedForms() {
+        #expect(CVDataSanitizer.strengths(title: "impiegata", qualities: ["organizzata", "precisione"], language: .italian) == nil)
     }
 
     @Test("o1: a floor of one sentence gets the strengths sentence when there are two qualities, and none without them")
@@ -258,7 +278,9 @@ struct SectionChecksTests {
         }
 
         #expect(try floor(["Precisione", "Affidabilità"])
-            == "Lavoro come impiegata amministrativa. Come impiegata amministrativa lavoro con precisione e affidabilità.")
+            == "Lavoro come impiegata amministrativa. Come impiegata amministrativa, lavoro con precisione e affidabilità.")
+        #expect(try floor(["organizzata", "puntuale", "chiara"])
+            == "Lavoro come impiegata amministrativa. Come impiegata amministrativa, sono organizzata e puntuale.")
         #expect(try floor([]) == nil)
     }
 

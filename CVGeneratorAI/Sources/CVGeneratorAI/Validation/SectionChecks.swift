@@ -865,8 +865,8 @@ extension CVDataSanitizer {
             var floor = Array((head + sentences + tail).filter { Self.leadingVerb(of: $0).map { verbs.insert($0).inserted } ?? true }
                 .prefix(most))
             if floor.count < most, floor.count < 2 || floor.joined(separator: " ").count < 120, let title = titles.first,
-               qualities.count >= 2 {
-                floor.append(Self.strengths(title: title, qualities: Array(qualities.prefix(2)), language: language))
+               let strengths = Self.strengths(title: title, qualities: qualities, language: language) {
+                floor.append(strengths)
             }
             return floor.count > sentences.count ? floor.joined(separator: " ") : nil
         }
@@ -890,21 +890,63 @@ extension CVDataSanitizer {
         sentence.lowercased().hasSuffix(" \(title.lowercased()).")
     }
 
-    /// The floor's last sentence, of the person's strengths: "As a head of sound, I work with care and calm." (#354, round 13, O1).
-    /// The qualities are written as the skills read them, in lower case but in German, whose nouns take a capital.
-    static func strengths(title: String, qualities: [String], language: Vocabulary.Language) -> String {
-        let named = language == .german ? qualities : qualities.map { $0.prefix(1).lowercased() + $0.dropFirst() }
+    /// The floor's last sentence, of the person's strengths: "As a head of sound, I work with care and calm." (#354, round 13, O1),
+    /// or, when the qualities are adjectives, "Come impiegata amministrativa, sono organizzata e puntuale.": the first two qualities of
+    /// one form (`isAdjective`), nouns first, written as the skills read them, in lower case but in German, whose nouns take a
+    /// capital. Nil when no two qualities share a form.
+    static func strengths(title: String, qualities: [String], language: Vocabulary.Language) -> String? {
+        let adjectives = qualities.filter { isAdjective($0, language: language) }
+        let nouns = qualities.filter { !isAdjective($0, language: language) }
+        let isNouns = nouns.count >= 2
+        guard isNouns || adjectives.count >= 2 else { return nil }
+        let chosen = Array((isNouns ? nouns : adjectives).prefix(2))
+        let named = language == .german ? chosen : chosen.map { $0.prefix(1).lowercased() + $0.dropFirst() }
         let ands: [Vocabulary.Language: String] = [.english: "and", .german: "und", .spanish: "y", .french: "et"]
         let list = named.dropLast().joined(separator: ", ") + " \(ands[language] ?? "e") " + (named.last ?? "")
-        switch language {
-        case .english: return "As \("aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a") \(title), I work with \(list)."
-        case .italian: return "Come \(title) lavoro con \(list)."
-        case .german: return "Als \(title) arbeite ich mit \(list)."
-        case .french: return "En tant que \(title), je travaille avec \(list)."
-        case .spanish: return "Como \(title), trabajo con \(list)."
-        case .portuguese: return "Como \(title), trabalho com \(list)."
+        let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
+        switch (language, isNouns) {
+        case (.english, true): return "As \(article) \(title), I work with \(list)."
+        case (.english, false): return "As \(article) \(title), I am \(list)."
+        case (.italian, true): return "Come \(title), lavoro con \(list)."
+        case (.italian, false): return "Come \(title), sono \(list)."
+        case (.german, true): return "Als \(title) arbeite ich mit \(list)."
+        case (.german, false): return "Als \(title) bin ich \(list)."
+        case (.french, true): return "En tant que \(title), je travaille avec \(list)."
+        case (.french, false): return "En tant que \(title), je suis \(list)."
+        case (.spanish, true): return "Como \(title), trabajo con \(list)."
+        case (.spanish, false): return "Como \(title), soy \(list)."
+        case (.portuguese, true): return "Como \(title), trabalho com \(list)."
+        case (.portuguese, false): return "Como \(title), sou \(list)."
         }
     }
+
+    /// Whether a quality reads as an adjective by its ending ("organizzata", "puntual", "ponctuelle", "reliable"), and as no noun
+    /// ("precisione", "puntualità", "rigueur", "teamwork"); in German, by its lower-case first letter. A rough rule for the
+    /// strengths sentence only (#354, round 13).
+    static func isAdjective(_ quality: String, language: Vocabulary.Language) -> Bool {
+        let word = quality.trimmingCharacters(in: .whitespaces)
+        guard !word.contains(" ") else { return false }
+        if language == .german { return word.first?.isLowercase ?? false }
+        let lower = word.lowercased()
+        guard !(nounEndings[language] ?? []).contains(where: lower.hasSuffix) else { return false }
+        return (adjectiveEndings[language] ?? []).contains(where: lower.hasSuffix)
+    }
+
+    private static let nounEndings: [Vocabulary.Language: [String]] = [
+        .english: ["ness", "ity", "ion", "ence", "ance", "ment", "ship", "ism", "work"],
+        .italian: ["ione", "ità", "ezza", "enza", "anza", "mento", "ura", "ia", "ismo"],
+        .spanish: ["ión", "dad", "eza", "encia", "ancia", "miento", "ura", "ía", "ismo"],
+        .portuguese: ["ção", "são", "dade", "eza", "ência", "ância", "mento", "ura", "ia", "ismo"],
+        .french: ["tion", "sion", "té", "ence", "ance", "ment", "esse", "ise", "eur", "ude", "isme"],
+    ]
+
+    private static let adjectiveEndings: [Vocabulary.Language: [String]] = [
+        .english: ["ful", "ous", "ive", "able", "ible", "ent", "ant", "ed", "al", "ic"],
+        .italian: ["o", "a", "ale", "ile", "ente", "ante", "evole"],
+        .spanish: ["o", "a", "al", "il", "ble", "ente", "ante", "az", "iz"],
+        .portuguese: ["o", "a", "al", "il", "vel", "ente", "ante", "az", "iz"],
+        .french: ["é", "ée", "if", "ive", "eux", "euse", "el", "elle", "able", "ible", "ant", "ante", "ent", "ente", "ique"],
+    ]
 
     /// The sentence of the earlier titles of a summary's floor, after another sentence or alone: "Before that, I worked as a
     /// fitter and an electrician."
