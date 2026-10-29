@@ -696,8 +696,21 @@ struct SectionChecksTests {
             of: Self.italianJobs, against: "La mia email è marco.tiglio@example.com.\n" + JobClausesTests.italian
         ).field
 
+        // After a sentence that ends with a percent, the e-mail clause is not read as given, and a clause about the person's own
+        // contact field with no address gives none: neither is a field.
+        let afterAPercent = try sanitizer.draftContext(
+            of: Self.italianJobs,
+            against: "Il reparto di 6 persone ha tagliato gli scarti del 12%. La mia email è marco.tiglio@example.com.\n"
+                + JobClausesTests.italian
+        ).field
+        let withoutTheAddress = try sanitizer.draftContext(
+            of: Self.italianJobs, against: "Il mio numero di cellulare è nella lettera.\n" + JobClausesTests.italian
+        ).field
+
         #expect(field?.hasPrefix("Lavoro da sedici anni") == true, "\(String(describing: field))")
         #expect(afterAContact == field, "\(String(describing: afterAContact))")
+        #expect(afterAPercent == field, "\(String(describing: afterAPercent))")
+        #expect(withoutTheAddress == field, "\(String(describing: withoutTheAddress))")
     }
 
     // MARK: The skills

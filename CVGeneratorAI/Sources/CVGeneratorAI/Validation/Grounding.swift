@@ -217,6 +217,12 @@ struct Grounding {
             return leansOnThePerson(before: place)
         }
 
+        /// Whether the clause at `place` is about a contact field of the person ("La mia email è ...", "Meu e-mail é"), or asks to be
+        /// contacted, whoever it is read as giving: with or without an address, it says nothing of the person's work (#354, round 14).
+        func offersAContact(at place: Place) -> Bool {
+            Statement(clause: clauses.clause(at: place), quotes: all, language: language).offersAContact
+        }
+
         /// Whether an address that stands alone in sentence `sentence`, with no words, is the person's: as a verbless contact, it is
         /// before the references, and what comes before it names no other person.
         func givesAnAddressAlone(inSentence sentence: Int) -> Bool {
@@ -860,8 +866,8 @@ extension Grounding {
             return clause.isAnchored && reading.speaks(at: place) && !reading.claimedWords(at: place).isEmpty
                 && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
                 && !clause.words.contains(where: \.isNumber) && clause.words.count >= 4
-                // A clause that gives the person's contacts ("La mia email è ...") is no field (#354, round 14).
-                && !reading.givesContacts(at: place)
+                // A clause that gives the person's contacts, or is about one ("La mia email è ..."), is no field (#354, round 14).
+                && !reading.givesContacts(at: place) && !reading.offersAContact(at: place)
                 // A clause that names the person ("Je suis Maria Rossi") is no field.
                 && !clause.words.indices.dropFirst().contains { i in
                     personWords.contains(clause.words[i].folded) && clause.written(from: i, to: i + 1).first?.isUppercase == true
