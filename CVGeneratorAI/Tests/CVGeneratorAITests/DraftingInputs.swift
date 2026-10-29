@@ -157,6 +157,7 @@ enum DraftingInputs {
             "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
             "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
             "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com", "sound mixers", "lighting rigs",
+            "follow spot rig", "lighting rig", "audio distribution box",
         ],
         "jobs-it": [
             "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
@@ -168,7 +169,7 @@ enum DraftingInputs {
         "en-plain": [
             "warehouse management system", "WMS", "reach truck", "pallet jack", "pallet truck", "order picker", "barcode scanner",
             "handheld scanner", "RF scanner", "label printer", "stretch wrapper", "conveyor", "Microsoft Outlook", "Microsoft Word",
-            "safety harness", "hand truck",
+            "hand truck",
         ],
         "it-traps": [
             "Excel", "Word", "Outlook", "Microsoft Office", "gestionale", "TeamSystem", "Zucchetti", "Danea Easyfatt", "PEC",
@@ -191,6 +192,12 @@ enum DraftingInputs {
             "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
             "tableau", "cahiers", "ENT", "logiciels éducatifs", "matériel de manipulation",
         ],
+    ]
+
+    /// The parts and materials a person of the trade installs or handles, which are no tool of it (#354, round 3): a technology of
+    /// the draft that is one is no tool of the trade (`ReaderClass.noToolOfTheTrade`). The list is the reader's.
+    static let parts: [String: [String]] = [
+        "de-plain": ["Schalter", "Leitungen", "Kabel", "Steckdosen", "Sicherungen"],
     ]
 
     // MARK: - The app's examples

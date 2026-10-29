@@ -324,7 +324,9 @@ struct DraftingWrittenTests {
 
         let found = ReaderRules.findings(in: cv, for: italian, report: InventedFacts.count(cv, for: italian))
 
-        #expect(found.filter { $0.kind == .bareSubjectSummary }.map(\.value) == ["Manutenzione è la mia attività principale."])
+        #expect(found.filter { $0.kind == .bareSubjectSummary }.map(\.value) == [
+            "Manutenzione è la mia attività principale.", "La manutenzione delle linee è il mio lavoro di ogni giorno.",
+        ])
     }
 
     @Test("A technology with a word in neither the description nor the tools of the trade is counted; a stated or a typical tool is not (#354, round 1)")
