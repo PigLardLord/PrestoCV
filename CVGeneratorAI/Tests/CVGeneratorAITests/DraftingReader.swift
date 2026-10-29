@@ -180,6 +180,16 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// A summary sentence that holds every word of a duty of the draft, with words added between them, which
     /// copiedDutyInSummary does not count ("Ich installiere elektrische Anlagen in Neubauten mit Sorgfalt"; #354, round 14).
     case restatedDutyInSummary
+    /// A technology the request for the tools of a past title wrote, which the headline title's request did not, that is no tool of
+    /// the trade's list (`DraftingInputs.vocabularies`) nor of the description and names no product ("trailer" of the forklift
+    /// driver beside the warehouse supervisor; #354, round 15). Read from the requests' steps (`ReaderRules.requestFindings`).
+    case pastGroupPadding
+    /// A generic system (`genericSystemTechnology`) that the request for more skills wrote ("sistema de gestión de documentos";
+    /// #354, round 15).
+    case repairGenericSystem
+    /// A topic of the second summary slot that is the words of a duty the description states, already written in the job
+    /// ("Anlagen in Neubauten"; #354, round 15): the sentence then restates it.
+    case statedDutyAsSlotTopic
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -247,6 +257,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .contactInDraft: "a draft sentence about the person's own contact"
         case .abstractDuty: "a duty of abstract words only"
         case .restatedDutyInSummary: "a summary sentence that restates a duty"
+        case .pastGroupPadding: "a tool of a past title's request that is no tool of the trade"
+        case .repairGenericSystem: "a generic system of the request for more skills"
+        case .statedDutyAsSlotTopic: "a stated duty as the topic of the second summary slot"
         }
     }
 }
@@ -1368,12 +1381,7 @@ enum ReaderRules {
         guard !fold(input.description).contains(whole),
               !(DraftingInputs.vocabularies[input.id] ?? []).contains(where: { fold($0) == whole }) else { return false }
         let words = name.split { !$0.isLetter && !$0.isNumber }.map(String.init)
-        let named = words.enumerated().contains { index, word in
-            word.count > 1 && word == word.uppercased() && word.contains(where: \.isLetter)
-                || word.dropFirst().contains(where: \.isUppercase)
-                || index > 0 && word.first?.isUppercase == true && input.language != "de"
-                || word.contains(where: \.isNumber)
-        }
+        let named = isNamed(name, language: input.language)
         let content = words.map(fold).filter { !linkWords.contains($0) && !shortLinkWords.contains($0) }
         guard !named, !content.contains(where: deviceWords.contains) else { return false }
         if input.language == "de", content.count == 1, let word = content.first {
@@ -1470,6 +1478,55 @@ enum ReaderRules {
         "au", "en", "dans", "depuis", "pour", "avec", "ou", "qui", "que", "em", "na", "no", "desde", "para", "durante", "onde",
         "donde", "con",
     ]
+
+    /// The classes read from the requests' steps (`RequestRecord.step`) as well as from the final draft: `pastGroupPadding`,
+    /// `repairGenericSystem` and `statedDutyAsSlotTopic` (#354, round 15).
+    static func requestFindings(in cv: CVData, for input: DraftingInput, requests: [RequestRecord]) -> [ReaderFinding] {
+        var found: [ReaderFinding] = []
+        let tools = requests.filter { $0.step.hasPrefix("tools ") }.map { request in
+            (roles: Set(request.step.dropFirst("tools ".count).split(separator: ",").compactMap { Int($0) }),
+             items: Set((request.answer ?? []).flatMap { $0.components(separatedBy: " | ") }.map(fold)))
+        }
+        let headline = cv.experience.firstIndex { fold($0.title) == fold(cv.personalInfo.title ?? "") } ?? 0
+        let headlineItems = tools.filter { $0.roles.contains(headline) }.reduce(into: Set<String>()) { $0.formUnion($1.items) }
+        let pastItems = tools.filter { !$0.roles.contains(headline) }.reduce(into: Set<String>()) { $0.formUnion($1.items) }
+        let repairItems = Set(requests.filter { $0.step.hasPrefix("more skills") }
+            .flatMap { ($0.answer ?? []).prefix { $0 != "/" } }.map(fold))
+        let known = stems(of: ([input.description] + (DraftingInputs.vocabularies[input.id] ?? [])).joined(separator: " "))
+        for (index, skill) in cv.skills.enumerated() where skill.kind == .technology {
+            let name = fold(skill.name)
+            let path = "skills[\(index)].name"
+            if pastItems.contains(name), !headlineItems.contains(name), !stems(of: skill.name).isSubset(of: known),
+               !isNamed(skill.name, language: input.language) {
+                found.append(ReaderFinding(kind: .pastGroupPadding, path: path, value: skill.name))
+            }
+            if repairItems.contains(name), isGenericSystem(skill.name, of: input) {
+                found.append(ReaderFinding(kind: .repairGenericSystem, path: path, value: skill.name))
+            }
+        }
+        // The second summary request reads the second slot, unless it reads the qualities (an answer with more than two lines).
+        let slots = requests.filter { $0.step == "summary" }
+        if slots.count > 1, let answer = slots[1].answer, answer.count == 2, answer[1].hasPrefix("topic: ") {
+            let description = " " + letterWords(of: input.description).joined(separator: " ") + " "
+            for topic in answer[1].dropFirst("topic: ".count).components(separatedBy: ": ").dropFirst() {
+                let words = letterWords(of: topic)
+                guard words.contains(where: { $0.count >= 4 }), description.contains(" " + words.joined(separator: " ") + " ") else { continue }
+                found.append(ReaderFinding(kind: .statedDutyAsSlotTopic, path: "summary", value: topic))
+            }
+        }
+        return found
+    }
+
+    /// Whether a technology names a product: a word of two capitals or more, a capital past a word's first letter, a word with a
+    /// capital after the first outside German, or a number (as `isGenericSystem` reads it).
+    static func isNamed(_ name: String, language: String) -> Bool {
+        name.split { !$0.isLetter && !$0.isNumber }.map(String.init).enumerated().contains { index, word in
+            word.count > 1 && word == word.uppercased() && word.contains(where: \.isLetter)
+                || word.dropFirst().contains(where: \.isUppercase)
+                || index > 0 && word.first?.isUppercase == true && language != "de"
+                || word.contains(where: \.isNumber)
+        }
+    }
 
     /// The words of the summary and of the job descriptions of `cv` that are two adjacent words of one of `answers` (the raw answers
     /// of the requests, with the sentences a repair request was given), the first with a capital and the second without.

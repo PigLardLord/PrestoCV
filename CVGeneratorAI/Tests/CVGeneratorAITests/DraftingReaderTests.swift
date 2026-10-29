@@ -613,6 +613,63 @@ struct DraftingReaderTests {
             == ["Ich verlege sorgfältig neue Kabel in Altbauten mit Präzision."])
     }
 
+    @Test("A past title's tool of no word of the trade is counted; one the headline's request also wrote, a stated, a listed or a named one is not (#354, round 15)")
+    func pastGroupPadding() throws {
+        let supervisor = try #require(DraftingInputs.written.first { $0.id == "en-plain" })
+        let engineer = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let counted = { (names: [String], titles: [String], requests: [RequestRecord], input: DraftingInput) in
+            let cv = CVData(
+                experience: titles.map { Experience(title: $0, company: "Werk") }, skills: names.map { Skill(name: $0) }
+            )
+            return ReaderRules.requestFindings(in: cv, for: input, requests: requests).filter { $0.kind == .pastGroupPadding }.map(\.value)
+        }
+
+        #expect(counted(
+            ["SAP", "Excel", "barcode scanner", "forklift", "trailer", "GPS"], ["warehouse supervisor", "forklift driver"],
+            [RequestRecord(step: "tools 0", answer: ["SAP | Excel | barcode scanner"]),
+             RequestRecord(step: "tools 1", answer: ["forklift | trailer | GPS"])],
+            supervisor
+        ) == ["trailer"])
+        #expect(counted(
+            ["Digital console", "lighting rig", "truck loading equipment"], ["head of sound", "assistant", "assistant", "stagehand"],
+            [RequestRecord(step: "tools 0", answer: ["Digital console | Sound mixer"]),
+             RequestRecord(step: "tools 3", answer: ["lighting rig | truck loading equipment | digital console"])],
+            engineer
+        ) == ["truck loading equipment"])
+    }
+
+    @Test("A generic system the request for more skills wrote is counted; one of a title's request and a kept product are not (#354, round 15)")
+    func repairGenericSystem() throws {
+        let accountant = try #require(DraftingInputs.written.first { $0.id == "es-traps" })
+        let names = ["Excel", "sistema de archivo digital", "software de contabilidad", "sistema de gestión de documentos", "máquina de escaneo de registros"]
+        let cv = CVData(experience: [Experience(title: "contable", company: "Werk")], skills: names.map { Skill(name: $0) })
+        let requests = [
+            RequestRecord(step: "tools 0,1", answer: ["Excel | sistema de archivo digital"]),
+            RequestRecord(step: "more skills 3+0", answer: [
+                "software de contabilidad", "sistema de gestión de documentos", "máquina de escaneo de registros", "/",
+            ]),
+        ]
+
+        #expect(ReaderRules.requestFindings(in: cv, for: accountant, requests: requests).filter { $0.kind == .repairGenericSystem }.map(\.value)
+            == ["sistema de gestión de documentos", "máquina de escaneo de registros"])
+    }
+
+    @Test("A stated duty as a topic of the second summary slot is counted; a typical duty, the first slot's field and the qualities' slot are not (#354, round 15)")
+    func statedDutyAsSlotTopic() throws {
+        let electrician = try #require(DraftingInputs.written.first { $0.id == "de-plain" })
+        let cv = CVData(experience: [Experience(title: "Elektriker", company: "Werk")])
+        let counted = { (second: [String]) in
+            ReaderRules.requestFindings(in: cv, for: electrician, requests: [
+                RequestRecord(step: "summary", answer: ["Ich arbeite als Elektriker.", "topic: Elektriker: Ich kenne mich mit KNX aus"]),
+                RequestRecord(step: "summary", answer: second),
+            ]).filter { $0.kind == .statedDutyAsSlotTopic }.map(\.value)
+        }
+
+        #expect(counted(["Ich installiere Anlagen.", "topic: Elektriker: Anlagen in Neubauten: dafür"]) == ["Anlagen in Neubauten"])
+        #expect(counted(["Ich plane Anlagen.", "topic: Elektriker: Elektroinstallationen planen"]) == [])
+        #expect(counted(["Ich arbeite genau.", "topic: Elektriker", "Präzision", "Anlagen in Neubauten"]) == [])
+    }
+
     @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")
     func gerundSoftSkill() {
         let counted = { (names: [String], language: String) in

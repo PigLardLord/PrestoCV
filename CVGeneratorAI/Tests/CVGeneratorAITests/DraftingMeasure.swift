@@ -160,7 +160,8 @@ struct DraftMeasure: Encodable {
         self.report = report
         rawInvented = raw.map { InventedFacts.count($0, for: input).invented } ?? []
         written = result.map { WrittenMeasure(
-            $0.cvData, for: input, report: report, answers: requests.flatMap { $0.answer ?? [] }, wordList: DeviceWordList()
+            $0.cvData, for: input, report: report, answers: requests.flatMap { $0.answer ?? [] }, requests: requests,
+            wordList: DeviceWordList()
         ) }
 
         var misses: [String] = []

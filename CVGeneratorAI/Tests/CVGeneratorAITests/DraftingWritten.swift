@@ -35,7 +35,11 @@ struct WrittenMeasure: Codable, Equatable {
     /// - Parameters:
     ///   - answers: the raw answers of the draft's requests, for the words they glue (`ReaderRules.gluedWords`).
     ///   - wordList: the dictionary that tells a sentence of a close language from one of the description's.
-    init(_ cv: CVData, for input: DraftingInput, report: InventedFacts.Report, answers: [String], wordList: any WordList) {
+    ///   - requests: the draft's requests with their steps, for the classes read from them (`ReaderRules.requestFindings`).
+    init(
+        _ cv: CVData, for input: DraftingInput, report: InventedFacts.Report, answers: [String], requests: [RequestRecord] = [],
+        wordList: any WordList
+    ) {
         let summary = cv.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let summarySentences = Self.sentences(of: summary)
         self.summarySentences = summarySentences.count
@@ -81,6 +85,7 @@ struct WrittenMeasure: Codable, Equatable {
         let rejected = Set(findings.filter { Self.notTools.contains($0.kind) }.map(\.path))
         tradeTools = cv.skills.indices.filter { cv.skills[$0].kind == .technology && !rejected.contains("skills[\($0)].name") }.count
         readerFindings = findings + ReaderRules.gluedWords(in: cv, answers: answers)
+            + ReaderRules.requestFindings(in: cv, for: input, requests: requests)
     }
 
     /// The reader's classes of a technology that is no tool of the trade: a quality, a work object, an activity, a person or a
