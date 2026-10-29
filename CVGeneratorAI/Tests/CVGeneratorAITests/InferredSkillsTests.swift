@@ -42,6 +42,19 @@ struct InferredSkillsTests {
         #expect(skills().accepted(name) == name)
     }
 
+    @Test("A name of three words joined by prepositions stays; a clause of more than four words still goes (#354, round 6)",
+          arguments: [
+              ("fr", "logiciel de suivi de lecture", true), ("fr", "j'ai animé des ateliers de lecture", false),
+              ("it", "piattaforma di gestione dei compiti", true), ("it", "Ho guidato il team di vendita", false),
+              ("es", "sistema de control de inventario", true), ("es", "Organicé las rutas de reparto", false),
+              ("pt", "sistema de registo das presenças", true), ("pt", "Coordenei a equipa de turno da noite", false),
+              ("de", "System zur Erfassung von Arbeitszeiten", true), ("de", "Ich leite das Team von Bäckern", false),
+              ("en", "led the team of the night shift", false),
+          ])
+    func joinedNames(language: String, name: String, stays: Bool) {
+        #expect((skills(language: Vocabulary.Language(rawValue: language)).accepted(name) != nil) == stays, "\(name)")
+    }
+
     @Test("The name of an exam or a certification is a qualification, in any spelling",
           arguments: ["TOEFL", "toefl", "IELTS", "TOEIC", "Cambridge CELTA", "TEFL", "TESOL", "DELE", "DELF", "TestDaF", "Goethe Zertifikat",
                       "HSK", "JLPT", "GMAT", "PMP", "CISSP", "CCNA", "ITIL", "Six Sigma", "Green Belt", "Security+", "Network+", "A+",

@@ -219,7 +219,7 @@ enum ReaderRules {
             if skill.kind == .technology, let known = tradeStems, !stems(of: skill.name).isSubset(of: known) {
                 found.append(ReaderFinding(kind: .offTradeTechnology, path: path, value: skill.name))
             }
-            if letterWords(of: skill.name).count > 4 {
+            if isClause(skill.name, language: language) {
                 found.append(ReaderFinding(kind: .clauseAsSkill, path: path, value: skill.name))
             }
         }
@@ -951,6 +951,24 @@ enum ReaderRules {
     static let linkWords: Set<String> = [
         "the", "and", "for", "with", "del", "dei", "della", "delle", "degli", "dello", "per", "con", "und", "von", "der", "die", "das",
         "des", "les", "pour", "avec", "los", "las", "para", "com", "dos",
+    ]
+
+    /// A skill of more than four words, unless it is three words joined by prepositions ("logiciel de suivi de lecture", #354, round 6).
+    static func isClause(_ name: String, language: String) -> Bool {
+        let words = letterWords(of: name)
+        guard words.count > 4 else { return false }
+        let joining = joiningWords[language] ?? []
+        guard words.count <= 6, let first = words.first, let last = words.last, !joining.contains(first), !joining.contains(last) else {
+            return true
+        }
+        return words.filter { !joining.contains($0) }.count > 3
+    }
+
+    /// The prepositions that join the words of a tool's name, folded; the French "à" is left out, as folded it is "a" (has).
+    static let joiningWords: [String: Set<String>] = [
+        "en": ["of", "for"], "it": ["di", "del", "dello", "della", "dei", "degli", "delle", "per"], "es": ["de", "del", "para"],
+        "fr": ["de", "du", "des", "d", "au", "aux", "pour"], "pt": ["de", "do", "da", "dos", "das", "para"],
+        "de": ["von", "fur", "zur", "zum"],
     ]
 
     static func letterWords(of text: String) -> [String] {

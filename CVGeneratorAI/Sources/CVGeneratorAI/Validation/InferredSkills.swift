@@ -2,7 +2,7 @@ import Foundation
 
 /// The skills the model writes for the person's roles, studies and field, which the description does not name (ADR 0031). Such a
 /// skill claims no fact: it has no level, and it is kept only as a plain name of a technology or a soft skill, of at most four words
-/// and forty characters, that holds
+/// (or three joined by the prepositions of the language, see `isAJoinedName`) and forty characters, that holds
 /// - no digit, and no word of level, duration or seniority the description does not write ("Advanced Excel", "Senior Java");
 /// - no language ("Business English"): the languages are the person's own, and the draft lists them apart;
 /// - no word of a qualification ("Certified Scrum Master", "Abilitazione"), and no name of an exam or a certification ("TOEFL",
@@ -40,7 +40,7 @@ struct InferredSkills {
         guard let name = name.presentValue, name.count <= 40, !name.contains(where: \.isNumber), SkillNameShape.isPlain(name),
               !QualificationNames.isOne(name) else { return nil }
         let words = Word.words(in: name)
-        guard !words.isEmpty, words.count <= 4 else { return nil }
+        guard !words.isEmpty, words.count <= 4 || isAJoinedName(words) else { return nil }
 
         let lists = WrittenTextWords.of(language)
         let normalized = DescriptionText.normalized(name)
@@ -53,6 +53,26 @@ struct InferredSkills {
               !facts.contains(where: { !DescriptionText.spans(of: $0, in: normalized).isEmpty }) else { return nil }
         return name
     }
+
+    /// Whether the words are a name of at most three words joined by the prepositions of the language, with none at either end:
+    /// "plateforme de partage de documents", "System zur Erfassung von Arbeitszeiten" (#354, round 6). A clause of the same length
+    /// holds a fourth word, a verb or an article ("j'ai animé des ateliers de lecture"), and still goes.
+    private func isAJoinedName(_ words: [Word]) -> Bool {
+        guard let language, let joining = Self.joiningWords[language], words.count <= 6, let first = words.first, let last = words.last,
+              !joining.contains(first.accented), !joining.contains(last.accented) else { return false }
+        return words.filter { !joining.contains($0.accented) }.count <= 3
+    }
+
+    /// The prepositions, and their forms with an article, that join the words of a name of a tool in each language, as
+    /// `Word.accented` writes them. No article alone and no French "a" (has): "il a formé des enseignants" is a clause.
+    private static let joiningWords: [Vocabulary.Language: Set<String>] = [
+        .english: ["of", "for"],
+        .italian: ["di", "del", "dello", "della", "dei", "degli", "delle", "per"],
+        .spanish: ["de", "del", "para"],
+        .french: ["de", "du", "des", "d", "à", "au", "aux", "pour"],
+        .portuguese: ["de", "do", "da", "dos", "das", "para"],
+        .german: ["von", "für", "zur", "zum"],
+    ]
 
     /// Whole skill names, as `DescriptionText.normalized` writes them, that hold a word of a qualification and are no qualification:
     /// "Master Data Management", "Scrum Master". Only the whole name is exempt ("Masters Data Science" is a degree). A sentence has

@@ -296,6 +296,16 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "en").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
     }
 
+    @Test("A name of three words joined by prepositions is no clause; a clause of more words with one is (#354, round 6)")
+    func joinedNameIsNoClause() {
+        let cv = CVData(skills: [
+            Skill(name: "logiciel de suivi de lecture"), Skill(name: "j'ai animé des ateliers de lecture"),
+            Skill(name: "travailler en équipe avec les parents", kind: .softSkill),
+        ])
+
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[1].name", "skills[2].name"])
+    }
+
     @Test("A summary sentence with a verb of the third person after the title is counted; one as the person is not")
     func thirdPersonSummary() {
         let input = DraftingInput(
