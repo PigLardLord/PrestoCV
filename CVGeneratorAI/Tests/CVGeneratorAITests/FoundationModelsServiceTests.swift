@@ -105,15 +105,17 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.writingTokens == 400)
     }
 
-    @Test("A tools request asks 2 or 3 tools of its job, never none (#354, rounds 5 and 6)")
-    func twoOrThreeToolsForEveryJob() throws {
-        let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema())
+    @Test("A tools request asks the tools its count says, 2 or 3 of a job among others, never none (#354, rounds 5 and 6)",
+          arguments: [(2...3, 80), (3...4, 100), (4...5, 120)] as [(ClosedRange<Int>, Int)])
+    func toolsOfACount(count: ClosedRange<Int>, tokens: Int) throws {
+        let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let tools = try #require((root["properties"] as? [String: Any])?["tools"] as? [String: Any])
 
         // Allowed none, the request answered none for a job with no lines of its own, and the next one filled it with roles.
-        #expect(tools["minItems"] as? Int == 2, "no job goes without tools")
-        #expect(tools["maxItems"] as? Int == 3)
-        #expect(FoundationModelsService.toolsTokens == 80)
+        #expect(tools["minItems"] as? Int == count.lowerBound, "no job goes without tools")
+        #expect(tools["maxItems"] as? Int == count.upperBound)
+        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) software") == true)
+        #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
     }
 }

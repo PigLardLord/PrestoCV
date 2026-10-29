@@ -20,8 +20,8 @@ extension FoundationModelsService {
     /// The longest summary a repair keeps, in sentences: a repair that runs on is cut, not thrown away.
     nonisolated static let summaryRepairSentences = 4
 
-    /// 2 or 3 tools of one job.
-    nonisolated static let toolsTokens = 80
+    /// The cap of a request for at most `most` tools of one title: 80 for 3.
+    nonisolated static func toolsTokens(most: Int) -> Int { 80 + 20 * max(most - 3, 0) }
 
     /// The cap of a request for `count` more skills.
     nonisolated static func moreSkillsTokens(count: Int) -> Int { 40 + 12 * count }
@@ -48,21 +48,25 @@ extension FoundationModelsService {
 
     // MARK: The skills
 
-    public func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]? {
+    public func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? {
         guard !roles.isEmpty, roles.allSatisfy(brief.roles.indices.contains) else { return nil }
-        let prompt = SectionPrompts.tools(for: brief, roles: roles)
-        let answer = try await respond(prompt, schema: try Self.toolsSchema(), tokens: Self.toolsTokens)
+        let prompt = SectionPrompts.tools(for: brief, roles: roles, count: count)
+        let schema = try Self.toolsSchema(count: count)
+        let answer = try await respond(prompt, schema: schema, tokens: Self.toolsTokens(most: count.upperBound))
         return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
 
-    /// 2 or 3 tools of one job. A job may not go without tools: allowed none, the model answered none for a job with no lines of
+    /// `count` tools of one title. A job may not go without tools: allowed none, the model answered none for a job with no lines of
     /// its own, and the next request filled the gap with activities and roles (#354, round 5).
-    nonisolated static func toolsSchema() throws -> GenerationSchema {
+    nonisolated static func toolsSchema(count: ClosedRange<Int>) throws -> GenerationSchema {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "2 or 3 software, equipment, machines or instruments of the job's trade, first those its lines name",
-                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 2, maximumElements: 3)
+                description: "\(count.lowerBound) or \(count.upperBound) software, equipment, machines or instruments of the job's trade, "
+                    + "first those its lines name",
+                schema: DynamicGenerationSchema(
+                    arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count.lowerBound, maximumElements: count.upperBound
+                )
             ),
         ])
         return try GenerationSchema(root: root, dependencies: [])

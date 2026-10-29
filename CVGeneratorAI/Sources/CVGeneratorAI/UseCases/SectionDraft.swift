@@ -183,16 +183,18 @@ final class SectionDraft {
     /// one request for those missing, and one more of each kind, when the final check would keep fewer than 4 technologies or 3
     /// soft skills (3 and 2 for a single short job); it reads the skills the checks dropped, with the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
+        let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
+        let fewestTools = sparse ? 3 : 4
+        let groups = Self.toolGroups(of: brief)
+        let count = Self.toolCount(groups: groups.count, sparse: sparse)
         var tools: [String] = []
-        for roles in Self.toolGroups(of: brief) {
-            tools += try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles) } ?? []
+        for roles in groups {
+            tools += try await request(.skills) { try await self.service.writeTools(for: brief, roles: roles, count: count) } ?? []
         }
         let qualities = try await request(.skills) { try await self.service.writeSoftSkills(for: brief) }
         let stated = dated.skills.filter { $0.kind != .softSkill }.map(\.name)
         // ADR 0031, D8: the work the person says they like doing is a soft skill in their own words, before those written.
         let liked = CVDataSanitizer.workLikings(in: description)
-        let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
-        let fewestTools = sparse ? 3 : 4
         var skills = sanitizer.skillCheck(
             technologies: tools, softSkills: liked + (qualities ?? []), stated: stated,
             against: description
@@ -220,6 +222,15 @@ final class SectionDraft {
             against: description
         )
         keep(skills)
+    }
+
+    /// How many tools each title's request asks: a single title asks the fewest the CV needs (4, or 3 for a sparse description)
+    /// and one more, as a check may drop one; a title among others asks 2 or 3. One title asked 2 or 3 left the CV short every
+    /// time, and the request for those missing named activities and bare kinds (#354, round 6).
+    static func toolCount(groups: Int, sparse: Bool) -> ClosedRange<Int> {
+        guard groups == 1 else { return 2...3 }
+        let fewest = sparse ? 3 : 4
+        return fewest...(fewest + 1)
     }
 
     /// The jobs of `brief` by their title, in the order of the first of each, a job with no title by the headline: each title asks

@@ -32,8 +32,8 @@ public protocol CVGenerationService {
     /// out, and one more duty, none of `kept`.
     func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]?
 
-    /// 2 or 3 tools of the trade of the jobs of `brief` at `roles`, which share a title.
-    func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]?
+    /// `count` tools of the trade of the jobs of `brief` at `roles`, which share a title: 2 or 3 of a title among others.
+    func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]?
 
     /// 3 to 5 personal qualities at work that fit the jobs of `brief`.
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]?
@@ -58,7 +58,7 @@ extension CVGenerationService {
     public func writeDraft(for brief: DraftBrief) async throws -> DraftWriting? { nil }
     public func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? { nil }
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? { nil }
-    public func writeTools(for brief: DraftBrief, roles: [Int]) async throws -> [String]? { nil }
+    public func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? { nil }
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { nil }
     public func writeMoreSkills(
         for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]

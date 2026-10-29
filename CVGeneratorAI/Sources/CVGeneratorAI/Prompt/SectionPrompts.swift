@@ -66,7 +66,7 @@ enum SectionPrompts {
     /// The tools request of one job, or of the jobs that share its title (`roles`, #354, round 6): the title, or the headline
     /// for a job with none; the jobs' own lines; and what their work is done on, which is no tool. Asked for the tools of every job
     /// at once, the request listed the panels a person repairs, activities and everyday objects.
-    static func tools(for brief: DraftBrief, roles: [Int]) -> Prompt {
+    static func tools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) -> Prompt {
         let jobs = roles.filter(brief.roles.indices.contains).map { brief.roles[$0] }
         let title = jobs.first?.title.presentValue ?? brief.headline ?? DraftWritingPrompt.noTitle
         var lines = header(brief) + ["Job title: \(title)"]
@@ -77,12 +77,15 @@ enum SectionPrompts {
         if !objects.isEmpty { lines.append("What the work is done on, which is no tool: " + objects.joined(separator: "; ")) }
         lines += said(brief)
         if !brief.namedSkills.isEmpty { lines.append("Skills already listed: " + brief.namedSkills.joined(separator: "; ")) }
-        return Prompt(instructions: toolsInstructions, text: lines.joined(separator: "\n"))
+        return Prompt(instructions: toolsInstructions(count: count), text: lines.joined(separator: "\n"))
     }
 
-    static let toolsInstructions = """
-        You name the tools of one job for a CV: 2 or 3 software, equipment, machines or instruments that a person with the job's \
-        title uses at work, each of another kind, as a CV of that trade names them. Write in the language named on the first line.
+    /// The tools request's rules, asking `count` tools.
+    static func toolsInstructions(count: ClosedRange<Int>) -> String {
+        """
+        You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
+        instruments that a person with the job's title uses at work, each of another kind, as a CV of that trade names them. \
+        Write in the language named on the first line.
         - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
         what they say of their work with no job, when they fit this job; then those of the trade, only when they fit the job's \
         title and the tools the person names.
@@ -91,6 +94,7 @@ enum SectionPrompts {
         a material, part or supply; stationery, furniture or protective wear; an everyday object a person of any trade uses; a \
         personal quality; a level; a skill already listed.
         """
+    }
 
     /// The soft skills request.
     static func softSkills(for brief: DraftBrief) -> Prompt {

@@ -98,6 +98,7 @@ struct SectionDraftTests {
         #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "tools", "tools", "softSkills", "summary"])
         // The two jobs of sound technician ask for their tools once (#354, round 6).
         #expect(service.toolsRequests == [[0], [1, 2], [3]])
+        #expect(service.toolsCounts == [2...3, 2...3, 2...3])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
@@ -108,6 +109,13 @@ struct SectionDraftTests {
         #expect(brief.roles[0].clauses.contains { $0.contains("rigged the lights") })
         #expect(!brief.roles[0].clauses.contains { $0.contains("Orchard Lane") })
         #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
+    }
+
+    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6)",
+          arguments: [(1, false, 4...5), (1, true, 3...4), (2, false, 2...3), (2, true, 2...3), (3, false, 2...3)] as [(Int, Bool, ClosedRange<Int>)])
+    func toolCount(groups: Int, sparse: Bool, count: ClosedRange<Int>) {
+        // One title asked 2 or 3: the CV was always short, and the request for those missing named activities and bare kinds.
+        #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
     }
 
     @Test("The summary request reads the opening code wrote, the topics of each job's kept duties, and the tools and the qualities the checks kept, apart (#354, round 3)")
