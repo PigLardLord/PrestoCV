@@ -161,22 +161,6 @@ struct SectionChecksTests {
         ]
     )
 
-    @Test("How often a text says its work is done, by a word or a phrase, in the six languages (#354, round 11)", arguments: [
-        ("Calculo los gastos mensuales de transporte.", ["monthly"]),
-        ("Ogni mese preparo le buste paga.", ["monthly"]),
-        ("Preparo le buste paga mensili.", ["monthly"]),
-        ("I check the stock every day and send the weekly report.", ["daily", "weekly"]),
-        ("Je range la salle tous les jours.", ["daily"]),
-        ("Ich prüfe die Anlagen täglich und schreibe den Jahresbericht jährlich.", ["daily", "yearly"]),
-        ("Faço o balanço anual e a conferência todos os meses.", ["monthly", "yearly"]),
-        ("Revisaba las cuentas cada semana.", ["weekly"]),
-        ("Llevo la contabilidad de la empresa.", []),
-        ("Trabajé todo el día en la gestoría.", []),
-    ] as [(String, Set<String>)])
-    func frequencies(text: String, said: Set<String>) {
-        #expect(CVDataSanitizer.frequencies(in: text) == said)
-    }
-
     @Test("o1: a typical duty keeps how often the work is done, which the description does not say; a number still goes (#354, round 13)")
     func dutyThatSaysHowOften() throws {
         let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
@@ -204,17 +188,78 @@ struct SectionChecksTests {
         #expect(verdicts.rejected.isEmpty)
     }
 
-    @Test("A summary sentence that says how often the work is done, which the description does not, goes with its reason (#354, round 11)")
-    func summaryThatSaysHowOften() throws {
-        let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
+    // MARK: O1, the summary (#354, round 13; D16 withdrawn)
+
+    @Test("o1: a summary sentence that says how often the work is done stays; one that says it with a number goes", arguments: [
+        ("Mantengo un controllo costante sulle attività quotidiane.", true),
+        ("Mantengo un controllo costante sulle attività dell'ufficio ogni 3 mesi.", false),
+    ])
+    func summaryThatSaysHowOften(sentence: String, stays: Bool) throws {
+        let verdict = try sanitizer.summaryCheck(of: Self.itTrapsJobs, summary: sentence, field: nil, against: try Self.itTraps())
+
+        #expect(verdict.kept == (stays ? [sentence] : []))
+        #expect(verdict.rejected.map(\.sentence) == (stays ? [] : [sentence]))
+    }
+
+    @Test("o1: a summary sentence of a typical duty stays; one that names a customer the person did not goes")
+    func summaryOfATypicalDuty() throws {
         let verdict = try sanitizer.summaryCheck(
-            of: Self.esTrapsJobs,
-            summary: "Llevo la contabilidad de la empresa con atención al detalle. Controlo los gastos mensuales de transporte.",
-            field: nil, against: description
+            of: Self.itTrapsJobs, summary: "Preparo i solleciti di pagamento. Registro le fatture per il cliente Peroni.", field: nil,
+            against: try Self.itTraps()
         )
 
-        #expect(verdict.rejected.contains { $0.sentence.contains("mensuales") && $0.reason == CVDataSanitizer.howOftenReason })
-        #expect(!verdict.kept.contains { $0.contains("mensuales") })
+        #expect(verdict.kept == ["Preparo i solleciti di pagamento."])
+        #expect(verdict.rejected.map(\.sentence) == ["Registro le fatture per il cliente Peroni."])
+    }
+
+    @Test("o1: a summary sentence that copies five words of a kept duty in a row goes with \"write it in other words\"; one in other words stays")
+    func summaryThatCopiesADuty() throws {
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.itTrapsJobs, summary: "Gestisco le fatture dei fornitori con estrema precisione. Seguo i pagamenti a chi rifornisce il negozio.",
+            field: nil, work: [], duties: ["Gestisco le fatture dei fornitori. Archivio le pratiche."], against: try Self.itTraps()
+        )
+
+        #expect(verdict.kept == ["Seguo i pagamenti a chi rifornisce il negozio."])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.copiesADutyReason])
+        #expect(CVDataSanitizer.copiesADutyReason.hasSuffix("write it in other words"))
+    }
+
+    @Test("o1: a summary sentence that guarantees a result goes with its reason, in any language", arguments: [
+        "Garantisco la correttezza dei pagamenti.", "I guarantee that every invoice is right.", "Ich garantiere, dass jede Verbindung funktioniert.",
+        "Je garantis des comptes exacts.", "Garantizo cuentas exactas.", "Garanto contas exatas.",
+    ])
+    func summaryThatGuarantees(sentence: String) throws {
+        #expect(CVDataSanitizer.guarantees(sentence))
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.itTrapsJobs, summary: "Garantisco la correttezza dei pagamenti.", field: nil, against: try Self.itTraps()
+        )
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.guaranteesReason])
+        #expect(!CVDataSanitizer.guarantees("Curo la garanzia dei prodotti venduti."))
+    }
+
+    @Test("o1: a summary's floor still short ends with a sentence of the person's strengths: the title and two qualities, one form per language", arguments: [
+        (Vocabulary.Language.english, "As an office clerk, I work with precision and reliability."),
+        (.italian, "Come office clerk lavoro con precision e reliability."),
+        (.german, "Als office clerk arbeite ich mit Precision und Reliability."),
+        (.french, "En tant que office clerk, je travaille avec precision et reliability."),
+        (.spanish, "Como office clerk, trabajo con precision y reliability."),
+        (.portuguese, "Como office clerk, trabalho com precision e reliability."),
+    ])
+    func strengths(language: Vocabulary.Language, sentence: String) {
+        #expect(CVDataSanitizer.strengths(title: "office clerk", qualities: ["Precision", "Reliability"], language: language) == sentence)
+    }
+
+    @Test("o1: a floor of one sentence gets the strengths sentence when there are two qualities, and none without them")
+    func floorEndsWithStrengths() throws {
+        let floor = { (qualities: [String]) in
+            try self.sanitizer.summaryFloor(
+                of: Self.itTrapsJobs, summary: "Lavoro come impiegata amministrativa.", most: 4, qualities: qualities, against: try Self.itTraps()
+            )
+        }
+
+        #expect(try floor(["Precisione", "Affidabilità"])
+            == "Lavoro come impiegata amministrativa. Come impiegata amministrativa lavoro con precisione e affidabilità.")
+        #expect(try floor([]) == nil)
     }
 
     // MARK: O1, the typical duties beside the person's (#354, round 13; D6 withdrawn)
@@ -1288,7 +1333,7 @@ struct SectionChecksTests {
         #expect(try final([titled, inferred].joined(separator: " "), ["SAP", "Maximo"]) == titled)
     }
 
-    @Test("A summary sentence names the work by a kept tool only when the description states the tool: one with a tool the person never named and no duty goes (#354, round 11)")
+    @Test("A summary sentence names the work by any kept tool, a typical one the person never named too; one with no kept tool and no duty goes (#354, round 13, O1)")
     func summaryNamingAnUnstatedTool() throws {
         let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Self.job("Elektriker", "Kranz", from: "2018")])
@@ -1301,14 +1346,17 @@ struct SectionChecksTests {
         }
         let titled = "Ich arbeite als Elektriker in neuen Wohnhäusern und halte jede Baustelle in Ordnung."
         let stated = "Ich sichere alle Schritte mit KNX ab."
-        let unstated = "Ich sichere alle Schritte mit dem Werkzeugkasten ab."
+        let typical = "Ich sichere alle Schritte mit dem Werkzeugkasten ab."
+        let unanchored = "Ich sichere alle Schritte mit dem Hammer ab."
 
         let keep = try check([titled, stated].joined(separator: " "))
-        let drop = try check([titled, unstated].joined(separator: " "))
+        let keepTypical = try check([titled, typical].joined(separator: " "))
+        let drop = try check([titled, unanchored].joined(separator: " "))
 
         #expect(keep.rejected.isEmpty, "\(keep.rejected)")
         #expect(keep.kept == [titled, stated])
-        #expect(drop.rejected.map(\.sentence) == [unstated], "\(drop.rejected)")
+        #expect(keepTypical.kept == [titled, typical], "\(keepTypical.rejected)")
+        #expect(drop.rejected.map(\.sentence) == [unanchored], "\(drop.rejected)")
         #expect(drop.rejected.map(\.reason) == [CVDataSanitizer.namesNoWork])
         #expect(CVDataSanitizer.namesNoWork == "it says nothing of the work: name a duty of the roles")
     }
@@ -1328,7 +1376,7 @@ struct SectionChecksTests {
     ] as [(String, String?)])
     func summaryFloor(summary: String, floor: String?) throws {
         let description = JobClausesTests.italian
-        let written = try sanitizer.summaryFloor(of: Self.italianJobs, summary: summary, most: 4, against: description)
+        let written = try sanitizer.summaryFloor(of: Self.italianJobs, summary: summary, most: 4, qualities: [], against: description)
 
         #expect(written == floor, "\(written ?? "nil")")
     }
@@ -1344,7 +1392,7 @@ struct SectionChecksTests {
             Self.job("contabile", "Studio Contabile Merlini", from: "2013", to: "2017"),
         ])
 
-        let written = try sanitizer.summaryFloor(of: facts, summary: "Seguo i fornitori con cura.", most: 4, against: description)
+        let written = try sanitizer.summaryFloor(of: facts, summary: "Seguo i fornitori con cura.", most: 4, qualities: [], against: description)
 
         #expect(written == "Lavoro come impiegata amministrativa. Seguo i fornitori con cura.", "\(written ?? "nil")")
     }
@@ -1439,7 +1487,7 @@ struct SectionChecksTests {
             jobs: [job("baker", "Wheatley Bakehouse", from: "2011", to: "2017"), job("shop manager", "Corn Exchange Deli", from: "2017")],
             ended: "I kneaded the dough by hand. I baked the bread loaves before dawn.",
             current: "I order the flour stock. I train the new staff at the counter.",
-            keeps: "I order the flour stock and train the counter staff with patience.",
+            keeps: "I manage the flour orders and train the counter staff with patience.",
             drops: "I knead the dough by hand and bake the bread loaves before dawn."
         ),
     ]
@@ -1656,7 +1704,7 @@ struct SectionChecksTests {
         #expect(verdict.kept == ["I mix live acts with a steady hand and a clear ear."])
         #expect(verdict.rejected.map(\.reason) == [
             CVDataSanitizer.startsAsAnEarlierOne,
-            "it says again a duty of a job: say what the person's work has in common",
+            CVDataSanitizer.copiesADutyReason,
             CVDataSanitizer.startsAsAnEarlierOne,
         ])
         #expect(verdict.problems.first == "it keeps fewer than 2 sentences")
@@ -1675,10 +1723,10 @@ struct SectionChecksTests {
 
         #expect(verdict.opening == "I work as a sound technician.")
         #expect(verdict.kept == ["I work as a sound technician."])
-        #expect(verdict.rejected.map(\.reason) == ["it says again a duty of a job: say what the person's work has in common"])
+        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.copiesADutyReason])
     }
 
-    @Test("A summary naming a title whole gets no opening; its sentences with other verbs, and one joining duties, stay (#354)")
+    @Test("A summary naming a title whole gets no opening; its sentences with other verbs, and one joining duties in other words, stay (#354)")
     func summaryNamingATitle() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Self.job("sound technician", "Copperfield Arena", from: "2019")])
@@ -1695,13 +1743,22 @@ struct SectionChecksTests {
         #expect(verdict.rejected.isEmpty)
         #expect(verdict.kept.count == 2)
 
+        let duties = ["I set up the sound systems.", "I mix the support acts."]
         let joining = try english.summaryCheck(
             of: facts,
-            summary: "I work as a sound technician for live shows of every size. I set up the sound systems, mix the support "
-                + "acts and keep each show on time.",
-            field: nil, duties: ["I set up the sound systems.", "I mix the support acts."], against: description
+            summary: "I work as a sound technician for live shows of every size. I install the sound rigs, mix the opening "
+                + "bands and keep each show on time.",
+            field: nil, duties: duties, against: description
         )
-        #expect(joining.rejected.isEmpty)
+        #expect(joining.rejected.isEmpty, "\(joining.rejected)")
+
+        // Five words of a duty in a row are the duty copied, not the work in common (#354, round 13, O1).
+        let copied = "I set up the sound systems, mix the support acts and keep each show on time."
+        let copying = try english.summaryCheck(
+            of: facts, summary: "I work as a sound technician for live shows of every size. " + copied,
+            field: nil, duties: duties, against: description
+        )
+        #expect(copying.rejected.first == CVDataSanitizer.Rejection(sentence: copied, reason: CVDataSanitizer.copiesADutyReason))
     }
 
     @Test("The opening says the current job's title in the present, else the last one's in the past, in the description's language")
@@ -1730,17 +1787,6 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.workTopics(of: "I trained 4 new porters. I sort the parcels and labels.") == ["the parcels", "labels"])
         #expect(CVDataSanitizer.workTopics(of: "I sort the mail. I sort the mail. I fold the towels. I stack the chairs. I wipe the tables.")
             == ["the mail", "the towels", "the chairs", "the tables"])
-    }
-
-    @Test("The summary reads a current job's work as the topics of the duties the person said, and those of its written duties only when the person said none (#354, round 11)")
-    func workTopicsOfACurrentJob() {
-        let written = "Gestisco le fatture dei fornitori. Organizzo le comunicazioni con i fornitori."
-        #expect(CVDataSanitizer.workTopics(stated: ["Gestisco le fatture dei fornitori."], duties: written) == ["le fatture dei fornitori"])
-        #expect(CVDataSanitizer.workTopics(stated: [], duties: written) == ["le fatture dei fornitori", "le comunicazioni con i fornitori"])
-        #expect(CVDataSanitizer.workTopics(stated: [], duties: nil).isEmpty)
-        let french = "Je prépare les ateliers d'éveil et j'accueille les familles le matin."
-        #expect(CVDataSanitizer.workTopics(stated: [french], duties: french + " Je range la salle.")
-            == ["les ateliers d'éveil", "les familles le matin"])
     }
 }
 

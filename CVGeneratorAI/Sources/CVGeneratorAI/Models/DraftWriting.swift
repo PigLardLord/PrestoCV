@@ -38,9 +38,6 @@ public struct DraftBrief: Equatable, Sendable {
         public static func adding(said: Int) -> Int {
             said >= mostDuties ? 0 : max(leastDuties - said, 1)
         }
-        /// The topics of the duties the checks kept for the job, which the summary request reads in place of the duties, which it
-        /// would copy (#354, round 3).
-        public var work: [String] = []
 
         public init(title: String, employer: String? = nil, hasEnded: Bool, clauses: [String] = []) {
             self.title = title
@@ -92,6 +89,30 @@ public struct DraftBrief: Equatable, Sendable {
         let headline = facts.personalInfo.title.presentValue
         guard headline != nil || roles.contains(where: { $0.title.presentValue != nil }) || !studies.isEmpty else { return nil }
         self.init(language: name, headline: headline, roles: roles, studies: studies, namedSkills: facts.skills.map(\.name))
+    }
+}
+
+/// What one sentence of the summary is about (#354, round 13, O1): the current job's title and the field, the topics of its first
+/// two kept duties, its title with two qualities, or an ended job's first kept duty. Asked for the whole summary from every job,
+/// the request ran short; asked of one slot, a sentence has one thing to say.
+public struct SummaryTopic: Equatable, Sendable {
+    /// The job's title, or the headline title for a job with none; nil when the CV has neither.
+    public let title: String?
+    /// The field the person works in, for the sentence on the role; nil for the other slots.
+    public let field: String?
+    /// The topics of the kept duties the sentence speaks of ("the junior technicians"); empty for the role and the qualities.
+    public let work: [String]
+    /// The qualities the sentence says the person works with; empty but for the qualities slot.
+    public let qualities: [String]
+    /// Whether the job is over: the sentence then speaks of it in the past.
+    public let hasEnded: Bool
+
+    public init(title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], hasEnded: Bool) {
+        self.title = title
+        self.field = field
+        self.work = work
+        self.qualities = qualities
+        self.hasEnded = hasEnded
     }
 }
 

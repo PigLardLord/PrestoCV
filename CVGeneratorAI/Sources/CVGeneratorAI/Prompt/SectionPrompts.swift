@@ -194,54 +194,48 @@ enum SectionPrompts {
 
     // MARK: The summary
 
-    /// The summary, written last from the brief's job titles, the topics of the duties the checks kept, and the tools and qualities
-    /// they kept, after the opening code wrote. It reads no whole duty: a duty it read came back word for word, and the check drops
-    /// a copied duty (#354, round 2); with no work at all it wrote lists of qualities (round 3).
-    static func summary(for brief: DraftBrief, tools: [String], qualities: [String]) -> Prompt {
-        var lines = header(brief) + headline(brief)
-        // Each topic of a role's work on its own line: written on one line with semicolons, the topics came back as one summary
-        // sentence of clauses joined by semicolons (#354, round 3).
-        let roles = brief.roles.map { role in
-            "- " + roleLine(role, employer: false) + (role.work.isEmpty ? "" : ", work:" + role.work.map { "\n  - " + $0 }.joined())
-        }
-        if !roles.isEmpty { lines.append("Roles:\n" + roles.joined(separator: "\n")) }
-        if !brief.studies.isEmpty { lines.append("Studies: " + brief.studies.joined(separator: "; ")) }
-        if !tools.isEmpty { lines.append("Tools: " + tools.joined(separator: "; ")) }
-        if !qualities.isEmpty { lines.append("Qualities: " + qualities.joined(separator: "; ")) }
-        if let opening = brief.opening { lines.append("Opening, already written: " + opening) }
-        return Prompt(instructions: summaryInstructions, text: lines.joined(separator: "\n"))
+    /// One sentence of the summary, written last on one slot (#354, round 13, O1): the job's title and whether it ended, with the
+    /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
+    /// whole summary from every job, the request ran short.
+    static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
+        var lines = header(brief)
+        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + (topic.hasEnded ? "; ended, write in the past" : ""))
+        if let field = topic.field { lines.append("Field: " + field) }
+        if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
+        if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
+        if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
+        return Prompt(instructions: summarySentenceInstructions, text: lines.joined(separator: "\n"))
     }
 
-    static let summaryInstructions = """
-        You write the summary of a CV after the opening, which is written, from the roles and skills below. Write in the language \
-        named on the first line.
-        - 2 to 3 sentences, at least 120 characters in all, on the work of the roles and how the person does it, each naming a \
-        duty of the roles; no list of tools or qualities, and never the opening or its first verb again.
-        - Each sentence starts with a capital letter and ends with a full stop; write as the person, never "he", "she" or "the person".
-        - No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
-        - Never add a language, job, study, certification, hobby, achievement or result.
+    /// What every summary sentence keeps to (S2): typical duties and tools are draft content (O1); no fact the person did not say.
+    static let summarySentenceRules = """
+        - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
+        qualities, say how the person works, the person as the subject. Typical duties and tools of the job are fine, in your own \
+        words.
+        - Do not start with the first verb of a sentence of the summary so far. Start with a capital letter, end with a full stop; \
+        no list.
+        - Never add a number, company, customer, product, school, place, person, language, study, certification or achievement; \
+        no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
         """
 
-    /// The summary's repair: what the check kept, what it rejected and why, and what the summary misses.
-    static func summaryRepair(
-        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
-    ) -> Prompt {
-        var lines = [summary(for: brief, tools: tools, qualities: qualities).text]
-        if !kept.isEmpty { lines.append("Summary sentences kept:\n" + bullets(kept)) }
-        if !rejected.isEmpty { lines.append("Summary sentences rejected, with the reason:\n" + bullets(rejected)) }
-        if !problems.isEmpty { lines.append("What the summary misses: " + problems.joined(separator: "; ")) }
-        return Prompt(instructions: summaryRepairInstructions, text: lines.joined(separator: "\n"))
+    static let summarySentenceInstructions = """
+        You write one more sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
+        - Exactly 1 sentence, as the person: in the first person, never "he", "she" or "the person".
+
+        """ + summarySentenceRules
+
+    /// The sentence's repair: the request again, then the sentence the check rejected and why.
+    static func summarySentenceRepair(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) -> Prompt {
+        let lines = [summarySentence(for: brief, topic: topic, written: written).text, "Rejected, with the reason: " + rejected]
+        return Prompt(instructions: summarySentenceRepairInstructions, text: lines.joined(separator: "\n"))
     }
 
-    static let summaryRepairInstructions = """
-        You fix the summary of a CV after the opening, which is written. Write in the language named on the first line.
-        - Write the summary again: 2 to 3 sentences, at least 120 characters in all, that keep the sentences kept and fix each \
-        reason, on the work of the roles, each naming a duty of the roles; no list of tools or qualities, and never the opening \
-        or its first verb again.
-        - Each sentence starts with a capital letter and ends with a full stop; write as the person, never "he", "she" or "the person".
-        - No number, date, company, school, place or person's name; no "experience", "years", "senior", "expert", "experienced".
-        - Never add a language, job, study, certification, hobby, achievement or result.
-        """
+    static let summarySentenceRepairInstructions = """
+        You fix one sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
+        - Write the rejected sentence again as exactly 1 sentence that fixes the reason, as the person: in the first person, never \
+        "he", "she" or "the person".
+
+        """ + summarySentenceRules
 
     // MARK: The parts of a request
 

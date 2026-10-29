@@ -13,12 +13,8 @@ extension FoundationModelsService {
     nonisolated static let jobRepairTokens = 180
     /// 3 to 5 qualities.
     nonisolated static let softSkillsTokens = 100
-    /// A summary of 2 to 4 sentences.
-    nonisolated static let summaryTokens = 220
-    /// The summary's repair: four sentences of a summary, not a page.
-    nonisolated static let summaryRepairTokens = 140
-    /// The longest summary a repair keeps, in sentences: a repair that runs on is cut, not thrown away.
-    nonisolated static let summaryRepairSentences = 4
+    /// One sentence of the summary, or its repair: a sentence, not a paragraph (#354, round 13).
+    nonisolated static let summarySentenceTokens = 90
 
     /// The cap of a request for at most `most` tools of one title: 80 for 3.
     nonisolated static func toolsTokens(most: Int) -> Int { 80 + 20 * max(most - 3, 0) }
@@ -137,23 +133,22 @@ extension FoundationModelsService {
 
     // MARK: The summary
 
-    public func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
-        let prompt = SectionPrompts.summary(for: brief, tools: tools, qualities: qualities)
-        guard let last = try await streamed(prompt, SummaryAnswer.self, tokens: Self.summaryTokens),
-              let summary = last.answer.content.summary else { return nil }
-        return last.isComplete ? summary.presentValue : Self.wholeSentences(of: summary)
+    public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
+        try await summarySentence(SectionPrompts.summarySentence(for: brief, topic: topic, written: written))
     }
 
-    public func repairSummary(
-        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
+    public func repairSummarySentence(
+        for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
     ) async throws -> String? {
-        let prompt = SectionPrompts.summaryRepair(
-            for: brief, tools: tools, qualities: qualities, kept: kept, rejected: rejected, problems: problems
-        )
-        guard let last = try await streamed(prompt, SummaryAnswer.self, tokens: Self.summaryRepairTokens),
-              let summary = last.answer.content.summary,
-              let whole = last.isComplete ? summary.presentValue : Self.wholeSentences(of: summary) else { return nil }
-        return SentenceSplitter.sentences(in: whole).prefix(Self.summaryRepairSentences).joined(separator: " ").presentValue
+        try await summarySentence(SectionPrompts.summarySentenceRepair(for: brief, topic: topic, written: written, rejected: rejected))
+    }
+
+    /// The first whole sentence `prompt` answers: one cut at its cap keeps its whole sentences, and a second sentence goes.
+    private func summarySentence(_ prompt: SectionPrompts.Prompt) async throws -> String? {
+        guard let last = try await streamed(prompt, SummarySentenceAnswer.self, tokens: Self.summarySentenceTokens),
+              let sentence = last.answer.content.sentence,
+              let whole = last.isComplete ? sentence.presentValue : Self.wholeSentences(of: sentence) else { return nil }
+        return SentenceSplitter.sentences(in: whole).first?.presentValue
     }
 
     // MARK: A request
@@ -251,8 +246,8 @@ struct QualitiesAnswer {
 }
 
 @Generable
-struct SummaryAnswer {
-    @Guide(description: "2 to 4 sentences on the person's profession and strengths")
-    let summary: String
+struct SummarySentenceAnswer {
+    @Guide(description: "One sentence of the summary, as the person")
+    let sentence: String
 }
 #endif

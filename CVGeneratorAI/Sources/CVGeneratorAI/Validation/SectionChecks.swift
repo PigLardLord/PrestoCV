@@ -222,50 +222,6 @@ extension CVDataSanitizer {
     /// Why a written duty that names its task through a vague phrase goes ("Ho svolto compiti legati alla gestione dei documenti.").
     static let vagueReason = "it names no task, only what the tasks relate to: name the task itself"
 
-    /// Why a written sentence that says how often the work is done, which the person did not say, goes ("Calculo los gastos
-    /// mensuales" of a person who never said "mensual").
-    static let howOftenReason = "it says how often the work is done, which the person did not say: do not say how often"
-
-    /// How often `text` says its work is done ("daily", "weekly", "monthly", "yearly"), by a word ("mensuales", "täglich") or by
-    /// a phrase ("ogni mese", "tous les jours"), in the six languages. A written duty or summary sentence that says it, when the
-    /// description does not, invents it (#354, round 11).
-    static func frequencies(in text: String) -> Set<String> {
-        let words = Word.words(in: text).map(\.folded)
-        var said = Set<String>()
-        for (index, word) in words.enumerated() {
-            if let often = frequencyStems.first(where: { _, stems in stems.contains(where: word.hasPrefix) })?.key { said.insert(often) }
-            guard let often = frequencyUnits[word], index > 0 else { continue }
-            let before = words[index - 1]
-            if everyWords.contains(before) || (index > 1 && everyWords.contains(words[index - 2]) && everyArticles.contains(before)) {
-                said.insert(often)
-            }
-        }
-        return said
-    }
-
-    /// The beginnings of the words that say how often, folded.
-    private static let frequencyStems: [String: [String]] = [
-        "daily": ["daily", "quotidian", "quotidien", "giornalier", "giornalment", "diari", "taglich"],
-        "weekly": ["weekly", "settimanal", "semanal", "hebdomadaire", "wochentlich"],
-        "monthly": ["monthly", "mensil", "mensual", "mensal", "mensais", "mensuel", "monatlich"],
-        "yearly": ["yearly", "annual", "annuel", "anual", "jahrlich"],
-    ]
-
-    /// The units of time of a phrase that says how often ("ogni mese", "every day"), folded.
-    private static let frequencyUnits: [String: String] = [
-        "day": "daily", "giorno": "daily", "dia": "daily", "dias": "daily", "jour": "daily", "jours": "daily", "tag": "daily",
-        "week": "weekly", "settimana": "weekly", "semana": "weekly", "semanas": "weekly", "semaine": "weekly", "semaines": "weekly",
-        "woche": "weekly",
-        "month": "monthly", "mese": "monthly", "mes": "monthly", "meses": "monthly", "mois": "monthly", "monat": "monthly",
-        "year": "yearly", "anno": "yearly", "ano": "yearly", "anos": "yearly", "annee": "yearly", "ans": "yearly", "jahr": "yearly",
-    ]
-
-    /// The words before a unit of time that say "every" ("ogni", "cada", "jeden"), and the articles between ("tous les jours").
-    private static let everyWords: Set<String> = [
-        "every", "each", "ogni", "cada", "chaque", "tous", "toutes", "jeden", "jede", "jedes", "todo", "toda", "todos", "todas",
-    ]
-    private static let everyArticles: Set<String> = ["les", "los", "las", "os", "as"]
-
     /// The names of `cvData` that say no work: its employers, schools, person and places.
     static func ownNames(of cvData: CVData) -> [String] {
         cvData.experience.map(\.company) + cvData.experience.compactMap(\.location)
@@ -351,13 +307,6 @@ extension CVDataSanitizer {
         return Array(topics.prefix(limit))
     }
 
-    /// The topics of a current job that the summary request reads: those of the duties the person said, else those of `duties`,
-    /// its kept ones. A written duty came back in the summary as the person's own work (#354, round 11).
-    static func workTopics(stated: [String], duties: String?) -> [String] {
-        let own = workTopics(of: stated.joined(separator: " "))
-        return own.isEmpty ? workTopics(of: duties ?? "") : own
-    }
-
     /// What the work of a job's own lines is done on, which its tools request reads as no tool (#354, round 6): their topics,
     /// none that names a tool or its kind, holds an acronym or, but in German, whose nouns all take a capital, a name. Asked for
     /// the tools of all jobs at once, the request listed the panels and the belts the person repairs.
@@ -440,7 +389,8 @@ extension CVDataSanitizer {
     /// was setting up the PA systems."): the job would say the same words twice (#354, round 13).
     static let repeatsWordsReason = "it repeats five words of a duty already written: write it in other words"
 
-    /// The runs of five words in a row of `duties`, folded, each sentence on its own; a sentence of fewer words is a run whole.
+    /// The runs of five words in a row of `duties`, folded, each sentence on its own; a sentence of fewer words is a run whole: what
+    /// a later duty of the job, or a summary sentence, may not hold again (#354, round 13).
     static func copiedRuns(of duties: [String]) -> [[String]] {
         duties.flatMap { SentenceSplitter.sentences(in: $0) }.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             .flatMap { duty in duty.count < 5 ? [duty] : (0...(duty.count - 5)).map { Array(duty[$0..<($0 + 5)]) } }
@@ -745,11 +695,11 @@ extension CVDataSanitizer {
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
-            // A kept tool the description states names the work whole, however short: "Java" and "SAP" have no stem of five
-            // letters (#354, round 10). One it lacks names no work: the summary said "Werkzeugkasten" of a person who never named
-            // it (round 11). A stated tool is no name; one it lacks is, as in the final check (ADR 0031).
+            // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters (#354, round 10); under
+            // O1 a typical tool is draft content, so any kept one anchors a sentence (round 13). A stated tool is no name; one the
+            // description lacks still is, as in the final check (ADR 0031).
             let stated = tools.filter { source.named($0) != nil }
-            let toolRuns = stated.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let statedTools = Self.words(of: stated)
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
@@ -761,6 +711,7 @@ extension CVDataSanitizer {
             let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
             let currentStems = Self.workStems(of: duties.filter { !endedDuties.contains($0) } + titles.compactMap { $0 })
             let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
+            let dutyRuns = Self.copiedRuns(of: duties)
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -770,7 +721,6 @@ extension CVDataSanitizer {
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
-            let often = Self.frequencies(in: description)
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 var sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
                 // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays (round 10).
@@ -806,12 +756,10 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if let closing = Self.closing(of: sentence), closings.contains(closing) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
-                } else if !Self.frequencies(in: sentence).isSubset(of: often) {
-                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.howOftenReason))
-                } else if dutySentences.contains(where: own.isSubset) {
-                    verdict.rejected.append(Rejection(
-                        sentence: sentence, reason: "it says again a duty of a job: say what the person's work has in common"
-                    ))
+                } else if Self.guarantees(sentence) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
+                } else if dutySentences.contains(where: own.isSubset) || Self.holdsARun(sentence, of: dutyRuns) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
@@ -880,8 +828,11 @@ extension CVDataSanitizer {
     /// 120 characters, as the requests left it, else the person's own, gets the opening (`opening(of:language:)`) when it names no
     /// title, and a sentence of the earlier titles it does not name, the latest first, within `most` sentences. Every impersonal
     /// sentence of a summary and of its repair went, and the draft kept the person's own sentence alone. Nil when the summary needs
-    /// no floor or the facts give it no sentence.
-    func summaryFloor(of facts: CVData, summary: String?, most: Int, against description: String) throws(CVGenerationError) -> String? {
+    /// no floor or the facts give it no sentence. A floor still short ends, as a last resort, with a sentence of the person's
+    /// strengths: the latest title and the first two `qualities`, in a fixed form per language (`strengths`; #354, round 13, O1).
+    func summaryFloor(
+        of facts: CVData, summary: String?, most: Int, qualities: [String], against description: String
+    ) throws(CVGenerationError) -> String? {
         try reading(description) { source in
             // The titles the description grounds, not those of the draft: "contabile" of "Studio Contabile Merlini" is no title of
             // the person (#354, round 7).
@@ -911,8 +862,12 @@ extension CVDataSanitizer {
             let head = opening.map { [$0] } ?? []
             let tail = earlier.isEmpty ? [] : [Self.earlier(as: earlier, after: !(head + sentences).isEmpty, language: language)]
             var verbs = Set<String>()
-            let floor = Array((head + sentences + tail).filter { Self.leadingVerb(of: $0).map { verbs.insert($0).inserted } ?? true }
+            var floor = Array((head + sentences + tail).filter { Self.leadingVerb(of: $0).map { verbs.insert($0).inserted } ?? true }
                 .prefix(most))
+            if floor.count < most, floor.count < 2 || floor.joined(separator: " ").count < 120, let title = titles.first,
+               qualities.count >= 2 {
+                floor.append(Self.strengths(title: title, qualities: Array(qualities.prefix(2)), language: language))
+            }
             return floor.count > sentences.count ? floor.joined(separator: " ") : nil
         }
     }
@@ -933,6 +888,22 @@ extension CVDataSanitizer {
     /// Whether `sentence` ends with `title` and its full stop: the opening that names it.
     private static func endsWithTitle(_ sentence: String, _ title: String) -> Bool {
         sentence.lowercased().hasSuffix(" \(title.lowercased()).")
+    }
+
+    /// The floor's last sentence, of the person's strengths: "As a head of sound, I work with care and calm." (#354, round 13, O1).
+    /// The qualities are written as the skills read them, in lower case but in German, whose nouns take a capital.
+    static func strengths(title: String, qualities: [String], language: Vocabulary.Language) -> String {
+        let named = language == .german ? qualities : qualities.map { $0.prefix(1).lowercased() + $0.dropFirst() }
+        let ands: [Vocabulary.Language: String] = [.english: "and", .german: "und", .spanish: "y", .french: "et"]
+        let list = named.dropLast().joined(separator: ", ") + " \(ands[language] ?? "e") " + (named.last ?? "")
+        switch language {
+        case .english: return "As \("aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a") \(title), I work with \(list)."
+        case .italian: return "Come \(title) lavoro con \(list)."
+        case .german: return "Als \(title) arbeite ich mit \(list)."
+        case .french: return "En tant que \(title), je travaille avec \(list)."
+        case .spanish: return "Como \(title), trabajo con \(list)."
+        case .portuguese: return "Como \(title), trabalho com \(list)."
+        }
     }
 
     /// The sentence of the earlier titles of a summary's floor, after another sentence or alone: "Before that, I worked as a
@@ -968,6 +939,20 @@ extension CVDataSanitizer {
     static let hasABareSubject = "its subject is a bare word of the person's work: write it as the person, with what they do"
 
     static let speaksOfAnEndedJob = "it says in the present a duty of a job that has ended: say what the person does now"
+    static let copiesADutyReason = "it copies a duty of a job: write it in other words"
+    static let guaranteesReason = "it guarantees a result: say what the person does"
+
+
+    /// Whether a summary sentence guarantees an outcome (#354, round 13): a form of "to guarantee" in the six languages, not its
+    /// noun ("Ich garantiere, dass jede Verbindung funktioniert").
+    static func guarantees(_ sentence: String) -> Bool {
+        Word.words(in: sentence).map(\.folded).contains { word in guaranteeForms.contains(where: word.hasPrefix) }
+    }
+
+    static let guaranteeForms = [
+        "guarantee", "garantisc", "garantire", "garantend", "garantit", "garantiz", "garanto", "garantim", "garantind", "garantir",
+        "garantis", "garantier",
+    ]
 
     /// Whether a summary sentence says in the present the duties of an ended job (#354, round 10): in the present
     /// (`isInThePresent`), with at least three stems of `endedStems` that are not of `currentStems`, the current jobs' titles and

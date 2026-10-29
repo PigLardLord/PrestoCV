@@ -16,6 +16,10 @@ final class SectionDraft {
     static let softSkills = 5
     /// The most sentences a summary keeps.
     static let summarySentences = 4
+    /// The most requests the summary makes, a sentence or its repair each (#354, round 13).
+    static let summaryRequests = 4
+    /// A summary of this many sentences and characters asks no more (#354, round 13).
+    static let summaryEnough = (sentences: 2, characters: 120)
 
     private let service: any CVGenerationService
     private let sanitizer: CVDataSanitizer
@@ -25,8 +29,6 @@ final class SectionDraft {
 
     /// What the requests wrote so far, as their checks kept it: what the draft keeps when a later request fails.
     private var duties: [String?] = []
-    /// The duties the person said for each job, as the check pins them: the summary reads them alone of an ended job.
-    private var stated: [[String]] = []
     private var years: [Int: RoleWriting] = [:]
     private var technologies: [String] = []
     private var softSkills: [String] = []
@@ -75,11 +77,9 @@ final class SectionDraft {
         for number in brief.roles.indices {
             brief.roles[number].clausesNameWork = brief.roles[number].clauses.contains { CVDataSanitizer.namesWork($0, names: names) }
         }
-        stated = Array(repeating: [], count: brief.roles.count)
         for number in brief.roles.indices where context.jobs.indices.contains(number) {
             let check = try? sanitizer.dutyCheck(of: located, job: context.jobs[number].job, duties: nil, against: description)
             brief.roles[number].avoid = check?.avoid ?? []
-            stated[number] = check?.pinned ?? []
             if let check {
                 brief.roles[number].said = check.pinned.count
                 brief.roles[number].adding = DraftBrief.Role.adding(said: check.pinned.count)
@@ -94,7 +94,9 @@ final class SectionDraft {
             // A summary too short to read as one gets the titles the person held, latest first by the dates of the draft, written by
             // the code (ADR 0031).
             let held = facts.with(experience: dated(located, context: context).experience)
-            if let floor = try? sanitizer.summaryFloor(of: held, summary: summary, most: Self.summarySentences, against: description) {
+            if let floor = try? sanitizer.summaryFloor(
+                of: held, summary: summary, most: Self.summarySentences, qualities: softSkills, against: description
+            ) {
                 summary = floor
             }
         } catch is Stopped {
@@ -317,74 +319,119 @@ final class SectionDraft {
 
     // MARK: - Summary
 
-    /// The summary, last, from the jobs and the skills the final check keeps. Code writes its opening from the facts and the request
-    /// what follows it, from the topics of each job's kept duties (#354, round 3). A summary that keeps a sentence but names no
-    /// title, or is too short, gets the opening again; one that drops a sentence or misses something else gets one repair, kept when
-    /// it misses no more than the first.
+    /// The summary, last, a sentence at a time after the opening code writes from the facts (#354, round 13, O1): each request asks
+    /// for one sentence on one slot (`summaryTopics`), the check reads it after the sentences kept, and a rejected sentence gets one
+    /// repair with its reason. The requests stop once the summary has 2 sentences and 120 characters, after 4 requests, or when no
+    /// slot is left; the floor then writes what is still missing (`summaryFloor`). Asked for the whole summary at once, the request
+    /// ran short.
     private func writeSummary(of brief: DraftBrief, field: String?, around dated: CVData) async throws {
         let kept = try kept(around: dated)
         let keptDuties = kept.experience.compactMap(\.description)
         let keptTools = kept.skills.filter { $0.kind != .softSkill }.map(\.name)
         let keptQualities = kept.skills.filter { $0.kind == .softSkill }.map(\.name)
         let endedDuties = kept.experience.filter { !$0.current && $0.endDate.presentValue != nil }.compactMap(\.description)
-        // The summary reads only the tools the description states: one the draft wrote came back as the summary's own claim
-        // (#354, round 11). The check still reads all the kept ones, for a sentence that lists them.
-        let summaryTools = (try? sanitizer.statedTools(keptTools, against: description)) ?? []
-        // It reads every kept quality: given the first two only, it ran one sentence on to its token cap (#354, round 12).
-        let work = keptDuties + summaryTools
+        // A sentence names the work by a title, the field, a kept duty or a kept tool (#354, round 13, O1).
+        let work = keptDuties + keptTools + [field].compactMap { $0?.presentValue }
         var brief = brief
-        let jobDuties = kept.experience.count == brief.roles.count ? kept.experience.map(\.description) : duties
-        // The work of the current jobs, the person's own duties first: an ended job's duties came back in the present as the
-        // person's work now (#354, round 10). With no current job, an ended one gives what the person said of it.
-        // A job ends by the years its own request read, which the extraction may have left out.
-        if kept.experience.count == brief.roles.count {
+        // A job ends by the years its own request read, which the extraction may have left out (#354, round 10).
+        let isDated = kept.experience.count == brief.roles.count
+        if isDated {
             for (number, job) in kept.experience.enumerated() where !job.current && job.endDate.presentValue != nil {
                 brief.roles[number].hasEnded = true
             }
         }
-        let isCurrent = brief.roles.contains { !$0.hasEnded }
-        for number in brief.roles.indices where jobDuties.indices.contains(number) {
-            let role = brief.roles[number]
-            // A current job's work is the topics of the duties the person said, those of its written ones only when the person
-            // said none: a written duty came back in the summary as the person's own claim (#354, round 11).
-            if !role.hasEnded {
-                brief.roles[number].work = CVDataSanitizer.workTopics(stated: stated[number], duties: jobDuties[number])
-            } else {
-                brief.roles[number].work = isCurrent ? [] : CVDataSanitizer.workTopics(of: stated[number].joined(separator: " "))
-            }
-        }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
-        let written = try await request(.summary) { [brief] in
-            try await self.service.writeSummary(for: brief, tools: summaryTools, qualities: keptQualities)
-        }
-        // The text mended (`mended`), then the summary cut to its most sentences (#354, round 4).
-        let opened = Self.opened(written.map(Self.mended), by: brief.opening)
-            .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
-        guard let first = try? sanitizer.summaryCheck(
-            of: dated, summary: opened, field: field, work: work, duties: keptDuties, qualities: keptQualities,
-            tools: keptTools, endedDuties: endedDuties, against: description
-        ) else {
-            return
-        }
-        summary = first.text
-        let opening = first.kept.isEmpty ? nil : first.opening
-        if let opening { summary = Self.joining(opening, first.kept) }
-        let problems = first.problems.filter { $0 != first.openingProblem }
-        guard !first.rejected.isEmpty || !problems.isEmpty else { return }
-        let keptSentences = ((opening.map { [$0] } ?? []) + first.kept).filter { $0 != brief.opening }
-        let rejected = first.rejected.map(Self.quoted)
-        let repaired = try await request(.summary) { [brief] in
-            try await self.service.repairSummary(
-                for: brief, tools: summaryTools, qualities: keptQualities, kept: keptSentences, rejected: rejected, problems: problems
+        let order = isDated ? Self.latestFirst(kept.experience) : Array(brief.roles.indices)
+        let jobDuties = (isDated ? kept.experience.map(\.description) : duties).map { SentenceSplitter.sentences(in: $0 ?? "") }
+        var topics = Self.summaryTopics(of: brief, duties: jobDuties, qualities: keptQualities, field: field, order: order)[...]
+        var lead = brief.opening
+        var accepted: [String] = []
+        var asked = 0
+
+        // The sentences the check keeps after the opening, of the summary so far and `answer`; nil when it keeps nothing new to read.
+        func checked(_ answer: String?) -> CVDataSanitizer.SummaryVerdict? {
+            guard let answer = answer?.presentValue else { return nil }
+            let text = ((lead.map { [$0] } ?? []) + accepted + SentenceSplitter.sentences(in: Self.mended(answer)))
+                .prefix(Self.summarySentences).joined(separator: " ")
+            return try? sanitizer.summaryCheck(
+                of: dated, summary: text, field: field, work: work, duties: keptDuties, qualities: keptQualities,
+                tools: keptTools, endedDuties: endedDuties, against: description
             )
         }
-        let cut = Self.opened(repaired.map(Self.mended), by: brief.opening)
-            .map { SentenceSplitter.sentences(in: $0).prefix(Self.summarySentences).joined(separator: " ") }
-        guard let second = try? sanitizer.summaryCheck(
-            of: dated, summary: cut, field: field, work: work, duties: keptDuties, qualities: keptQualities,
-            tools: keptTools, endedDuties: endedDuties, against: description
-        ), second.text != nil, second.problems.count <= first.problems.count || first.text == nil else { return }
-        summary = second.opening.map { Self.joining($0, second.kept) } ?? second.text
+        func following(_ verdict: CVDataSanitizer.SummaryVerdict) -> [String] {
+            let opening = lead ?? verdict.opening
+            return Array(verdict.kept.filter { $0 != opening && $0 != verdict.opening }.prefix(Self.summarySentences - 1))
+        }
+
+        while asked < Self.summaryRequests, !Self.isEnough(lead, accepted), accepted.count < Self.summarySentences - 1,
+              let topic = topics.popFirst() {
+            let written = (lead.map { [$0] } ?? []) + accepted
+            asked += 1
+            let answer = try await request(.summary) { [brief] in
+                try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
+            }
+            var verdict = checked(answer)
+            if let first = verdict, let rejection = first.rejected.first, asked < Self.summaryRequests,
+               !Self.isEnough(lead ?? first.opening, following(first)) {
+                asked += 1
+                let repaired = try await request(.summary) { [brief] in
+                    try await self.service.repairSummarySentence(
+                        for: brief, topic: topic, written: written, rejected: Self.quoted(rejection)
+                    )
+                }
+                if let second = checked(repaired), following(second).count >= following(first).count { verdict = second }
+            }
+            // A request that wrote nothing the check reads leaves the summary as it was.
+            guard let verdict else { continue }
+            if lead == nil { lead = verdict.opening }
+            accepted = following(verdict)
+            summary = ((lead.map { [$0] } ?? []) + accepted).joined(separator: " ").presentValue
+        }
+    }
+
+    /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1): the current job's title and the
+    /// `field`; the topics of the first two kept `duties` of the current job; its title with the first two `qualities`; then the
+    /// first kept duty of each ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no
+    /// title reads the headline title.
+    static func summaryTopics(
+        of brief: DraftBrief, duties: [[String]], qualities: [String], field: String?, order: [Int]
+    ) -> [SummaryTopic] {
+        let roles = order.filter(brief.roles.indices.contains)
+        guard let current = roles.first(where: { !brief.roles[$0].hasEnded }) ?? roles.first else {
+            return qualities.isEmpty ? [] : [SummaryTopic(title: brief.headline, qualities: Array(qualities.prefix(2)), hasEnded: false)]
+        }
+        let title = { (number: Int) in brief.roles[number].title.presentValue ?? brief.headline }
+        let kept = { (number: Int) in duties.indices.contains(number) ? duties[number] : [] }
+        let hasEnded = brief.roles[current].hasEnded
+        var topics = [SummaryTopic(title: title(current), field: field?.presentValue, hasEnded: hasEnded)]
+        let work = CVDataSanitizer.workTopics(of: kept(current).prefix(2).joined(separator: " "), limit: 2)
+        if !work.isEmpty { topics.append(SummaryTopic(title: title(current), work: work, hasEnded: hasEnded)) }
+        if !qualities.isEmpty {
+            topics.append(SummaryTopic(title: title(current), qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
+        }
+        for number in roles where number != current {
+            let work = CVDataSanitizer.workTopics(of: kept(number).first ?? "", limit: 1)
+            if !work.isEmpty { topics.append(SummaryTopic(title: title(number), work: work, hasEnded: brief.roles[number].hasEnded)) }
+        }
+        return topics
+    }
+
+    /// The numbers of `jobs`, the latest first: the current ones, then by end and start, the earlier in the draft first on a tie.
+    static func latestFirst(_ jobs: [Experience]) -> [Int] {
+        func key(_ job: Experience) -> (Int, String, String) {
+            let isOver = !job.current && job.endDate.presentValue != nil
+            return (isOver ? 0 : 1, job.endDate.presentValue ?? "", job.startDate.presentValue ?? "")
+        }
+        return jobs.indices.sorted { left, right in
+            let (one, other) = (key(jobs[left]), key(jobs[right]))
+            return one == other ? left < right : one > other
+        }
+    }
+
+    /// Whether `opening` and the sentences `accepted` after it are a summary long enough to ask no more.
+    private static func isEnough(_ opening: String?, _ accepted: [String]) -> Bool {
+        let sentences = (opening.map { [$0] } ?? []) + accepted
+        return sentences.count >= summaryEnough.sentences && sentences.joined(separator: " ").count >= summaryEnough.characters
     }
 
     /// `text` as a request wrote it, with each semicolon the person's own clause follows as a full stop and each German separable
@@ -392,18 +439,6 @@ final class SectionDraft {
     /// with and each verb without the noun of its own action (#354, round 12): the checks then read the sentences the draft keeps.
     static func mended(_ text: String) -> String {
         OwnActionNoun.dropped(in: SeparableVerbs.joined(in: CVDataSanitizer.withoutRelativeOpenings(SentenceSplitter.unchained(text))))
-    }
-
-    /// The sentences a summary request wrote after `opening`, which code wrote: nil when it wrote none. The check drops a sentence
-    /// that says the opening again.
-    private static func opened(_ written: String?, by opening: String?) -> String? {
-        guard let written = written?.presentValue else { return nil }
-        return opening.map { $0 + " " + written } ?? written
-    }
-
-    /// The opening, then the kept sentences that are not it, at most four.
-    private static func joining(_ opening: String, _ kept: [String]) -> String? {
-        ([opening] + kept.filter { $0 != opening }).prefix(summarySentences).joined(separator: " ").presentValue
     }
 
     // MARK: - Requests

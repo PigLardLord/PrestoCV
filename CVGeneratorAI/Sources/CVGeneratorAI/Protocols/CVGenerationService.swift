@@ -44,13 +44,12 @@ public protocol CVGenerationService {
         for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
     ) async throws -> DraftWriting?
 
-    /// The summary, from the job titles of `brief`, the tools kept and the qualities kept: no duty, which it would copy (#354).
-    func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String?
+    /// One sentence of the summary, on `topic` alone, after the sentences `written` so far: no duty, which it would copy (#354,
+    /// round 13).
+    func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String?
 
-    /// The summary written again from the sentences the check kept, those it rejected ("sentence": reason) and what it misses.
-    func repairSummary(
-        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
-    ) async throws -> String?
+    /// The sentence on `topic` written again, from the one the check rejected and why (`rejected`, "sentence": reason).
+    func repairSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) async throws -> String?
 }
 
 extension CVGenerationService {
@@ -63,8 +62,8 @@ extension CVGenerationService {
     public func writeMoreSkills(
         for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
     ) async throws -> DraftWriting? { nil }
-    public func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? { nil }
-    public func repairSummary(
-        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
+    public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? { nil }
+    public func repairSummarySentence(
+        for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
     ) async throws -> String? { nil }
 }

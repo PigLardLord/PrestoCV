@@ -385,67 +385,66 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("The summary request reads the opening code wrote, each job's title and its work one topic a line, the studies, the kept tools and qualities, and no employer (#354, round 3)")
-    func summaryPrompt() {
-        var brief = Self.brief
-        brief.roles[1].work = ["i turni dei tecnici", "le linee di imbottigliamento"]
-        brief.opening = "Lavoro come capoturno della manutenzione."
+    @Test("A summary sentence's request reads the job's title and whether it ended, its slot (the field, the topics or the qualities) and the summary so far, and no employer (#354, round 13)")
+    func summarySentencePrompt() {
+        let topic = SummaryTopic(
+            title: "capoturno della manutenzione", field: "manutenzione industriale", work: ["i turni", "i quadri elettrici"],
+            qualities: ["precisione"], hasEnded: false
+        )
 
-        let prompt = SectionPrompts.summary(for: brief, tools: ["PLC", "inverter"], qualities: ["precisione"])
+        let prompt = SectionPrompts.summarySentence(for: Self.brief, topic: topic, written: ["Lavoro come capoturno della manutenzione."])
 
-        #expect(prompt.instructions == SectionPrompts.summaryInstructions)
+        #expect(prompt.instructions == SectionPrompts.summarySentenceInstructions)
         #expect(prompt.text == """
             Language: Italian
             Scrivi in italiano.
-            Roles:
-            - manutentore elettromeccanico; ended
-            - capoturno della manutenzione, work:
-              - i turni dei tecnici
-              - le linee di imbottigliamento
-            Studies: Perito elettrotecnico
-            Tools: PLC; inverter
+            Job: capoturno della manutenzione
+            Field: manutenzione industriale
+            Topics: i turni; i quadri elettrici
             Qualities: precisione
-            Opening, already written: Lavoro come capoturno della manutenzione.
-            """)
-        #expect(!prompt.text.contains("Cerreto"))
-        #expect(SectionPrompts.summary(for: Self.brief, tools: [], qualities: []).text.hasSuffix("Studies: Perito elettrotecnico"))
-    }
-
-    @Test("The summary repair reads the summary request, the sentences kept, those rejected with their reasons and what it misses")
-    func summaryRepair() {
-        let prompt = SectionPrompts.summaryRepair(
-            for: Self.brief, tools: [], qualities: [], kept: ["Lavoro come capoturno della manutenzione."],
-            rejected: ["\"Lui è un tecnico.\": it speaks of the person in the third person"], problems: ["it is shorter than 120 characters"]
-        )
-
-        #expect(prompt.instructions == SectionPrompts.summaryRepairInstructions)
-        #expect(prompt.text.hasPrefix(SectionPrompts.summary(for: Self.brief, tools: [], qualities: []).text))
-        #expect(prompt.text.hasSuffix("""
-            Summary sentences kept:
+            Summary so far:
             - Lavoro come capoturno della manutenzione.
-            Summary sentences rejected, with the reason:
-            - "Lui è un tecnico.": it speaks of the person in the third person
-            What the summary misses: it is shorter than 120 characters
+            """)
+        #expect(!prompt.text.contains("Valtrigno"))
+        let ended = SummaryTopic(title: "manutentore elettromeccanico", work: ["i quadri elettrici"], hasEnded: true)
+        #expect(SectionPrompts.summarySentence(for: Self.brief, topic: ended, written: []).text.hasSuffix("""
+            Job: manutentore elettromeccanico; ended, write in the past
+            Topics: i quadri elettrici
+            """))
+        let untitled = SummaryTopic(title: nil, qualities: ["precisione"], hasEnded: false)
+        #expect(SectionPrompts.summarySentence(for: Self.brief, topic: untitled, written: []).text.hasSuffix("""
+            Job: no title given
+            Qualities: precisione
             """))
     }
 
-    @Test("The summary is written as the person, 2 to 3 sentences of at least 120 characters, with no fact of its own")
+    @Test("A summary sentence's repair reads the request, then the rejected sentence and why it went")
+    func summarySentenceRepair() {
+        let topic = SummaryTopic(title: "capoturno della manutenzione", work: ["tre tecnici"], hasEnded: false)
+        let rejected = "\"Lui coordina tre tecnici.\": it speaks of the person in the third person"
+
+        let prompt = SectionPrompts.summarySentenceRepair(for: Self.brief, topic: topic, written: [], rejected: rejected)
+
+        #expect(prompt.instructions == SectionPrompts.summarySentenceRepairInstructions)
+        #expect(prompt.text == SectionPrompts.summarySentence(for: Self.brief, topic: topic, written: []).text
+            + "\nRejected, with the reason: " + rejected)
+    }
+
+    @Test("A summary sentence is one sentence as the person on its topic alone, with no fact of its own (#354, round 13)")
     func summaryInstructions() {
-        for instructions in [SectionPrompts.summaryInstructions, SectionPrompts.summaryRepairInstructions] {
-            #expect(instructions.contains("2 to 3 sentences, at least 120 characters in all"))
-            #expect(instructions.contains("write as the person, never \"he\", \"she\" or \"the person\""))
-            #expect(instructions.contains("No number, date, company, school, place or person's name"))
-            #expect(instructions.contains("Never add a language, job, study, certification, hobby, achievement or result."))
-            #expect(instructions.contains("after the opening, which is written"))
-            #expect(instructions.contains("no list of tools or qualities"))
+        for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
+            #expect(instructions.contains("exactly 1 sentence") || instructions.contains("Exactly 1 sentence"))
+            #expect(instructions.contains("in the first person, never \"he\", \"she\" or \"the person\""))
+            #expect(instructions.contains("in the past when the job ended"))
+            #expect(instructions.contains("Do not start with the first verb of a sentence of the summary so far."))
+            // O1: typical duties and tools are draft content; facts never are (#354, round 13).
+            #expect(instructions.contains("Typical duties and tools of the job are fine, in your own words."))
+            #expect(instructions.contains(
+                "Never add a number, company, customer, product, school, place, person, language, study, certification or achievement"
+            ))
+            #expect(instructions.contains("never guarantee a result"))
             // Asked for a quality in each sentence, the summary closed each with the person's own praise (#354, round 10).
             #expect(!instructions.contains("quality of the lists"))
-            // The check drops a sentence that names no duty and no tool (`namesNoWork`): the request says so, or the summary of a
-            // job with one duty is written of nothing and falls under its floor (#354, round 10).
-            // It reads only the stated tools, so a sentence names a duty: one of a tool alone named a tool the person never
-            // stated (#354, round 11).
-            #expect(instructions.contains("each naming a duty of the roles;"))
-            #expect(!instructions.contains("a tool of the lists"))
         }
     }
 

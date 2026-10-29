@@ -50,7 +50,7 @@ struct SectionDraftTests {
     private static let qualities = ["teamwork", "calm under pressure", "attention to detail"]
     /// An invented answer to the summary request, which follows the opening code writes.
     private static let summary = """
-        I plan the sound of each production, run the rehearsals and look after the mixing desks and stage monitors.
+        I plan the sound of each production and keep the mixing desks and monitors ready for every show.
         """
     /// The opening code writes for the jobs of `extracted`.
     private static let opening = "I work as a head of sound."
@@ -88,7 +88,7 @@ struct SectionDraftTests {
 
     // MARK: The order of the requests
 
-    @Test("After the facts, a request per job in order, then the tools, the soft skills and the summary, each reading the brief, the summary with its opening and work")
+    @Test("After the facts, a request per job in order, then the tools, the soft skills and the summary, each reading the brief, the summary with its opening")
     func order() async throws {
         let service = service()
 
@@ -106,7 +106,6 @@ struct SectionDraftTests {
         // The summary reads a job as ended by the years its own request read (#354, round 10).
         #expect(summaryBrief.roles.map(\.hasEnded) == [true, true, true, false])
         for number in summaryBrief.roles.indices {
-            summaryBrief.roles[number].work = []
             summaryBrief.roles[number].hasEnded = brief.roles[number].hasEnded
         }
         #expect(summaryBrief == brief)
@@ -146,33 +145,67 @@ struct SectionDraftTests {
         #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
     }
 
-    @Test("The summary request reads the opening code wrote, the topics of each job's kept duties, and the tools and every quality the checks kept, apart (#354, rounds 3 and 12)")
+    @Test("o1: each summary request reads the opening code wrote, the sentences kept so far and one slot: the role, the current job's work, two qualities, then the ended jobs (#354, round 13)")
     func summaryInputs() async throws {
         let service = service()
+        // No sentence kept: the summary asks a slot each time, up to its most requests.
+        service.summaryResult = nil
 
         let draft = try await draft(service)
 
         let brief = try #require(service.sectionCalls.firstIndex(of: "summary").map { service.sectionBriefs[$0] })
         #expect(brief.opening == Self.opening)
-        // A current job's work is the topics of the duties the person said: a written one came back in the summary as the
-        // person's own claim (#354, round 11).
-        #expect(brief.roles[3].work == ["the junior technicians"])
-        // The jobs that ended, by the years their requests read, are titles alone (#354, round 10).
-        #expect(brief.roles.prefix(3).allSatisfy { $0.hasEnded && $0.work.isEmpty })
-        #expect(!brief.roles[3].hasEnded)
-        #expect(!brief.roles.flatMap(\.work).contains { $0.hasPrefix("I ") })
-        let request = try #require(service.summaryRequests.first)
-        // The summary reads only the tools the description states: one the draft wrote came back as the summary's own claim
-        // (#354, round 11).
-        #expect(request.tools.contains("PA systems"))
-        #expect(!request.tools.contains("mixing desks"))
-        #expect(!request.tools.contains("teamwork"))
-        #expect(request.qualities.contains("teamwork"))
-        #expect(!request.qualities.contains("mixing desks"))
-        // Every kept quality: given the first two only, the request ran one sentence on to its token cap (#354, round 12).
-        let qualities = draft.skills.filter { $0.kind == .softSkill }.map(\.name)
-        #expect(qualities.count > 2)
-        #expect(request.qualities == qualities)
+        let topics = service.summaryRequests.map(\.topic)
+        #expect(topics.count == SectionDraft.summaryRequests)
+        #expect(service.summaryRequests.allSatisfy { $0.written == [Self.opening] })
+        #expect(topics.prefix(3).allSatisfy { $0.title == "head of sound" && !$0.hasEnded })
+        #expect(topics.first.map { $0.work.isEmpty && $0.qualities.isEmpty } == true)
+        // O1: the work of the current job's kept duties, typical ones too (D16 withdrawn).
+        #expect(topics.dropFirst().first.map { !$0.work.isEmpty && $0.qualities.isEmpty } == true)
+        let qualities = Array(draft.skills.filter { $0.kind == .softSkill }.map(\.name).prefix(2))
+        #expect(qualities.count == 2)
+        #expect(topics.dropFirst(2).first?.qualities == qualities)
+        #expect(topics.dropFirst(3).allSatisfy { $0.hasEnded && $0.work.count == 1 })
+    }
+
+    @Test("o1: the summary's slots are the current job's role and field, the topics of its first two kept duties, two qualities, then the first kept duty of each other job (#354, round 13)")
+    func summaryTopics() {
+        let brief = DraftBrief(
+            language: "English", headline: "head of sound",
+            roles: [
+                .init(title: "stagehand", hasEnded: true), .init(title: "sound technician", hasEnded: true),
+                .init(title: "head of sound", hasEnded: false),
+            ],
+            studies: [], namedSkills: []
+        )
+        let duties = [["I rigged the lights."], [], ["I train the junior technicians.", "I plan the rehearsals.", "I mix the shows."]]
+
+        let topics = SectionDraft.summaryTopics(
+            of: brief, duties: duties, qualities: ["teamwork", "calm", "care"], field: "live sound", order: [2, 1, 0]
+        )
+
+        #expect(topics == [
+            SummaryTopic(title: "head of sound", field: "live sound", hasEnded: false),
+            SummaryTopic(title: "head of sound", work: ["the junior technicians", "the rehearsals"], hasEnded: false),
+            SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
+            SummaryTopic(title: "stagehand", work: ["the lights"], hasEnded: true),
+        ])
+        // The pair: no duty and no quality leave the role alone; no role leaves the qualities with the headline.
+        #expect(SectionDraft.summaryTopics(of: brief, duties: [[], [], []], qualities: [], field: nil, order: [2, 1, 0]) == [
+            SummaryTopic(title: "head of sound", hasEnded: false),
+        ])
+        #expect(SectionDraft.summaryTopics(of: brief, duties: [], qualities: ["teamwork", "calm"], field: nil, order: []) == [
+            SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
+        ])
+    }
+
+    @Test("The jobs are read latest first: the current ones, then by end and start, the earlier in the draft first on a tie")
+    func latestFirst() {
+        let jobs = [
+            Experience(title: "a", startDate: "2013", endDate: "2016"), Experience(title: "b", startDate: "2016", endDate: "2019"),
+            Experience(title: "c", startDate: "2021", current: true), Experience(title: "d", startDate: "2016", endDate: "2019"),
+        ]
+        #expect(SectionDraft.latestFirst(jobs) == [2, 1, 3, 0])
     }
 
     // MARK: What reaches the draft
@@ -446,7 +479,7 @@ struct SectionDraftTests {
         #expect(duties.contains("I ran the sound checks with each band."))
     }
 
-    @Test("A summary whose every sentence and repair went is written by code from the titles, and the draft keeps it (#354, round 6)")
+    @Test("A summary whose every sentence and repair went is written by code from the titles and two qualities after its most requests, and the draft keeps it (#354, rounds 6 and 13)")
     func summaryFloor() async throws {
         let service = service()
         service.summaryResult = "He is a sound engineer."
@@ -454,27 +487,40 @@ struct SectionDraftTests {
 
         let draft = try await draft(service)
 
-        #expect(draft.summary == "I work as a head of sound. Before that, I worked as a sound technician and a stagehand.")
+        #expect(service.sectionCalls.filter { $0.hasSuffix("ummary") } == ["summary", "repairSummary", "summary", "repairSummary"])
+        // O1: a floor still short ends with the person's strengths, from the title and two qualities (#354, round 13).
+        #expect(draft.summary == "I work as a head of sound. Before that, I worked as a sound technician and a stagehand. "
+            + "As a head of sound, I work with teamwork and calm under pressure.")
     }
 
-    @Test("A summary that keeps a sentence but is short gets an opening from the facts, and one repair for what else it misses")
+    @Test("A rejected summary sentence gets one repair on the same topic that reads it and why it went, and the repair is kept (#354, round 13)")
     func summaryRepair() async throws {
         let service = service()
-        service.summaryResult = "He is a sound engineer. I keep every rehearsal running smoothly."
-        service.summaryRepairResult = """
-            I work as a head of sound. I keep every rehearsal running smoothly. I plan the sound of each production and look after the \
-            mixing desks. I train the technicians. I check the stage monitors.
-            """
+        service.summaryResults = ["He is a sound engineer."]
+        service.summaryRepairResult = Self.summary
 
         let draft = try await draft(service)
 
         #expect(service.sectionCalls.suffix(2) == ["summary", "repairSummary"])
         let repair = try #require(service.summaryRepairs.first)
-        #expect(repair.kept == ["I keep every rehearsal running smoothly."])
-        #expect(repair.rejected.contains { $0.hasPrefix("\"He is a sound engineer.\": it speaks of the person in the third person") })
-        let summary = try #require(draft.summary)
-        #expect(SentenceSplitter.sentences(in: summary).count <= 4)
-        #expect(summary.hasPrefix("I work as a head of sound."))
+        #expect(repair.topic == service.summaryRequests.first?.topic)
+        #expect(repair.written == [Self.opening])
+        #expect(repair.rejected.hasPrefix("\"He is a sound engineer.\": it speaks of the person in the third person"))
+        #expect(draft.summary == Self.opening + " " + Self.summary)
+    }
+
+    @Test("The summary asks one sentence at a time, each after those kept, until it has 2 sentences and 120 characters (#354, round 13)")
+    func summaryOneSentenceAtATime() async throws {
+        let service = service()
+        let first = "I keep the sound of every show clear and balanced."
+        service.summaryResults = [first, Self.summary, "I keep the stage calm."]
+
+        let draft = try await draft(service)
+
+        #expect(service.summaryRepairs.isEmpty)
+        #expect(service.sectionCalls.filter { $0.hasSuffix("ummary") } == ["summary", "summary"])
+        #expect(service.summaryRequests.map(\.written) == [[Self.opening], [Self.opening, first]])
+        #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 
     // MARK: Failures

@@ -204,20 +204,19 @@ struct DraftingEvaluation {
             return more
         }
 
-        func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
-            let summary = try await model.writeSummary(for: brief, tools: tools, qualities: qualities)
-            log("summary", summary.map { [$0] })
-            return summary
+        func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
+            let sentence = try await model.writeSummarySentence(for: brief, topic: topic, written: written)
+            let slot = ([topic.title, topic.field].compactMap { $0 } + topic.work).joined(separator: ": ")
+            log("summary", [sentence ?? "none", "topic: " + slot] + topic.qualities)
+            return sentence
         }
 
-        func repairSummary(
-            for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
+        func repairSummarySentence(
+            for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
         ) async throws -> String? {
-            let summary = try await model.repairSummary(
-                for: brief, tools: tools, qualities: qualities, kept: kept, rejected: rejected, problems: problems
-            )
-            log("summary repair", [summary ?? "none", "kept: " + kept.joined(separator: " "), "rejected: " + rejected.joined(separator: " ")] + problems)
-            return summary
+            let sentence = try await model.repairSummarySentence(for: brief, topic: topic, written: written, rejected: rejected)
+            log("summary repair", [sentence ?? "none", "rejected: " + rejected])
+            return sentence
         }
 
         private func log(_ step: String, _ answer: [String]?) {

@@ -35,6 +35,8 @@ final class FakeCVGenerationService: CVGenerationService {
     var toolsResult: [[String]]?
     var softSkillsResult: [String]?
     var moreSkillsResult: DraftWriting?
+    /// The sentences the summary requests answer, in order; once they run out, `summaryResult` answers each.
+    var summaryResults: [String?] = []
     var summaryResult: String?
     var summaryRepairResult: String?
     /// The errors the first calls of a request throw, in order, by the request's name in `sectionCalls`.
@@ -54,8 +56,8 @@ final class FakeCVGenerationService: CVGenerationService {
     private(set) var toolsCounts: [ClosedRange<Int>] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
     private(set) var moreSkillsRequests: [(tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String])] = []
-    private(set) var summaryRequests: [(tools: [String], qualities: [String])] = []
-    private(set) var summaryRepairs: [(kept: [String], rejected: [String], problems: [String])] = []
+    private(set) var summaryRequests: [(topic: SummaryTopic, written: [String])] = []
+    private(set) var summaryRepairs: [(topic: SummaryTopic, written: [String], rejected: String)] = []
 
     func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
         try await section("job \(number)", brief)
@@ -88,16 +90,14 @@ final class FakeCVGenerationService: CVGenerationService {
         return moreSkillsResult
     }
 
-    func writeSummary(for brief: DraftBrief, tools: [String], qualities: [String]) async throws -> String? {
-        summaryRequests.append((tools, qualities))
+    func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
+        summaryRequests.append((topic, written))
         try await section("summary", brief)
-        return summaryResult
+        return summaryResults.isEmpty ? summaryResult : summaryResults.removeFirst()
     }
 
-    func repairSummary(
-        for brief: DraftBrief, tools: [String], qualities: [String], kept: [String], rejected: [String], problems: [String]
-    ) async throws -> String? {
-        summaryRepairs.append((kept, rejected, problems))
+    func repairSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) async throws -> String? {
+        summaryRepairs.append((topic, written, rejected))
         try await section("repairSummary", brief)
         return summaryRepairResult
     }
