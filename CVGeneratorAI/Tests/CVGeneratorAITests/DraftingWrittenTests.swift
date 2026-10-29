@@ -438,6 +438,18 @@ struct DraftingWrittenTests {
         ])
     }
 
+    @Test("Three sentences of a job that open with the subject and an auxiliary are no repeated opening; three with one verb are (#354, round 2)")
+    func sameOpeningPastAnAuxiliary() {
+        let cv = CVData(experience: [
+            Experience(company: "A", description: "Ich habe die Regale montiert. Ich habe die Lampen geprüft. Ich habe die Böden verlegt."),
+            Experience(company: "B", description: "Ich prüfte die Regale. Ich prüfte die Lampen. Ich prüfte die Böden."),
+        ])
+
+        #expect(Self.reader(cv, "de").filter { $0.kind == .sameOpening } == [
+            ReaderFinding(kind: .sameOpening, path: "experience[1].description", value: "ich prufte"),
+        ])
+    }
+
     @Test("A soft skill whose head noun is a tool is counted; one that only starts with a tool word is not")
     func toolAsSoftSkill() {
         let cv = CVData(skills: [
@@ -492,7 +504,11 @@ struct DraftingWrittenTests {
             skills: [Skill(name: "digital consoles"), Skill(name: "calm under pressure", kind: .softSkill)]
         )
         let held = CVData(
-            experience: [Experience(title: "head of sound", company: "Orchard Lane Theatre", description: "I plan the sound design.")],
+            experience: [Experience(
+                title: "head of sound", company: "Orchard Lane Theatre",
+                description: "I rigged the lights and loaded the trucks. I set up the PA systems, mixed the support acts and ran the "
+                    + "follow spots. I plan the sound design and train the junior technicians."
+            )],
             skills: [
                 Skill(name: "digital consoles"), Skill(name: "sound effects editing"), Skill(name: "stress resistance under pressure", kind: .softSkill),
                 Skill(name: "collaboration with directors", kind: .softSkill),
@@ -501,15 +517,23 @@ struct DraftingWrittenTests {
         let described = CVData(
             experience: [Experience(
                 title: "capoturno della manutenzione", company: "Birrificio Valtrigno",
-                description: "Leggo gli schemi elettrici e uso i PLC per trovare i guasti."
+                description: "Riparavo i nastri trasportatori e sostituivo i cuscinetti. Controllavo i quadri elettrici e programmavo "
+                    + "la manutenzione preventiva. Ordinavo i ricambi. Coordino i tecnici e gestisco i fermi impianto. Leggo gli schemi "
+                    + "elettrici e uso i PLC per trovare i guasti."
             )],
             skills: [Skill(name: "PLC"), Skill(name: "lavoro di squadra", kind: .softSkill)]
         )
 
-        #expect(unwritten(missing, english) == ["sound effects", "working closely with directors"])
+        #expect(unwritten(missing, english) == [
+            "sound effects", "working closely with directors", "lights", "trucks", "PA systems", "support acts", "follow spots",
+            "junior technicians",
+        ])
         #expect(unwritten(held, english).isEmpty)
         #expect(unwritten(described, italian).isEmpty)
-        #expect(unwritten(CVData(skills: [Skill(name: "PLC")]), italian) == ["schemi elettrici", "trovare i guasti", "lavorare in squadra"])
+        #expect(unwritten(CVData(skills: [Skill(name: "PLC")]), italian) == [
+            "schemi elettrici", "trovare i guasti", "lavorare in squadra", "nastri trasportatori", "cuscinetti", "quadri elettrici",
+            "manutenzione preventiva", "ricambi", "fermi impianto", "tecnici",
+        ])
     }
 
     @Test("A sentence that quotes little of the description, in a job whose quoting sentences run to 40 characters, is counted; none in a job the person said little of (#354, round 1, D6)")

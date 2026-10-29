@@ -239,7 +239,7 @@ enum DraftingInputs {
         ],
         "fr": [
             .name("Maria Rossi"), .title("institutrice"), .employer("Don Milani"), .employer("crèche"),
-            .school("université de Bologne"), .language("italien"), .language("anglais"),
+            .school("université de Bologne"), .language("italien"), .language("anglais"), .duty("enseigne"),
         ],
         "pt": [
             .name("Maria Rossi"), .title("professora do ensino fundamental", "professora"), .employer("Don Milani"),
@@ -261,7 +261,7 @@ enum DraftingInputs {
             facts: [
                 .name("Daniel Hart"), .title("warehouse supervisor", "supervisor"), .employer("Northfield Logistics"),
                 .employer("Kestrel Foods"), .school("Leeds City College"), .language("English"), .language("Polish"),
-                .skill("SAP"), .skill("Excel"),
+                .skill("SAP"), .skill("Excel"), .duty("night shifts"),
             ],
             traps: []
         ),
@@ -310,7 +310,7 @@ enum DraftingInputs {
             facts: [
                 .name("Chiara Benedetti"), .title("impiegata amministrativa", "impiegata"), .employer("Ferramenta Scaligera"),
                 .employer("Studio Contabile Merlini", "Merlini"), .school("istituto tecnico Lungadige", "Lungadige"),
-                .language("italiano"), .language("inglese"),
+                .language("italiano"), .language("inglese"), .duty("fatture dei fornitori", "fatture"),
             ],
             traps: [
                 "tedesco", "paolo.greco@example.com", "Marco", "Cantina Le Tre Querce", "consulente fiscale", "spagnolo", "SAP",
@@ -329,7 +329,7 @@ enum DraftingInputs {
             facts: [
                 .name("Jonas Albrecht"), .title("Elektriker"), .employer("Elektro Brandner", "Brandner"),
                 .employer("Haustechnik Kellner", "Kellner"), .school("Berufsschule Lechfeld", "Lechfeld"), .language("Deutsch"),
-                .language("Englisch"), .skill("KNX"),
+                .language("Englisch"), .skill("KNX"), .duty("Neubauten"),
             ],
             traps: []
         ),
@@ -381,7 +381,7 @@ enum DraftingInputs {
             facts: [
                 .name("Diego Salcedo"), .title("contable"), .employer("Transportes Ebro Norte", "Ebro Norte"),
                 .employer("Aranda y Molina"), .school("Universidad del Moncayo", "Moncayo"), .language("español"),
-                .language("inglés"),
+                .language("inglés"), .duty("contabilidad"),
             ],
             traps: ["alemán", "rafael.ortiz@example.com", "Javier", "Seguros Pilar", "auditor", "francés", "SAP", "15", "300"]
         ),
@@ -450,7 +450,7 @@ enum DraftingInputs {
             facts: [
                 .name("Tiago Ferreira"), .title("programador"), .employer("Sulware Sistemas", "Sulware"),
                 .employer("Pixel Gaúcho"), .school("Universidade do Guaíba", "Guaíba"), .language("português"),
-                .language("espanhol"),
+                .language("espanhol"), .duty("aplicativos para lojas", "aplicativos"),
             ],
             traps: [
                 "japonês", "marcos.lima@example.com", "Rafael", "Nuvem Azul Tecnologia", "arquiteto de software", "alemão",
@@ -549,7 +549,8 @@ enum DraftingInputs {
                 .employer("Fenwick Playhouse", "Fenwick"), .employer("Brightwater Events", "Brightwater"),
                 .employer("Copperfield Arena", "Copperfield"), .employer("Orchard Lane Theatre", "Orchard Lane"),
                 .duty("digital consoles"), .duty("sound effects"), .quality("calm under pressure", "pressure", "calm"),
-                .quality("working closely with directors", "directors"),
+                .quality("working closely with directors", "directors"), .duty("lights"), .duty("trucks"), .duty("PA systems"),
+                .duty("support acts"), .duty("follow spots"), .duty("sound design"), .duty("junior technicians"),
             ],
             traps: ["technical manager"]
         ),
@@ -571,6 +572,8 @@ enum DraftingInputs {
                 .employer("Pastificio Cerreto", "Cerreto"), .employer("Molino Fontebasso", "Fontebasso"),
                 .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"), .duty("schemi elettrici", "schemi"),
                 .duty("trovare i guasti", "guasti"), .quality("lavorare in squadra", "squadra"),
+                .duty("nastri trasportatori"), .duty("cuscinetti"), .duty("quadri elettrici"), .duty("manutenzione preventiva"),
+                .duty("ricambi"), .duty("fermi impianto"), .duty("tecnici"),
             ],
             traps: ["responsabile della manutenzione"]
         ),

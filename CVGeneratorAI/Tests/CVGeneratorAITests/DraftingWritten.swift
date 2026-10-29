@@ -380,12 +380,21 @@ enum ReaderRules {
         if let run = repeatedRun(in: description) {
             found.append(ReaderFinding(kind: .repeatedDuty, path: path, value: run))
         }
-        let openings = sentences.map { letterWords(of: $0).prefix(2).joined(separator: " ") }.filter { $0.contains(" ") }
+        let openings = sentences.map { letterWords(of: $0).prefix(2) }
+            .filter { $0.count == 2 && !auxiliaries.contains($0.last ?? "") }
+            .map { $0.joined(separator: " ") }
         if let opening = openings.first(where: { opening in openings.count { $0 == opening } >= 3 }) {
             found.append(ReaderFinding(kind: .sameOpening, path: path, value: opening))
         }
         return found
     }
+
+    /// The auxiliaries a past or a perfect tense opens with ("Ich habe die Leitungen geprüft", "J'ai formé"): an opening of the
+    /// subject and an auxiliary says nothing of the verb, which comes later, so three of them are no repeated opening.
+    static let auxiliaries: Set<String> = [
+        "have", "has", "had", "am", "was", "were", "habe", "hat", "hatte", "bin", "war", "wurde", "ai", "avais", "suis", "etais",
+        "ho", "avevo", "sono", "ero", "he", "habia", "tengo", "tenho", "tinha",
+    ]
 
     /// The first run of five words that `text` writes twice, the second time apart from the first, if any.
     static func repeatedRun(in text: String) -> String? {
