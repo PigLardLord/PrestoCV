@@ -171,7 +171,7 @@ struct SectionPromptsTests {
         )
 
         for text in [SectionPrompts.softSkills(for: brief).text,
-                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
+                     SectionPrompts.moreSkills(for: brief, title: nil, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
             #expect(text.contains("Jobs:\n1. programador; ended"))
             #expect(text.contains("\n2. analista de testes"))
         }
@@ -325,24 +325,28 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.softSkillsInstructions.contains("No tool, no technique, no level."))
     }
 
-    @Test("The request for more skills asks for the counts given, of the trade of the tools kept or of the jobs, in the CV's language, none of the skills kept, and none of those rejected, with the reason")
+    @Test("The request for more skills asks for the counts given, named tools of the headline title, each new, in the CV's language, none of the skills kept, and none of those rejected, with the reason")
     func moreSkillsPrompt() {
         let both = SectionPrompts.moreSkills(
-            for: Self.brief, tools: 2, qualities: 1, listedTools: ["PLC"], listedQualities: ["precisione"],
-            rejected: ["\"manutenzione preventiva\": an activity, not a tool"]
+            for: Self.brief, title: "manutentore elettromeccanico", tools: 2, qualities: 1, listedTools: ["PLC"],
+            listedQualities: ["precisione"], rejected: ["\"manutenzione preventiva\": an activity, not a tool"]
         ).text
-        let toolsOnly = SectionPrompts.moreSkills(for: Self.brief, tools: 1, qualities: 0, listedTools: [], listedQualities: [], rejected: []).text
+        let toolsOnly = SectionPrompts.moreSkills(
+            for: Self.brief, title: nil, tools: 1, qualities: 0, listedTools: [], listedQualities: [], rejected: []
+        ).text
 
-        // With every tool of the jobs dropped, "of the trade of those listed" named no trade, and the request wrote a programmer a
-        // codec and a sensor (#354, round 4).
+        // Asked for "software, systems, machines" of the trade of the jobs, the request wrote general kinds of the work
+        // ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
         #expect(both.contains(
-            "The CV lists too few tools for its trade: name 2 more software, systems, machines or instruments of the trade of the "
-                + "tools listed, that a person with these jobs uses, each of another kind than those listed."
+            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more named software products, "
+                + "named devices or instruments that a person working as manutentore elettromeccanico uses, each new, none of the "
+                + "tools listed or rejected, and each of another kind than those listed."
         ))
         #expect(toolsOnly.contains(
-            "The CV lists too few tools for its trade: name 1 more software, systems, machines or instruments of the trade of the "
-                + "jobs above, that a person with these jobs uses, each of another kind."
+            "The CV lists too few tools for a person with these jobs: name 1 more named software products, named devices or "
+                + "instruments that a person with these jobs uses, each of another kind."
         ))
+        #expect(!both.contains("systems, machines"))
         #expect(!both.contains("material"))
         #expect(!both.contains("pieces of equipment"))
         #expect(!SectionPrompts.toolsInstructions(count: 2...3).contains("materials or"))
@@ -367,7 +371,7 @@ struct SectionPromptsTests {
             """
 
         for text in [SectionPrompts.tools(for: brief, roles: [0], count: 2...3).text, SectionPrompts.softSkills(for: brief).text,
-                     SectionPrompts.moreSkills(for: brief, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
+                     SectionPrompts.moreSkills(for: brief, title: nil, tools: 1, qualities: 1, listedTools: [], listedQualities: [], rejected: []).text] {
             #expect(text.contains(said), "\(text)")
         }
         #expect(!SectionPrompts.tools(for: Self.brief, roles: [0], count: 2...3).text.contains("with no job"))

@@ -413,7 +413,7 @@ struct SectionDraftTests {
         service.toolsResult = [[], [], [], ["mixing desks", "frequency calibration"]]
         service.softSkillsResult = ["teamwork"]
         service.moreSkillsResult = DraftWriting(
-            summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "microphones"],
+            summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "document management system", "microphones"],
             softSkills: ["reliability", "patience"]
         )
 
@@ -429,6 +429,9 @@ struct SectionDraftTests {
         }
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
+        // The tools of the headline title, the latest job's here; a general kind of the work they wrote goes (#354, round 15).
+        #expect(service.moreSkillsRequests.map(\.title) == ["head of sound", "head of sound"])
+        #expect(!draft.skills.contains { $0.name == "document management system" })
     }
 
     @Test("A written tool of the kind of a tool the person names goes; the named one stays (#354, round 2)")

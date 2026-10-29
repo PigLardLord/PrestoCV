@@ -39,9 +39,11 @@ public protocol CVGenerationService {
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]?
 
     /// `tools` more technologies and `qualities` more soft skills for the jobs of `brief`, none of the tools and qualities kept
-    /// (`listedTools`, `listedQualities`) and none of `rejected` ("skill": reason), the skills the checks dropped.
+    /// (`listedTools`, `listedQualities`) and none of `rejected` ("skill": reason), the skills the checks dropped; the tools of a
+    /// person working as `title`, the headline title (#354, round 15).
     func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+        for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
+        rejected: [String]
     ) async throws -> DraftWriting?
 
     /// One sentence of the summary, on `topic` alone, after the sentences `written` so far: no duty, which it would copy (#354,
@@ -60,7 +62,8 @@ extension CVGenerationService {
     public func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? { nil }
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { nil }
     public func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+        for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
+        rejected: [String]
     ) async throws -> DraftWriting? { nil }
     public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? { nil }
     public func repairSummarySentence(

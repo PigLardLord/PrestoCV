@@ -215,7 +215,8 @@ final class SectionDraft {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
         let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
-        let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: Self.headlineRole(of: brief, order: order))
+        let headline = Self.headlineRole(of: brief, order: order)
+        let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: headline)
         let count = Self.toolCount(groups: groups.count, sparse: sparse)
         var answers: [[String]] = []
         for roles in groups {
@@ -249,18 +250,21 @@ final class SectionDraft {
         let rejected = Self.rejectedSkills(skills.dropped)
         // The tools are asked apart from the qualities: asked together, the tools came back as an activity and a bare record,
         // asked alone as a system of the trade (#354, round 8).
+        // The tools asked are those of the headline title: asked those of the jobs, the request wrote a past trade's (#354, round 15).
+        let title = headline.flatMap { brief.roles[$0].title.presentValue } ?? brief.headline
         var moreTools: [String] = []
         var moreQualities: [String] = []
         for (tools, qualities) in [(toolsAsked, 0), (0, qualitiesAsked)] where tools + qualities > 0 {
             let more = try await request(.skills) {
                 try await self.service.writeMoreSkills(
-                    for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities,
-                    rejected: rejected
+                    for: brief, title: title, tools: tools, qualities: qualities, listedTools: listedTools,
+                    listedQualities: listedQualities, rejected: rejected
                 )
             }
             if tools > 0 { moreTools += more?.technologies ?? [] }
             if qualities > 0 { moreQualities += more?.softSkills ?? [] }
         }
+        moreTools = sanitizer.repairedTools(moreTools, against: description)
         guard !moreTools.isEmpty || !moreQualities.isEmpty else { return }
         skills = sanitizer.skillCheck(
             technologies: skills.technologies + moreTools, softSkills: skills.softSkills + moreQualities, stated: stated,
@@ -339,7 +343,7 @@ final class SectionDraft {
         "activity": "an activity, not a tool", "a word for a skill": "names no skill", "verb": "a verb, not a noun",
         "fragment": "not a whole name", "another language": "in another language", "a tool": "a tool, not a quality",
         "a name": "a name, not a quality", "same kind as an earlier tool": "a tool of a kind already listed",
-        "a kind of tool, not its name": "a kind of tool, not the name of one",
+        "a kind of tool, not its name": "a general kind, not a named tool",
         "the same quality as an earlier one": "the same quality as one listed",
         "a part or a material, not a tool": "a part or a material the work is done on, not a tool",
         "a word of a name": "named after a company, a school or a person",

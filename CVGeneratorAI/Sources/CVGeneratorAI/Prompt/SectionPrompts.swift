@@ -166,16 +166,20 @@ enum SectionPrompts {
     /// jobs (#354, round 4), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`
     /// ("skill": reason).
     static func moreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+        for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
+        rejected: [String]
     ) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
         if !listedTools.isEmpty { lines.append("Tools listed, do not repeat: " + listedTools.joined(separator: "; ")) }
         if !listedQualities.isEmpty { lines.append("Qualities listed, do not repeat: " + listedQualities.joined(separator: "; ")) }
         if tools > 0 {
-            let trade = listedTools.isEmpty ? "jobs above" : "tools listed"
+            // Asked for "software, systems, machines" of the trade of the jobs, the request wrote general kinds of the work
+            // ("sistema di tracciamento dati", "máquina de escaneo de registros") and the tools of a past trade (#354, round 15).
+            let who = title.map { "a person working as \($0)" } ?? "a person with these jobs"
+            let new = listedTools.isEmpty && rejected.isEmpty ? "" : " each new, none of the tools listed or rejected, and"
             lines.append(
-                "The CV lists too few tools for its trade: name \(tools) more software, systems, machines or instruments of the trade of "
-                    + "the \(trade), that a person with these jobs uses, each of another kind"
+                "The CV lists too few tools for \(who): name \(tools) more named software products, named devices or instruments "
+                    + "that \(who) uses,\(new) each of another kind"
                     + (listedTools.isEmpty ? "." : " than those listed.")
             )
         }

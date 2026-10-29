@@ -22,6 +22,9 @@ extension FoundationModelsService {
     /// The cap of a request for `count` more skills.
     nonisolated static func moreSkillsTokens(count: Int) -> Int { 40 + 12 * count }
 
+    /// The tokens of the trade a request for more tools writes before them: a few words, never shown.
+    nonisolated static let tradeTokens = 60
+
     // MARK: The jobs
 
     public func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
@@ -102,7 +105,8 @@ extension FoundationModelsService {
     }
 
     public func writeMoreSkills(
-        for brief: DraftBrief, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String], rejected: [String]
+        for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
+        rejected: [String]
     ) async throws -> DraftWriting? {
         let list = { (name: String, about: String, count: Int) in
             DynamicGenerationSchema.Property(
@@ -114,16 +118,26 @@ extension FoundationModelsService {
         }
         var properties: [DynamicGenerationSchema.Property] = []
         if tools > 0 {
-            let about = "\(tools) more software, systems, machines or instruments of the trade, each of another kind; no activity, no material or part"
+            // The trade first, as properties are generated in order: asked for the tools of the jobs, the request wrote a general
+            // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
+            let who = title.map { "a person working as \($0)" } ?? "the person"
+            properties.append(DynamicGenerationSchema.Property(
+                name: "trade", description: "The trade of \(who) and the kinds of named software, devices and instruments it uses, in a few words",
+                schema: DynamicGenerationSchema(type: String.self)
+            ))
+            let about = "\(tools) more named software products, named devices or instruments, each new and of another kind; "
+                + "no general kind, no activity, no material or part"
             properties.append(list("tools", about, tools))
         }
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work, in the language of the CV", qualities)) }
         guard !properties.isEmpty else { return nil }
         let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "MoreSkills", properties: properties), dependencies: [])
         let prompt = SectionPrompts.moreSkills(
-            for: brief, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities, rejected: rejected
+            for: brief, title: title, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities,
+            rejected: rejected
         )
-        let answer = try await respond(prompt, schema: schema, tokens: Self.moreSkillsTokens(count: tools + qualities))
+        let tokens = Self.moreSkillsTokens(count: tools + qualities) + (tools > 0 ? Self.tradeTokens : 0)
+        let answer = try await respond(prompt, schema: schema, tokens: tokens)
         return DraftWriting(
             summary: nil, roleDescriptions: [],
             technologies: tools > 0 ? Self.clean(try? answer.value([String].self, forProperty: "tools")) : [],
