@@ -177,13 +177,15 @@ struct DraftingReaderTests {
         #expect(counted(["gel pens", "digital pens"], "en") == ["gel pens"])
     }
 
-    @Test("A German subordinate clause that ends with a noun after its verb is counted; one that ends with its verb is not (#354, round 5)")
+    @Test("A German subordinate clause that ends with a noun or an adverb after its verb is counted; one that ends with its verb is not (#354, rounds 5 and 12)")
     func germanVerbPosition() {
         let cv = CVData(summary: "Ich arbeite als Schleusenwärter. Ich prüfe, dass alle Tore schließen sauber nach jeder Fahrt. "
-            + "Ich achte darauf, dass die Tore sauber schließen. Ich weiß, ob die Pumpe läuft.")
+            + "Ich achte darauf, dass die Tore sauber schließen. Ich weiß, ob die Pumpe läuft. "
+            + "Ich sorge dafür, dass die Schleusen öffnen zuverlässig. Ich sehe, dass die Pumpen ruhig laufen. "
+            + "Ich weiß, dass die Kunden zufrieden sind.")
 
         #expect(Self.reader(cv, "de").filter { $0.kind == .germanVerbPosition }.map(\.value) == [
-            "dass alle Tore schließen sauber nach jeder Fahrt",
+            "dass alle Tore schließen sauber nach jeder Fahrt", "dass die Schleusen öffnen zuverlässig",
         ])
     }
 
@@ -514,6 +516,46 @@ struct DraftingReaderTests {
         ])
 
         #expect(Self.reader(cv, "es").filter { $0.kind == .bareWorkDescription }.map(\.path) == ["experience[1].description"])
+    }
+
+    @Test("A job sentence that opens with a relative word is counted; a relative word before a comma and a sentence that opens with the person are not (#354, round 12)")
+    func relativeDuty() {
+        let cv = CVData(experience: [
+            Experience(title: "bibliothécaire", company: "médiathèque Saule", description: "Je range les fonds anciens. Où j'ai classé 40 cartons."),
+            Experience(title: "keeper", company: "Ash Park", description: "Where needed, I repair the fences. I feed the goats."),
+            Experience(title: "custode", company: "Parco Olmo", description: "Curo il parco. Dove ho piantato i tigli."),
+        ])
+
+        #expect(Self.reader(cv, "fr").filter { $0.kind == .relativeDuty }.map(\.value) == ["Où j'ai classé 40 cartons.", "Dove ho piantato i tigli."])
+    }
+
+    @Test("A verb with the noun of its own action is counted; a verb with a noun of the people it serves, and two words of other stems, are not (#354, round 12)")
+    func ownNounAfterTheVerb() {
+        let cv = CVData(
+            summary: "Lavoro come archivista. Gestisco la gestione dei registri. Insegno agli insegnanti nuovi a catalogare.",
+            experience: [
+                Experience(title: "archivist", company: "Elm Records", description: "I manage the management of the ledgers. I file the deeds."),
+                Experience(title: "Archivarin", company: "Stadtarchiv Linde", description: "Ich verwalte die Akten. Ich ordne die Bestände."),
+            ]
+        )
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .ownNounDuty }.map(\.value)
+            == ["I manage the management of the ledgers.", "Gestisco la gestione dei registri."])
+    }
+
+    @Test("An ended job with a compound past and an imperfect is counted; one past form, and a current job, are not (#354, round 12)")
+    func twoPastForms() {
+        let cv = CVData(experience: [
+            Experience(title: "magazziniere", company: "Deposito Faggio", endDate: "2019", description: "Ho caricato i furgoni. Controllavo le bolle."),
+            Experience(title: "magazziniere", company: "Deposito Tiglio", endDate: "2015", description: "Ho caricato i furgoni. Ho controllato le bolle."),
+            Experience(title: "magazziniere", company: "Deposito Pino", current: true, description: "Ho caricato i furgoni. Controllo le bolle."),
+        ])
+        let french = CVData(experience: [
+            Experience(title: "magasinier", company: "dépôt Hêtre", endDate: "2012", description: "J'ai chargé les camions. Je vérifiais les bons."),
+        ])
+
+        #expect(Self.reader(cv, "it").filter { $0.kind == .twoPastForms }.map(\.path) == ["experience[0].description"])
+        #expect(Self.reader(french, "fr").filter { $0.kind == .twoPastForms }.map(\.path) == ["experience[0].description"])
     }
 
     @Test("A soft skill of a gerund and its words is counted; a quality and a pair of skills are not (#354, round 10)")

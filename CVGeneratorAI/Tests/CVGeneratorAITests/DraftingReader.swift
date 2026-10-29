@@ -168,6 +168,14 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     case vagueDuty
     /// A job's description that only says the person worked, with no word of the job ("Trabajé."; #354, round 11).
     case bareWorkDescription
+    /// A job's sentence that opens with a relative word, a clause cut from the sentence before it ("Où j'ai formé 3 nouveaux
+    /// enseignants."; #354, round 12).
+    case relativeDuty
+    /// A verb with the noun of its own action ("Gestisco la gestione delle fatture"; #354, round 12).
+    case ownNounDuty
+    /// An ended job whose duties use a compound past and an imperfect ("Ho gestito le comunicazioni. Verificavo i documenti.";
+    /// #354, round 12).
+    case twoPastForms
 
     /// The words of the class in the line of summary.txt.
     var label: String {
@@ -230,6 +238,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .employerWordInDuty: "a duty with a word of an employer's name"
         case .vagueDuty: "a duty of a vague phrase"
         case .bareWorkDescription: "a description that only says the person worked"
+        case .relativeDuty: "a job sentence that opens with a relative word"
+        case .ownNounDuty: "a verb with the noun of its own action"
+        case .twoPastForms: "an ended job in a compound past and an imperfect"
         }
     }
 }
@@ -335,6 +346,18 @@ enum ReaderRules {
                 .map { ReaderFinding(kind: .vagueDuty, path: "experience[\(index)].description", value: $0) }
         }
         for (index, job) in cv.experience.enumerated() {
+            let path = "experience[\(index)].description"
+            let sentences = WrittenMeasure.sentences(of: job.description ?? "")
+            found += sentences.filter(opensWithARelativeWord).map { ReaderFinding(kind: .relativeDuty, path: path, value: $0) }
+            found += sentences.filter(namesItsOwnAction).map { ReaderFinding(kind: .ownNounDuty, path: path, value: $0) }
+            let pasts = Set(sentences.compactMap { pastForm(of: withoutConnector($0), language: language) })
+            if !job.current, pasts.count > 1 {
+                found.append(ReaderFinding(kind: .twoPastForms, path: path, value: job.description ?? ""))
+            }
+        }
+        found += WrittenMeasure.sentences(of: cv.summary ?? "").filter(namesItsOwnAction)
+            .map { ReaderFinding(kind: .ownNounDuty, path: "summary", value: $0) }
+        for (index, job) in cv.experience.enumerated() {
             let sentences = WrittenMeasure.sentences(of: job.description ?? "")
             if !sentences.isEmpty, sentences.allSatisfy({ RoleStub.isStub($0, jobWords: [], language: vocabulary) }) {
                 found.append(ReaderFinding(kind: .bareWorkDescription, path: "experience[\(index)].description", value: job.description ?? ""))
@@ -390,6 +413,62 @@ enum ReaderRules {
             found.append(ReaderFinding(kind: .sameOpening, path: path, value: opening))
         }
         return found
+    }
+
+    /// The relative words a clause cut from its sentence opens with, folded ("où" is "ou").
+    static let relativeWords: Set<String> = ["where", "ou", "dove", "donde", "onde", "wo"]
+
+    /// Whether `sentence` opens with a relative word, unless it stands in a short phrase before a comma ("Where needed, I…").
+    static func opensWithARelativeWord(_ sentence: String) -> Bool {
+        guard let first = letterWords(of: sentence).first, relativeWords.contains(first) else { return false }
+        let head = sentence.prefix { $0 != "," }
+        return head.count == sentence.count || letterWords(of: String(head)).count > 3
+    }
+
+    /// The endings of the nouns of an action, folded.
+    static let actionNounEndings = ["ione", "ion", "mento", "ment", "ung", "ao", "age"]
+
+    /// Whether the verb of `sentence` (its first word after a pronoun) has, among the next four words, the noun of its own action:
+    /// a noun with an ending of an action that shares its first five letters ("Organizzo l'organizzazione", "I manage the
+    /// management"). A noun of the people it serves ("Insegno agli insegnanti") has no such ending.
+    static func namesItsOwnAction(_ sentence: String) -> Bool {
+        let words = letterWords(of: sentence)
+        guard let start = words.firstIndex(where: { !pronouns.contains($0) }) else { return false }
+        let verb = words[start]
+        guard verb.count >= 5 else { return false }
+        return words.dropFirst(start + 1).prefix(4).contains { noun in
+            noun.count > 6 && actionNounEndings.contains(where: noun.hasSuffix) && noun.hasPrefix(verb.prefix(5))
+        }
+    }
+
+    enum PastForm: Hashable { case perfective, imperfect }
+
+    /// The past form of a duty said in the first person: the compound past or the simple one ("Ho gestito", "J'ai formé", "He
+    /// llevado", "Gestioné", "Gerenciei"), or the imperfect ("Verificavo", "Je vérifiais", "Llevaba", "Gerenciava"); nil in English and
+    /// German, and when the ending does not tell it.
+    static func pastForm(of sentence: String, language: String) -> PastForm? {
+        let words = letterWords(of: sentence)
+        guard let first = words.first else { return nil }
+        switch language {
+        case "it":
+            if first == "ho" { return .perfective }
+            return ["avo", "evo", "ivo"].contains(where: first.hasSuffix) && first.count > 4 ? .imperfect : nil
+        case "fr":
+            guard first == "je" || first == "j",
+                  let verb = words.dropFirst().first(where: { !frenchPronounsBeforeTheVerb.contains($0) }) else { return nil }
+            if verb == "ai" { return .perfective }
+            return verb.hasSuffix("ais") && verb.count > 4 ? .imperfect : nil
+        case "es":
+            if first == "he" { return .perfective }
+            if first.count > 4, ["aba", "ia"].contains(where: first.hasSuffix) { return .imperfect }
+            // The preterite of the first person ends in an accented vowel, folded: "Coordiné", "Dirigí".
+            return first.count > 4 && ["e", "i"].contains(where: first.hasSuffix) ? .perfective : nil
+        case "pt":
+            if first.count > 4, first.hasSuffix("ava") { return .imperfect }
+            return first.count > 4 && first.hasSuffix("ei") ? .perfective : nil
+        default:
+            return nil
+        }
     }
 
     /// The auxiliaries a past or a perfect tense opens with ("Ich habe die Leitungen geprüft", "J'ai formé"): an opening of the
@@ -734,11 +813,22 @@ enum ReaderRules {
             let words = clause.split { !$0.isLetter }.map(String.init)
             guard let start = words.firstIndex(where: { ["dass", "weil", "sodass", "ob"].contains($0.lowercased()) }) else { return nil }
             let rest = words[(start + 1)...]
-            guard rest.count >= 3, let last = rest.last, last.first?.isUppercase == true,
-                  rest.dropLast().contains(where: { $0.count >= 4 && $0.first?.isLowercase == true && ($0.hasSuffix("en") || $0.hasSuffix("t")) })
-            else { return nil }
-            return clause.trimmingCharacters(in: .whitespaces)
+            guard rest.count >= 3, let last = rest.last else { return nil }
+            let isVerb = { (word: String) in word.count >= 4 && word.first?.isLowercase == true && (word.hasSuffix("en") || word.hasSuffix("t")) }
+            // After its verb, a noun ends the clause, or an adverb right after the verb ("dass die Anlagen funktionieren
+            // zuverlässig"; #354, round 12).
+            let afterTheVerb = last.first?.isUppercase == true ? rest.dropLast().contains(where: isVerb)
+                : isGermanAdverb(last) && isVerb(rest[rest.endIndex - 2])
+            return afterTheVerb ? clause.trimmingCharacters(in: .whitespaces) : nil
         }
+    }
+
+    /// Whether a German word in lower case is an adverb of manner: by its ending, or one of the short ones.
+    static func isGermanAdverb(_ word: String) -> Bool {
+        guard word.first?.isLowercase == true else { return false }
+        return ["ig", "lich", "los", "bar", "sam", "isch", "frei", "haft"].contains { word.count > $0.count + 2 && word.hasSuffix($0) }
+            || ["gut", "schnell", "sicher", "genau", "ruhig", "stabil", "korrekt", "exakt", "immer", "sofort", "richtig", "sauber", "gern", "gerne"]
+                .contains(word)
     }
 
     /// Whether a technology names a person, an activity or a document: its head noun (the last word in English and German, the
