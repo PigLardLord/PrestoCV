@@ -99,7 +99,7 @@ struct SectionDraftTests {
         // The two jobs of sound technician ask for their tools once (#354, round 6). The latest job's title asks first, 6 to 8, and
         // each other title at most 1 (O1, #354, round 13).
         #expect(service.toolsRequests == [[3], [0], [1, 2]])
-        #expect(service.toolsCounts == [6...8, 0...1, 0...1])
+        #expect(service.toolsCounts == [6...8, 1...1, 1...1])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
@@ -140,7 +140,7 @@ struct SectionDraftTests {
     }
 
     @Test("o1: the headline's title asks 6 to 8 tools; each other title, often of another trade, at most 1 (#354, round 13)",
-          arguments: [(true, 6...8), (false, 0...1)] as [(Bool, ClosedRange<Int>)])
+          arguments: [(true, 6...8), (false, 1...1)] as [(Bool, ClosedRange<Int>)])
     func toolCount(isHeadline: Bool, count: ClosedRange<Int>) {
         // Each title asked 2 or 3, and the past titles of another trade filled the CV with tools of no trade of the person's.
         #expect(SectionDraft.toolCount(isHeadline: isHeadline) == count)
@@ -384,11 +384,11 @@ struct SectionDraftTests {
         #expect(duties.contains("I looked after the microphones and cables."))
     }
 
-    @Test("o1: too few tools kept ask the headline's title for 2 tools of one kind at a time, software, then devices, then instruments, until the CV has enough, none of those kept, with those dropped and why (#354, round 13)")
+    @Test("o1: too few tools kept ask the headline's title for 2 tools of one kind at a time, software, then devices, then instruments, until the CV has enough; a tool the CV holds goes again (#354, round 13)")
     func toolsOfAKind() async throws {
         let service = service()
         service.toolsResult = [[], [], [], ["mixing desks", "frequency calibration"]]
-        service.toolsOfAKindResults = [.software: ["QLab"], .device: ["PA systems", "stage monitors"], .instrument: ["SPL meter"]]
+        service.toolsOfAKindResults = [.software: ["QLab", "mixing desks"], .device: ["PA systems", "stage monitors"], .instrument: ["SPL meter"]]
 
         let draft = try await draft(service)
 
@@ -396,9 +396,6 @@ struct SectionDraftTests {
         #expect(service.toolsOfAKindRequests.map(\.kind) == [.software, .device])
         let first = try #require(service.toolsOfAKindRequests.first)
         #expect(first.roles == [3])
-        #expect(first.listed == ["mixing desks"])
-        #expect(first.rejected == ["\"frequency calibration\": an activity, not a tool"])
-        #expect(service.toolsOfAKindRequests.last?.listed == ["mixing desks", "QLab"])
         let tools = draft.skills.filter { $0.kind == .technology }.map(\.name)
         #expect(["mixing desks", "QLab", "PA systems", "stage monitors"].allSatisfy(tools.contains))
         #expect(!tools.contains("SPL meter"))

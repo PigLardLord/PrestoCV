@@ -148,19 +148,19 @@ enum SectionPrompts {
         """
     }
 
-    /// How many tools a request asks: "6 to 8", or "at most 1" when it may ask none.
+    /// How many tools a request asks: "6 to 8", "1", or "at most 2" when it may ask none.
     static func toolAmount(_ count: ClosedRange<Int>) -> String {
-        count.lowerBound == 0 ? "at most \(count.upperBound)" : "\(count.lowerBound) to \(count.upperBound)"
+        if count.lowerBound == count.upperBound { return "\(count.upperBound)" }
+        return count.lowerBound == 0 ? "at most \(count.upperBound)" : "\(count.lowerBound) to \(count.upperBound)"
     }
 
-    /// The request for up to 2 tools of one kind of the headline's title (`roles`, #354, round 13, O1, T2): the kind, the tools
-    /// kept and those dropped with why. Asked for "N more" tools of any kind, the request named systems and tools of other trades.
-    static func toolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]) -> Prompt {
+    /// The request for up to 2 tools of one kind of the headline's title (`roles`, #354, round 13, O1, T2): the title and the kind
+    /// only. Asked for "N more" tools of any kind, the request named systems and tools of other trades; shown the tools kept, it
+    /// named them again for every kind. The checks drop a tool the CV holds.
+    static func toolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) -> Prompt {
         let title = roles.filter(brief.roles.indices.contains).first.flatMap { brief.roles[$0].title.presentValue }
             ?? brief.headline ?? DraftWritingPrompt.noTitle
-        var lines = header(brief) + ["Job title: \(title)", "Kind: \(kind.words)"]
-        if !listed.isEmpty { lines.append("Tools listed, do not repeat: " + listed.joined(separator: "; ")) }
-        if !rejected.isEmpty { lines.append("Rejected, with the reason; write none of them again:\n" + bullets(rejected)) }
+        let lines = header(brief) + ["Job title: \(title)", "Kind: \(kind.words)"]
         return Prompt(instructions: toolsOfAKindInstructions, text: lines.joined(separator: "\n"))
     }
 
@@ -168,7 +168,7 @@ enum SectionPrompts {
         You add tools to a CV, for the job's title. Write in the language named on the first line.
         - Name up to 2 tools of the kind given that a person with this title works with, as a CV of that trade names them; a \
         product name is fine. None when the trade works with none of that kind.
-        - 1 to 3 words each, none of those listed.
+        - 1 to 3 words each.
         """
 
     /// The soft skills request.

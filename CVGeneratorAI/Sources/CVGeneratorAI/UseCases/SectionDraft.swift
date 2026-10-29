@@ -207,12 +207,12 @@ final class SectionDraft {
     // MARK: - Skills
 
     /// The tools of each job title, a request each, the headline's first, and the soft skills, cleaned by code against the tools
-    /// the person names (#354, round 13, O1). The headline's title asks 6 to 8 tools and each other title at most 1: each title
+    /// the person names (#354, round 13, O1). The headline's title asks 6 to 8 tools and each other title 1: each title
     /// asked 2 or 3, and the past titles of another trade filled the CV with tools of no trade of the person's. When the final
     /// check would keep fewer than 4 technologies (3 for a single short job), the headline's title is asked for up to 2 tools of
     /// one kind at a time, software, then devices, then instruments, until the CV has enough; and with fewer than 3 soft skills
-    /// (2), one request asks the qualities missing and one more. Each reads the skills kept and those the checks dropped, with the
-    /// reason.
+    /// (2), one request asks the qualities missing and one more, reading the qualities kept and those the checks dropped, with the
+    /// reason. A tools request reads no tool kept: shown them, it named them again.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = sparse ? 3 : 4
@@ -238,12 +238,8 @@ final class SectionDraft {
         for kind in ToolKind.allCases {
             let kept = try kept(around: dated).skills
             guard kept.count(where: { $0.kind == .technology }) < fewestTools else { break }
-            let listed = kept.filter { $0.kind != .softSkill }.map(\.name)
-            let rejected = Self.rejectedSkills(skills.dropped)
             let more = try await request(.skills) {
-                try await self.service.writeToolsOfAKind(
-                    for: brief, roles: headlineRoles, kind: kind, listed: listed, rejected: rejected
-                )
+                try await self.service.writeToolsOfAKind(for: brief, roles: headlineRoles, kind: kind)
             } ?? []
             guard !more.isEmpty else { continue }
             skills = sanitizer.skillCheck(
@@ -269,10 +265,11 @@ final class SectionDraft {
         keep(skills)
     }
 
-    /// How many tools a title's request asks: 6 to 8 for the headline's, at most 1 for another, often of another trade (#354,
-    /// round 13, O1, T1).
-    static func toolCount(isHeadline: Bool) -> ClosedRange<Int> {
-        isHeadline ? 6...8 : 0...1
+    /// How many tools a title's request asks: 6 to 8 for the headline's, 1 for another, often of another trade, which the checks
+    /// may drop (#354, round 13, O1, T1). Not "0 to 1": the model fails an array of 0 to 1 before a word (ModelManagerError 1032),
+    /// and every draft with a second title lost its writing.
+    nonisolated static func toolCount(isHeadline: Bool) -> ClosedRange<Int> {
+        isHeadline ? 6...8 : 1...1
     }
 
     /// The group of `groups` of the headline's title: the one whose job holds the headline, or has no title and so reads it; else

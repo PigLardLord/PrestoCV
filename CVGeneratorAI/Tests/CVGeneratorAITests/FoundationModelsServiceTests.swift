@@ -105,8 +105,8 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.writingTokens == 400)
     }
 
-    @Test("A tools request asks the tools its count says: 6 to 8 of the headline's title, at most 1 of another (#354, rounds 5, 6 and 13)",
-          arguments: [(0...1, 80), (6...8, 180)] as [(ClosedRange<Int>, Int)])
+    @Test("A tools request asks the tools its count says: 6 to 8 of the headline's title, 1 of another (#354, rounds 5, 6 and 13)",
+          arguments: [(1...1, 80), (6...8, 180)] as [(ClosedRange<Int>, Int)])
     func toolsOfACount(count: ClosedRange<Int>, tokens: Int) throws {
         let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -116,6 +116,18 @@ struct FoundationModelsServiceTests {
         #expect(tools["maxItems"] as? Int == count.upperBound)
         #expect((tools["description"] as? String)?.hasPrefix(SectionPrompts.toolAmount(count) + " ") == true)
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
+    }
+
+    @Test("No tools request the drafting asks is an array of 0 to 1, which the model fails before a word: other titles ask 1 (#354, round 13)",
+          arguments: [true, false])
+    func toolsOfACountTheModelAnswers(isHeadline: Bool) throws {
+        let count = SectionDraft.toolCount(isHeadline: isHeadline)
+        let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let tools = try #require((root["properties"] as? [String: Any])?["tools"] as? [String: Any])
+
+        // Every input with a second title threw on its tools request (ModelManagerError 1032) and lost the written draft.
+        #expect(!(tools["minItems"] as? Int == 0 && tools["maxItems"] as? Int == 1))
     }
 
     @Test("o1: a request for tools of one kind asks 0 to 2, so a trade with none of that kind answers none (#354, round 13)")

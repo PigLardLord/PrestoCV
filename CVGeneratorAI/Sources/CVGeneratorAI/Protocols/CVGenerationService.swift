@@ -39,8 +39,8 @@ public protocol CVGenerationService {
     func writeSoftSkills(for brief: DraftBrief) async throws -> [String]?
 
     /// Up to 2 tools of `kind` of the title of the jobs of `brief` at `roles`, the headline's: none when the trade works with none
-    /// of that kind; none of the tools kept (`listed`) and none of `rejected` ("tool": reason), those the check dropped.
-    func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]) async throws -> [String]?
+    /// of that kind. It reads no tool the CV holds, which it would name again; the checks drop those.
+    func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]?
 
     /// `count` more soft skills for the jobs of `brief`, none of those kept (`listed`) and none of `rejected` ("quality": reason).
     func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]?
@@ -60,9 +60,7 @@ extension CVGenerationService {
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? { nil }
     public func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? { nil }
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? { nil }
-    public func writeToolsOfAKind(
-        for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]
-    ) async throws -> [String]? { nil }
+    public func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? { nil }
     public func writeMoreQualities(for brief: DraftBrief, count: Int, listed: [String], rejected: [String]) async throws -> [String]? { nil }
     public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? { nil }
     public func repairSummarySentence(

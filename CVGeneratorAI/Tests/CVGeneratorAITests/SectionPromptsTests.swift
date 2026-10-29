@@ -272,12 +272,12 @@ struct SectionPromptsTests {
         #expect(text.hasSuffix("What the work is done on, which is no tool: helping the lighting crew with the follow spots"))
     }
 
-    @Test("o1: the tools request defines a tool in a short positive way, a product name too, asks the headline's title 6 to 8 and another title at most 1, and lists no kind of non-tool, which the check drops (#354, round 13)")
+    @Test("o1: the tools request defines a tool in a short positive way, a product name too, asks the headline's title 6 to 8 and another title 1, and lists no kind of non-tool, which the check drops (#354, round 13)")
     func toolsOfEachJob() {
         let rules = SectionPrompts.toolsInstructions(count: 6...8)
 
         #expect(rules.contains("You name the tools of one job for a CV: 6 to 8 tools that a person with the job's title works with"))
-        #expect(SectionPrompts.toolsInstructions(count: 0...1).contains("You name the tools of one job for a CV: at most 1 tool that"))
+        #expect(SectionPrompts.toolsInstructions(count: 1...1).contains("You name the tools of one job for a CV: 1 tool that"))
         #expect(rules.contains(
             "A tool is software or an app, a device or a machine, or an instrument or a hand tool of the job's trade; a product name is fine."
         ))
@@ -322,11 +322,9 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.softSkillsInstructions.contains("No tool, no technique, no level."))
     }
 
-    @Test("o1: a request for tools of one kind reads the headline's title, the kind, the tools kept and those dropped with why, and allows none (#354, round 13)")
+    @Test("o1: a request for tools of one kind reads the headline's title and the kind only, and allows none: shown the tools kept, it named them again for every kind (#354, round 13)")
     func toolsOfAKindPrompt() {
-        let prompt = SectionPrompts.toolsOfAKind(
-            for: Self.brief, roles: [1], kind: .device, listed: ["PLC"], rejected: ["\"manutenzione preventiva\": an activity, not a tool"]
-        )
+        let prompt = SectionPrompts.toolsOfAKind(for: Self.brief, roles: [1], kind: .device)
 
         #expect(prompt.instructions == SectionPrompts.toolsOfAKindInstructions)
         #expect(prompt.text == """
@@ -334,14 +332,12 @@ struct SectionPromptsTests {
             Scrivi in italiano.
             Job title: capoturno della manutenzione
             Kind: devices or machines
-            Tools listed, do not repeat: PLC
-            Rejected, with the reason; write none of them again:
-            - "manutenzione preventiva": an activity, not a tool
             """)
         #expect(ToolKind.allCases.map(\.words) == ["software or apps", "devices or machines", "instruments or hand tools"])
         #expect(SectionPrompts.toolsOfAKindInstructions.contains("Name up to 2 tools of the kind given"))
         #expect(SectionPrompts.toolsOfAKindInstructions.contains("None when the trade works with none of that kind."))
         #expect(SectionPrompts.toolsOfAKindInstructions.contains("a product name is fine"))
+        #expect(!SectionPrompts.toolsOfAKindInstructions.contains("listed"))
     }
 
     @Test("The request for more qualities asks the count given in the CV's language, none of those kept and none of those rejected, with the reason, and no tool (#354, rounds 4 and 13)")

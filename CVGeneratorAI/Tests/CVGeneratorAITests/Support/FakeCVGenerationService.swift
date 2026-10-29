@@ -57,7 +57,7 @@ final class FakeCVGenerationService: CVGenerationService {
     private(set) var toolsRequests: [[Int]] = []
     private(set) var toolsCounts: [ClosedRange<Int>] = []
     private(set) var jobRepairs: [(number: Int, kept: [String], rejected: [String])] = []
-    private(set) var toolsOfAKindRequests: [(roles: [Int], kind: ToolKind, listed: [String], rejected: [String])] = []
+    private(set) var toolsOfAKindRequests: [(roles: [Int], kind: ToolKind)] = []
     private(set) var moreQualitiesRequests: [(count: Int, listed: [String], rejected: [String])] = []
     private(set) var summaryRequests: [(topic: SummaryTopic, written: [String])] = []
     private(set) var summaryRepairs: [(topic: SummaryTopic, written: [String], rejected: String)] = []
@@ -85,10 +85,8 @@ final class FakeCVGenerationService: CVGenerationService {
         return softSkillsResult
     }
 
-    func writeToolsOfAKind(
-        for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]
-    ) async throws -> [String]? {
-        toolsOfAKindRequests.append((roles, kind, listed, rejected))
+    func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
+        toolsOfAKindRequests.append((roles, kind))
         try await section("toolsOfAKind", brief)
         return toolsOfAKindResults[kind]
     }

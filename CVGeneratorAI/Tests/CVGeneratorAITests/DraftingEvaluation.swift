@@ -194,10 +194,8 @@ struct DraftingEvaluation {
             return qualities
         }
 
-        func writeToolsOfAKind(
-            for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]
-        ) async throws -> [String]? {
-            let tools = try await model.writeToolsOfAKind(for: brief, roles: roles, kind: kind, listed: listed, rejected: rejected)
+        func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
+            let tools = try await model.writeToolsOfAKind(for: brief, roles: roles, kind: kind)
             log("tools of a kind: " + kind.words, tools)
             return tools
         }

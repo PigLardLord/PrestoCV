@@ -82,7 +82,8 @@ extension FoundationModelsService {
         return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
 
-    /// `count` tools of one title: 6 to 8 of the headline's, at most 1 of another (#354, round 13, O1, T1).
+    /// `count` tools of one title: 6 to 8 of the headline's, 1 of another (#354, round 13, O1, T1); never an array of 0 to 1, which
+    /// the model fails before a word.
     nonisolated static func toolsSchema(count: ClosedRange<Int>) throws -> GenerationSchema {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
@@ -103,11 +104,9 @@ extension FoundationModelsService {
         return Self.whole(last.answer.content.qualities, isComplete: last.isComplete)
     }
 
-    public func writeToolsOfAKind(
-        for brief: DraftBrief, roles: [Int], kind: ToolKind, listed: [String], rejected: [String]
-    ) async throws -> [String]? {
+    public func writeToolsOfAKind(for brief: DraftBrief, roles: [Int], kind: ToolKind) async throws -> [String]? {
         guard roles.allSatisfy(brief.roles.indices.contains) else { return nil }
-        let prompt = SectionPrompts.toolsOfAKind(for: brief, roles: roles, kind: kind, listed: listed, rejected: rejected)
+        let prompt = SectionPrompts.toolsOfAKind(for: brief, roles: roles, kind: kind)
         let answer = try await respond(prompt, schema: try Self.toolsOfAKindSchema(), tokens: Self.toolsOfAKindTokens)
         return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
