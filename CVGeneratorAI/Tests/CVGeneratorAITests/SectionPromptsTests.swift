@@ -143,16 +143,17 @@ struct SectionPromptsTests {
             """)
     }
 
-    @Test("The tools request puts the equipment of a job's own lines first, allows none for a job, and asks for no activity (#354, round 1)")
+    @Test("The tools request puts the equipment of a job's own lines first, asks 2 or 3 for every job, and asks for no activity (#354, rounds 1 and 5)")
     func toolsOfEachJob() {
         let rules = SectionPrompts.toolsInstructions
 
         #expect(rules.contains("First the equipment, machines and software the job's own lines name, as written;"))
         #expect(rules.contains("only when they fit the job's title and the tools the person names"))
-        #expect(rules.contains("Name none for a job when none fits."))
+        // Allowed none, a job with no lines of its own got none, and the next request filled it with roles (#354, round 5).
+        #expect(!rules.contains("none fits"))
         #expect(rules.contains("no activity or task, also when written as a noun"))
         // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4).
-        #expect(rules.contains("name up to 3 tools of the trade that a person with that job's title uses: its software, systems, machines or instruments"))
+        #expect(rules.contains("name 2 or 3 tools of the trade that a person with that job's title uses: its software, systems, machines or instruments"))
         #expect(rules.contains("no stationery, furniture or protective wear"))
         #expect(!rules.contains("pieces of equipment"))
         #expect(!rules.contains("technique"))

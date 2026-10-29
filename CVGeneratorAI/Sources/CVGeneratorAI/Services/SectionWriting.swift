@@ -58,8 +58,9 @@ extension FoundationModelsService {
         return jobs.map { Self.clean(try? $0.value([String].self, forProperty: "tools")) }
     }
 
-    /// One entry of up to 3 tools for each of `count` jobs, in order, none for a job when none fits; the entry's type is a
-    /// dependency the array refers to.
+    /// One entry of 2 or 3 tools for each of `count` jobs, in order; the entry's type is a dependency the array refers to. A job
+    /// may not go without tools: allowed none, the model answered none for a job with no lines of its own, and the next request
+    /// filled the gap with activities and roles (#354, round 5).
     nonisolated static func toolsSchema(count: Int) throws -> GenerationSchema {
         let job = DynamicGenerationSchema(name: "JobTools", properties: [
             DynamicGenerationSchema.Property(
@@ -67,8 +68,8 @@ extension FoundationModelsService {
             ),
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "Up to 3 software, systems, machines or instruments of the job's trade, first those its lines name; none when none fits",
-                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 0, maximumElements: 3)
+                description: "2 or 3 software, systems, machines or instruments of the job's trade, first those its lines name",
+                schema: DynamicGenerationSchema(arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 2, maximumElements: 3)
             ),
         ])
         let root = DynamicGenerationSchema(name: "Tools", properties: [
