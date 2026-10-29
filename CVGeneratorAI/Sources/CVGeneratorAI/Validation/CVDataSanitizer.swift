@@ -295,7 +295,7 @@ public struct CVDataSanitizer: Sendable {
             let dutyWords = Set(Self.letterWords(of: roleDuties ?? ""))
             let jobWords = Self.words(of: [experience.title, experience.company])
             let quote = description(experience.description, evidence.quotable).flatMap { quote in
-                roleDuties == nil ? quote : SentenceSplitter.sentences(in: quote)
+                roleDuties == nil ? Self.withoutBareWork(quote, language: source.explainer.language) : SentenceSplitter.sentences(in: quote)
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
                     // A quoted sentence the duties restate goes, so the job's text keeps one voice.
                     .filter { !Self.letterWords(of: $0).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains) }
@@ -319,6 +319,13 @@ public struct CVDataSanitizer: Sendable {
                 achievements: experience.achievements
             )
         }
+    }
+
+    /// `quote` without its sentences that only say the person worked, with no word of the job ("Trabajé."): the job's only text then
+    /// says nothing, and a job with none reads better (#354, round 11). One that names the title or the employer stays (`RoleStub`).
+    private static func withoutBareWork(_ quote: String, language: Vocabulary.Language?) -> String? {
+        SentenceSplitter.sentences(in: quote).filter { !RoleStub.isStub($0, jobWords: [], language: language) }
+            .joined(separator: " ").presentValue
     }
 
     /// ADR 0031, D7: the position among `jobs` of the current job, which takes the duties the person said with no job: the only job

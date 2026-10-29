@@ -296,6 +296,19 @@ struct TwoPassDraftTests {
         #expect(unwritten.experience.first?.description == stub.quote)
     }
 
+    @Test("A role's quote that only says the person worked, with no word of the job, goes even as the only text (#354, round 11)")
+    func bareWorkQuoteGoes() throws {
+        let description = "De 2014 a 2018 trabajé en la gestoría Aranda y Molina."
+        let draft = CVData(experience: [Experience(
+            company: "gestoría Aranda y Molina", startDate: "2014", endDate: "2018", description: "Trabajé."
+        )])
+
+        let result = try sanitizer.sanitize(draft, writing: writing(duties: [nil]), against: description)
+
+        #expect(result.experience.map(\.company) == ["gestoría Aranda y Molina"])
+        #expect(result.experience.first?.description == nil)
+    }
+
     @Test("A role's quote that says what the person did stays in front of the written duties (#354)")
     func quoteOfADutyStays() throws {
         let description = "From 2018 to 2021 I worked as a cook in a bakery, where I baked the bread."
