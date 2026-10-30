@@ -174,6 +174,11 @@ struct SectionChecksTests {
         ("Ich habe die Teile der Pumpen geprüft.", false),
         ("Organizei o fluxo de pedidos da loja.", false),
         ("Riparavo le pompe.", false),
+        // A general verb and a place say nothing of the work (#354, round 16, jobs-en).
+        ("I manage the audio flow across all areas.", true),
+        ("Gestisco il flusso di lavoro in tutte le aree.", true),
+        ("I was adjusting the audio flow for live performances.", false),
+        ("I manage the cable runs of the stage systems.", false),
     ])
     func abstractWords(duty: String, abstract: Bool) {
         #expect(CVDataSanitizer.isAbstract(duty) == abstract)

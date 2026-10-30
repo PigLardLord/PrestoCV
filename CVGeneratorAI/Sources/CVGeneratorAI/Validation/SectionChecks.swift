@@ -260,14 +260,40 @@ extension CVDataSanitizer {
     static let abstractReason = "it names no thing the work is done on, only abstract words: name what the person works on"
 
     /// Whether `duty` says its work only through abstract nouns ("processes", "flows", "systems", "parts"): it holds one, and,
-    /// of its other words of four letters or more, one at most is no stop word or empty modifier, and that one is its verb. A
-    /// duty that names what the work is done on ("the brake systems of the trucks") has more, and stays. The person's own duties
-    /// are pinned before this check, so it drops only a written one (#354, round 14).
+    /// of its other words of four letters or more, one at most is no stop word, empty modifier, general verb or place. A duty
+    /// that names what the work is done on ("the brake systems of the trucks") has more, and stays. A general verb (manage,
+    /// ensure, maintain) and a place (areas, site) say nothing of the work either: "I manage the audio flow across all areas."
+    /// is one word of the work, and goes (#354, round 16). The person's own duties are pinned before this check, so it drops
+    /// only a written one (#354, round 14).
     static func isAbstract(_ duty: String) -> Bool {
         let words = Word.words(in: duty).map(\.folded).filter { $0.count >= 4 && !abstractStops.contains($0) }
         guard words.contains(where: abstractNouns.contains) else { return false }
-        return words.count { !abstractNouns.contains($0) && !emptyModifiers.contains($0) } <= 1
+        return words.count {
+            !abstractNouns.contains($0) && !emptyModifiers.contains($0) && !generalVerbs.contains($0) && !placeWords.contains($0)
+        } <= 1
     }
+
+    /// The verbs of a duty that name no work of their own, folded, in the six languages: manage, ensure, maintain, handle,
+    /// oversee, coordinate (#354, round 16).
+    private static let generalVerbs: Set<String> = [
+        "manage", "manages", "managed", "ensure", "ensures", "ensured", "maintain", "maintains", "maintained", "handle", "handles",
+        "handled", "oversee", "oversees", "oversaw", "coordinate", "coordinates", "coordinated",
+        "gestisco", "gestivo", "gestito", "mantengo", "mantenevo", "mantenuto", "garantisco", "garantivo", "garantito", "curavo",
+        "curato", "coordino", "coordinavo", "coordinato", "assicuro", "assicuravo",
+        "gestiono", "gestionaba", "gestione", "mantenia", "mantuve", "garantizo", "garantizaba", "garantice", "aseguro",
+        "aseguraba", "asegure", "coordinaba", "coordine",
+        "gere", "gerais", "maintiens", "maintenais", "maintenu", "assure", "assurais", "coordonne", "coordonnais",
+        "verwalte", "verwaltete", "verwaltet", "gewahrleiste", "gewahrleistet", "betreue", "betreut", "koordiniere", "koordiniert",
+        "gerencio", "gerenciei", "gerenciava", "mantenho", "mantive", "mantinha", "garanto", "garanti", "coordeno", "coordenei",
+        "coordenava", "asseguro", "assegurei",
+    ]
+
+    /// The words of a duty for where the work is done, with no thing it is done on, folded, in the six languages (#354, round 16).
+    private static let placeWords: Set<String> = [
+        "area", "areas", "site", "sites", "zone", "zones", "location", "locations", "aree", "sito", "siti", "sede", "sedi",
+        "zona", "zonas", "lugar", "lugares", "locaux", "lieux", "bereich", "bereiche", "bereichen", "standort", "standorte",
+        "standorten", "locais",
+    ]
 
     /// The abstract nouns of a duty, folded, in the six languages.
     private static let abstractNouns: Set<String> = [
