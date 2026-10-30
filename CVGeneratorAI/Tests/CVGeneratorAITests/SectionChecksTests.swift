@@ -184,6 +184,30 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.isAbstract(duty) == abstract)
     }
 
+    @Test("A written duty loses a phrase of care at its end; one with care in its middle, or too short without it, is left as it is (#354, round 16, jobs-it)",
+          arguments: [
+              ("Pulivo le superfici interne con attenzione.", "Pulivo le superfici interne."),
+              ("I sanded the window frames carefully.", "I sanded the window frames."),
+              ("J'ai rangé les outils avec soin.", "J'ai rangé les outils."),
+              ("Limpiaba las mesas, con cuidado.", "Limpiaba las mesas."),
+              ("Montavo con cura i pannelli del soffitto.", "Montavo con cura i pannelli del soffitto."),
+              ("Lavoravo con attenzione.", "Lavoravo con attenzione."),
+          ])
+    func careTailGoes(duty: String, trimmed: String) {
+        #expect(CVDataSanitizer.withoutCareTail(duty) == trimmed)
+    }
+
+    @Test("The duty check keeps a written duty without its phrase of care (#354, round 16)")
+    func dutyCheckTrimsCare() throws {
+        let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let verdicts = try spanish.dutyCheck(
+            of: Self.esTrapsJobs, job: 1, duties: "Calculé los movimientos financieros diarios con cuidado.", against: description
+        )
+
+        #expect(verdicts.kept == ["Calculé los movimientos financieros diarios."])
+    }
+
     // MARK: How often (#354, round 11)
 
     /// The jobs of es-traps: a current one with a duty the person said, and an ended one the person only named.

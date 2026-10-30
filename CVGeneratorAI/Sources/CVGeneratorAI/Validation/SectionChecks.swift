@@ -165,6 +165,7 @@ extension CVDataSanitizer {
                 )
                 guard !sentence.isEmpty else { continue }
                 if !current { sentence = FirstPersonDuty.inThePast(of: held, sentence, language: language, wordList: wordList) }
+                sentence = Self.withoutCareTail(sentence)
                 // A count the person gave in digits that the model wrote in words is the person's: a sentence that goes for it is
                 // written as they wrote it, and stays (#354, round 6). Another count still goes.
                 let counted = WrittenTextWords.inDigits(sentence, language: language)
@@ -255,6 +256,30 @@ extension CVDataSanitizer {
         let folded = " " + Word.words(in: duty).map(\.folded).joined(separator: " ") + " "
         return vaguePhrases.contains { folded.contains(" \($0) ") }
     }
+
+    /// `duty` without a phrase of care at its end ("Pulivo le superfici interne con attenzione." is "Pulivo le superfici interne."):
+    /// it says nothing of the work, and every duty is done with care. A duty of 2 words or fewer before it is left as it is, for
+    /// the checks to read (#354, round 16).
+    static func withoutCareTail(_ duty: String) -> String {
+        var body = duty.trimmingCharacters(in: .whitespaces)
+        let end = body.last.map { ".!".contains($0) } == true ? String(body.removeLast()) : "."
+        var parts = body.split(separator: " ").map(String.init)
+        for tail in careTails {
+            let count = tail.split(separator: " ").count
+            let last = parts.suffix(count).map { DescriptionText.normalized($0).trimmingCharacters(in: .punctuationCharacters) }
+            guard parts.count > count + 2, last.joined(separator: " ") == tail else { continue }
+            parts.removeLast(count)
+            return parts.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: ",;")) + end
+        }
+        return duty
+    }
+
+    /// The phrases of care that close a duty, without accents, in the six languages.
+    private static let careTails = [
+        "with care", "carefully", "attentively", "con attenzione", "con cura", "attentamente", "accuratamente", "con cuidado",
+        "con atencion", "cuidadosamente", "avec soin", "avec attention", "soigneusement", "com cuidado", "com atencao",
+        "mit sorgfalt", "mit bedacht",
+    ]
 
     /// Why a written duty whose work is only abstract nouns goes ("I managed the processes.", #354, round 14).
     static let abstractReason = "it names no thing the work is done on, only abstract words: name what the person works on"
