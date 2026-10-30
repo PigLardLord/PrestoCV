@@ -178,6 +178,8 @@ extension CVDataSanitizer {
                     rejection = Self.vagueReason
                 } else if Self.isAbstract(sentence) {
                     rejection = Self.abstractReason
+                } else if Self.isNominal(sentence, language: language) {
+                    rejection = Self.nominalReason
                 } else if Self.saysWorking(sentence), !Self.namesWork(sentence, names: names) {
                     rejection = Self.onlyWhereReason
                 } else if let ruled = reason(sentence, quotes) {
@@ -299,18 +301,64 @@ extension CVDataSanitizer {
     }
 
     /// The verbs of a duty that name no work of their own, folded, in the six languages: manage, ensure, maintain, handle,
-    /// oversee, coordinate (#354, round 16).
+    /// oversee, coordinate, supervise, monitor (#354, round 16).
     private static let generalVerbs: Set<String> = [
         "manage", "manages", "managed", "ensure", "ensures", "ensured", "maintain", "maintains", "maintained", "handle", "handles",
-        "handled", "oversee", "oversees", "oversaw", "coordinate", "coordinates", "coordinated",
-        "gestisco", "gestivo", "gestito", "mantengo", "mantenevo", "mantenuto", "garantisco", "garantivo", "garantito", "curavo",
-        "curato", "coordino", "coordinavo", "coordinato", "assicuro", "assicuravo",
+        "handled", "oversee", "oversees", "oversaw", "coordinate", "coordinates", "coordinated", "supervise", "supervises",
+        "supervised", "monitor", "monitors", "monitored",
+        "gestisco", "gestivo", "gestito", "mantengo", "mantenevo", "mantenuto", "garantisco", "garantivo", "garantito", "curo",
+        "curavo", "curato", "coordino", "coordinavo", "coordinato", "assicuro", "assicuravo", "supervisiono", "supervisionavo",
         "gestiono", "gestionaba", "gestione", "mantenia", "mantuve", "garantizo", "garantizaba", "garantice", "aseguro",
-        "aseguraba", "asegure", "coordinaba", "coordine",
-        "gere", "gerais", "maintiens", "maintenais", "maintenu", "assure", "assurais", "coordonne", "coordonnais",
+        "aseguraba", "asegure", "coordinaba", "coordine", "superviso", "supervisaba",
+        "gere", "gerais", "maintiens", "maintenais", "maintenu", "assure", "assurais", "coordonne", "coordonnais", "supervisais",
         "verwalte", "verwaltete", "verwaltet", "gewahrleiste", "gewahrleistet", "betreue", "betreut", "koordiniere", "koordiniert",
+        "sichere", "gesichert", "uberwache", "uberwacht",
         "gerencio", "gerenciei", "gerenciava", "mantenho", "mantive", "mantinha", "garanto", "garanti", "coordeno", "coordenei",
-        "coordenava", "asseguro", "assegurei",
+        "coordenava", "asseguro", "assegurei", "supervisionei",
+    ]
+
+    /// Why a written duty that names its work only as a general verb and an activity goes (#354, round 16).
+    static let nominalReason = "it names its work only as a general verb and an activity (\"I managed the movement of …\"): say what the person did, to what"
+
+    /// Whether `duty` names its work only as a general verb (`generalVerbs`) whose object is the noun of an activity or a state
+    /// ("I managed the movement of heavy equipment", "Mantenevo l'integrità dei cavi", "Gerencio fluxos de dados"): the verb
+    /// says no work, and the noun names one without saying what the person did. In German, whose verb comes last, the two
+    /// stand anywhere in the duty; elsewhere the noun closes the duty or takes an "of", so "the flow meters" stays. The
+    /// person's own duties are pinned before this check (#354, round 16).
+    static func isNominal(_ duty: String, language: Vocabulary.Language?) -> Bool {
+        let words = Word.words(in: duty).map(\.folded)
+        if language == .german {
+            return words.contains(where: generalVerbs.contains) && words.contains(where: activityNouns.contains)
+        }
+        guard let verb = words.firstIndex(where: generalVerbs.contains),
+              let object = words[(verb + 1)...].firstIndex(where: { !objectArticles.contains($0) }) else { return false }
+        // The noun closes the duty or takes an "of": "the flow meters" names a thing.
+        return activityNouns.contains(words[object]) && (object + 1 == words.count || ofWords.contains(words[object + 1]))
+    }
+
+    /// The words of "of" after an activity noun, folded.
+    private static let ofWords: Set<String> = [
+        "of", "di", "del", "dello", "della", "dei", "degli", "delle", "dell", "de", "des", "du", "d", "da", "do", "dos", "das",
+    ]
+
+    /// The nouns of an activity or a state that a general verb takes as its object, folded, in the six languages.
+    private static let activityNouns: Set<String> = [
+        "movement", "movements", "flow", "flows", "integrity", "quality", "efficiency", "continuity", "functionality", "functioning",
+        "operation", "operations", "process", "processes", "activities", "handling", "workflow", "workflows",
+        "movimento", "movimenti", "flusso", "flussi", "integrita", "qualita", "efficienza", "continuita", "funzionalita",
+        "funzionamento", "operazioni", "processi", "attivita", "gestione",
+        "movimiento", "movimientos", "flujo", "flujos", "integridad", "calidad", "eficiencia", "continuidad", "funcionamiento",
+        "operaciones", "procesos", "actividades",
+        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement", "operations",
+        "processus", "activites",
+        "fluxo", "fluxos", "integridade", "qualidade", "continuidade", "operacoes", "processos", "atividades",
+        "bewegung", "ablauf", "ablaufe", "fluss", "integritat", "qualitat", "effizienz", "betrieb", "prozesse",
+    ]
+
+    /// The articles and determiners between a verb and its object, folded.
+    private static let objectArticles: Set<String> = [
+        "the", "a", "an", "all", "il", "lo", "la", "l", "i", "gli", "le", "el", "los", "las", "un", "una", "uno", "une", "des",
+        "les", "du", "o", "os", "as", "um", "uma", "tutti", "tutte", "todos", "todas", "tous", "toutes",
     ]
 
     /// The words of a duty for where the work is done, with no thing it is done on, folded, in the six languages (#354, round 16).

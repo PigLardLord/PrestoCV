@@ -184,6 +184,24 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.isAbstract(duty) == abstract)
     }
 
+    @Test("A duty that names its work only as a general verb and an activity, in the six languages; a verb with a thing as its object is none (#354, round 16)",
+          arguments: [
+              ("en", "I managed the movement of heavy equipment across the site.", true),
+              ("en", "I oversee the movement of inventory throughout the facility.", true),
+              ("it", "Mantenevo l'integrità dei cavi di alimentazione.", true),
+              ("pt", "Gerencio fluxos de dados internos.", true),
+              ("es", "Garantizaba la calidad de los envíos.", true),
+              ("de", "Ich habe den Betrieb der Anlagen gesichert.", true),
+              ("en", "I ensure consistent quality in every recording.", false),
+              ("en", "I managed the stage crew of six.", false),
+              ("it", "Coordino tre tecnici e gestisco i fermi impianto.", false),
+              ("de", "Ich habe die Leitungen verlegt.", false),
+              ("en", "I maintain the flow meters of the plant.", false),
+          ])
+    func nominalDuty(language: String, duty: String, nominal: Bool) {
+        #expect(CVDataSanitizer.isNominal(duty, language: Vocabulary.Language(tag: language)) == nominal)
+    }
+
     @Test("A written duty loses a phrase of care at its end; one with care in its middle, or too short without it, is left as it is (#354, round 16, jobs-it)",
           arguments: [
               ("Pulivo le superfici interne con attenzione.", "Pulivo le superfici interne."),
@@ -203,6 +221,18 @@ struct SectionChecksTests {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let verdicts = try spanish.dutyCheck(
             of: Self.esTrapsJobs, job: 1, duties: "Calculé los movimientos financieros diarios con cuidado.", against: description
+        )
+
+        #expect(verdicts.kept == ["Calculé los movimientos financieros diarios."])
+    }
+
+    @Test("The duty check drops a written duty that names its work only as a general verb and an activity (#354, round 16)")
+    func dutyCheckDropsNominal() throws {
+        let description = try #require(DraftingInputs.written.first { $0.id == "es-traps" }).description
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let verdicts = try spanish.dutyCheck(
+            of: Self.esTrapsJobs, job: 1,
+            duties: "Garantizaba la calidad de los asientos contables. Calculé los movimientos financieros diarios.", against: description
         )
 
         #expect(verdicts.kept == ["Calculé los movimientos financieros diarios."])
