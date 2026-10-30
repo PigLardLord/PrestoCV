@@ -68,7 +68,8 @@ extension CVDataSanitizer {
     private static let purposeWords: Set<String> = [
         "gestion", "gestione", "gestao", "management", "verwaltung", "suivi", "tracking", "tracciamento", "seguimiento",
         "rastreamento", "escaneo", "scansione", "scanning", "numerisation", "digitalizacion", "digitalizacao", "archiviazione",
-        "archivage", "archiving",
+        "archivage", "archiving", "monitoraggio", "monitoring", "monitoreo", "monitorizacion", "monitoramento", "surveillance",
+        "uberwachung",
     ]
 
     /// The objects and modifiers of a purpose that name no trade, without accents.
