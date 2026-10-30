@@ -14,6 +14,8 @@ struct RepairedToolsTests {
               ("es", ["máquina de escaneo de registros", "sistema de gestión de documentos", "escáner"], ["escáner"]),
               ("en", ["document management system", "PA system", "venue management software"], ["PA system", "venue management software"]),
               ("it", ["archivio digitale", "archivio di gestione documenti"], ["archivio digitale"]),
+              // A German word that ends in a kind of tool is a kind too (#354, round 16, de-plain).
+              ("de", ["Sicherungssystem", "KNX", "Spannungsprüfer", "Messgeräte"], ["KNX", "Spannungsprüfer"]),
           ])
     func generalKindGoes(language: String, tools: [String], kept: [String]) {
         #expect(Self.checker(language).repairedTools(tools, against: "Lavoro a Lecce dal 2019.") == kept)
@@ -35,5 +37,6 @@ struct RepairedToolsTests {
         let description = "Uso ogni giorno il sistema di tracciamento dati del magazzino."
 
         #expect(Self.checker("it").repairedTools(["sistema di tracciamento dati"], against: description) == ["sistema di tracciamento dati"])
+        #expect(Self.checker("de").repairedTools(["Sicherungssystem"], against: "Ich prüfe das Sicherungssystem der Halle.") == ["Sicherungssystem"])
     }
 }

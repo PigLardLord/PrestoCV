@@ -5,13 +5,14 @@ import Foundation
 extension CVDataSanitizer {
     /// The tools a request for more tools wrote (`writeMoreSkills`) that name a tool: a general kind of the work, a kind of tool
     /// with a purpose and its object alone ("sistema di tracciamento dati", "système de suivi des progrès", "máquina de escaneo de
-    /// registros"; #354, round 15), goes unless the description writes it. Only these answers are checked so: the first answers'
-    /// kinds with a word of their trade stay ("software di rilievo").
+    /// registros"; #354, round 15), or a German word that ends in a kind of tool ("Sicherungssystem"; #354, round 16), goes unless
+    /// the description writes it. Only these answers are checked so: the first answers' kinds with a word of their trade stay
+    /// ("software di rilievo").
     func repairedTools(_ tools: [String], against description: String) -> [String] {
         let language = language(of: description)
         let text = DescriptionText.normalized(description)
         return tools.filter { tool in
-            !Self.namesAGeneralKind(tool, language: language)
+            !(Self.namesAGeneralKind(tool, language: language) || Self.isAKindCompound(tool, language: language))
                 || !DescriptionText.spans(of: DescriptionText.normalized(tool), in: text).isEmpty
         }
     }
@@ -46,7 +47,11 @@ extension CVDataSanitizer {
     /// is one word that ends in a kind of tool with a word before it ("Montagesystem", "Messgeräte"): a past title's answer adds a
     /// tool before such a kind (`SectionDraft.mergedTools`; #354, round 15).
     static func endsInAKindOfTool(_ item: String, language: String?) -> Bool {
-        if namesAKindOfTool(item, language: language) { return true }
+        namesAKindOfTool(item, language: language) || isAKindCompound(item, language: language)
+    }
+
+    /// Whether `item` is, in German, one word that ends in a kind of tool with a word before it ("Montagesystem", "Messgeräte").
+    static func isAKindCompound(_ item: String, language: String?) -> Bool {
         let words = item.split { !$0.isLetter && !$0.isNumber }
         guard language == "de", words.count == 1, let word = words.first, word.dropFirst().allSatisfy(\.isLowercase) else { return false }
         let folded = DescriptionText.normalized(String(word))
