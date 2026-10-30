@@ -36,7 +36,7 @@ struct UseCaseSurfaceTests {
         // final check reads them.
         let sections: Set = [
             "requireLanguageData", "grounded", "keptJobs", "joined", "foreignWords", "otherTitles", "namedTitle", "quotedWords",
-            "letterWords", "stems", "words", "generalDutyJob",
+            "letterWords", "stems", "words", "generalDutyJob", "employerWord",
         ]
         // The reading of an interest's verb, which the sanitising of an interest and its rows call.
         let interests: Set = ["isConjugated"]

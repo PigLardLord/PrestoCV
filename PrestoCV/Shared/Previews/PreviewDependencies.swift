@@ -1,4 +1,5 @@
 #if DEBUG
+import DiagnosticTrace
 import Foundation
 import PrestoCVCore
 import CVPDFExporter
@@ -51,6 +52,16 @@ enum PreviewDependencies {
             exportPolicy: .standard,
             documentLanguageDetector: documentLanguageDetector,
             appLocale: Locale(identifier: "en")
+        )
+    }
+
+    /// The diagnostics screen of a test build whose trace stored no run
+    @MainActor
+    static func diagnostics() -> DiagnosticsViewModel {
+        DiagnosticsViewModel(
+            access: TraceAccess(isOn: { true }, reader: PreviewTraceReader()),
+            locale: Locale(identifier: "en"),
+            calendar: { Calendar(identifier: .gregorian) }
         )
     }
 
@@ -143,5 +154,12 @@ struct PreviewExportPreferencesStore: ExportPreferencesStore {
     func load() -> ExportPreferences {
         ExportPreferences()
     }
+}
+
+/// A trace store with no run: a preview reads nothing from the device.
+struct PreviewTraceReader: TraceReading {
+    func runs() async -> [TraceRunListing] { [] }
+    func shareCopies(of id: UUID) async throws -> [URL] { [] }
+    func discardCopies() async {}
 }
 #endif

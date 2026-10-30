@@ -1,5 +1,6 @@
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
+import DiagnosticTrace
 import Foundation
 import Testing
 @testable import PrestoCVImporting
@@ -226,7 +227,8 @@ struct ReadingWorkTests {
         let layout = ExtractedLayout.pages(pages)
         let logger = RecordingLogger()
         let tight = ImportCV(
-            pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000), logger: logger, clock: ContinuousClock()
+            pdfReader: ScriptedPDFReader(layout: layout), limits: limits(steps: analysed + 300_000), logger: logger, clock: ContinuousClock(),
+            tracer: NoTracer()
         )
         var failure: (any Error)?
         do { _ = try await tight.importPDF(Data([1])) } catch { failure = error }

@@ -1,4 +1,5 @@
 import DiagnosticLogging
+import DiagnosticTrace
 import Foundation
 
 // MARK: - The port
@@ -70,19 +71,27 @@ public enum ImportError: Error, Equatable, Sendable {
 // MARK: - The use case
 
 /// Imports a CV someone already has, with rules only, on every device (ADR 0027). It logs what it read and how it
-/// failed through the logger it is given, as counts, kinds and times (ADR 0030).
+/// failed through the logger it is given, as counts, kinds and times (ADR 0030). A text import also records each step,
+/// with the text, through the tracer it is given, which keeps it only in a test build (ADR 0032).
 public struct ImportCV: Sendable {
     private let pdfReader: any PDFTextExtracting
     private let limits: ImportLimits
     private let logger: any DiagnosticLogger
     private let clock: any Clock<Duration>
+    private let tracer: any DiagnosticTracer
 
-    /// - Parameter clock: measures the time an import takes, for the log.
-    public init(pdfReader: any PDFTextExtracting, limits: ImportLimits, logger: any DiagnosticLogger, clock: any Clock<Duration>) {
+    /// - Parameters:
+    ///   - clock: measures the time an import takes, for the log and the trace.
+    ///   - tracer: where a text import records its steps; the composition root decides whether it keeps them.
+    public init(
+        pdfReader: any PDFTextExtracting, limits: ImportLimits, logger: any DiagnosticLogger, clock: any Clock<Duration>,
+        tracer: any DiagnosticTracer
+    ) {
         self.pdfReader = pdfReader
         self.limits = limits
         self.logger = logger
         self.clock = clock
+        self.tracer = tracer
     }
 
     /// Imports a pasted text. Reading it is bounded by the same steps as a PDF's (`ImportLimits`). Lets
@@ -90,12 +99,23 @@ public struct ImportCV: Sendable {
     public func importText(_ text: String) throws -> ImportResult {
         let stopwatch = Stopwatch(started: self.clock)
         let log = ImportLog(logger: logger, source: .text)
-        do {
-            let reading = try readText(text)
-            log.finished(reading, pages: nil, elapsed: stopwatch.elapsed)
-            return reading.result
-        } catch {
-            throw log.failed(error, elapsed: stopwatch.elapsed)
+        let trace = ImportTrace(tracer: tracer)
+        // The logger records by kind: the scope tells it this import's run, so its entries are events of that run.
+        return try trace.within {
+            trace.input(text)
+            do {
+                let reading = try readText(text)
+                let elapsed = stopwatch.elapsed
+                log.finished(reading, pages: nil, elapsed: elapsed)
+                trace.finished(reading, elapsed: elapsed)
+                return reading.result
+            } catch {
+                let elapsed = stopwatch.elapsed
+                // The entry is logged first: once the run is finished, it takes no more
+                let failure = log.failed(error, elapsed: elapsed)
+                trace.failed(error, elapsed: elapsed)
+                throw failure
+            }
         }
     }
 

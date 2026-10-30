@@ -69,6 +69,12 @@ final class ViewModelFactory {
         return OnboardingViewModel(onboardingUseCase: try dependencyContainer.makeOnboardingUseCase())
     }
 
+    /// The diagnostics screen of a TestFlight or Debug build (ADR 0032): the runs the trace stored, and their files to share
+    @MainActor
+    func makeDiagnosticsViewModel() -> DiagnosticsViewModel {
+        DiagnosticsViewModel(access: environment.trace, locale: environment.appLocale, calendar: environment.calendar)
+    }
+
     /// The list of CVs, whose stored CVs are renamed and given a document language or a look through PrestoCVApplication.
     @MainActor
     func makeCVListViewModel() -> CVListViewModel {
@@ -157,7 +163,10 @@ final class ViewModelFactory {
                 labels: makeAIDraftLabels(),
                 languageOfText: DescriptionLanguageDetector.languageTag(of:)
             ),
-            languageData: LanguageDataPreparation(requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep),
+            languageData: LanguageDataPreparation(
+                requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep,
+                logger: environment.diagnostics, clock: environment.clock
+            ),
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
@@ -174,7 +183,8 @@ final class ViewModelFactory {
                 pdfReader: PDFKitTextExtractor(logger: environment.diagnostics),
                 limits: limits,
                 logger: environment.diagnostics,
-                clock: environment.clock
+                clock: environment.clock,
+                tracer: environment.tracer
             ),
             mapper: ImportedCVMapper(),
             fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
@@ -243,17 +253,19 @@ final class ViewModelFactory {
     @MainActor
     private func makeCVGeneratorUseCase(lexicalClasses: any LexicalTagger) -> CVGeneratorUseCase {
         #if DEBUG
-        let service = AIDraftScript.service(arguments: environment.arguments) ?? FoundationModelsService()
-        let claimChecker = AIDraftScript.claimChecker(arguments: environment.arguments) ?? FoundationModelsClaimChecker()
+        let service = AIDraftScript.service(arguments: environment.arguments) ?? FoundationModelsService(tracer: environment.tracer)
+        let claimChecker = AIDraftScript.claimChecker(arguments: environment.arguments)
+            ?? FoundationModelsClaimChecker(tracer: environment.tracer)
         #else
-        let service: any CVGenerationService = FoundationModelsService()
-        let claimChecker: any ClaimChecking = FoundationModelsClaimChecker()
+        let service: any CVGenerationService = FoundationModelsService(tracer: environment.tracer)
+        let claimChecker: any ClaimChecking = FoundationModelsClaimChecker(tracer: environment.tracer)
         #endif
         return CVGeneratorUseCase(
             service: service,
             claimChecker: claimChecker,
             logger: environment.diagnostics,
             clock: environment.clock,
+            tracer: environment.tracer,
             sanitizer: CVDataSanitizer(
                 languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: lexicalClasses, wordList: DeviceWordList()
             )

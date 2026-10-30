@@ -1,5 +1,6 @@
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
+import DiagnosticTrace
 import Foundation
 import Testing
 @testable import CVGeneratorAI
@@ -15,13 +16,13 @@ struct SectionDraftTests {
     private let sanitizer = CVDataSanitizer(
         languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([.english: .words(Self.verbs)]), wordList: TableWordList()
     )
-    private static let verbs: Set<String> = [
+    static let verbs: Set<String> = [
         "have", "has", "been", "was", "is", "am", "are", "worked", "work", "started", "rigged", "loaded", "setting", "set", "mixing",
         "mixed", "helping", "plan", "train", "looking", "moved", "kept", "keep", "ran", "run", "looked", "look", "won", "check",
     ]
     /// The jobs of `JobClausesTests.english`, each said in a short duty or none, so each job's request writes the typical duties
     /// that reach three (ADR 0031, O1).
-    private static let briefly = """
+    static let briefly = """
         I have worked in live sound for theatres and touring shows for thirteen years.
         I started in 2013 as a stagehand at the Fenwick Playhouse in Norwich, where I rigged the lights until 2016.
         Then I was a sound technician at Brightwater Events from 2016 to 2019, then at Copperfield Arena from 2019 to 2021, \
@@ -32,7 +33,7 @@ struct SectionDraftTests {
     private let description = Self.briefly
 
     /// The jobs of the description as the extraction gives them: the titles, the employers and which job goes on, and no date.
-    private static let extracted = CVData(experience: [
+    static let extracted = CVData(experience: [
         Experience(title: "stagehand", company: "Fenwick Playhouse"),
         Experience(title: "sound technician", company: "Brightwater Events"),
         Experience(title: "sound technician", company: "Copperfield Arena"),
@@ -40,16 +41,16 @@ struct SectionDraftTests {
     ])
 
     /// Invented answers that state no fact of their own, each job in the form of the person's own duties.
-    private static let jobs: [Int: RoleWriting] = [
+    static let jobs: [Int: RoleWriting] = [
         0: RoleWriting(startDate: "2013", endDate: "2016", duties: "I moved the scenery between scenes. I kept the backstage area clear and safe."),
         1: RoleWriting(startDate: "2016", endDate: "2019", duties: "I ran the sound checks with each band. I looked after the microphones and cables."),
         2: RoleWriting(startDate: "2019", endDate: "2021", duties: "I ran the sound checks before each concert. I looked after the stage monitors."),
         3: RoleWriting(startDate: "2021", endDate: nil, duties: "I run the technical rehearsals. I look after the mixing desks and the stage monitors."),
     ]
-    private static let tools = [["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
-    private static let qualities = ["teamwork", "calm under pressure", "attention to detail"]
+    static let tools = [["scenery flats", "rigging hardware"], ["PA systems", "microphones"], ["stage monitors"], ["mixing desks", "QLab"]]
+    static let qualities = ["teamwork", "calm under pressure", "attention to detail"]
     /// An invented answer to the summary request, which follows the opening code writes.
-    private static let summary = """
+    static let summary = """
         I plan the sound of each production and keep the mixing desks and monitors ready for every show.
         """
     /// The opening code writes for the jobs of `extracted`.
@@ -70,7 +71,7 @@ struct SectionDraftTests {
     ) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: logger, clock: ContinuousClock(),
-            validator: DefaultCVValidator(), sanitizer: sanitizer, limits: limits
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: sanitizer, limits: limits
         )
     }
 
@@ -749,7 +750,7 @@ struct SectionDraftTests {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let generator = CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: SilentLogger(), clock: ContinuousClock(),
-            validator: DefaultCVValidator(), sanitizer: spanish, limits: .standard
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: spanish, limits: .standard
         )
 
         let draft = try await generator.generateCV(from: CVGenerationRequest(userPrompt: Self.spanish)).cvData

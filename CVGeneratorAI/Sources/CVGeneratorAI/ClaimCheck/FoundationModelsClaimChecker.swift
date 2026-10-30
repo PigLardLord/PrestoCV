@@ -1,4 +1,5 @@
 #if canImport(FoundationModels)
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 
@@ -9,7 +10,13 @@ import FoundationModels
 /// it throws, and the draft is unchecked.
 @available(iOS 26, macOS 26, *)
 public struct FoundationModelsClaimChecker: ClaimChecking {
-    public init() {}
+    private let tracer: any DiagnosticTracer
+
+    /// - Parameter tracer: Where each batch asked of the model and its raw answer are recorded, in the open run of the draft
+    ///   (ADR 0032).
+    public init(tracer: any DiagnosticTracer) {
+        self.tracer = tracer
+    }
 
     public func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement] {
         guard !candidates.isEmpty else { return [] }
@@ -20,12 +27,30 @@ public struct FoundationModelsClaimChecker: ClaimChecking {
     /// What the model answers to a batch of candidates, as it numbered it and before it is read as judgements (`ClaimAnswer`).
     func answer(to candidates: [ClaimCandidate], in description: String) async throws -> [ClaimVerdictEntry] {
         let session = LanguageModelSession(instructions: Self.instructions)
-        let response = try await session.respond(
-            to: Self.prompt(for: candidates, in: description),
-            schema: Self.schema(forCandidates: candidates.count),
-            includeSchemaInPrompt: true,
-            options: GenerationOptions(samplingMode: .greedy)
-        )
+        let prompt = Self.prompt(for: candidates, in: description)
+        tracer.record(.request, into: .aiDraft) {
+            [
+                .token("call", "claimCheck"), .count("candidates", candidates.count), .flag("schemaInPrompt", true),
+                .token("sampling", "greedy"), .text("instructions", Self.instructions), .text("prompt", prompt),
+            ]
+        }
+        let response: LanguageModelSession.Response<GeneratedContent>
+        do {
+            response = try await session.respond(
+                to: prompt,
+                schema: Self.schema(forCandidates: candidates.count),
+                includeSchemaInPrompt: true,
+                options: GenerationOptions(samplingMode: .greedy)
+            )
+        } catch {
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "claimCheck"), .flag("answered", false), .text("framework", String(describing: error))]
+            }
+            throw error
+        }
+        tracer.record(.response, into: .aiDraft) {
+            [.token("call", "claimCheck"), .flag("answered", true), .text("raw", response.content.jsonString)]
+        }
         let verdicts = try response.content.value([ClaimVerdict].self, forProperty: Self.verdictsProperty)
         return verdicts.map { ClaimVerdictEntry(item: $0.item, quote: $0.quote, stance: $0.stance) }
     }

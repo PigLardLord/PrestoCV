@@ -1,5 +1,6 @@
 #if canImport(FoundationModels)
 import Testing
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 @testable import CVGeneratorAI
@@ -43,7 +44,7 @@ struct DraftingEvaluation {
         let settings = try DraftingSettings(environment: environment)
         let all = try DraftingInputs.all()
         let inputs = try settings.inputs(from: all)
-        try #require(FoundationModelsService().availability() == .available, "the on-device model is not available on this host")
+        try #require(FoundationModelsService(tracer: NoTracer()).availability() == .available, "the on-device model is not available on this host")
 
         let folder = settings.folder(now: Date(), temporary: URL(fileURLWithPath: NSTemporaryDirectory()))
         try RunFolder.prepare(folder)
@@ -91,7 +92,7 @@ struct DraftingEvaluation {
         let sanitizer = CVDataSanitizer(
             languageOfText: { AppLanguageDetector.languageTag(of: $0) }, lexicalClasses: DeviceLexicalTagger()
         )
-        let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(), log: log)
+        let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(tracer: NoTracer()), log: log)
         let useCase = CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: sanitizer)
         useCase.observeWriting = { [service] writing, draft in service.record(writing, around: draft) }
         let load = loadAverage()
@@ -149,7 +150,7 @@ struct DraftingEvaluation {
     /// around it (ADR 0031, "A request per section").
     @MainActor
     final class RecordingService: CVGenerationService {
-        private let model = FoundationModelsService()
+        private let model = FoundationModelsService(tracer: NoTracer())
         private(set) var raw: CVData?
         private(set) var writing: DraftWriting?
         /// The facts the sections were written around, with the years the jobs' requests read.

@@ -13,7 +13,7 @@ struct LoggingGuideTests {
 
     /// The sources that may log through the interface: the packages and the app.
     static let sourceFolders = [
-        "DiagnosticLogging/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCV",
+        "DiagnosticLogging/Sources", "DiagnosticTrace/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCV",
     ]
 
     /// An event as the code names it, in a shorthand (`logger.info(.draft, "draft.started", …)`) or in an entry

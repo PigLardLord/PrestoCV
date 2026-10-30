@@ -23,6 +23,9 @@ struct ReleaseHygieneTests {
         "PrestoCVImportingPDFKit": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
         "DiagnosticLogging": "DiagnosticLogging/Sources/DiagnosticLogging",
         "DiagnosticLoggingOSLog": "DiagnosticLogging/Sources/DiagnosticLoggingOSLog",
+        "DiagnosticTrace": "DiagnosticTrace/Sources/DiagnosticTrace",
+        "DiagnosticTraceFiles": "DiagnosticTrace/Sources/DiagnosticTraceFiles",
+        "DiagnosticTraceDistribution": "DiagnosticTrace/Sources/DiagnosticTraceDistribution",
     ]
 
     /// The sources whose code ships with the app.
@@ -100,6 +103,19 @@ struct ReleaseHygieneTests {
 
         #expect(!reads.isEmpty, "The scan no longer finds the code that reads the seed: update it with the code")
         #expect(offenders.isEmpty, "The seed of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// A Release build asks the store how it was installed, and nothing else turns its trace on (ADR 0032).
+    @Test("The launch argument that gives the store's answer to the trace is read only by Debug builds")
+    func theDistributionOfTheTraceIsGivenOnlyToDebugBuilds() {
+        let reads = Self.shippedLines().filter {
+            $0.code.contains("diagnosticsDistribution") || $0.code.contains("DiagnosticsDistributionOverride")
+        }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the answer: update it with the code")
+        #expect(offenders.isEmpty, "The answer of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
     // MARK: Privacy manifest

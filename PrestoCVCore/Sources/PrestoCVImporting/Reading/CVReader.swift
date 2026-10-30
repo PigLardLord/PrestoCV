@@ -61,6 +61,22 @@ enum CVReader {
         return (findings, sections)
     }
 
+    /// The rule that reads a kind of section, as the trace of a test build names it (ADR 0032). It follows the switch of
+    /// `readSections`; "none" for a kind the CV has no field for, whose text stays visible.
+    static func readerName(of kind: SectionKind) -> String {
+        switch kind {
+        case .header, .personal: "HeaderReader"
+        case .summary: "CVReader.summary"
+        case .experience: "EntryReader.experience"
+        case .education: "EntryReader.education"
+        case .skills: "ListReader.skills"
+        case .interests: "ListReader.interests"
+        case .languages: "LanguageReader"
+        case .certifications: "CertificationReader"
+        case .projects, .volunteering, .references, .drivingLicence, .additional, .unknown: "none"
+        }
+    }
+
     /// The summary: the lines of its section, in order.
     private static func readSummary(_ section: Section, into findings: inout Findings) {
         let pieces = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }.flatMap { section.cells(of: $0, in: findings.document) }

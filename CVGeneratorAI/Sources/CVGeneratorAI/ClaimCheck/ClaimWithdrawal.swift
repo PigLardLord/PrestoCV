@@ -18,6 +18,34 @@ struct ClaimCheckLimits: Equatable, Sendable {
     }
 }
 
+/// What the claim check did with a grounded draft: the draft it gave, the candidates it was asked about, the judgement of each when
+/// it answered, and why it gave no answer when it did not (ADR 0032).
+struct ClaimCheckReport: Equatable, Sendable {
+    let draft: GeneratedDraft
+    let candidates: [ClaimCandidate]
+    /// One for each candidate, in order; empty when the check gave no answer.
+    let judgements: [ClaimJudgement]
+    /// Why the check gave no answer, or nil when it answered.
+    let failure: ClaimCheckFailure?
+}
+
+/// Why the claim check gave no answer, as the trace shows it.
+struct ClaimCheckFailure: Equatable, Sendable {
+    /// `invalidAnswer`, `timedOut`, or the type of what the checker threw.
+    let code: String
+    /// The error as the framework or the checker describes it, which may quote the model.
+    let text: String
+
+    init(_ error: any Error) {
+        switch error {
+        case ClaimCheckError.invalidAnswer: code = "invalidAnswer"
+        case ClaimCheckError.timedOut: code = "timedOut"
+        default: code = String(describing: type(of: error))
+        }
+        text = String(describing: error)
+    }
+}
+
 /// Applies the claim check to a grounded draft (ADR 0028). It only ever removes: a personal item stays when the check judged it a
 /// fact about the writer, and everything the check does not judge (the name, the contacts, the summary, the jobs, the schools,
 /// their dates and the certifications) stays as the rules left it.
@@ -29,21 +57,34 @@ enum ClaimWithdrawal {
     /// - Note: A checker must stop when its task is cancelled, or the time limit cannot cut it short.
     static func checking(_ grounded: CVData, in description: String, with checker: any ClaimChecking,
                          within limits: ClaimCheckLimits = .standard) async throws -> GeneratedDraft {
+        try await report(on: grounded, in: description, with: checker, within: limits).draft
+    }
+
+    /// What `checking` gives, with what the check said for the trace of a test build (ADR 0032): the candidates, the judgement of
+    /// each, and why the check gave no answer when it did not.
+    static func report(on grounded: CVData, in description: String, with checker: any ClaimChecking,
+                       within limits: ClaimCheckLimits = .standard) async throws -> ClaimCheckReport {
         let candidates = ClaimCandidates.of(grounded, in: description)
-        guard !candidates.isEmpty else { return GeneratedDraft(cvData: grounded, personalItemsUnchecked: false) }
+        guard !candidates.isEmpty else {
+            return ClaimCheckReport(draft: GeneratedDraft(cvData: grounded, personalItemsUnchecked: false), candidates: [],
+                                    judgements: [], failure: nil)
+        }
 
         do {
             let judgements = try await judgementsInBatches(of: candidates, in: description, with: checker, within: limits)
             let checked = keepingFacts(of: grounded, candidates: candidates, judgements: judgements)
-            return GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: checked, description: description),
-                                  personalItemsUnchecked: false)
+            let draft = GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: checked, description: description),
+                                       personalItemsUnchecked: false)
+            return ClaimCheckReport(draft: draft, candidates: candidates, judgements: judgements, failure: nil)
         } catch let cancellation as CancellationError {
             throw cancellation
         } catch {
             // A check stopped by a cancellation may report it with an error of its own.
             try Task.checkCancellation()
-            return GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: withdrawingAll(from: grounded), description: description),
-                                  personalItemsUnchecked: true)
+            let draft = GeneratedDraft(
+                cvData: keepingTheSelfTitle(of: grounded, in: withdrawingAll(from: grounded), description: description),
+                personalItemsUnchecked: true)
+            return ClaimCheckReport(draft: draft, candidates: candidates, judgements: [], failure: ClaimCheckFailure(error))
         }
     }
 

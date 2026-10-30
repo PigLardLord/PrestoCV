@@ -504,6 +504,65 @@ legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) 
 expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
 if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
 else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothing else"; fi
+# --- ADR 0032: the trace store and the distribution check are composition-only: only the files the rule lists may import
+# their modules or make the chain's types, in production and legacy targets alike; tests may
+composition_only() {   # a legacy app with a composition file and a screen, its legacy tests, and the rule (ADR $1)
+  setup; src 'let x = 1'; mkdir -p "$ROOT/App" "$ROOT/AppTests"
+  echo 'let root = 1' > "$ROOT/App/Root.swift"; echo 'let screen = 1' > "$ROOT/App/Screen.swift"; echo 'let t = 1' > "$ROOT/AppTests/T.swift"
+  echo '# ADR' > "$ROOT/adr/0032-record-each-step.md"
+  python3 - "$ROOT/rules.json" "$1" "${2:-App/Root.swift}" <<'PY2'
+import json, sys
+p, adr, listed = sys.argv[1:]; r = json.load(open(p))
+r["targets"] += [{"name": "App", "path": "App", "kind": "legacy", "allowedImports": [], "rules": []},
+                 {"name": "AppTests", "path": "AppTests", "kind": "legacy", "allowedImports": [], "rules": []}]
+r["compositionOnly"] = {"adr": adr, "files": [listed], "modules": ["TraceFiles"], "types": ["GatedTracer", "TracingLogger"]}
+json.dump(r, open(p, "w"))
+PY2
+}
+composition_only 0032; printf '%s\n' 'import TraceFiles' 'let s = TraceStore()' 'let g = GatedTracer(gate: gate, next: s)' > "$ROOT/App/Root.swift"
+expect "ADR 0032: the composition file imports the store's module and makes the chain" 0 ""
+composition_only 0032; printf '%s\n' 'import TraceFiles' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: another file of a legacy app may not import the store's module" 1 "App/Screen.swift:1: R4 compositionOnly: import TraceFiles"
+composition_only 0032; printf '%s\n' 'import struct TraceFiles.TraceStore' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor import one of its types" 1 "App/Screen.swift:1: R4 compositionOnly: import TraceFiles"
+composition_only 0032; printf '%s\n' 'let l = TracingLogger(tracer: t, next: n, kinds: [:])' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: another file may not make the chain" 1 "App/Screen.swift:1: R4 compositionOnly: TracingLogger"
+composition_only 0032; src 'let g = GatedTracer(gate: gate, next: next)'
+expect "ADR 0032: nor may a production target" 1 "Sources/Pure/P.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'import TraceFiles' 'let g = GatedTracer(gate: gate, next: next)' > "$ROOT/AppTests/T.swift"
+expect "ADR 0032: a legacy test target may, to test the chain" 0 ""
+composition_only 0032; printf '%s\n' 'import TraceCore' 'let g = TraceCore.GatedTracer(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a module-qualified constructor of a restricted type is a breach" 1 "App/Screen.swift:2: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'let g = Outer.Inner.GatedTracer.init(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor is an explicit init through a qualifier" 1 "App/Screen.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'typealias Gate = GatedTracer' 'let g = Gate(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: an alias of a restricted type is refused where it is declared" 1 "App/Screen.swift:1: R4 compositionOnly: typealias Gate of GatedTracer"
+if grep -q "App/Screen.swift:2: R4 compositionOnly: Gate" "$ROOT/out.txt"; then pass=$((pass+1)); echo "ok   ADR 0032: and the construction through it is a breach"
+else fail=$((fail+1)); echo "FAIL ADR 0032: a construction through an alias passed"; sed 's/^/     /' "$ROOT/out.txt"; fi
+composition_only 0032; printf '%s\n' 'typealias Gate = TraceCore.GatedTracer' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a qualified alias of a restricted type is refused too" 1 "App/Screen.swift:1: R4 compositionOnly: typealias Gate of GatedTracer"
+composition_only 0032; printf '%s\n' 'typealias Gate = GatedTracer' > "$ROOT/App/Root.swift"; printf '%s\n' 'let g = Gate(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: an alias the composition root declares cannot be used to make the type elsewhere" 1 "App/Screen.swift:1: R4 compositionOnly: Gate"
+composition_only 0032; printf '%s\n' 'typealias Gate = GatedTracer' 'let g = Gate(gate: gate, next: next)' > "$ROOT/App/Root.swift"
+expect "ADR 0032: the composition root may alias and make the type" 0 ""
+composition_only 0032; printf '%s\n' 'let g: GatedTracer = .init(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a contextual init that the annotation resolves to a restricted type is a breach" 1 "App/Screen.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'func make() -> GatedTracer { .init(gate: gate, next: next) }' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor is one that the return type resolves to" 1 "App/Screen.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'let g: Other.GatedTracer? = .init(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor is one through a qualified optional annotation" 1 "App/Screen.swift:1: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'struct Holder { let gate: GatedTracer }' 'let h = Holder(gate: .init(gate: gate, next: next))' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a contextual init passed as the argument of a type of the target is a breach" 1 "App/Screen.swift:2: R4 compositionOnly: GatedTracer"
+composition_only 0032; printf '%s\n' 'struct Holder { let n: Int }' 'let h = Holder(n: .init(3))' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: nor is one that is no restricted type" 0 ""
+composition_only 0032; printf '%s\n' 'typealias Tracers = [GatedTracer]' 'typealias Box = Wrapper<GatedTracer>' 'let t = Tracers()' 'let b = Box()' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: an alias of a collection or a generic that holds a restricted type is another type, and no breach" 0 ""
+composition_only 0032; printf '%s\n' 'typealias Gate = GatedTracer' 'typealias Again = Gate' 'let g = Again(gate: gate, next: next)' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a chain of direct aliases is followed" 1 "App/Screen.swift:3: R4 compositionOnly: Again"
+composition_only 0032; printf '%s\n' 'let n: Int = .init(3)' 'let t: TracerSettings = .init()' > "$ROOT/App/Screen.swift"
+expect "ADR 0032: a contextual init of another type is not a breach" 0 ""
+composition_only 0099; expect "ADR 0032: the rule cites an ADR that exists" 1 "compositionOnly cites ADR 0099"
+composition_only 0032 App/Gone.swift; expect "ADR 0032: every file the rule lists exists" 1 "compositionOnly lists App/Gone.swift"
 # --- R18: a pure target stays portable to Android: no Apple-only module and no bundle; an API that needs the full
 # Foundation, with ICU, warns without failing (#267)
 only_portable() {   # the Pure target has only R18 and may import every module a case names, so a case shows R18 alone

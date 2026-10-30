@@ -4,8 +4,9 @@ import Foundation
 // MARK: - What the AI draft logs (ADR 0030)
 
 extension LogCategory {
-    /// The AI draft of a CV, from the availability of the model to the checked draft.
-    static let draft = LogCategory("draft")
+    /// The AI draft of a CV, from the availability of the model to the checked draft. The app logs its wait for the language data
+    /// that a draft needs under it too.
+    public static let draft = LogCategory("draft")
 }
 
 /// The entries of the AI draft: whether the model can run, the language of the description and its data, the generation from its

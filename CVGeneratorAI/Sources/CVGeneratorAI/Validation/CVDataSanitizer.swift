@@ -632,7 +632,7 @@ public struct CVDataSanitizer: Sendable {
 
     /// Whether two folded words are one, or forms of one: of 5 letters or more, at most 2 letters apart in length, and alike but
     /// for their last 2 letters ("event", "events").
-    static func isAForm(_ word: String, of other: String) -> Bool {
+    private static func isAForm(_ word: String, of other: String) -> Bool {
         guard word != other else { return true }
         let shorter = min(word.count, other.count)
         guard abs(word.count - other.count) <= 2, shorter >= 5 else { return false }

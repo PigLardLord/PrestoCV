@@ -1,5 +1,6 @@
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
+import DiagnosticTrace
 import Foundation
 import Testing
 @testable import CVGeneratorAI
@@ -34,7 +35,7 @@ struct TwoPassDraftTests {
                            logger: any DiagnosticLogger = SilentLogger()) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: logger, clock: ContinuousClock(),
-            validator: DefaultCVValidator(), sanitizer: sanitizer, limits: limits
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: sanitizer, limits: limits
         )
     }
 

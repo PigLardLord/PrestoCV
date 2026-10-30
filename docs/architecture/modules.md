@@ -23,7 +23,7 @@ Test targets and test-support targets are described below each package. The chec
 | `DiagnosticLogging` | port, value types and decorators | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `DiagnosticLoggingOSLog` | outbound adapter | iOS, macOS | `DiagnosticLogging`, `os` |
 
-A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` may depend on its `DiagnosticLogging` target, and only on that one: the one exception to the forbidden edges between the three packages.
+A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI` may depend on its `DiagnosticLogging` target, and only on that one: an exception to the forbidden edges between the three packages, as `DiagnosticTrace` is.
 
 **`DiagnosticLogging`**
 - **The port, `DiagnosticLogger`:** one synchronous `log(_:)` that never throws, with the shorthands `debug`, `info`, `notice`, `error` and `fault`.
@@ -41,6 +41,36 @@ A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through
 
 ---
 
+## Package `DiagnosticTrace` — Trace of a test build
+
+| Target | Layer | Platforms | May import |
+|---|---|---|---|
+| `DiagnosticTrace` | port, value types, decorators and rules | iOS, macOS, Linux ✓, Android ✓ | `DiagnosticLogging`, Foundation, Synchronization |
+| `DiagnosticTraceFiles` | outbound adapter (the store) | iOS, macOS, Linux ✓ | `DiagnosticTrace`, `DiagnosticLogging`, Foundation, Synchronization |
+| `DiagnosticTraceDistribution` | outbound adapter (how the app was installed) | iOS, macOS | `DiagnosticTrace`, StoreKit |
+
+Each step of the AI draft and of the import, with the text it read and wrote, kept on the device in TestFlight and Debug builds only ([ADR 0032](adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It carries CV content, so it is a package of its own, apart from `DiagnosticLogging`, which never does. It depends on `DiagnosticLogging` only. `PrestoCVCore` and `CVGeneratorAI` may depend on its `DiagnosticTrace` target, and only on that one; only the composition root imports its adapters and makes its recorder, gate and decorators, which the checker's `compositionOnly` rule enforces.
+
+**`DiagnosticTrace`**
+- **The port, `DiagnosticTracer`:** `begin(kind)` opens a run of a kind (`aiDraft` or `textImport`) and returns its `TraceRunRecording`, which records steps and finishes with an outcome; `record(_:_:into:)` adds a step to the run whose `TraceScope` the work is in (`within` sets it: the run, `suppressed` or none; a step outside a run is dropped); `mirror(_:)` takes a log entry. Every call is synchronous and never throws.
+- **The values:** `TraceRun` (id, kind, start, build, steps, outcome), `TraceStep` (sequence, elapsed time, a `TraceStepName` from a closed set, ordered fields) and `TraceField`, whose `TraceValue` is a text cut at 32 KB, a count, a flag, a duration or a token.
+- **The decorators:** `NoTracer`, for previews and tests that do not look at the trace; `GatedTracer(gate:next:)`, which drops what comes while its gate is closed; `TracingLogger(tracer:next:kinds:)`, a `DiagnosticLogger` that mirrors each entry into the run of the work's scope, or into the session events when the work is in no run.
+- **The recorder, `TraceRecorder`:** keeps each open run under its size cap and hands every new state to a `TraceStoring`, on an injected clock, time source and id generator (R2).
+- **The gate rule:** `ConstantGate` for a Debug build, and `DistributionGate`, open only for a verified TestFlight install (`DistributionAnswer.sandbox`) through the port `DistributionReading`; everything else fails closed.
+- **The rules of the files:** the JSON document of a run (schema 1, keys sorted), its plain-text summary (`TraceSummary`), the ten runs kept (`TraceRetention`), the 200 session events kept (`TraceSessionLog`), and the port `TraceReading`, through which the diagnostics screen lists and shares the runs.
+- No platform condition, no Apple-only import, no bundle (R11, R18).
+
+**`DiagnosticTraceFiles`** is the store, `TraceFileStore`: one folder, made on the first write, excluded from backup, with files under complete protection on iOS; per run a JSON document and a summary; the session's events. It writes on one task off the main actor, only the latest state of each run, and logs a failure through `DiagnosticLogger` under the category `trace`. It makes the copies to share in a temporary folder.
+
+**`DiagnosticTraceDistribution`** reads `AppTransaction.shared`, never `refresh()`, and maps its environment to a `DistributionAnswer`. Every file is wrapped in `#if canImport(StoreKit)`, and the manifest adds the target on Apple hosts only.
+
+**Test support and tests.**
+- `DiagnosticTraceTestSupport` may import `DiagnosticTrace`, Foundation, Synchronization. It holds `RecordingTraceStore`, `RecordingTracer` (the real recorder on a stopped clock, with the runs it recorded), `FixedDistribution` and `StoppedClock`.
+- **`DiagnosticTraceTests`** may import `DiagnosticTrace`, `DiagnosticTraceTestSupport`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. They test the recorder, the gate's truth table, the decorators, the document, the summary and the retention, on Linux too.
+- **`DiagnosticTraceFilesTests`** may import `DiagnosticTraceFiles`, `DiagnosticTrace`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, Synchronization. They write to a temporary folder, on Linux too; a spy of the folder protection records its calls under a `Mutex`.
+
+---
+
 ## Package `PrestoCVCore` — CV Authoring and CV Import
 
 | Target | Layer | Platforms | May import |
@@ -48,7 +78,7 @@ A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through
 | `PrestoCVDomain` | domain | iOS, macOS, Linux ✓, Android ✓ | Foundation |
 | `PrestoCVApplication` | application | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, Foundation |
 | `PrestoCVPersistence` | outbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Glibc, Darwin, Android |
-| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, `DiagnosticLogging`, Foundation |
+| `PrestoCVImporting` | domain + application (CV Import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVDomain`, `DiagnosticLogging`, `DiagnosticTrace`, Foundation |
 | `PrestoCVImportingPDFKit` | outbound adapter | iOS, macOS | `PrestoCVImporting`, `DiagnosticLogging`, PDFKit, UIKit, AppKit, CoreGraphics, Foundation |
 
 **`PrestoCVDomain`**
@@ -113,8 +143,8 @@ A leaf package that depends on no other package ([ADR 0030](adr/0030-log-through
 **`PrestoCVImportingPDFKit`** implements `PDFTextExtracting` with PDFKit: each page's words with their box, font size and weight, in PDFKit's order, and nothing decided about the reading order, which the core decides. It checks the size, the page count and the encryption before it reads any text, refuses a page whose text is longer than the characters left before it reads the page's glyphs, counts the words as it reads them, and stops in the middle of a page once its task is cancelled. A word whose font PDFKit cannot name comes back without its weight, so the adapter draws the page with CoreGraphics and marks a word bold when its strokes are clearly heavier than the page's ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)). `characterBounds(at:)` has no box for the line breaks of `PDFPage.string`, so the adapter walks the two together. Through the logger its initialiser takes, it logs the pages and the words it read, and the limit that stopped it, which it throws as a `LimitReached` for the use case to word and log. Every file is wrapped in `#if canImport(PDFKit)`.
 
 **Test support and tests.**
-- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
-- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
+- **`PrestoCVImportingTests`** may import `PrestoCVImporting`, `PrestoCVDomain`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, `DiagnosticTrace`, `DiagnosticTraceTestSupport`, Testing, Foundation. It holds the unit tests of every rule and the **contract table**: the synthetic corpus under `PrestoCVCore/Tests/ImportFixtures/` (texts, recorded page layouts and their PDFs, each with the fields it states), measured per language and form, and checked line by line: every line of every fixture is covered by a value, a text not imported or a left-out piece. No real CV is ever committed.
+- **`PrestoCVImportingPDFKitTests`** (Apple hosts) may import `PrestoCVImportingPDFKit`, `PrestoCVImporting`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, `DiagnosticTrace` (its `NoTracer`), Testing, Foundation, PDFKit, CoreGraphics, and CoreText, with which it draws hostile pages when it runs. Its contract test reads the fixture PDFs with PDFKit and compares the words with the recorded layouts that the Linux tests use.
 - `PrestoCVCoreTestSupport` may import `PrestoCVApplication`, `PrestoCVDomain`, Foundation, Synchronization. It holds:
   - `InMemoryCVRepository`, `SteppingClock`, `SequentialIDGenerator`;
   - `ManualClock`, a `Clock` that moves only when a test moves it, for the timing of `Autosave`;
@@ -236,7 +266,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **Test support.** `CVDraftingTestSupport` holds a fake generator and fixtures.
 
-**The legacy target `CVGeneratorAI`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), depends on `DiagnosticLogging` on Apple hosts: its use case takes a `DiagnosticLogger` and a `Clock` in its initialiser, and logs under the category `draft` the availability of the model and why not, the language of the description and the state of its data, a generation started, finished, cancelled or refused by the guardrails, with its time, the claims checked and withdrawn, as counts, and the check that rejected a request or a draft ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). Its tests may also import `DiagnosticLoggingTestSupport`.
+**The legacy target `CVGeneratorAI`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), depends on `DiagnosticLogging` on Apple hosts: its use case takes a `DiagnosticLogger` and a `Clock` in its initialiser, and logs under the category `draft` the availability of the model and why not, the language of the description and the state of its data, a generation started, finished, cancelled or refused by the guardrails, with its time, the claims checked and withdrawn, as counts, and the check that rejected a request or a draft ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)). It also depends on `DiagnosticTrace`: the use case, the model service and the claim checker take a `DiagnosticTracer`, and record each step of a draft with its text ([ADR 0032](adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). Its tests may also import `DiagnosticLoggingTestSupport` and `DiagnosticTraceTestSupport`.
 
 ---
 
@@ -297,8 +327,9 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
-**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)), and `DiagnosticLogging` with `DiagnosticLoggingOSLog` ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)):
+**The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)), and `DiagnosticLogging` with `DiagnosticLoggingOSLog` ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)), and `DiagnosticTrace` with `DiagnosticTraceFiles` and `DiagnosticTraceDistribution` ([ADR 0032](adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)):
 - its entry point makes the one `OSLogDiagnosticLogger`, with the subsystem `com.PigLardLord.prestocv`, and its factory passes it to the import and to the AI draft; the construction moves into `PrestoCVComposition` with the app;
+- its entry point and `App/AppEnvironment.swift`, and no other file, build the trace: the gate for the build, the recorder, the file store, and the `TracingLogger` in front of the native log; its factory passes the tracer to the import and to the AI draft, and the diagnostics screen reads the runs through `TraceReading`;
 - it imports each declaration of the two by name (`import struct PrestoCVDomain.ExportPolicy`), since the legacy `PrestoCVCore` declares types with the same names;
 - its adapters from the legacy `CVModel` to the plain values the rules read are in `PrestoCV/Shared/CoreRules/`;
 - its mapper from an `ImportedCV` to an unsaved `CVModel` is in `PrestoCV/Features/Import/`, as the AI draft's is in `PrestoCV/Features/AIGeneration/`; the PDFs it opens from the share sheet are declared in `PrestoCV/Info.plist`, which Xcode merges with the generated one;
@@ -333,8 +364,10 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
 PrestoCVImportingPDFKit ─▶ PrestoCVImporting
 PrestoCVImporting, PrestoCVImportingPDFKit, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticLogging
 PrestoCV (app) ─▶ DiagnosticLoggingOSLog ─▶ DiagnosticLogging
+PrestoCVImporting, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticTrace ─▶ DiagnosticLogging
+PrestoCV (app) ─▶ DiagnosticTraceFiles, DiagnosticTraceDistribution ─▶ DiagnosticTrace
 
-Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI, except to DiagnosticLogging (ADR 0030).
+Forbidden: any edge between PrestoCVCore, CVPDFExporter and CVGeneratorAI, except to DiagnosticLogging (ADR 0030) and DiagnosticTrace (ADR 0032).
 Forbidden: any edge from a domain, application or port target to an adapter target.
 Forbidden: PrestoCVPresentation → PrestoCVIntegration.
 ```

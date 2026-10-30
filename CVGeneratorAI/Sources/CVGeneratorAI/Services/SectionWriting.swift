@@ -1,4 +1,5 @@
 #if canImport(FoundationModels)
+import DiagnosticTrace
 import Foundation
 import FoundationModels
 
@@ -31,7 +32,8 @@ extension FoundationModelsService {
         guard brief.roles.indices.contains(number) else { return nil }
         let role = brief.roles[number]
         let schema = try Self.jobSchema(duties: Self.jobDuties(said: role.said, adding: role.adding))
-        guard let last = try await streamed(SectionPrompts.job(number: number, of: brief), schema: schema, tokens: Self.jobTokens) else {
+        let call = SectionCallTrace(call: "job", role: number, tokens: Self.jobTokens)
+        guard let last = try await streamed(SectionPrompts.job(number: number, of: brief), schema: schema, call: call) else {
             return nil
         }
         let content = last.answer.content
@@ -68,7 +70,8 @@ extension FoundationModelsService {
 
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
         let prompt = SectionPrompts.jobRepair(number: number, of: brief, kept: kept, rejected: rejected)
-        guard let last = try await streamed(prompt, JobRepairAnswer.self, tokens: Self.jobRepairTokens) else { return nil }
+        let call = SectionCallTrace(call: "jobRepair", role: number, tokens: Self.jobRepairTokens)
+        guard let last = try await streamed(prompt, JobRepairAnswer.self, call: call) else { return nil }
         return Self.whole(last.answer.content.duties, isComplete: last.isComplete).map(Self.sentence)
     }
 
@@ -78,7 +81,8 @@ extension FoundationModelsService {
         guard !roles.isEmpty, roles.allSatisfy(brief.roles.indices.contains) else { return nil }
         let prompt = SectionPrompts.tools(for: brief, roles: roles, count: count)
         let schema = try Self.toolsSchema(count: count)
-        let answer = try await respond(prompt, schema: schema, tokens: Self.toolsTokens(most: count.upperBound))
+        let call = SectionCallTrace(call: "tools", role: nil, tokens: Self.toolsTokens(most: count.upperBound))
+        let answer = try await respond(prompt, schema: schema, call: call)
         return Self.clean(try? answer.value([String].self, forProperty: "tools"))
     }
 
@@ -100,7 +104,8 @@ extension FoundationModelsService {
 
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
         let prompt = SectionPrompts.softSkills(for: brief)
-        guard let last = try await streamed(prompt, QualitiesAnswer.self, tokens: Self.softSkillsTokens) else { return nil }
+        let call = SectionCallTrace(call: "softSkills", role: nil, tokens: Self.softSkillsTokens)
+        guard let last = try await streamed(prompt, QualitiesAnswer.self, call: call) else { return nil }
         return Self.whole(last.answer.content.qualities, isComplete: last.isComplete)
     }
 
@@ -137,7 +142,7 @@ extension FoundationModelsService {
             rejected: rejected
         )
         let tokens = Self.moreSkillsTokens(count: tools + qualities) + (tools > 0 ? Self.tradeTokens : 0)
-        let answer = try await respond(prompt, schema: schema, tokens: tokens)
+        let answer = try await respond(prompt, schema: schema, call: SectionCallTrace(call: "moreSkills", role: nil, tokens: tokens))
         return DraftWriting(
             summary: nil, roleDescriptions: [],
             technologies: tools > 0 ? Self.clean(try? answer.value([String].self, forProperty: "tools")) : [],
@@ -148,18 +153,21 @@ extension FoundationModelsService {
     // MARK: The summary
 
     public func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
-        try await summarySentence(SectionPrompts.summarySentence(for: brief, topic: topic, written: written))
+        try await summarySentence(SectionPrompts.summarySentence(for: brief, topic: topic, written: written), call: "summarySentence")
     }
 
     public func repairSummarySentence(
         for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
     ) async throws -> String? {
-        try await summarySentence(SectionPrompts.summarySentenceRepair(for: brief, topic: topic, written: written, rejected: rejected))
+        try await summarySentence(
+            SectionPrompts.summarySentenceRepair(for: brief, topic: topic, written: written, rejected: rejected), call: "summarySentenceRepair"
+        )
     }
 
     /// The first whole sentence `prompt` answers: one cut at its cap keeps its whole sentences, and a second sentence goes.
-    private func summarySentence(_ prompt: SectionPrompts.Prompt) async throws -> String? {
-        guard let last = try await streamed(prompt, SummarySentenceAnswer.self, tokens: Self.summarySentenceTokens),
+    private func summarySentence(_ prompt: SectionPrompts.Prompt, call: String) async throws -> String? {
+        let call = SectionCallTrace(call: call, role: nil, tokens: Self.summarySentenceTokens)
+        guard let last = try await streamed(prompt, SummarySentenceAnswer.self, call: call),
               let sentence = last.answer.content.sentence,
               let whole = last.isComplete ? sentence.presentValue : Self.wholeSentences(of: sentence) else { return nil }
         return SentenceSplitter.sentences(in: whole).first?.presentValue
@@ -167,61 +175,72 @@ extension FoundationModelsService {
 
     // MARK: A request
 
-    private func respond(_ prompt: SectionPrompts.Prompt, schema: GenerationSchema, tokens: Int) async throws -> GeneratedContent {
+    /// A request is recorded in the trace of the draft (ADR 0032) with its prompt and its raw answer, and a failed one with why.
+    private func respond(_ prompt: SectionPrompts.Prompt, schema: GenerationSchema, call: SectionCallTrace) async throws -> GeneratedContent {
         let session = LanguageModelSession(instructions: prompt.instructions)
+        tracer.record(.request, into: .aiDraft) { call.request(prompt) }
         do {
-            return try await session.respond(
+            let content = try await session.respond(
                 to: prompt.text, schema: schema, includeSchemaInPrompt: true,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokens)
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: call.tokens)
             ).content
-        } catch is CancellationError {
-            throw CancellationError()
+            tracer.record(.response, into: .aiDraft) { call.answered(raw: content.jsonString, complete: nil) }
+            return content
         } catch {
-            if Task.isCancelled {
-                throw CancellationError()
-            }
-            throw Self.map(failure: error)
+            throw failure(of: error, in: call)
         }
     }
 
     private func streamed(
-        _ prompt: SectionPrompts.Prompt, schema: GenerationSchema, tokens: Int
+        _ prompt: SectionPrompts.Prompt, schema: GenerationSchema, call: SectionCallTrace
     ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<GeneratedContent>.Snapshot>? {
         let session = LanguageModelSession(instructions: prompt.instructions)
+        tracer.record(.request, into: .aiDraft) { call.request(prompt) }
         do {
             let stream = session.streamResponse(
                 to: prompt.text, schema: schema, includeSchemaInPrompt: true,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokens)
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: call.tokens)
             )
-            return try await StreamedAnswer.last(of: stream, keepingPartialAfter: Self.leavesAnAnswer(failure:))
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            if Task.isCancelled {
-                throw CancellationError()
+            let last = try await StreamedAnswer.last(of: stream, keepingPartialAfter: Self.leavesAnAnswer(failure:))
+            tracer.record(.response, into: .aiDraft) {
+                last.map { call.answered(raw: $0.answer.rawContent.jsonString, complete: $0.isComplete) } ?? call.unanswered()
             }
-            throw Self.map(failure: error)
+            return last
+        } catch {
+            throw failure(of: error, in: call)
         }
     }
 
     private func streamed<Answer: Generable>(
-        _ prompt: SectionPrompts.Prompt, _ type: Answer.Type, tokens: Int
+        _ prompt: SectionPrompts.Prompt, _ type: Answer.Type, call: SectionCallTrace
     ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<Answer>.Snapshot>? {
         let session = LanguageModelSession(instructions: prompt.instructions)
+        tracer.record(.request, into: .aiDraft) { call.request(prompt) }
         do {
             let stream = session.streamResponse(
                 to: prompt.text, generating: type, includeSchemaInPrompt: true,
-                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokens)
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: call.tokens)
             )
-            return try await StreamedAnswer.last(of: stream, keepingPartialAfter: Self.leavesAnAnswer(failure:))
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            if Task.isCancelled {
-                throw CancellationError()
+            let last = try await StreamedAnswer.last(of: stream, keepingPartialAfter: Self.leavesAnAnswer(failure:))
+            tracer.record(.response, into: .aiDraft) {
+                last.map { call.answered(raw: $0.answer.rawContent.jsonString, complete: $0.isComplete) } ?? call.unanswered()
             }
-            throw Self.map(failure: error)
+            return last
+        } catch {
+            throw failure(of: error, in: call)
         }
+    }
+
+    /// What a request that failed throws: the cancellation as it is, and any other failure as the error the app explains, which the
+    /// trace records with the framework's own words. The framework stops a cancelled request with an error of its own, not with
+    /// `CancellationError`.
+    private func failure(of error: any Error, in call: SectionCallTrace) -> any Error {
+        if error is CancellationError || Task.isCancelled {
+            return CancellationError()
+        }
+        let mapped = Self.map(failure: error)
+        tracer.record(.response, into: .aiDraft) { call.failed(error: "\(mapped.logCode)", framework: String(describing: error)) }
+        return mapped
     }
 
     // MARK: The parts of an answer

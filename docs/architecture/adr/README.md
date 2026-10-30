@@ -32,5 +32,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0029](0029-check-pull-requests-on-the-mac-mini.md) | Check pull requests on the Mac mini | Accepted |
 | [0030](0030-log-through-one-interface-that-carries-no-cv-content.md) | Log through one interface that carries no CV content | Accepted |
 | [0031](0031-let-the-ai-draft-write-around-the-facts.md) | Let the AI draft write around the facts | Accepted |
+| [0032](0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md) | Record each step of the AI draft and the import in test builds | Proposed |
 
 New ADRs copy [template.md](template.md).

@@ -71,6 +71,8 @@ public struct LogEntry: Sendable {
 
 So a log line can be read in Console as it is, sent by a tester, or sent to any future backend, without showing anyone's CV.
 
+**Amended by [ADR 0032](0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md):** the logs carry no CV content; the trace of a test build may, in its own package, on the device, never in the unified log and never off the device without the person's own act. The text above stays as it was decided.
+
 ### 3. Decorators and composites implement the same interface
 
 - **`FanOutLogger([…])`** sends each entry to several loggers, for example the native log and a crash-reporting service at once.
@@ -89,6 +91,8 @@ A new behaviour is one more type that wraps another logger, such as sampling, ad
   - an in-memory ring buffer, for a "Copy diagnostics" button that a tester can paste into feedback;
   - a bridge to swift-log on the server;
   - a crash-reporting service. A service such as Crashlytics sends data off the device and changes the privacy answers in App Store Connect, so it needs its own ADR.
+
+**Amended by [ADR 0032](0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md):** the trace store of a test build is a second kind of sink. It is not an adapter of `DiagnosticLogger`; it receives log entries only through `TracingLogger`.
 
 ### 5. The logger is injected, and made in one place
 
