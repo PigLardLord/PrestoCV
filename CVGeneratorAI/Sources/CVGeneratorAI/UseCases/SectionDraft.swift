@@ -22,6 +22,8 @@ final class SectionDraft {
     static let summaryEnough = (sentences: 3, characters: 220)
     /// Why a sentence on the current job's work that says one of its duties again goes, which its repair reads (#354, round 15).
     static let restatesADutyReason = "describe what the work involves, not the same task"
+    /// Why a sentence that says an earlier sentence of the summary again goes, which its repair reads (#354, round 17).
+    static let repeatsReason = "say something the summary does not say yet"
 
     private let service: any CVGenerationService
     private let sanitizer: CVDataSanitizer
@@ -217,7 +219,7 @@ final class SectionDraft {
     /// the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
-        let fewestTools = sparse ? 4 : 6
+        let fewestTools = sparse ? 3 : 5
         let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
         let headline = Self.headlineRole(of: brief, order: order)
         let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: headline)
@@ -283,8 +285,8 @@ final class SectionDraft {
     /// and one more, as a check may drop one; a title among others asks 2 or 3. One title asked 2 or 3 left the CV short every
     /// time, and the request for those missing named activities and bare kinds (#354, round 6).
     static func toolCount(groups: Int, sparse: Bool) -> ClosedRange<Int> {
-        guard groups == 1 else { return 3...4 }
-        let fewest = sparse ? 4 : 6
+        guard groups == 1 else { return 2...3 }
+        let fewest = sparse ? 3 : 5
         return fewest...(fewest + 1)
     }
 
@@ -440,6 +442,20 @@ final class SectionDraft {
             return verdict
         }
 
+        // `verdict` without a new sentence that says an earlier one of the summary again (`CVDataSanitizer.repeats`), which then
+        // leads its rejections (#354, round 17): a third sentence wrote the second again with "avec bienveillance" added.
+        func withoutRepeats(_ verdict: CVDataSanitizer.SummaryVerdict?) -> CVDataSanitizer.SummaryVerdict? {
+            guard var verdict else { return nil }
+            var earlier = [lead ?? verdict.opening].compactMap { $0 } + accepted
+            var repeats: [String] = []
+            for sentence in following(verdict) where !accepted.contains(sentence) {
+                if CVDataSanitizer.repeats(sentence, earlier: earlier) { repeats.append(sentence) } else { earlier.append(sentence) }
+            }
+            verdict.kept.removeAll(where: repeats.contains)
+            verdict.rejected.insert(contentsOf: repeats.map { .init(sentence: $0, reason: Self.repeatsReason) }, at: 0)
+            return verdict
+        }
+
         while asked < Self.summaryRequests, !Self.isEnough(lead, accepted), accepted.count < Self.summarySentences - 1,
               let topic = topics.popFirst() {
             let written = (lead.map { [$0] } ?? []) + accepted
@@ -447,7 +463,7 @@ final class SectionDraft {
             let answer = try await request(.summary) { [brief] in
                 try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
             }
-            var verdict = withoutCopies(checked(answer), on: topic)
+            var verdict = withoutRepeats(withoutCopies(checked(answer), on: topic))
             if let first = verdict, let rejection = first.rejected.first, asked < Self.summaryRequests,
                !Self.isEnough(lead ?? first.opening, following(first)) {
                 asked += 1
@@ -456,7 +472,7 @@ final class SectionDraft {
                         for: brief, topic: topic, written: written, rejected: Self.quoted(rejection)
                     )
                 }
-                if let second = withoutCopies(checked(repaired), on: topic), following(second).count >= following(first).count {
+                if let second = withoutRepeats(withoutCopies(checked(repaired), on: topic)), following(second).count >= following(first).count {
                     verdict = second
                 }
             }

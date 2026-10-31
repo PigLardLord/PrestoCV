@@ -30,8 +30,8 @@ public struct DraftBrief: Equatable, Sendable {
         public var adding = Self.leastDuties
 
         /// The duties each job gets at least, and from how many of the person's own it gets no typical one (O1).
-        public static let leastDuties = 5
-        public static let mostDuties = 6
+        public static let leastDuties = 4
+        public static let mostDuties = 5
 
         /// The typical duties a job of `said` stated duties needs: enough to reach `leastDuties`, at least one, and none from
         /// `mostDuties` on. Asked for a range, the request padded a job with the same duty said again (#354, round 10).

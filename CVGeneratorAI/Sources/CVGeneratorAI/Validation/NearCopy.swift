@@ -17,6 +17,18 @@ extension CVDataSanitizer {
         }
     }
 
+    /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the
+    /// content words of one of two content words or more, as `nearlyCopies` compares them, or four of them. "Agisco come
+    /// capoturno della manutenzione" after "Lavoro come capoturno della manutenzione" says the opening again.
+    static func repeats(_ sentence: String, earlier: [String]) -> Bool {
+        let own = contentStems(of: sentence)
+        return earlier.contains { other in
+            let said = contentStems(of: other)
+            let shared = said.intersection(own).count
+            return shared >= 4 || (said.count >= 2 && Double(shared) >= 0.6 * Double(said.count))
+        }
+    }
+
     private static func contentStems(of text: String) -> Set<String> {
         Set(Word.words(in: text).map(\.folded).filter { $0.count >= 4 && !functionWords.contains($0) }.map { String($0.prefix(5)) })
     }
