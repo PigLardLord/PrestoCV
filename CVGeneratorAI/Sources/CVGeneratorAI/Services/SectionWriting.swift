@@ -9,9 +9,9 @@ extension FoundationModelsService {
     // MARK: The token caps
 
     /// A job's years and 1 to 4 duties.
-    nonisolated static let jobTokens = 220
+    nonisolated static let jobTokens = 340
     /// A job's repair: up to 3 duties.
-    nonisolated static let jobRepairTokens = 180
+    nonisolated static let jobRepairTokens = 280
     /// 3 to 5 qualities.
     nonisolated static let softSkillsTokens = 100
     /// One sentence of the summary, or its repair: a sentence, not a paragraph (#354, round 13).
@@ -46,7 +46,7 @@ extension FoundationModelsService {
     }
 
     /// The duties a job's request writes: the person's own, then the typical ones it needs, 1 to 4 (#354, round 10).
-    nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(4, max(1, said + adding)) }
+    nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(6, max(1, said + adding)) }
 
     /// A job's years and exactly `duties` duties. A range let the model pad: asked for 2 to 4, it wrote 4 for a job that needed one
     /// more, and the extra ones said a duty again with other words (#354, round 10).
@@ -268,7 +268,7 @@ extension FoundationModelsService {
 
 @Generable
 struct JobRepairAnswer {
-    @Guide(description: "The rejected sentences written again and the duties asked for, one short whole sentence each", .count(1...3))
+    @Guide(description: "The rejected sentences written again and the duties asked for, one short whole sentence each", .count(1...5))
     let duties: [String]
 }
 

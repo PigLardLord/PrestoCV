@@ -12,14 +12,14 @@ final class SectionDraft {
     /// The jobs a draft writes duties for, in its order: a longer career gets no request for its oldest jobs.
     static let writtenJobs = 10
     /// The most technologies and soft skills a draft keeps.
-    static let technologies = 8
+    static let technologies = 10
     static let softSkills = 5
     /// The most sentences a summary keeps.
     static let summarySentences = 4
     /// The most requests the summary makes, a sentence or its repair each (#354, round 13).
-    static let summaryRequests = 4
+    static let summaryRequests = 5
     /// A summary of this many sentences and characters asks no more (#354, round 13).
-    static let summaryEnough = (sentences: 2, characters: 120)
+    static let summaryEnough = (sentences: 3, characters: 220)
     /// Why a sentence on the current job's work that says one of its duties again goes, which its repair reads (#354, round 15).
     static let restatesADutyReason = "describe what the work involves, not the same task"
 
@@ -217,7 +217,7 @@ final class SectionDraft {
     /// the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
-        let fewestTools = sparse ? 3 : 4
+        let fewestTools = sparse ? 4 : 6
         let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
         let headline = Self.headlineRole(of: brief, order: order)
         let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: headline)
@@ -283,8 +283,8 @@ final class SectionDraft {
     /// and one more, as a check may drop one; a title among others asks 2 or 3. One title asked 2 or 3 left the CV short every
     /// time, and the request for those missing named activities and bare kinds (#354, round 6).
     static func toolCount(groups: Int, sparse: Bool) -> ClosedRange<Int> {
-        guard groups == 1 else { return 2...3 }
-        let fewest = sparse ? 3 : 4
+        guard groups == 1 else { return 3...4 }
+        let fewest = sparse ? 4 : 6
         return fewest...(fewest + 1)
     }
 
