@@ -159,20 +159,24 @@ public struct CVDataSanitizer: Sendable {
             inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
         )
         // A kept technology is the person's word in the summary, as the summary check reads it: "SAP" names the work and no one
-        // (#354, round 10), and under O1 a typical tool the skills list holds is draft content too (probe round 4).
+        // (#354, round 10), and under O1 a typical tool the skills list holds is draft content too (probe round 4). The kept employers
+        // and schools are no names the draft's summary invents either, as in the summary check (probe round 7): this pass dropped "Je
+        // donne des cours à l'école Don Milani", which the check had kept. The extraction's own summary keeps no such sentence: "I am
+        // a primary school teacher from Bologna" quotes nothing (ADR 0023).
         let keptTools = skills.filter { $0.kind == .technology }.map(\.name)
         let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + keptTools)
+        let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution)))
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
-        let summary = { (text: String?) in
+        let summary = { (text: String?, words: Set<String>) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {
-                written.isPlain($0, ownWords: ownWords) && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
+                written.isPlain($0, ownWords: words) && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
             }
         }
 
         return CVData(
             personalInfo: personalInfo,
             summary: hasAFact
-                ? summary(writing?.summary) ?? summary(cvData.summary)
+                ? summary(writing?.summary, draftWords) ?? summary(cvData.summary, ownWords)
                 : Self.withoutLiking(source.grounded(cvData.summary, quoting: entries.summaryQuotes, allowsNumbers: false), source),
             experience: experience,
             education: education,

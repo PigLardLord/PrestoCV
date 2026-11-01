@@ -3,27 +3,14 @@ import Foundation
 // MARK: A summary sentence that says a duty again
 
 extension CVDataSanitizer {
-    /// Whether `sentence` says one of the `duties` again in other words (#354, round 15): 60% or more of the content words of a
-    /// duty of two content words or more are in it, past the words of the job's `title`. Words compare by their first five letters,
+    /// Whether `sentence` says one of the `duties` again (#354, probe round 7): past the words of the job's `title`, it shares more
+    /// content words with a single duty sentence than it adds, and adds fewer than two. Words compare by their first five letters,
     /// so "installiere" and "Installation" are one, and a content word has four letters or more and is no function word
-    /// (`functionWords`). The summary check drops a duty copied word for word; "Ich installiere elektrische Anlagen in Neubauten"
-    /// after "Ich installiere Anlagen in Neubauten" is no copy to it, and said the job's work twice.
-    static func nearlyCopies(_ sentence: String, duties: [String], title: String?) -> Bool {
-        let titled = contentStems(of: title ?? "")
-        let own = contentStems(of: sentence).subtracting(titled)
-        return duties.flatMap { SentenceSplitter.sentences(in: $0) }.contains { duty in
-            let said = contentStems(of: duty).subtracting(titled)
-            return said.count >= 2 && Double(said.intersection(own).count) >= 0.6 * Double(said.count)
-        }
-    }
-
-    /// Whether `sentence` says mostly one of the `duties` again (#354, probe round 4): 75% or more of its own content words, past
-    /// the words of the job's `title`, are of a single duty sentence, as `nearlyCopies` compares them. A sentence that joins two
-    /// duties, or says one with what it is for, stays: the summary's slots are the topics of the duties, and a sentence on two of
-    /// them read as a copy of each (`nearlyCopies`). "Ich installiere elektrische Anlagen in Neubauten" after "Ich installiere
-    /// Anlagen in Neubauten" still goes. A sentence that names one of `skills`, the kept tools and qualities, that the duty does not
-    /// name adds to it, and stays (probe round 6, O1): "Preparo i piatti principali … con la padella e il coltello".
-    static func mostlyCopies(_ sentence: String, duties: [String], title: String?, skills: [String]) -> Bool {
+    /// (`functionWords`). A sentence that joins two duties, or says one with how or what for, adds to it and stays: the summary is
+    /// a draft, which the person edits (O1). "Ich installiere elektrische Anlagen in Neubauten" as an electrician, after "Ich
+    /// installiere Anlagen in Neubauten", still goes. A sentence that names one of `skills`, the kept tools and qualities, that the
+    /// duty does not name adds to it too (probe round 6): "Preparo i piatti principali … con la padella e il coltello".
+    static func copiesADuty(_ sentence: String, duties: [String], title: String?, skills: [String]) -> Bool {
         let titled = contentStems(of: title ?? "")
         let own = contentStems(of: sentence).subtracting(titled)
         guard own.count >= 2 else { return false }
@@ -31,8 +18,9 @@ extension CVDataSanitizer {
         let named = skills.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty && holds($0, in: words) }
         return duties.flatMap { SentenceSplitter.sentences(in: $0) }.contains { duty in
             let said = Word.words(in: duty).map(\.folded)
-            return named.allSatisfy { holds($0, in: said) }
-                && Double(contentStems(of: duty).intersection(own).count) >= 0.75 * Double(own.count)
+            let shared = own.intersection(contentStems(of: duty)).count
+            let added = own.count - shared
+            return named.allSatisfy { holds($0, in: said) } && added < 2 && shared > added
         }
     }
 
@@ -41,7 +29,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the
-    /// content words of one of two content words or more, as `nearlyCopies` compares them, or four of them. "Agisco come
+    /// content words of one of two content words or more, as `copiesADuty` compares them, or four of them. "Agisco come
     /// capoturno della manutenzione" after "Lavoro come capoturno della manutenzione" says the opening again.
     static func repeats(_ sentence: String, earlier: [String]) -> Bool {
         let own = contentStems(of: sentence)
@@ -62,7 +50,7 @@ extension CVDataSanitizer {
         "dass", "dafur", "darauf", "damit", "eine", "einen", "einem", "einer", "eines", "mein", "meine", "meinen", "unsere", "habe",
         "haben", "wird", "werden", "sind", "auch", "oder", "sowie", "durch", "nach", "uber", "della", "delle", "dello", "degli",
         "nella", "nelle", "nello", "sono", "anche", "molto", "come", "dove", "questo", "questa", "pour", "avec", "dans", "sont",
-        "mais", "plus", "tous", "toutes", "cette", "leurs", "para", "como", "este", "esta", "estos", "estas", "todos", "todas",
-        "desde", "entre", "muito", "tambem", "pelo", "pela", "pelos", "pelas", "minha", "meus", "minhas", "sobre",
+        "mais", "plus", "tous", "toutes", "cette", "leurs", "comme", "para", "como", "este", "esta", "estos", "estas", "todos",
+        "todas", "desde", "entre", "muito", "tambem", "pelo", "pela", "pelos", "pelas", "minha", "meus", "minhas", "sobre",
     ]
 }

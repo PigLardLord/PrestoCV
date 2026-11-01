@@ -21,8 +21,6 @@ final class SectionDraft {
     nonisolated static var summaryRequests: Int { DraftDepth.isRich ? 8 : 4 }
     /// A summary of this many sentences and characters asks no more (#354, round 13).
     nonisolated static var summaryEnough: (sentences: Int, characters: Int) { DraftDepth.isRich ? (4, 300) : (2, 120) }
-    /// Why a sentence on the current job's work that says one of its duties again goes, which its repair reads (#354, round 15).
-    static let restatesADutyReason = "describe what the work involves, not the same task"
     /// Why a sentence that says an earlier sentence of the summary again goes, which its repair reads (#354, round 17).
     static let repeatsReason = "say something the summary does not say yet"
 
@@ -417,9 +415,6 @@ final class SectionDraft {
             of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order,
             tools: Self.specificFirst(keptTools, language: sanitizer.language(of: description)), hasOpening: brief.opening != nil
         )[...]
-        // The current job's work slots, whose sentences must not say mostly one of its duties again (`CVDataSanitizer.mostlyCopies`).
-        let current = Self.currentJob(of: brief, order: order)
-        let workSlots = current.map { Self.workTopics(of: brief, current: $0, duties: jobDuties, typical: typical) } ?? []
         var lead = brief.opening
         var accepted: [String] = []
         var asked = 0
@@ -438,21 +433,6 @@ final class SectionDraft {
             let opening = lead ?? verdict.opening
             return Array(verdict.kept.filter { $0 != opening && $0 != verdict.opening }.prefix(Self.summarySentences - 1))
         }
-        // `verdict` without a new sentence on the current job's work that says mostly one of its duties again, which then leads
-        // its rejections (#354, round 15): the check reads a copy word for word, not one in other words ("Ich installiere
-        // elektrische Anlagen in Neubauten" after "Ich installiere Anlagen in Neubauten"). A sentence on two duties stays (probe
-        // round 4): the slot asks for the topics of two.
-        func withoutCopies(_ verdict: CVDataSanitizer.SummaryVerdict?, on topic: SummaryTopic) -> CVDataSanitizer.SummaryVerdict? {
-            guard var verdict, let current, workSlots.contains(topic) else { return verdict }
-            let duties = jobDuties.indices.contains(current) ? jobDuties[current] : []
-            let copies = following(verdict).filter { sentence in
-                !accepted.contains(sentence) && CVDataSanitizer.mostlyCopies(sentence, duties: duties, title: topic.title, skills: keptTools + keptQualities)
-            }
-            verdict.kept.removeAll(where: copies.contains)
-            verdict.rejected.insert(contentsOf: copies.map { .init(sentence: $0, reason: Self.restatesADutyReason) }, at: 0)
-            return verdict
-        }
-
         // `verdict`, of a rich draft (`DraftDepth`), without a new sentence that says an earlier one of the summary again
         // (`CVDataSanitizer.repeats`), which then leads its rejections (#354, round 17): a third sentence wrote the second again
         // with "avec bienveillance" added.
@@ -475,7 +455,7 @@ final class SectionDraft {
             let answer = try await request(.summary) { [brief] in
                 try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
             }
-            var verdict = withoutRepeats(withoutCopies(checked(answer), on: topic))
+            var verdict = withoutRepeats(checked(answer))
             if let first = verdict, let rejection = first.rejected.first, asked < Self.summaryRequests,
                !Self.isEnough(lead ?? first.opening, following(first)) {
                 asked += 1
@@ -484,7 +464,7 @@ final class SectionDraft {
                         for: brief, topic: topic, written: written, rejected: Self.quoted(rejection)
                     )
                 }
-                if let second = withoutRepeats(withoutCopies(checked(repaired), on: topic)), following(second).count >= following(first).count {
+                if let second = withoutRepeats(checked(repaired)), following(second).count >= following(first).count {
                     verdict = second
                 }
             }

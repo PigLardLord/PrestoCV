@@ -585,7 +585,7 @@ struct SectionDraftTests {
         #expect(!work.isEmpty && !work.contains("the junior technicians"))
         #expect(service.sectionCalls.filter { $0.hasSuffix("ummary") } == ["summary", "summary", "repairSummary"])
         let repair = try #require(service.summaryRepairs.first)
-        #expect(repair.rejected == "\"\(copy)\": \(SectionDraft.restatesADutyReason)")
+        #expect(repair.rejected == "\"\(copy)\": \(CVDataSanitizer.copiesADutyReason)")
         #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 

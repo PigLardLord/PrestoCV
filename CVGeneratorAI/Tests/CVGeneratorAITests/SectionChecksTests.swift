@@ -300,15 +300,17 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.sentence) == ["Registro le fatture per il cliente Peroni."])
     }
 
-    @Test("o1: a summary sentence that copies five words of a kept duty in a row goes with \"write it in other words\"; one in other words stays")
-    func summaryThatCopiesADuty() throws {
+    @Test("o1: a summary sentence that says a kept duty again and adds less than two words goes with \"write it in other words\"; one that adds two stays (probe round 7)",
+          arguments: [("Gestisco le fatture dei fornitori con precisione.", true), ("Gestisco le fatture dei fornitori con estrema precisione.", false)])
+    func summaryThatCopiesADuty(sentence: String, copies: Bool) throws {
         let verdict = try sanitizer.summaryCheck(
-            of: Self.itTrapsJobs, summary: "Gestisco le fatture dei fornitori con estrema precisione. Seguo i pagamenti a chi rifornisce il negozio.",
+            of: Self.itTrapsJobs, summary: sentence + " Seguo i pagamenti a chi rifornisce il negozio.",
             field: nil, work: [], duties: ["Gestisco le fatture dei fornitori. Archivio le pratiche."], against: try Self.itTraps()
         )
 
-        #expect(verdict.kept == ["Seguo i pagamenti a chi rifornisce il negozio."])
-        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.copiesADutyReason])
+        #expect(verdict.kept.contains("Seguo i pagamenti a chi rifornisce il negozio."))
+        #expect(verdict.rejected.contains(CVDataSanitizer.Rejection(sentence: sentence, reason: CVDataSanitizer.copiesADutyReason)) == copies,
+                "\(verdict.rejected)")
         #expect(CVDataSanitizer.copiesADutyReason.hasSuffix("write it in other words"))
     }
 
@@ -1506,6 +1508,31 @@ struct SectionChecksTests {
         #expect(try final([titled, inferred].joined(separator: " "), ["SAP"]) == titled)
     }
 
+    @Test("The final check reads the kept employer's words in the draft's summary, as the summary check does; the extraction's own summary keeps no sentence on them (probe round 7, ADR 0023)")
+    func summaryNamingAnEmployer() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("fitter", "Harlow Mills", from: "2015")])
+        let description = "I live in Leeds. Since 2015 I have worked as a fitter at Harlow Mills, where I service each gearbox and keep my notes in SAP."
+        let titled = "I work as a fitter at a busy mill and keep its lines running through every shift."
+        let employer = "At Harlow Mills I service each gearbox on the main line and log every repair."
+        let extractedEmployer = "I am a fitter at Harlow Mills."
+        let summary = [titled, employer].joined(separator: " ")
+
+        let check = try english.summaryCheck(
+            of: facts, summary: summary, field: nil, work: ["I service each gearbox."], duties: [], qualities: [], tools: [],
+            against: description
+        )
+        let final = try english.sanitize(
+            facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: [], softSkills: []),
+            against: description
+        )
+        let extracted = try english.sanitize(CVData(summary: extractedEmployer, experience: facts.experience), against: description)
+
+        #expect(check.kept == [titled, employer], "\(check.rejected)")
+        #expect(final.summary == summary)
+        #expect(extracted.summary == nil)
+    }
+
     @Test("A summary sentence names the work by any kept tool, a typical one the person never named too; one with no kept tool and no duty goes (#354, round 13, O1)")
     func summaryNamingAnUnstatedTool() throws {
         let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -1608,11 +1635,12 @@ struct SectionChecksTests {
         ])
     }
 
-    @Test("A summary sentence that ends or closes as an earlier one loses the shared tail and the words that join it, and stays when four words or more are left; with fewer it goes (#354, probe round 6)",
+    @Test("A summary sentence that ends or closes as an earlier one loses the shared tail from the word that brings it in, and stays when four words or more are left; with fewer, or with no such word before the tail, it goes (#354, probe rounds 6 and 7)",
           arguments: [
               ("I check every invoice before it is paid, with care and patience.", "I check every invoice before it is paid."),
               ("I check every invoice before it is paid, with steady patience.", "I check every invoice before it is paid."),
               ("I check every invoice before it is paid using a ledger and an invoicing program.", "I check every invoice before it is paid."),
+              ("I check every invoice before it is paid with the help of a ledger and an invoicing program.", nil),
               ("I check it with care and patience.", nil),
           ] as [(String, String?)])
     func summaryWithASharedTail(second: String, kept: String?) throws {
@@ -1966,13 +1994,20 @@ struct SectionChecksTests {
         )
         #expect(joining.rejected.isEmpty, "\(joining.rejected)")
 
-        // Five words of a duty in a row are the duty copied, not the work in common (#354, round 13, O1).
-        let copied = "I set up the sound systems, mix the support acts and keep each show on time."
+        // A sentence that says a duty again and adds less than two words is the duty copied; one that adds what the person
+        // does besides is the work in common (probe round 7, O1).
+        let copied = "I set up the sound systems and mix the support acts."
         let copying = try english.summaryCheck(
             of: facts, summary: "I work as a sound technician for live shows of every size. " + copied,
             field: nil, duties: duties, against: description
         )
         #expect(copying.rejected.first == CVDataSanitizer.Rejection(sentence: copied, reason: CVDataSanitizer.copiesADutyReason))
+        let adding = "I set up the sound systems, mix the support acts and keep each show on time."
+        let added = try english.summaryCheck(
+            of: facts, summary: "I work as a sound technician for live shows of every size. " + adding,
+            field: nil, duties: duties, against: description
+        )
+        #expect(added.kept.contains(adding), "\(added.rejected)")
     }
 
     @Test("The opening says the current job's title in the present, else the last one's in the past, in the description's language")

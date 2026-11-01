@@ -859,10 +859,8 @@ extension CVDataSanitizer {
             let language = source.explainer.language
             let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
             let currentStems = Self.workStems(of: duties.filter { !endedDuties.contains($0) } + titles.compactMap { $0 })
-            let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
-            // A summary sentence may name the work of a duty, and of two; it goes when it says mostly one (`mostlyCopies`) or
-            // holds eight of its words in a row (probe round 4).
-            let dutyRuns = Self.copiedRuns(of: duties, length: 8)
+            // A summary sentence may name the work of a duty, and of two, and say it with how or what for; it goes when it says one
+            // again and adds less than two words to it (`copiesADuty`, probe round 7).
             let dutyTitles = titles.compactMap { $0?.presentValue }.joined(separator: " ")
             var verdict = SummaryVerdict()
             var seen = Set<String>()
@@ -887,7 +885,6 @@ extension CVDataSanitizer {
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
                 let lower = sentence.lowercased()
                 let verb = Self.leadingVerb(of: sentence)
-                let own = Self.stems(of: sentence)
                 if Self.thirdPersonOpeners.contains(where: lower.hasPrefix)
                     || Self.speaksInTheThirdPerson(sentence, titles: titles.compactMap { $0 }, language: language) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.speaksInTheThirdPerson))
@@ -916,8 +913,7 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if Self.guarantees(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
-                } else if dutySentences.contains(where: own.isSubset) || Self.holdsARun(sentence, of: dutyRuns)
-                    || Self.mostlyCopies(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
+                } else if Self.copiesADuty(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
@@ -1282,6 +1278,8 @@ extension CVDataSanitizer {
     /// its last comma when its closing is one of `closings`, or the last words it shares with one of `earlier` when its ending is
     /// one of `endings`, with the joining words left before them (`tailJoins`). Nil when it shares neither, or when fewer than four
     /// words would be left. The model closed each sentence with the same tools; the sentence went whole, and the summary ran short.
+    /// The shared words go only from the word that brings them in (`toolJoins`), with only joining words between (probe round 7):
+    /// after "…, with care and patience.", the cut of "… with great care and patience." left "… with great.", and now none is made.
     static func withoutTheTail(of sentence: String, endings: Set<[String]>, closings: Set<[String]>, earlier: [String]) -> String? {
         let words = Word.words(in: sentence)
         let folded = words.map(\.folded)
@@ -1290,7 +1288,10 @@ extension CVDataSanitizer {
             let shared = earlier.map { other in
                 zip(folded.reversed(), Word.words(in: other).map(\.folded).reversed()).prefix { $0 == $1 }.count
             }.max() ?? 0
-            end -= shared
+            let start = folded.count - shared
+            guard shared > 0, let tool = folded[..<min(start + 1, folded.count)].lastIndex(where: toolJoins.contains),
+                  folded[min(tool + 1, start)..<start].allSatisfy(tailJoins.contains) else { return nil }
+            end = tool
         } else if let closing = closing(of: sentence), closings.contains(closing), let comma = sentence.lastIndex(of: ",") {
             let offset = sentence.distance(from: sentence.startIndex, to: comma)
             end = words.prefix { $0.range.upperBound <= offset }.count
@@ -1301,6 +1302,12 @@ extension CVDataSanitizer {
         guard end >= 4, end < folded.count else { return nil }
         return String(Array(sentence)[..<words[end - 1].range.upperBound]) + "."
     }
+
+    /// The words, folded, that bring in the tools or the manner a shared ending says, in the five languages a tail is cut in.
+    private static let toolJoins: Set<String> = [
+        "with", "using", "via", "through", "con", "col", "usando", "utilizzando", "tramite", "attraverso", "utilizando", "mediante",
+        "com", "atraves", "traves", "avec", "utilisant", "grace",
+    ]
 
     /// The words, folded, that join a tail to what comes before it in the five languages a tail is cut in: conjunctions,
     /// prepositions and articles.
