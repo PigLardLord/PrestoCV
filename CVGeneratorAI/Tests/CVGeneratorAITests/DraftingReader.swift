@@ -1677,10 +1677,21 @@ enum ReaderRules {
         }
     }
 
-    /// Whether a summary sentence guarantees an outcome: a form of "to guarantee" in the six languages, not its noun.
+    /// Whether a summary sentence promises an outcome: a form of "to guarantee" in the six languages, not its noun, with a clause
+    /// or a word of all or always in the two words after it. A guarantee of plain work is draft content (O1).
     static func guarantees(_ sentence: String) -> Bool {
-        letterWords(of: sentence).contains { word in guaranteeForms.contains(where: word.hasPrefix) }
+        let words = fold(sentence).split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        return words.indices.contains { index in
+            guaranteeForms.contains(where: words[index].hasPrefix)
+                && words[(index + 1)..<min(index + 3, words.count)].contains(where: promiseWords.contains)
+        }
     }
+
+    static let promiseWords: Set<String> = [
+        "that", "every", "each", "always", "all", "100", "zero", "che", "ogni", "sempre", "tutti", "tutte", "tutto", "tutta", "dass",
+        "jede", "jeden", "jedes", "jeder", "jedem", "immer", "null", "que", "cada", "siempre", "todo", "todos", "toda", "todas",
+        "cero", "qu", "chaque", "toujours", "tout", "tous", "toute", "toutes", "aucun", "aucune",
+    ]
 
     static let guaranteeForms = [
         "guarantee", "garantisc", "garantire", "garantend", "garantit", "garantiz", "garanto", "garantim", "garantind", "garantir",

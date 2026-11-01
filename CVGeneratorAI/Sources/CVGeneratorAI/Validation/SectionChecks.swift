@@ -1140,11 +1140,25 @@ extension CVDataSanitizer {
     static let guaranteesReason = "it guarantees a result: say what the person does"
 
 
-    /// Whether a summary sentence guarantees an outcome (#354, round 13): a form of "to guarantee" in the six languages, not its
-    /// noun ("Ich garantiere, dass jede Verbindung funktioniert").
+    /// Whether a summary sentence promises an outcome (#354, round 13): a form of "to guarantee" in the six languages, not its
+    /// noun, with a clause or a word of all or always in the two words after it ("Ich garantiere, dass jede Verbindung
+    /// funktioniert", "I guarantee every delivery"). A guarantee of plain work is draft content (O1; #354, probe round 10):
+    /// "garantisco l'accesso ai sistemi interni", "per garantire la sicurezza alimentare".
     static func guarantees(_ sentence: String) -> Bool {
-        Word.words(in: sentence).map(\.folded).contains { word in guaranteeForms.contains(where: word.hasPrefix) }
+        let words = Word.words(in: sentence).map(\.folded)
+        return words.indices.contains { index in
+            guaranteeForms.contains(where: words[index].hasPrefix)
+                && words[(index + 1)..<min(index + 3, words.count)].contains(where: promiseWords.contains)
+        }
     }
+
+    /// The words after "to guarantee" that make it a promise of an outcome, folded: a clause, all, every, always, a hundred or
+    /// zero. Not "alle", which in Italian is "to the".
+    static let promiseWords: Set<String> = [
+        "that", "every", "each", "always", "all", "100", "zero", "che", "ogni", "sempre", "tutti", "tutte", "tutto", "tutta", "dass",
+        "jede", "jeden", "jedes", "jeder", "jedem", "immer", "null", "que", "cada", "siempre", "todo", "todos", "toda", "todas",
+        "cero", "qu", "chaque", "toujours", "tout", "tous", "toute", "toutes", "aucun", "aucune",
+    ]
 
     static let guaranteeForms = [
         "guarantee", "garantisc", "garantire", "garantend", "garantit", "garantiz", "garanto", "garantim", "garantind", "garantir",

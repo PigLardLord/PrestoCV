@@ -49,6 +49,18 @@ struct WrittenTextTests {
         #expect(written("I'm a senior teacher with years of experience at a school.").isPlain(sentence, ownWords: []))
     }
 
+    @Test("A noun of a low level after a definite article is the matter taught, not a level; without one it is a level (probe round 10)")
+    func taughtLevelNouns() {
+        let french = written("Je suis institutrice. J'enseigne dans une école de ma ville.", languageOfText: { _ in "fr" })
+        let german = written("Ich bin Grundschullehrerin. Ich unterrichte an einer Schule.", languageOfText: { _ in "de" })
+        let statesALevel = { (reason: String?) in reason?.contains("states a level") == true }
+
+        #expect(!statesALevel(french.rejection(of: "J'explique les notions aux élèves.", ownWords: [])))
+        #expect(statesALevel(french.rejection(of: "J'ai des notions d'anglais.", ownWords: [])))
+        #expect(!statesALevel(german.rejection(of: "Sie vermittelt die Grundlagen der Mathematik.", ownWords: [])))
+        #expect(statesALevel(german.rejection(of: "Sie hat Grundkenntnisse in Englisch.", ownWords: [])))
+    }
+
     @Test("A word the description holds only where the person claims nothing is a fact the person never claimed")
     func excludedWords() {
         let text = written("I teach at a school. I would like to teach music.", claiming: ["I teach at a school."])

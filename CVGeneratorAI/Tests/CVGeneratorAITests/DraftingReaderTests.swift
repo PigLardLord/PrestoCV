@@ -478,7 +478,7 @@ struct DraftingReaderTests {
         ])
     }
 
-    @Test("A summary sentence with a verb that guarantees is counted in the six languages; the noun of a warranty is not (#354, round 13)")
+    @Test("A summary sentence that promises an outcome with a verb that guarantees is counted in the six languages; a guarantee of plain work and the noun of a warranty are not (#354, round 13 and probe round 10)")
     func overclaimSummary() {
         let counted = { (summary: String, language: String) in
             Self.reader(CVData(summary: summary), language).filter { $0.kind == .overclaimSummary }.map(\.value)
@@ -487,10 +487,17 @@ struct DraftingReaderTests {
         #expect(counted("Ich verkabele die Schaltschränke. Ich garantiere, dass jede Verbindung funktioniert.", "de")
             == ["Ich garantiere, dass jede Verbindung funktioniert."])
         #expect(counted("I guarantee every delivery on time. I handle the warranty claims.", "en") == ["I guarantee every delivery on time."])
-        #expect(counted("Garantisco la qualità del servizio. Gestisco le garanzie dei clienti.", "it") == ["Garantisco la qualità del servizio."])
-        #expect(counted("Garantizo la entrega de cada pedido. Tramito las garantías.", "es") == ["Garantizo la entrega de cada pedido."])
-        #expect(counted("Je garantis la sécurité des élèves. Je gère la garantie des appareils.", "fr") == ["Je garantis la sécurité des élèves."])
-        #expect(counted("Garanto a qualidade das peças. Trato das garantias.", "pt") == ["Garanto a qualidade das peças."])
+        #expect(counted("Garantisco sempre la qualità del servizio. Gestisco le garanzie dei clienti.", "it")
+            == ["Garantisco sempre la qualità del servizio."])
+        #expect(counted("Garantizo que cada pedido llega a tiempo. Tramito las garantías.", "es") == ["Garantizo que cada pedido llega a tiempo."])
+        #expect(counted("Je garantis qu'aucun élève ne reste seul. Je gère la garantie des appareils.", "fr")
+            == ["Je garantis qu'aucun élève ne reste seul."])
+        #expect(counted("Garanto o 100% das peças sem defeitos. Trato das garantias.", "pt") == ["Garanto o 100% das peças sem defeitos."])
+
+        #expect(counted("Distribuisco i documenti e garantisco l'accesso ai sistemi interni.", "it").isEmpty)
+        #expect(counted("Uso le norme HACCP per garantire la sicurezza alimentare.", "it").isEmpty)
+        #expect(counted("Je garantis la sécurité des élèves.", "fr").isEmpty)
+        #expect(counted("Garanto a qualidade das peças.", "pt").isEmpty)
     }
 
     @Test("A duty word in lower case that the description has only in an employer's name is counted; the name and a word said elsewhere are not (#354, round 11)")

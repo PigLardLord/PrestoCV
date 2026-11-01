@@ -63,6 +63,29 @@ struct RichDraftTests {
         #expect(opened == Array(topics.dropFirst()))
     }
 
+    @Test("The first qualities slot says them with the third pair of work when the job has one, and that work gets no slot of its own (probe round 10)")
+    func qualitiesWithWork() {
+        let duties = [[], [], [
+            "I train the junior technicians.", "I plan the rehearsals.", "I mix the shows.", "I tune the rooms.", "I patch the stage boxes.",
+        ]]
+        let topics = SectionDraft.summaryTopics(
+            of: Self.brief, duties: duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: nil,
+            order: [2, 1, 0], tools: Array(Self.tools.prefix(3)), hasOpening: true
+        )
+
+        #expect(topics == [
+            SummaryTopic(title: "head of sound", work: ["the junior technicians", "the rehearsals"], hasEnded: false),
+            SummaryTopic(title: "head of sound", tools: ["Pro Tools", "DiGiCo SD7", "in-ear monitors"], hasEnded: false),
+            SummaryTopic(title: "head of sound", work: ["the shows", "the rooms"], hasEnded: false),
+            SummaryTopic(title: "head of sound", work: ["the stage boxes"], qualities: ["teamwork", "calm"], hasEnded: false),
+            SummaryTopic(title: "head of sound", qualities: ["care"], hasEnded: false),
+        ])
+        // With no qualities the third pair keeps its own slot.
+        #expect(SectionDraft.summaryTopics(
+            of: Self.brief, duties: duties, typical: [[], [], []], qualities: [], field: nil, order: [2, 1, 0], hasOpening: true
+        ).last == SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false))
+    }
+
     @Test("A job with no title reads the headline, and its field comes first, or last after an opening; a field that reads as a clause goes")
     func summaryField() {
         let brief = DraftBrief(

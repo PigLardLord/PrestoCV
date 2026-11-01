@@ -314,17 +314,30 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.copiesADutyReason.hasSuffix("write it in other words"))
     }
 
-    @Test("o1: a summary sentence that guarantees a result goes with its reason, in any language", arguments: [
-        "Garantisco la correttezza dei pagamenti.", "I guarantee that every invoice is right.", "Ich garantiere, dass jede Verbindung funktioniert.",
-        "Je garantis des comptes exacts.", "Garantizo cuentas exactas.", "Garanto contas exatas.",
+    @Test("o1: a summary sentence that promises an outcome goes with its reason, in any language", arguments: [
+        "I guarantee that every invoice is right.", "I guarantee every delivery on time.", "Ich garantiere, dass jede Verbindung funktioniert.",
+        "Garantisco che ogni pagamento sia corretto.", "Garantisco il 100% di puntualità.", "Je garantis qu'il n'y a aucune erreur.",
+        "Garantizo que todas las cuentas cuadran.", "Garanto sempre contas exatas.",
     ])
     func summaryThatGuarantees(sentence: String) throws {
         #expect(CVDataSanitizer.guarantees(sentence))
         let verdict = try sanitizer.summaryCheck(
-            of: Self.itTrapsJobs, summary: "Garantisco la correttezza dei pagamenti.", field: nil, against: try Self.itTraps()
+            of: Self.itTrapsJobs, summary: "Garantisco sempre la correttezza dei pagamenti.", field: nil, against: try Self.itTraps()
         )
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.guaranteesReason])
-        #expect(!CVDataSanitizer.guarantees("Curo la garanzia dei prodotti venduti."))
+    }
+
+    @Test("o1: a guarantee of plain work is draft content, and so is the noun of a warranty (#354, probe round 10)", arguments: [
+        "Distribuisco i documenti e garantisco l'accesso ai sistemi interni.", "Uso le norme HACCP per garantire la sicurezza alimentare.",
+        "Garantisco la correttezza dei pagamenti.", "I guarantee data quality in the monthly reports.", "Je garantis la sécurité des élèves.",
+        "Garantizo la entrega de los pedidos.", "Garanto a qualidade das peças.", "Curo la garanzia dei prodotti venduti.",
+    ])
+    func summaryThatGuaranteesPlainWork(sentence: String) throws {
+        #expect(!CVDataSanitizer.guarantees(sentence))
+        let verdict = try sanitizer.summaryCheck(
+            of: Self.itTrapsJobs, summary: "Garantisco la correttezza dei pagamenti.", field: nil, against: try Self.itTraps()
+        )
+        #expect(!verdict.rejected.map(\.reason).contains(CVDataSanitizer.guaranteesReason))
     }
 
     @Test("o1: a summary's floor still short ends with a sentence of the person's strengths: the title and two qualities, one form per language", arguments: [

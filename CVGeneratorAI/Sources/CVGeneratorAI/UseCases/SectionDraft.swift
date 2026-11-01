@@ -487,7 +487,8 @@ final class SectionDraft {
     /// field; the topics of its work (`workTopics`); its title with the first two `qualities`; then the first kept duty of each
     /// ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no title reads the
     /// headline title. A rich draft (`DraftDepth`; probe rounds 3 and 4) also asks of the first three kept `tools`, after the
-    /// first work slot, and, after the ended jobs, of the current job's next work, tools and qualities; its title is said by the
+    /// first work slot, with the third pair of work in the first qualities slot, and, after the ended jobs, of the current job's
+    /// next work, tools and qualities; its title is said by the
     /// opening when there is one, so its slot then comes last and only with a field, and the field is asked only of a job with no
     /// title, as a few words of a trade (`cleanField`).
     static func summaryTopics(
@@ -522,11 +523,16 @@ final class SectionDraft {
         topics += work.prefix(1)
         if !tools.isEmpty { topics.append(toolsSlot(tools.prefix(3))) }
         topics += work.dropFirst().prefix(1)
-        if !qualities.isEmpty { topics.append(qualitiesSlot(qualities.prefix(2))) }
+        // The first qualities slot with the third pair of work (probe round 10): with no work of its own, its sentence said again
+        // a duty an earlier sentence had said, and the check rejected it as a repeat.
+        let paired = qualities.isEmpty ? nil : work.dropFirst(2).first
+        if !qualities.isEmpty {
+            topics.append(SummaryTopic(title: title(current), work: paired?.work ?? [], qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
+        }
         topics += ended
         // The slots for a summary still short (probe round 4): with a slot rejected, the summary of a short description stopped at
         // 2 sentences.
-        topics += work.dropFirst(2)
+        topics += work.dropFirst(paired == nil ? 2 : 3)
         if tools.count > 3 { topics.append(toolsSlot(tools.dropFirst(3).prefix(3))) }
         if qualities.count > 2 { topics.append(qualitiesSlot(qualities.dropFirst(2).prefix(2))) }
         if hasOpening, field != nil { topics.append(role) }

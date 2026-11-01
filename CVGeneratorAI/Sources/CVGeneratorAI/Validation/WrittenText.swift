@@ -68,14 +68,17 @@ struct WrittenText {
         guard !Self.hasAContractedNegation(sentence) else { return "it holds a negation" }
 
         let sentenceWords = Word.words(in: sentence)
-        for word in sentenceWords {
+        for (index, word) in sentenceWords.enumerated() {
             let folded = word.folded
             let isAllowed = allowing.contains(folded)
+            let isTaught = index > 0 && Self.isTaught(folded, after: sentenceWords[index - 1].folded)
             if words.isNumber(folded) && !isAllowed { return "the word \"\(folded)\" is a number" }
             if words.qualifications.contains(folded) { return "the word \"\(folded)\" names a qualification" }
             if words.months.contains(folded) { return "the word \"\(folded)\" is a date" }
             if words.negations.contains(folded) { return "the word \"\(folded)\" is a negation" }
-            if isAnUnstatedLevel(folded) && !isAllowed { return "the word \"\(folded)\" states a level the person did not say" }
+            if isAnUnstatedLevel(folded) && !isAllowed && !isTaught {
+                return "the word \"\(folded)\" states a level the person did not say"
+            }
             if isExcluded(folded) { return "the word \"\(folded)\" is something the person only wishes or plans" }
             if foreignWords.contains(folded) { return "the word \"\(folded)\" belongs to another job" }
         }
@@ -117,6 +120,13 @@ struct WrittenText {
     /// Whether `word` is a word of level, duration or seniority that the description does not write.
     func isAnUnstatedLevel(_ word: String) -> Bool {
         (words.seniority.contains(word) || Vocabulary.isLevel(word, in: language)) && !descriptionWords.contains(word)
+    }
+
+    /// Whether `word` is a noun of a low level that `previous`, a definite article, makes the matter that is taught (O1; #354, probe
+    /// round 10): "j'explique les notions aux élèves", "ich vermittle die Grundlagen". Without one it states the person's level:
+    /// "notions d'anglais", "Grundkenntnisse in Excel". Not "des", which is also the article of "j'ai des notions".
+    static func isTaught(_ word: String, after previous: String) -> Bool {
+        ["notions", "grundlagen", "grundkenntnisse"].contains(word) && ["les", "aux", "die", "den", "der"].contains(previous)
     }
 
     private func statesAFact(_ word: String, foreignWords: Set<String>) -> Bool {
