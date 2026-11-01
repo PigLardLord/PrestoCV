@@ -6,8 +6,8 @@ import Testing
 @testable import CVGeneratorAI
 
 /// A draft written a section at a time (ADR 0031, "A request per section"): after the facts, a request per job, then the tools and
-/// the soft skills, then the summary, each answer checked inside its step; a request that fails stops the writing, and the draft
-/// keeps what the earlier ones gave. The description and every answer are invented.
+/// the soft skills, then the summary, each answer checked inside its step; the first request that fails leaves its part unwritten,
+/// the second stops the writing, and the draft keeps what the earlier ones gave. The description and every answer are invented.
 @MainActor
 @Suite("A draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionDraftTests {
@@ -605,7 +605,7 @@ struct SectionDraftTests {
 
     // MARK: Failures
 
-    @Test("A request that fails stops the writing: the draft keeps what the earlier ones gave, and the log names the step", arguments: [
+    @Test("The first request that fails leaves its part unwritten and the writing goes on, and the log names the step", arguments: [
         ("job 1", "jobs"), ("tools", "skills"), ("softSkills", "skills"), ("summary", "summary"),
     ])
     func failingStep(request: String, step: String) async throws {
@@ -615,16 +615,19 @@ struct SectionDraftTests {
 
         let draft = try await draft(service, logger: logger)
 
-        #expect(service.sectionCalls.last == request)
-        #expect(logger.entry("draft.unwritten")?.line == "draft.unwritten step=\(step) error=CVGenerationError.generationFailed")
+        #expect(logger.entries("draft.unwritten").map(\.line) == ["draft.unwritten step=\(step) error=CVGenerationError.generationFailed"])
         #expect(logger.entry("draft.unwritten")?.level == .notice)
+        #expect(service.sectionCalls.last == "summary")
         #expect(job("Fenwick Playhouse", in: draft)?.description?.contains("I moved the scenery between scenes.") == true)
         #expect(job("Fenwick Playhouse", in: draft)?.startDate == "2013")
-        #expect(draft.skills.isEmpty == (step != "summary"))
-        #expect(draft.summary == nil)
+        #expect(!draft.skills.isEmpty)
+        #expect(draft.summary?.hasPrefix(Self.opening) == true)
+        // A job whose request failed gets no repair, which could fail a second time and stop the writing.
+        #expect(!service.sectionCalls.contains("repairJob 1"))
+        #expect(job("Brightwater Events", in: draft)?.description?.contains("I ran the sound checks with each band.") != (step == "jobs"))
     }
 
-    @Test("A request that runs out of time, or fails twice below the model, stops the writing like a failure", arguments: [
+    @Test("A request that runs out of time, or fails twice below the model, leaves its part unwritten like a failure", arguments: [
         "timedOut", "serviceFailed",
     ])
     func timeoutAndRetries(how: String) async throws {
@@ -635,18 +638,47 @@ struct SectionDraftTests {
         } else {
             service.sectionFailures["job 0"] = [CVGenerationError.serviceFailed, CVGenerationError.serviceFailed]
         }
-        let limits = DraftingLimits(extraction: .seconds(30), section: .milliseconds(20))
+        let limits = DraftingLimits(extraction: .seconds(30), section: .milliseconds(200))
 
         let draft = try await draft(service, limits: limits, logger: logger)
 
-        #expect(service.sectionCalls == (how == "timedOut" ? ["job 0"] : ["job 0", "job 0"]))
+        let asked = how == "timedOut" ? ["job 0", "job 1"] : ["job 0", "job 0", "job 1"]
+        #expect(Array(service.sectionCalls.prefix(asked.count)) == asked)
         let error = how == "timedOut" ? "generationFailed" : "serviceFailed"
-        #expect(logger.entry("draft.unwritten")?.line == "draft.unwritten step=jobs error=CVGenerationError.\(error)")
+        #expect(logger.entries("draft.unwritten").map(\.line) == ["draft.unwritten step=jobs error=CVGenerationError.\(error)"])
         #expect(logger.entries("draft.retried").map(\.line) == (how == "timedOut" ? [] : [
             "draft.retried stage=writing error=CVGenerationError.serviceFailed",
         ]))
         #expect(draft.experience.count == 4)
-        #expect(draft.summary == nil && draft.skills.isEmpty)
+        #expect(draft.summary != nil && !draft.skills.isEmpty)
+    }
+
+    @Test("A second request that fails or runs out of time stops the writing: the draft keeps what the earlier ones gave", arguments: [
+        "failed", "timedOut",
+    ])
+    func secondFailure(how: String) async throws {
+        let logger = RecordingLogger()
+        let service = service()
+        if how == "timedOut" {
+            service.sectionDelays["job 1"] = .seconds(30)
+            service.sectionDelays["tools"] = .seconds(30)
+        } else {
+            service.sectionFailures["job 1"] = [CVGenerationError.generationFailed]
+            service.sectionFailures["tools"] = [CVGenerationError.generationFailed]
+        }
+        let limits = DraftingLimits(extraction: .seconds(30), section: .milliseconds(200))
+
+        let draft = try await draft(service, limits: limits, logger: logger)
+
+        #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools"])
+        #expect(logger.entries("draft.unwritten").map(\.line) == [
+            "draft.unwritten step=jobs error=CVGenerationError.generationFailed",
+            "draft.unwritten step=skills error=CVGenerationError.generationFailed",
+        ])
+        #expect(job("Fenwick Playhouse", in: draft)?.description?.contains("I moved the scenery between scenes.") == true)
+        #expect(draft.experience.count == 4)
+        #expect(draft.skills.isEmpty)
+        #expect(draft.summary == nil)
     }
 
     @Test("A request that fails once below the model is tried again, and the draft goes on")

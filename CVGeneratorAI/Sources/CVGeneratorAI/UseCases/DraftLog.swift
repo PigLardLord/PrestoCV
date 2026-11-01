@@ -103,8 +103,8 @@ struct DraftLog {
         )
     }
 
-    /// A request that failed or ran out of time at `step`: a notice, since the draft then keeps only what the earlier requests
-    /// wrote, and no section of the model's own after it.
+    /// A request that failed or ran out of time at `step`: a notice, since its part stays unwritten; at the second, the draft keeps
+    /// only what the earlier requests wrote, and no section of the model's own after it.
     func unwritten(at step: DraftStep, by error: any Error) {
         logger.notice(.draft, "draft.unwritten", .token("step", step.logName), .error(error))
     }

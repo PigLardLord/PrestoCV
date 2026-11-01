@@ -5,8 +5,9 @@ import Foundation
 /// the soft skills, and a last request the summary from the jobs and skills kept. Each answer is checked by the rules of the final
 /// check inside its step, and a step whose check finds too little gets one repair request that reads what it rejected and why.
 ///
-/// A request that fails or runs out of time stops the writing: the draft keeps the facts and what the earlier requests wrote, and the
-/// log says at which step. Cancellation passes through. One instance writes one draft.
+/// The first request that fails or runs out of time leaves its part unwritten and the writing goes on; a second stops the writing:
+/// the draft keeps the facts and what the earlier requests wrote, and the log says at which steps. Cancellation passes through. One
+/// instance writes one draft.
 @MainActor
 final class SectionDraft {
     /// The jobs a draft writes duties for, in its order: a longer career gets no request for its oldest jobs.
@@ -30,14 +31,17 @@ final class SectionDraft {
     private let limit: Duration
     private let description: String
 
-    /// What the requests wrote so far, as their checks kept it: what the draft keeps when a later request fails.
+    /// What the requests wrote so far, as their checks kept it: what the draft keeps when the writing stops.
     private var duties: [String?] = []
     private var years: [Int: RoleWriting] = [:]
     private var technologies: [String] = []
     private var softSkills: [String] = []
     private var summary: String?
 
-    /// A request failed or ran out of time, and the log says so: the writing stops there.
+    /// The requests that failed or ran out of time: the first leaves its part unwritten, the second stops the writing (ADR 0031).
+    private var failures = 0
+
+    /// A second request failed or ran out of time, and the log says so: the writing stops there.
     private struct Stopped: Error {}
 
     /// - Parameters:
@@ -178,9 +182,11 @@ final class SectionDraft {
             // the final check (#354, round 10).
             let adding = brief.roles[number].adding
             guard adding > 0 || !Self.hasItsYears(number, context: context, in: located) else { continue }
+            let failed = failures
             let role = try await request(.jobs) { try await self.service.writeJob(number: number, of: brief) }
             if let role { years[number] = role }
-            guard context.jobs.indices.contains(number) else { continue }
+            // A job whose request failed gets no repair: a second failure would stop the writing before the skills and the summary.
+            guard failures == failed, context.jobs.indices.contains(number) else { continue }
             let job = context.jobs[number].job
             guard let first = try? sanitizer.dutyCheck(
                 of: located, job: job, duties: role?.duties.map(Self.mended), against: description
@@ -601,11 +607,13 @@ final class SectionDraft {
         "\"\(rejection.sentence)\": \(rejection.reason)"
     }
 
-    /// One request of `step`, within its time and tried once more when it fails below the model.
-    /// - Throws: `Stopped` when it fails or runs out of time, once the log says so; CancellationError when the task was cancelled.
+    /// One request of `step`, within its time and tried once more when it fails below the model: nil when it fails or runs out of
+    /// time for the first time, once the log says so.
+    /// - Throws: `Stopped` when it is the second to fail or run out of time, once the log says so; CancellationError when the task
+    ///   was cancelled.
     private func request<Value: Sendable>(
-        _ step: DraftStep, _ work: @escaping @Sendable @MainActor () async throws -> Value
-    ) async throws -> Value {
+        _ step: DraftStep, _ work: @escaping @Sendable @MainActor () async throws -> Value?
+    ) async throws -> Value? {
         do {
             return try await DraftAttempt.run(within: limit, retried: { self.log.retried(at: .writing, by: $0) }, work)
         } catch let cancellation as CancellationError {
@@ -614,7 +622,9 @@ final class SectionDraft {
             // A request stopped by a cancellation may report it with an error of its own.
             try Task.checkCancellation()
             log.unwritten(at: step, by: error)
-            throw Stopped()
+            guard failures == 0 else { throw Stopped() }
+            failures += 1
+            return nil
         }
     }
 }
