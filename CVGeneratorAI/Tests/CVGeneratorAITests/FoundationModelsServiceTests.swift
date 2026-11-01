@@ -115,7 +115,8 @@ struct FoundationModelsServiceTests {
         // Allowed none, the request answered none for a job with no lines of its own, and the next one filled it with roles.
         #expect(tools["minItems"] as? Int == count.lowerBound, "no job goes without tools")
         #expect(tools["maxItems"] as? Int == count.upperBound)
-        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) software") == true)
+        // A technical skill is also a method, a standard or a field of knowledge of the trade (probe round 11).
+        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) technical skills") == true)
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
     }
 

@@ -110,8 +110,8 @@ extension FoundationModelsService {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "\(count.lowerBound) or \(count.upperBound) software, equipment, machines or instruments of the job's trade, "
-                    + "first those its lines name",
+                description: "\(count.lowerBound) or \(count.upperBound) technical skills of the job's trade: software, equipment, "
+                    + "machines, instruments, methods, standards or fields of knowledge; first those its lines name",
                 schema: DynamicGenerationSchema(
                     arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count.lowerBound, maximumElements: count.upperBound
                 )
@@ -145,11 +145,11 @@ extension FoundationModelsService {
             // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
             let who = title.map { "a person working as \($0)" } ?? "the person"
             properties.append(DynamicGenerationSchema.Property(
-                name: "trade", description: "The trade of \(who) and the kinds of software, systems, machines and instruments it uses, in a few words",
+                name: "trade", description: "The trade of \(who) and the software, machines, instruments, methods and knowledge a CV of it lists, in a few words",
                 schema: DynamicGenerationSchema(type: String.self)
             ))
-            let about = "\(tools) more software, systems, machines or instruments of the trade, each new and of another kind; "
-                + "no general kind, no activity, no material or part"
+            let about = "\(tools) more technical skills of the trade: software, machines, instruments, methods, standards or fields "
+                + "of knowledge, each new; no general kind, no task, no material or part"
             properties.append(list("tools", about, tools))
         }
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work, in the language of the CV", qualities)) }
