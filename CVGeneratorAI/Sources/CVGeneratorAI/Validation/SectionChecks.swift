@@ -907,9 +907,13 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.listsSkills))
                 } else if let verb, verbs.contains(verb) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.startsAsAnEarlierOne))
-                } else if let ending = Self.ending(of: sentence), endings.contains(ending) {
+                } else if let ending = Self.ending(of: sentence), endings.contains(ending), Self.saysLittleMore(
+                    sentence, than: verdict.kept.filter { Self.ending(of: $0) == ending }, besides: qualities
+                ) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
-                } else if let closing = Self.closing(of: sentence), closings.contains(closing) {
+                } else if let closing = Self.closing(of: sentence), closings.contains(closing), Self.saysLittleMore(
+                    sentence, than: verdict.kept.filter { Self.closing(of: $0) == closing }, besides: qualities
+                ) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if Self.guarantees(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
@@ -1254,6 +1258,15 @@ extension CVDataSanitizer {
         let clause = Word.words(in: String(sentence.prefix { $0 != "," }))
         guard clause.count >= 5, let first = words.first, !wordsOfThePerson.contains(first) else { return false }
         return qualities.contains { words.starts(with: $0) }
+    }
+
+    /// Whether `sentence`, which ends as the `earlier` kept sentences do, says too little more than one of them to stay: always
+    /// in a plain draft, and in a rich one (`DraftDepth`) when it adds fewer than three content words to it past the `besides`
+    /// qualities (`addedStems`; #354, probe round 14). "Utilizzo il sistema di email per inviare comunicazioni ufficiali e il
+    /// database aziendale per conservare la documentazione richiesta." after a sentence that ends on "la documentazione
+    /// richiesta" says the tools of that work, and stays.
+    static func saysLittleMore(_ sentence: String, than earlier: [String], besides: [String]) -> Bool {
+        !DraftDepth.isRich || earlier.contains { addedStems(sentence, to: $0, besides: besides) < 3 }
     }
 
     /// The first and the last word of the last clause of `sentence` after a comma, folded, when it has three or more: two sentences

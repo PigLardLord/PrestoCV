@@ -29,18 +29,28 @@ extension CVDataSanitizer {
     }
 
     /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the
-    /// content words of one of two content words or more, as `copiesADuty` compares them, or four of them. "Agisco come
-    /// capoturno della manutenzione" after "Lavoro come capoturno della manutenzione" says the opening again.
-    static func repeats(_ sentence: String, earlier: [String]) -> Bool {
+    /// content words of one of two content words or more, as `copiesADuty` compares them, or four of them, and adds fewer than
+    /// two to it past the words of the kept `qualities` (probe round 14). "Agisco come capoturno della manutenzione" after
+    /// "Lavoro come capoturno della manutenzione" says the opening again; "Genero los informes mensuales y mantengo los registros
+    /// de inventario con Balance y Cuentas." after a sentence on the inventory with the same tools adds four words and stays.
+    static func repeats(_ sentence: String, earlier: [String], besides qualities: [String]) -> Bool {
         let own = contentStems(of: sentence)
         return earlier.contains { other in
             let said = contentStems(of: other)
             let shared = said.intersection(own).count
-            return shared >= 4 || (said.count >= 2 && Double(shared) >= 0.6 * Double(said.count))
+            let says = shared >= 4 || (said.count >= 2 && Double(shared) >= 0.6 * Double(said.count))
+            return says && addedStems(sentence, to: other, besides: qualities) < 2
         }
     }
 
-    private static func contentStems(of text: String) -> Set<String> {
+    /// How many content words `sentence` adds to `other`, as `copiesADuty` compares them, past the words of `besides` (#354,
+    /// probe round 14): the kept qualities, which a sentence on work said before joins to it.
+    static func addedStems(_ sentence: String, to other: String, besides: [String]) -> Int {
+        let skipped = contentStems(of: besides.joined(separator: " "))
+        return contentStems(of: sentence).subtracting(contentStems(of: other)).subtracting(skipped).count
+    }
+
+    static func contentStems(of text: String) -> Set<String> {
         Set(Word.words(in: text).map(\.folded).filter { $0.count >= 4 && !functionWords.contains($0) }.map { String($0.prefix(5)) })
     }
 

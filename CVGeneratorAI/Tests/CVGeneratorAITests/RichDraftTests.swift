@@ -92,6 +92,26 @@ struct RichDraftTests {
         ).last == SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false))
     }
 
+    @Test("With no third pair of work, the first qualities slot asks a topic of the job's work no slot asks, and an ended job's slot a topic of its work no earlier slot asks (probe round 14)")
+    func spareWork() {
+        let typical = [[], [], [
+            "I train the junior technicians and plan the rehearsals.", "I mix the shows.", "I tune the rooms.", "I patch the stage boxes.",
+        ]]
+        let duties = [["I trained the junior technicians and rigged the lights."], [], Self.duties[2]]
+
+        let topics = SectionDraft.summaryTopics(
+            of: Self.brief, duties: duties, typical: typical, qualities: ["teamwork", "calm"], field: nil, order: [2, 1, 0], hasOpening: true
+        )
+
+        #expect(topics == [
+            SummaryTopic(title: "head of sound", work: ["the junior technicians", "the rehearsals"], hasEnded: false),
+            SummaryTopic(title: "head of sound", work: ["the rooms", "the stage boxes"], hasEnded: false),
+            SummaryTopic(title: "head of sound", work: ["the shows"], qualities: ["teamwork", "calm"], hasEnded: false),
+            SummaryTopic(title: "stagehand", work: ["the lights"], hasEnded: true),
+        ])
+        #expect(SectionDraft.unused(["delle comunicazioni ufficiali", "i verbali"], besides: ["le comunicazioni ufficiali"]) == ["i verbali"])
+    }
+
     @Test("A job with no title reads the headline, and its field comes first, or last after an opening; a field that reads as a clause goes")
     func summaryField() {
         let brief = DraftBrief(
@@ -155,6 +175,46 @@ struct RichDraftTests {
         let qualities = SummaryTopic(title: "head of sound", qualities: ["calm"], hasEnded: false)
         #expect(SectionDraft.unsaid(work, tools: tools, written: said) == work)
         #expect(SectionDraft.unsaid(qualities, tools: tools, written: said) == qualities)
+    }
+
+    // MARK: The summary's repeats (probe round 14)
+
+    @Test("A summary sentence repeats an earlier one when it shares most of its content words and adds fewer than two past the kept qualities (probe round 14)")
+    func repeatsAnEarlierSentence() {
+        #expect(CVDataSanitizer.repeats(
+            "Agisco come capoturno della manutenzione.", earlier: ["Lavoro come capoturno della manutenzione."], besides: []
+        ))
+        #expect(!CVDataSanitizer.repeats(
+            "Genero los informes mensuales y mantengo los registros de inventario con Balance y Cuentas.",
+            earlier: ["Controlo el inventario y los registros con Balance y Cuentas."], besides: []
+        ))
+        let sentence = "Sono precisa e puntuale mentre gestisco le comunicazioni ufficiali."
+        let earlier = ["Gestisco le comunicazioni ufficiali."]
+        #expect(CVDataSanitizer.repeats(sentence, earlier: earlier, besides: ["precisa", "puntuale"]))
+        #expect(!CVDataSanitizer.repeats(sentence, earlier: earlier, besides: []))
+    }
+
+    @Test("A summary sentence that ends as an earlier one stays when it adds three content words or more to it, and goes with fewer (probe round 14)",
+          arguments: [
+              ("I check every invoice before it is paid with the help of a ledger and an invoicing program.", true),
+              ("I check it with a ledger and an invoicing program.", false),
+          ])
+    func summaryEndingAsAnEarlierOne(second: String, stays: Bool) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Experience(title: "accountant", company: "Brembo Furniture", startDate: "2017", endDate: nil, current: true)])
+        let description = "I live in Lecco. Since 2017 I work as an accountant at Brembo Furniture, where I keep the books and check the invoices."
+        // Not with the opening's verb ("I work as…"): a summary of one sentence gets the opening, and a sentence with its verb goes.
+        let first = "I keep the books as an accountant with a ledger and an invoicing program."
+
+        let verdict = try english.summaryCheck(of: facts, summary: first + " " + second, field: nil, against: description)
+
+        #expect(verdict.kept == (stays ? [first, second] : [first]), "\(verdict.rejected)")
+        #expect(verdict.rejected.contains { $0.sentence == second && $0.reason == CVDataSanitizer.endsAsAnEarlierOne } == !stays)
+        // A plain draft keeps the rule as it was: the sentence goes.
+        DraftDepth.$pinned.withValue(false) {
+            let plain = try? english.summaryCheck(of: facts, summary: first + " " + second, field: nil, against: description)
+            #expect(plain?.kept == [first], "\(plain?.rejected ?? [])")
+        }
     }
 
     // MARK: The summary's request
