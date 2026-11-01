@@ -537,9 +537,9 @@ extension CVDataSanitizer {
 
     /// The runs of five words in a row of `duties`, folded, each sentence on its own; a sentence of fewer words is a run whole: what
     /// a later duty of the job, or a summary sentence, may not hold again (#354, round 13).
-    static func copiedRuns(of duties: [String]) -> [[String]] {
+    static func copiedRuns(of duties: [String], length: Int = 5) -> [[String]] {
         duties.flatMap { SentenceSplitter.sentences(in: $0) }.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
-            .flatMap { duty in duty.count < 5 ? [duty] : (0...(duty.count - 5)).map { Array(duty[$0..<($0 + 5)]) } }
+            .flatMap { duty in duty.count < length ? [duty] : (0...(duty.count - length)).map { Array(duty[$0..<($0 + length)]) } }
     }
 
     /// Whether `sentence` holds one of the `runs` word for word.
@@ -842,11 +842,11 @@ extension CVDataSanitizer {
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
             // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters (#354, round 10); under
-            // O1 a typical tool is draft content, so any kept one anchors a sentence (round 13). A stated tool is no name; one the
-            // description lacks still is, as in the final check (ADR 0031).
-            let stated = tools.filter { source.named($0) != nil }
+            // O1 a typical tool is draft content, so any kept one anchors a sentence (round 13).
+            // Every kept tool's words are the person's own (probe round 4, O1): the skills list holds them already, and the tool
+            // check drops one that holds a name of the draft; read as names, "Excel" and "Xcode" left the summary short.
             let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
-            let statedTools = Self.words(of: stated)
+            let toolWords = Self.words(of: tools)
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
                 return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
@@ -857,7 +857,10 @@ extension CVDataSanitizer {
             let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
             let currentStems = Self.workStems(of: duties.filter { !endedDuties.contains($0) } + titles.compactMap { $0 })
             let dutySentences = duties.flatMap { SentenceSplitter.sentences(in: $0) }.map(Self.stems).filter { !$0.isEmpty }
-            let dutyRuns = Self.copiedRuns(of: duties)
+            // A summary sentence may name the work of a duty, and of two; it goes when it says mostly one (`mostlyCopies`) or
+            // holds eight of its words in a row (probe round 4).
+            let dutyRuns = Self.copiedRuns(of: duties, length: 8)
+            let dutyTitles = titles.compactMap { $0?.presentValue }.joined(separator: " ")
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -904,12 +907,13 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.endsAsAnEarlierOne))
                 } else if Self.guarantees(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
-                } else if dutySentences.contains(where: own.isSubset) || Self.holdsARun(sentence, of: dutyRuns) {
+                } else if dutySentences.contains(where: own.isSubset) || Self.holdsARun(sentence, of: dutyRuns)
+                    || Self.mostlyCopies(sentence, duties: duties, title: dutyTitles) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(statedTools)) {
+                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(toolWords)) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
@@ -1313,13 +1317,30 @@ extension CVDataSanitizer {
         .english: ["with"], .italian: ["con"], .german: ["mit"], .spanish: ["con"], .french: ["avec"], .portuguese: ["com"],
     ]
 
-    /// Whether `sentence` holds three or more of `skills` (each its words, folded) whole: a list of the draft's skills, not the
-    /// person's work (#354, round 3). Two named inside the work ("…con la pala e il forno…") stay.
+    /// Whether `sentence` holds three or more of `skills` (each its words, folded) in a row, with only commas, "and", "or" or an
+    /// article between them: a list of the draft's skills, not the person's work (#354, round 3). Skills named inside the work
+    /// ("Uso il forno per… e l'abbattitore per…") stay (probe round 4): held anywhere, three dropped good sentences.
     static func listsSkills(_ sentence: String, skills: [[String]]) -> Bool {
         let words = Word.words(in: sentence).map(\.folded)
-        let held = Set(skills.filter { run in words.indices.contains { words[$0...].starts(with: run) } })
-        return held.count >= 3
+        let held = skills.filter { !$0.isEmpty }.flatMap { run in
+            words.indices.filter { words[$0...].starts(with: run) }.map { ($0, $0 + run.count) }
+        }.sorted { $0 < $1 }
+        var chain = 0
+        var end = -1
+        for (start, stop) in held where start >= end {
+            chain = end >= 0 && words[end..<start].allSatisfy(listJoiners.contains) ? chain + 1 : 1
+            if chain >= 3 { return true }
+            end = stop
+        }
+        return false
     }
+
+    /// The words that join the items of a list, folded, of the six languages: "and", "or" and the articles.
+    private static let listJoiners: Set<String> = [
+        "and", "or", "the", "a", "an", "e", "ed", "o", "il", "lo", "la", "l", "i", "gli", "le", "un", "una", "und", "oder", "sowie",
+        "der", "die", "das", "den", "dem", "ein", "eine", "einen", "y", "el", "los", "las", "et", "ou", "les", "une", "des", "os", "as",
+        "um", "uma",
+    ]
 
     /// The articles and demonstratives that open a subject, folded, per language ("l" of "l'attività"; the English "I" is none).
     private static let subjectArticles: [Vocabulary.Language: Set<String>] = [

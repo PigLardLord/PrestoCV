@@ -158,10 +158,10 @@ public struct CVDataSanitizer: Sendable {
             titles: ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue), entries,
             inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
         )
-        // A kept technology the description states is the person's word in the summary, as the summary check reads it: "SAP" names
-        // the work and no one (#354, round 10). One the description lacks is still a name.
-        let statedTools = skills.filter { $0.kind == .technology && source.named($0.name) != nil }.map(\.name)
-        let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + statedTools)
+        // A kept technology is the person's word in the summary, as the summary check reads it: "SAP" names the work and no one
+        // (#354, round 10), and under O1 a typical tool the skills list holds is draft content too (probe round 4).
+        let keptTools = skills.filter { $0.kind == .technology }.map(\.name)
+        let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + keptTools)
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let summary = { (text: String?) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {

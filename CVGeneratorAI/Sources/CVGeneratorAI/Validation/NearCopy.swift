@@ -17,6 +17,20 @@ extension CVDataSanitizer {
         }
     }
 
+    /// Whether `sentence` says mostly one of the `duties` again (#354, probe round 4): 75% or more of its own content words, past
+    /// the words of the job's `title`, are of a single duty sentence, as `nearlyCopies` compares them. A sentence that joins two
+    /// duties, or says one with what it is for, stays: the summary's slots are the topics of the duties, and a sentence on two of
+    /// them read as a copy of each (`nearlyCopies`). "Ich installiere elektrische Anlagen in Neubauten" after "Ich installiere
+    /// Anlagen in Neubauten" still goes.
+    static func mostlyCopies(_ sentence: String, duties: [String], title: String?) -> Bool {
+        let titled = contentStems(of: title ?? "")
+        let own = contentStems(of: sentence).subtracting(titled)
+        guard own.count >= 2 else { return false }
+        return duties.flatMap { SentenceSplitter.sentences(in: $0) }.contains { duty in
+            Double(contentStems(of: duty).intersection(own).count) >= 0.75 * Double(own.count)
+        }
+    }
+
     /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the
     /// content words of one of two content words or more, as `nearlyCopies` compares them, or four of them. "Agisco come
     /// capoturno della manutenzione" after "Lavoro come capoturno della manutenzione" says the opening again.

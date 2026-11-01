@@ -140,11 +140,14 @@ struct SectionDraftTests {
         #expect(brief.roles.map(\.clausesNameWork) == [false, true])
     }
 
-    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6)",
-          arguments: [(1, false, 4...5), (1, true, 3...4), (2, false, 2...3), (2, true, 2...3), (3, false, 2...3)] as [(Int, Bool, ClosedRange<Int>)])
-    func toolCount(groups: Int, sparse: Bool, count: ClosedRange<Int>) {
+    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6), but a rich draft's headline title (probe round 4)",
+          arguments: [
+              (0, 1, false, 4...5, 8...9), (0, 1, true, 3...4, 5...6), (0, 2, false, 2...3, 8...9), (1, 2, false, 2...3, 2...3),
+              (2, 3, false, 2...3, 2...3),
+          ] as [(Int, Int, Bool, ClosedRange<Int>, ClosedRange<Int>)])
+    func toolCount(group: Int, groups: Int, sparse: Bool, count: ClosedRange<Int>, rich: ClosedRange<Int>) {
         // One title asked 2 or 3: the CV was always short, and the request for those missing named activities and bare kinds.
-        #expect(SectionDraft.toolCount(groups: groups, sparse: sparse) == count)
+        #expect(SectionDraft.toolCount(group: group, groups: groups, sparse: sparse) == (DraftDepth.isRich ? rich : count))
     }
 
     @Test("A past title's answer adds only its first kept tool, and only while the CV is short of tools of the trade (#354, round 15)")
