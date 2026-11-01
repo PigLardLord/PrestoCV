@@ -1727,8 +1727,9 @@ extension CVDataSanitizer {
             if soft, namesATool, !Self.hasAWordOfItsTrade(item) {
                 // A kind of tool named by a quality alone is no tool of a trade ("Präzisionswerkzeug").
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
-            } else if !soft || namesATool {
-                // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354, round 5).
+            } else if !soft || namesATool || !Self.namesAQuality(item, language: language) {
+                // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354, round 5),
+                // and so is one whose head noun is no quality ("computer di gestione"; #354, probe round 9).
                 if Self.holdsANameWord(item, of: nameWords, in: description) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
                 } else if Self.namesAnActivity(item, language: language) {
@@ -2266,6 +2267,30 @@ extension CVDataSanitizer {
 
     static let firstPersonSubjects: [String: Set<String>] = [
         "en": ["i"], "de": ["ich"], "fr": ["je", "j"], "it": ["io"], "es": ["yo"], "pt": ["eu"],
+    ]
+
+    /// Whether a technology with a soft stem names a quality: one word ("Zuverlässigkeit"), a quality of several words
+    /// ("time management", "lavoro di squadra"), or a head noun, the word that names its kind (the last in English and German, the
+    /// first in the other languages), that holds a stem or names a skill ("gestione del tempo", "capacità organizzative"). A tool
+    /// named by the quality it serves is none ("computer di gestione", "precision scale"): read by any of its words, it went to the
+    /// soft skills (#354, probe round 9).
+    static func namesAQuality(_ item: String, language: String?) -> Bool {
+        let lower = item.lowercased()
+        let words = lower.split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
+        guard words.count > 1, let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return true }
+        return softStems.contains { stem in stem.contains { !$0.isLetter } ? lower.contains(stem) : head.contains(stem) }
+            || qualityHeads.contains(where: head.hasPrefix) || qualityHeadWords.contains(head)
+    }
+
+    /// The beginnings of the head nouns that name a skill of the person ("communication skills", "capacità organizzative").
+    private static let qualityHeads = [
+        "skill", "abilit", "capacit", "competen", "compéten", "fähigkeit", "kompetenz", "habilidad", "aptitud", "attitud",
+    ]
+
+    /// The head nouns that name a quality of the person, whole: as beginnings, "senso" and "sense" named a sensor.
+    private static let qualityHeadWords: Set<String> = [
+        "spirit", "spirito", "esprit", "espíritu", "espírito", "sense", "senso", "sens", "sentido", "doti", "dote", "quality",
+        "qualities", "qualità", "qualité", "qualités", "cualidad", "cualidades", "qualidade", "qualidades",
     ]
 
     /// The beginnings of the names of qualities and activities: listed as a technology, they are soft skills.

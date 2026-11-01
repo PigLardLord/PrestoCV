@@ -175,14 +175,17 @@ enum SectionPrompts {
         if tools > 0 {
             // Asked for the tools of the jobs, the request wrote the tools of a past trade; asked for "named software products, named
             // devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"). The general kinds of the work it
-            // writes go by code (`repairedTools`; #354, round 15).
+            // writes go by code (`repairedTools`; #354, round 15). Asked "each of another kind" of software, systems, machines or
+            // instruments, it wrote kinds an office or a school has none of ("Termostatos", "Blockchain"): it is asked the tools a
+            // CV of the trade typically lists, the most common first, machines only when the trade uses any (probe round 9).
             let who = title.map { "a person working as \($0)" } ?? "a person with these jobs"
             let trade = listedTools.isEmpty ? "the trade" : "the trade of the tools listed"
-            let new = listedTools.isEmpty && rejected.isEmpty ? "" : " each new, none of the tools listed or rejected, and"
+            let new = listedTools.isEmpty && rejected.isEmpty ? "" : " none of the tools listed or rejected;"
             lines.append(
-                "The CV lists too few tools for \(who): name \(tools) more software, systems, machines or instruments of \(trade), "
-                    + "that \(who) uses,\(new) each of another kind"
-                    + (listedTools.isEmpty ? "." : " than those listed.")
+                "The CV lists too few tools for \(who): name \(tools) more tools that a CV of \(who) typically lists, the most "
+                    + "common first: the software, as a kind with a word of the trade or a widely used product of \(trade), then the "
+                    + "equipment, machines or instruments, when the trade uses any;\(new) each a different tool"
+                    + (listedTools.isEmpty ? "." : ", not another name of one listed.")
             )
         }
         if qualities > 0 {
@@ -235,9 +238,9 @@ enum SectionPrompts {
 
     static let richWorkRule = """
         - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
-        tools, say what the person does with one or two of them, by name; with qualities, say how the person works, the person as \
-        the subject. Typical duties and tools of the job are fine, in your own words, concrete: no bare "tools", "software", \
-        "systems", "equipment", "techniques" or "methods".
+        tools, say what the person does with one or two of them, by name, each for the work it is made for; with qualities, say \
+        how the person works, the person as the subject. Name a tool only when a Tools line is given. Typical duties of the job \
+        are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods".
 
         """
 

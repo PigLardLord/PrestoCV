@@ -116,11 +116,14 @@ struct RichDraftTests {
             Do not start with: work; train
             """)
         for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
-            #expect(instructions.contains("with tools, say what the person does with one or two of them, by name"))
+            #expect(instructions.contains(
+                "with tools, say what the person does with one or two of them, by name, each for the work it is made for"
+            ))
+            #expect(instructions.contains("Name a tool only when a Tools line is given."))
             #expect(instructions.contains(
                 "concrete: no bare \"tools\", \"software\", \"systems\", \"equipment\", \"techniques\" or \"methods\""
             ))
-            #expect(instructions.contains("Typical duties and tools of the job are fine, in your own words"))
+            #expect(instructions.contains("Typical duties of the job are fine, in your own words"))
             #expect(instructions.contains("never guarantee a result"))
         }
         // iOS 26's model keeps the plain request: no list of verbs, no rule on the tools.

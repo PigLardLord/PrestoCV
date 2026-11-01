@@ -336,16 +336,21 @@ struct SectionPromptsTests {
         ).text
 
         // Asked for the tools of the jobs, the request wrote the tools of a trade the person left (#354, round 15); asked for "named
-        // software products, named devices", it wrote devices of any trade ("scanner portable", "Tableta táctil").
+        // software products, named devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"); asked "each of
+        // another kind", it wrote kinds an office has none of ("Termostatos"; probe round 9).
         #expect(both.contains(
-            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more software, systems, "
-                + "machines or instruments of the trade of the tools listed, that a person working as manutentore elettromeccanico "
-                + "uses, each new, none of the tools listed or rejected, and each of another kind than those listed."
+            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more tools that a CV of a "
+                + "person working as manutentore elettromeccanico typically lists, the most common first: the software, as a kind "
+                + "with a word of the trade or a widely used product of the trade of the tools listed, then the equipment, machines "
+                + "or instruments, when the trade uses any; none of the tools listed or rejected; each a different tool, not another "
+                + "name of one listed."
         ))
         #expect(toolsOnly.contains(
-            "The CV lists too few tools for a person with these jobs: name 1 more software, systems, machines or instruments of "
-                + "the trade, that a person with these jobs uses, each of another kind."
+            "The CV lists too few tools for a person with these jobs: name 1 more tools that a CV of a person with these jobs "
+                + "typically lists, the most common first: the software, as a kind with a word of the trade or a widely used product "
+                + "of the trade, then the equipment, machines or instruments, when the trade uses any; each a different tool."
         ))
+        #expect(!both.contains("of another kind"))
         #expect(!both.contains("named devices"))
         #expect(!both.contains("material"))
         #expect(!both.contains("pieces of equipment"))

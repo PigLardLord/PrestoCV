@@ -258,8 +258,9 @@ final class SectionDraft {
         let listedTools = kept.filter { $0.kind != .softSkill }.map(\.name)
         let listedQualities = kept.filter { $0.kind == .softSkill }.map(\.name)
         // One more of each kind short, as the checks may drop one, and two more tools of a rich draft, whose answer repeated the
-        // tools listed (probe round 4); the answer is cut to the most of each kind.
-        let toolsAsked = missingTools > 0 ? missingTools + (DraftDepth.isRich ? 2 : 1) : 0
+        // tools listed (probe round 4); the answer is cut to the most of each kind. Asked 8 or more, the request ran out of the
+        // trade's tools and wrote those of another (probe round 9): 6 at most.
+        let toolsAsked = missingTools > 0 ? min(missingTools + (DraftDepth.isRich ? 2 : 1), 6) : 0
         let qualitiesAsked = missingQualities > 0 ? missingQualities + 1 : 0
         let rejected = Self.rejectedSkills(skills.dropped)
         // The tools are asked apart from the qualities: asked together, the tools came back as an activity and a bare record,

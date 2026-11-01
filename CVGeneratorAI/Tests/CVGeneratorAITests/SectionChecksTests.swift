@@ -824,6 +824,25 @@ struct SectionChecksTests {
         #expect(verdict.dropped.isEmpty)
     }
 
+    @Test("A tool named by the quality it serves is a tool; a quality of several words, or with a quality as its head noun, is a soft skill (#354, probe round 9)")
+    func toolNamedByAQuality() {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let plant = sanitizer.skillCheck(
+            technologies: ["computer di gestione", "macchina per taglio di precisione", "gestione del tempo", "capacità organizzative"],
+            softSkills: [], against: JobClausesTests.italian
+        )
+        let lab = english.skillCheck(
+            technologies: ["precision scale", "time management", "communication skills"], softSkills: [],
+            against: "I run the tests in a small food lab in Leeds."
+        )
+
+        #expect(plant.technologies == ["computer di gestione", "macchina per taglio di precisione"])
+        #expect(plant.softSkills == ["gestione del tempo", "capacità organizzative"])
+        #expect(lab.technologies == ["precision scale"])
+        #expect(lab.softSkills == ["time management", "communication skills"])
+    }
+
     @Test("In Italian, a word of English that ends in a consonant goes though the device's dictionary knows it; a loanword Italian writes as its own, a product and an Italian word stay (#354, round 3)")
     func englishWordInItalian() {
         let bothLanguages = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList())
