@@ -172,25 +172,27 @@ struct DraftingEvaluation {
         }
 
         func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
-            let job = try await model.writeJob(number: number, of: brief)
+            let job = try await recorded("job \(number)") { try await model.writeJob(number: number, of: brief) }
             log("job \(number)", job.map { [$0.startDate ?? "-", $0.endDate ?? "-", $0.duties ?? ""] })
             return job
         }
 
         func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
-            let duties = try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+            let duties = try await recorded("job \(number) repair") {
+                try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+            }
             log("job \(number) repair", duties)
             return duties
         }
 
         func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? {
-            let tools = try await model.writeTools(for: brief, roles: roles, count: count)
+            let tools = try await recorded("tools") { try await model.writeTools(for: brief, roles: roles, count: count) }
             log("tools " + roles.map(String.init).joined(separator: ","), tools.map { [$0.joined(separator: " | ")] })
             return tools
         }
 
         func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
-            let qualities = try await model.writeSoftSkills(for: brief)
+            let qualities = try await recorded("soft skills") { try await model.writeSoftSkills(for: brief) }
             log("soft skills", qualities)
             return qualities
         }
@@ -199,16 +201,20 @@ struct DraftingEvaluation {
             for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
             rejected: [String]
         ) async throws -> DraftWriting? {
-            let more = try await model.writeMoreSkills(
-                for: brief, title: title, tools: tools, qualities: qualities, listedTools: listedTools, listedQualities: listedQualities,
-                rejected: rejected
-            )
+            let more = try await recorded("more skills") {
+                try await model.writeMoreSkills(
+                    for: brief, title: title, tools: tools, qualities: qualities, listedTools: listedTools,
+                    listedQualities: listedQualities, rejected: rejected
+                )
+            }
             log("more skills \(tools)+\(qualities)", more.map { $0.technologies + ["/"] + $0.softSkills })
             return more
         }
 
         func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
-            let sentence = try await model.writeSummarySentence(for: brief, topic: topic, written: written)
+            let sentence = try await recorded("summary") {
+                try await model.writeSummarySentence(for: brief, topic: topic, written: written)
+            }
             let slot = ([topic.title, topic.field].compactMap { $0 } + topic.work).joined(separator: ": ")
             log("summary", [sentence ?? "none", "topic: " + slot] + topic.qualities)
             return sentence
@@ -217,13 +223,27 @@ struct DraftingEvaluation {
         func repairSummarySentence(
             for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
         ) async throws -> String? {
-            let sentence = try await model.repairSummarySentence(for: brief, topic: topic, written: written, rejected: rejected)
+            let sentence = try await recorded("summary repair") {
+                try await model.repairSummarySentence(for: brief, topic: topic, written: written, rejected: rejected)
+            }
             log("summary repair", [sentence ?? "none", "rejected: " + rejected])
             return sentence
         }
 
         private func log(_ step: String, _ answer: [String]?) {
             requests.append(RequestRecord(step: step, answer: answer))
+        }
+
+        /// What `work` answers; a request that throws is logged with its error and its time, so that a draft stopped by a failed
+        /// or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no trace).
+        private func recorded<Value>(_ step: String, _ work: () async throws -> Value) async throws -> Value {
+            let start = ContinuousClock.now
+            do {
+                return try await work()
+            } catch {
+                log(step + " failed", [String(reflecting: error), "after \(ContinuousClock.now - start)"])
+                throw error
+            }
         }
     }
 }
