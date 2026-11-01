@@ -212,31 +212,49 @@ enum SectionPrompts {
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
         if !topic.tools.isEmpty { lines.append("Tools: " + topic.tools.joined(separator: "; ")) }
         if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
-        // The first verbs said, by name: told only not to start as an earlier sentence, the sentences kept starting with the same
-        // verb and the check rejected them (#354, probe round 3).
+        // The first verbs said, by name, of a rich draft (`DraftDepth`): told only not to start as an earlier sentence, the
+        // sentences kept starting with the same verb and the check rejected them (#354, probe round 3).
         var seen = Set<String>()
         let verbs = written.compactMap(CVDataSanitizer.leadingVerb(of:)).filter { seen.insert($0).inserted }
-        if !verbs.isEmpty { lines.append("Do not start with: " + verbs.joined(separator: "; ")) }
+        if DraftDepth.isRich, !verbs.isEmpty { lines.append("Do not start with: " + verbs.joined(separator: "; ")) }
         return Prompt(instructions: summarySentenceInstructions, text: lines.joined(separator: "\n"))
     }
 
     /// What every summary sentence keeps to (S2): typical duties and tools are draft content (O1); no fact the person did not say.
-    static let summarySentenceRules = """
+    /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool (probe round 4).
+    static var summarySentenceRules: String {
+        (DraftDepth.isRich ? richWorkRule : plainWorkRule) + summarySentenceLimits
+    }
+
+    static let plainWorkRule = """
+        - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
+        qualities, say how the person works, the person as the subject. Typical duties and tools of the job are fine, in your own \
+        words.
+
+        """
+
+    static let richWorkRule = """
         - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
         tools, say what the person does with one or two of them, by name; with qualities, say how the person works, the person as \
         the subject. Typical duties and tools of the job are fine, in your own words, concrete: no bare "tools", "software", \
         "systems", "equipment", "techniques" or "methods".
+
+        """
+
+    static let summarySentenceLimits = """
         - Do not start with the first verb of a sentence of the summary so far. Start with a capital letter, end with a full stop; \
         no list.
         - Never add a number, company, customer, product, school, place, person, language, study, certification or achievement; \
         no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
         """
 
-    static let summarySentenceInstructions = """
+    static var summarySentenceInstructions: String {
+        """
         You write one more sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
         - Exactly 1 sentence, as the person: in the first person, never "he", "she" or "the person".
 
         """ + summarySentenceRules
+    }
 
     /// The sentence's repair: the request again, then the sentence the check rejected and why.
     static func summarySentenceRepair(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) -> Prompt {
@@ -244,12 +262,14 @@ enum SectionPrompts {
         return Prompt(instructions: summarySentenceRepairInstructions, text: lines.joined(separator: "\n"))
     }
 
-    static let summarySentenceRepairInstructions = """
+    static var summarySentenceRepairInstructions: String {
+        """
         You fix one sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
         - Write the rejected sentence again as exactly 1 sentence that fixes the reason, as the person: in the first person, never \
         "he", "she" or "the person".
 
         """ + summarySentenceRules
+    }
 
     // MARK: The parts of a request
 

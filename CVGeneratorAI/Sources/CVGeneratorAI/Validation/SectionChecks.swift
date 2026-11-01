@@ -847,6 +847,9 @@ extension CVDataSanitizer {
             // check drops one that holds a name of the draft; read as names, "Excel" and "Xcode" left the summary short.
             let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let toolWords = Self.words(of: tools)
+            // The draft's own employers and schools are no names the summary invents (probe round 6): "Je donne des cours à
+            // l'école Don Milani" lost the school where the person teaches.
+            let employerWords = Self.words(of: facts.experience.map(\.company)).union(Self.words(of: facts.education.map(\.institution)))
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
                 return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
@@ -874,6 +877,12 @@ extension CVDataSanitizer {
                 var sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
                 // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays (round 10).
                 if hasATail, let tail = Self.commentTail(of: sentence), tail.praises { sentence = tail.head }
+                // A sentence that ends as an earlier one loses the shared tail, and stays when enough is left to say something
+                // (probe round 6): "…con hojas de cálculo y un sistema de gestión financiero." closed every sentence. Not in German,
+                // where the last words hold the verb ("…, dass die Anlage stabil bleibt").
+                if language != .german, let head = Self.withoutTheTail(of: sentence, endings: endings, closings: closings, earlier: verdict.kept) {
+                    sentence = head
+                }
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
                 let lower = sentence.lowercased()
@@ -908,12 +917,12 @@ extension CVDataSanitizer {
                 } else if Self.guarantees(sentence) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
                 } else if dutySentences.contains(where: own.isSubset) || Self.holdsARun(sentence, of: dutyRuns)
-                    || Self.mostlyCopies(sentence, duties: duties, title: dutyTitles) {
+                    || Self.mostlyCopies(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(toolWords)) {
+                          let reason = written.rejection(of: sentence, ownWords: ownWords.union(toolWords).union(employerWords)) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
@@ -1269,6 +1278,40 @@ extension CVDataSanitizer {
         "^ ce qui [a-z]+ (mon|ma|mes) ", "^ lo (que|cual) [a-z]+ (mi|mis) ", "^ o (que|qual) [a-z]+ (o meu|a minha|os meus|as minhas|meu|minha) ",
     ]
 
+    /// `sentence` without the tail it shares with an earlier sentence of `earlier`, with a full stop (probe round 6): the words after
+    /// its last comma when its closing is one of `closings`, or the last words it shares with one of `earlier` when its ending is
+    /// one of `endings`, with the joining words left before them (`tailJoins`). Nil when it shares neither, or when fewer than four
+    /// words would be left. The model closed each sentence with the same tools; the sentence went whole, and the summary ran short.
+    static func withoutTheTail(of sentence: String, endings: Set<[String]>, closings: Set<[String]>, earlier: [String]) -> String? {
+        let words = Word.words(in: sentence)
+        let folded = words.map(\.folded)
+        var end = folded.count
+        if let ending = ending(of: sentence), endings.contains(ending) {
+            let shared = earlier.map { other in
+                zip(folded.reversed(), Word.words(in: other).map(\.folded).reversed()).prefix { $0 == $1 }.count
+            }.max() ?? 0
+            end -= shared
+        } else if let closing = closing(of: sentence), closings.contains(closing), let comma = sentence.lastIndex(of: ",") {
+            let offset = sentence.distance(from: sentence.startIndex, to: comma)
+            end = words.prefix { $0.range.upperBound <= offset }.count
+        } else {
+            return nil
+        }
+        while end > 0, tailJoins.contains(folded[end - 1]) { end -= 1 }
+        guard end >= 4, end < folded.count else { return nil }
+        return String(Array(sentence)[..<words[end - 1].range.upperBound]) + "."
+    }
+
+    /// The words, folded, that join a tail to what comes before it in the five languages a tail is cut in: conjunctions,
+    /// prepositions and articles.
+    private static let tailJoins: Set<String> = [
+        "and", "with", "using", "by", "for", "to", "of", "the", "a", "an", "in", "on", "through", "via",
+        "e", "ed", "con", "col", "usando", "utilizzando", "tramite", "per", "di", "il", "lo", "la", "i", "gli", "le", "un", "una", "uno",
+        "nel", "nella", "y", "utilizando", "mediante", "para", "de", "el", "los", "las", "en", "por", "com", "atraves", "do", "da",
+        "dos", "das", "o", "os", "as", "um", "uma", "em", "no", "na", "pelo", "pela", "avec", "et", "utilisant", "grace", "par",
+        "pour", "du", "des", "les", "une", "au", "aux", "dans",
+    ]
+
     /// The last three words of `sentence`, folded, when it has five or more: two sentences that end alike repeat a phrase
     /// ("…con enfoque organizado.", #354, round 2).
     static func ending(of sentence: String) -> [String]? {
@@ -1409,7 +1452,18 @@ extension CVDataSanitizer {
         let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
         return firsts.contains { word in
             word.count >= 3 && !openersInO.contains(word) && !isParticiple(word, language: language) && !isGerund(word, language: language)
-                && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei")))
+                && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei") || isAPastOfThePerson(word, language: language)))
+        }
+    }
+
+    /// Whether a lowercased word ends as the first person of the simple past of a verb in "-er" or "-ir": "-í" in Spanish
+    /// ("aprendí"), "-i" or "-í" in Portuguese ("desenvolvi", "construí"; probe round 6). "Desenvolvi aplicações …" read as no verb
+    /// of the person, and went.
+    private static func isAPastOfThePerson(_ word: String, language: Vocabulary.Language) -> Bool {
+        switch language {
+        case .spanish: word.hasSuffix("í")
+        case .portuguese: word.hasSuffix("i") || word.hasSuffix("í")
+        default: false
         }
     }
 

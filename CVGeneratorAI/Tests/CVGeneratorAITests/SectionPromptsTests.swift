@@ -4,7 +4,7 @@ import Testing
 /// The prompts of a draft written a section at a time (ADR 0031, "A request per section"): a request per job that reads the job's own
 /// clauses, a request for the tools of each job and one for the soft skills, then the summary from what the checks kept, and the
 /// repairs that read what a check rejected and why. Every name, trade and date is invented.
-@Suite("The prompts of a draft written a section at a time (ADR 0031)")
+@Suite("The prompts of a draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionPromptsTests {
     private static let brief: DraftBrief = {
         var brief = DraftBrief(

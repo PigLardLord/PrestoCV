@@ -15,4 +15,16 @@ struct NearCopyTests {
     func nearCopy(sentence: String, duties: [String], title: String, copies: Bool) {
         #expect(CVDataSanitizer.nearlyCopies(sentence, duties: duties, title: title) == copies)
     }
+
+    @Test("A sentence whose content words past the title are mostly those of a duty copies it, unless it names a kept tool or quality that the duty does not (#354, probe round 6)",
+          arguments: [
+              ("Preparo i piatti principali e le verdure.", ["Preparo i piatti principali e taglio le verdure."], ["padella"], true),
+              ("Preparo i piatti principali con la padella.", ["Preparo i piatti principali e taglio le verdure."], ["padella"], false),
+              ("Preparo i piatti principali con precisione.", ["Preparo i piatti principali e taglio le verdure."], ["precisione"], false),
+              // A tool the duty names too adds nothing to it.
+              ("Preparo i piatti principali con la padella.", ["Preparo i piatti principali con la padella e taglio le verdure."], ["padella"], true),
+          ] as [(String, [String], [String], Bool)])
+    func mostlyCopies(sentence: String, duties: [String], skills: [String], copies: Bool) {
+        #expect(CVDataSanitizer.mostlyCopies(sentence, duties: duties, title: "cuoco", skills: skills) == copies)
+    }
 }

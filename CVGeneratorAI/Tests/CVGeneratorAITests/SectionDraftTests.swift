@@ -9,7 +9,7 @@ import Testing
 /// the soft skills, then the summary, each answer checked inside its step; a request that fails stops the writing, and the draft
 /// keeps what the earlier ones gave. The description and every answer are invented.
 @MainActor
-@Suite("A draft written a section at a time (ADR 0031)")
+@Suite("A draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionDraftTests {
     /// A sanitizer that reads every text as English and tags the verbs of the description and of the answers as verbs: the checks
     /// then read the same on every platform, with the device's language data or without.
@@ -147,7 +147,8 @@ struct SectionDraftTests {
           ] as [(Int, Int, Bool, ClosedRange<Int>, ClosedRange<Int>)])
     func toolCount(group: Int, groups: Int, sparse: Bool, count: ClosedRange<Int>, rich: ClosedRange<Int>) {
         // One title asked 2 or 3: the CV was always short, and the request for those missing named activities and bare kinds.
-        #expect(SectionDraft.toolCount(group: group, groups: groups, sparse: sparse) == (DraftDepth.isRich ? rich : count))
+        DraftDepth.$pinned.withValue(false) { #expect(SectionDraft.toolCount(group: group, groups: groups, sparse: sparse) == count) }
+        DraftDepth.$pinned.withValue(true) { #expect(SectionDraft.toolCount(group: group, groups: groups, sparse: sparse) == rich) }
     }
 
     @Test("A past title's answer adds only its first kept tool, and only while the CV is short of tools of the trade (#354, round 15)")
@@ -485,7 +486,7 @@ struct SectionDraftTests {
     func chainedSummaryIsCut() async throws {
         let service = service()
         service.summaryResult = """
-            I plan the sound of each production with the mixing desks; I look after the stage monitors in every show; I train the \
+            I plan the sound of each production with the mixing desks; I check the stage monitors for every singer; I train the \
             technicians before the tours; I keep the microphones ready.
             """
 
@@ -493,7 +494,7 @@ struct SectionDraftTests {
 
         let summary = try #require(draft.summary)
         #expect(!summary.contains(";"))
-        #expect(summary.contains("I plan the sound of each production with the mixing desks. I look after the stage monitors in every show."))
+        #expect(summary.contains("I plan the sound of each production with the mixing desks. I check the stage monitors for every singer."))
         #expect(SentenceSplitter.sentences(in: summary).count == 4)
     }
 
@@ -574,7 +575,7 @@ struct SectionDraftTests {
     func summaryNearCopy() async throws {
         let service = service()
         let first = "I keep the sound of every show clear and balanced."
-        let copy = "I train junior technicians in every rehearsal and show."
+        let copy = "I train junior technicians on tour."
         service.summaryResults = [first, copy]
         service.summaryRepairResult = Self.summary
 

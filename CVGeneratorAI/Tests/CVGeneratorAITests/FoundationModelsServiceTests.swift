@@ -3,7 +3,7 @@ import Foundation
 import FoundationModels
 @testable import CVGeneratorAI
 
-@Suite("FoundationModelsService Tests")
+@Suite("FoundationModelsService Tests", .plainDraft)
 struct FoundationModelsServiceTests {
     @Test("map translates every framework availability")
     func mapTranslatesAvailability() {

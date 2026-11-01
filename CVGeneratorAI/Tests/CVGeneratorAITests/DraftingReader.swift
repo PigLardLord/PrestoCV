@@ -769,13 +769,13 @@ enum ReaderRules {
     }
 
     /// Whether a lowercased word, as written, is a first person of the simple past: "-é" or "-í" in Spanish ("controlé", "atendí"),
-    /// "-ei" in Portuguese ("gerenciei"), "-ai" or "-ii" in Italian ("lavorai", "gestii"). A rough rule, read only first in a
-    /// sentence or after a comma (#354, round 13).
+    /// "-i" or "-í" in Portuguese ("gerenciei", "construí"), "-ai" or "-ii" in Italian ("lavorai", "gestii"). A rough rule, read
+    /// only first in a sentence or after a comma (#354, round 13; probe round 6).
     static func isFirstPersonPast(_ word: String, language: String) -> Bool {
         guard word.count >= 5 else { return false }
         switch language {
         case "es": return word.hasSuffix("é") || word.hasSuffix("í")
-        case "pt": return word.hasSuffix("ei")
+        case "pt": return word.hasSuffix("i") || word.hasSuffix("í")
         case "it": return word.hasSuffix("ai") || word.hasSuffix("ii")
         default: return false
         }

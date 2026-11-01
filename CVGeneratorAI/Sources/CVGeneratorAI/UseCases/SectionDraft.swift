@@ -446,17 +446,18 @@ final class SectionDraft {
             guard var verdict, let current, workSlots.contains(topic) else { return verdict }
             let duties = jobDuties.indices.contains(current) ? jobDuties[current] : []
             let copies = following(verdict).filter { sentence in
-                !accepted.contains(sentence) && CVDataSanitizer.mostlyCopies(sentence, duties: duties, title: topic.title)
+                !accepted.contains(sentence) && CVDataSanitizer.mostlyCopies(sentence, duties: duties, title: topic.title, skills: keptTools + keptQualities)
             }
             verdict.kept.removeAll(where: copies.contains)
             verdict.rejected.insert(contentsOf: copies.map { .init(sentence: $0, reason: Self.restatesADutyReason) }, at: 0)
             return verdict
         }
 
-        // `verdict` without a new sentence that says an earlier one of the summary again (`CVDataSanitizer.repeats`), which then
-        // leads its rejections (#354, round 17): a third sentence wrote the second again with "avec bienveillance" added.
+        // `verdict`, of a rich draft (`DraftDepth`), without a new sentence that says an earlier one of the summary again
+        // (`CVDataSanitizer.repeats`), which then leads its rejections (#354, round 17): a third sentence wrote the second again
+        // with "avec bienveillance" added.
         func withoutRepeats(_ verdict: CVDataSanitizer.SummaryVerdict?) -> CVDataSanitizer.SummaryVerdict? {
-            guard var verdict else { return nil }
+            guard var verdict, DraftDepth.isRich else { return verdict }
             var earlier = [lead ?? verdict.opening].compactMap { $0 } + accepted
             var repeats: [String] = []
             for sentence in following(verdict) where !accepted.contains(sentence) {
@@ -495,12 +496,13 @@ final class SectionDraft {
         }
     }
 
-    /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1; probe round 3): the topics of the
-    /// current job's work (`workTopics`, the second slot after the tools); its first three kept `tools`; its title with the first
-    /// two `qualities`; the first kept duty of each ended job, latest first by `order`; of a rich draft its next work, tools and
-    /// qualities (probe round 4); then its title with the field. With an opening the title is said already: its slot comes last,
-    /// and only with a field; with none it comes first. With no current job, the latest one stands for it. A job with no title
-    /// reads the headline title.
+    /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1): the current job's title with the
+    /// field; the topics of its work (`workTopics`); its title with the first two `qualities`; then the first kept duty of each
+    /// ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no title reads the
+    /// headline title. A rich draft (`DraftDepth`; probe rounds 3 and 4) also asks of the first three kept `tools`, after the
+    /// first work slot, and, after the ended jobs, of the current job's next work, tools and qualities; its title is said by the
+    /// opening when there is one, so its slot then comes last and only with a field, and the field is asked only of a job with no
+    /// title, as a few words of a trade (`cleanField`).
     static func summaryTopics(
         of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int],
         tools: [String] = [], hasOpening: Bool = false
@@ -512,31 +514,34 @@ final class SectionDraft {
         let title = { (number: Int) in brief.roles[number].title.presentValue ?? brief.headline }
         let kept = { (number: Int) in duties.indices.contains(number) ? duties[number] : [] }
         let hasEnded = brief.roles[current].hasEnded
+        let work = workTopics(of: brief, current: current, duties: duties, typical: typical)
+        let qualitiesSlot = { (qualities: ArraySlice<String>) in
+            SummaryTopic(title: title(current), qualities: Array(qualities), hasEnded: hasEnded)
+        }
+        let ended = roles.filter { $0 != current }.compactMap { number -> SummaryTopic? in
+            let work = CVDataSanitizer.workTopics(of: kept(number).first ?? "", limit: 1)
+            return work.isEmpty ? nil : SummaryTopic(title: title(number), work: work, hasEnded: brief.roles[number].hasEnded)
+        }
+        guard DraftDepth.isRich else {
+            let role = SummaryTopic(title: title(current), field: field?.presentValue, hasEnded: hasEnded)
+            return [role] + work.prefix(1) + (qualities.isEmpty ? [] : [qualitiesSlot(qualities.prefix(2))]) + ended
+        }
         // The field only for a job with no title, and only as a few words of a trade: a clause of the description fed as the
         // field ("Ich kenne mich mit KNX aus") came back as a sentence on it (#354, probe round 3).
         let field = brief.roles[current].title.presentValue == nil ? cleanField(field) : nil
         let role = SummaryTopic(title: title(current), field: field, hasEnded: hasEnded)
-        var topics = hasOpening ? [] : [role]
-        let work = workTopics(of: brief, current: current, duties: duties, typical: typical)
         let toolsSlot = { (tools: ArraySlice<String>) in SummaryTopic(title: title(current), tools: Array(tools), hasEnded: hasEnded) }
-        let qualitiesSlot = { (qualities: ArraySlice<String>) in
-            SummaryTopic(title: title(current), qualities: Array(qualities), hasEnded: hasEnded)
-        }
+        var topics = hasOpening ? [] : [role]
         topics += work.prefix(1)
         if !tools.isEmpty { topics.append(toolsSlot(tools.prefix(3))) }
         topics += work.dropFirst().prefix(1)
         if !qualities.isEmpty { topics.append(qualitiesSlot(qualities.prefix(2))) }
-        for number in roles where number != current {
-            let work = CVDataSanitizer.workTopics(of: kept(number).first ?? "", limit: 1)
-            if !work.isEmpty { topics.append(SummaryTopic(title: title(number), work: work, hasEnded: brief.roles[number].hasEnded)) }
-        }
-        // A rich draft's slots for a summary still short (`DraftDepth`; probe round 4): the current job's third pair of duties, its
-        // next three tools and its next two qualities. With a slot rejected, the summary of a short description stopped at 2 sentences.
-        if DraftDepth.isRich {
-            topics += work.dropFirst(2)
-            if tools.count > 3 { topics.append(toolsSlot(tools.dropFirst(3).prefix(3))) }
-            if qualities.count > 2 { topics.append(qualitiesSlot(qualities.dropFirst(2).prefix(2))) }
-        }
+        topics += ended
+        // The slots for a summary still short (probe round 4): with a slot rejected, the summary of a short description stopped at
+        // 2 sentences.
+        topics += work.dropFirst(2)
+        if tools.count > 3 { topics.append(toolsSlot(tools.dropFirst(3).prefix(3))) }
+        if qualities.count > 2 { topics.append(qualitiesSlot(qualities.dropFirst(2).prefix(2))) }
         if hasOpening, field != nil { topics.append(role) }
         return topics
     }

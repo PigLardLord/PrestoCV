@@ -21,14 +21,23 @@ extension CVDataSanitizer {
     /// the words of the job's `title`, are of a single duty sentence, as `nearlyCopies` compares them. A sentence that joins two
     /// duties, or says one with what it is for, stays: the summary's slots are the topics of the duties, and a sentence on two of
     /// them read as a copy of each (`nearlyCopies`). "Ich installiere elektrische Anlagen in Neubauten" after "Ich installiere
-    /// Anlagen in Neubauten" still goes.
-    static func mostlyCopies(_ sentence: String, duties: [String], title: String?) -> Bool {
+    /// Anlagen in Neubauten" still goes. A sentence that names one of `skills`, the kept tools and qualities, that the duty does not
+    /// name adds to it, and stays (probe round 6, O1): "Preparo i piatti principali … con la padella e il coltello".
+    static func mostlyCopies(_ sentence: String, duties: [String], title: String?, skills: [String]) -> Bool {
         let titled = contentStems(of: title ?? "")
         let own = contentStems(of: sentence).subtracting(titled)
         guard own.count >= 2 else { return false }
+        let words = Word.words(in: sentence).map(\.folded)
+        let named = skills.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty && holds($0, in: words) }
         return duties.flatMap { SentenceSplitter.sentences(in: $0) }.contains { duty in
-            Double(contentStems(of: duty).intersection(own).count) >= 0.75 * Double(own.count)
+            let said = Word.words(in: duty).map(\.folded)
+            return named.allSatisfy { holds($0, in: said) }
+                && Double(contentStems(of: duty).intersection(own).count) >= 0.75 * Double(own.count)
         }
+    }
+
+    private static func holds(_ run: [String], in words: [String]) -> Bool {
+        words.indices.contains { words[$0...].prefix(run.count).elementsEqual(run) }
     }
 
     /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the

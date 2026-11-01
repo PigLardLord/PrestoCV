@@ -5,7 +5,7 @@ import Testing
 /// summary are read sentence by sentence, as the final check reads them, with the reason a repair request reads for each sentence
 /// that goes. The descriptions are Italian, and their language is given, so the checks read the same on every platform; every name,
 /// trade and date is invented.
-@Suite("The checks of a draft written a section at a time (ADR 0031)")
+@Suite("The checks of a draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionChecksTests {
     private let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList())
 
@@ -1465,7 +1465,7 @@ struct SectionChecksTests {
         #expect(opened.kept == [duty])
     }
 
-    @Test("A summary sentence that names a kept tool of fewer than five letters names the work, and one the description states is no name; the same sentence without it, or with a tool the description does not state, goes, in the summary check and in the final check (#354, round 10)")
+    @Test("A summary sentence that names a kept tool of fewer than five letters names the work, and a kept tool is no name, stated or typical; the same sentence without it, or with a tool the draft does not keep, goes, in the summary check and in the final check (#354, round 10; probe round 5, O1)")
     func summaryNamingAShortTool() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Self.job("fitter", "Harlow Mills", from: "2015")])
@@ -1480,18 +1480,21 @@ struct SectionChecksTests {
         let tool = "I log each repair in SAP before the end of the day."
         let bare = "I log each repair before the end of the day."
         let inferred = "I log each repair in Maximo before the end of the day."
+        let unkept = "I log each repair in SAP and in Primavera before the end of the day."
 
         let named = try check([titled, tool].joined(separator: " "))
         let unnamed = try check([titled, bare].joined(separator: " "))
-        let unstated = try check([titled, inferred].joined(separator: " "))
+        let typical = try check([titled, inferred].joined(separator: " "))
+        let other = try check([titled, unkept].joined(separator: " "))
 
         #expect(named.rejected.isEmpty, "\(named.rejected)")
         #expect(named.kept == [titled, tool])
         #expect(unnamed.rejected.first { $0.sentence == bare }?.reason == CVDataSanitizer.namesNoWork, "\(unnamed.rejected)")
-        #expect(unstated.rejected.first { $0.sentence == inferred }?.reason.hasSuffix("reads as a name") == true, "\(unstated.rejected)")
+        #expect(typical.kept == [titled, inferred], "\(typical.rejected)")
+        #expect(other.rejected.first { $0.sentence == unkept }?.reason.hasSuffix("reads as a name") == true, "\(other.rejected)")
 
-        // The final check reads the stated technologies the draft keeps as the person's words too: a summary names no tool the
-        // description lacks, as no other name (ADR 0031, "inferred").
+        // The final check reads the technologies the draft keeps as the person's words too, a typical one the description lacks
+        // as well (O1: it is draft content); a summary names no other name (ADR 0031, "inferred").
         let final = { (summary: String, technologies: [String]) in
             try english.sanitize(
                 facts, writing: DraftWriting(summary: summary, roleDescriptions: [nil], technologies: technologies, softSkills: []),
@@ -1499,7 +1502,8 @@ struct SectionChecksTests {
             ).summary
         }
         #expect(try final([titled, tool].joined(separator: " "), ["SAP"]) == [titled, tool].joined(separator: " "))
-        #expect(try final([titled, inferred].joined(separator: " "), ["SAP", "Maximo"]) == titled)
+        #expect(try final([titled, inferred].joined(separator: " "), ["SAP", "Maximo"]) == [titled, inferred].joined(separator: " "))
+        #expect(try final([titled, inferred].joined(separator: " "), ["SAP"]) == titled)
     }
 
     @Test("A summary sentence names the work by any kept tool, a typical one the person never named too; one with no kept tool and no duty goes (#354, round 13, O1)")
@@ -1582,7 +1586,7 @@ struct SectionChecksTests {
         #expect(sanitized.summary == [titled, team].joined(separator: " "), "\(sanitized.summary ?? "nil")")
     }
 
-    @Test("A summary sentence that ends with the last three words of an earlier one goes; one that shares fewer stays (#354, round 2)")
+    @Test("A summary sentence that ends with the last three words of an earlier one loses the words they share, and stays; one that shares fewer stays whole (#354, round 2; probe round 6)")
     func summaryWithARepeatedEnding() throws {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Self.job("contable", "Muebles Albarracín", from: "2017")])
@@ -1596,12 +1600,50 @@ struct SectionChecksTests {
             field: nil, work: ["cuentas", "facturas"], duties: [], qualities: [], against: description
         )
 
-        #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.endsAsAnEarlierOne])
-        #expect(verdict.rejected.map(\.sentence) == ["Llevo las cuentas de la empresa con enfoque ordenado."])
+        #expect(verdict.rejected.isEmpty, "\(verdict.rejected)")
         #expect(verdict.kept == [
             "Trabajo como contable y cuido las cuentas de cada cliente con enfoque ordenado.",
+            "Llevo las cuentas de la empresa.",
             "Preparo las facturas de los clientes con un enfoque claro y ordenado.",
         ])
+    }
+
+    @Test("A summary sentence that ends or closes as an earlier one loses the shared tail and the words that join it, and stays when four words or more are left; with fewer it goes (#354, probe round 6)",
+          arguments: [
+              ("I check every invoice before it is paid, with care and patience.", "I check every invoice before it is paid."),
+              ("I check every invoice before it is paid, with steady patience.", "I check every invoice before it is paid."),
+              ("I check every invoice before it is paid using a ledger and an invoicing program.", "I check every invoice before it is paid."),
+              ("I check it with care and patience.", nil),
+          ] as [(String, String?)])
+    func summaryWithASharedTail(second: String, kept: String?) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Self.job("accountant", "Brembo Furniture", from: "2017")])
+        let description = "I live in Lecco. Since 2017 I work as an accountant at Brembo Furniture, where I keep the books and check the invoices."
+        let first = second.contains("ledger")
+            ? "I work as an accountant and keep the books in order with a ledger and an invoicing program."
+            : "I work as an accountant and keep the books of the firm in order, with care and patience."
+
+        let verdict = try english.summaryCheck(of: facts, summary: first + " " + second, field: nil, against: description)
+
+        if let kept {
+            #expect(verdict.kept == [first, kept], "\(verdict.rejected)")
+            #expect(verdict.rejected.isEmpty, "\(verdict.rejected)")
+        } else {
+            #expect(!verdict.kept.contains(second))
+            #expect(verdict.rejected.contains { $0.sentence == second && $0.reason == CVDataSanitizer.endsAsAnEarlierOne }, "\(verdict.rejected)")
+        }
+    }
+
+    @Test("A summary sentence may name the person's own employer; a capitalised name the CV does not hold still goes (#354, probe round 6)",
+          arguments: [("Seguo i conti della Mobili Brembo con cura e precisione.", true), ("Seguo i conti con Zucchetti e con cura.", false)])
+    func summaryNamingTheEmployer(sentence: String, stays: Bool) throws {
+        let (checker, facts, description) = Self.accountant("it")
+        let summary = "Lavoro come contabile e analizzo i movimenti di cassa ogni settimana. " + sentence
+
+        let verdict = try checker.summaryCheck(of: facts, summary: summary, field: nil, against: description)
+
+        #expect(verdict.kept.contains(sentence) == stays, "\(verdict.rejected)")
+        #expect(verdict.rejected.contains { $0.sentence == sentence && $0.reason.hasSuffix("reads as a name") } == !stays, "\(verdict.rejected)")
     }
 
     @Test("A summary sentence whose closing clause opens and ends as an earlier one's goes; one that ends otherwise stays (#354, round 8)")
@@ -1828,7 +1870,7 @@ struct SectionChecksTests {
         #expect(verdict.rejected.map(\.reason) == [CVDataSanitizer.speaksInTheThirdPerson])
     }
 
-    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays; a past participle first, or a gerund, is no verb of the person (#354, rounds 5 and 6)",
+    @Test("An Italian, Spanish or Portuguese summary sentence with no word and no verb of the person goes; one with a verb of the person first, or first after a comma, or a word of the person stays; a past participle first, or a gerund, is no verb of the person; a first person of the past is one (#354, rounds 5 and 6; probe round 6)",
           arguments: [
               ("it", "Ogni azione è guidata dalla cura per i conti.", false), ("it", "Controllo i conti della ditta ogni giorno.", true),
               ("it", "Con cura, verifico i movimenti di cassa.", true), ("it", "Il mio lavoro è tenere i conti in ordine.", true),
@@ -1847,6 +1889,9 @@ struct SectionChecksTests {
               ("es", "Atiendo a los proveedores con calma.", true), ("es", "Reviso las facturas, asegurando su exactitud.", true),
               ("pt", "As faturas exigem cuidado, garantindo prazos cumpridos.", false),
               ("pt", "Atendo os fornecedores com calma.", true),
+              // A first person of the past in "-í" or "-i" is one (#354, probe round 6).
+              ("es", "Aprendí a revisar las facturas cada semana.", true), ("pt", "Desenvolvi um arquivo ordenado das faturas.", true),
+              ("pt", "Construí um arquivo ordenado das faturas.", true),
           ])
     func summaryWithNoVerbOfThePerson(language: String, sentence: String, stays: Bool) throws {
         let (checker, facts, description) = Self.accountant(language)
