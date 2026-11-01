@@ -608,13 +608,15 @@ enum ReaderRules {
     // MARK: Technologies
 
     /// A technology whose head noun, by its stem, an earlier technology has: the last word in English and German, the first in the
-    /// other languages ("cahier d'exercices" after "cahiers").
+    /// other languages ("cahier d'exercices" after "cahiers"). A generic head (`genericHeads`) is no kind: "software di diagnostica"
+    /// and "software di gestione flussi" are two tools (probe round 12).
     static func sharedHeads(in cv: CVData, language: String) -> [ReaderFinding] {
         var heads: Set<String> = []
         var found: [ReaderFinding] = []
         for (index, skill) in cv.skills.enumerated() where skill.kind == .technology {
             let words = letterWords(of: skill.name).filter { !["l", "d"].contains($0) }
-            guard let word = ["en", "de"].contains(language) ? words.last : words.first, word.count >= 4 else { continue }
+            guard let word = ["en", "de"].contains(language) ? words.last : words.first, word.count >= 4,
+                  !genericHeads.contains(fold(word)) else { continue }
             let head = headGroups[stem(word)] ?? stem(word)
             if !heads.insert(head).inserted {
                 found.append(ReaderFinding(kind: .sharedHeadNoun, path: "skills[\(index)].name", value: skill.name))

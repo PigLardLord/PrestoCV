@@ -430,7 +430,7 @@ struct SectionDraftTests {
     @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
     func moreSkills() async throws {
         let service = service()
-        service.toolsResult = [[], [], [], ["mixing desks", "frequency calibration"]]
+        service.toolsResult = [[], [], [], ["mixing desks", "equipment"]]
         service.softSkillsResult = ["teamwork"]
         service.moreSkillsResult = DraftWriting(
             summary: nil, roleDescriptions: [], technologies: ["stage monitors", "PA systems", "document management system", "microphones"],
@@ -441,11 +441,11 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 2)
         // One more of each kind short than missing, as a rule may drop one of them; asked with the qualities, the tools came back as
-        // an activity and a bare record, asked alone as a system.
+        // a bare kind and a bare record, asked alone as a system (a method is a technical skill since probe round 12).
         #expect(service.moreSkillsRequests.map { [$0.tools, $0.qualities] } == [[4, 0], [0, 3]])
         for request in service.moreSkillsRequests {
             #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
-            #expect(request.rejected == ["\"frequency calibration\": an activity, not a tool"])
+            #expect(request.rejected == ["\"equipment\": a general kind, not a named tool"])
         }
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
@@ -454,18 +454,20 @@ struct SectionDraftTests {
         #expect(!draft.skills.contains { $0.name == "document management system" })
     }
 
-    @Test("A written tool of the kind of a tool the person names goes; the named one stays (#354, round 2)")
+    @Test("A written tool of the kind of a tool the person names goes; the named one stays, and so does one of a generic kind (#354, round 2; probe round 12)")
     func toolOfAStatedKind() async throws {
         let service = service()
-        service.generateResult = .success(CVData(experience: Self.extracted.experience, skills: [Skill(name: "PA systems", kind: .technology)]))
+        service.generateResult = .success(CVData(experience: Self.extracted.experience, skills: [Skill(name: "digital consoles", kind: .technology)]))
         // The headline title's answer: a past title's adds only one while the CV is short (#354, round 15).
-        service.toolsResult = [["scenery flats"], ["stage monitors"], [], ["line array systems", "microphones", "mixing desks"]]
+        service.toolsResult = [["scenery flats"], ["stage monitors"], [], ["audio mixing console", "microphones", "line array systems"]]
 
-        let draft = try await draft(service)
+        let draft = try await draft(service, of: description + "\nI mix on digital consoles.")
 
-        #expect(draft.skills.contains { $0.name == "PA systems" })
-        #expect(!draft.skills.contains { $0.name == "line array systems" })
+        #expect(draft.skills.contains { $0.name == "digital consoles" })
+        #expect(!draft.skills.contains { $0.name == "audio mixing console" })
         #expect(draft.skills.contains { $0.name == "microphones" })
+        // "systems" is a generic kind, so the PA systems the person sets up are no kind of their own.
+        #expect(draft.skills.contains { $0.name == "line array systems" })
     }
 
     @Test("A kind of tool with a word of its trade stays though the CV lists enough tools; a bare kind goes (#354, round 4)")

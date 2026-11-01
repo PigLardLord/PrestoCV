@@ -1645,10 +1645,12 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
-    /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a technology that names an activity
-    /// (`namesAnActivity`); the singular and the plural of one skill count
-    /// once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the second goes; a fragment, a
-    /// verb, a skill in another language and a soft skill that names a tool go, and so does stationery, furniture or protective wear
+    /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a German infinitive (`isGermanActivity`),
+    /// while a method or a field of the trade stays ("manutenzione preventiva", "Facturación"; probe round 12); the singular and the
+    /// plural of one skill count once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the
+    /// second goes, unless that noun is a generic kind ("software di diagnostica", "software di controllo"); a fragment, a verb, a
+    /// skill in another language (a product name is none: "Docker") and a soft skill that names a tool go, and so does stationery,
+    /// furniture or protective wear
     /// (`namesAnEverydayObject`); so does a technology that is a bare kind of tool
     /// ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo") stays (#354, round 4). A technology the verb it starts with leads ("usare i PLC") is
     /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
@@ -1660,19 +1662,17 @@ extension CVDataSanitizer {
     /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
     /// one of them, by its head noun, the written one goes (#354, round 2). A written technology that holds a word of one of the
     /// `names` of the CV (an employer, a school, the person) goes unless the description writes it whole: the tools request read
-    /// "Kestrel Logistics" and wrote "Kestrel forklift" (#354, round 7). So does one that is, by its head noun, what the person's
-    /// work is done on (`workObjectHeads`): "quadri elettrici" for a person who checks them.
+    /// "Kestrel Logistics" and wrote "Kestrel forklift" (#354, round 7). What the person's work is done on stays: a CV of the trade
+    /// lists it ("quadri elettrici" for a person who checks them; probe round 12).
     func skillCheck(
         technologies: [String], softSkills: [String], stated: [String], names: [String] = [], against description: String
     ) -> SkillVerdict {
         checkedSkills(technologies: technologies, softSkills: softSkills, stated: stated, names: names, against: description)
     }
 
-    /// The written skills, cleaned by code (`skillCheck`); a skill the person states keeps the object of its verb, which may be
-    /// what the work is done on (`dropsWorkObjects` false: "I mix on digital desks").
+    /// The written skills, cleaned by code (`skillCheck`).
     private func checkedSkills(
-        technologies: [String], softSkills: [String], stated: [String], names: [String], dropsWorkObjects: Bool = true,
-        against description: String
+        technologies: [String], softSkills: [String], stated: [String], names: [String], against description: String
     ) -> SkillVerdict {
         let language = DescriptionText(description, languageOfText: languageOfText).explainer.language?.rawValue
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
@@ -1707,9 +1707,12 @@ extension CVDataSanitizer {
             }
             if let language, language != "en" {
                 // Each word as written: the device's German dictionary knows its nouns only with their capital ("Multimeter"), and
-                // read in lower case a tool of the trade went as English (#354, round 15).
+                // read in lower case a tool of the trade went as English (#354, round 15). A technology whose words all have a
+                // capital is a product's name in any language but German, whose nouns all have one ("Docker", "TypeScript"; probe
+                // round 12).
                 let letters = words.filter { $0.count >= 3 && $0.allSatisfy(\.isLetter) && $0 != $0.uppercased() }
-                if !letters.isEmpty, letters.allSatisfy({
+                let named = cutsVerb && language != "de" && letters.allSatisfy { $0.first?.isUppercase == true }
+                if !letters.isEmpty, !named, letters.allSatisfy({
                     wordList.knows($0, inLanguage: "en") == true && wordList.knows($0, inLanguage: language) == false
                 }) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "another language"))
@@ -1731,7 +1734,6 @@ extension CVDataSanitizer {
             return kept
         }
         var heads = Set(stated.compactMap { Self.headKey(of: $0, language: language) })
-        let objects = dropsWorkObjects ? Self.workObjectHeads(in: description, language: language).subtracting(heads) : []
         let nameWords = nameWords(of: names, language: language)
         for raw in Self.joiningClippedModifiers(technologies, in: description, language: language) {
             guard let item = check(raw, true), keys.insert(Self.skillKey(item)).inserted else { continue }
@@ -1746,7 +1748,7 @@ extension CVDataSanitizer {
                 // and so is one whose head noun is no quality ("computer di gestione"; #354, probe round 9).
                 if Self.holdsANameWord(item, of: nameWords, in: description) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
-                } else if Self.namesAnActivity(item, language: language) {
+                } else if language == "de", Self.isGermanActivity(item) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
                 } else if Self.namesARecord(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a record or a document, not a tool"))
@@ -1756,9 +1758,8 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "an everyday object, not a tool of the trade"))
                 } else if Self.namesABareKind(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
-                } else if let head = Self.headKey(of: item, language: language), objects.contains(head) {
-                    verdict.dropped.append(Rejection(sentence: raw, reason: "what the work is done on"))
-                } else if let head = Self.headKey(of: item, language: language), !heads.insert(head).inserted {
+                } else if !Self.hasAGenericHead(item, language: language), let head = Self.headKey(of: item, language: language),
+                          !heads.insert(head).inserted {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "same kind as an earlier tool"))
                 } else {
                     verdict.technologies.append(item)
@@ -1789,7 +1790,7 @@ extension CVDataSanitizer {
         return verdict
     }
 
-    // MARK: Names and work objects among the tools
+    // MARK: Names among the tools
 
     /// The words of `names` that name nothing else (#354, round 7): of 3 letters or more, with a capital, no word that links others
     /// ("di", "of") and no legal form ("GmbH"). In German, whose nouns all take a capital, a name word is one the device's dictionary
@@ -1814,78 +1815,6 @@ extension CVDataSanitizer {
         return DescriptionText.spans(of: DescriptionText.normalized(item), in: DescriptionText.normalized(description)).isEmpty
     }
 
-    /// The head keys (`headKey`) of what the person's work is done on (#354, round 7): the topics of the description's clauses
-    /// (`topic(of:opensTheSentence:)`) without their articles, none that holds a number, an acronym or, but in German, a name. A
-    /// clause whose verb is one of using (`useVerbs`: "uso i PLC") names a tool, and so does a clause it leads with no verb of its
-    /// own ("e il multimetro").
-    private static func workObjectHeads(in description: String, language: String?) -> Set<String> {
-        var heads = Set<String>()
-        for sentence in SentenceSplitter.sentences(in: description) {
-            let characters = Array(Digits.ascii(sentence))
-            var pieces: [[Word]] = [[]]
-            for word in Word.words(in: sentence) {
-                if dutyConjunctions.contains(word.folded), !word.isHyphenated {
-                    pieces.append([])
-                    continue
-                }
-                pieces[pieces.count - 1].append(word)
-                if word.endsWithABreak { pieces.append([]) }
-            }
-            var using = false
-            for (index, raw) in pieces.enumerated() {
-                guard let opening = raw.first else { continue }
-                // What follows a verb of using in its sentence is a tool too ("Uso i PLC e il multimetro"), until a subject opens a
-                // clause of its own ("and I clean the loading docks").
-                if using, !subjectWords.contains(opening.folded) || opening.folded == "i" && language != "en" { continue }
-                let topic: ArraySlice<Word>
-                if index > 0, skillLinkWords.contains(opening.folded), opening.folded != "i" || language != "en" {
-                    // An article and no verb: the clause goes on with the verb of the one before it ("e i nastri").
-                    topic = raw[...]
-                } else {
-                    let piece = Array(raw.drop { subjectWords.contains($0.folded) || relativeOpenings.contains($0.folded) })
-                    let words = Self.topic(of: piece, opensTheSentence: true)
-                    // "Lavoro con il muletto": what the work is done with is a tool too.
-                    using = useVerbs.contains(verb(of: piece)?.folded ?? "") || instrumentWords.contains(words?.first?.folded ?? "")
-                    guard !using, let words else { continue }
-                    topic = words
-                }
-                // The object itself, up to the first word that links another to it: "panels" of "panels for the line".
-                let words = topic.drop { skillLinkWords.contains($0.folded) }.prefix { !skillLinkWords.contains($0.folded) }
-                guard !words.contains(where: \.isNumber) else { continue }
-                let written = words.map { String(characters[$0.range]) }
-                let named = written.contains { word in
-                    word.filter(\.isUppercase).count > 1 || language != "de" && word.first?.isUppercase == true
-                }
-                // A topic of a kind of tool ("the CNC machines", "il gestionale di sistema") names what the person works with.
-                let ofATool = words.contains { toolKinds.contains($0.folded) || toolWords.contains($0.folded) }
-                if !named, !ofATool, let head = headKey(of: written.joined(separator: " "), language: language) { heads.insert(head) }
-            }
-        }
-        return heads
-    }
-
-    /// The verb of a clause after its subject: the word after an auxiliary, the last word after a German one, else the first.
-    private static func verb(of piece: [Word]) -> Word? {
-        guard let first = piece.first else { return nil }
-        if germanAuxiliaries.contains(first.folded) { return piece.last }
-        if auxiliaries.contains(first.folded) { return piece.dropFirst().first }
-        return first
-    }
-
-    /// The prepositions of what the work is done with, folded.
-    private static let instrumentWords: Set<String> = ["with", "con", "mit", "avec", "com"]
-
-    /// The verbs of using, operating or driving a tool, folded, in the six languages: what they lead is a tool, not what the work
-    /// is done on.
-    private static let useVerbs: Set<String> = [
-        "use", "uses", "used", "using", "operate", "operates", "operated", "drive", "drove", "driven", "run", "runs", "ran",
-        "uso", "usavo", "usato", "utilizzo", "utilizzavo", "utilizzato", "adopero", "guido", "guidavo", "manovro", "conduco",
-        "usaba", "usado", "utilizo", "utilizaba", "utilizado", "manejo", "manejaba", "opero", "conduzco",
-        "usava", "utilizava", "conduzo", "manuseio", "operado",
-        "utilise", "utilisais", "conduis", "manie", "pilote",
-        "benutze", "benutzt", "nutze", "genutzt", "verwende", "verwendet", "bediene", "bedient", "fahre", "gefahren",
-    ]
-
     /// The words that name a skill or a knowledge and no skill ("compétence", "skills", "Wissen"), without accents: alone, they are
     /// no quality (#354).
     static let skillWords: Set<String> = [
@@ -1907,9 +1836,10 @@ extension CVDataSanitizer {
         return partKeys.contains(skillKey(head))
     }
 
-    /// Whether a technology is a record or a document alone, or the scan or audit of one (#354, round 8): the request for more
-    /// tools filled the count with "Escaneo", "Registro" and "archivio", and the tools request listed "Documenti". A record named
-    /// with its system or device stays ("registro elettronico", "archivio digitale", "document scanner").
+    /// Whether a technology is a record or a document alone, or the scan of one (#354, round 8): the request for more tools filled
+    /// the count with "Escaneo", "Registro" and "archivio", and the tools request listed "Documenti". A record named with its system
+    /// or device stays ("registro elettronico", "archivio digitale", "document scanner"), and so does an audit, a method of the
+    /// trade ("Auditoría"; probe round 12).
     static func namesARecord(_ item: String, language: String?) -> Bool {
         if recordKeys.contains(skillKey(item)) { return true }
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { !skillLinkWords.contains($0) }
@@ -1928,10 +1858,9 @@ extension CVDataSanitizer {
         "archive", "archives", "archivio", "archivi", "archivo", "archivos", "arquivo", "arquivos", "archiv",
     ].map(skillKey))
 
-    /// The keys (`skillKey`) of the scan or audit of a record, the head noun of an activity that ends as no other does.
+    /// The keys (`skillKey`) of the scan of a record, the head noun of an activity that ends as no other does.
     private static let scanKeys: Set<String> = Set([
-        "scan", "scans", "audit", "audits", "scansione", "scansioni", "escaneo", "escaneos", "auditoría", "auditorías",
-        "escaneamento", "auditoria", "auditorias", "numérisation", "scannen",
+        "scan", "scans", "scansione", "scansioni", "escaneo", "escaneos", "escaneamento", "numérisation", "scannen",
     ].map(skillKey))
 
     /// The keys (`skillKey`) of the parts and materials of the trades that install them, singular and plural, in each language.
@@ -2116,9 +2045,7 @@ extension CVDataSanitizer {
     /// `mostSkillWords` words, a clause of the person's that names no skill (#354); any other as it is.
     func statedSkill(_ name: String, against description: String) -> String? {
         guard !Self.isTooLong(name.split(whereSeparator: \.isWhitespace).map(String.init)) else { return nil }
-        let verdict = checkedSkills(
-            technologies: [name], softSkills: [], stated: [], names: [], dropsWorkObjects: false, against: description
-        )
+        let verdict = checkedSkills(technologies: [name], softSkills: [], stated: [], names: [], against: description)
         guard verdict.dropped.contains(where: { $0.reason == "verb cut" }) else { return name }
         return verdict.technologies.first ?? verdict.softSkills.first ?? name
     }
@@ -2135,6 +2062,14 @@ extension CVDataSanitizer {
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first, head.count >= 4 else { return nil }
         let key = skillKey(head)
         return headGroups[key] ?? key
+    }
+
+    /// Whether a tool's head noun (`headKey`) is a generic kind ("software di diagnostica", "Audio editing software"): two tools of
+    /// that kind are two tools (probe round 12).
+    private static func hasAGenericHead(_ item: String, language: String?) -> Bool {
+        let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
+        guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
+        return toolWords.contains(head) || toolKinds.contains(DescriptionText.normalized(head))
     }
 
     /// The keys of head nouns that name one tool, by the key that stands for them: a mixer and a desk are a mixing console.
@@ -2166,23 +2101,6 @@ extension CVDataSanitizer {
             capitalised = capitalised || !sentenceStart
         }
         return capitalised
-    }
-
-    /// Whether a technology names an activity, not a tool: its head noun ends as a noun of an action does ("frequency calibration",
-    /// "manutenzione preventiva"). A kind of tool named by what it does is a tool ("software di tracciamento", "logiciel de gestion
-    /// de classe"; #354, round 5: dropping it left trades with too few tools). A skill with an acronym or a digit names a tool ("PLC
-    /// programming"); a noun of a thing with such an ending ("docking station", "stazione di saldatura") is no activity. German,
-    /// whose nouns of actions and of machines share their endings ("Steuerung"), is not read.
-    static func namesAnActivity(_ item: String, language: String?) -> Bool {
-        if language == "de" { return isGermanActivity(item) }
-        guard let language, let endings = activityEndings[language] else { return false }
-        let words = item.split { !$0.isLetter && !$0.isNumber }.map(String.init)
-        guard !words.contains(where: { word in
-            word.contains(where: \.isNumber) || word.count >= 2 && word.allSatisfy(\.isUppercase)
-        }) else { return false }
-        let lower = words.map { $0.lowercased() }.filter { !skillLinkWords.contains($0) }
-        guard let head = language == "en" ? lower.last : lower.first else { return false }
-        return head.count >= 6 && endings.contains(where: head.hasSuffix) && !activityLookalikes.contains(where: head.hasSuffix)
     }
 
     /// Whether a German technology of one word is the infinitive of an activity written as a noun ("Messen", "Installieren"; #354,
@@ -2243,22 +2161,6 @@ extension CVDataSanitizer {
         "plataforma", "plataformas", "plattform", "plateforme", "editor", "editors", "editeur", "workstation", "workstations",
         "tool", "tools", "ferramenta", "ferramentas", "herramienta", "herramientas", "strumento", "strumenti", "outil", "outils",
         "werkzeug", "werkzeuge",
-    ]
-
-    /// The endings of the nouns of an action, by language: "-ing" and "-tion" of English, "-zione" and "-mento" of Italian.
-    private static let activityEndings: [String: [String]] = [
-        "en": ["ing", "tion", "sion", "control"],
-        "it": ["zione", "sione", "mento", "aggio", "controllo"],
-        "es": ["ción", "sión", "miento", "control"],
-        "fr": ["tion", "sion", "contrôle"],
-        "pt": ["ção", "são", "controle"],
-    ]
-
-    /// The nouns of a thing that end as a noun of an action does.
-    private static let activityLookalikes = [
-        "station", "stazione", "postazione", "estación", "estação", "strumento", "instrumento", "equipamento", "equipaggiamento",
-        "string", "ceiling", "building", "bearing", "housing", "casing", "fitting", "coupling",
-        "applicazione", "applicazioni", "application", "applications", "aplicación", "aplicaciones", "aplicação", "aplicações",
     ]
 
     /// The key by which two skills are one: their words without a plural ending or a last vowel ("PLC" and "PLCs").

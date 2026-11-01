@@ -948,6 +948,38 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["another language"])
     }
 
+    @Test("A technology whose words all have a capital is a product's name in a description of another language; a quality so written is not, nor is a German noun (#354, probe round 12)")
+    func productNameIsNoOtherLanguage() {
+        let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: EnglishOnly())
+        let german = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: EnglishOnly())
+
+        let product = portuguese.skillCheck(
+            technologies: ["Docker", "TypeScript", "preventive maintenance"], softSkills: ["Team Spirit"],
+            against: "Trabalho como programador em Braga desde 2019."
+        )
+        let noun = german.skillCheck(technologies: ["Docker"], softSkills: [], against: "Ich arbeite seit 2019 als Entwickler in Suhl.")
+
+        #expect(product.technologies == ["Docker", "TypeScript"])
+        #expect(product.softSkills.isEmpty)
+        #expect(product.dropped.map(\.sentence) == ["preventive maintenance", "Team Spirit"])
+        #expect(Set(product.dropped.map(\.reason)) == ["another language"])
+        #expect(noun.technologies.isEmpty)
+        #expect(noun.dropped.map(\.reason) == ["another language"])
+    }
+
+    @Test("A field of the trade, its billing and its audit are technical skills (#354, probe round 12)")
+    func fieldOfTheTradeIsATechnology() {
+        let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = spanish.skillCheck(
+            technologies: ["Contabilidad", "Facturación", "Auditoría"], softSkills: [],
+            against: "Trabajo como contable en una gestoría de Murcia desde 2017."
+        )
+
+        #expect(verdict.technologies == ["Contabilidad", "Facturación", "Auditoría"])
+        #expect(verdict.dropped.isEmpty)
+    }
+
     @Test("Of two technologies of one kind, by their head noun, the second goes; tools of other kinds, and a short last word, stay (#354)")
     func toolsOfOneKind() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -970,8 +1002,7 @@ struct SectionChecksTests {
 
     @Test("In every language two written tools of one head noun are one kind, whatever their modifiers, as the reader counts them (#354, round 16)",
           arguments: [
-              ("it", ["software di gestione impianti", "software di controllo"], ["software di gestione impianti"]),
-              ("it", ["strumenti di diagnostica", "strumenti di misura"], ["strumenti di diagnostica"]),
+              ("it", ["pinza spelafili", "pinza a becchi"], ["pinza spelafili"]),
               ("pt", ["chave de fenda", "chave inglesa"], ["chave de fenda"]),
               ("en", ["studio monitors", "stage monitors"], ["studio monitors"]),
           ])
@@ -983,7 +1014,22 @@ struct SectionChecksTests {
         #expect(verdict.technologies == kept)
     }
 
-    @Test("A written technology of the kind of a tool the person names goes, a console, a mixer and a desk one kind; a tool of another kind stays (#354, round 2)")
+    @Test("Two written tools whose head noun is a generic kind are two tools, as the reader counts them (#354, probe round 12)",
+          arguments: [
+              ("it", ["software di diagnostica", "software di gestione flussi", "strumenti di misura", "strumenti di diagnostica"]),
+              ("en", ["audio editing software", "video editing software"]),
+              ("es", ["software de contabilidad", "software de facturación"]),
+          ])
+    func genericHeadIsNoKind(language: String, technologies: [String]) {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdict = checker.skillCheck(technologies: technologies, softSkills: [], against: "Lavoro a Lecce dal 2019.")
+
+        #expect(verdict.technologies == technologies)
+        #expect(verdict.dropped.isEmpty)
+    }
+
+    @Test("A written technology of the kind of a tool the person names goes, a console, a mixer and a desk one kind; a tool of another kind, and one of a generic kind, stays (#354, round 2; probe round 12)")
     func toolOfAStatedKind() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
@@ -992,13 +1038,13 @@ struct SectionChecksTests {
             softSkills: [], stated: ["digital consoles", "PA systems"], against: "I mix on digital consoles and set up the PA systems in Hull."
         )
 
-        #expect(verdict.technologies == ["studio monitors"])
+        #expect(verdict.technologies == ["studio monitors", "line array systems"])
         #expect(Set(verdict.dropped.map(\.reason)) == ["same kind as an earlier tool"])
     }
 
     @Test("A one-word technology clipped from a phrase of two joined by a conjunction is joined back; two tools joined by one stay apart (#354, round 5)",
           arguments: [
-              // What the person works with: what the work is done on is no tool (round 7).
+              // What the person works with and what the work is done on are both skills of the trade (probe round 12).
               ("it", "Lavoro con schemi elettrici e pneumatici e programmo PLC e HMI.", ["PLC", "schemi elettrici", "pneumatici", "HMI"],
                ["PLC", "schemi elettrici e pneumatici", "HMI"]),
               ("en", "I work with hydraulic and pneumatic valves and use PLC and HMI panels.", ["hydraulic", "pneumatic valves", "PLC", "HMI panels"],
@@ -1013,8 +1059,8 @@ struct SectionChecksTests {
         #expect(verdict.dropped.isEmpty)
     }
 
-    @Test("A technology that names an activity goes; equipment, a kind of tool named by what it does, a named tool and one with an acronym stay (#354, rounds 1 and 5)")
-    func activityIsNoTechnology() {
+    @Test("A method or a field of the trade is a technical skill, as equipment and a named tool are (#354, probe round 12)")
+    func methodIsATechnology() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
         let sound = english.skillCheck(
@@ -1038,13 +1084,18 @@ struct SectionChecksTests {
             softSkills: [], against: "J'enseigne dans une petite école de village près de Rodez."
         )
 
-        #expect(sound.technologies == ["digital consoles", "PA systems", "tracking software", "PLC programming", "line arrays", "docking station"])
-        #expect(sound.dropped.map(\.sentence) == ["frequency calibration", "signal routing", "beam focusing"])
-        #expect(Set(sound.dropped.map(\.reason)) == ["activity"])
-        #expect(plant.technologies == ["PLC", "software di tracciamento", "sistema di controllo remoto", "stazione di saldatura", "multimetro", "programmazione PLC"])
-        #expect(plant.dropped.map(\.sentence) == ["manutenzione preventiva"])
-        #expect(school.technologies == ["logiciel de gestion de classe", "tableau numérique"])
-        #expect(school.dropped.map(\.sentence) == ["correction des copies"])
+        #expect(sound.technologies == [
+            "digital consoles", "frequency calibration", "PA systems", "signal routing", "beam focusing", "tracking software",
+            "PLC programming", "line arrays", "docking station",
+        ])
+        #expect(sound.dropped.isEmpty)
+        #expect(plant.technologies == [
+            "PLC", "software di tracciamento", "sistema di controllo remoto", "stazione di saldatura", "manutenzione preventiva",
+            "multimetro", "programmazione PLC",
+        ])
+        #expect(plant.dropped.isEmpty)
+        #expect(school.technologies == ["logiciel de gestion de classe", "correction des copies", "tableau numérique"])
+        #expect(school.dropped.isEmpty)
     }
 
     @Test("A tool that holds a word of the employer's name goes, unless the person writes it whole; one of a name the CV does not hold stays (#354, round 7)")
@@ -1065,8 +1116,8 @@ struct SectionChecksTests {
         #expect(unnamed.technologies == ["Kestrel forklift", "reach truck"])
     }
 
-    @Test("A tool that is, by its head noun, what the person's work is done on goes; what the person uses stays (#354, round 7)")
-    func toolThatIsAWorkObject() {
+    @Test("What the person's work is done on is a skill of the trade, as what the person uses is; one of the kind of a stated one goes (#354, probe round 12)")
+    func workObjectIsATechnology() {
         let description = "Controllo i quadri elettrici e riparo i nastri trasportatori. Uso i PLC e il multimetro per trovare i guasti."
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
@@ -1081,15 +1132,15 @@ struct SectionChecksTests {
             against: "I work with forklifts and a pallet jack, and I clean the loading docks."
         )
 
-        #expect(verdict.technologies == ["PLC", "multimetro"])
-        #expect(verdict.dropped.map(\.reason) == ["what the work is done on", "what the work is done on"])
-        #expect(stated.dropped.map(\.reason) != ["what the work is done on"])
-        #expect(driven.technologies == ["forklift", "pallet jack"])
-        #expect(driven.dropped.map(\.reason) == ["what the work is done on"])
+        #expect(verdict.technologies == ["quadri elettrici", "PLC", "nastri trasportatori", "multimetro"])
+        #expect(verdict.dropped.isEmpty)
+        #expect(stated.dropped.map(\.reason) == ["same kind as an earlier tool"])
+        #expect(driven.technologies == ["forklift", "pallet jack", "loading dock"])
+        #expect(driven.dropped.isEmpty)
     }
 
-    @Test("An application of a trade is a tool, though its noun ends as an activity's does; the activity of that trade goes (#354, round 7)")
-    func applicationIsNoActivity() {
+    @Test("An application of a trade and an activity of that trade are both skills of it (#354, round 7; probe round 12)")
+    func applicationAndActivityStay() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -1111,24 +1162,24 @@ struct SectionChecksTests {
             against: "Trabalho no armazém de uma loja em Braga."
         )
 
-        #expect(office.technologies == ["applicazione di contabilità"])
-        #expect(office.dropped.map(\.reason) == ["activity"])
-        #expect(shop.technologies == ["stock tracking application"])
-        #expect(shop.dropped.map(\.reason) == ["activity"])
-        #expect(clinic.technologies == ["aplicaciones de facturación"])
-        #expect(clinic.dropped.map(\.reason) == ["activity"])
-        #expect(store.technologies == ["aplicação de inventário"])
-        #expect(store.dropped.map(\.reason) == ["activity"])
+        #expect(office.technologies == ["applicazione di contabilità", "riparazione delle stampanti"])
+        #expect(office.dropped.isEmpty)
+        #expect(shop.technologies == ["stock tracking application", "stock reconciliation"])
+        #expect(shop.dropped.isEmpty)
+        #expect(clinic.technologies == ["aplicaciones de facturación", "reparación de equipos"])
+        #expect(clinic.dropped.isEmpty)
+        #expect(store.technologies == ["aplicação de inventário", "programação de entregas"])
+        #expect(store.dropped.isEmpty)
     }
 
-    @Test("A record or a document alone, or its scan, goes; a record named with its system or device stays (#354, round 8)",
+    @Test("A record or a document alone, or its scan, goes; a record named with its system or device, and an audit, stay (#354, round 8; probe round 12)",
           arguments: [
               ("es", ["Escaneo", "Registros", "escaneo de albaranes", "lector de albaranes"], ["lector de albaranes"]),
               ("it", ["Documenti", "archivio", "registro elettronico", "archivio digitale", "scanner piano"],
                ["registro elettronico", "archivio digitale", "scanner piano"]),
               ("en", ["paperwork", "records", "document scanner", "QuickBooks"], ["document scanner", "QuickBooks"]),
               ("fr", ["registres", "dossiers", "logiciel de paie"], ["logiciel de paie"]),
-              ("pt", ["Documentos", "auditoria", "relógio de ponto"], ["relógio de ponto"]),
+              ("pt", ["Documentos", "auditoria", "relógio de ponto"], ["auditoria", "relógio de ponto"]),
               ("de", ["Unterlagen", "Dokumentenscanner", "Register"], ["Dokumentenscanner"]),
           ])
     func recordIsNoTechnology(language: String, technologies: [String], kept: [String]) throws {

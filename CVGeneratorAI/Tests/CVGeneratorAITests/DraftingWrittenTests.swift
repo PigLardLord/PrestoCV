@@ -202,17 +202,19 @@ struct DraftingWrittenTests {
         #expect(!measure.readerFindings.contains { $0.kind == .skillInAnotherLanguage })
     }
 
-    @Test("A technology whose head noun an earlier one has is counted: the last word in English, the first in French")
+    @Test("A technology whose head noun an earlier one has is counted: the last word in English, the first in French; a generic head is not (probe round 12)")
     func sharedHeadNoun() {
         let english = CVData(skills: [Skill(name: "Mixing desks"), Skill(name: "Stage boxes"), Skill(name: "Digital desk")])
         let french = CVData(skills: [Skill(name: "carnets"), Skill(name: "carnet de notes"), Skill(name: "rétroprojecteur")])
         let short = CVData(skills: [Skill(name: "Logic Pro"), Skill(name: "Premiere Pro")])
+        let generic = CVData(skills: [Skill(name: "software di diagnostica"), Skill(name: "software di gestione flussi")])
 
         let shared = { (cv: CVData, language: String) in Self.reader(cv, language).filter { $0.kind == .sharedHeadNoun }.map(\.value) }
 
         #expect(shared(english, "en") == ["Digital desk"])
         #expect(shared(french, "fr") == ["carnet de notes"])
         #expect(shared(short, "en").isEmpty)
+        #expect(shared(generic, "it").isEmpty)
     }
 
     @Test("A headline that is a part of a stated title is counted, and a form of the title is not")
