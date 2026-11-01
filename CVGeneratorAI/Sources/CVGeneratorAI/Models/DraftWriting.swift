@@ -30,8 +30,8 @@ public struct DraftBrief: Equatable, Sendable {
         public var adding = Self.leastDuties
 
         /// The duties each job gets at least, and from how many of the person's own it gets no typical one (O1).
-        public static let leastDuties = 4
-        public static let mostDuties = 5
+        public static var leastDuties: Int { DraftDepth.isRich ? 5 : 3 }
+        public static var mostDuties: Int { DraftDepth.isRich ? 6 : 4 }
 
         /// The typical duties a job of `said` stated duties needs: enough to reach `leastDuties`, at least one, and none from
         /// `mostDuties` on. Asked for a range, the request padded a job with the same duty said again (#354, round 10).
@@ -92,8 +92,8 @@ public struct DraftBrief: Equatable, Sendable {
     }
 }
 
-/// What one sentence of the summary is about (#354, round 13, O1): the current job's title and the field, the topics of its first
-/// two kept duties, its title with two qualities, or an ended job's first kept duty. Asked for the whole summary from every job,
+/// What one sentence of the summary is about (#354, round 13, O1): the current job's title and the field, the topics of its kept
+/// duties, its kept tools, its title with two qualities, or an ended job's first kept duty. Asked for the whole summary from every job,
 /// the request ran short; asked of one slot, a sentence has one thing to say.
 public struct SummaryTopic: Equatable, Sendable {
     /// The job's title, or the headline title for a job with none; nil when the CV has neither.
@@ -104,14 +104,19 @@ public struct SummaryTopic: Equatable, Sendable {
     public let work: [String]
     /// The qualities the sentence says the person works with; empty but for the qualities slot.
     public let qualities: [String]
+    /// The kept tools the sentence says the person works with; empty but for the tools slot (#354, probe round 3).
+    public let tools: [String]
     /// Whether the job is over: the sentence then speaks of it in the past.
     public let hasEnded: Bool
 
-    public init(title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], hasEnded: Bool) {
+    public init(
+        title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], tools: [String] = [], hasEnded: Bool
+    ) {
         self.title = title
         self.field = field
         self.work = work
         self.qualities = qualities
+        self.tools = tools
         self.hasEnded = hasEnded
     }
 }

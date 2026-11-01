@@ -11,15 +11,16 @@ import Foundation
 final class SectionDraft {
     /// The jobs a draft writes duties for, in its order: a longer career gets no request for its oldest jobs.
     static let writtenJobs = 10
-    /// The most technologies and soft skills a draft keeps.
-    static let technologies = 10
+    /// The most technologies and soft skills a draft keeps: more of a rich draft (`DraftDepth`).
+    nonisolated static var technologies: Int { DraftDepth.isRich ? 10 : 8 }
     static let softSkills = 5
     /// The most sentences a summary keeps.
     static let summarySentences = 4
-    /// The most requests the summary makes, a sentence or its repair each (#354, round 13).
-    static let summaryRequests = 5
+    /// The most requests the summary makes, a sentence or its repair each (#354, round 13): more of a rich draft, whose summary
+    /// asks a slot more and has more to repair.
+    nonisolated static var summaryRequests: Int { DraftDepth.isRich ? 8 : 4 }
     /// A summary of this many sentences and characters asks no more (#354, round 13).
-    static let summaryEnough = (sentences: 3, characters: 220)
+    nonisolated static var summaryEnough: (sentences: Int, characters: Int) { DraftDepth.isRich ? (4, 300) : (2, 120) }
     /// Why a sentence on the current job's work that says one of its duties again goes, which its repair reads (#354, round 15).
     static let restatesADutyReason = "describe what the work involves, not the same task"
     /// Why a sentence that says an earlier sentence of the summary again goes, which its repair reads (#354, round 17).
@@ -219,7 +220,7 @@ final class SectionDraft {
     /// the reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
-        let fewestTools = sparse ? 3 : 5
+        let fewestTools = Self.fewestTools(sparse: sparse)
         let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
         let headline = Self.headlineRole(of: brief, order: order)
         let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: headline)
@@ -285,9 +286,14 @@ final class SectionDraft {
     /// and one more, as a check may drop one; a title among others asks 2 or 3. One title asked 2 or 3 left the CV short every
     /// time, and the request for those missing named activities and bare kinds (#354, round 6).
     static func toolCount(groups: Int, sparse: Bool) -> ClosedRange<Int> {
-        guard groups == 1 else { return 2...3 }
-        let fewest = sparse ? 3 : 5
+        guard groups == 1 else { return DraftDepth.isRich ? 3...4 : 2...3 }
+        let fewest = fewestTools(sparse: sparse)
         return fewest...(fewest + 1)
+    }
+
+    /// The fewest tools a draft keeps, of a `sparse` description or of the others: more of a rich draft (`DraftDepth`).
+    static func fewestTools(sparse: Bool) -> Int {
+        DraftDepth.isRich ? (sparse ? 4 : 6) : (sparse ? 3 : 4)
     }
 
     /// The tools of the title groups' answers, the headline title's first (`headlineFirst`): its answer whole, then of each past
@@ -404,12 +410,12 @@ final class SectionDraft {
             return written.isEmpty ? [] : jobDuties[number].filter { written.contains(DescriptionText.normalized($0)) }
         }
         var topics = Self.summaryTopics(
-            of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order
+            of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order,
+            tools: keptTools, hasOpening: brief.opening != nil
         )[...]
-        // The current job's work slot, whose sentence must not say one of its duties again (`CVDataSanitizer.nearlyCopies`).
-        let workSlot = Self.currentJob(of: brief, order: order).flatMap { current in
-            Self.workTopic(of: brief, current: current, duties: jobDuties, typical: typical).map { (topic: $0, current: current) }
-        }
+        // The current job's work slots, whose sentences must not say one of its duties again (`CVDataSanitizer.nearlyCopies`).
+        let current = Self.currentJob(of: brief, order: order)
+        let workSlots = current.map { Self.workTopics(of: brief, current: $0, duties: jobDuties, typical: typical) } ?? []
         var lead = brief.opening
         var accepted: [String] = []
         var asked = 0
@@ -432,8 +438,8 @@ final class SectionDraft {
         // rejections (#354, round 15): the check reads a copy word for word, not one in other words ("Ich installiere elektrische
         // Anlagen in Neubauten" after "Ich installiere Anlagen in Neubauten").
         func withoutCopies(_ verdict: CVDataSanitizer.SummaryVerdict?, on topic: SummaryTopic) -> CVDataSanitizer.SummaryVerdict? {
-            guard var verdict, let workSlot, topic == workSlot.topic else { return verdict }
-            let duties = jobDuties.indices.contains(workSlot.current) ? jobDuties[workSlot.current] : []
+            guard var verdict, let current, workSlots.contains(topic) else { return verdict }
+            let duties = jobDuties.indices.contains(current) ? jobDuties[current] : []
             let copies = following(verdict).filter { sentence in
                 !accepted.contains(sentence) && CVDataSanitizer.nearlyCopies(sentence, duties: duties, title: topic.title)
             }
@@ -484,12 +490,14 @@ final class SectionDraft {
         }
     }
 
-    /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1): the current job's title and the
-    /// `field`; the topics of its work (`workTopic`); its title with the first two `qualities`; then the first kept duty of each
-    /// ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no title reads the
-    /// headline title.
+    /// The slots of the summary's sentences, in the order they are asked (#354, round 13, O1; probe round 3): the topics of the
+    /// current job's work (`workTopics`, the second slot after the tools); its first three kept `tools`; its title with the first
+    /// two `qualities`; the first kept duty of each ended job, latest first by `order`; then its title with the field. With an
+    /// opening the title is said already: its slot comes last, and only with a field; with none it comes first. With no current
+    /// job, the latest one stands for it. A job with no title reads the headline title.
     static func summaryTopics(
-        of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int]
+        of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int],
+        tools: [String] = [], hasOpening: Bool = false
     ) -> [SummaryTopic] {
         let roles = order.filter(brief.roles.indices.contains)
         guard let current = currentJob(of: brief, order: order) else {
@@ -498,8 +506,15 @@ final class SectionDraft {
         let title = { (number: Int) in brief.roles[number].title.presentValue ?? brief.headline }
         let kept = { (number: Int) in duties.indices.contains(number) ? duties[number] : [] }
         let hasEnded = brief.roles[current].hasEnded
-        var topics = [SummaryTopic(title: title(current), field: field?.presentValue, hasEnded: hasEnded)]
-        if let work = workTopic(of: brief, current: current, duties: duties, typical: typical) { topics.append(work) }
+        // The field only for a job with no title, and only as a few words of a trade: a clause of the description fed as the
+        // field ("Ich kenne mich mit KNX aus") came back as a sentence on it (#354, probe round 3).
+        let field = brief.roles[current].title.presentValue == nil ? cleanField(field) : nil
+        let role = SummaryTopic(title: title(current), field: field, hasEnded: hasEnded)
+        var topics = hasOpening ? [] : [role]
+        let work = workTopics(of: brief, current: current, duties: duties, typical: typical)
+        topics += work.prefix(1)
+        if !tools.isEmpty { topics.append(SummaryTopic(title: title(current), tools: Array(tools.prefix(3)), hasEnded: hasEnded)) }
+        topics += work.dropFirst()
         if !qualities.isEmpty {
             topics.append(SummaryTopic(title: title(current), qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
         }
@@ -507,7 +522,15 @@ final class SectionDraft {
             let work = CVDataSanitizer.workTopics(of: kept(number).first ?? "", limit: 1)
             if !work.isEmpty { topics.append(SummaryTopic(title: title(number), work: work, hasEnded: brief.roles[number].hasEnded)) }
         }
+        if hasOpening, field != nil { topics.append(role) }
         return topics
+    }
+
+    /// `field` when it reads as a few words of a trade: at most four words of letters, spaces and hyphens, as the summary check
+    /// reads it.
+    static func cleanField(_ field: String?) -> String? {
+        guard let field = field?.presentValue else { return nil }
+        return field.split(separator: " ").count <= 4 && field.allSatisfy { $0.isLetter || $0 == " " || $0 == "-" } ? field : nil
     }
 
     /// The job the summary speaks of first: the first one of `order` that goes on, else the latest.
@@ -516,16 +539,19 @@ final class SectionDraft {
         return roles.first(where: { !brief.roles[$0].hasEnded }) ?? roles.first
     }
 
-    /// The slot of the `current` job's work: the topics of its first two `typical` duties, those its own request wrote (#354,
-    /// round 15). The duties the person said are already in the job, and a sentence on them said one again; they stand for the
-    /// work only when the job has no typical duty. Nil when its kept `duties` have no topic.
-    static func workTopic(of brief: DraftBrief, current: Int, duties: [[String]], typical: [[String]]) -> SummaryTopic? {
+    /// The slots of the `current` job's work: the topics of its first two `typical` duties, those its own request wrote (#354,
+    /// round 15), and of a rich draft the next two (`DraftDepth`; probe round 3). The duties the person said are already in the
+    /// job, and a sentence on them said one again; they stand for the work only when the job has no typical duty. Empty when its
+    /// kept `duties` have no topic.
+    static func workTopics(of brief: DraftBrief, current: Int, duties: [[String]], typical: [[String]]) -> [SummaryTopic] {
         let own = typical.indices.contains(current) ? typical[current] : []
         let kept = own.isEmpty ? (duties.indices.contains(current) ? duties[current] : []) : own
-        let work = CVDataSanitizer.workTopics(of: kept.prefix(2).joined(separator: " "), limit: 2)
-        guard !work.isEmpty else { return nil }
         let title = brief.roles[current].title.presentValue ?? brief.headline
-        return SummaryTopic(title: title, work: work, hasEnded: brief.roles[current].hasEnded)
+        let pairs = DraftDepth.isRich ? [kept.prefix(2), kept.dropFirst(2).prefix(2)] : [kept.prefix(2)]
+        return pairs.compactMap { pair in
+            let work = CVDataSanitizer.workTopics(of: pair.joined(separator: " "), limit: 2)
+            return work.isEmpty ? nil : SummaryTopic(title: title, work: work, hasEnded: brief.roles[current].hasEnded)
+        }
     }
 
     /// The numbers of `jobs`, the latest first: the current ones, then by end and start, the earlier in the draft first on a tie.

@@ -8,10 +8,12 @@ import FoundationModels
 extension FoundationModelsService {
     // MARK: The token caps
 
-    /// A job's years and 1 to 4 duties.
-    nonisolated static let jobTokens = 290
-    /// A job's repair: up to 3 duties.
-    nonisolated static let jobRepairTokens = 240
+    /// A job's years and 1 to 6 duties of a rich draft, 1 to 4 of the others (`DraftDepth`).
+    nonisolated static var jobTokens: Int { DraftDepth.isRich ? 340 : 220 }
+    /// A job's repair: up to 5 duties of a rich draft, 3 of the others.
+    nonisolated static var jobRepairTokens: Int { DraftDepth.isRich ? 280 : 180 }
+    /// The most duties a job's repair writes.
+    nonisolated static var jobRepairDuties: Int { DraftDepth.isRich ? 5 : 3 }
     /// 3 to 5 qualities.
     nonisolated static let softSkillsTokens = 100
     /// One sentence of the summary, or its repair: a sentence, not a paragraph (#354, round 13).
@@ -46,7 +48,7 @@ extension FoundationModelsService {
     }
 
     /// The duties a job's request writes: the person's own, then the typical ones it needs, 1 to 4 (#354, round 10).
-    nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(5, max(1, said + adding)) }
+    nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(DraftBrief.Role.mostDuties, max(1, said + adding)) }
 
     /// A job's years and exactly `duties` duties. A range let the model pad: asked for 2 to 4, it wrote 4 for a job that needed one
     /// more, and the extra ones said a duty again with other words (#354, round 10).
@@ -71,8 +73,24 @@ extension FoundationModelsService {
     public func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
         let prompt = SectionPrompts.jobRepair(number: number, of: brief, kept: kept, rejected: rejected)
         let call = SectionCallTrace(call: "jobRepair", role: number, tokens: Self.jobRepairTokens)
-        guard let last = try await streamed(prompt, JobRepairAnswer.self, call: call) else { return nil }
-        return Self.whole(last.answer.content.duties, isComplete: last.isComplete).map(Self.sentence)
+        let schema = try Self.jobRepairSchema(most: Self.jobRepairDuties)
+        guard let last = try await streamed(prompt, schema: schema, call: call) else { return nil }
+        let duties = try? last.answer.content.value([String].self, forProperty: "duties")
+        return Self.whole(duties, isComplete: last.isComplete).map(Self.sentence)
+    }
+
+    /// A job's repair: 1 to `most` duties.
+    nonisolated static func jobRepairSchema(most: Int) throws -> GenerationSchema {
+        let root = DynamicGenerationSchema(name: "JobRepair", properties: [
+            DynamicGenerationSchema.Property(
+                name: "duties",
+                description: "The rejected sentences written again and the duties asked for, one short whole sentence each",
+                schema: DynamicGenerationSchema(
+                    arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: 1, maximumElements: most
+                )
+            ),
+        ])
+        return try GenerationSchema(root: root, dependencies: [])
     }
 
     // MARK: The skills
@@ -264,12 +282,6 @@ extension FoundationModelsService {
         guard let end = text.lastIndex(where: { ".!?…".contains($0) }) else { return nil }
         return String(text[...end]).trimmingCharacters(in: .whitespacesAndNewlines).presentValue
     }
-}
-
-@Generable
-struct JobRepairAnswer {
-    @Guide(description: "The rejected sentences written again and the duties asked for, one short whole sentence each", .count(1...4))
-    let duties: [String]
 }
 
 @Generable
