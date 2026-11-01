@@ -16,13 +16,14 @@ final class SectionDraft {
     /// `InferredSkills.caps` keeps.
     nonisolated static var technologies: Int { DraftDepth.isRich ? 12 : 8 }
     nonisolated static var softSkills: Int { DraftDepth.isRich ? 6 : 5 }
-    /// The most sentences a summary keeps.
-    static let summarySentences = 4
+    /// The most sentences a summary keeps, as its check keeps them (`CVDataSanitizer.summaryMost`; probe round 15).
+    nonisolated static var summarySentences: Int { CVDataSanitizer.summaryMost }
     /// The most requests the summary makes, a sentence or its repair each (#354, round 13): more of a rich draft, whose summary
-    /// asks a slot more and has more to repair.
-    nonisolated static var summaryRequests: Int { DraftDepth.isRich ? 8 : 4 }
-    /// A summary of this many sentences and characters asks no more (#354, round 13).
-    nonisolated static var summaryEnough: (sentences: Int, characters: Int) { DraftDepth.isRich ? (4, 300) : (2, 120) }
+    /// asks a slot more and has more to repair, and asks for a fifth sentence (probe round 15).
+    nonisolated static var summaryRequests: Int { DraftDepth.isRich ? 10 : 4 }
+    /// A summary of this many sentences and characters asks no more (#354, round 13): a rich one asks on to 450 characters (probe
+    /// round 15), as a CV typical of the trade under O1 has; it stopped at 300, with the work of the ended jobs unsaid.
+    nonisolated static var summaryEnough: (sentences: Int, characters: Int) { DraftDepth.isRich ? (4, 450) : (2, 120) }
     /// Why a sentence that says an earlier sentence of the summary again goes, which its repair reads (#354, round 17).
     static let repeatsReason = "say something the summary does not say yet"
 
@@ -398,9 +399,9 @@ final class SectionDraft {
 
     /// The summary, last, a sentence at a time after the opening code writes from the facts (#354, round 13, O1): each request asks
     /// for one sentence on one slot (`summaryTopics`), the check reads it after the sentences kept, and a rejected sentence gets one
-    /// repair with its reason. The requests stop once the summary has 2 sentences and 120 characters, after 4 requests, or when no
-    /// slot is left; the floor then writes what is still missing (`summaryFloor`). Asked for the whole summary at once, the request
-    /// ran short.
+    /// repair with its reason. The requests stop once the summary has 2 sentences and 120 characters (4 and 450 in a rich draft, which
+    /// keeps up to 5; probe round 15), after 4 requests (10 in a rich draft), or when no slot is left; the floor then writes what is
+    /// still missing (`summaryFloor`). Asked for the whole summary at once, the request ran short.
     private func writeSummary(of brief: DraftBrief, field: String?, around dated: CVData) async throws {
         let kept = try kept(around: dated)
         let keptDuties = kept.experience.compactMap(\.description)
@@ -504,11 +505,11 @@ final class SectionDraft {
     /// field; the topics of its work (`workTopics`); its title with the first two `qualities`; then the first kept duty of each
     /// ended job, latest first by `order`. With no current job, the latest one stands for it. A job with no title reads the
     /// headline title. A rich draft (`DraftDepth`; probe rounds 3 and 4) also asks of the first three kept `tools`, after the
-    /// first work slot, with the third pair of work in the first qualities slot (else a topic of the job's work no slot asks),
-    /// each ended job with the first topic of its work no earlier slot asks (probe round 14), and, after the ended jobs, of the
-    /// current job's next work, tools and qualities; its title is said by the
-    /// opening when there is one, so its slot then comes last and only with a field, and the field is asked only of a job with no
-    /// title, as a few words of a trade (`cleanField`).
+    /// first work slot, with the second pair of work in the first qualities slot (else a topic of the job's work no slot asks;
+    /// probe round 15), then of the latest ended job, with the first topic of its work no earlier slot asks (probe round 14), then
+    /// of the current job's next work, of two topics of its work no slot asks, of its next tools and qualities, and of the other
+    /// ended jobs; its title is said by the opening when there is one, so its slot then comes last and only with a field, and the
+    /// field is asked only of a job with no title, as a few words of a trade (`cleanField`).
     static func summaryTopics(
         of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int],
         tools: [String] = [], hasOpening: Bool = false
@@ -540,31 +541,39 @@ final class SectionDraft {
         var topics = hasOpening ? [] : [role]
         topics += work.prefix(1)
         if !tools.isEmpty { topics.append(toolsSlot(tools.prefix(3))) }
-        topics += work.dropFirst().prefix(1)
-        // The first qualities slot with the third pair of work (probe round 10): with no work of its own, its sentence said again
-        // a duty an earlier sentence had said, and the check rejected it as a repeat. With no third pair, it takes the first topic
-        // of the job's work that no slot asks (probe round 14): with four typical duties, its sentence said the first pair again.
-        let paired = qualities.isEmpty ? nil : work.dropFirst(2).first
         var asked = work.flatMap(\.work)
+        let own = ((typical.indices.contains(current) ? typical[current] : []) + kept(current)).flatMap { CVDataSanitizer.workTopics(of: $0) }
+        // The first qualities slot with the second pair of work (probe rounds 10 and 15): with no work of its own, its sentence said
+        // again a duty an earlier sentence had said, and the check rejected it as a repeat; after the third pair, it came once the
+        // summary had enough. With no second pair, it takes the first topic of the job's work that no slot asks (probe round 14):
+        // with four typical duties, its sentence said the first pair again.
         if !qualities.isEmpty {
-            let own = (typical.indices.contains(current) ? typical[current] : []) + kept(current)
-            let spare = paired?.work ?? Array(unused(own.flatMap { CVDataSanitizer.workTopics(of: $0) }, besides: asked).prefix(1))
-            asked += spare
-            topics.append(SummaryTopic(title: title(current), work: spare, qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
+            let paired = work.dropFirst().first?.work ?? Array(unused(own, besides: asked).prefix(1))
+            asked += paired
+            topics.append(SummaryTopic(title: title(current), work: paired, qualities: Array(qualities.prefix(2)), hasEnded: hasEnded))
+        } else {
+            topics += work.dropFirst().prefix(1)
         }
         // Each ended job with the first topic of its work that no earlier slot asks, else its first (probe round 14): the first
-        // duty of an ended job said the work of the current one, and its sentence was rejected as a repeat.
+        // duty of an ended job said the work of the current one, and its sentence was rejected as a repeat. The latest comes
+        // next (probe round 15): after all the current job's work, it came once the summary had enough, and the career went unsaid.
+        var endedSlots: [SummaryTopic] = []
         for number in roles where number != current {
-            let own = kept(number).flatMap { CVDataSanitizer.workTopics(of: $0) }
-            guard let topic = unused(own, besides: asked).first ?? own.first else { continue }
+            let ownEnded = kept(number).flatMap { CVDataSanitizer.workTopics(of: $0) }
+            guard let topic = unused(ownEnded, besides: asked).first ?? ownEnded.first else { continue }
             asked.append(topic)
-            topics.append(SummaryTopic(title: title(number), work: [topic], hasEnded: brief.roles[number].hasEnded))
+            endedSlots.append(SummaryTopic(title: title(number), work: [topic], hasEnded: brief.roles[number].hasEnded))
         }
+        topics += endedSlots.prefix(1)
         // The slots for a summary still short (probe round 4): with a slot rejected, the summary of a short description stopped at
-        // 2 sentences.
-        topics += work.dropFirst(paired == nil ? 2 : 3)
+        // 2 sentences. Two topics of the job's work that no slot asks have one of their own (probe round 15): the typical duties
+        // held work no sentence said.
+        topics += work.dropFirst(2)
+        let spare = unused(own, besides: asked).prefix(2)
+        if !spare.isEmpty { topics.append(SummaryTopic(title: title(current), work: Array(spare), hasEnded: hasEnded)) }
         if tools.count > 3 { topics.append(toolsSlot(tools.dropFirst(3).prefix(3))) }
         if qualities.count > 2 { topics.append(qualitiesSlot(qualities.dropFirst(2).prefix(2))) }
+        topics += endedSlots.dropFirst()
         if hasOpening, field != nil { topics.append(role) }
         return topics
     }

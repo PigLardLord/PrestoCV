@@ -797,6 +797,10 @@ extension CVDataSanitizer {
         "tutte", "circa", "tramite", "grazie", "perante", "onde", "ainda", "agora", "tive", "estive", "trouxe", "disse", "soube",
     ]
 
+    /// The most sentences a summary keeps: 5 in a rich draft (`DraftDepth`; probe round 15), whose summary says more of the work
+    /// and of the career, and 4 in a plain one.
+    static var summaryMost: Int { DraftDepth.isRich ? 5 : 4 }
+
     /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes, and so does one with no
     /// word of the person in a language that keeps its pronoun, and one whose subject is a bare word of the person's work
     /// (`hasABareSubject`); so does a sentence that starts with the verb of an earlier one, one
@@ -879,6 +883,12 @@ extension CVDataSanitizer {
                 // (probe round 6): "…con hojas de cálculo y un sistema de gestión financiero." closed every sentence. Not in German,
                 // where the last words hold the verb ("…, dass die Anlage stabil bleibt").
                 if language != .german, let head = Self.withoutTheTail(of: sentence, endings: endings, closings: closings, earlier: verdict.kept) {
+                    sentence = head
+                }
+                // A closing phrase that says again what the kept sentences say goes in a rich draft, and the sentence stays (probe
+                // round 15): "…, usando o Swift e o Xcode." after a sentence on Swift and Xcode said the tools twice.
+                if DraftDepth.isRich,
+                   let head = Self.withoutARepeatedTail(of: sentence, earlier: verdict.kept, besides: qualities, language: language) {
                     sentence = head
                 }
                 let key = sentence.lowercased().filter(\.isLetter)
@@ -968,7 +978,7 @@ extension CVDataSanitizer {
             }
             var sizes: [String] = []
             if verdict.kept.count < 2 { sizes.append("it keeps fewer than 2 sentences") }
-            if verdict.kept.count > 4 { sizes.append("it has more than 4 sentences") }
+            if verdict.kept.count > Self.summaryMost { sizes.append("it has more than \(Self.summaryMost) sentences") }
             if verdict.kept.joined(separator: " ").count < 120 { sizes.append("it is shorter than 120 characters") }
             verdict.problems = sizes + verdict.problems
             return verdict
@@ -1330,6 +1340,68 @@ extension CVDataSanitizer {
         return String(Array(sentence)[..<words[end - 1].range.upperBound]) + "."
     }
 
+    /// `sentence` without a closing phrase that says again what the `earlier` kept sentences say, with a full stop, in a rich draft
+    /// (probe round 15): the words from a point that brings in a phrase (`repeatPoints`) to the end go when they add fewer than two
+    /// content words past the earlier sentences and the `besides` qualities, and repeat more words than they add; the joining words
+    /// before them go too (`tailJoins`). The cut is made again while a point is left, and none leaves fewer than four words. Nil
+    /// when no cut is made. The model closed sentences with the work or the tools of an earlier one ("…, usando o Swift e o
+    /// Xcode.", "…, indem ich die Anlage prüfe."), and the summary said the same thing twice.
+    static func withoutARepeatedTail(of sentence: String, earlier: [String], besides: [String], language: Vocabulary.Language?) -> String? {
+        guard !earlier.isEmpty else { return nil }
+        let said = contentStems(of: earlier.joined(separator: " "))
+        let skipped = contentStems(of: besides.joined(separator: " "))
+        var current = sentence
+        var cut = false
+        while true {
+            let words = Word.words(in: current)
+            let characters = Array(current)
+            // The rightmost point first: its tail is the shortest, and a tail only adds words leftwards.
+            let point = repeatPoints(in: words, language: language).reversed().first { point in
+                guard point.tail < words.count else { return false }
+                let tail = contentStems(of: String(characters[words[point.tail].range.lowerBound...]))
+                let added = tail.subtracting(said).subtracting(skipped).count
+                return added < 2 && tail.intersection(said).count > added
+            }
+            guard let point else { break }
+            var end = point.end
+            while end > 0, tailJoins.contains(words[end - 1].folded) { end -= 1 }
+            guard end >= 4 else { break }
+            current = String(characters[..<words[end - 1].range.upperBound]) + "."
+            cut = true
+        }
+        return cut ? current : nil
+    }
+
+    /// The points of `words` where a closing phrase starts, each as the first word to drop and the first word of the phrase to
+    /// compare (probe round 15): a word of `toolJoins`, a gerund in Italian, Spanish and Portuguese (`isGerund`), a subordinating
+    /// word after a comma (`subordinators`), or after a comma a French participle in "-ant" or an English one in "-ing". In
+    /// German, where the verb closes the sentence, only a subordinating word after a comma.
+    private static func repeatPoints(in words: [Word], language: Vocabulary.Language?) -> [(end: Int, tail: Int)] {
+        words.indices.dropFirst().compactMap { index -> (end: Int, tail: Int)? in
+            let word = words[index].folded
+            let afterABreak = words[index - 1].endsWithABreak
+            if language == .german { return afterABreak && germanSubordinators.contains(word) ? (index, index + 1) : nil }
+            if toolJoins.contains(word) { return (index, index + 1) }
+            if let language, isGerund(words[index].accented, language: language) { return (index, index) }
+            guard afterABreak, let language else { return nil }
+            if subordinators[language]?.contains(word) == true { return (index, index + 1) }
+            let isParticiple = word.count >= 5 && (language == .french && word.hasSuffix("ant") || language == .english && word.hasSuffix("ing"))
+            return isParticiple ? (index, index) : nil
+        }
+    }
+
+    /// The words, folded, that open a clause of how or what for after a comma, in the five languages but German.
+    private static let subordinators: [Vocabulary.Language: Set<String>] = [
+        .italian: ["mentre", "utilizzando", "usando", "attraverso", "grazie", "per"],
+        .spanish: ["mientras", "utilizando", "usando", "mediante", "para", "gracias"],
+        .portuguese: ["enquanto", "usando", "utilizando", "atraves", "para", "gracas"],
+        .french: ["en", "pour", "grace", "avec", "afin", "tout"],
+        .english: ["while", "using", "with", "to", "by"],
+    ]
+
+    /// The German words, folded, that open a clause of how or what for after a comma.
+    private static let germanSubordinators: Set<String> = ["indem", "um", "wobei", "damit", "sodass", "wodurch", "wahrend"]
+
     /// The words, folded, that bring in the tools or the manner a shared ending says, in the five languages a tail is cut in.
     private static let toolJoins: Set<String> = [
         "with", "using", "via", "through", "con", "col", "usando", "utilizzando", "tramite", "attraverso", "utilizando", "mediante",
@@ -1479,16 +1551,32 @@ extension CVDataSanitizer {
     /// person or an auxiliary of the first person ("mi", "tengo", "sou"), or its first word, or the first word after a comma, is a
     /// verb of the first person, in "-o" ("Controllo …", "Con cura, verifico …") or in the past of the first person in Spanish and
     /// Portuguese ("Revisé …", "Organizei …"). A past participle (`isParticiple`) is no verb of the person (#354, round 6):
-    /// "Mantenido un control riguroso …" speaks as no one, nor does a gerund (`isGerund`): "…, garantendo conti in ordine". A rough
-    /// rule: "Con cura verifico" is not read.
+    /// "Mantenido un control riguroso …" speaks as no one, nor does a gerund (`isGerund`): "…, garantendo conti in ordine". In a
+    /// rich draft (`DraftDepth`), a verb of the person in "-o" after "ciò che", "o que" or "lo que" counts too (probe round 15):
+    /// "…, é o que faço." A rough rule: "Con cura verifico" is not read.
     private static func speaksAsThePerson(_ sentence: String, language: Vocabulary.Language) -> Bool {
-        if letterWords(of: sentence).contains(where: wordsOfTheSpeaker.contains) { return true }
-        let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
-        return firsts.contains { word in
+        let words = letterWords(of: sentence)
+        if words.contains(where: wordsOfTheSpeaker.contains) { return true }
+        let isAVerb = { (word: String) in
             word.count >= 3 && !openersInO.contains(word) && !isParticiple(word, language: language) && !isGerund(word, language: language)
+        }
+        let firsts = sentence.split(separator: ",").compactMap { letterWords(of: String($0)).first { !clauseConnectors.contains($0) } }
+        if firsts.contains(where: { word in
+            isAVerb(word)
                 && (word.hasSuffix("o") || word.count >= 5 && (word.hasSuffix("é") || word.hasSuffix("ei") || isAPastOfThePerson(word, language: language)))
+        }) { return true }
+        guard DraftDepth.isRich else { return false }
+        // Not an Italian third person of the plural in "-ano", "-ono" or "-nno" ("ciò che fanno").
+        return words.indices.dropFirst(2).contains { index in
+            let word = words[index]
+            return relativeHeads.contains(words[index - 2]) && ["che", "que"].contains(words[index - 1]) && isAVerb(word) && word.hasSuffix("o")
+                && !(language == .italian && ["ano", "ono", "nno"].contains(where: word.hasSuffix))
         }
     }
+
+    /// The words, lowercased, that a relative "che" or "que" follows when the person's verb comes next: "ciò che faccio", "é o
+    /// que faço", "es lo que hago".
+    private static let relativeHeads: Set<String> = ["o", "lo", "ciò", "cio", "quello", "eso", "esto", "isso", "aquilo"]
 
     /// Whether a lowercased word ends as the first person of the simple past of a verb in "-er" or "-ir": "-í" in Spanish
     /// ("aprendí"), "-i" or "-í" in Portuguese ("desenvolvi", "construí"; probe round 6). "Desenvolvi aplicações …" read as no verb
