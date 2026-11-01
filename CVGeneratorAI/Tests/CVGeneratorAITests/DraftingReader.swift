@@ -1650,8 +1650,10 @@ enum ReaderRules {
     /// person's name. German writes every noun with a capital, so there only the second kind is a product; a kind of tool written
     /// in lower case is draft content (O1).
     static func unstatedProducts(in sentences: [String], of cv: CVData, for input: DraftingInput) -> [String] {
-        let known = Set(InventedFacts.words(of: [input.description, cv.personalInfo.title ?? "", cv.personalInfo.name ?? ""]
-            .joined(separator: " ") + " " + cv.experience.map(\.title).joined(separator: " ")))
+        // A technology the draft lists is the same claim as that skill: typical of the trade, draft content under O1.
+        let tools = cv.skills.filter { $0.kind == .technology }.map(\.name)
+        let known = Set(InventedFacts.words(of: ([input.description, cv.personalInfo.title ?? "", cv.personalInfo.name ?? ""]
+            + cv.experience.map(\.title) + tools).joined(separator: " ")))
         return sentences.filter { sentence in
             let words = sentence.split { !$0.isLetter && !$0.isNumber }.map(String.init)
             return words.enumerated().contains { index, word in

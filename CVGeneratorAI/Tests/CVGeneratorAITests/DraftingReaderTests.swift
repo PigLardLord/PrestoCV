@@ -456,6 +456,10 @@ struct DraftingReaderTests {
             "it", "Sono impiegata amministrativa.",
             "Lavoro come impiegata amministrativa. Registro le fatture con il gestionale contabile. Preparo i bilanci con Zucchetti."
         ) == ["Preparo i bilanci con Zucchetti."])
+        let listed = CVData(summary: "Lavoro come impiegata amministrativa. Preparo i bilanci con Zucchetti.", skills: [Skill(name: "Zucchetti")])
+        let clerk = DraftingInput(id: "reader-it", kind: .plain, language: "it", description: "Sono impiegata amministrativa.", facts: [], traps: [])
+        #expect(ReaderRules.findings(in: listed, for: clerk, report: InventedFacts.count(listed, for: clerk))
+            .filter { $0.kind == .unstatedProductInSummary }.isEmpty, "a product the draft lists as a technology (O1)")
     }
 
     @Test("A summary sentence that copies five words of a duty in a row, or a whole shorter duty, is counted; one in other words is not (#354, rounds 11 and 13)")

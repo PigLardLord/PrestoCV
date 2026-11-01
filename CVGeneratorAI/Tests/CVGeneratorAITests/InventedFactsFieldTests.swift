@@ -101,6 +101,26 @@ struct InventedFactsFieldTests {
         #expect(report.inferred.map(\.path) == ["summary", "experience[0].description"], "\(report.findings)")
     }
 
+    @Test("A capital of a technology the draft lists is no invented name in written text; one it does not list still is (O1)")
+    func listedToolInProse() throws {
+        let input = try InventedFactsTests.input("it-traps")
+        var draft = Draft(faithfulTo: input)
+        draft.skills.append(Skill(name: "Microsoft Excel"))
+        let path = "experience[0].description"
+        draft.summary = "Lavoro come impiegata amministrativa. Uso Microsoft Excel per organizzare i dati."
+        draft.experience[0] = Experience(company: draft.experience[0].company, description: "Registro le fatture in Excel.")
+
+        let listed = InventedFacts.count(draft.cv, for: input)
+        draft.summary = "Lavoro come impiegata amministrativa. Uso Google Sheets per organizzare i dati."
+        let unlisted = InventedFacts.count(draft.cv, for: input)
+
+        #expect(listed.invented.isEmpty, "\(listed.invented)")
+        #expect(listed.inferred.map(\.path).contains("summary"), "\(listed.findings)")
+        #expect(listed.inferred.map(\.path).contains(path), "\(listed.findings)")
+        #expect(unlisted.invented.map(\.path) == ["summary"], "\(unlisted.findings)")
+        #expect(unlisted.invented.first?.reason.contains("Google, Sheets") == true, "\(unlisted.invented)")
+    }
+
     @Test("A length or a rank the description lacks is invented in a summary", arguments: [
         ("en-plain", "A seasoned supervisor who keeps every shift safe."),
         ("it-plain", "Cuoco con esperienza pluriennale in cucina."),

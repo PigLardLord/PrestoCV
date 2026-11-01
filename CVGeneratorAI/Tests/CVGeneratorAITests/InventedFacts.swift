@@ -575,7 +575,15 @@ enum InventedFacts {
             let tokens = tokensWithStarts(of: value)
             let absent = zip(tokens, words).filter { !source.vocabulary.contains($0.1) }
             let numbers = absent.filter { $0.1.contains(where: \.isNumber) }.map(\.0.token)
-            let capitals = absent.filter { !$0.1.contains(where: \.isNumber) && ($0.0.token.first?.isUppercase ?? false) }
+            // The summary and a job's description are written around the facts (ADR 0031): a person reads them, first capitals
+            // included, in the pertinence item of the draft.
+            let isWritten = leaf.steps.first?.name == "summary" || (leaf.steps.first?.name == "experience" && leaf.steps.last?.name == "description")
+            // O1: a typical tool is draft content, not an invention ("The evaluation", ADR 0031). In written text, a capital of a
+            // technology the draft lists ("Excel" for a clerk) is the same claim as that skill, which the person reads and corrects.
+            let toolWords = isWritten ? Set(cv.skills.filter { $0.kind == .technology }.flatMap { Self.words(of: $0.name) }) : []
+            let capitals = absent.filter {
+                !$0.1.contains(where: \.isNumber) && ($0.0.token.first?.isUppercase ?? false) && !toolWords.contains($0.1)
+            }
             let inside = capitals.filter { !$0.0.initial }.map(\.0.token)
             let atStart = capitals.filter { $0.0.initial }.map(\.0.token)
             let lengths = absent.map(\.1).filter(lengthWords.contains)
@@ -597,9 +605,6 @@ enum InventedFacts {
                     context: context
                 )
             }
-            // The summary and a job's description are written around the facts (ADR 0031): a person reads them, first capitals
-            // included, in the pertinence item of the draft.
-            let isWritten = leaf.steps.first?.name == "summary" || (leaf.steps.first?.name == "experience" && leaf.steps.last?.name == "description")
             if isWritten, !holds(source.words, run: words) {
                 let start = atStart.isEmpty ? "" : "; a sentence starts with a word the description lacks: \(atStart.joined(separator: ", "))"
                 return finding(
