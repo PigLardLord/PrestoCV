@@ -82,10 +82,12 @@ enum UncheckedCause: Equatable, Sendable, CustomStringConvertible {
 
 // MARK: - One request
 
-/// One request of the sections and the model's answer to it, before the rules: nil when it gave none.
+/// One request of the sections and the model's answer to it, before the rules: nil when it gave none. Its seconds show how close an
+/// answer came to the request's time limit (#354, probe round 7: on macOS 26 the first job's request ran out of time).
 struct RequestRecord: Encodable, Equatable {
     let step: String
     let answer: [String]?
+    var seconds: Double? = nil
 }
 
 // MARK: - One run

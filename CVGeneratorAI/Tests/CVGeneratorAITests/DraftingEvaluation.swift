@@ -230,16 +230,24 @@ struct DraftingEvaluation {
             return sentence
         }
 
+        /// The time of the request that answered last, which its log reads.
+        private var answeredIn: Duration?
+
         private func log(_ step: String, _ answer: [String]?) {
-            requests.append(RequestRecord(step: step, answer: answer))
+            let seconds = answeredIn.map { Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18 }
+            answeredIn = nil
+            requests.append(RequestRecord(step: step, answer: answer, seconds: seconds))
         }
 
-        /// What `work` answers; a request that throws is logged with its error and its time, so that a draft stopped by a failed
-        /// or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no trace).
+        /// What `work` answers, with its time; a request that throws is logged with its error and its time, so that a draft stopped
+        /// by a failed or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no
+        /// trace).
         private func recorded<Value>(_ step: String, _ work: () async throws -> Value) async throws -> Value {
             let start = ContinuousClock.now
             do {
-                return try await work()
+                let value = try await work()
+                answeredIn = ContinuousClock.now - start
+                return value
             } catch {
                 log(step + " failed", [String(reflecting: error), "after \(ContinuousClock.now - start)"])
                 throw error
