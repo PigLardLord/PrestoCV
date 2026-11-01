@@ -101,7 +101,7 @@ extension FoundationModelsService {
         let schema = try Self.toolsSchema(count: count)
         let call = SectionCallTrace(call: "tools", role: nil, tokens: Self.toolsTokens(most: count.upperBound))
         let answer = try await respond(prompt, schema: schema, call: call)
-        return Self.clean(try? answer.value([String].self, forProperty: "tools"))
+        return Self.skills(try? answer.value([String].self, forProperty: "tools"))
     }
 
     /// `count` tools of one title. A job may not go without tools: allowed none, the model answered none for a job with no lines of
@@ -110,8 +110,8 @@ extension FoundationModelsService {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
                 name: "tools",
-                description: "\(count.lowerBound) or \(count.upperBound) technical skills of the job's trade: software, equipment, "
-                    + "machines, instruments, methods, standards or fields of knowledge; first those its lines name",
+                description: "\(count.lowerBound) or \(count.upperBound) software, equipment, machines or instruments of the job's trade, "
+                    + "first those its lines name",
                 schema: DynamicGenerationSchema(
                     arrayOf: DynamicGenerationSchema(type: String.self), minimumElements: count.lowerBound, maximumElements: count.upperBound
                 )
@@ -145,11 +145,11 @@ extension FoundationModelsService {
             // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
             let who = title.map { "a person working as \($0)" } ?? "the person"
             properties.append(DynamicGenerationSchema.Property(
-                name: "trade", description: "The trade of \(who) and the software, machines, instruments, methods and knowledge a CV of it lists, in a few words",
+                name: "trade", description: "The trade of \(who) and the kinds of software, systems, machines and instruments it uses, in a few words",
                 schema: DynamicGenerationSchema(type: String.self)
             ))
-            let about = "\(tools) more technical skills of the trade: software, machines, instruments, methods, standards or fields "
-                + "of knowledge, each new; no general kind, no task, no material or part"
+            let about = "\(tools) more software, systems, machines or instruments of the trade, each new and of another kind; "
+                + "no general kind, no activity, no material or part"
             properties.append(list("tools", about, tools))
         }
         if qualities > 0 { properties.append(list("qualities", "\(qualities) more personal qualities at work, in the language of the CV", qualities)) }
@@ -163,8 +163,8 @@ extension FoundationModelsService {
         let answer = try await respond(prompt, schema: schema, call: SectionCallTrace(call: "moreSkills", role: nil, tokens: tokens))
         return DraftWriting(
             summary: nil, roleDescriptions: [],
-            technologies: tools > 0 ? Self.clean(try? answer.value([String].self, forProperty: "tools")) : [],
-            softSkills: qualities > 0 ? Self.clean(try? answer.value([String].self, forProperty: "qualities")) : []
+            technologies: tools > 0 ? Self.skills(try? answer.value([String].self, forProperty: "tools")) : [],
+            softSkills: qualities > 0 ? Self.skills(try? answer.value([String].self, forProperty: "qualities")) : []
         )
     }
 
@@ -267,6 +267,12 @@ extension FoundationModelsService {
     nonisolated private static func whole(_ values: [String]?, isComplete: Bool) -> [String] {
         let present = clean(values)
         return isComplete ? present : Array(present.dropLast())
+    }
+
+    /// The skills of a list, trimmed. The request once wrote all its skills in the first value, joined by ";", and the schema's
+    /// type name "string" in the others (probe round 11): each part is a skill, and the type name is none.
+    nonisolated static func skills(_ values: [String]?) -> [String] {
+        clean(values?.flatMap { $0.split(separator: ";").map(String.init) }).filter { $0.lowercased() != "string" }
     }
 
     nonisolated private static func clean(_ values: [String]?) -> [String] {

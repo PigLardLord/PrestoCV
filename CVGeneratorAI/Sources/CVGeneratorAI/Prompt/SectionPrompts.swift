@@ -133,23 +133,22 @@ enum SectionPrompts {
     /// The legal forms of a company of 4 letters or more, lowercased: no name of its own.
     private static let legalForms: Set<String> = ["gmbh", "sarl", "ltda"]
 
-    /// The tools request's rules, asking `count` technical skills. Asked only for software, equipment, machines or instruments,
-    /// "each of another kind", the request named household and room objects ("frigorifero", "microonde", "classe") and words of
-    /// no trade ("Sicherungsarm"): a technology is also a method, a standard or a field of knowledge of the trade (`SkillKind`,
-    /// ADR 0031), as a CV of the trade lists them (O1; probe round 11).
+    /// The tools request's rules, asking `count` tools. Asked for objects only, the request named household and room objects
+    /// ("frigorifero", "microonde", "classe"); asked for methods and fields of knowledge too, it named fields instead of products
+    /// ("linguagens de programação" for Python and Java) and the job's own duties: a standard or method is asked only by its own
+    /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1; probe round 11).
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
         """
-        You name the technical skills of one job for a CV: \(count.lowerBound) or \(count.upperBound) that a CV of a person with \
-        the job's title typically lists, the most typical first. Write in the language named on the first line.
-        - A technical skill is a software, equipment, machine or instrument of the trade, or a method, standard or field of \
-        knowledge of the trade.
-        - First the equipment, machines and software the job's own lines name, as written; then the skills the person names in \
+        You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
+        instruments that a person with the job's title uses at work, each of another kind, as a CV of that trade names them; \
+        a standard or method of the trade known by its own name counts as one. Write in the language named on the first line.
+        - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
         what they say of their work with no job, when they fit this job; then those of the trade, only when they fit the job's \
         title and the tools the person names.
         - A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not.
-        - 1 to 3 words each. Not a technical skill: what the work is done on; a task or duty, also when written as a noun; a \
-        document; a material, part or supply; stationery, furniture or protective wear; an everyday object a person of any trade \
-        uses, a household appliance or a room; a personal quality; a level; a skill already listed.
+        - 1 to 3 words each. Not a tool: what the work is done on; an activity or task, also when written as a noun; a document; \
+        a material, part or supply; stationery, furniture or protective wear; an everyday object a person of any trade uses, a \
+        household appliance or a room; a personal quality; a level; a skill already listed.
         """
     }
 
@@ -174,23 +173,24 @@ enum SectionPrompts {
         rejected: [String]
     ) -> Prompt {
         var lines = header(brief) + headline(brief) + [jobList(brief)] + said(brief)
-        if !listedTools.isEmpty { lines.append("Technical skills listed, do not repeat: " + listedTools.joined(separator: "; ")) }
+        if !listedTools.isEmpty { lines.append("Tools listed, do not repeat: " + listedTools.joined(separator: "; ")) }
         if !listedQualities.isEmpty { lines.append("Qualities listed, do not repeat: " + listedQualities.joined(separator: "; ")) }
         if tools > 0 {
             // Asked for the tools of the jobs, the request wrote the tools of a past trade; asked for "named software products, named
             // devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"). The general kinds of the work it
             // writes go by code (`repairedTools`; #354, round 15). Asked "each of another kind" of software, systems, machines or
             // instruments, it wrote kinds an office or a school has none of ("Termostatos", "Blockchain"): it is asked the tools a
-            // CV of the trade typically lists, the most common first, machines only when the trade uses any (probe round 9), and its
-            // methods, standards and fields of knowledge, which a CV of the trade lists too (probe round 11).
+            // CV of the trade typically lists, the most common first, machines only when the trade uses any (probe round 9). Asked
+            // for its methods and fields of knowledge too, it named fields instead of products ("linguagens de programação"): only
+            // a standard or method known by its own name is asked, after the products (probe round 11).
             let who = title.map { "a person working as \($0)" } ?? "a person with these jobs"
-            let trade = listedTools.isEmpty ? "the trade" : "the trade of the skills listed"
-            let new = listedTools.isEmpty && rejected.isEmpty ? "" : " none of those listed or rejected;"
+            let trade = listedTools.isEmpty ? "the trade" : "the trade of the tools listed"
+            let new = listedTools.isEmpty && rejected.isEmpty ? "" : " none of the tools listed or rejected;"
             lines.append(
-                "The CV lists too few technical skills for \(who): name \(tools) more that a CV of \(who) typically lists, the most "
-                    + "typical first: the software of \(trade), as a widely used product or a kind with a word of the trade; its "
-                    + "equipment, machines or instruments, when it uses any; its methods, standards and fields of knowledge;\(new) "
-                    + "each a different skill" + (listedTools.isEmpty ? "." : ", not another name of one listed.")
+                "The CV lists too few tools for \(who): name \(tools) more tools that a CV of \(who) typically lists, the most "
+                    + "common first: the software, as a kind with a word of the trade or a widely used product of \(trade), then the "
+                    + "equipment, machines or instruments, when the trade uses any, then a standard or method of the trade known by "
+                    + "its own name;\(new) each a different tool" + (listedTools.isEmpty ? "." : ", not another name of one listed.")
             )
         }
         if qualities > 0 {
@@ -202,7 +202,7 @@ enum SectionPrompts {
 
     static let moreSkillsInstructions = """
         You add skills to a CV, for the person's trade. Write in the language named on the first line.
-        - Nouns of 1 to 3 words; no level, no task or duty, also when written as a noun, none of those already listed.
+        - Nouns of 1 to 3 words; no level, no activity or task, also when written as a noun, none of those already listed.
         - First those the person names in what they say of their work with no job; then those of the trade.
         """
 

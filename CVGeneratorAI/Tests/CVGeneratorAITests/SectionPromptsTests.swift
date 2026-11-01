@@ -280,18 +280,18 @@ struct SectionPromptsTests {
         #expect(rules.contains("only when they fit the job's title and the tools the person names"))
         // Allowed none, a job with no lines of its own got none, and the next request filled it with roles (#354, round 5).
         #expect(!rules.contains("none fits"))
-        #expect(rules.contains("Not a technical skill: what the work is done on; a task or duty, also when written as a noun; a document;"))
-        // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4); asked only for objects "each of
-        // another kind", it named household objects and rooms: a technical skill is also a method, a standard or a field of
-        // knowledge of the trade (probe round 11).
-        #expect(rules.contains("2 or 3 that a CV of a person with the job's title typically lists, the most typical first."))
-        #expect(rules.contains("A technical skill is a software, equipment, machine or instrument of the trade, or a method, standard or field of knowledge of the trade."))
-        #expect(rules.contains("a household appliance or a room"))
-        #expect(!rules.contains("of another kind"))
+        #expect(rules.contains("Not a tool: what the work is done on; an activity or task, also when written as a noun; a document;"))
+        // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4).
+        #expect(rules.contains("2 or 3 software, equipment, machines or instruments that a person with the job's title uses at work"))
         // One title asked 2 or 3, and the request for those missing named activities and bare kinds (#354, round 6).
-        #expect(SectionPrompts.toolsInstructions(count: 4...5).contains("technical skills of one job for a CV: 4 or 5 that"))
+        #expect(SectionPrompts.toolsInstructions(count: 4...5).contains("4 or 5 software, equipment, machines or instruments"))
         #expect(SectionPrompts.tools(for: Self.brief, roles: [0], count: 4...5).instructions == SectionPrompts.toolsInstructions(count: 4...5))
         #expect(rules.contains("stationery, furniture or protective wear; an everyday object a person of any trade uses"))
+        // Asked for objects only, the request named household objects and rooms ("frigorifero", "classe"); asked for methods and
+        // fields of knowledge too, it named fields instead of products: a standard or method counts by its own name (probe round 11).
+        #expect(rules.contains("an everyday object a person of any trade uses, a household appliance or a room;"))
+        #expect(rules.contains("as a CV of that trade names them; a standard or method of the trade known by its own name counts as one."))
+        #expect(!rules.contains("field of knowledge"))
         // A bare kind is no tool; with a word of its trade it is one (#354, round 4).
         #expect(rules.contains("A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not."))
         #expect(!rules.contains("pieces of equipment"))
@@ -342,20 +342,20 @@ struct SectionPromptsTests {
 
         // Asked for the tools of the jobs, the request wrote the tools of a trade the person left (#354, round 15); asked for "named
         // software products, named devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"); asked "each of
-        // another kind", it wrote kinds an office has none of ("Termostatos"; probe round 9); asked only for objects, it wrote
-        // household objects: a CV of the trade also lists its methods, standards and fields of knowledge (probe round 11).
+        // another kind", it wrote kinds an office has none of ("Termostatos"; probe round 9); asked for methods and fields of
+        // knowledge, it wrote fields instead of products: only a standard or method with its own name, after them (probe round 11).
         #expect(both.contains(
-            "The CV lists too few technical skills for a person working as manutentore elettromeccanico: name 2 more that a CV of "
-                + "a person working as manutentore elettromeccanico typically lists, the most typical first: the software of the "
-                + "trade of the skills listed, as a widely used product or a kind with a word of the trade; its equipment, machines "
-                + "or instruments, when it uses any; its methods, standards and fields of knowledge; none of those listed or "
-                + "rejected; each a different skill, not another name of one listed."
+            "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more tools that a CV of a "
+                + "person working as manutentore elettromeccanico typically lists, the most common first: the software, as a kind "
+                + "with a word of the trade or a widely used product of the trade of the tools listed, then the equipment, machines "
+                + "or instruments, when the trade uses any, then a standard or method of the trade known by its own name; none of "
+                + "the tools listed or rejected; each a different tool, not another name of one listed."
         ))
         #expect(toolsOnly.contains(
-            "The CV lists too few technical skills for a person with these jobs: name 1 more that a CV of a person with these jobs "
-                + "typically lists, the most typical first: the software of the trade, as a widely used product or a kind with a word "
-                + "of the trade; its equipment, machines or instruments, when it uses any; its methods, standards and fields of "
-                + "knowledge; each a different skill."
+            "The CV lists too few tools for a person with these jobs: name 1 more tools that a CV of a person with these jobs "
+                + "typically lists, the most common first: the software, as a kind with a word of the trade or a widely used product "
+                + "of the trade, then the equipment, machines or instruments, when the trade uses any, then a standard or method of "
+                + "the trade known by its own name; each a different tool."
         ))
         #expect(!both.contains("of another kind"))
         #expect(!both.contains("named devices"))
@@ -364,7 +364,7 @@ struct SectionPromptsTests {
         #expect(!SectionPrompts.toolsInstructions(count: 2...3).contains("materials or"))
         // Asked for qualities with no language, the request wrote an Italian CV English ones (#354, round 4).
         #expect(both.contains("Name 1 more personal qualities at work that fit these jobs, as nouns in the language named on the first line."))
-        #expect(both.contains("Technical skills listed, do not repeat: PLC"))
+        #expect(both.contains("Tools listed, do not repeat: PLC"))
         #expect(both.contains("Qualities listed, do not repeat: precisione"))
         #expect(!toolsOnly.contains("personal qualities"))
         #expect(!toolsOnly.contains("listed, do not repeat"))
@@ -387,7 +387,7 @@ struct SectionPromptsTests {
             #expect(text.contains(said), "\(text)")
         }
         #expect(!SectionPrompts.tools(for: Self.brief, roles: [0], count: 2...3).text.contains("with no job"))
-        #expect(SectionPrompts.toolsInstructions(count: 2...3).contains("then the skills the person names in what they say of their work with no job"))
+        #expect(SectionPrompts.toolsInstructions(count: 2...3).contains("then the tools the person names in what they say of their work with no job"))
         #expect(SectionPrompts.softSkillsInstructions.contains("First the qualities the person says of themselves"))
         #expect(SectionPrompts.moreSkillsInstructions.contains("First those the person names"))
     }

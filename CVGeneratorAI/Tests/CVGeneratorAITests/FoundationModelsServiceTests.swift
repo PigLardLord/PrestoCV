@@ -115,9 +115,15 @@ struct FoundationModelsServiceTests {
         // Allowed none, the request answered none for a job with no lines of its own, and the next one filled it with roles.
         #expect(tools["minItems"] as? Int == count.lowerBound, "no job goes without tools")
         #expect(tools["maxItems"] as? Int == count.upperBound)
-        // A technical skill is also a method, a standard or a field of knowledge of the trade (probe round 11).
-        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) technical skills") == true)
+        #expect((tools["description"] as? String)?.hasPrefix("\(count.lowerBound) or \(count.upperBound) software") == true)
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
+    }
+
+    @Test("A skills list splits a value that joins several with \";\" and drops the schema's type name (probe round 11)")
+    func skillsOfAList() {
+        #expect(FoundationModelsService.skills(["registro di classe ; lavagna interattiva", "string", " Moodle ", "String", ""])
+            == ["registro di classe", "lavagna interattiva", "Moodle"])
+        #expect(FoundationModelsService.skills(nil).isEmpty)
     }
 
     @Test("A job's request writes exactly the person's duties and the typical ones the job needs, 1 to 4, and its years only if said (#354, round 10)",
