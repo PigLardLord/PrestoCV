@@ -13,8 +13,10 @@ import Foundation
 ///
 /// The draft keeps at most `caps` skills of each kind, those the description names first.
 struct InferredSkills {
-    /// The most skills of each kind a draft keeps: the instructions ask for 4 to 8 technologies and 3 to 5 soft skills.
-    static let caps: [SkillKind: Int] = [.technology: 8, .softSkill: 5]
+    /// The most skills of each kind a draft keeps: the instructions ask for 4 to 8 technologies and 3 to 5 soft skills, and a rich
+    /// draft (`DraftDepth`) keeps 12 and 6, a CV typical of the trade under O1: capped at 8, it kept 8 of the 10 or more technologies
+    /// its requests wrote (probe round 13).
+    static var caps: [SkillKind: Int] { DraftDepth.isRich ? [.technology: 12, .softSkill: 6] : [.technology: 8, .softSkill: 5] }
 
     private let language: Vocabulary.Language?
     private let written: WrittenText

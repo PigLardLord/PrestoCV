@@ -26,7 +26,13 @@ struct RichDraftTests {
         #expect(DraftBrief.Role.mostDuties == 6)
         #expect([0, 1, 4, 5, 6, 8].map(DraftBrief.Role.adding(said:)) == [5, 4, 1, 1, 0, 0])
         #expect(DraftBrief.Role(title: "stagehand", hasEnded: true).adding == 5)
-        #expect(SectionDraft.technologies == 10)
+        // Probe round 13: capped at 8 and 5, the draft kept 8 of the 10 or more technologies its requests wrote.
+        #expect(SectionDraft.technologies == 12)
+        #expect(SectionDraft.softSkills == 6)
+        #expect(InferredSkills.caps == [.technology: 12, .softSkill: 6])
+        #expect([false, true].map(SectionDraft.fewestTools(sparse:)) == [10, 6])
+        #expect([false, true].map(SectionDraft.fewestQualities(sparse:)) == [4, 3])
+        #expect(SectionPrompts.softSkillsInstructions.contains("You name 4 to 6 personal qualities at work"))
         #expect(FoundationModelsService.jobTokens == 340)
         #expect(FoundationModelsService.jobRepairTokens == 280)
         #expect(FoundationModelsService.jobRepairDuties == 5)
@@ -116,6 +122,39 @@ struct RichDraftTests {
         let topics = SectionDraft.workTopics(of: Self.brief, current: 2, duties: Self.duties, typical: [[], [], []])
 
         #expect(topics.map(\.work) == [["the junior technicians", "the rehearsals"], ["the shows"]])
+    }
+
+    // MARK: The tools slots (probe round 13)
+
+    @Test("The tools slots read the products, standards and systems first, then the tools in capitals, the others, and last the fields of the work (probe round 13)")
+    func specificFirst() {
+        let tools = ["contabilità", "Facturación", "matita", "Excel", "HACCP", "Wartung", "manutenzione", "Balance sheets"]
+
+        #expect(SectionDraft.specificFirst(tools, language: "it")
+                == ["HACCP", "Excel", "Balance sheets", "matita", "contabilità", "Facturación", "Wartung", "manutenzione"])
+        // German nouns all have a capital: a capital says nothing there.
+        #expect(SectionDraft.specificFirst(["Wartung", "Werkzeugkoffer", "SPS-Steuerung", "Messgerät"], language: "de")
+                == ["SPS-Steuerung", "Werkzeugkoffer", "Messgerät", "Wartung"])
+    }
+
+    @Test("A tools slot asks the tools the summary does not name yet, as many as it holds, and none when it names them all; other slots stay (probe round 13)")
+    func unsaidTools() {
+        let tools = ["Pro Tools", "DiGiCo SD7", "in-ear monitors", "XLR cables", "Dante"]
+        let slot = SummaryTopic(title: "head of sound", tools: ["Pro Tools", "DiGiCo SD7", "in-ear monitors"], hasEnded: false)
+        let written = ["I work as head of sound.", "I mix the shows on the digico sd7 and edit them in Pro Tools."]
+
+        #expect(SectionDraft.unsaid(slot, tools: tools, written: written)
+                == SummaryTopic(title: "head of sound", tools: ["in-ear monitors", "XLR cables", "Dante"], hasEnded: false))
+        #expect(SectionDraft.unsaid(slot, tools: tools, written: []) == slot)
+        let said = written + ["I fit the in-ear monitors, run the XLR cables and route the stage over Dante."]
+        #expect(SectionDraft.unsaid(slot, tools: tools, written: said) == nil)
+        // "Pro" alone is not the tool "Pro Tools".
+        let short = SummaryTopic(title: "head of sound", tools: ["Pro Tools"], hasEnded: false)
+        #expect(SectionDraft.unsaid(short, tools: tools, written: ["I am a pro at mixing."]) == short)
+        let work = SummaryTopic(title: "head of sound", work: ["the shows"], hasEnded: false)
+        let qualities = SummaryTopic(title: "head of sound", qualities: ["calm"], hasEnded: false)
+        #expect(SectionDraft.unsaid(work, tools: tools, written: said) == work)
+        #expect(SectionDraft.unsaid(qualities, tools: tools, written: said) == qualities)
     }
 
     // MARK: The summary's request

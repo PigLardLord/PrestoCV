@@ -6596,8 +6596,9 @@ extension GroundingRows {
         }
 
         let technologies = ["Lesson planning", "Classroom management", "Phonics", "Early literacy", "Excel", "Montessori method",
-                            "Interactive whiteboard", "Educational games", "Assessment design", "Google Classroom"]
-        let softSkills = ["Patience", "Teamwork", "Empathy", "Communication", "Creativity", "Adaptability"]
+                            "Interactive whiteboard", "Educational games", "Assessment design", "Google Classroom",
+                            "Phonemic awareness", "Math manipulatives", "Reading recovery"]
+        let softSkills = ["Patience", "Teamwork", "Empathy", "Communication", "Creativity", "Adaptability", "Curiosity"]
         return [
             skillsRow("kept", "technologies and soft skills of the role, in plain words, claim no fact: they stay",
                       [planning, Skill(name: "Classroom management"), Skill(name: "Patience", kind: .softSkill),
@@ -6647,10 +6648,15 @@ extension GroundingRows {
                       [Skill(name: "Excel"), Skill(name: "Excel spreadsheets"), planning],
                       .exactly(CVData(personalInfo: info, skills: [planning])),
                       description: AppExample.en + " I have never used Excel."),
-            skillsRow("caps-by-kind", "eight technologies, the named Excel among them, and five soft skills: the rest go",
+            // The caps of a rich draft are 12 and 6 (probe round 13); the depth is the OS's here.
+            skillsRow("caps-by-kind", "the cap of each kind, 8 technologies and 5 soft skills or 12 and 6 of a rich draft, the named "
+                      + "Excel among them: the rest go",
                       technologies.map { Skill(name: $0) } + softSkills.map { Skill(name: $0, kind: .softSkill) },
-                      .exactly(CVData(personalInfo: info, skills: technologies.prefix(8).map { Skill(name: $0) }
-                                          + softSkills.prefix(5).map { Skill(name: $0, kind: .softSkill) })),
+                      .exactly(CVData(
+                          personalInfo: info,
+                          skills: technologies.prefix(InferredSkills.caps[.technology, default: 0]).map { Skill(name: $0) }
+                              + softSkills.prefix(InferredSkills.caps[.softSkill, default: 0]).map { Skill(name: $0, kind: .softSkill) }
+                      )),
                       description: AppExample.en + " I use Excel every day."),
             // #354: the model wrote "écoute" and "écoute active" in one draft; the second says the first again.
             secondGoes("held-by-an-earlier-one-goes", "planning is a word of lesson planning, written before it: the same skill again",

@@ -12,9 +12,10 @@ import Foundation
 final class SectionDraft {
     /// The jobs a draft writes duties for, in its order: a longer career gets no request for its oldest jobs.
     static let writtenJobs = 10
-    /// The most technologies and soft skills a draft keeps: more of a rich draft (`DraftDepth`).
-    nonisolated static var technologies: Int { DraftDepth.isRich ? 10 : 8 }
-    static let softSkills = 5
+    /// The most technologies and soft skills a draft keeps: more of a rich draft (`DraftDepth`; probe round 13), as
+    /// `InferredSkills.caps` keeps.
+    nonisolated static var technologies: Int { DraftDepth.isRich ? 12 : 8 }
+    nonisolated static var softSkills: Int { DraftDepth.isRich ? 6 : 5 }
     /// The most sentences a summary keeps.
     static let summarySentences = 4
     /// The most requests the summary makes, a sentence or its repair each (#354, round 13): more of a rich draft, whose summary
@@ -220,8 +221,8 @@ final class SectionDraft {
     /// The tools of each job title, a request each, the headline title first and a past title's only while the CV is short of
     /// tools (`mergedTools`), and the soft skills, cleaned by code against the tools the person names, then
     /// a request for the tools missing and one for the qualities missing, each asking one more, when the final check would keep
-    /// fewer than 4 technologies or 3 soft skills (3 and 2 for a single short job); each reads the skills the checks dropped, with
-    /// the reason.
+    /// fewer than `fewestTools` technologies or `fewestQualities` soft skills; each reads the skills the checks dropped, with the
+    /// reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = Self.fewestTools(sparse: sparse)
@@ -253,7 +254,7 @@ final class SectionDraft {
         keep(skills)
         let kept = try kept(around: dated).skills
         let missingTools = max(fewestTools - kept.count { $0.kind == .technology }, 0)
-        let missingQualities = max((sparse ? 2 : 3) - kept.count { $0.kind == .softSkill }, 0)
+        let missingQualities = max(Self.fewestQualities(sparse: sparse) - kept.count { $0.kind == .softSkill }, 0)
         guard missingTools > 0 || missingQualities > 0 else { return }
         let listedTools = kept.filter { $0.kind != .softSkill }.map(\.name)
         let listedQualities = kept.filter { $0.kind == .softSkill }.map(\.name)
@@ -300,9 +301,15 @@ final class SectionDraft {
     }
 
     /// The fewest tools a draft keeps, of a `sparse` description or of the others: more of a rich draft (`DraftDepth`), a CV
-    /// typical of the trade under O1 (probe round 4).
+    /// typical of the trade under O1 (probe rounds 4 and 13).
     static func fewestTools(sparse: Bool) -> Int {
-        DraftDepth.isRich ? (sparse ? 5 : 8) : (sparse ? 3 : 4)
+        DraftDepth.isRich ? (sparse ? 6 : 10) : (sparse ? 3 : 4)
+    }
+
+    /// The fewest soft skills a draft keeps, of a `sparse` description or of the others: more of a rich draft (`DraftDepth`;
+    /// probe round 13).
+    static func fewestQualities(sparse: Bool) -> Int {
+        DraftDepth.isRich ? (sparse ? 3 : 4) : (sparse ? 2 : 3)
     }
 
     /// The tools of the title groups' answers, the headline title's first (`headlineFirst`): its answer whole, then of each past
@@ -418,9 +425,10 @@ final class SectionDraft {
             let written = DescriptionText.normalized(duties.indices.contains(number) ? duties[number] ?? "" : "")
             return written.isEmpty ? [] : jobDuties[number].filter { written.contains(DescriptionText.normalized($0)) }
         }
+        let rankedTools = Self.specificFirst(keptTools, language: sanitizer.language(of: description))
         var topics = Self.summaryTopics(
             of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order,
-            tools: Self.specificFirst(keptTools, language: sanitizer.language(of: description)), hasOpening: brief.opening != nil
+            tools: rankedTools, hasOpening: brief.opening != nil
         )[...]
         var lead = brief.opening
         var accepted: [String] = []
@@ -456,8 +464,13 @@ final class SectionDraft {
         }
 
         while asked < Self.summaryRequests, !Self.isEnough(lead, accepted), accepted.count < Self.summarySentences - 1,
-              let topic = topics.popFirst() {
+              var topic = topics.popFirst() {
             let written = (lead.map { [$0] } ?? []) + accepted
+            // A tools slot of a rich draft asks the tools the summary does not name yet, and none when it names them all.
+            if DraftDepth.isRich {
+                guard let unsaid = Self.unsaid(topic, tools: rankedTools, written: written) else { continue }
+                topic = unsaid
+            }
             asked += 1
             let answer = try await request(.summary) { [brief] in
                 try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
@@ -547,17 +560,39 @@ final class SectionDraft {
     }
 
     /// `tools` with those that name a product, a standard or a system first (probe round 4): a word with a digit or two capitals
-    /// ("HACCP", "KNX-Systeme", "Excel 365"), then a capitalized one but in German, whose nouns all are, then the others, each
-    /// group in its order. The tools slot asked of "il frigorifero" and "il forno" wrote a sentence any job could hold.
+    /// ("HACCP", "KNX-Systeme", "Excel 365"), then a capitalized one but in German, whose nouns all are, then the others, and last
+    /// a field of the work, whose last word ends as an abstract noun does (`fieldEndings`: "Facturación", "manutenzione"), each
+    /// group in its order. The tools slot asked of "il frigorifero" and "il forno" wrote a sentence any job could hold; asked of
+    /// "Facturación", it said a duty again and was rejected as a repeat (probe round 13).
     static func specificFirst(_ tools: [String], language: String?) -> [String] {
         func rank(_ tool: String) -> Int {
             let letters = Array(tool)
             let isNamed = tool.contains(where: \.isNumber)
                 || zip(letters, letters.dropFirst()).contains { $0.isUppercase && $1.isUppercase }
             if isNamed { return 0 }
+            if let last = Word.words(in: tool).last?.accented, fieldEndings.contains(where: last.hasSuffix) { return 3 }
             return language != "de" && tool.first?.isUppercase == true ? 1 : 2
         }
         return tools.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+
+    /// The endings of the abstract nouns that name a field of the work rather than a tool, in the six languages, with their
+    /// accents: "matita" does not end as "contabilità" does.
+    static let fieldEndings = [
+        "ción", "sión", "dad", "zione", "sione", "ità", "tion", "sion", "ity", "ité", "ção", "são", "dade", "ung", "keit", "heit",
+    ]
+
+    /// `topic` of a rich draft, a tools slot with the first of `tools` that the summary `written` does not name yet, as many as the
+    /// slot holds, and nil when it names them all; another slot as it is (probe round 13). A work slot named the tools, and the
+    /// tools slots after it said them again and were rejected as repeats, which shortened the summary.
+    static func unsaid(_ topic: SummaryTopic, tools: [String], written: [String]) -> SummaryTopic? {
+        guard !topic.tools.isEmpty, topic.work.isEmpty, topic.qualities.isEmpty else { return topic }
+        let text = DescriptionText.normalized(written.joined(separator: " "))
+        let unsaid = tools.filter { DescriptionText.spans(of: DescriptionText.normalized($0), in: text).isEmpty }
+        guard !unsaid.isEmpty else { return nil }
+        return SummaryTopic(
+            title: topic.title, field: topic.field, tools: Array(unsaid.prefix(topic.tools.count)), hasEnded: topic.hasEnded
+        )
     }
 
     /// The job the summary speaks of first: the first one of `order` that goes on, else the latest.

@@ -159,11 +159,14 @@ enum SectionPrompts {
         )
     }
 
-    static let softSkillsInstructions = """
-        You name 3 to 5 personal qualities at work that fit the person's jobs, as nouns of 1 to 3 words. Write in the language named \
-        on the first line. No tool, no technique, no level. First the qualities the person says of themselves, as nouns; then \
-        those that fit the jobs.
+    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others.
+    static var softSkillsInstructions: String {
         """
+        You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, as nouns of 1 to \
+        3 words. Write in the language named on the first line. No tool, no technique, no level. First the qualities the person \
+        says of themselves, as nouns; then those that fit the jobs.
+        """
+    }
 
     /// The request for the skills a draft still misses: `tools` more tools, of the trade of the tools kept or, with none kept, of the
     /// jobs (#354, round 4), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`

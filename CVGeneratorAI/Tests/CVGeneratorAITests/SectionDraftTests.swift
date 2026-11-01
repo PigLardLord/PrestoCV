@@ -142,7 +142,7 @@ struct SectionDraftTests {
 
     @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6), but a rich draft's headline title (probe round 4)",
           arguments: [
-              (0, 1, false, 4...5, 8...9), (0, 1, true, 3...4, 5...6), (0, 2, false, 2...3, 8...9), (1, 2, false, 2...3, 2...3),
+              (0, 1, false, 4...5, 10...11), (0, 1, true, 3...4, 6...7), (0, 2, false, 2...3, 10...11), (1, 2, false, 2...3, 2...3),
               (2, 3, false, 2...3, 2...3),
           ] as [(Int, Int, Bool, ClosedRange<Int>, ClosedRange<Int>)])
     func toolCount(group: Int, groups: Int, sparse: Bool, count: ClosedRange<Int>, rich: ClosedRange<Int>) {
