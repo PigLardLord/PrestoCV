@@ -395,22 +395,6 @@ struct RichDraftTests {
 
     // MARK: probe round 17
 
-    @Test("A rich draft asks the tools a job ad of the title asks, by the names of the trade, and no person or role; a plain one keeps its request (probe round 17)")
-    func toolsOfAJobAd() {
-        let rich = SectionPrompts.toolsInstructions(count: 4...5)
-
-        #expect(rich.contains("4 or 5 software, equipment, machines or instruments that a job ad for the job's title asks a candidate to use"))
-        #expect(rich.contains("equipment by the words that tell it from what a home or any office has"))
-        #expect(rich.contains("an activity, task or field of the work"))
-        #expect(rich.contains("a person or a role"))
-        DraftDepth.$pinned.withValue(false) {
-            let plain = SectionPrompts.toolsInstructions(count: 4...5)
-            #expect(!plain.contains("a job ad"))
-            #expect(!plain.contains("a person or a role"))
-            #expect(plain.contains("that a person with the job's title uses at work, each of another kind, as a CV of that trade names them"))
-        }
-    }
-
     @Test("The final pass keeps a rich summary sentence with an acronym of a kept duty, as the summary check does, and a plain one drops it (probe round 17)")
     func acronymOfAKeptDuty() throws {
         let french = CVDataSanitizer(languageOfText: { _ in "fr" })
@@ -430,6 +414,30 @@ struct RichDraftTests {
         #expect(draft.summary == summary)
         let plain = try DraftDepth.$pinned.withValue(false) { try french.sanitize(cv, writing: writing, against: description) }
         #expect(plain.summary?.contains("PA") != true, "\(plain.summary ?? "")")
+    }
+
+    // MARK: probe round 18
+
+    @Test("A rich draft asks the tools as a plain one does (probe round 18)")
+    func toolsAsAPlainDraft() {
+        let rich = SectionPrompts.toolsInstructions(count: 4...5)
+
+        #expect(!rich.contains("a job ad"))
+        DraftDepth.$pinned.withValue(false) {
+            #expect(SectionPrompts.toolsInstructions(count: 4...5) == rich)
+        }
+    }
+
+    @Test("A rich draft asks the soft skills as the nouns of the qualities, never adjectives of the person; a plain one keeps its request (probe round 18)")
+    func softSkillsAsNouns() {
+        let rich = SectionPrompts.softSkillsInstructions
+
+        #expect(rich.contains("4 to 6 personal qualities at work that fit the person's jobs, each the noun that names the quality, never an adjective that describes the person, of 1 to 3 words."))
+        DraftDepth.$pinned.withValue(false) {
+            let plain = SectionPrompts.softSkillsInstructions
+            #expect(plain.contains("3 to 5 personal qualities at work that fit the person's jobs, as nouns of 1 to 3 words. Write in the language named on the first line."))
+            #expect(!plain.contains("adjective"))
+        }
     }
 
     // MARK: The summary's request

@@ -136,11 +136,10 @@ enum SectionPrompts {
     /// The tools request's rules, asking `count` tools. Asked for objects only, the request named household and room objects
     /// ("frigorifero", "microonde", "classe"); asked for methods and fields of knowledge too, it named fields instead of products
     /// ("linguagens de programação" for Python and Java) and the job's own duties: a standard or method is asked only by its own
-    /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1; probe round 11). A rich draft (`DraftDepth`) asks them
-    /// as a job ad of the title does (`richToolsInstructions`).
+    /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1; probe round 11). Asked the tools a job ad of the title
+    /// asks, a rich draft named the ad's words for the work ("shift", "pallet") and its fields ("Stromversorgung"; probe round 17).
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
-        guard !DraftDepth.isRich else { return richToolsInstructions(count: count) }
-        return """
+        """
         You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
         instruments that a person with the job's title uses at work, each of another kind, as a CV of that trade names them; \
         a standard or method of the trade known by its own name counts as one. Write in the language named on the first line.
@@ -154,27 +153,6 @@ enum SectionPrompts {
         """
     }
 
-    /// The tools rules of a rich draft (probe round 17): the tools a job ad of the title asks, by the names of the trade. Asked as
-    /// a CV of the trade names them, the request named what a home has ("frigorifero", "microonde", "Headphones"), the fields and
-    /// documents of the work ("Contabilidad", "Facturación") and bare kinds ("Steuerungssystem").
-    static func richToolsInstructions(count: ClosedRange<Int>) -> String {
-        """
-        You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
-        instruments that a job ad for the job's title asks a candidate to use, each of another kind, by the names the \
-        professionals of that trade use; a standard or method of the trade known by its own name counts as one. Write in the \
-        language named on the first line.
-        - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
-        what they say of their work with no job, when they fit this job; then those of the trade, only when they fit the job's \
-        title and the tools the person names.
-        - The professional kind: equipment by the words that tell it from what a home or any office has, software by its \
-        product name or with a word of its trade. A bare kind, with no word of its trade, is no tool.
-        - 1 to 3 words each. Not a tool: what the work is done on; an activity, task or field of the work, also when written as \
-        a noun; a document; a material, part or supply; stationery, furniture or protective wear; an everyday object a person \
-        of any trade uses, a household appliance or a room; a person or a role; a personal quality; a level; a skill already \
-        listed.
-        """
-    }
-
     /// The soft skills request.
     static func softSkills(for brief: DraftBrief) -> Prompt {
         Prompt(
@@ -182,12 +160,15 @@ enum SectionPrompts {
         )
     }
 
-    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others.
+    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others. Asked
+    /// for nouns, a rich draft still wrote adjectives of the person ("reliable", "organizzata"): it is told the noun of the
+    /// quality (probe round 18).
     static var softSkillsInstructions: String {
-        """
-        You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, as nouns of 1 to \
-        3 words. Write in the language named on the first line. No tool, no technique, no level. First the qualities the person \
-        says of themselves, as nouns; then those that fit the jobs.
+        let nouns = DraftDepth.isRich ? "each the noun that names the quality, never an adjective that describes the person, of 1 to 3 words" : "as nouns of 1 to 3 words"
+        return """
+        You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, \(nouns). Write \
+        in the language named on the first line. No tool, no technique, no level. First the qualities the person says of \
+        themselves, as nouns; then those that fit the jobs.
         """
     }
 
