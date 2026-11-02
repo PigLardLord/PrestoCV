@@ -7,7 +7,7 @@ import Foundation
 /// The run of one AI draft in the trace: the description, whether the model could run, its language data, what each stage gave
 /// or removed, what the sections wrote around the facts, the claim check's verdicts, the time of each stage and the draft the
 /// person sees. Unlike `DraftLog`, it holds the text, so it goes only to the trace, which a closed gate drops whole in an App Store
-/// build. The model service and the claim checker add the requests and the raw answers to the same run (`CVPrompt.traceFields`,
+/// build. The model service and the claim checker add the requests and the raw answers to the same run (`CVPrompt.traceFields(sampling:)`,
 /// `SectionCallTrace`).
 struct DraftTrace {
     private let run: any TraceRunRecording
@@ -233,10 +233,11 @@ struct DraftTiming {
 // MARK: - The requests to the model
 
 extension CVPrompt {
-    /// What the model service asks the model for a draft, for the trace: the instructions, the prompt and how it is asked.
-    var traceFields: [TraceField] {
+    /// What the model service asks the model for a draft, for the trace: the instructions, the prompt and how it is asked; the
+    /// `sampling` names how the answer is sampled, which changes when an answer that repeats is asked again (#354).
+    func traceFields(sampling: String) -> [TraceField] {
         [
-            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "greedy"),
+            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", sampling),
             .text("instructions", instructions ?? ""), .text("prompt", text),
         ]
     }

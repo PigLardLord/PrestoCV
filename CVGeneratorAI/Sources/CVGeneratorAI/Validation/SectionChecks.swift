@@ -664,13 +664,16 @@ extension CVDataSanitizer {
 
     /// The rule a job's duty passes (ADR 0031, D3 and D4): a sentence that quotes, with no number, a clause of this job alone is the
     /// person's own; any other states no fact (`WrittenText`), names no other job's title whole, and restates no sentence of the
-    /// description about another employer.
+    /// description about another employer, nor says the person is, or works as, what none of the person's titles names
+    /// (`RoleAssertion`; #354, the final gate).
     struct DutyRule {
         let evidence: EntryEvidence
         private let job: Entries.Job
         private let ownWords: Set<String>
         private let foreignWords: Set<String>
         private let otherTitles: [String]
+        private let titles: [String]
+        private let language: Vocabulary.Language?
         private let otherEmployers: [String]
         private let source: DescriptionText
         private let written: WrittenText
@@ -690,6 +693,8 @@ extension CVDataSanitizer {
             ownWords = CVDataSanitizer.words(of: [title])
             foreignWords = CVDataSanitizer.foreignWords(of: otherJobs.map(\.company), own: ownWords, language: source.explainer.language)
             otherTitles = CVDataSanitizer.otherTitles(otherJobs.map(\.title), own: title)
+            titles = ([title, entries.headline] + jobs.map(\.title)).compactMap(\.presentValue)
+            language = source.explainer.language
             otherEmployers = otherJobs.compactMap(\.company)
             self.source = source
             self.written = written
@@ -717,6 +722,10 @@ extension CVDataSanitizer {
             }
             if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 }) {
                 return "it says what the person did at another job"
+            }
+            // Last, so that a word the other checks name ("certified") is the reason the model reads.
+            if let role = RoleAssertion.unkeptRole(in: sentence, titles: titles, name: nil, language: language) {
+                return "the words \"\(role)\" name a role the person did not state"
             }
             return nil
         }
@@ -880,6 +889,10 @@ extension CVDataSanitizer {
             // A summary sentence may name the work of a duty, and of two, and say it with how or what for; it goes when it says one
             // again and adds less than two words to it (`copiesADuty`, probe round 7).
             let dutyTitles = titles.compactMap { $0?.presentValue }.joined(separator: " ")
+            // A sentence that says the person is, or works as, what no kept title names goes (#354, the final gate; O1): "As a nurse,
+            // I coordinate patient care" of a nursing assistant. The person's own words, quoted, stay.
+            let keptTitles = titles.compactMap { $0?.presentValue }
+            let personName = facts.personalInfo.name
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -959,6 +972,10 @@ extension CVDataSanitizer {
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
                           let reason = written.rejection(of: sentence, ownWords: summaryOwnWords, ownQualifications: ownQualifications) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
+                } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
+                          RoleAssertion.unkeptRole(in: sentence, titles: keptTitles, name: personName, language: language) != nil {
+                    // Last, so that a word the written check names ("certified") is the reason the model reads.
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesAnUnstatedRole))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
@@ -1168,6 +1185,7 @@ extension CVDataSanitizer {
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
+    static let namesAnUnstatedRole = "it names a role the person did not state: say the person's own title, or none"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
     static let saysNothingOfThePerson = "it says nothing of the person: write it as the person, with \"I\" and what the person does"

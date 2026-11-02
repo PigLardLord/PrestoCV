@@ -30,6 +30,8 @@ struct Entries {
     let jobs: [Job]
     let studies: [Study]
     let certifications: [Certificate]
+    /// The person's own title, the role they put forward (`personalInfo.title`).
+    let headline: String?
     private let subjects: [Subject]
     private let clauses: DescriptionClauses
     private let grounding: Grounding
@@ -66,6 +68,7 @@ struct Entries {
         }
 
         person = [personalInfo.name, personalInfo.location, personalInfo.title].compactMap { $0 }.map(Self.words(of:))
+        headline = personalInfo.title
         self.subjects = subjects
         language = source.explainer.language
         clauses = DescriptionClauses(

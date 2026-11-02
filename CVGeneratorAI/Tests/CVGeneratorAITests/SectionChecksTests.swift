@@ -1757,6 +1757,81 @@ struct SectionChecksTests {
         #expect(sanitized.summary == [titled, team].joined(separator: " "), "\(sanitized.summary ?? "nil")")
     }
 
+    @Test("A summary sentence that names a role no kept title names goes, in both checks; the own title stays (#354, the gate)", arguments: [false, true])
+    func summaryOfAnUnstatedRole(rich: Bool) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = Self.nursingAssistant
+        let unstated = "As a nurse, I coordinate patient care and support the clinical team."
+        let stated = "As a nursing assistant, I help patients with washing and meals."
+
+        try DraftDepth.$pinned.withValue(rich) {
+            let verdict = try english.summaryCheck(
+                of: facts, summary: unstated + " " + stated, field: nil, against: Self.unstatedRoleDescription
+            )
+            let sanitized = try english.sanitize(
+                facts, writing: DraftWriting(summary: unstated + " " + stated, roleDescriptions: [nil], technologies: [], softSkills: []),
+                against: Self.unstatedRoleDescription
+            )
+
+            #expect(!verdict.kept.contains(unstated), "\(verdict.kept)")
+            #expect(verdict.rejected.contains { $0.sentence == unstated && $0.reason == CVDataSanitizer.namesAnUnstatedRole })
+            #expect(!verdict.rejected.contains { $0.reason == CVDataSanitizer.namesAnUnstatedRole && $0.sentence != unstated })
+            #expect(sanitized.summary?.contains("nurse,") != true, "\(sanitized.summary ?? "nil")")
+        }
+    }
+
+    @Test("A written duty that names a role no title names goes, in both checks; a plain duty stays (#354, the gate)", arguments: [false, true])
+    func dutyOfAnUnstatedRole(rich: Bool) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = Self.nursingAssistant
+        let unstated = "As a nurse, I coordinate the care plans of the ward."
+        let stated = "I help patients wash and dress in the morning."
+
+        try DraftDepth.$pinned.withValue(rich) {
+            let verdicts = try english.dutyCheck(
+                of: facts, job: 0, duties: unstated + " " + stated, against: Self.unstatedRoleDescription
+            )
+            let sanitized = try english.sanitize(
+                facts, writing: DraftWriting(summary: nil, roleDescriptions: [unstated + " " + stated], technologies: [], softSkills: []),
+                against: Self.unstatedRoleDescription
+            )
+
+            #expect(!verdicts.kept.contains(unstated), "\(verdicts.kept)")
+            #expect(
+                verdicts.rejected.contains { $0.sentence == unstated && $0.reason.contains("\"nurse\" name a role") },
+                "\(verdicts.rejected)"
+            )
+            #expect(sanitized.experience.first?.description?.contains("nurse,") != true, "\(sanitized.experience)")
+        }
+    }
+
+    @Test("A sentence with a qualification word and a role no title names goes for the word, the reason the model can act on (#354)", arguments: [false, true])
+    func qualificationBeforeAnUnstatedRole(rich: Bool) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let summary = "As a certified nurse, I coordinate patient care."
+        let duty = "As a certified nurse, I coordinate the care plans of the ward."
+
+        try DraftDepth.$pinned.withValue(rich) {
+            let verdict = try english.summaryCheck(
+                of: Self.nursingAssistant, summary: summary, field: nil, against: Self.unstatedRoleDescription
+            )
+            let verdicts = try english.dutyCheck(of: Self.nursingAssistant, job: 0, duties: duty, against: Self.unstatedRoleDescription)
+
+            #expect(
+                verdict.rejected.contains { $0.sentence.contains("certified") && $0.reason.contains("\"certified\"") },
+                "\(verdict.rejected)"
+            )
+            #expect(verdicts.rejected.contains { $0.sentence == duty && $0.reason.contains("\"certified\"") }, "\(verdicts.rejected)")
+        }
+    }
+
+    /// The final gate's case: a nursing assistant, whom a draft called a nurse.
+    private static let nursingAssistant = CVData(experience: [
+        Experience(title: "nursing assistant", company: "Riverside", startDate: nil, endDate: nil, current: true),
+    ])
+
+    private static let unstatedRoleDescription = "I am a nursing assistant at Riverside. I help patients with personal care."
+
     @Test("A summary sentence that ends with the last three words of an earlier one loses the words they share, and stays; one that shares fewer stays whole (#354, round 2; probe round 6)")
     func summaryWithARepeatedEnding() throws {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())

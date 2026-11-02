@@ -28,22 +28,14 @@ public final class FoundationModelsService: CVGenerationService {
         }
 
         let prompt = CVPrompt(request: request, delivery: instructionsDelivery)
-        let session = LanguageModelSession(instructions: prompt.instructions)
-        tracer.record(.request, into: .aiDraft) { prompt.traceFields }
-
         do {
-            let response = try await session.respond(
-                to: prompt.text,
-                generating: CVData.self,
-                includeSchemaInPrompt: true,
-                options: GenerationOptions(samplingMode: .greedy)
-            )
-            tracer.record(.response, into: .aiDraft) {
-                [.token("call", "draft"), .flag("answered", true), .text("raw", response.rawContent.jsonString)]
+            for sampling in Self.factsSampling {
+                if let facts = try await facts(for: prompt, sampling: sampling) { return facts }
             }
-            return response.content
         } catch is CancellationError {
             throw CancellationError()
+        } catch let failure as CVGenerationError {
+            throw failure
         } catch {
             // The framework stops a cancelled request with an error of its own, not with CancellationError.
             if Task.isCancelled {
@@ -58,6 +50,49 @@ public final class FoundationModelsService: CVGenerationService {
             }
             throw failure
         }
+        throw CVGenerationError.generationFailed
+    }
+
+    /// How the first pass samples its answer, once and, when the answer repeats, once more (#354). Greedy sampling gives the best
+    /// facts of the evaluation, and can loop on one sentence of a description; a fresh session that samples among the five likeliest
+    /// tokens wrote each answer of jobs-de with no loop. The seed is any fixed one, so that a description is drafted the same each time.
+    nonisolated static let factsSampling = [
+        FactsSampling(mode: .greedy, name: "greedy"), FactsSampling(mode: .random(top: 5, seed: 1), name: "top5"),
+    ]
+
+    /// One way of sampling the first pass, with the name the trace gives it.
+    struct FactsSampling: Sendable {
+        let mode: GenerationOptions.SamplingMode
+        let name: String
+    }
+
+    /// The facts of the description, asked in a fresh session and streamed: nil when the answer repeats one stretch
+    /// (`RepeatingAnswer`), which is stopped there.
+    ///
+    /// - Throws: `CVGenerationError.generationFailed` when the stream ends with no answer, and what the stream throws.
+    private func facts(for prompt: CVPrompt, sampling: FactsSampling) async throws -> CVData? {
+        tracer.record(.request, into: .aiDraft) { prompt.traceFields(sampling: sampling.name) }
+        let session = LanguageModelSession(instructions: prompt.instructions)
+        let stream = session.streamResponse(
+            to: prompt.text, generating: CVData.self, includeSchemaInPrompt: true, options: GenerationOptions(samplingMode: sampling.mode)
+        )
+        let watched = try await RepeatingAnswer.watch(
+            stream, texts: { $0.rawContent.texts }, length: { $0.rawContent.jsonString.utf8.count }
+        )
+        try Task.checkCancellation()
+        guard let watched else {
+            tracer.record(.response, into: .aiDraft) { [.token("call", "draft"), .flag("answered", false), .token("error", "noAnswer")] }
+            throw CVGenerationError.generationFailed
+        }
+        let raw = watched.answer.rawContent
+        guard !watched.repeats else {
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "draft"), .flag("answered", false), .token("error", "repeating"), .text("raw", raw.jsonString)]
+            }
+            return nil
+        }
+        tracer.record(.response, into: .aiDraft) { [.token("call", "draft"), .flag("answered", true), .text("raw", raw.jsonString)] }
+        return try CVData(raw)
     }
 
     /// The second pass (ADR 0031), streamed: an answer cut by its token limit keeps what the model wrote before the cut
@@ -189,6 +224,20 @@ extension WritingAnswer.PartiallyGenerated {
             technologies: technologies, softSkills: softSkills, summary: summary,
             roles: roles?.map { WritingSnapshot.Role(number: $0.number, text: $0.description) }
         )
+    }
+}
+
+extension GeneratedContent {
+    /// The texts of an answer, as `RepeatingAnswer` reads them: each string, and each list as one text with an item a line, its items
+    /// also on their own.
+    fileprivate var texts: [String] {
+        switch kind {
+        case .string(let text): [text]
+        case .array(let items): [items.map { $0.jsonString + "\n" }.joined()] + items.flatMap(\.texts)
+        case .structure(let properties, _): properties.values.flatMap(\.texts)
+        case .null, .bool, .number: []
+        @unknown default: []
+        }
     }
 }
 

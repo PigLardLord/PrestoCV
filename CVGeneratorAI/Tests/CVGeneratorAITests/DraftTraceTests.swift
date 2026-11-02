@@ -469,13 +469,13 @@ struct DraftTraceTests {
         #expect([DraftLog.Stage.grounding, .claimCheck, .result].map(DraftTrace.step(for:)) == [.removal, .removal, .removal])
     }
 
-    @Test("The request to the model is its instructions and its prompt, as the service sends them", arguments: [
+    @Test("The request to the model is its instructions, its prompt and its sampling, as the service sends them", arguments: [
         InstructionsDelivery.session, .promptPrefix,
     ])
     func promptFields(delivery: InstructionsDelivery) {
         let prompt = CVPrompt(request: request, delivery: delivery)
-        #expect(prompt.traceFields == [
-            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "greedy"),
+        #expect(prompt.traceFields(sampling: "top5") == [
+            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "top5"),
             .text("instructions", prompt.instructions ?? ""), .text("prompt", prompt.text),
         ])
     }

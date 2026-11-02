@@ -96,40 +96,12 @@ public struct CVDataSanitizer: Sendable {
         return LanguageCheck(language: language, data: lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue) ? .present : .missing)
     }
 
-    /// Whether a written summary sentence says the person worked as what no kept title names (#354, round 7): "In passato ho
-    /// lavorato come contabile." of a person whose only "contabile" is the name of an employer. The word after "as" ("come", "als",
-    /// "comme", "como") and its article must be a word of a kept title, but "part" ("I work as part of a team").
-    private static func namesAnUnkeptTitle(_ sentence: String, titles: [String]) -> Bool {
-        let words = Word.words(in: sentence).map(\.folded)
-        guard words.contains(where: workVerbs.contains) else { return false }
-        let titleWords = Set(titles.flatMap { Word.words(in: $0).map(\.folded) })
-        for (index, word) in words.enumerated() where index > 0 && asWords.contains(word) {
-            // Right after the verb, or in German after the subject of its perfect: "Davor habe ich als Monteur gearbeitet".
-            guard workVerbs.contains(words[index - 1]) || word == "als" && ["ich", "habe"].contains(words[index - 1]),
-                  let role = words.dropFirst(index + 1).first(where: { !roleArticles.contains($0) }) else { continue }
-            if !partWords.contains(role) && !titleWords.contains(role) { return true }
-        }
-        return false
-    }
-
     /// The forms of "to work" that a role follows ("lavoro come", "habe als ... gearbeitet"), folded: a duty that only says where
     /// the person worked holds one and no other word of work (#354, round 11).
     static let workVerbs: Set<String> = [
         "work", "worked", "working", "lavoro", "lavorato", "lavoravo", "arbeite", "arbeitete", "gearbeitet", "travaille",
         "travaillais", "trabajo", "trabaje", "trabajaba", "trabajado", "trabalho", "trabalhei", "trabalhava", "trabalhado",
     ]
-
-    /// The words a role follows after a form of "to work", folded.
-    private static let asWords: Set<String> = ["as", "come", "als", "comme", "como"]
-
-    /// The articles before a role, folded.
-    private static let roleArticles: Set<String> = [
-        "a", "an", "the", "un", "una", "uno", "l", "il", "lo", "la", "ein", "eine", "einer", "der", "die", "une", "le", "el", "um",
-        "uma", "o",
-    ]
-
-    /// The words after "as" that name no role ("as part of", "come membro di").
-    private static let partWords: Set<String> = ["part", "parte", "teil", "member", "membre", "miembro", "membro", "partie"]
 
     func grounded(_ cvData: CVData, writing: DraftWriting?, in source: DescriptionText) -> CVData {
         let jobTitles = cvData.experience.map(\.title)
@@ -180,11 +152,13 @@ public struct CVDataSanitizer: Sendable {
         let ownQualifications: Set<String> = DraftDepth.isRich ? OwnQualifications.words(of: education, in: source) : []
         let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution))).union(acronyms)
             .union(languageWords)
+        // A written sentence says the person is, or works as, only what a kept title names (#354, round 7 and the final gate).
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
+        let language = source.explainer.language
         let summary = { (text: String?, words: Set<String>) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {
                 written.isPlain($0, ownWords: words, ownQualifications: ownQualifications)
-                    && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
+                    && RoleAssertion.unkeptRole(in: $0, titles: keptTitles, name: personalInfo.name, language: language) == nil
             }
         }
 
