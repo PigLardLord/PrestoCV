@@ -1787,11 +1787,12 @@ extension CVDataSanitizer {
     ]
 
     /// The opening of a summary that names no title: the current job's title, else the person's own, in the present; else the title
-    /// of the job that ended last, in the past. Nil when the facts hold no title or the language is none of the six.
+    /// of the latest job (`JobRecency.latestFirst`, the one the CV lists first), in the past. Nil when the facts hold no title or the
+    /// language is none of the six.
     static func opening(of facts: CVData, language: Vocabulary.Language?) -> String? {
         let current = facts.experience.first { $0.current && $0.title.presentValue != nil }?.title.presentValue
             ?? facts.personalInfo.title?.presentValue
-        let past = facts.experience.filter { $0.title.presentValue != nil }.max { JobRecency($0) < JobRecency($1) }?.title
+        let past = JobRecency.latestFirst(facts.experience).map { facts.experience[$0].title }.first { $0.presentValue != nil }
         guard let language, let title = current ?? past?.presentValue else { return nil }
         let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
         switch (language, current != nil) {

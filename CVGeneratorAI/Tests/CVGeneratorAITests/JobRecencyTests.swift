@@ -42,6 +42,19 @@ struct JobRecencyTests {
         #expect(JobRecency.latestFirst(noEnd) == [1, 0], "A job with no end date goes on")
     }
 
+    @Test("A job the person says goes on now comes before one with no end date; a job with no year keeps its place among the others")
+    func currentBeforeOpenAndUndatedInPlace() {
+        let open = [Experience(title: "a", startDate: "2019"), Experience(title: "b", startDate: "2016", current: true)]
+        let undated = [
+            Experience(title: "a", startDate: "2012", endDate: "2014"), Experience(title: "b"),
+            Experience(title: "c", startDate: "2016", endDate: "2019"),
+        ]
+
+        #expect(JobRecency.latestFirst(open) == [1, 0])
+        #expect(JobRecency(open[1]) > JobRecency(open[0]))
+        #expect(JobRecency.latestFirst(undated) == [2, 1, 0])
+    }
+
     struct YearRow: Sendable, CustomTestStringConvertible {
         let date: String?
         let year: Int?
