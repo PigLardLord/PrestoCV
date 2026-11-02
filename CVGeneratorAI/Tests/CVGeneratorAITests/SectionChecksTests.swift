@@ -2172,6 +2172,21 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.opening(of: sameYear, language: .english) == "I worked as a storekeeper.", "The start year decides a tie")
     }
 
+    @Test("Of two current jobs the opening names the latest, the one the CV lists first, whatever order the draft has them in")
+    func openingTakesTheLatestCurrentJob() {
+        let facts = CVData(experience: [
+            Self.job("cook", "Brook Lane Canteen", from: "2015"),
+            Self.job("caretaker", "Harlow Fittings", from: "2022"),
+        ])
+        let headline = CVData(personalInfo: PersonalInfo(title: "kitchen manager"), experience: facts.experience)
+
+        #expect(JobOrder.ordered(facts.experience).first?.title == "caretaker")
+        #expect(CVDataSanitizer.opening(of: facts, language: .english) == "I work as a caretaker.")
+        #expect(CVDataSanitizer.currentTitle(of: facts) == "caretaker", "The being opening (\"I am a…\") reads the same title")
+        #expect(CVDataSanitizer.currentTitle(of: headline) == "caretaker")
+        #expect(CVDataSanitizer.currentTitle(of: CVData(personalInfo: PersonalInfo(title: "kitchen manager"))) == "kitchen manager")
+    }
+
     @Test("The summary reads a job's work as its duties' topics: each clause with its subject, auxiliary and verb gone, none with a number (#354, round 3)")
     func workTopics() {
         #expect(CVDataSanitizer.workTopics(of: "Je prépare les ateliers d'éveil et j'accueille les familles le matin.")

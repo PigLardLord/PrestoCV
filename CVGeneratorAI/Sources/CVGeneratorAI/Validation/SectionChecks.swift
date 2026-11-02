@@ -1786,14 +1786,22 @@ extension CVDataSanitizer {
         "tasks", "teams", "works",
     ]
 
-    /// The opening of a summary that names no title: the current job's title, else the person's own, in the present; else the title
-    /// of the latest job (`JobRecency.latestFirst`, the one the CV lists first), in the past. Nil when the facts hold no title or the
-    /// language is none of the six.
+    /// The jobs of `facts` that have a title, the latest first (`JobRecency.latestFirst`): in the order the CV lists them.
+    private static func titledJobs(of facts: CVData) -> [Experience] {
+        JobRecency.latestFirst(facts.experience).map { facts.experience[$0] }.filter { $0.title.presentValue != nil }
+    }
+
+    /// The title the person works as now: the latest current job's, the first the CV lists, else their headline. Nil with neither.
+    static func currentTitle(of facts: CVData) -> String? {
+        titledJobs(of: facts).first(where: \.current)?.title.presentValue ?? facts.personalInfo.title?.presentValue
+    }
+
+    /// The opening of a summary that names no title: the title the person works as now (`currentTitle`), in the present; else the
+    /// title of the latest job, the one the CV lists first, in the past. Nil when the facts hold no title or the language is none
+    /// of the six.
     static func opening(of facts: CVData, language: Vocabulary.Language?) -> String? {
-        let current = facts.experience.first { $0.current && $0.title.presentValue != nil }?.title.presentValue
-            ?? facts.personalInfo.title?.presentValue
-        let past = JobRecency.latestFirst(facts.experience).map { facts.experience[$0].title }.first { $0.presentValue != nil }
-        guard let language, let title = current ?? past?.presentValue else { return nil }
+        let current = currentTitle(of: facts)
+        guard let language, let title = current ?? titledJobs(of: facts).first?.title.presentValue else { return nil }
         let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
         switch (language, current != nil) {
         case (.english, true): return "I work as \(article) \(title)."
@@ -1811,11 +1819,10 @@ extension CVDataSanitizer {
         }
     }
 
-    /// The opening of a summary that says what the person is now, by the title of their current job or their headline: "Sono
+    /// The opening of a summary that says what the person is now, by the title they work as now (`currentTitle`): "Sono
     /// capoturno.", "I am a fitter.". Nil with no current title.
     private static func beingOpening(of facts: CVData, language: Vocabulary.Language) -> String? {
-        guard let title = facts.experience.first(where: { $0.current && $0.title.presentValue != nil })?.title.presentValue
-            ?? facts.personalInfo.title?.presentValue else { return nil }
+        guard let title = currentTitle(of: facts) else { return nil }
         let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
         switch language {
         case .english: return "I am \(article) \(title)."
