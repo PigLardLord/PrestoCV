@@ -257,7 +257,7 @@ enum SectionPrompts {
         var seen = Set<String>()
         let verbs = written.compactMap(CVDataSanitizer.leadingVerb(of:)).filter { seen.insert($0).inserted }
         if DraftDepth.isRich, !verbs.isEmpty { lines.append("Do not start with: " + verbs.joined(separator: "; ")) }
-        let instructions = isOfStudies(topic) ? studiesSentenceInstructions : summarySentenceInstructions
+        let instructions = isOfStudies(topic) ? studiesSentenceInstructions(for: topic) : summarySentenceInstructions
         return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
     }
 
@@ -290,13 +290,23 @@ enum SectionPrompts {
         """
 
     /// The rule of the studies slot of a rich draft, in place of the rule of the job (probe round 23); it asks to join the names
-    /// in the words of the language, since the sentences copied the separators of the lines (probe round 24).
-    static let studiesSentenceRule = """
-        - Say in the past what the person studied and where, by the names of the Course and School lines, and which languages \
-        the person speaks, by the names of the Languages line, each when its line is given; nothing more of them, no level and no job.
-        - Write a sentence of the language: join the names with its own words, never with ";".
-
-        """
+    /// in the words of the language, since the sentences copied the separators of the lines (probe round 24). It names only the
+    /// lines `topic` gives (probe round 25): asked for the Course line of a study with only a school, the sentence named a course
+    /// of its own ("Ho studiato Corso di cucina") and the check rejected it; told only "no job", one sentence spoke of the job.
+    static func studiesSentenceRule(for topic: SummaryTopic) -> String {
+        let courses = topic.studies.contains { $0.course != nil }, schools = topic.studies.contains { $0.school != nil }
+        var says: [String] = []
+        switch (courses, schools) {
+        case (true, true): says.append("in the past what the person studied and where, by the names of the Course and School lines")
+        case (true, false): says.append("in the past what the person studied, by the names of the Course lines")
+        case (false, true): says.append("in the past where the person studied, by the names of the School lines")
+        case (false, false): break
+        }
+        if !topic.languages.isEmpty { says.append("which languages the person speaks, by the names of the Languages line") }
+        return "- Speak only of the person's studies and languages, never of the job: say " + says.joined(separator: ", and ")
+            + "; nothing more of them, no level.\n"
+            + "- Write a sentence of the language: join the names with its own words, never with \";\".\n\n"
+    }
 
     static let summarySentenceLimits = """
         - Do not start with the first verb of a sentence of the summary so far. Start with a capital letter, end with a full stop; \
@@ -321,12 +331,14 @@ enum SectionPrompts {
 
     static var summarySentenceInstructions: String { summarySentenceTask + summarySentenceRules }
 
-    static let studiesSentenceInstructions = summarySentenceTask + studiesSentenceRule + richSummarySentenceLimits
+    static func studiesSentenceInstructions(for topic: SummaryTopic) -> String {
+        summarySentenceTask + studiesSentenceRule(for: topic) + richSummarySentenceLimits
+    }
 
     /// The sentence's repair: the request again, then the sentence the check rejected and why.
     static func summarySentenceRepair(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) -> Prompt {
         let lines = [summarySentence(for: brief, topic: topic, written: written).text, "Rejected, with the reason: " + rejected]
-        let instructions = isOfStudies(topic) ? studiesSentenceRepairInstructions : summarySentenceRepairInstructions
+        let instructions = isOfStudies(topic) ? studiesSentenceRepairInstructions(for: topic) : summarySentenceRepairInstructions
         return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
     }
 
@@ -339,7 +351,9 @@ enum SectionPrompts {
 
     static var summarySentenceRepairInstructions: String { summarySentenceRepairTask + summarySentenceRules }
 
-    static let studiesSentenceRepairInstructions = summarySentenceRepairTask + studiesSentenceRule + richSummarySentenceLimits
+    static func studiesSentenceRepairInstructions(for topic: SummaryTopic) -> String {
+        summarySentenceRepairTask + studiesSentenceRule(for: topic) + richSummarySentenceLimits
+    }
 
     // MARK: The parts of a request
 

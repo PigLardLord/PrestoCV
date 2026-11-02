@@ -503,7 +503,7 @@ struct RichDraftTests {
             Summary so far:
             - I work as a warehouse operative.
             """), "\(prompt.text)")
-        #expect(prompt.instructions == SectionPrompts.studiesSentenceInstructions)
+        #expect(prompt.instructions == SectionPrompts.studiesSentenceInstructions(for: topic))
         for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
             #expect(instructions.contains("certification or achievement beyond those the lines give"))
         }
@@ -633,12 +633,12 @@ struct RichDraftTests {
 
         #expect(studies.isOfStudies && !job.isOfStudies)
         #expect(prompts.map(\.instructions) == [
-            SectionPrompts.studiesSentenceInstructions, SectionPrompts.studiesSentenceRepairInstructions,
+            SectionPrompts.studiesSentenceInstructions(for: studies), SectionPrompts.studiesSentenceRepairInstructions(for: studies),
         ])
         for instructions in prompts.map(\.instructions) {
-            #expect(instructions.contains("- Say in the past what the person studied and where, by the names of the Course and School "
-                + "lines, and which languages the person speaks, by the names of the Languages line, each when its line is given; "
-                + "nothing more of them, no level and no job."))
+            #expect(instructions.contains("- Speak only of the person's studies and languages, never of the job: say in the past what "
+                + "the person studied and where, by the names of the Course and School lines, and which languages the person speaks, "
+                + "by the names of the Languages line; nothing more of them, no level."))
             #expect(instructions.contains("certification or achievement beyond those the lines give"))
             #expect(!instructions.contains("Say what the person does as the job"))
         }
@@ -695,7 +695,10 @@ struct RichDraftTests {
 
     @Test("The studies rule asks for a sentence of the language, its names joined by its words, never by a semicolon (probe round 24)")
     func studiesJoinRule() {
-        for instructions in [SectionPrompts.studiesSentenceInstructions, SectionPrompts.studiesSentenceRepairInstructions] {
+        let topic = SummaryTopic(title: "warehouse operative", studies: [Self.logistics], languages: ["Polish"], hasEnded: false)
+        for instructions in [
+            SectionPrompts.studiesSentenceInstructions(for: topic), SectionPrompts.studiesSentenceRepairInstructions(for: topic),
+        ] {
             #expect(instructions.contains("- Write a sentence of the language: join the names with its own words, never with \";\"."))
         }
         #expect(!SectionPrompts.summarySentenceInstructions.contains("never with \";\""))
@@ -712,6 +715,30 @@ struct RichDraftTests {
             Self.logistics, SummaryStudy(course: "forklift licence", school: nil), SummaryStudy(course: nil, school: "Arlen School"),
         ])
         #expect(SectionDraft.studies(of: CVData()).isEmpty)
+    }
+
+    // MARK: probe round 25
+
+    @Test("The studies rule names only the lines its slot gives: no course for a study with only a school (probe round 25)")
+    func studiesRuleOfLines() {
+        let school = SummaryStudy(course: nil, school: "Arlen School"), course = SummaryStudy(course: "first aid", school: nil)
+        func rule(_ studies: [SummaryStudy], _ languages: [String]) -> String {
+            SectionPrompts.studiesSentenceRule(
+                for: SummaryTopic(title: "warehouse operative", studies: studies, languages: languages, hasEnded: false)
+            )
+        }
+        let lead = "- Speak only of the person's studies and languages, never of the job: say "
+        let speaks = "which languages the person speaks, by the names of the Languages line"
+
+        #expect(rule([school], ["Polish"]).hasPrefix(
+            lead + "in the past where the person studied, by the names of the School lines, and " + speaks + "; nothing more"
+        ))
+        #expect(!rule([school], ["Polish"]).contains("Course"))
+        #expect(rule([course], []).hasPrefix(lead + "in the past what the person studied, by the names of the Course lines; nothing"))
+        #expect(!rule([course], []).contains("School") && !rule([course], []).contains("Languages"))
+        #expect(rule([], ["Polish"]).hasPrefix(lead + speaks + "; nothing more of them, no level."))
+        #expect(!rule([], ["Polish"]).contains("studied"))
+        #expect(rule([school, Self.logistics], []).contains("what the person studied and where, by the names of the Course and School"))
     }
 
     // MARK: The summary's request
