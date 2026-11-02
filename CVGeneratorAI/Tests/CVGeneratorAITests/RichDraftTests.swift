@@ -256,7 +256,7 @@ struct RichDraftTests {
           ] as [(String, String, [String], String?)])
     func repeatedTail(language: String, sentence: String, earlier: [String], kept: String?) {
         let tail = CVDataSanitizer.withoutARepeatedTail(
-            of: sentence, earlier: earlier, besides: [], language: Vocabulary.Language(rawValue: language)
+            of: sentence, earlier: earlier, besides: [], tools: [], language: Vocabulary.Language(rawValue: language)
         )
 
         #expect(tail == kept)
@@ -302,6 +302,91 @@ struct RichDraftTests {
         DraftDepth.$pinned.withValue(false) {
             let plain = try? checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
             #expect(plain?.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerbOfThePerson) == true, "\(plain?.rejected ?? [])")
+        }
+    }
+
+    // MARK: probe round 16
+
+    @Test("A closing clause of time or purpose that says again an earlier sentence goes, a tail of three repeats goes against two added, and a tail of tools said before goes with what they are for (probe round 16)",
+          arguments: [
+              ("it", "Uso il registro elettronico per annotare le presenze mentre correggo i compiti degli alunni.",
+               ["Correggo i compiti degli alunni ogni settimana."], [], "Uso il registro elettronico per annotare le presenze."),
+              ("en", "I log the deliveries in the stock system while I check the orders of the week.",
+               ["I check the orders of the week every morning."], [], "I log the deliveries in the stock system."),
+              ("it", "Accolgo i clienti al banco con il nuovo registratore di cassa e la grande macchina del caffè.",
+               ["Uso il registratore di cassa e la macchina del caffè ogni mattina."], [], "Accolgo i clienti al banco."),
+              ("it", "Accolgo i clienti al banco con il nuovo registratore di cassa e la grande macchina.",
+               ["Uso il registratore di cassa e la macchina ogni mattina."], [], nil),
+              ("pt", "Crio aplicativos para lojas, usando o IDE para escrever código e o SQL para buscar informações.",
+               ["Utilizo o IDE para desenvolver código e o SQL para consultar bancos de dados."], [["ide"], ["sql"]], "Crio aplicativos para lojas."),
+              ("pt", "Crio aplicativos para lojas, usando o IDE para escrever código e o SQL para buscar informações.",
+               ["Utilizo o IDE para desenvolver código e o SQL para consultar bancos de dados."], [], nil),
+              ("pt", "Crio aplicativos para lojas, usando o IDE para escrever código e o SQL para buscar informações.",
+               ["Utilizo o Eclipse para desenvolver código."], [["ide"], ["sql"]], nil),
+          ] as [(String, String, [String], [[String]], String?)])
+    func repeatedTailRound16(language: String, sentence: String, earlier: [String], tools: [[String]], kept: String?) {
+        let tail = CVDataSanitizer.withoutARepeatedTail(
+            of: sentence, earlier: earlier, besides: [], tools: tools, language: Vocabulary.Language(rawValue: language)
+        )
+
+        #expect(tail == kept)
+    }
+
+    @Test("A first word in the imperfect of a verb in \"-ar\" speaks as the person in a rich draft, and not in a plain one (probe round 16)",
+          arguments: [
+              ("pt", "contabilista", "Móveis Cávado",
+               "Moro em Braga. Desde 2017 trabalho como contabilista na Móveis Cávado, onde faço a contabilidade e analiso os movimentos de caixa.",
+               "Organizava os arquivos das faturas de cada cliente."),
+              ("es", "contable", "Muebles Albarracín",
+               "Vivo en Teruel. Desde 2017 trabajo como contable en Muebles Albarracín, donde llevo la contabilidad y reviso las facturas.",
+               "Gestionaba los pedidos de los clientes cada semana."),
+          ] as [(String, String, String, String, String)])
+    func imperfectOfThePerson(language: String, title: String, company: String, description: String, sentence: String) throws {
+        let checker = CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Experience(title: title, company: company, startDate: "2017", endDate: nil, current: true)])
+
+        let verdict = try checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(!verdict.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerbOfThePerson), "\(verdict.rejected)")
+        // A plain draft keeps the rule as it was: no verb of the person.
+        DraftDepth.$pinned.withValue(false) {
+            let plain = try? checker.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+            #expect(plain?.rejected.map(\.reason).contains(CVDataSanitizer.hasNoVerbOfThePerson) == true, "\(plain?.rejected ?? [])")
+        }
+    }
+
+    @Test("A rich summary keeps the head of a sentence whose closing phrase holds a name, and a plain one drops it (probe round 16)")
+    func headBeforeAName() throws {
+        let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Experience(title: "programador", company: "Lojas Minho", startDate: "2017", endDate: nil, current: true)])
+        let description = "Moro em Braga. Desde 2017 trabalho como programador na Lojas Minho, onde crio interfaces para os clientes e automatizo tarefas."
+        let sentence = "Crio interfaces para os clientes e automatizo tarefas repetitivas com código usando o Visual Studio Code."
+        let head = "Crio interfaces para os clientes e automatizo tarefas repetitivas com código."
+
+        let verdict = try portuguese.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+
+        #expect(verdict.kept.contains(head), "\(verdict.kept) \(verdict.rejected)")
+        DraftDepth.$pinned.withValue(false) {
+            let plain = try? portuguese.summaryCheck(of: facts, summary: sentence, field: nil, against: description)
+            #expect(plain?.kept.contains { $0.hasPrefix("Crio") } == false, "\(plain?.kept ?? [])")
+            #expect(plain?.rejected.contains { $0.sentence == sentence && $0.reason.contains("reads as a name") } == true, "\(plain?.rejected ?? [])")
+        }
+    }
+
+    @Test("A rich summary keeps an acronym the person's work writes, and a plain one reads it as a name (probe round 16)")
+    func acronymOfTheWork() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(experience: [Experience(title: "sound technician", company: "Teatro Lario", startDate: "2017", endDate: nil, current: true)])
+        let description = "I live in Como. Since 2017 I work as a sound technician at Teatro Lario, where I set up the sound for the concerts."
+        let sentence = "I manage the PA systems of the theatre for every show."
+        let work = ["I was setting up the PA systems for the concerts."]
+
+        let verdict = try english.summaryCheck(of: facts, summary: sentence, field: nil, work: work, against: description)
+
+        #expect(verdict.kept.contains(sentence), "\(verdict.kept) \(verdict.rejected)")
+        DraftDepth.$pinned.withValue(false) {
+            let plain = try? english.summaryCheck(of: facts, summary: sentence, field: nil, work: work, against: description)
+            #expect(plain?.rejected.contains { $0.sentence == sentence && $0.reason == "the word \"PA\" reads as a name" } == true, "\(plain?.rejected ?? [])")
         }
     }
 
