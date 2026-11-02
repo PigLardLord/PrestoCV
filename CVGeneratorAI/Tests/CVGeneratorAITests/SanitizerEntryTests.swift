@@ -96,6 +96,20 @@ struct SanitizerEntryTests {
 
         #expect(try sanitizer.sanitize(cvData, against: "anything at all") == CVData())
     }
+
+    @Test("A character the reader cannot see, in a fact or a sentence of the draft, is left out of it: the draft keeps the rest")
+    func hiddenCharactersLeftOut() throws {
+        let example = faithfulExamples[0]
+        let hidden = faithfulDraft(
+            title: "primary\u{200B} school teacher", location: "Bolo\u{202E}gna",
+            summary: "A caring\u{00AD} teacher who loves her pupils.", school: "Don Milani\u{E000} school",
+            past: ("assistant", "nur\u{0007}sery"), achievement: "Trained 3 new\u{200B} teachers",
+            degree: "Education\u{FEFF} Sciences", university: "University of Bologna",
+            native: ("Italian", .native), english: "Eng\u{200F}lish", interests: ["chess", "hik\u{200D}ing"]
+        )
+
+        #expect(try sanitizer.sanitize(hidden, against: example.description) == example.survivors)
+    }
 }
 
 // MARK: - The app's example description, and a draft that says exactly what it says

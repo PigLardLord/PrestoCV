@@ -4,7 +4,10 @@ import Foundation
 /// each job's title. Such a sentence quotes nothing, so it is kept only when it states no fact of its own, which the person would have
 /// had to say. A sentence is plain when it is in the language of the description and holds:
 /// - no address, and no number, in digits or in words, compound ones included ("five", "cinque", "ventuno", "einundzwanzig");
-/// - no word of a qualification ("license", "abilitazione", "Abschluss"): a qualification is a fact the person has to state;
+/// - no character that the reader cannot see or that reorders what they see (`HiddenCharacters`): a zero-width space would hide an
+///   address from the checks;
+/// - no word of a qualification ("license", "abilitazione", "Abschluss"): a qualification is a fact the person has to state, unless it is
+///   one of the person's studies (`OwnQualifications`);
 /// - no month, and no word of duration, seniority or level ("years", "senior", "expert") that the description does not write;
 /// - no negation: the person denied nothing in it;
 /// - no word that the description holds only in the clauses that claim nothing for the person (another person's, or one that denies,
@@ -51,7 +54,7 @@ struct WrittenText {
     /// - Parameters:
     ///   - ownWords: The words that are no name in it, as `Word.folded` writes them: the titles and degrees it may name.
     ///   - foreignWords: The words it may not hold: for a job, those of the other jobs' titles and employers.
-    ///   - ownQualifications: The words of the person's own degrees, as `rejection` reads them.
+    ///   - ownQualifications: The qualification words that are the person's own (`OwnQualifications`), as `rejection` reads them.
     func isPlain(_ sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], ownQualifications: Set<String> = []) -> Bool {
         rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords, ownQualifications: ownQualifications) == nil
     }
@@ -60,12 +63,13 @@ struct WrittenText {
     ///
     /// ADR 0031, D3: `allowing` holds the words of a duty that quotes its own job's clause word for word: there its acronyms,
     /// number words and seniority words are the person's own. Digits and another job's words still reject it. `ownQualifications`
-    /// holds the words of the person's own degrees, which a summary sentence of a rich draft names (#354, probe round 21).
+    /// holds the qualification words of the person's studies, which a summary sentence of a rich draft names (#354, probe round 21).
     func rejection(
         of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = [],
         ownQualifications: Set<String> = []
     ) -> String? {
         guard source.isInTheLanguageOfTheDescription(sentence, wordList: wordList) else { return "it is not in the language of the description" }
+        guard !HiddenCharacters.occur(in: sentence) else { return "it holds a character the reader cannot see" }
 
         let addresses = AddressTokens(sentence)
         guard addresses.emails.isEmpty, addresses.links.isEmpty, !addresses.hasAmbiguousAddress else { return "it holds an address" }

@@ -219,17 +219,18 @@ final class SectionDraft {
 
     // MARK: - Skills
 
-    /// The tools of each job title, a request each, the headline title first and a past title's only while the CV is short of
-    /// tools (`mergedTools`), and the soft skills, cleaned by code against the tools the person names, then
+    /// The tools of each job title, a request each (of ten titles at most), the headline title first and a past title's only while
+    /// the CV is short of tools (`mergedTools`), and the soft skills, cleaned by code against the tools the person names, then
     /// a request for the tools missing and one for the qualities missing, each asking one more, when the final check would keep
     /// fewer than `fewestTools` technologies or `fewestQualities` soft skills; each reads the skills the checks dropped, with the
     /// reason.
     private func writeSkills(of brief: DraftBrief, around dated: CVData) async throws {
         let sparse = brief.roles.count <= 1 && brief.roles.flatMap(\.clauses).joined().count < 80
         let fewestTools = Self.fewestTools(sparse: sparse)
-        let order = dated.experience.count == brief.roles.count ? Self.latestFirst(dated.experience) : Array(brief.roles.indices)
+        let order = dated.experience.count == brief.roles.count ? JobRecency.latestFirst(dated.experience) : Array(brief.roles.indices)
         let headline = Self.headlineRole(of: brief, order: order)
-        let groups = Self.headlineFirst(Self.toolGroups(of: brief), headline: headline)
+        // At most `writtenJobs` titles are asked, the headline title and the latest first: a long career is not a long wait.
+        let groups = Array(Self.headlineFirst(Self.toolGroups(of: brief), headline: headline).prefix(Self.writtenJobs))
         var answers: [[String]] = []
         for (group, roles) in groups.enumerated() {
             let count = Self.toolCount(group: group, groups: groups.count, sparse: sparse)
@@ -332,7 +333,7 @@ final class SectionDraft {
         return tools
     }
 
-    /// The headline role of `brief`: the first job of the headline title, else the latest by `order` (`latestFirst`).
+    /// The headline role of `brief`: the first job of the headline title, else the latest by `order` (`JobRecency.latestFirst`).
     static func headlineRole(of brief: DraftBrief, order: [Int]) -> Int? {
         let title = { (text: String?) in text?.presentValue?.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
         if let headline = title(brief.headline), let number = brief.roles.indices.first(where: { title(brief.roles[$0].title) == headline }) {
@@ -420,7 +421,7 @@ final class SectionDraft {
             }
         }
         brief.opening = try? sanitizer.summaryOpening(of: dated, against: description)
-        let order = isDated ? Self.latestFirst(kept.experience) : Array(brief.roles.indices)
+        let order = isDated ? JobRecency.latestFirst(kept.experience) : Array(brief.roles.indices)
         let jobDuties = (isDated ? kept.experience.map(\.description) : duties).map { SentenceSplitter.sentences(in: $0 ?? "") }
         // The typical duties each job keeps: the sentences its own request wrote, not the person's (#354, round 15).
         let typical = jobDuties.indices.map { number -> [String] in
@@ -674,18 +675,6 @@ final class SectionDraft {
         return pairs.compactMap { pair in
             let work = CVDataSanitizer.workTopics(of: pair.joined(separator: " "), limit: 2)
             return work.isEmpty ? nil : SummaryTopic(title: title, work: work, hasEnded: brief.roles[current].hasEnded)
-        }
-    }
-
-    /// The numbers of `jobs`, the latest first: the current ones, then by end and start, the earlier in the draft first on a tie.
-    static func latestFirst(_ jobs: [Experience]) -> [Int] {
-        func key(_ job: Experience) -> (Int, String, String) {
-            let isOver = !job.current && job.endDate.presentValue != nil
-            return (isOver ? 0 : 1, job.endDate.presentValue ?? "", job.startDate.presentValue ?? "")
-        }
-        return jobs.indices.sorted { left, right in
-            let (one, other) = (key(jobs[left]), key(jobs[right]))
-            return one == other ? left < right : one > other
         }
     }
 

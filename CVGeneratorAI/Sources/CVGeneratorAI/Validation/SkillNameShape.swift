@@ -36,14 +36,9 @@ struct SkillNameShape {
         return markCount <= mostMarks && !isAnAddress(name)
     }
 
-    /// Whether the scalar is one the reader sees: no control, format (bidirectional marks, zero-width characters, the soft hyphen),
-    /// surrogate, private-use or unassigned scalar, no line or paragraph separator, and no space but the plain one.
+    /// Whether the scalar is one the reader sees (`HiddenCharacters`), and no space but the plain one: a name has no no-break space.
     private static func isVisible(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.properties.generalCategory {
-        case .control, .format, .surrogate, .privateUse, .unassigned, .lineSeparator, .paragraphSeparator: false
-        case .spaceSeparator: scalar == " "
-        default: true
-        }
+        !HiddenCharacters.hides(scalar) && (scalar.properties.generalCategory != .spaceSeparator || scalar == " ")
     }
 
     /// Whether a token of `name` is an email or a link, or mentions one: "Node.js" is a tool, "evil.example" is a link.

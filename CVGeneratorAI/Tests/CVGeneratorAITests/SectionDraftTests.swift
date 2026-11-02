@@ -117,6 +117,29 @@ struct SectionDraftTests {
         #expect(brief.roles[3].clauses.contains { $0.contains("junior technicians") })
     }
 
+    @Test("A career of more titles than the draft writes jobs for asks the tools of ten titles at most, the current title first")
+    func toolsRequestsAreCapped() async throws {
+        let titles = [
+            "baker", "cook", "waiter", "porter", "driver", "cleaner", "gardener", "painter", "welder", "tailor", "cashier", "clerk",
+        ]
+        let employers = [
+            "Alpha Bakery", "Bravo Kitchen", "Cedar Cafe", "Delta Depot", "Echo Express", "Foxtrot Cleaning", "Garden House",
+            "Harbour Paints", "Iron Works", "Jolly Tailors", "Kilo Shop", "Lima Office",
+        ]
+        let service = service()
+        service.generateResult = .success(CVData(experience: zip(titles, employers).map { Experience(title: $0, company: $1) }))
+        service.toolsResult = titles.indices.map { ["tool \($0)"] }
+        let text = zip(titles, employers).map { "I worked as a \($0) at \($1)." }.joined(separator: "\n")
+
+        _ = try await draft(service, of: text)
+
+        #expect(service.sectionCalls.filter { $0 == "tools" }.count == SectionDraft.writtenJobs)
+        // The current job's title (the fourth, by the years of the jobs' answers) first, the others in their order, the last two none.
+        let asked = [3] + (0..<SectionDraft.writtenJobs).filter { $0 != 3 }
+        #expect(service.toolsRequests == asked.map { [$0] })
+        #expect(service.toolsCounts == Array(repeating: 2...3, count: SectionDraft.writtenJobs))
+    }
+
     @Test("A job whose clauses only say where the person worked is marked so, and its request asks for typical duties alone (#354, round 11)")
     func jobThatNamesNoWork() async throws {
         let service = service()
@@ -255,15 +278,6 @@ struct SectionDraftTests {
         #expect(SectionDraft.summaryTopics(of: brief, duties: [], typical: [], qualities: ["teamwork", "calm"], field: nil, order: []) == [
             SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
         ])
-    }
-
-    @Test("The jobs are read latest first: the current ones, then by end and start, the earlier in the draft first on a tie")
-    func latestFirst() {
-        let jobs = [
-            Experience(title: "a", startDate: "2013", endDate: "2016"), Experience(title: "b", startDate: "2016", endDate: "2019"),
-            Experience(title: "c", startDate: "2021", current: true), Experience(title: "d", startDate: "2016", endDate: "2019"),
-        ]
-        #expect(SectionDraft.latestFirst(jobs) == [2, 1, 3, 0])
     }
 
     // MARK: What reaches the draft

@@ -31,17 +31,34 @@ enum GeneralDuty {
     }
 
     /// Whether `verb`, the sentence's first word after the pronoun, is in the present: an Italian, Spanish or Portuguese first person
-    /// in "-o"; an English verb with no "-ed"; any other one that is no auxiliary of the past (`stopWords`).
+    /// in "-o"; an English verb with no "-ed"; a French verb with no ending of the past or the future ("-ais", "-ai"); a German first
+    /// person in "-e" with no "-te" of the preterite.
+    ///
+    /// Known limit: a German weak preterite whose stem does not end in "t" or "-ier" ("plante", "lagerte") reads as a present, because
+    /// the two end alike ("warte") and no German tense tagger tells them apart.
     private static func isPresent(_ verb: String, language: Vocabulary.Language) -> Bool {
         switch language {
         case .italian, .spanish, .portuguese:
             return CVDataSanitizer.tense(of: verb, language: language) == .present
         case .english:
             return !verb.hasSuffix("ed") && !englishPast.contains(verb)
-        case .german, .french:
-            return true
+        case .french:
+            // The imperfect and the conditional end in "-ais", the simple past and the future in "-ai"; the present forms in "-ais"
+            // are few, and a suffix would take the imperfect of "faire" ("faisais") and of "freiner" ("freinais") for them.
+            return !verb.hasSuffix("ai") && (!verb.hasSuffix("ais") || frenchPresentsInAis.contains(verb))
+        case .german:
+            let isPreterite = verb.hasSuffix("ierte") || (verb.hasSuffix("ete") && !germanPresentsInEte.contains(where: verb.hasSuffix))
+            return verb.hasSuffix("e") && !isPreterite
         }
     }
+
+    /// The French first persons of the present that end in "-ais", folded.
+    private static let frenchPresentsInAis: Set<String> = [
+        "fais", "refais", "defais", "satisfais", "vais", "reconnais", "parais", "apparais", "disparais", "plais", "tais", "hais",
+    ]
+
+    /// The endings of the German first persons of the present in "-ete" (beten, kneten, treten and its compounds), folded.
+    private static let germanPresentsInEte = ["bete", "knete", "trete"]
 
     /// The English past forms with no "-ed" that a duty opens with most, folded.
     private static let englishPast: Set<String> = [

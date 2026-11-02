@@ -859,14 +859,13 @@ extension CVDataSanitizer {
             let acronyms = DraftDepth.isRich ? Self.acronyms(in: work + duties) : []
             // The person's studies and languages are their own in a rich draft (probe round 21, O1): a word of a degree or school of
             // the facts, or a language's name, anchors a sentence, the languages are no names, and a qualification word of a degree
-            // or of the description is the person's own. Told never to name them, the summary left out what the person wrote of
-            // them. A wish ("I want to take a master") still goes: its words are excluded.
-            let studyWords: Set<String> = DraftDepth.isRich
-                ? Self.words(of: facts.education.map(\.degree)).union(Self.words(of: facts.education.map(\.institution))).filter { $0.count >= 4 }
-                : []
+            // or of a sentence of the description that speaks of the studies is the person's own (`OwnQualifications`): not one
+            // of an object of the work or of an employer ("I calibrate certified weights at Chartered Scales"). Told never to name
+            // them, the summary left out what the person wrote of them. A wish ("I want to take a master") still goes: its words
+            // are excluded.
+            let studyWords: Set<String> = DraftDepth.isRich ? OwnQualifications.studyWords(of: facts.education) : []
             let languageWords: Set<String> = DraftDepth.isRich ? Self.words(of: facts.languages.map(\.name)) : []
-            let ownQualifications: Set<String> = DraftDepth.isRich
-                ? Self.words(of: facts.education.map(\.degree)).union(Self.words(of: [description])) : []
+            let ownQualifications: Set<String> = DraftDepth.isRich ? OwnQualifications.words(of: facts.education, in: source) : []
             let summaryOwnWords = ownWords.union(toolWords).union(employerWords).union(acronyms).union(languageWords)
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
@@ -1041,10 +1040,7 @@ extension CVDataSanitizer {
                 return !run.isEmpty && text.indices.contains { text[$0...].prefix(run.count).elementsEqual(run) }
             }
             var seen = Set<String>()
-            let end = { (job: Experience) in job.current ? "~" : job.endDate ?? "" }
-            let latest = facts.experience.enumerated()
-                .sorted { (end($0.element), $1.offset) > (end($1.element), $0.offset) }
-                .map(\.element.title)
+            let latest = JobRecency.latestFirst(facts.experience).map { facts.experience[$0].title }
             let titles = ([facts.personalInfo.title] + latest).compactMap { $0?.presentValue }
                 .filter { seen.insert($0.lowercased()).inserted }
             var opening = titles.contains(where: named) ? nil : Self.opening(of: facts, language: language)
@@ -1795,7 +1791,7 @@ extension CVDataSanitizer {
     static func opening(of facts: CVData, language: Vocabulary.Language?) -> String? {
         let current = facts.experience.first { $0.current && $0.title.presentValue != nil }?.title.presentValue
             ?? facts.personalInfo.title?.presentValue
-        let past = facts.experience.filter { $0.title.presentValue != nil }.max { ($0.endDate ?? "") < ($1.endDate ?? "") }?.title
+        let past = facts.experience.filter { $0.title.presentValue != nil }.max { JobRecency($0) < JobRecency($1) }?.title
         guard let language, let title = current ?? past?.presentValue else { return nil }
         let article = "aeiou".contains(title.lowercased().first ?? "x") ? "an" : "a"
         switch (language, current != nil) {

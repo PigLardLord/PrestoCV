@@ -175,6 +175,31 @@ struct CVGeneratorUseCaseTests {
         }
     }
 
+    // MARK: - The description without hidden characters (ADR 0031)
+
+    @Test("A description pasted with characters the reader cannot see is read without them: the model gets the clean text")
+    func hiddenCharactersOfTheDescriptionAreCleaned() async throws {
+        let hidden = example.description
+            .replacingOccurrences(of: "trained", with: "tra\u{00AD}ined")
+            .replacingOccurrences(of: "Since 2016", with: "Since\u{200B} 2016")
+            .replacingOccurrences(of: "Don Milani", with: "Don Milani\u{E000}")
+            .replacingOccurrences(of: "I speak Italian", with: "I speak\tItalian")
+            .replacingOccurrences(of: "Bologna.", with: "Bologna\u{0007}.")
+        #expect(hidden != example.description)
+
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(example.draft)
+        let sanitizer = CVDataSanitizer(wordList: TableWordList())
+        let useCase = CVGeneratorUseCase(service: service, claimChecker: FakeClaimChecker(), sanitizer: sanitizer)
+        let draft = try await useCase.generateCV(from: CVGenerationRequest(userPrompt: hidden))
+
+        #expect(service.generateRequests == [CVGenerationRequest(userPrompt: example.description)])
+        #expect(draft.cvData.experience.first?.achievements == ["Trained 3 new teachers"], "The soft hyphen costs the person no sentence")
+        let clean = try await generator(drafting: example.draft, checker: FakeClaimChecker())
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+        #expect(draft == clean)
+    }
+
     // MARK: - The claim check (ADR 0028)
 
     private var example: FaithfulExample { faithfulExamples[0] }

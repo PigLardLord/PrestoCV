@@ -90,8 +90,13 @@ public final class CVGeneratorUseCase {
         return try await trace.within { try await generate(from: request, trace: trace) }
     }
 
-    private func generate(from request: CVGenerationRequest, trace: DraftTrace) async throws -> GeneratedDraft {
-        trace.input(request)
+    private func generate(from received: CVGenerationRequest, trace: DraftTrace) async throws -> GeneratedDraft {
+        trace.input(received)
+        // The description is read without the characters the reader cannot see (ADR 0031): the model, the checks and the quotes the
+        // CV keeps from it all get the clean text, and a soft hyphen in a pasted word costs the person no sentence.
+        let request = CVGenerationRequest(
+            userPrompt: HiddenCharacters.cleaned(received.userPrompt), fallbackLanguageCode: received.fallbackLanguageCode
+        )
         let availability = service.availability()
         trace.availability(availability)
         if case .unavailable(let reason) = availability {

@@ -654,6 +654,34 @@ struct SectionChecksTests {
     }
 
     @Test(
+        "ADR 0031, D7: a French or German sentence in the past (imperfect, simple past, future, preterite) is no duty; the present is",
+        arguments: [
+            ("Je réglais les compresseurs.", Vocabulary.Language.french, false),
+            ("Je réglai les compresseurs.", .french, false),
+            ("Je réglerai les compresseurs.", .french, false),
+            ("Je réglerais les compresseurs.", .french, false),
+            ("Je portais les colis.", .french, false),
+            ("Je disais les consignes aux équipes.", .french, false),
+            ("Je freinais les convois.", .french, false),
+            ("Je règle les compresseurs.", .french, true),
+            ("Je fais les devis.", .french, true),
+            ("Je reconnais les pannes.", .french, true),
+            ("Ich reparierte die Pumpen.", .german, false),
+            ("Ich arbeitete an den Pumpen.", .german, false),
+            ("Ich ordnete die Ersatzteile.", .german, false),
+            ("Ich fuhr die Gabelstapler.", .german, false),
+            ("Ich half den Kunden.", .german, false),
+            ("Ich repariere die Pumpen.", .german, true),
+            ("Ich warte die Anlagen.", .german, true),
+            ("Ich knete den Teig.", .german, true),
+            ("Ich vertrete die Kollegen.", .german, true),
+        ]
+    )
+    func generalDutyIsNoPastInFrenchOrGerman(sentence: String, language: Vocabulary.Language, holds: Bool) {
+        #expect(GeneralDuty.holds(sentence, language: language) == holds)
+    }
+
+    @Test(
         "ADR 0031, D7: a present sentence of work with no job is a duty of the current job, in the step and the final check alike; one in the past, a quality, a pastime, a knowledge and one that names another employer are none",
         arguments: [
             ("Taro le valvole e smonto i riduttori delle linee.", true),
@@ -2122,6 +2150,26 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.opening(of: electrician, language: .german) == "Ich habe als electrician gearbeitet.")
         #expect(CVDataSanitizer.opening(of: CVData(), language: .english) == nil)
         #expect(CVDataSanitizer.opening(of: teacher, language: nil) == nil)
+    }
+
+    @Test("The opening names the job that ended last by the year of the end, not by the text of the date (Q1)")
+    func openingTakesTheLatestYear() {
+        let bare = CVData(experience: [
+            Self.job("cashier", "Brook Lane Shop", from: "2012", to: "March 2015"),
+            Self.job("storekeeper", "Harlow Fittings", from: "2016", to: "2018"),
+        ])
+        let italian = CVData(experience: [
+            Self.job("magazziniere", "Pastificio Cerreto", from: "settembre 2013", to: "marzo 2016"),
+            Self.job("cassiere", "Molino Fontebasso", from: "gennaio 2016", to: "gennaio 2018"),
+        ])
+        let sameYear = CVData(experience: [
+            Self.job("cashier", "Brook Lane Shop", from: "March 2010", to: "2015"),
+            Self.job("storekeeper", "Harlow Fittings", from: "2012", to: "June 2015"),
+        ])
+
+        #expect(CVDataSanitizer.opening(of: bare, language: .english) == "I worked as a storekeeper.")
+        #expect(CVDataSanitizer.opening(of: italian, language: .italian) == "Ho lavorato come cassiere.")
+        #expect(CVDataSanitizer.opening(of: sameYear, language: .english) == "I worked as a storekeeper.", "The start year decides a tie")
     }
 
     @Test("The summary reads a job's work as its duties' topics: each clause with its subject, auxiliary and verb gone, none with a number (#354, round 3)")

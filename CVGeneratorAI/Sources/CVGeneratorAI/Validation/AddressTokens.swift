@@ -18,8 +18,11 @@ struct AddressTokens {
     let remainder: String
 
     init(_ text: String) {
-        let characters = Array(text)
-        var blanked = characters
+        // The tokens are read from a copy where the lookalikes of "." and "@" are the real ones, one character for one character so
+        // that the positions stay: "market。io" is a link. `remainder` is still made of the characters as written.
+        let original = Array(text)
+        let characters = original.map(Self.withoutLookalikes)
+        var blanked = original
         var emails: [String] = []
         var links: [String] = []
         var ambiguous = false
@@ -77,6 +80,15 @@ struct AddressTokens {
     }
 
     // MARK: - Tokens
+
+    /// The full stops of other scripts and the fullwidth and small at signs, which the reader takes for "." and "@".
+    private static let lookalikeDots: Set<Character> = ["\u{3002}", "\u{FF0E}", "\u{FF61}", "\u{2024}", "\u{FE52}"]
+    private static let lookalikeAts: Set<Character> = ["\u{FF20}", "\u{FE6B}"]
+
+    private static func withoutLookalikes(_ character: Character) -> Character {
+        if lookalikeDots.contains(character) { return "." }
+        return lookalikeAts.contains(character) ? "@" : character
+    }
 
     private enum Kind {
         case email, link, ambiguous, plain

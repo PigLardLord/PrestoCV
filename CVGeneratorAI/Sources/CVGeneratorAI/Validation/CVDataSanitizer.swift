@@ -67,12 +67,16 @@ public struct CVDataSanitizer: Sendable {
     ///     `sanitize(cvData, against: description)` keeps. Its summary replaces the first pass's when a sentence of it stays; its
     ///     duties follow each job's own description; its skills follow the skills of `cvData`. All of it is text written around the
     ///     facts, and stays only as such (`WrittenText`, `InferredSkills`).
+    ///   - description: The person's description, as the use case reads it (`HiddenCharacters.cleaned(_:)`). The draft and the
+    ///     writing are read the same way first: a character the reader cannot see is left out of every fact and sentence of them.
     /// - Throws: `CVGenerationError.languageDataUnavailable`, and no draft, when the description is in English or German and the
     ///   device does not tag its language.
     public func sanitize(_ cvData: CVData, writing: DraftWriting? = nil, against description: String) throws(CVGenerationError) -> CVData {
         let source = DescriptionText(description, languageOfText: languageOfText)
         try requireLanguageData(of: source)
-        return LexicalClasses.$tagger.withValue(lexicalClasses) { grounded(cvData, writing: writing, in: source) }
+        return LexicalClasses.$tagger.withValue(lexicalClasses) {
+            grounded(HiddenCharacters.cleaned(cvData), writing: writing.map { HiddenCharacters.cleaned($0) }, in: source)
+        }
     }
 
     /// The language of `description`, when it is one of the six, and whether grounding it needs the device's language data and
@@ -168,13 +172,12 @@ public struct CVDataSanitizer: Sendable {
         // The acronyms of the kept duties are the person's words too in a rich draft, as in the summary check (probe round 17):
         // this pass dropped "I managed the PA systems …", which the check had kept for the "PA" of a kept duty.
         let acronyms = DraftDepth.isRich ? Self.acronyms(in: experience.compactMap(\.description)) : []
-        // The kept languages and the person's own degrees are no names or qualifications the draft's summary invents in a rich
-        // draft either, as in the summary check (probe round 22): this pass dropped "I speak English and Polish", which the check
-        // had kept.
+        // The kept languages and the person's own qualifications (the kept degrees, and the words of the sentences about the studies) are
+        // no names or qualifications the draft's summary invents in a rich draft either, as in the summary check (probe round 22):
+        // this pass dropped "I speak English and Polish", which the check had kept.
         let languages = sanitize(cvData.languages, claimed)
         let languageWords: Set<String> = DraftDepth.isRich ? Self.words(of: languages.map(\.name)) : []
-        let ownQualifications: Set<String> = DraftDepth.isRich
-            ? Self.words(of: education.map(\.degree)).union(source.foldedWords) : []
+        let ownQualifications: Set<String> = DraftDepth.isRich ? OwnQualifications.words(of: education, in: source) : []
         let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution))).union(acronyms)
             .union(languageWords)
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
@@ -352,9 +355,7 @@ public struct CVDataSanitizer: Sendable {
         guard jobs.allSatisfy({ $0.current || $0.startDate.presentValue != nil || $0.endDate.presentValue != nil }) else { return nil }
         let open = jobs.indices.filter { jobs[$0].endDate.presentValue == nil }
         if !open.isEmpty { return open.count == 1 ? open[0] : nil }
-        let years = jobs.map { job in
-            Word.words(in: job.endDate ?? "").filter { $0.isNumber && $0.folded.count == 4 }.compactMap { Int($0.folded) }.max()
-        }
+        let years = jobs.map { JobRecency.year(in: $0.endDate) }
         guard let latest = years.compactMap({ $0 }).max(), years.filter({ $0 == latest }).count == 1 else { return nil }
         return years.firstIndex(of: latest)
     }

@@ -567,6 +567,32 @@ struct RichDraftTests {
         #expect(verdict.rejected.contains { $0.sentence == sentence && $0.reason.contains("\"\(word)\"") }, "\(verdict.rejected)")
     }
 
+    @Test("A rich summary drops a qualification word that the description holds outside its studies: an object of the work, an employer",
+          arguments: [
+            ("I am a certified technician with chartered training.", "certified"),
+            ("I am a chartered technician.", "chartered"),
+          ])
+    func qualificationOutsideTheStudies(sentence: String, word: String) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(
+            experience: [Experience(title: "calibration technician", company: "Chartered Scales", startDate: "2019", current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")]
+        )
+
+        let verdict = try english.summaryCheck(
+            of: facts, summary: "I work as a calibration technician. " + sentence, field: nil, work: ["I calibrate certified weights."],
+            against: Self.calibrator
+        )
+
+        #expect(!verdict.kept.contains(sentence), "\(verdict.kept)")
+        #expect(verdict.rejected.contains { $0.sentence == sentence && $0.reason.contains("\"\(word)\"") }, "\(verdict.rejected)")
+    }
+
+    private static let calibrator = """
+        Since 2019 I work as a calibration technician at Chartered Scales in Leeds, where I calibrate certified weights. I studied \
+        logistics at Harlow City College.
+        """
+
     // MARK: probe round 22
 
     @Test("The final pass keeps a rich summary sentence of the person's studies and languages, and a plain one drops it (probe round 22)",
@@ -614,6 +640,46 @@ struct RichDraftTests {
         let draft = try english.sanitize(cv, writing: writing, against: description)
 
         #expect(draft.summary?.contains(wish) != true, "\(draft.summary ?? "")")
+    }
+
+    @Test("The final pass drops a rich summary sentence of a qualification word that the description holds outside its studies",
+          arguments: [
+            "I am a certified technician with chartered training.",
+            "I am a chartered technician.",
+          ])
+    func qualificationOutsideTheStudiesDropped(sentence: String) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let cv = CVData(
+            experience: [Experience(title: "calibration technician", company: "Chartered Scales", startDate: "2019", current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")]
+        )
+        let writing = DraftWriting(
+            summary: "I work as a calibration technician. " + sentence, roleDescriptions: [nil], technologies: [], softSkills: []
+        )
+
+        let draft = try english.sanitize(cv, writing: writing, against: Self.calibrator)
+
+        #expect(draft.summary?.contains(sentence) != true, "\(draft.summary ?? "")")
+    }
+
+    @Test("The final pass keeps a written duty and a summary sentence without the character the reader cannot see in them")
+    func hiddenCharactersOfTheWritingLeftOut() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let description = "Since 2019 I work as a warehouse operative at Depot Arlen, where I load the lorries."
+        let cv = CVData(
+            experience: [Experience(title: "warehouse operative", company: "Depot Arlen", startDate: "2019", current: true)]
+        )
+        let writing = DraftWriting(
+            summary: "I work as a\u{00AD} warehouse operative.", roleDescriptions: ["I load the lorries\u{202E}."], technologies: [],
+            softSkills: []
+        )
+
+        let draft = try english.sanitize(cv, writing: writing, against: description)
+
+        #expect(draft.summary == "I work as a warehouse operative.")
+        #expect(draft.experience.first?.description?.contains("I load the lorries.") == true, "\(draft.experience)")
+        let kept = [draft.summary, draft.experience.first?.description].compactMap { $0 }
+        #expect(!kept.contains(where: HiddenCharacters.occur(in:)))
     }
 
     // MARK: probe round 23

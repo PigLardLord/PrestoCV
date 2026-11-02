@@ -32,11 +32,6 @@ enum JobOrder {
     }
 
     private static func latestYear(of job: Experience) -> Int? {
-        latestYear(in: job.endDate) ?? latestYear(in: job.startDate)
-    }
-
-    private static func latestYear(in date: String?) -> Int? {
-        guard let date else { return nil }
-        return Digits.runs(in: Digits.ascii(date)).filter { $0.count == 4 }.compactMap { Int($0) }.max()
+        JobRecency.year(in: job.endDate) ?? JobRecency.year(in: job.startDate)
     }
 }

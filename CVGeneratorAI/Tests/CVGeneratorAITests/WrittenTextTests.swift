@@ -125,12 +125,68 @@ struct WrittenTextTests {
         #expect(!written(description).isPlain("Sie arbeitet eng mit dem UKE zusammen.", ownWords: []))
     }
 
+    // MARK: - Hidden characters and lookalike dots
+
+    @Test("A sentence that holds a character the reader cannot see is rejected, whatever the class of the character", arguments: hiddenRows)
+    func hiddenCharacter(row: SentenceRow) {
+        #expect(written(teacher).rejection(of: row.sentence, ownWords: []) == "it holds a character the reader cannot see", "\(row)")
+    }
+
+    @Test("An address written with a full stop or an at sign of another script is an address", arguments: lookalikeRows)
+    func lookalikeAddress(row: SentenceRow) {
+        #expect(written(teacher).rejection(of: row.sentence, ownWords: []) == "it holds an address", "\(row)")
+    }
+
+    @Test("A space that the reader sees, the no-break space before a French colon or exclamation mark included, is no hidden character",
+          arguments: ["\u{00A0}:", "\u{202F}!", "\u{00A0}?", "\u{2009};"])
+    func seenSpaces(before mark: String) {
+        let french = written("Je suis institutrice. J'enseigne dans une école de ma ville.", languageOfText: { _ in "fr" })
+        let sentence = "Institutrice patiente qui prépare les cours\(mark) elle collabore avec les familles."
+
+        #expect(french.rejection(of: sentence, ownWords: []) == nil, "\(mark.unicodeScalars.map(\.value))")
+    }
+
+    static let hiddenRows: [SentenceRow] = [
+        SentenceRow("a zero-width space before the dot of a domain", "Manages orders at market\u{200B}.io"),
+        SentenceRow("a bidirectional override", "Handles the front desk\u{202E}."),
+        SentenceRow("a soft hyphen inside a word", "Plans lessons for the pu\u{00AD}pils."),
+        SentenceRow("a line separator", "Plans lessons\u{2028}for the pupils."),
+        SentenceRow("a paragraph separator", "Plans lessons\u{2029}for the pupils."),
+        SentenceRow("a private-use scalar", "Plans lessons\u{E000} for the pupils."),
+        SentenceRow("a control scalar", "Plans lessons\u{0007} for the pupils."),
+        SentenceRow("a tab", "Plans lessons\tfor the pupils."),
+        SentenceRow("an unassigned scalar", "Plans lessons\u{0378} for the pupils."),
+    ]
+
+    static let lookalikeRows: [SentenceRow] = [
+        SentenceRow("an ideographic full stop as the dot of a domain", "Manages orders at market\u{3002}io"),
+        SentenceRow("a fullwidth full stop as the dot of a domain", "Manages orders at market\u{FF0E}io"),
+        SentenceRow("a halfwidth ideographic full stop as the dot of a domain", "Manages orders at market\u{FF61}io"),
+        SentenceRow("a one dot leader as the dot of a domain", "Manages orders at market\u{2024}io"),
+        SentenceRow("a small full stop as the dot of a domain", "Manages orders at market\u{FE52}io"),
+        SentenceRow("a fullwidth at sign in an email", "Answers at anna\u{FF20}example.com"),
+        SentenceRow("a small at sign in an email", "Answers at anna\u{FE6B}example.com"),
+    ]
+
     @Test("Every language lists the noun of experience among its words of seniority", arguments: Vocabulary.Language.allCases)
     func experienceIsSeniority(language: Vocabulary.Language) {
         let noun = ["en": "experience", "it": "esperienza", "de": "erfahrung", "es": "experiencia", "fr": "experience", "pt": "experiencia"]
 
         #expect(WrittenTextWords.of(language).seniority.contains(noun[language.rawValue] ?? ""))
     }
+}
+
+/// A sentence a row of a test gives `WrittenText`, with what makes it a row.
+struct SentenceRow: Sendable, CustomTestStringConvertible {
+    let name: String
+    let sentence: String
+
+    init(_ name: String, _ sentence: String) {
+        self.name = name
+        self.sentence = sentence
+    }
+
+    var testDescription: String { name }
 }
 
 /// ADR 0031: a skill the model writes for the role names no language: the languages are the person's own.
