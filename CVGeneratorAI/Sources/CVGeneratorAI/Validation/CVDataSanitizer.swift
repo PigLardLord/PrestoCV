@@ -165,7 +165,10 @@ public struct CVDataSanitizer: Sendable {
         // a primary school teacher from Bologna" quotes nothing (ADR 0023).
         let keptTools = skills.filter { $0.kind == .technology }.map(\.name)
         let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + keptTools)
-        let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution)))
+        // The acronyms of the kept duties are the person's words too in a rich draft, as in the summary check (probe round 17):
+        // this pass dropped "I managed the PA systems …", which the check had kept for the "PA" of a kept duty.
+        let acronyms = DraftDepth.isRich ? Self.acronyms(in: experience.compactMap(\.description)) : []
+        let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution))).union(acronyms)
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let summary = { (text: String?, words: Set<String>) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {

@@ -43,7 +43,7 @@ struct RichDraftTests {
 
     // MARK: The summary's slots
 
-    @Test("The summary's slots: the role, the first work, three tools, the next work with two qualities, the latest ended job, then the rest of the tools and qualities for a summary still short (probe round 15)")
+    @Test("The summary's slots: the role, the first work, three tools, the next work with two qualities, the latest ended job, then the rest of the tools and qualities for a summary still short (probe rounds 15 and 17)")
     func summaryTopics() {
         let topics = SectionDraft.summaryTopics(
             of: Self.brief, duties: Self.duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: "live sound",
@@ -60,12 +60,12 @@ struct RichDraftTests {
             SummaryTopic(title: "head of sound", tools: ["XLR cables", "Dante"], hasEnded: false),
             SummaryTopic(title: "head of sound", qualities: ["care"], hasEnded: false),
         ])
-        // The opening says the title: no role slot.
+        // The opening says the title: the role slot comes last, for a summary still short (probe round 17).
         let opened = SectionDraft.summaryTopics(
             of: Self.brief, duties: Self.duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: "live sound",
             order: [2, 1, 0], tools: Self.tools, hasOpening: true
         )
-        #expect(opened == Array(topics.dropFirst()))
+        #expect(opened == Array(topics.dropFirst()) + [topics[0]])
     }
 
     @Test("The first qualities slot says them with the second pair of work, and that work gets no slot of its own (probe rounds 10 and 15)")
@@ -84,11 +84,12 @@ struct RichDraftTests {
             SummaryTopic(title: "head of sound", work: ["the shows", "the rooms"], qualities: ["teamwork", "calm"], hasEnded: false),
             SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false),
             SummaryTopic(title: "head of sound", qualities: ["care"], hasEnded: false),
+            SummaryTopic(title: "head of sound", hasEnded: false),
         ])
-        // With no qualities the second pair keeps its own slot, and the third comes last.
+        // With no qualities the second pair keeps its own slot, and the third comes last before the role.
         #expect(SectionDraft.summaryTopics(
             of: Self.brief, duties: duties, typical: [[], [], []], qualities: [], field: nil, order: [2, 1, 0], hasOpening: true
-        ).last == SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false))
+        ).dropLast().last == SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false))
     }
 
     @Test("An ended job's slot asks a topic of its work no earlier slot asks, the job's work no slot asks gets a slot, and with no second pair the first qualities slot asks it (probe rounds 14 and 15)")
@@ -107,6 +108,7 @@ struct RichDraftTests {
             SummaryTopic(title: "head of sound", work: ["the rooms", "the stage boxes"], qualities: ["teamwork", "calm"], hasEnded: false),
             SummaryTopic(title: "stagehand", work: ["the lights"], hasEnded: true),
             SummaryTopic(title: "head of sound", work: ["the shows"], hasEnded: false),
+            SummaryTopic(title: "head of sound", hasEnded: false),
         ])
         // Two typical duties make one pair: the qualities slot asks the work it leaves.
         let short = SectionDraft.summaryTopics(
@@ -116,6 +118,7 @@ struct RichDraftTests {
         #expect(short == [
             SummaryTopic(title: "head of sound", work: ["the junior technicians", "the rehearsals"], hasEnded: false),
             SummaryTopic(title: "head of sound", work: ["the shows"], qualities: ["teamwork", "calm"], hasEnded: false),
+            SummaryTopic(title: "head of sound", hasEnded: false),
         ])
         #expect(SectionDraft.unused(["delle comunicazioni ufficiali", "i verbali"], besides: ["le comunicazioni ufficiali"]) == ["i verbali"])
     }
@@ -136,7 +139,7 @@ struct RichDraftTests {
         #expect(topics("live sound", false) == [role, calm])
         #expect(topics("live sound", true) == [calm, role])
         #expect(topics("I know my way around a mixing desk", false) == [SummaryTopic(title: "head of sound", hasEnded: false), calm])
-        #expect(topics("I know my way around a mixing desk", true) == [calm])
+        #expect(topics("I know my way around a mixing desk", true) == [calm, SummaryTopic(title: "head of sound", hasEnded: false)])
         #expect(SectionDraft.cleanField("live sound") == "live sound")
         #expect(SectionDraft.cleanField("front-of-house sound") == "front-of-house sound")
         #expect(SectionDraft.cleanField("Ich kenne mich mit KNX aus") == nil)
@@ -228,10 +231,10 @@ struct RichDraftTests {
 
     // MARK: probe round 15
 
-    @Test("A rich summary keeps up to 5 sentences, a plain one 4 (probe round 15)")
+    @Test("A rich summary keeps up to 6 sentences, a plain one 4 (probe rounds 15 and 17)")
     func summaryMost() {
-        #expect(CVDataSanitizer.summaryMost == 5)
-        #expect(SectionDraft.summarySentences == 5)
+        #expect(CVDataSanitizer.summaryMost == 6)
+        #expect(SectionDraft.summarySentences == 6)
         DraftDepth.$pinned.withValue(false) {
             #expect(CVDataSanitizer.summaryMost == 4)
             #expect(SectionDraft.summarySentences == 4)
@@ -388,6 +391,45 @@ struct RichDraftTests {
             let plain = try? english.summaryCheck(of: facts, summary: sentence, field: nil, work: work, against: description)
             #expect(plain?.rejected.contains { $0.sentence == sentence && $0.reason == "the word \"PA\" reads as a name" } == true, "\(plain?.rejected ?? [])")
         }
+    }
+
+    // MARK: probe round 17
+
+    @Test("A rich draft asks the tools a job ad of the title asks, by the names of the trade, and no person or role; a plain one keeps its request (probe round 17)")
+    func toolsOfAJobAd() {
+        let rich = SectionPrompts.toolsInstructions(count: 4...5)
+
+        #expect(rich.contains("4 or 5 software, equipment, machines or instruments that a job ad for the job's title asks a candidate to use"))
+        #expect(rich.contains("equipment by the words that tell it from what a home or any office has"))
+        #expect(rich.contains("an activity, task or field of the work"))
+        #expect(rich.contains("a person or a role"))
+        DraftDepth.$pinned.withValue(false) {
+            let plain = SectionPrompts.toolsInstructions(count: 4...5)
+            #expect(!plain.contains("a job ad"))
+            #expect(!plain.contains("a person or a role"))
+            #expect(plain.contains("that a person with the job's title uses at work, each of another kind, as a CV of that trade names them"))
+        }
+    }
+
+    @Test("The final pass keeps a rich summary sentence with an acronym of a kept duty, as the summary check does, and a plain one drops it (probe round 17)")
+    func acronymOfAKeptDuty() throws {
+        let french = CVDataSanitizer(languageOfText: { _ in "fr" })
+        let description = """
+            J'habite à Rouen. Depuis 2017, je travaille comme technicien du son au Théâtre Lario, où je règle les systèmes PA des \
+            concerts.
+            """
+        let cv = CVData(experience: [Experience(title: "technicien du son", company: "Théâtre Lario", startDate: "2017", current: true)])
+        let summary = "Je gère les systèmes PA du théâtre pour chaque spectacle."
+        let writing = DraftWriting(
+            summary: summary, roleDescriptions: ["Je règle les systèmes PA des concerts."], technologies: [], softSkills: []
+        )
+
+        let draft = try french.sanitize(cv, writing: writing, against: description)
+
+        #expect(draft.experience.first?.description?.contains("PA") == true, "\(draft.experience)")
+        #expect(draft.summary == summary)
+        let plain = try DraftDepth.$pinned.withValue(false) { try french.sanitize(cv, writing: writing, against: description) }
+        #expect(plain.summary?.contains("PA") != true, "\(plain.summary ?? "")")
     }
 
     // MARK: The summary's request

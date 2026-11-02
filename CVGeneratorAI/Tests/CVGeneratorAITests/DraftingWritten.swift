@@ -105,8 +105,8 @@ struct WrittenMeasure: Codable, Equatable {
         }
     }
 
-    /// Whether the draft has a summary of 2 to 5 sentences and at least 120 characters: a rich draft keeps up to 5 (probe round 15).
-    var hasSummary: Bool { (2...5).contains(summarySentences) && summaryCharacters >= 120 }
+    /// Whether the draft has a summary of 2 to 6 sentences and at least 120 characters: a rich draft keeps up to 6 (probe round 17).
+    var hasSummary: Bool { (2...6).contains(summarySentences) && summaryCharacters >= 120 }
 
     /// Whether the draft has at least 4 tools of the trade (`tradeTools`) and 3 soft skills; 3 and 2 for a sparse description.
     func hasSkills(sparse: Bool) -> Bool {

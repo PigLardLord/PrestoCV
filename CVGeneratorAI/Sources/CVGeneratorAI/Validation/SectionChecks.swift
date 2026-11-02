@@ -797,9 +797,9 @@ extension CVDataSanitizer {
         "tutte", "circa", "tramite", "grazie", "perante", "onde", "ainda", "agora", "tive", "estive", "trouxe", "disse", "soube",
     ]
 
-    /// The most sentences a summary keeps: 5 in a rich draft (`DraftDepth`; probe round 15), whose summary says more of the work
-    /// and of the career, and 4 in a plain one.
-    static var summaryMost: Int { DraftDepth.isRich ? 5 : 4 }
+    /// The most sentences a summary keeps: 6 in a rich draft (`DraftDepth`; probe rounds 15 and 17), whose summary says more of the
+    /// work and of the career, and 4 in a plain one. With 5, five summaries of nine stopped at the limit under 450 characters.
+    static var summaryMost: Int { DraftDepth.isRich ? 6 : 4 }
 
     /// The summary of `cvData`, sentence by sentence: a sentence about the person in the third person goes, and so does one with no
     /// word of the person in a language that keeps its pronoun, and one whose subject is a bare word of the person's work

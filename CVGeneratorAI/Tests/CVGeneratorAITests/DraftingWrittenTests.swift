@@ -9,7 +9,7 @@ import CVGeneratorAI
 struct DraftingWrittenTests {
     // MARK: - One draft
 
-    @Test("A summary counts with 2 to 5 sentences and 120 characters or more", arguments: SummaryCase.all)
+    @Test("A summary counts with 2 to 6 sentences and 120 characters or more", arguments: SummaryCase.all)
     func summary(_ item: SummaryCase) throws {
         let measure = try Self.measure("en-plain", CVData(summary: item.summary))
 
@@ -749,9 +749,9 @@ struct SummaryCase: Sendable, CustomTestStringConvertible {
         ),
         SummaryCase(label: "two short sentences", summary: "Reliable and careful worker. Friendly with colleagues.", counts: false),
         SummaryCase(
-            label: "six sentences",
+            label: "seven sentences",
             summary: "Reliable and careful at work. Plans each task well. Keeps the place safe. Keeps the place tidy. "
-                + "Friendly with colleagues. Ready to learn.",
+                + "Friendly with colleagues. Ready to learn. Calm when the day gets busy.",
             counts: false
         ),
     ]

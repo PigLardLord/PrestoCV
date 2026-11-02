@@ -574,7 +574,9 @@ final class SectionDraft {
         if tools.count > 3 { topics.append(toolsSlot(tools.dropFirst(3).prefix(3))) }
         if qualities.count > 2 { topics.append(qualitiesSlot(qualities.dropFirst(2).prefix(2))) }
         topics += endedSlots.dropFirst()
-        if hasOpening, field != nil { topics.append(role) }
+        // The role last, with the opening too (probe round 17): a summary still short then has one more slot, of the title alone
+        // when it has no field.
+        if hasOpening { topics.append(role) }
         return topics
     }
 
