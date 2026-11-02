@@ -1023,7 +1023,8 @@ extension CVDataSanitizer {
     /// title, and a sentence of the earlier titles it does not name, the latest first, within `most` sentences. Every impersonal
     /// sentence of a summary and of its repair went, and the draft kept the person's own sentence alone. Nil when the summary needs
     /// no floor or the facts give it no sentence. A floor still short ends, as a last resort, with a sentence of the person's
-    /// strengths: the latest title and the first two `qualities`, in a fixed form per language (`strengths`; #354, round 13, O1).
+    /// strengths: the title the person works as now (`currentTitle`), else the latest one, and the first two `qualities`, in a
+    /// fixed form per language (`strengths`; #354, round 13, O1).
     func summaryFloor(
         of facts: CVData, summary: String?, most: Int, qualities: [String], against description: String
     ) throws(CVGenerationError) -> String? {
@@ -1055,7 +1056,9 @@ extension CVDataSanitizer {
             var verbs = Set<String>()
             var floor = Array((head + sentences + tail).filter { Self.leadingVerb(of: $0).map { verbs.insert($0).inserted } ?? true }
                 .prefix(most))
-            if floor.count < most, floor.count < 2 || floor.joined(separator: " ").count < 120, let title = titles.first,
+            // The strengths name the title the opening names, not the headline before it (#354).
+            if floor.count < most, floor.count < 2 || floor.joined(separator: " ").count < 120,
+               let title = Self.currentTitle(of: facts) ?? titles.first,
                let strengths = Self.strengths(title: title, qualities: qualities, language: language) {
                 floor.append(strengths)
             }

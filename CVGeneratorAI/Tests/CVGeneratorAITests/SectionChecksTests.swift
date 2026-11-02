@@ -387,6 +387,23 @@ struct SectionChecksTests {
         #expect(try floor([]) == nil)
     }
 
+    @Test("o1: the strengths sentence names the job the opening names, the latest current one, not the headline")
+    func floorStrengthsTakeTheLatestCurrentJob() throws {
+        let description = "Sono responsabile di cucina. Dal 2015 lavoro come cuoco alla Mensa Ponte Verde "
+            + "e dal 2022 anche come custode all'Officina Ferri."
+        let facts = CVData(
+            personalInfo: PersonalInfo(title: "responsabile di cucina"),
+            experience: [Self.job("cuoco", "Mensa Ponte Verde", from: "2015"), Self.job("custode", "Officina Ferri", from: "2022")]
+        )
+
+        let written = try sanitizer.summaryFloor(
+            of: facts, summary: "Tengo in ordine la cucina.", most: 4, qualities: ["Precisione", "Affidabilità"], against: description
+        )
+
+        #expect(written?.hasPrefix("Lavoro come custode.") == true, "\(written ?? "nil")")
+        #expect(written?.hasSuffix(" Come custode, lavoro con precisione e affidabilità.") == true, "\(written ?? "nil")")
+    }
+
     // MARK: O1, the typical duties beside the person's (#354, round 13; D6 withdrawn)
 
     @Test("o1: a job whose stated duty is short keeps a typical duty after it")
