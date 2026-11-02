@@ -1884,7 +1884,10 @@ extension CVDataSanitizer {
             let second = words.count > 1 ? words[1].lowercased() : nil
             // A lone English quality in -ed is an adjective the tagger reads as a past verb ("organized"; #354, round 2).
             let adjective = !cutsVerb && second == nil && language == "en" && first.hasSuffix("ed")
-            let taggedVerb = tagsVerbs && !adjective
+            // A lone word of a Romance language is a verb only in the infinitive: the tagger of iOS 26 reads a lone noun of the
+            // trade as a verb ("Auditoría", #354).
+            let loneNoun = second == nil && Self.infinitiveEndings[language ?? ""].map { !$0.contains(where: first.hasSuffix) } == true
+            let taggedVerb = tagsVerbs && !adjective && !loneNoun
                 && language.flatMap { lexicalClasses.verbs(in: item, language: $0).first?.lowerBound } == 0
                 && (second == nil || !first.hasSuffix("ing") && Self.skillLinkWords.contains(second ?? ""))
             let saidVerb = second != nil && Self.saysAfterSubject(first, in: description, language: language)

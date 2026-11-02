@@ -980,6 +980,22 @@ struct SectionChecksTests {
         #expect(verdict.dropped.isEmpty)
     }
 
+    @Test("A lone word of a Romance language that the tagger reads as a verb is one only in the infinitive (#354, iOS 26)")
+    func loneRomanceWordIsAVerbOnlyInTheInfinitive() {
+        let spanish = CVDataSanitizer(
+            languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([.spanish: .everyWord]), wordList: TableWordList()
+        )
+
+        let verdict = spanish.skillCheck(
+            technologies: ["Auditoría"], softSkills: ["Negociar"], against: "Trabajo como contable en una gestoría de Murcia desde 2017."
+        )
+
+        #expect(verdict.technologies == ["Auditoría"])
+        #expect(verdict.softSkills.isEmpty)
+        #expect(verdict.dropped.map(\.sentence) == ["Negociar"])
+        #expect(verdict.dropped.map(\.reason) == ["verb"])
+    }
+
     @Test("Of two technologies of one kind, by their head noun, the second goes; tools of other kinds, and a short last word, stay (#354)")
     func toolsOfOneKind() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
