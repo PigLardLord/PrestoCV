@@ -235,7 +235,9 @@ enum SectionPrompts {
     /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
     /// whole summary from every job, the request ran short.
     /// The studies slot of a rich draft (probe round 21) has no job line (probe round 22): told its job, the sentence said the
-    /// job's work again and left the studies out. The rule says its studies in the past.
+    /// job's work again and left the studies out. The rule says its studies in the past. Each study is a Course and a School line,
+    /// and the languages are joined by commas (probe round 24): given "logistics, Leeds City College" and "English; Polish", the
+    /// sentences copied the separators ("I speak English; Polish").
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
         let tense = topic.hasEnded ? "; ended, write in the past" : "; write in the present"
@@ -244,8 +246,11 @@ enum SectionPrompts {
         if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
         if !topic.tools.isEmpty { lines.append("Tools: " + topic.tools.joined(separator: "; ")) }
-        if !topic.studies.isEmpty { lines.append("Studies: " + topic.studies.joined(separator: "; ")) }
-        if !topic.languages.isEmpty { lines.append("Languages: " + topic.languages.joined(separator: "; ")) }
+        for study in topic.studies {
+            if let course = study.course { lines.append("Course: " + course) }
+            if let school = study.school { lines.append("School: " + school) }
+        }
+        if !topic.languages.isEmpty { lines.append("Languages: " + topic.languages.joined(separator: ", ")) }
         if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
         // The first verbs said, by name, of a rich draft (`DraftDepth`): told only not to start as an earlier sentence, the
         // sentences kept starting with the same verb and the check rejected them (#354, probe round 3).
@@ -284,10 +289,12 @@ enum SectionPrompts {
 
         """
 
-    /// The rule of the studies slot of a rich draft, in place of the rule of the job (probe round 23).
+    /// The rule of the studies slot of a rich draft, in place of the rule of the job (probe round 23); it asks to join the names
+    /// in the words of the language, since the sentences copied the separators of the lines (probe round 24).
     static let studiesSentenceRule = """
-        - Say in the past what and where the person studied, by the names of the Studies line, and which languages the person \
-        speaks, by the names of the Languages line, each when its line is given; nothing more of them, no level and no job.
+        - Say in the past what the person studied and where, by the names of the Course and School lines, and which languages \
+        the person speaks, by the names of the Languages line, each when its line is given; nothing more of them, no level and no job.
+        - Write a sentence of the language: join the names with its own words, never with ";".
 
         """
 

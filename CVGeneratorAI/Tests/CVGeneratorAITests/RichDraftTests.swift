@@ -454,15 +454,17 @@ struct RichDraftTests {
         studies: ["logistics"], namedSkills: []
     )
 
+    private static let logistics = SummaryStudy(course: "logistics", school: "Harlow City College")
+
     @Test("A rich summary asks of the person's studies and languages after the latest ended job; a plain one does not (probe round 21)")
     func studiesSlot() {
         let duties = [["I moved the pallets."], ["I load the lorries.", "I check the deliveries."]]
         let rich = SectionDraft.summaryTopics(
             of: Self.schooled, duties: duties, typical: [[], []], qualities: [], field: nil, order: [1, 0],
-            studies: ["logistics, Harlow City College"], languages: ["English", "Polish"]
+            studies: [Self.logistics], languages: ["English", "Polish"]
         )
         let studies = SummaryTopic(
-            title: "warehouse operative", studies: ["logistics, Harlow City College"], languages: ["English", "Polish"], hasEnded: false
+            title: "warehouse operative", studies: [Self.logistics], languages: ["English", "Polish"], hasEnded: false
         )
 
         let ended = rich.firstIndex { $0.title == "forklift driver" }
@@ -473,13 +475,13 @@ struct RichDraftTests {
         let plain = DraftDepth.$pinned.withValue(false) {
             SectionDraft.summaryTopics(
                 of: Self.schooled, duties: duties, typical: [[], []], qualities: [], field: nil, order: [1, 0],
-                studies: ["logistics, Harlow City College"], languages: ["English", "Polish"]
+                studies: [Self.logistics], languages: ["English", "Polish"]
             )
         }
         #expect(!plain.contains(studies), "\(plain)")
     }
 
-    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21 and 22)")
+    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21, 22 and 24)")
     func studiesPrompt() {
         let facts = CVData(
             education: [Education(degree: "logistics", institution: "Harlow City College"), Education(institution: "Arlen School")],
@@ -494,8 +496,10 @@ struct RichDraftTests {
         #expect(prompt.text.hasPrefix("""
             Language: English
             Write in English.
-            Studies: logistics, Harlow City College; Arlen School
-            Languages: English; Polish
+            Course: logistics
+            School: Harlow City College
+            School: Arlen School
+            Languages: English, Polish
             Summary so far:
             - I work as a warehouse operative.
             """), "\(prompt.text)")
@@ -617,7 +621,7 @@ struct RichDraftTests {
     @Test("The studies slot asks with its own rule, of the studies and languages alone; a job's slot keeps the job's rule (probe round 23)")
     func studiesRule() {
         let studies = SummaryTopic(
-            title: "warehouse operative", studies: ["logistics, Harlow City College"], languages: ["Polish"], hasEnded: false
+            title: "warehouse operative", studies: [Self.logistics], languages: ["Polish"], hasEnded: false
         )
         let job = SummaryTopic(title: "warehouse operative", work: ["the lorries"], hasEnded: false)
         let written = ["I work as a warehouse operative."]
@@ -632,9 +636,9 @@ struct RichDraftTests {
             SectionPrompts.studiesSentenceInstructions, SectionPrompts.studiesSentenceRepairInstructions,
         ])
         for instructions in prompts.map(\.instructions) {
-            #expect(instructions.contains("- Say in the past what and where the person studied, by the names of the Studies line, and "
-                + "which languages the person speaks, by the names of the Languages line, each when its line is given; nothing more of "
-                + "them, no level and no job."))
+            #expect(instructions.contains("- Say in the past what the person studied and where, by the names of the Course and School "
+                + "lines, and which languages the person speaks, by the names of the Languages line, each when its line is given; "
+                + "nothing more of them, no level and no job."))
             #expect(instructions.contains("certification or achievement beyond those the lines give"))
             #expect(!instructions.contains("Say what the person does as the job"))
         }
@@ -666,6 +670,48 @@ struct RichDraftTests {
         let plainNext = DraftDepth.$pinned.withValue(false) { SectionDraft.nextTopic(of: &plain, isEnough: true) }
         #expect(plainNext == nil)
         #expect(plain.count == 2)
+    }
+
+    // MARK: probe round 24
+
+    @Test("The studies slot gives each study as its own Course and School lines and the languages joined by commas (probe round 24)")
+    func studiesLines() {
+        let topic = SummaryTopic(
+            title: "warehouse operative", studies: [Self.logistics, SummaryStudy(course: "first aid", school: nil)],
+            languages: ["English", "Polish", "German"], hasEnded: false
+        )
+
+        let text = SectionPrompts.summarySentence(for: Self.schooled, topic: topic, written: ["I work as a warehouse operative."]).text
+
+        #expect(text.contains("""
+            Course: logistics
+            School: Harlow City College
+            Course: first aid
+            Languages: English, Polish, German
+            """), "\(text)")
+        #expect(!text.contains(";"), "\(text)")
+        #expect(!text.contains("Studies:"), "\(text)")
+    }
+
+    @Test("The studies rule asks for a sentence of the language, its names joined by its words, never by a semicolon (probe round 24)")
+    func studiesJoinRule() {
+        for instructions in [SectionPrompts.studiesSentenceInstructions, SectionPrompts.studiesSentenceRepairInstructions] {
+            #expect(instructions.contains("- Write a sentence of the language: join the names with its own words, never with \";\"."))
+        }
+        #expect(!SectionPrompts.summarySentenceInstructions.contains("never with \";\""))
+    }
+
+    @Test("A study keeps its degree and school apart, and one with neither is left out (probe round 24)")
+    func studiesOfFacts() {
+        let facts = CVData(education: [
+            Education(degree: "logistics", institution: "Harlow City College"), Education(degree: " forklift licence "),
+            Education(institution: "Arlen School"), Education(degree: " ", institution: ""),
+        ])
+
+        #expect(SectionDraft.studies(of: facts) == [
+            Self.logistics, SummaryStudy(course: "forklift licence", school: nil), SummaryStudy(course: nil, school: "Arlen School"),
+        ])
+        #expect(SectionDraft.studies(of: CVData()).isEmpty)
     }
 
     // MARK: The summary's request

@@ -216,7 +216,8 @@ struct DraftingEvaluation {
                 try await model.writeSummarySentence(for: brief, topic: topic, written: written)
             }
             let slot = ([topic.title, topic.field].compactMap { $0 } + topic.work).joined(separator: ": ")
-            log("summary", [sentence ?? "none", "topic: " + slot] + topic.qualities + topic.studies + topic.languages)
+            let studies = topic.studies.map { [$0.course, $0.school].compactMap { $0 }.joined(separator: ", ") }
+            log("summary", [sentence ?? "none", "topic: " + slot] + topic.qualities + studies + topic.languages)
             return sentence
         }
 

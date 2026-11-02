@@ -515,7 +515,7 @@ final class SectionDraft {
     /// a trade (`cleanField`).
     static func summaryTopics(
         of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int],
-        tools: [String] = [], studies: [String] = [], languages: [String] = [], hasOpening: Bool = false
+        tools: [String] = [], studies: [SummaryStudy] = [], languages: [String] = [], hasOpening: Bool = false
     ) -> [SummaryTopic] {
         let roles = order.filter(brief.roles.indices.contains)
         guard let current = currentJob(of: brief, order: order) else {
@@ -588,9 +588,13 @@ final class SectionDraft {
         return topics
     }
 
-    /// Each study of `facts` as its degree and school, for the summary's studies slot (#354, probe round 21).
-    static func studies(of facts: CVData) -> [String] {
-        facts.education.compactMap { [$0.degree, $0.institution].compactMap(\.presentValue).joined(separator: ", ").presentValue }
+    /// Each study of `facts` as its degree and school, for the summary's studies slot (#354, probe round 21); a study with neither
+    /// is left out.
+    static func studies(of facts: CVData) -> [SummaryStudy] {
+        facts.education.compactMap { entry in
+            let study = SummaryStudy(course: entry.degree.presentValue, school: entry.institution.presentValue)
+            return study.course == nil && study.school == nil ? nil : study
+        }
     }
 
     /// The `topics` that say something `asked` does not, each once (#354, probe round 14): a topic all of whose content words, as

@@ -108,7 +108,7 @@ public struct SummaryTopic: Equatable, Sendable {
     public let tools: [String]
     /// The person's studies, each its degree and school as the facts hold them; empty but for the studies slot of a rich draft
     /// (`DraftDepth`; #354, probe round 21).
-    public let studies: [String]
+    public let studies: [SummaryStudy]
     /// The names of the languages the person speaks, as the facts hold them, with no level; empty but for that slot.
     public let languages: [String]
     /// Whether the job is over: the sentence then speaks of it in the past.
@@ -118,7 +118,7 @@ public struct SummaryTopic: Equatable, Sendable {
 
     public init(
         title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], tools: [String] = [],
-        studies: [String] = [], languages: [String] = [], hasEnded: Bool
+        studies: [SummaryStudy] = [], languages: [String] = [], hasEnded: Bool
     ) {
         self.title = title
         self.field = field
@@ -128,6 +128,21 @@ public struct SummaryTopic: Equatable, Sendable {
         self.studies = studies
         self.languages = languages
         self.hasEnded = hasEnded
+    }
+}
+
+/// One study of the person, for the studies slot of a rich summary: what and where the person studied, as the facts hold them
+/// (probe round 24). Asked as one "degree, school" line, the sentence copied the comma ("Ich habe Ausbildung, Berufsschule Lechfeld
+/// studiert").
+public struct SummaryStudy: Equatable, Sendable {
+    /// What the person studied, the degree as the facts hold it; nil when they hold none.
+    public let course: String?
+    /// Where the person studied, the school as the facts hold it; nil when they hold none.
+    public let school: String?
+
+    public init(course: String?, school: String?) {
+        self.course = course
+        self.school = school
     }
 }
 
