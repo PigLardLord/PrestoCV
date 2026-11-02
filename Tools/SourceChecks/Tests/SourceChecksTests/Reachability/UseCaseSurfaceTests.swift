@@ -33,10 +33,10 @@ struct UseCaseSurfaceTests {
         let functions = try Self.functions(in: "CVGeneratorAI/Sources/CVGeneratorAI/Validation/CVDataSanitizer.swift", from: "struct CVDataSanitizer")
 
         // The checks of each section (ADR 0031, "A request per section") read the facts and the words of the description as the
-        // final check reads them.
+        // final check reads them; a rich summary's check ends each sentence as the final check does.
         let sections: Set = [
             "requireLanguageData", "grounded", "keptJobs", "joined", "foreignWords", "otherTitles", "namedTitle", "quotedWords",
-            "letterWords", "stems", "words", "generalDutyJob", "employerWord",
+            "letterWords", "stems", "words", "generalDutyJob", "employerWord", "ended",
         ]
         // The reading of an interest's verb, which the sanitising of an interest and its rows call.
         let interests: Set = ["isConjugated"]
