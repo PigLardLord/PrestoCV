@@ -416,16 +416,18 @@ struct RichDraftTests {
         #expect(plain.summary?.contains("PA") != true, "\(plain.summary ?? "")")
     }
 
-    // MARK: probe round 18
+    // MARK: probe rounds 18 and 20
 
-    @Test("A rich draft asks the tools as a plain one does (probe round 18)")
-    func toolsAsAPlainDraft() {
+    @Test("A rich draft asks the trade's tools a workplace of it has, with no job ad and no example; a plain one asks as before (probe rounds 18 and 20)")
+    func toolsOfAWorkplace() {
         let rich = SectionPrompts.toolsInstructions(count: 4...5)
+        let plain = DraftDepth.$pinned.withValue(false) { SectionPrompts.toolsInstructions(count: 4...5) }
 
+        #expect(rich.contains("then those of the trade: the professional machines, equipment and software a workplace of that trade "
+            + "has, by the names the trade gives them, not those a home has, only when they fit the job's title and the tools"))
         #expect(!rich.contains("a job ad"))
-        DraftDepth.$pinned.withValue(false) {
-            #expect(SectionPrompts.toolsInstructions(count: 4...5) == rich)
-        }
+        #expect(!rich.contains("\""))
+        #expect(rich.replacingOccurrences(of: ": " + SectionPrompts.workplaceTools, with: "") == plain)
     }
 
     // MARK: probe round 19

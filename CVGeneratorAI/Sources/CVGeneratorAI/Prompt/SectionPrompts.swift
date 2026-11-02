@@ -138,20 +138,27 @@ enum SectionPrompts {
     /// ("linguagens de programação" for Python and Java) and the job's own duties: a standard or method is asked only by its own
     /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1; probe round 11). Asked the tools a job ad of the title
     /// asks, a rich draft named the ad's words for the work ("shift", "pallet") and its fields ("Stromversorgung"; probe round 17).
+    /// Asked those of the trade, a rich draft named a home's objects ("frigorifero", "microonde") and fields ("Bilancio"): it asks
+    /// those a workplace of the trade has (`workplaceTools`; probe round 20).
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
-        """
+        let trade = DraftDepth.isRich ? "those of the trade: \(workplaceTools)" : "those of the trade"
+        return """
         You name the tools of one job for a CV: \(count.lowerBound) or \(count.upperBound) software, equipment, machines or \
         instruments that a person with the job's title uses at work, each of another kind, as a CV of that trade names them; \
         a standard or method of the trade known by its own name counts as one. Write in the language named on the first line.
         - First the equipment, machines and software the job's own lines name, as written; then the tools the person names in \
-        what they say of their work with no job, when they fit this job; then those of the trade, only when they fit the job's \
-        title and the tools the person names.
+        what they say of their work with no job, when they fit this job; then \(trade), only when they fit the job's title \
+        and the tools the person names.
         - A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not.
         - 1 to 3 words each. Not a tool: what the work is done on; an activity or task, also when written as a noun; a document; \
         a material, part or supply; stationery, furniture or protective wear; an everyday object a person of any trade uses, a \
         household appliance or a room; a personal quality; a level; a skill already listed.
         """
     }
+
+    /// The tools of the trade a rich draft's tools request asks (probe round 20).
+    static let workplaceTools = "the professional machines, equipment and software a workplace of that trade has, by the names "
+        + "the trade gives them, not those a home has"
 
     /// The soft skills request; a rich draft's ends with a quality's adjective and its noun (`qualityAsNoun`).
     static func softSkills(for brief: DraftBrief) -> Prompt {
