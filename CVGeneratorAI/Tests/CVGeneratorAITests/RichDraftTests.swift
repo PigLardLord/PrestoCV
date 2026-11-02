@@ -481,7 +481,7 @@ struct RichDraftTests {
         #expect(!plain.contains(studies), "\(plain)")
     }
 
-    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21, 22 and 24)")
+    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21, 22, 24 and 26)")
     func studiesPrompt() {
         let facts = CVData(
             education: [Education(degree: "logistics", institution: "Harlow City College"), Education(institution: "Arlen School")],
@@ -499,7 +499,7 @@ struct RichDraftTests {
             Course: logistics
             School: Harlow City College
             School: Arlen School
-            Languages: English, Polish
+            Languages: English and Polish
             Summary so far:
             - I work as a warehouse operative.
             """), "\(prompt.text)")
@@ -674,7 +674,7 @@ struct RichDraftTests {
 
     // MARK: probe round 24
 
-    @Test("The studies slot gives each study as its own Course and School lines and the languages joined by commas (probe round 24)")
+    @Test("The studies slot gives each study as its own Course and School lines and the languages as a list (probe rounds 24 and 26)")
     func studiesLines() {
         let topic = SummaryTopic(
             title: "warehouse operative", studies: [Self.logistics, SummaryStudy(course: "first aid", school: nil)],
@@ -687,7 +687,7 @@ struct RichDraftTests {
             Course: logistics
             School: Harlow City College
             Course: first aid
-            Languages: English, Polish, German
+            Languages: English, Polish and German
             """), "\(text)")
         #expect(!text.contains(";"), "\(text)")
         #expect(!text.contains("Studies:"), "\(text)")
@@ -739,6 +739,24 @@ struct RichDraftTests {
         #expect(rule([], ["Polish"]).hasPrefix(lead + speaks + "; nothing more of them, no level."))
         #expect(!rule([], ["Polish"]).contains("studied"))
         #expect(rule([school, Self.logistics], []).contains("what the person studied and where, by the names of the Course and School"))
+    }
+
+    // MARK: probe round 26
+
+    @Test("The languages are a list of the brief's language, its last two joined by its own \"and\" (probe round 26)", arguments: [
+        (["English", "Polish", "German"], "English", "English, Polish and German"),
+        (["italiano", "inglese"], "Italian", "italiano e inglese"),
+        (["Deutsch", "Englisch"], "German", "Deutsch und Englisch"),
+        (["français", "anglais"], "French", "français et anglais"),
+        (["español", "francés"], "Spanish", "español y francés"),
+        (["español", "inglés"], "Spanish", "español e inglés"),
+        (["español", "hindi"], "Spanish", "español e hindi"),
+        (["português", "inglês"], "Portuguese", "português e inglês"),
+        (["Polish"], "English", "Polish"),
+        (["Polish", "Czech"], "Klingon", "Polish, Czech"),
+    ])
+    func languagesListed(names: [String], language: String, line: String) {
+        #expect(SectionPrompts.listed(names, in: language) == line)
     }
 
     // MARK: The summary's request

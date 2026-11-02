@@ -437,10 +437,12 @@ final class SectionDraft {
         var asked = 0
 
         // The sentences the check keeps after the opening, of the summary so far and `answer`; nil when it keeps nothing new to read.
+        // A rich draft's sentence (`DraftDepth`) ends with a full stop (probe round 26): written with none, it closed the summary
+        // with none, and one before another would read as one sentence with it.
         func checked(_ answer: String?) -> CVDataSanitizer.SummaryVerdict? {
             guard let answer = answer?.presentValue else { return nil }
-            let text = ((lead.map { [$0] } ?? []) + accepted + SentenceSplitter.sentences(in: Self.mended(answer)))
-                .prefix(Self.summarySentences).joined(separator: " ")
+            let said = SentenceSplitter.sentences(in: Self.mended(answer)).map { DraftDepth.isRich ? CVDataSanitizer.ended($0) : $0 }
+            let text = ((lead.map { [$0] } ?? []) + accepted + said).prefix(Self.summarySentences).joined(separator: " ")
             return try? sanitizer.summaryCheck(
                 of: dated, summary: text, field: field, work: work, duties: keptDuties, qualities: keptQualities,
                 tools: keptTools, endedDuties: endedDuties, against: description

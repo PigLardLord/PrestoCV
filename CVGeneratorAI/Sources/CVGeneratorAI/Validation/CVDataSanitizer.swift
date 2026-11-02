@@ -474,7 +474,7 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// `text` with a full stop after it, unless it ends with one, a question mark, an exclamation mark or an ellipsis.
-    private static func ended(_ text: String) -> String {
+    static func ended(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let last = trimmed.last, !".!?…".contains(last) else { return trimmed }
         return trimmed + "."

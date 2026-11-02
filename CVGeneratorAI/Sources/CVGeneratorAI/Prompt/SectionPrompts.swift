@@ -236,8 +236,8 @@ enum SectionPrompts {
     /// whole summary from every job, the request ran short.
     /// The studies slot of a rich draft (probe round 21) has no job line (probe round 22): told its job, the sentence said the
     /// job's work again and left the studies out. The rule says its studies in the past. Each study is a Course and a School line,
-    /// and the languages are joined by commas (probe round 24): given "logistics, Leeds City College" and "English; Polish", the
-    /// sentences copied the separators ("I speak English; Polish").
+    /// and the languages are a list of the language (`listed`; probe rounds 24 and 26): given "logistics, Leeds City College" and
+    /// "English; Polish", the sentences copied the separators ("I speak English; Polish"), and given commas, the commas.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
         let tense = topic.hasEnded ? "; ended, write in the past" : "; write in the present"
@@ -250,7 +250,7 @@ enum SectionPrompts {
             if let course = study.course { lines.append("Course: " + course) }
             if let school = study.school { lines.append("School: " + school) }
         }
-        if !topic.languages.isEmpty { lines.append("Languages: " + topic.languages.joined(separator: ", ")) }
+        if !topic.languages.isEmpty { lines.append("Languages: " + listed(topic.languages, in: brief.language)) }
         if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
         // The first verbs said, by name, of a rich draft (`DraftDepth`): told only not to start as an earlier sentence, the
         // sentences kept starting with the same verb and the check rejected them (#354, probe round 3).
@@ -260,6 +260,20 @@ enum SectionPrompts {
         let instructions = isOfStudies(topic) ? studiesSentenceInstructions(for: topic) : summarySentenceInstructions
         return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
     }
+
+    /// `names` as a list of `language`, the last two joined by its "and" (probe round 26): joined by commas, the sentences of 3
+    /// inputs of 9 copied them ("parlo italiano, inglese"). Spanish writes "e" before a word that starts with the sound "i"
+    /// ("español e inglés"). A language with no word here keeps the commas.
+    static func listed(_ names: [String], in language: String) -> String {
+        guard let last = names.last, names.count > 1, let and = andWords[language] else { return names.joined(separator: ", ") }
+        let folded = last.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        let sound = folded.hasPrefix("i") || folded.hasPrefix("hi") && !folded.hasPrefix("hie") && !folded.hasPrefix("hia")
+        return names.dropLast().joined(separator: ", ") + " " + (language == "Spanish" && sound ? "e" : and) + " " + last
+    }
+
+    private static let andWords = [
+        "English": "and", "Italian": "e", "German": "und", "French": "et", "Spanish": "y", "Portuguese": "e",
+    ]
 
     /// Whether `topic` is the studies slot of a rich draft (`DraftDepth`), which asks with its own rules (probe round 23): under the
     /// rule of the job, its sentences spoke of the job in the 5 inputs of 9 that asked it.

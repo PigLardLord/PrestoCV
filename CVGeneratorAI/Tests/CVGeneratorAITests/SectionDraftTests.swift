@@ -605,6 +605,19 @@ struct SectionDraftTests {
         #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 
+    @Test("A rich summary sentence written with no full stop gets one, and stays a sentence of its own (probe round 26)")
+    func richSentenceEnded() async throws {
+        let service = service()
+        let first = "I keep the sound of every show clear and balanced"
+        service.summaryResults = [first]
+
+        let draft = try await DraftDepth.$pinned.withValue(true) { try await draft(service) }
+
+        let summary = try #require(draft.summary)
+        #expect(SentenceSplitter.sentences(in: summary).contains(first + "."), "\(summary)")
+        #expect(service.summaryRequests.dropFirst().first?.written.contains(first + ".") == true, "\(service.summaryRequests)")
+    }
+
     // MARK: Failures
 
     @Test("The first request that fails leaves its part unwritten and the writing goes on, and the log names the step", arguments: [
