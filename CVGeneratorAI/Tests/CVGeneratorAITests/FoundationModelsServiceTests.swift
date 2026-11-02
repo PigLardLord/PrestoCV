@@ -105,6 +105,15 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.writingTokens == 400)
     }
 
+    @Test("The first pass and the sections stream their answers only on iOS 27 and macOS 27: iOS 26 streams them too slowly (#354)")
+    func answersStreamFromSystem27() {
+        if #available(iOS 27, macOS 27, *) {
+            #expect(FoundationModelsService.streamsAnswers)
+        } else {
+            #expect(!FoundationModelsService.streamsAnswers)
+        }
+    }
+
     @Test("A tools request asks the tools its count says, 2 or 3 of a job among others, never none (#354, rounds 5 and 6)",
           arguments: [(2...3, 80), (3...4, 100), (4...5, 120)] as [(ClosedRange<Int>, Int)])
     func toolsOfACount(count: ClosedRange<Int>, tokens: Int) throws {

@@ -53,8 +53,8 @@ public final class FoundationModelsService: CVGenerationService {
         throw CVGenerationError.generationFailed
     }
 
-    /// How the first pass samples its answer, once and, when the answer repeats, once more (#354). Greedy sampling gives the best
-    /// facts of the evaluation, and can loop on one sentence of a description; a fresh session that samples among the five likeliest
+    /// How the first pass samples its answer, once and, when the streamed answer repeats, once more (#354). Greedy sampling gives the
+    /// best facts of the evaluation, and can loop on one sentence of a description; a fresh session that samples among the five likeliest
     /// tokens wrote each answer of jobs-de with no loop. The seed is any fixed one, so that a description is drafted the same each time.
     nonisolated static let factsSampling = [
         FactsSampling(mode: .greedy, name: "greedy"), FactsSampling(mode: .random(top: 5, seed: 1), name: "top5"),
@@ -66,16 +66,33 @@ public final class FoundationModelsService: CVGenerationService {
         let name: String
     }
 
-    /// The facts of the description, asked in a fresh session and streamed: nil when the answer repeats one stretch
+    /// Whether the draft's requests stream their answers: on iOS 27 and macOS 27 only. Streamed, the first pass is stopped where it
+    /// repeats (`RepeatingAnswer`), and a section's answer cut by its token cap keeps its whole parts (`StreamedAnswer`).
+    /// The framework of iOS 26 and macOS 26 streams a structured answer about three times slower than it answers it whole, even with
+    /// the watch's checks made trivial: en-plain took 26 s answered whole on macOS 26, and streamed it failed the 90 s of
+    /// `DraftingLimits`; its sections, streamed, failed their 30 s (#354). There every request asks for its whole answer: a first pass
+    /// that loops ends with its limit, and a section cut by its cap is lost as a failed request.
+    nonisolated static var streamsAnswers: Bool {
+        if #available(iOS 27, macOS 27, *) { return true }
+        return false
+    }
+
+    /// The facts of the description, asked in a fresh session: nil when the streamed answer repeats one stretch
     /// (`RepeatingAnswer`), which is stopped there.
     ///
-    /// - Throws: `CVGenerationError.generationFailed` when the stream ends with no answer, and what the stream throws.
+    /// - Throws: `CVGenerationError.generationFailed` when the stream ends with no answer, and what the request throws.
     private func facts(for prompt: CVPrompt, sampling: FactsSampling) async throws -> CVData? {
         tracer.record(.request, into: .aiDraft) { prompt.traceFields(sampling: sampling.name) }
         let session = LanguageModelSession(instructions: prompt.instructions)
-        let stream = session.streamResponse(
-            to: prompt.text, generating: CVData.self, includeSchemaInPrompt: true, options: GenerationOptions(samplingMode: sampling.mode)
-        )
+        let options = GenerationOptions(samplingMode: sampling.mode)
+        guard Self.streamsAnswers else {
+            let response = try await session.respond(to: prompt.text, generating: CVData.self, includeSchemaInPrompt: true, options: options)
+            tracer.record(.response, into: .aiDraft) {
+                [.token("call", "draft"), .flag("answered", true), .text("raw", response.rawContent.jsonString)]
+            }
+            return response.content
+        }
+        let stream = session.streamResponse(to: prompt.text, generating: CVData.self, includeSchemaInPrompt: true, options: options)
         let watched = try await RepeatingAnswer.watch(
             stream, texts: { $0.rawContent.texts }, length: { $0.rawContent.jsonString.utf8.count }
         )

@@ -4,7 +4,8 @@ import Foundation
 import FoundationModels
 
 /// The requests of a draft written a section at a time (ADR 0031, "A request per section"). Each request is a fresh session with its
-/// own token cap and greedy decoding; a streamed answer cut by its cap keeps its whole parts, and the part the cut fell in goes.
+/// own token cap and greedy decoding; a streamed answer cut by its cap keeps its whole parts, and the part the cut fell in goes. On
+/// iOS 26 and macOS 26 the answers are not streamed (`streamsAnswers`), and one cut by its cap fails as a request.
 extension FoundationModelsService {
     // MARK: The token caps
 
@@ -35,10 +36,10 @@ extension FoundationModelsService {
         let role = brief.roles[number]
         let schema = try Self.jobSchema(duties: Self.jobDuties(said: role.said, adding: role.adding))
         let call = SectionCallTrace(call: "job", role: number, tokens: Self.jobTokens)
-        guard let last = try await streamed(SectionPrompts.job(number: number, of: brief), schema: schema, call: call) else {
+        guard let last = try await answered(SectionPrompts.job(number: number, of: brief), schema: schema, call: call) else {
             return nil
         }
-        let content = last.answer.content
+        let content = last.content
         let duties = Self.whole(try? content.value([String].self, forProperty: "duties"), isComplete: last.isComplete)
         let year = { (name: String) in (try? content.value(String.self, forProperty: name))?.presentValue }
         return RoleWriting(
@@ -74,8 +75,8 @@ extension FoundationModelsService {
         let prompt = SectionPrompts.jobRepair(number: number, of: brief, kept: kept, rejected: rejected)
         let call = SectionCallTrace(call: "jobRepair", role: number, tokens: Self.jobRepairTokens)
         let schema = try Self.jobRepairSchema(most: Self.jobRepairDuties)
-        guard let last = try await streamed(prompt, schema: schema, call: call) else { return nil }
-        let duties = try? last.answer.content.value([String].self, forProperty: "duties")
+        guard let last = try await answered(prompt, schema: schema, call: call) else { return nil }
+        let duties = try? last.content.value([String].self, forProperty: "duties")
         return Self.whole(duties, isComplete: last.isComplete).map(Self.sentence)
     }
 
@@ -123,8 +124,8 @@ extension FoundationModelsService {
     public func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
         let prompt = SectionPrompts.softSkills(for: brief)
         let call = SectionCallTrace(call: "softSkills", role: nil, tokens: Self.softSkillsTokens)
-        guard let last = try await streamed(prompt, QualitiesAnswer.self, call: call) else { return nil }
-        return Self.whole(last.answer.content.qualities, isComplete: last.isComplete)
+        guard let last = try await answered(prompt, QualitiesAnswer.self, call: call) else { return nil }
+        return Self.whole(last.content.qualities, isComplete: last.isComplete)
     }
 
     public func writeMoreSkills(
@@ -185,8 +186,8 @@ extension FoundationModelsService {
     /// The first whole sentence `prompt` answers: one cut at its cap keeps its whole sentences, and a second sentence goes.
     private func summarySentence(_ prompt: SectionPrompts.Prompt, call: String) async throws -> String? {
         let call = SectionCallTrace(call: call, role: nil, tokens: Self.summarySentenceTokens)
-        guard let last = try await streamed(prompt, SummarySentenceAnswer.self, call: call),
-              let sentence = last.answer.content.sentence,
+        guard let last = try await answered(prompt, SummarySentenceAnswer.self, call: call),
+              let sentence = last.content.sentence,
               let whole = last.isComplete ? sentence.presentValue : Self.wholeSentences(of: sentence) else { return nil }
         return SentenceSplitter.sentences(in: whole).first?.presentValue
     }
@@ -209,9 +210,32 @@ extension FoundationModelsService {
         }
     }
 
-    private func streamed(
+    private func respond<Answer: Generable>(
+        _ prompt: SectionPrompts.Prompt, _ type: Answer.Type, call: SectionCallTrace
+    ) async throws -> Answer.PartiallyGenerated {
+        let session = LanguageModelSession(instructions: prompt.instructions)
+        tracer.record(.request, into: .aiDraft) { call.request(prompt) }
+        do {
+            let raw = try await session.respond(
+                to: prompt.text, generating: type, includeSchemaInPrompt: true,
+                options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: call.tokens)
+            ).rawContent
+            let content = try Answer.PartiallyGenerated(raw)
+            tracer.record(.response, into: .aiDraft) { call.answered(raw: raw.jsonString, complete: nil) }
+            return content
+        } catch {
+            throw failure(of: error, in: call)
+        }
+    }
+
+    /// The answer of a request that may be cut by its cap: streamed on iOS 27 and macOS 27, and answered whole before
+    /// (`streamsAnswers`), where an answer cut by its cap fails.
+    private func answered(
         _ prompt: SectionPrompts.Prompt, schema: GenerationSchema, call: SectionCallTrace
-    ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<GeneratedContent>.Snapshot>? {
+    ) async throws -> SectionAnswer<GeneratedContent>? {
+        guard Self.streamsAnswers else {
+            return SectionAnswer(content: try await respond(prompt, schema: schema, call: call), isComplete: true)
+        }
         let session = LanguageModelSession(instructions: prompt.instructions)
         tracer.record(.request, into: .aiDraft) { call.request(prompt) }
         do {
@@ -223,15 +247,18 @@ extension FoundationModelsService {
             tracer.record(.response, into: .aiDraft) {
                 last.map { call.answered(raw: $0.answer.rawContent.jsonString, complete: $0.isComplete) } ?? call.unanswered()
             }
-            return last
+            return last.map { SectionAnswer(content: $0.answer.content, isComplete: $0.isComplete) }
         } catch {
             throw failure(of: error, in: call)
         }
     }
 
-    private func streamed<Answer: Generable>(
+    private func answered<Answer: Generable>(
         _ prompt: SectionPrompts.Prompt, _ type: Answer.Type, call: SectionCallTrace
-    ) async throws -> StreamedAnswer.Last<LanguageModelSession.ResponseStream<Answer>.Snapshot>? {
+    ) async throws -> SectionAnswer<Answer.PartiallyGenerated>? {
+        guard Self.streamsAnswers else {
+            return SectionAnswer(content: try await respond(prompt, type, call: call), isComplete: true)
+        }
         let session = LanguageModelSession(instructions: prompt.instructions)
         tracer.record(.request, into: .aiDraft) { call.request(prompt) }
         do {
@@ -243,7 +270,7 @@ extension FoundationModelsService {
             tracer.record(.response, into: .aiDraft) {
                 last.map { call.answered(raw: $0.answer.rawContent.jsonString, complete: $0.isComplete) } ?? call.unanswered()
             }
-            return last
+            return last.map { SectionAnswer(content: $0.answer.content, isComplete: $0.isComplete) }
         } catch {
             throw failure(of: error, in: call)
         }
@@ -288,6 +315,12 @@ extension FoundationModelsService {
         guard let end = text.lastIndex(where: { ".!?…".contains($0) }) else { return nil }
         return String(text[...end]).trimmingCharacters(in: .whitespacesAndNewlines).presentValue
     }
+}
+
+/// The answer of a section's request, and whether the model wrote it to its end.
+private struct SectionAnswer<Content> {
+    let content: Content
+    let isComplete: Bool
 }
 
 @Generable

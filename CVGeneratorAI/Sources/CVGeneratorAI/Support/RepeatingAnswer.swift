@@ -2,7 +2,8 @@ import Foundation
 
 /// An answer of the model caught writing one stretch of text again and again (#354). Greedy sampling can fall into a loop on a
 /// sentence or an item and write it until the session's window overflows, about 200 seconds later: jobs-de wrote one sentence of its
-/// description over and over in a job's duties. The first pass streams its answer and stops it as soon as it repeats.
+/// description over and over in a job's duties. On iOS 27 and macOS 27 the first pass streams its answer and stops it as soon as it
+/// repeats (`FoundationModelsService.streamsAnswers`).
 enum RepeatingAnswer {
     /// How many times one stretch is written back to back before the answer repeats: an answer asked again with sampling wrote one
     /// sentence of the description three times in a row, which the checks of the facts then leave as a quote.
