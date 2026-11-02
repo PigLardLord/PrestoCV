@@ -400,8 +400,9 @@ final class SectionDraft {
     /// The summary, last, a sentence at a time after the opening code writes from the facts (#354, round 13, O1): each request asks
     /// for one sentence on one slot (`summaryTopics`), the check reads it after the sentences kept, and a rejected sentence gets one
     /// repair with its reason. The requests stop once the summary has 2 sentences and 120 characters (4 and 450 in a rich draft, which
-    /// keeps up to 5; probe round 15), after 4 requests (10 in a rich draft), or when no slot is left; the floor then writes what is
-    /// still missing (`summaryFloor`). Asked for the whole summary at once, the request ran short.
+    /// keeps up to 5; probe round 15, and asks its studies slot still: `nextTopic`), after 4 requests (10 in a rich draft), or when no
+    /// slot is left; the floor then writes what is still missing (`summaryFloor`). Asked for the whole summary at once, the request
+    /// ran short.
     private func writeSummary(of brief: DraftBrief, field: String?, around dated: CVData) async throws {
         let kept = try kept(around: dated)
         let keptDuties = kept.experience.compactMap(\.description)
@@ -468,8 +469,8 @@ final class SectionDraft {
             return verdict
         }
 
-        while asked < Self.summaryRequests, !Self.isEnough(lead, accepted), accepted.count < Self.summarySentences - 1,
-              var topic = topics.popFirst() {
+        while asked < Self.summaryRequests, accepted.count < Self.summarySentences - 1,
+              var topic = Self.nextTopic(of: &topics, isEnough: Self.isEnough(lead, accepted)) {
             let written = (lead.map { [$0] } ?? []) + accepted
             // A tools slot of a rich draft asks the tools the summary does not name yet, and none when it names them all.
             if DraftDepth.isRich {
@@ -481,8 +482,9 @@ final class SectionDraft {
                 try await self.service.writeSummarySentence(for: brief, topic: topic, written: written)
             }
             var verdict = withoutRepeats(checked(answer))
+            // The studies slot, which a summary long enough still asks, gets its repair too (probe round 23).
             if let first = verdict, let rejection = first.rejected.first, asked < Self.summaryRequests,
-               !Self.isEnough(lead ?? first.opening, following(first)) {
+               topic.isOfStudies || !Self.isEnough(lead ?? first.opening, following(first)) {
                 asked += 1
                 let repaired = try await request(.summary) { [brief] in
                     try await self.service.repairSummarySentence(
@@ -679,6 +681,16 @@ final class SectionDraft {
             let (one, other) = (key(jobs[left]), key(jobs[right]))
             return one == other ? left < right : one > other
         }
+    }
+
+    /// The next slot of `topics` to ask: the first one until the summary `isEnough`; then, in a rich draft (`DraftDepth`), the
+    /// studies slot if it is still to ask, and no slot after it (probe round 23). The slot came after a summary long enough in 4
+    /// inputs of 9, which then never named the person's studies and languages.
+    static func nextTopic(of topics: inout ArraySlice<SummaryTopic>, isEnough: Bool) -> SummaryTopic? {
+        guard isEnough else { return topics.popFirst() }
+        guard DraftDepth.isRich, let studies = topics.first(where: \.isOfStudies) else { return nil }
+        topics.removeAll()
+        return studies
     }
 
     /// Whether `opening` and the sentences `accepted` after it are a summary long enough to ask no more.

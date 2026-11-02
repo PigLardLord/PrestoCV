@@ -499,9 +499,8 @@ struct RichDraftTests {
             Summary so far:
             - I work as a warehouse operative.
             """), "\(prompt.text)")
+        #expect(prompt.instructions == SectionPrompts.studiesSentenceInstructions)
         for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
-            #expect(instructions.contains("With a Studies or Languages line, write only of them: say in the past what and where the "
-                + "person studied, and which languages the person speaks; by the names given, with nothing more of them and no level."))
             #expect(instructions.contains("certification or achievement beyond those the lines give"))
         }
         DraftDepth.$pinned.withValue(false) {
@@ -611,6 +610,62 @@ struct RichDraftTests {
         let draft = try english.sanitize(cv, writing: writing, against: description)
 
         #expect(draft.summary?.contains(wish) != true, "\(draft.summary ?? "")")
+    }
+
+    // MARK: probe round 23
+
+    @Test("The studies slot asks with its own rule, of the studies and languages alone; a job's slot keeps the job's rule (probe round 23)")
+    func studiesRule() {
+        let studies = SummaryTopic(
+            title: "warehouse operative", studies: ["logistics, Harlow City College"], languages: ["Polish"], hasEnded: false
+        )
+        let job = SummaryTopic(title: "warehouse operative", work: ["the lorries"], hasEnded: false)
+        let written = ["I work as a warehouse operative."]
+
+        let prompts = [
+            SectionPrompts.summarySentence(for: Self.schooled, topic: studies, written: written),
+            SectionPrompts.summarySentenceRepair(for: Self.schooled, topic: studies, written: written, rejected: "\"I studied.\": short"),
+        ]
+
+        #expect(studies.isOfStudies && !job.isOfStudies)
+        #expect(prompts.map(\.instructions) == [
+            SectionPrompts.studiesSentenceInstructions, SectionPrompts.studiesSentenceRepairInstructions,
+        ])
+        for instructions in prompts.map(\.instructions) {
+            #expect(instructions.contains("- Say in the past what and where the person studied, by the names of the Studies line, and "
+                + "which languages the person speaks, by the names of the Languages line, each when its line is given; nothing more of "
+                + "them, no level and no job."))
+            #expect(instructions.contains("certification or achievement beyond those the lines give"))
+            #expect(!instructions.contains("Say what the person does as the job"))
+        }
+        let ofJob = SectionPrompts.summarySentence(for: Self.schooled, topic: job, written: written)
+        #expect(ofJob.instructions == SectionPrompts.summarySentenceInstructions)
+        #expect(!SectionPrompts.summarySentenceInstructions.contains("Studies"))
+        DraftDepth.$pinned.withValue(false) {
+            let plain = SectionPrompts.summarySentence(for: Self.schooled, topic: studies, written: written)
+            #expect(plain.instructions == SectionPrompts.summarySentenceInstructions)
+        }
+    }
+
+    @Test("A rich summary long enough still asks its studies slot, then no slot; a plain one asks no more (probe round 23)")
+    func studiesAfterEnough() {
+        let role = SummaryTopic(title: "warehouse operative", hasEnded: false)
+        let ended = SummaryTopic(title: "forklift driver", work: ["the pallets"], hasEnded: true)
+        let studies = SummaryTopic(title: "warehouse operative", languages: ["Polish"], hasEnded: false)
+        var topics = [role, ended, studies, role][...]
+
+        let first = SectionDraft.nextTopic(of: &topics, isEnough: false)
+        let enough = SectionDraft.nextTopic(of: &topics, isEnough: true)
+        let after = SectionDraft.nextTopic(of: &topics, isEnough: true)
+
+        #expect(first == role)
+        #expect(enough == studies)
+        #expect(after == nil)
+        #expect(topics.isEmpty)
+        var plain = [role, studies][...]
+        let plainNext = DraftDepth.$pinned.withValue(false) { SectionDraft.nextTopic(of: &plain, isEnough: true) }
+        #expect(plainNext == nil)
+        #expect(plain.count == 2)
     }
 
     // MARK: The summary's request

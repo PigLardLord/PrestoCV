@@ -238,9 +238,8 @@ enum SectionPrompts {
     /// job's work again and left the studies out. The rule says its studies in the past.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
-        let isOfStudies = !topic.studies.isEmpty || !topic.languages.isEmpty
         let tense = topic.hasEnded ? "; ended, write in the past" : "; write in the present"
-        if !isOfStudies { lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + tense) }
+        if !topic.isOfStudies { lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + tense) }
         if let field = topic.field { lines.append("Field: " + field) }
         if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
@@ -253,12 +252,19 @@ enum SectionPrompts {
         var seen = Set<String>()
         let verbs = written.compactMap(CVDataSanitizer.leadingVerb(of:)).filter { seen.insert($0).inserted }
         if DraftDepth.isRich, !verbs.isEmpty { lines.append("Do not start with: " + verbs.joined(separator: "; ")) }
-        return Prompt(instructions: summarySentenceInstructions, text: lines.joined(separator: "\n"))
+        let instructions = isOfStudies(topic) ? studiesSentenceInstructions : summarySentenceInstructions
+        return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
+    }
+
+    /// Whether `topic` is the studies slot of a rich draft (`DraftDepth`), which asks with its own rules (probe round 23): under the
+    /// rule of the job, its sentences spoke of the job in the 5 inputs of 9 that asked it.
+    private static func isOfStudies(_ topic: SummaryTopic) -> Bool {
+        DraftDepth.isRich && topic.isOfStudies
     }
 
     /// What every summary sentence keeps to (S2): typical duties and tools are draft content (O1); no fact the person did not say.
     /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool (probe round 4), and a slot of the person's
-    /// studies and languages, which its limits allow by the names given (probe round 21).
+    /// studies and languages, which its limits allow by the names given (probe round 21) and which has its own rule (probe round 23).
     static var summarySentenceRules: String {
         DraftDepth.isRich ? richWorkRule + richSummarySentenceLimits : plainWorkRule + summarySentenceLimits
     }
@@ -275,8 +281,13 @@ enum SectionPrompts {
         tools, say what the person does with one or two of them, by name, each for the work it is made for; with qualities, say \
         how the person works, the person as the subject. Name a tool only when a Tools line is given. Typical duties of the job \
         are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods".
-        - With a Studies or Languages line, write only of them: say in the past what and where the person studied, and which \
-        languages the person speaks; by the names given, with nothing more of them and no level.
+
+        """
+
+    /// The rule of the studies slot of a rich draft, in place of the rule of the job (probe round 23).
+    static let studiesSentenceRule = """
+        - Say in the past what and where the person studied, by the names of the Studies line, and which languages the person \
+        speaks, by the names of the Languages line, each when its line is given; nothing more of them, no level and no job.
 
         """
 
@@ -295,28 +306,33 @@ enum SectionPrompts {
         beyond those the lines give; no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
         """
 
-    static var summarySentenceInstructions: String {
-        """
+    static let summarySentenceTask = """
         You write one more sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
         - Exactly 1 sentence, as the person: in the first person, never "he", "she" or "the person".
 
-        """ + summarySentenceRules
-    }
+        """
+
+    static var summarySentenceInstructions: String { summarySentenceTask + summarySentenceRules }
+
+    static let studiesSentenceInstructions = summarySentenceTask + studiesSentenceRule + richSummarySentenceLimits
 
     /// The sentence's repair: the request again, then the sentence the check rejected and why.
     static func summarySentenceRepair(for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String) -> Prompt {
         let lines = [summarySentence(for: brief, topic: topic, written: written).text, "Rejected, with the reason: " + rejected]
-        return Prompt(instructions: summarySentenceRepairInstructions, text: lines.joined(separator: "\n"))
+        let instructions = isOfStudies(topic) ? studiesSentenceRepairInstructions : summarySentenceRepairInstructions
+        return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
     }
 
-    static var summarySentenceRepairInstructions: String {
-        """
+    static let summarySentenceRepairTask = """
         You fix one sentence of the summary of a CV, after the summary so far. Write in the language named on the first line.
         - Write the rejected sentence again as exactly 1 sentence that fixes the reason, as the person: in the first person, never \
         "he", "she" or "the person".
 
-        """ + summarySentenceRules
-    }
+        """
+
+    static var summarySentenceRepairInstructions: String { summarySentenceRepairTask + summarySentenceRules }
+
+    static let studiesSentenceRepairInstructions = summarySentenceRepairTask + studiesSentenceRule + richSummarySentenceLimits
 
     // MARK: The parts of a request
 

@@ -113,6 +113,8 @@ public struct SummaryTopic: Equatable, Sendable {
     public let languages: [String]
     /// Whether the job is over: the sentence then speaks of it in the past.
     public let hasEnded: Bool
+    /// Whether the sentence is of the person's studies and languages, and of no job (probe round 23).
+    public var isOfStudies: Bool { !studies.isEmpty || !languages.isEmpty }
 
     public init(
         title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], tools: [String] = [],
