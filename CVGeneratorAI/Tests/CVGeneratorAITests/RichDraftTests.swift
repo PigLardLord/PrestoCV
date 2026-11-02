@@ -446,6 +446,125 @@ struct RichDraftTests {
         }
     }
 
+    // MARK: probe round 21
+
+    private static let schooled = DraftBrief(
+        language: "English", headline: "warehouse operative",
+        roles: [.init(title: "forklift driver", hasEnded: true), .init(title: "warehouse operative", hasEnded: false)],
+        studies: ["logistics"], namedSkills: []
+    )
+
+    @Test("A rich summary asks of the person's studies and languages after the latest ended job; a plain one does not (probe round 21)")
+    func studiesSlot() {
+        let duties = [["I moved the pallets."], ["I load the lorries.", "I check the deliveries."]]
+        let rich = SectionDraft.summaryTopics(
+            of: Self.schooled, duties: duties, typical: [[], []], qualities: [], field: nil, order: [1, 0],
+            studies: ["logistics, Harlow City College"], languages: ["English", "Polish"]
+        )
+        let studies = SummaryTopic(
+            title: "warehouse operative", studies: ["logistics, Harlow City College"], languages: ["English", "Polish"], hasEnded: false
+        )
+
+        let ended = rich.firstIndex { $0.title == "forklift driver" }
+        #expect(ended.map { rich.indices.contains($0 + 1) && rich[$0 + 1] == studies } == true, "\(rich)")
+        #expect(SectionDraft.summaryTopics(
+            of: Self.schooled, duties: duties, typical: [[], []], qualities: [], field: nil, order: [1, 0]
+        ) == rich.filter { $0 != studies })
+        let plain = DraftDepth.$pinned.withValue(false) {
+            SectionDraft.summaryTopics(
+                of: Self.schooled, duties: duties, typical: [[], []], qualities: [], field: nil, order: [1, 0],
+                studies: ["logistics, Harlow City College"], languages: ["English", "Polish"]
+            )
+        }
+        #expect(!plain.contains(studies), "\(plain)")
+    }
+
+    @Test("The studies slot reads the degree and school and the language names, with no level and no tense on the job (probe round 21)")
+    func studiesPrompt() {
+        let facts = CVData(
+            education: [Education(degree: "logistics", institution: "Harlow City College"), Education(institution: "Arlen School")],
+            languages: [Language(name: "English", proficiency: .native), Language(name: "Polish", proficiency: .b2)]
+        )
+        let topic = SummaryTopic(
+            title: "warehouse operative", studies: SectionDraft.studies(of: facts), languages: facts.languages.map(\.name), hasEnded: false
+        )
+
+        let prompt = SectionPrompts.summarySentence(for: Self.schooled, topic: topic, written: ["I work as a warehouse operative."])
+
+        #expect(prompt.text.hasPrefix("""
+            Language: English
+            Write in English.
+            Job: warehouse operative
+            Studies: logistics, Harlow City College; Arlen School
+            Languages: English; Polish
+            Summary so far:
+            - I work as a warehouse operative.
+            """), "\(prompt.text)")
+        for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
+            #expect(instructions.contains("With studies, say in the past what and where the person studied; with languages, say which "
+                + "ones the person speaks; by the names given, with nothing more of them and no level."))
+            #expect(instructions.contains("certification or achievement beyond those the lines give"))
+        }
+        DraftDepth.$pinned.withValue(false) {
+            #expect(!SectionPrompts.summarySentenceInstructions.contains("With studies"))
+            #expect(!SectionPrompts.summarySentenceInstructions.contains("beyond those the lines give"))
+            #expect(SectionPrompts.summarySentenceRules == SectionPrompts.plainWorkRule + SectionPrompts.summarySentenceLimits)
+        }
+    }
+
+    @Test("A rich summary keeps a sentence of the person's own studies and languages, and a plain one drops it (probe round 21)",
+          arguments: [
+            "I studied logistics at Harlow City College.",
+            "I hold a diploma in logistics from Harlow City College.",
+            "I speak English and Polish.",
+          ])
+    func ownStudiesAndLanguages(sentence: String) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(
+            experience: [Experience(title: "warehouse operative", company: "Depot Arlen", startDate: "2019", endDate: nil, current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")],
+            languages: [Language(name: "English"), Language(name: "Polish")]
+        )
+        let description = """
+            Since 2019 I work as a warehouse operative at Depot Arlen, where I load the lorries. I have a diploma in logistics from \
+            Harlow City College. I speak English and Polish.
+            """
+        let first = "I work as a warehouse operative."
+        let work = ["I load the lorries."]
+
+        let verdict = try english.summaryCheck(of: facts, summary: first + " " + sentence, field: nil, work: work, against: description)
+
+        #expect(verdict.kept == [first, sentence], "\(verdict.kept) \(verdict.rejected)")
+        DraftDepth.$pinned.withValue(false) {
+            let plain = try? english.summaryCheck(of: facts, summary: first + " " + sentence, field: nil, work: work, against: description)
+            #expect(plain?.kept == [first], "\(plain?.kept ?? []) \(plain?.rejected ?? [])")
+        }
+    }
+
+    @Test("A rich summary still drops a qualification the person did not write, and one the person only wishes for (probe round 21)",
+          arguments: [
+            ("I am a certified logistics manager from Harlow City College.", "certified"),
+            ("I studied for a master in logistics at Harlow City College.", "master"),
+          ])
+    func unsaidQualification(sentence: String, word: String) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let facts = CVData(
+            experience: [Experience(title: "warehouse operative", company: "Depot Arlen", startDate: "2019", endDate: nil, current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")]
+        )
+        let description = """
+            Since 2019 I work as a warehouse operative at Depot Arlen, where I load the lorries. I studied logistics at Harlow City \
+            College. One day I would like to take a master.
+            """
+
+        let verdict = try english.summaryCheck(
+            of: facts, summary: "I work as a warehouse operative. " + sentence, field: nil, work: ["I load the lorries."], against: description
+        )
+
+        #expect(!verdict.kept.contains(sentence), "\(verdict.kept)")
+        #expect(verdict.rejected.contains { $0.sentence == sentence && $0.reason.contains("\"\(word)\"") }, "\(verdict.rejected)")
+    }
+
     // MARK: The summary's request
 
     @Test("A summary sentence's request reads the tools of its slot and the first verbs said, and its rules ask for the tools by name and for concrete work")

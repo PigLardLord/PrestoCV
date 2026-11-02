@@ -234,13 +234,18 @@ enum SectionPrompts {
     /// and present otherwise (told only the past, a current job's sentence came in the past), with the
     /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
     /// whole summary from every job, the request ran short.
+    /// The studies slot of a rich draft (probe round 21) has no tense on its job: the rule says its studies in the past.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
-        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + (topic.hasEnded ? "; ended, write in the past" : "; write in the present"))
+        let isOfStudies = !topic.studies.isEmpty || !topic.languages.isEmpty
+        let tense = isOfStudies ? "" : topic.hasEnded ? "; ended, write in the past" : "; write in the present"
+        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + tense)
         if let field = topic.field { lines.append("Field: " + field) }
         if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
         if !topic.tools.isEmpty { lines.append("Tools: " + topic.tools.joined(separator: "; ")) }
+        if !topic.studies.isEmpty { lines.append("Studies: " + topic.studies.joined(separator: "; ")) }
+        if !topic.languages.isEmpty { lines.append("Languages: " + topic.languages.joined(separator: "; ")) }
         if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
         // The first verbs said, by name, of a rich draft (`DraftDepth`): told only not to start as an earlier sentence, the
         // sentences kept starting with the same verb and the check rejected them (#354, probe round 3).
@@ -251,9 +256,10 @@ enum SectionPrompts {
     }
 
     /// What every summary sentence keeps to (S2): typical duties and tools are draft content (O1); no fact the person did not say.
-    /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool (probe round 4).
+    /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool (probe round 4), and a slot of the person's
+    /// studies and languages, which its limits allow by the names given (probe round 21).
     static var summarySentenceRules: String {
-        (DraftDepth.isRich ? richWorkRule : plainWorkRule) + summarySentenceLimits
+        DraftDepth.isRich ? richWorkRule + richSummarySentenceLimits : plainWorkRule + summarySentenceLimits
     }
 
     static let plainWorkRule = """
@@ -267,7 +273,9 @@ enum SectionPrompts {
         - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
         tools, say what the person does with one or two of them, by name, each for the work it is made for; with qualities, say \
         how the person works, the person as the subject. Name a tool only when a Tools line is given. Typical duties of the job \
-        are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods".
+        are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods". \
+        With studies, say in the past what and where the person studied; with languages, say which ones the person speaks; by \
+        the names given, with nothing more of them and no level.
 
         """
 
@@ -276,6 +284,14 @@ enum SectionPrompts {
         no list.
         - Never add a number, company, customer, product, school, place, person, language, study, certification or achievement; \
         no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
+        """
+
+    /// The limits of a rich draft: the school, study and language of the lines are the person's own (probe round 21, O1).
+    static let richSummarySentenceLimits = """
+        - Do not start with the first verb of a sentence of the summary so far. Start with a capital letter, end with a full stop; \
+        no list.
+        - Never add a number, company, customer, product, school, place, person, language, study, certification or achievement \
+        beyond those the lines give; no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
         """
 
     static var summarySentenceInstructions: String {

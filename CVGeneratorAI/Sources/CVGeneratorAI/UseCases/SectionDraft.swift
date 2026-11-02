@@ -429,7 +429,7 @@ final class SectionDraft {
         let rankedTools = Self.specificFirst(keptTools, language: sanitizer.language(of: description))
         var topics = Self.summaryTopics(
             of: brief, duties: jobDuties, typical: typical, qualities: keptQualities, field: field, order: order,
-            tools: rankedTools, hasOpening: brief.opening != nil
+            tools: rankedTools, studies: Self.studies(of: kept), languages: kept.languages.map(\.name), hasOpening: brief.opening != nil
         )[...]
         var lead = brief.opening
         var accepted: [String] = []
@@ -507,12 +507,13 @@ final class SectionDraft {
     /// headline title. A rich draft (`DraftDepth`; probe rounds 3 and 4) also asks of the first three kept `tools`, after the
     /// first work slot, with the second pair of work in the first qualities slot (else a topic of the job's work no slot asks;
     /// probe round 15), then of the latest ended job, with the first topic of its work no earlier slot asks (probe round 14), then
-    /// of the current job's next work, of two topics of its work no slot asks, of its next tools and qualities, and of the other
-    /// ended jobs; its title is said by the opening when there is one, so its slot then comes last and only with a field, and the
-    /// field is asked only of a job with no title, as a few words of a trade (`cleanField`).
+    /// of the person's `studies` and `languages` (probe round 21), then of the current job's next work, of two topics of its work
+    /// no slot asks, of its next tools and qualities, and of the other ended jobs; its title is said by the opening when there is
+    /// one, so its slot then comes last and only with a field, and the field is asked only of a job with no title, as a few words of
+    /// a trade (`cleanField`).
     static func summaryTopics(
         of brief: DraftBrief, duties: [[String]], typical: [[String]], qualities: [String], field: String?, order: [Int],
-        tools: [String] = [], hasOpening: Bool = false
+        tools: [String] = [], studies: [String] = [], languages: [String] = [], hasOpening: Bool = false
     ) -> [SummaryTopic] {
         let roles = order.filter(brief.roles.indices.contains)
         guard let current = currentJob(of: brief, order: order) else {
@@ -565,6 +566,11 @@ final class SectionDraft {
             endedSlots.append(SummaryTopic(title: title(number), work: [topic], hasEnded: brief.roles[number].hasEnded))
         }
         topics += endedSlots.prefix(1)
+        // The person's studies and languages after the career (probe round 21, O1): told never to name a school, a study or a
+        // language, the summary left out what the person wrote of them.
+        if DraftDepth.isRich, !studies.isEmpty || !languages.isEmpty {
+            topics.append(SummaryTopic(title: title(current), studies: studies, languages: languages, hasEnded: hasEnded))
+        }
         // The slots for a summary still short (probe round 4): with a slot rejected, the summary of a short description stopped at
         // 2 sentences. Two topics of the job's work that no slot asks have one of their own (probe round 15): the typical duties
         // held work no sentence said.
@@ -578,6 +584,11 @@ final class SectionDraft {
         // when it has no field.
         if hasOpening { topics.append(role) }
         return topics
+    }
+
+    /// Each study of `facts` as its degree and school, for the summary's studies slot (#354, probe round 21).
+    static func studies(of facts: CVData) -> [String] {
+        facts.education.compactMap { [$0.degree, $0.institution].compactMap(\.presentValue).joined(separator: ", ").presentValue }
     }
 
     /// The `topics` that say something `asked` does not, each once (#354, probe round 14): a topic all of whose content words, as

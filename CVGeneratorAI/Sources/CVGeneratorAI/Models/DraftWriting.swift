@@ -93,8 +93,8 @@ public struct DraftBrief: Equatable, Sendable {
 }
 
 /// What one sentence of the summary is about (#354, round 13, O1): the current job's title and the field, the topics of its kept
-/// duties, its kept tools, its title with two qualities, or an ended job's first kept duty. Asked for the whole summary from every job,
-/// the request ran short; asked of one slot, a sentence has one thing to say.
+/// duties, its kept tools, its title with two qualities, an ended job's first kept duty, or the person's studies and languages (probe
+/// round 21). Asked for the whole summary from every job, the request ran short; asked of one slot, a sentence has one thing to say.
 public struct SummaryTopic: Equatable, Sendable {
     /// The job's title, or the headline title for a job with none; nil when the CV has neither.
     public let title: String?
@@ -106,17 +106,25 @@ public struct SummaryTopic: Equatable, Sendable {
     public let qualities: [String]
     /// The kept tools the sentence says the person works with; empty but for the tools slot (#354, probe round 3).
     public let tools: [String]
+    /// The person's studies, each its degree and school as the facts hold them; empty but for the studies slot of a rich draft
+    /// (`DraftDepth`; #354, probe round 21).
+    public let studies: [String]
+    /// The names of the languages the person speaks, as the facts hold them, with no level; empty but for that slot.
+    public let languages: [String]
     /// Whether the job is over: the sentence then speaks of it in the past.
     public let hasEnded: Bool
 
     public init(
-        title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], tools: [String] = [], hasEnded: Bool
+        title: String?, field: String? = nil, work: [String] = [], qualities: [String] = [], tools: [String] = [],
+        studies: [String] = [], languages: [String] = [], hasEnded: Bool
     ) {
         self.title = title
         self.field = field
         self.work = work
         self.qualities = qualities
         self.tools = tools
+        self.studies = studies
+        self.languages = languages
         self.hasEnded = hasEnded
     }
 }

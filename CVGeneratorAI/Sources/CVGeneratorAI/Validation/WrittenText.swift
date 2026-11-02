@@ -58,8 +58,12 @@ struct WrittenText {
     /// Why `isPlain` rejects `sentence`, as a short reason the repair request reads; nil when it is plain.
     ///
     /// ADR 0031, D3: `allowing` holds the words of a duty that quotes its own job's clause word for word: there its acronyms,
-    /// number words and seniority words are the person's own. Digits and another job's words still reject it.
-    func rejection(of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = []) -> String? {
+    /// number words and seniority words are the person's own. Digits and another job's words still reject it. `ownQualifications`
+    /// holds the words of the person's own degrees, which a summary sentence of a rich draft names (#354, probe round 21).
+    func rejection(
+        of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = [],
+        ownQualifications: Set<String> = []
+    ) -> String? {
         guard source.isInTheLanguageOfTheDescription(sentence, wordList: wordList) else { return "it is not in the language of the description" }
 
         let addresses = AddressTokens(sentence)
@@ -73,7 +77,7 @@ struct WrittenText {
             let isAllowed = allowing.contains(folded)
             let isTaught = index > 0 && Self.isTaught(folded, after: sentenceWords[index - 1].folded)
             if words.isNumber(folded) && !isAllowed { return "the word \"\(folded)\" is a number" }
-            if words.qualifications.contains(folded) { return "the word \"\(folded)\" names a qualification" }
+            if words.qualifications.contains(folded) && !ownQualifications.contains(folded) { return "the word \"\(folded)\" names a qualification" }
             if words.months.contains(folded) { return "the word \"\(folded)\" is a date" }
             if words.negations.contains(folded) { return "the word \"\(folded)\" is a negation" }
             if isAnUnstatedLevel(folded) && !isAllowed && !isTaught {

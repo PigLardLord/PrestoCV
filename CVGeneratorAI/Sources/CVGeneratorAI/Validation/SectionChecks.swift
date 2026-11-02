@@ -857,11 +857,22 @@ extension CVDataSanitizer {
             // The acronyms the person writes of their work are their own words in a rich draft (probe round 16): "I managed the PA
             // systems …" went for "PA", which the job's own line names.
             let acronyms = DraftDepth.isRich ? Self.acronyms(in: work + duties) : []
-            let summaryOwnWords = ownWords.union(toolWords).union(employerWords).union(acronyms)
+            // The person's studies and languages are their own in a rich draft (probe round 21, O1): a word of a degree or school of
+            // the facts, or a language's name, anchors a sentence, the languages are no names, and a qualification word of a degree
+            // or of the description is the person's own. Told never to name them, the summary left out what the person wrote of
+            // them. A wish ("I want to take a master") still goes: its words are excluded.
+            let studyWords: Set<String> = DraftDepth.isRich
+                ? Self.words(of: facts.education.map(\.degree)).union(Self.words(of: facts.education.map(\.institution))).filter { $0.count >= 4 }
+                : []
+            let languageWords: Set<String> = DraftDepth.isRich ? Self.words(of: facts.languages.map(\.name)) : []
+            let ownQualifications: Set<String> = DraftDepth.isRich
+                ? Self.words(of: facts.education.map(\.degree)).union(Self.words(of: [description])) : []
+            let summaryOwnWords = ownWords.union(toolWords).union(employerWords).union(acronyms).union(languageWords)
             let namesWork = { (sentence: String) in
                 let words = Word.words(in: sentence).map(\.folded)
                 return !Self.workStems(of: [sentence]).isDisjoint(with: workStems)
                     || toolRuns.contains { run in words.indices.contains { words[$0...].prefix(run.count).elementsEqual(run) } }
+                    || !studyWords.union(languageWords).isDisjoint(with: words)
             }
 
             let language = source.explainer.language
@@ -900,8 +911,10 @@ extension CVDataSanitizer {
                 // draft (probe round 16): "…com código usando o Visual Studio Code para desenvolvimento." went whole for "Code".
                 if DraftDepth.isRich, source.isInTheLanguageOfTheDescription(sentence, wordList: wordList),
                    source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                   written.rejection(of: sentence, ownWords: summaryOwnWords) != nil,
-                   let head = Self.heads(of: sentence, language: language).first(where: { written.rejection(of: $0, ownWords: summaryOwnWords) == nil }) {
+                   written.rejection(of: sentence, ownWords: summaryOwnWords, ownQualifications: ownQualifications) != nil,
+                   let head = Self.heads(of: sentence, language: language).first(where: {
+                       written.rejection(of: $0, ownWords: summaryOwnWords, ownQualifications: ownQualifications) == nil
+                   }) {
                     sentence = head
                 }
                 let key = sentence.lowercased().filter(\.isLetter)
@@ -945,7 +958,7 @@ extension CVDataSanitizer {
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
-                          let reason = written.rejection(of: sentence, ownWords: summaryOwnWords) {
+                          let reason = written.rejection(of: sentence, ownWords: summaryOwnWords, ownQualifications: ownQualifications) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: reason))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
