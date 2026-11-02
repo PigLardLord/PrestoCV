@@ -10,6 +10,11 @@ import Foundation
 /// a kept title holds all its words, masculine and feminine read as one ("infermiera" is "infermiere"); a head-first title may go on
 /// with words of its own ("programador utilizando"), and a German compound title names its last part ("Gärtnerin" of a
 /// "Landschaftsgärtnerin"). A phrase whose head names no trade ("part", "team player", "result") is no role.
+///
+/// A role joined to one by "and" ("As a nursing assistant and nurse") is read the same way, unless what follows "and" is a verb
+/// ("and help patients", "e mi occupo di"). Italian, Spanish, French and Portuguese have no tags, and the vocabulary lists only some
+/// of their presents, so there a joined role follows an indefinite article ("e un infermiere") or is one word that ends the clause
+/// ("e cuoco."), and "e scrivo applicazioni" or "e collaboro con la cucina" is no role.
 enum RoleAssertion {
     /// The first role `sentence` puts forward that no title of `titles` names, in its folded words with the words of `name` left
     /// out; nil when it puts forward none, or when its language is not one of the six.
@@ -18,19 +23,37 @@ enum RoleAssertion {
         let tokens = tokens(in: sentence)
         let titleWords = titles.map { Word.words(in: $0).map { gendered($0.folded, in: language) } }.filter { !$0.isEmpty }
         let nameWords = Set(Word.words(in: name ?? "").map(\.folded))
-        let headsLast = language == .english || language == .german
+        var verbs: Set<Int>?
 
         for start in starts(in: tokens, language: language) {
-            guard let span = phrase(in: tokens, from: start, language: language) else { continue }
-            let phrase = tokens[span].map(\.folded).filter { !nameWords.contains($0) }
-            guard let head = headsLast ? phrase.last : phrase.first, !genericWords.contains(head) else { continue }
-            let gendered = phrase.map { Self.gendered($0, in: language) }
-            if titleWords.contains(where: { Set(gendered).isSubset(of: $0) }) { continue }
-            if !headsLast, titleWords.contains(where: { gendered.starts(with: $0) }) { continue }
-            if language == .german, gendered.count == 1, titleWords.joined().contains(where: { $0.hasSuffix(gendered[0]) }) { continue }
-            return phrase.joined(separator: " ")
+            var span = phrase(in: tokens, from: start, language: language)
+            while let current = span {
+                if let role = unkept(tokens[current].map(\.folded), titleWords: titleWords, nameWords: nameWords, language: language) {
+                    return role
+                }
+                guard current.upperBound < tokens.count, coordinators[language]?.contains(tokens[current.upperBound].folded) == true,
+                      !tokens[current.upperBound - 1].endsAClause else { break }
+                let tagged = verbs ?? LexicalClasses.verbs(in: sentence, words: Word.words(in: sentence), language: language)
+                verbs = tagged
+                span = coordinated(in: tokens, after: current.upperBound, verbs: tagged, language: language)
+            }
         }
         return nil
+    }
+
+    /// The role `words` name, without the words of the person's name; nil when its head names no trade or a title of `titleWords`
+    /// names it.
+    private static func unkept(
+        _ words: [String], titleWords: [[String]], nameWords: Set<String>, language: Vocabulary.Language
+    ) -> String? {
+        let phrase = words.filter { !nameWords.contains($0) }
+        let headsLast = language == .english || language == .german
+        guard let head = headsLast ? phrase.last : phrase.first, !genericWords.contains(head) else { return nil }
+        let gendered = phrase.map { Self.gendered($0, in: language) }
+        if titleWords.contains(where: { Set(gendered).isSubset(of: $0) }) { return nil }
+        if !headsLast, titleWords.contains(where: { gendered.starts(with: $0) }) { return nil }
+        if language == .german, gendered.count == 1, titleWords.joined().contains(where: { $0.hasSuffix(gendered[0]) }) { return nil }
+        return phrase.joined(separator: " ")
     }
 
     // MARK: The words of a sentence
@@ -117,6 +140,20 @@ enum RoleAssertion {
         return first..<end
     }
 
+    /// The role joined by the word at `coordinator` to the one before it; nil when what follows names no role: a word the
+    /// vocabulary explains or the device tags as a verb, or, in a language without tags, words that no indefinite article opens,
+    /// unless one word ends the clause ("e cuoco."): an unlisted present goes on to what it acts on ("e collaboro con la cucina").
+    private static func coordinated(
+        in tokens: [Token], after coordinator: Int, verbs: Set<Int>, language: Vocabulary.Language
+    ) -> Range<Int>? {
+        let next = coordinator + 1
+        guard let span = phrase(in: tokens, from: Start(index: next, isBare: false), language: language),
+              !Vocabulary.explains(tokens[span.lowerBound].folded, in: language), verbs.isDisjoint(with: span) else { return nil }
+        if VerbForms.readsVerbsByTags(in: language) || indefiniteArticles.contains(tokens[next].folded) { return span }
+        let endsTheClause = span.upperBound == tokens.count || tokens[next].endsAClause
+        return span == next..<next + 1 && endsTheClause ? span : nil
+    }
+
     // MARK: Masculine and feminine
 
     /// `word` with a feminine or plural ending read as the masculine one, roughly: enough to read "infermiera" as "infermiere" and
@@ -179,6 +216,12 @@ enum RoleAssertion {
     ]
 
     private static let indefiniteArticles: Set<String> = ["a", "an", "un", "uno", "una", "ein", "eine", "une", "um", "uma"]
+
+    /// The words that join a second role to the first, per language: "a nursing assistant and nurse". Portuguese "o" is an article.
+    private static let coordinators: [Vocabulary.Language: Set<String>] = [
+        .english: ["and", "or"], .italian: ["e", "ed", "o"], .german: ["und", "oder"], .french: ["et", "ou"],
+        .spanish: ["y", "e", "o", "u"], .portuguese: ["e", "ou"],
+    ]
 
     /// The articles and possessives before a role.
     private static let articles: Set<String> = [

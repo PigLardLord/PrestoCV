@@ -35,6 +35,12 @@ struct RoleAssertionTests {
         #expect(RoleAssertion.unkeptRole(
             in: "Lavoro come infermiera presso l'ospedale.", titles: ["operatrice socio-sanitaria"], name: nil, language: .italian
         ) == "infermiera")
+        #expect(RoleAssertion.unkeptRole(
+            in: "As a nursing assistant and nurse, I coordinate patient care.", titles: titles, name: nil, language: .english
+        ) == "nurse")
+        #expect(RoleAssertion.unkeptRole(
+            in: "Lavoro come cameriere e un cuoco attento.", titles: ["cameriere"], name: nil, language: .italian
+        ) == "cuoco attento")
     }
 
     @Test("A text in no language of the six puts no role forward")
@@ -83,6 +89,13 @@ struct RoleCase: Sendable, CustomTestStringConvertible {
         RoleCase(.portuguese, ["auxiliar de enfermagem"], "Como enfermeira, coordeno os cuidados."),
         RoleCase(.portuguese, ["auxiliar de enfermagem"], "Trabalho como enfermeira no hospital."),
         RoleCase(.portuguese, ["auxiliar de enfermagem"], "Sou uma enfermeira atenta."),
+        RoleCase(.english, ["nursing assistant"], "As a nursing assistant and nurse, I coordinate patient care."),
+        RoleCase(.english, ["nursing assistant"], "I work as a nursing assistant and caregiver in a care home."),
+        RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e cuoco."),
+        RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e un cuoco attento."),
+        RoleCase(.german, ["Pflegehelferin"], "Ich arbeite als Pflegehelferin und Krankenpflegerin."),
+        RoleCase(.spanish, ["camarero"], "Trabajo como camarero y cocinero."),
+        RoleCase(.french, ["serveur"], "Je travaille comme serveur et un cuisinier attentif."),
     ]
 
     static let kept: [RoleCase] = [
@@ -106,5 +119,15 @@ struct RoleCase: Sendable, CustomTestStringConvertible {
         RoleCase(.spanish, ["auxiliar de enfermería"], "Como auxiliar de enfermería, ayudo a los pacientes."),
         RoleCase(.portuguese, ["auxiliar de enfermagem"], "As forças da equipe são a atenção e o cuidado."),
         RoleCase(.portuguese, ["programador"], "Trabalho como programador utilizando ferramentas modernas."),
+        RoleCase(.english, ["nursing assistant"], "As a nursing assistant and team player, I help patients."),
+        RoleCase(.english, ["nursing assistant"], "I work as a nursing assistant and help patients with personal care."),
+        RoleCase(.english, ["sound technician", "stagehand"], "I work as a sound technician and stagehand."),
+        RoleCase(.italian, ["operatrice socio-sanitaria"], "Lavoro come operatrice socio-sanitaria e aiuto i pazienti."),
+        RoleCase(.italian, ["operatrice socio-sanitaria"], "Lavoro come operatrice socio-sanitaria e mi occupo di igiene."),
+        RoleCase(.italian, ["Sviluppatore iOS"], "Lavoro come sviluppatore iOS e scrivo applicazioni per iPhone."),
+        RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e assisto i clienti."),
+        RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e collaboro con la cucina."),
+        RoleCase(.german, ["Pflegehelferin"], "Ich arbeite als Pflegehelferin und helfe Patienten."),
+        RoleCase(.spanish, ["camarero"], "Trabajo como camarero y atiendo a los clientes."),
     ]
 }

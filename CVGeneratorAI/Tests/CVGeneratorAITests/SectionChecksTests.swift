@@ -1825,6 +1825,32 @@ struct SectionChecksTests {
         }
     }
 
+    @Test("A sentence that joins a role no title names to the stated one goes, in both checks; a joined duty stays (#354, fix-check 5)", arguments: [false, true])
+    func joinedUnstatedRole(rich: Bool) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let joined = "As a nursing assistant and nurse, I coordinate patient care."
+        let helping = "I work as a nursing assistant and help patients with washing and meals."
+
+        try DraftDepth.$pinned.withValue(rich) {
+            let verdict = try english.summaryCheck(
+                of: Self.nursingAssistant, summary: joined + " " + helping, field: nil, against: Self.unstatedRoleDescription
+            )
+            let verdicts = try english.dutyCheck(
+                of: Self.nursingAssistant, job: 0, duties: joined + " " + helping, against: Self.unstatedRoleDescription
+            )
+
+            #expect(
+                verdict.rejected.contains { $0.sentence == joined && $0.reason == CVDataSanitizer.namesAnUnstatedRole },
+                "\(verdict.rejected)"
+            )
+            #expect(!verdict.rejected.contains { $0.sentence == helping && $0.reason == CVDataSanitizer.namesAnUnstatedRole })
+            #expect(
+                verdicts.rejected.contains { $0.sentence == joined && $0.reason.contains("\"nurse\" name a role") }, "\(verdicts.rejected)"
+            )
+            #expect(!verdicts.rejected.contains { $0.sentence == helping && $0.reason.contains("name a role") }, "\(verdicts.rejected)")
+        }
+    }
+
     /// The final gate's case: a nursing assistant, whom a draft called a nurse.
     private static let nursingAssistant = CVData(experience: [
         Experience(title: "nursing assistant", company: "Riverside", startDate: nil, endDate: nil, current: true),
