@@ -153,22 +153,30 @@ enum SectionPrompts {
         """
     }
 
-    /// The soft skills request.
+    /// The soft skills request; a rich draft's ends with a quality's adjective and its noun (`qualityAsNoun`).
     static func softSkills(for brief: DraftBrief) -> Prompt {
-        Prompt(
-            instructions: softSkillsInstructions, text: (header(brief) + headline(brief) + [jobList(brief)] + said(brief)).joined(separator: "\n")
+        let noun = DraftDepth.isRich ? qualityAsNoun[brief.language].map { "A quality said as an adjective goes as its noun: \($0)." } : nil
+        return Prompt(
+            instructions: softSkillsInstructions,
+            text: (header(brief) + headline(brief) + [jobList(brief)] + said(brief) + [noun].compactMap { $0 }).joined(separator: "\n")
         )
     }
 
-    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others. Asked
-    /// for nouns, a rich draft still wrote adjectives of the person ("reliable", "organizzata"): it is told the noun of the
-    /// quality (probe round 18).
+    /// A quality said as an adjective and its noun, by language, for a rich draft (`DraftDepth`; probe round 19): asked for nouns,
+    /// it still wrote the person's adjectives ("reliable", "organizzata"); told "the noun that names the quality", it named the
+    /// nouns of the person's text instead ("Football", "Bread", "piatto"; probe round 18).
+    static let qualityAsNoun = [
+        "English": "\"reliable\" → \"reliability\"", "Italian": "\"affidabile\" → \"affidabilità\"",
+        "German": "\"zuverlässig\" → \"Zuverlässigkeit\"", "Spanish": "\"responsable\" → \"responsabilidad\"",
+        "French": "\"rigoureux\" → \"rigueur\"", "Portuguese": "\"responsável\" → \"responsabilidade\"",
+    ]
+
+    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others.
     static var softSkillsInstructions: String {
-        let nouns = DraftDepth.isRich ? "each the noun that names the quality, never an adjective that describes the person, of 1 to 3 words" : "as nouns of 1 to 3 words"
-        return """
-        You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, \(nouns). Write \
-        in the language named on the first line. No tool, no technique, no level. First the qualities the person says of \
-        themselves, as nouns; then those that fit the jobs.
+        """
+        You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, as nouns of 1 to \
+        3 words. Write in the language named on the first line. No tool, no technique, no level. First the qualities the person \
+        says of themselves, as nouns; then those that fit the jobs.
         """
     }
 

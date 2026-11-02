@@ -428,15 +428,19 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich draft asks the soft skills as the nouns of the qualities, never adjectives of the person; a plain one keeps its request (probe round 18)")
-    func softSkillsAsNouns() {
-        let rich = SectionPrompts.softSkillsInstructions
+    // MARK: probe round 19
 
-        #expect(rich.contains("4 to 6 personal qualities at work that fit the person's jobs, each the noun that names the quality, never an adjective that describes the person, of 1 to 3 words."))
+    @Test("A rich draft's soft skills request shows a quality's adjective and its noun in the CV's language; a plain one does not (probe round 19)")
+    func qualityAsANoun() {
+        let italian = DraftBrief(language: "Italian", headline: "cuoco", roles: [.init(title: "cuoco", hasEnded: false)], studies: [], namedSkills: [])
+        let line = "A quality said as an adjective goes as its noun: \"affidabile\" → \"affidabilità\"."
+
+        #expect(SectionPrompts.softSkills(for: italian).text.hasSuffix("\n" + line))
+        #expect(SectionPrompts.softSkills(for: Self.brief).text.hasSuffix("\"reliable\" → \"reliability\"."))
+        #expect(Set(SectionPrompts.qualityAsNoun.keys) == Set(DraftWritingPrompt.writeIn.keys))
+        #expect(!SectionPrompts.softSkillsInstructions.contains("adjective"))
         DraftDepth.$pinned.withValue(false) {
-            let plain = SectionPrompts.softSkillsInstructions
-            #expect(plain.contains("3 to 5 personal qualities at work that fit the person's jobs, as nouns of 1 to 3 words. Write in the language named on the first line."))
-            #expect(!plain.contains("adjective"))
+            #expect(!SectionPrompts.softSkills(for: italian).text.contains("adjective"))
         }
     }
 
