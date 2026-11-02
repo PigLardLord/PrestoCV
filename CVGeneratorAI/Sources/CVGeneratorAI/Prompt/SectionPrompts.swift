@@ -234,12 +234,13 @@ enum SectionPrompts {
     /// and present otherwise (told only the past, a current job's sentence came in the past), with the
     /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
     /// whole summary from every job, the request ran short.
-    /// The studies slot of a rich draft (probe round 21) has no tense on its job: the rule says its studies in the past.
+    /// The studies slot of a rich draft (probe round 21) has no job line (probe round 22): told its job, the sentence said the
+    /// job's work again and left the studies out. The rule says its studies in the past.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
         let isOfStudies = !topic.studies.isEmpty || !topic.languages.isEmpty
-        let tense = isOfStudies ? "" : topic.hasEnded ? "; ended, write in the past" : "; write in the present"
-        lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + tense)
+        let tense = topic.hasEnded ? "; ended, write in the past" : "; write in the present"
+        if !isOfStudies { lines.append("Job: " + (topic.title ?? DraftWritingPrompt.noTitle) + tense) }
         if let field = topic.field { lines.append("Field: " + field) }
         if !topic.work.isEmpty { lines.append("Topics: " + topic.work.joined(separator: "; ")) }
         if !topic.qualities.isEmpty { lines.append("Qualities: " + topic.qualities.joined(separator: "; ")) }
@@ -273,9 +274,9 @@ enum SectionPrompts {
         - Say what the person does as the job, with the topics or the field when given, in the past when the job ended; with \
         tools, say what the person does with one or two of them, by name, each for the work it is made for; with qualities, say \
         how the person works, the person as the subject. Name a tool only when a Tools line is given. Typical duties of the job \
-        are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods". \
-        With studies, say in the past what and where the person studied; with languages, say which ones the person speaks; by \
-        the names given, with nothing more of them and no level.
+        are fine, in your own words, concrete: no bare "tools", "software", "systems", "equipment", "techniques" or "methods".
+        - With a Studies or Languages line, write only of them: say in the past what and where the person studied, and which \
+        languages the person speaks; by the names given, with nothing more of them and no level.
 
         """
 

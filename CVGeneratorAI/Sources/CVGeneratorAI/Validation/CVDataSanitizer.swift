@@ -168,11 +168,20 @@ public struct CVDataSanitizer: Sendable {
         // The acronyms of the kept duties are the person's words too in a rich draft, as in the summary check (probe round 17):
         // this pass dropped "I managed the PA systems …", which the check had kept for the "PA" of a kept duty.
         let acronyms = DraftDepth.isRich ? Self.acronyms(in: experience.compactMap(\.description)) : []
+        // The kept languages and the person's own degrees are no names or qualifications the draft's summary invents in a rich
+        // draft either, as in the summary check (probe round 22): this pass dropped "I speak English and Polish", which the check
+        // had kept.
+        let languages = sanitize(cvData.languages, claimed)
+        let languageWords: Set<String> = DraftDepth.isRich ? Self.words(of: languages.map(\.name)) : []
+        let ownQualifications: Set<String> = DraftDepth.isRich
+            ? Self.words(of: education.map(\.degree)).union(source.foldedWords) : []
         let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution))).union(acronyms)
+            .union(languageWords)
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let summary = { (text: String?, words: Set<String>) in
             source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {
-                written.isPlain($0, ownWords: words) && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
+                written.isPlain($0, ownWords: words, ownQualifications: ownQualifications)
+                    && !Self.namesAnUnkeptTitle($0, titles: keptTitles)
             }
         }
 
@@ -184,7 +193,7 @@ public struct CVDataSanitizer: Sendable {
             experience: experience,
             education: education,
             skills: skills,
-            languages: sanitize(cvData.languages, claimed),
+            languages: languages,
             certifications: sanitize(entries.certifications, entries),
             interests: interests
         )

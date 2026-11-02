@@ -51,8 +51,9 @@ struct WrittenText {
     /// - Parameters:
     ///   - ownWords: The words that are no name in it, as `Word.folded` writes them: the titles and degrees it may name.
     ///   - foreignWords: The words it may not hold: for a job, those of the other jobs' titles and employers.
-    func isPlain(_ sentence: String, ownWords: Set<String>, foreignWords: Set<String> = []) -> Bool {
-        rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords) == nil
+    ///   - ownQualifications: The words of the person's own degrees, as `rejection` reads them.
+    func isPlain(_ sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], ownQualifications: Set<String> = []) -> Bool {
+        rejection(of: sentence, ownWords: ownWords, foreignWords: foreignWords, ownQualifications: ownQualifications) == nil
     }
 
     /// Why `isPlain` rejects `sentence`, as a short reason the repair request reads; nil when it is plain.

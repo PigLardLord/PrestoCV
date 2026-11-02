@@ -479,7 +479,7 @@ struct RichDraftTests {
         #expect(!plain.contains(studies), "\(plain)")
     }
 
-    @Test("The studies slot reads the degree and school and the language names, with no level and no tense on the job (probe round 21)")
+    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21 and 22)")
     func studiesPrompt() {
         let facts = CVData(
             education: [Education(degree: "logistics", institution: "Harlow City College"), Education(institution: "Arlen School")],
@@ -494,19 +494,18 @@ struct RichDraftTests {
         #expect(prompt.text.hasPrefix("""
             Language: English
             Write in English.
-            Job: warehouse operative
             Studies: logistics, Harlow City College; Arlen School
             Languages: English; Polish
             Summary so far:
             - I work as a warehouse operative.
             """), "\(prompt.text)")
         for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
-            #expect(instructions.contains("With studies, say in the past what and where the person studied; with languages, say which "
-                + "ones the person speaks; by the names given, with nothing more of them and no level."))
+            #expect(instructions.contains("With a Studies or Languages line, write only of them: say in the past what and where the "
+                + "person studied, and which languages the person speaks; by the names given, with nothing more of them and no level."))
             #expect(instructions.contains("certification or achievement beyond those the lines give"))
         }
         DraftDepth.$pinned.withValue(false) {
-            #expect(!SectionPrompts.summarySentenceInstructions.contains("With studies"))
+            #expect(!SectionPrompts.summarySentenceInstructions.contains("Studies or Languages"))
             #expect(!SectionPrompts.summarySentenceInstructions.contains("beyond those the lines give"))
             #expect(SectionPrompts.summarySentenceRules == SectionPrompts.plainWorkRule + SectionPrompts.summarySentenceLimits)
         }
@@ -563,6 +562,55 @@ struct RichDraftTests {
 
         #expect(!verdict.kept.contains(sentence), "\(verdict.kept)")
         #expect(verdict.rejected.contains { $0.sentence == sentence && $0.reason.contains("\"\(word)\"") }, "\(verdict.rejected)")
+    }
+
+    // MARK: probe round 22
+
+    @Test("The final pass keeps a rich summary sentence of the person's studies and languages, and a plain one drops it (probe round 22)",
+          arguments: [
+            "I hold a diploma in logistics from Harlow City College.",
+            "I speak Polish and English at work.",
+          ])
+    func ownStudiesAndLanguagesKept(sentence: String) throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let description = """
+            Since 2019 I work as a warehouse operative at Depot Arlen, where I load the lorries. I have a diploma in logistics from \
+            Harlow City College. I speak English and Polish.
+            """
+        let cv = CVData(
+            experience: [Experience(title: "warehouse operative", company: "Depot Arlen", startDate: "2019", current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")],
+            languages: [Language(name: "English"), Language(name: "Polish")]
+        )
+        let summary = "I work as a warehouse operative. " + sentence
+        let writing = DraftWriting(summary: summary, roleDescriptions: ["I load the lorries."], technologies: [], softSkills: [])
+
+        let draft = try english.sanitize(cv, writing: writing, against: description)
+
+        #expect(draft.summary == summary, "\(draft.summary ?? "")")
+        let plain = try DraftDepth.$pinned.withValue(false) { try english.sanitize(cv, writing: writing, against: description) }
+        #expect(plain.summary?.contains(sentence) != true, "\(plain.summary ?? "")")
+    }
+
+    @Test("The final pass still drops a rich summary sentence of a qualification the person only wishes for (probe round 22)")
+    func wishedQualificationDropped() throws {
+        let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let description = """
+            Since 2019 I work as a warehouse operative at Depot Arlen, where I load the lorries. I studied logistics at Harlow City \
+            College. One day I would like to take a master.
+            """
+        let cv = CVData(
+            experience: [Experience(title: "warehouse operative", company: "Depot Arlen", startDate: "2019", current: true)],
+            education: [Education(degree: "logistics", institution: "Harlow City College")]
+        )
+        let wish = "I studied for a master in logistics at Harlow City College."
+        let writing = DraftWriting(
+            summary: "I work as a warehouse operative. " + wish, roleDescriptions: ["I load the lorries."], technologies: [], softSkills: []
+        )
+
+        let draft = try english.sanitize(cv, writing: writing, against: description)
+
+        #expect(draft.summary?.contains(wish) != true, "\(draft.summary ?? "")")
     }
 
     // MARK: The summary's request
