@@ -30,9 +30,12 @@ pass=0; fail=0
 swiftc -O -swift-version 6 -o "$T/compose" "$HERE/compose-store-screenshots.swift" 2>"$T/swiftc.log" \
     || { cat "$T/swiftc.log"; echo "compose-store-screenshots-selftest: the composer does not compile"; exit 1; }
 
-# A plain PNG of a size, as the simulator takes it: <width> <height> <file> [bar | bar-on-a-mark]. With "bar" it has the
-# iPad's status bar where the simulator puts it: the time, the date and the app's name, each a black block; with
-# "bar-on-a-mark" also a mark right of the name, too faint to be text, on what must be a plain background
+# A plain PNG of a size, as the simulator takes it: <width> <height> <file> [bar | bar-on-a-mark | bar-of-four |
+# bar-long-name]. With "bar" it has the iPad's status bar where the simulator puts it: the time, the date and the app's
+# name, each a black block; with "bar-on-a-mark" also a mark right of the name, too faint to be text, on what must be a
+# plain background; with "bar-of-four" a fourth item after the name; with "bar-long-name" a name that reaches nearly to
+# the end of the share of the width the composer searches (x 825 of 2064), so that it cannot move right. That name is thin
+# strokes, as letters are: a block so long would make the colour of most of the row black, and the bar's background with it
 png() {
     python3 - "$@" <<'PY'
 import struct, sys, zlib
@@ -45,8 +48,12 @@ plain = bytearray(b"\x00" + bytes([0xF0, 0xF0, 0xF0]) * width)
 rows = [bytes(plain)] * height
 if bar:
     text = bytearray(plain)
-    for start, end in ((51, 122), (147, 275), (299, 427)):
-        text[1 + 3 * start:1 + 3 * end] = bytes(3 * (end - start))
+    blocks = [(51, 122, 1), (147, 275, 1), (299, 820, 3) if bar == "bar-long-name" else (299, 427, 1)]
+    if bar == "bar-of-four":
+        blocks.append((451, 520, 1))
+    for start, end, step in blocks:
+        for x in range(start, end, step):
+            text[1 + 3 * x:4 + 3 * x] = bytes(3)
     rows[22:42] = [bytes(text)] * 20
     if bar == "bar-on-a-mark":
         marked = bytearray(text)
@@ -269,29 +276,84 @@ ipad_locales() {
         for number in 01 02 03 04 05 06; do png 2064 2752 "$T/captures/ipad/$language/$number.png" bar; done
     done
 }
-# rows_differing <a.png> <b.png>: prints the first and the last row from the top where the two images differ, and how many
-# rows do. sips makes each a BMP, whose rows are uncompressed
-rows_differing() {
+# bar_of <a.png> <b.png>: the status bars of two composed iPad images of one screen, in the pixels of their 2064-wide
+# captures, which the composer scales down. Prints the box where the two images differ ("differ <top> <bottom> <left>
+# <right>", or "differ none"), then the items of text of each bar, from the time to the end of the share of the width the
+# composer searches ("items a <start>-<end> ..." and "items b ..."). sips makes each a BMP, whose rows are uncompressed
+bar_of() {
     sips -s format bmp "$1" --out "$T/a.bmp" > /dev/null && sips -s format bmp "$2" --out "$T/b.bmp" > /dev/null \
         || { echo "sips failed"; return; }
     python3 - "$T/a.bmp" "$T/b.bmp" <<'PY'
-import struct, sys
-def rows(path):
+import re, struct, sys
+def image(path):
     data = open(path, "rb").read()
     start, = struct.unpack("<I", data[10:14])
     width, height = struct.unpack("<ii", data[18:26])
-    depth, = struct.unpack("<H", data[28:30])
-    stride = (depth * width + 31) // 32 * 4
-    out = [data[start + y * stride:start + (y + 1) * stride] for y in range(abs(height))]
-    return out[::-1] if height > 0 else out  # a positive height lists the rows from the bottom
-a, b = rows(sys.argv[1]), rows(sys.argv[2])
-different = [y for y in range(len(a)) if a[y] != b[y]] if len(a) == len(b) else [0, len(a) - 1]
-print(different[0], different[-1], len(different)) if different else print("none")
+    size = struct.unpack("<H", data[28:30])[0] // 8
+    stride = (8 * size * width + 31) // 32 * 4
+    rows = [data[start + y * stride:start + y * stride + size * width] for y in range(abs(height))]
+    return (rows[::-1] if height > 0 else rows), size  # a positive height lists the rows from the bottom
+(a, size), (b, _) = image(sys.argv[1]), image(sys.argv[2])
+if len(a) != len(b) or len(a[0]) != len(b[0]):
+    sys.exit(print("differ in size"))
+def pixel(rows, x, y): return rows[y][size * x:size * (x + 1)]  # blue, green, red, and maybe alpha
+def run(pattern, row, least):
+    match = re.compile(b"(?:" + pattern + b"." * (size - 3) + b"){%d,}" % least, re.S).search(row)
+    return (-(-match.start() // size), match.end() // size) if match else None
+# The bar's top: the first row with a run of black, the time and the name. The scale: the width of the capture's plain
+# grey in a row below the bar, where the screen is not rounded
+top = next((y for y, row in enumerate(b) if run(b"\0\0\0", row, 40)), None)
+screen = run(b"[\xee-\xf2]{3}", b[top + 150], 1000) if top is not None else None
+if not screen:
+    sys.exit(print("no status bar"))
+scale = (screen[1] - screen[0]) / 2064
+def x_of(x): return round((x - screen[0]) / scale)
+def y_of(y): return round(22 + (y - top) / scale)
+def at(x): return screen[0] + round(x * scale)
+differing = [y for y in range(len(a)) if a[y] != b[y]]
+if differing:
+    columns = [x for x in range(len(a[0]) // size) if any(pixel(a, x, y) != pixel(b, x, y) for y in differing)]
+    print("differ", y_of(differing[0]), y_of(differing[-1]), x_of(columns[0]), x_of(columns[-1]))
+else:
+    print("differ none")
+# A pixel of text: grey, darker than the bar's background. The items: runs of columns with one in the bar's rows
+# (StatusBar.rows, 10 to 53), those closer than the composer's gap between items (16) joined
+def text(p): return max(p[:3]) - min(p[:3]) < 16 and (722 * p[0] + 7152 * p[1] + 2126 * p[2]) // 10_000 < 200
+band = range(top + round((10 - 22) * scale), top + round((54 - 22) * scale))
+for name, rows in (("a", a), ("b", b)):
+    items = []
+    for x in range(at(51), at(825)):
+        if any(text(pixel(rows, x, y)) for y in band):
+            if items and x - items[-1][1] < 16 * scale:
+                items[-1][1] = x + 1
+            else:
+                items.append([x, x + 1])
+    print("items", name, *(f"{x_of(start)}-{x_of(end)}" for start, end in items))
 PY
 }
-# The rows of the date, and the bar around it, are a band at most as high as in the capture: StatusBar.rows, 44
-in_the_bar() {
-    [[ "$DIFFERING" =~ ^([0-9]+)\ ([0-9]+)\ [0-9]+$ ]] && [ "$((BASH_REMATCH[2] - BASH_REMATCH[1]))" -lt 44 ]
+# The images differ only inside the part of the bar the composer paints: its rows (StatusBar.rows, 10 to 53), and its
+# columns from the date (x 144) to the end of the searched share of the width (x 825), a pixel or two either way for the
+# scaling
+only_the_bar_differs() {
+    [[ "$(sed -n 's/^differ //p' <<< "$BAR")" =~ ^([0-9]+)\ ([0-9]+)\ ([0-9]+)\ ([0-9]+)$ ]] \
+        && [ "${BASH_REMATCH[1]}" -ge 8 ] && [ "${BASH_REMATCH[2]}" -le 55 ] \
+        && [ "${BASH_REMATCH[3]}" -ge 140 ] && [ "${BASH_REMATCH[4]}" -le 828 ]
+}
+# items_of <a | b>: the items of an image's bar, one "<start> <end>" a line
+items_of() { sed -n "s/^items $1 //p" <<< "$BAR" | tr ' ' '\n' | tr '-' ' '; }
+three_items() { [ "$(items_of a | grep -c .)" = 3 ] && [ "$(items_of b | grep -c .)" = 3 ]; }
+name_start() { items_of "$1" | sed -n '3s/ .*//p'; }
+name_moved() { three_items && [ "$(name_start b)" -gt "$(($(name_start a) + 20))" ]; }
+# The name keeps its width (128, and a pixel of each soft edge) and follows the date as the device places it: its ink 22
+# pixels after the date's advance, so 22 or a few more after the ink of the date's last letter (22 in English, 24 in German)
+name_follows_the_date() {
+    local image date_end name_left name_right
+    three_items || return 1
+    for image in a b; do
+        { read -r _; read -r _ date_end; read -r name_left name_right; } < <(items_of "$image")
+        [ $((name_right - name_left)) -ge 124 ] && [ $((name_right - name_left)) -le 132 ] \
+            && [ $((name_left - date_end)) -ge 19 ] && [ $((name_left - date_end)) -le 27 ] || return 1
+    done
 }
 
 # 12. The iPad's images of each locale show the date in its language: those of en-US and en-GB are the same, and those of
@@ -303,9 +365,12 @@ expect "  writes six images of each locale" "$(cd "$T/out" 2>/dev/null && find .
     [ "$(find "$T/out" -path '*/ipad/*.png' | wc -l | tr -d ' ')" = 18 ]
 expect "  writes the same images for two locales of one language" "en-US and en-GB differ" \
     cmp -s "$T/out/en-US/ipad/03.png" "$T/out/en-GB/ipad/03.png"
-DIFFERING="$(rows_differing "$T/out/en-US/ipad/03.png" "$T/out/de-DE/ipad/03.png")"
-OUT="rows that differ (first, last, count): $DIFFERING"
-expect "  writes the date of each language in the status bar, and nothing else differs" "$OUT" in_the_bar
+BAR="$(bar_of "$T/out/en-US/ipad/03.png" "$T/out/de-DE/ipad/03.png")"; OUT="$BAR"
+what="the bars of en-US (a) and de-DE (b), in the pixels of the capture:"
+expect "  writes the date of each language in the status bar, and nothing else differs" "$what" only_the_bar_differs
+expect "  leaves the time, the date and the name in each bar" "$what" three_items
+expect "  moves the name right after the longer date" "$what" name_moved
+expect "  keeps the name's width, the device's gap after the date" "$what" name_follows_the_date
 
 # 13. A capture without the status bar is refused, and nothing is written: its date could not be found
 ipad_locales; png 2064 2752 "$T/captures/ipad/en/03.png"
@@ -322,7 +387,24 @@ expect "an iPad status bar that is not on a plain background" "exit $RC, want a 
 expect "  names the capture and the reason" "the message is: $OUT" grep -q "ipad/de/05.png.*not on a plain background" <<< "$OUT"
 expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
 
-# 15. A language with no date in the composer's table is refused on the iPad, before anything is written, and composed on
+# 15. A status bar with a fourth item at the top left is refused, and nothing is written: the date is the second of three
+ipad_locales; png 2064 2752 "$T/captures/ipad/en/02.png" bar-of-four
+compose_all ipad
+expect "an iPad status bar with four items at the top left" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  names the capture and what it shows" "the message is: $OUT" grep -q "ipad/en/02.png.*shows 4 items" <<< "$OUT"
+expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
+
+# 16. A date that would push the app's name past the share of the width the composer searches is refused, and nothing is
+#     written: the name would run into what the bar shows further right. The name fits after the capture's date, not
+#     after the German one, which is wider
+ipad_locales; png 2064 2752 "$T/captures/ipad/de/04.png" bar-long-name
+compose_all ipad
+expect "an iPad status bar with no room for the name after the date" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  names the capture and the reason" "the message is: $OUT" \
+    grep -q "ipad/de/04.png.*leaves no room for the app's name" <<< "$OUT"
+expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
+
+# 17. A language with no date in the composer's table is refused on the iPad, before anything is written, and composed on
 #     the iPhone, whose status bar shows no date
 rm -rf "$T/captures" "$T/out"
 { printf '## Japanese, ja-JP\n\n### Screenshot captions\n\n```text\n'; printf '%s\n' "${SIX[@]}"; printf '```\n'; } > "$T/listing.md"

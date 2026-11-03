@@ -533,6 +533,17 @@ let statusBarDates: [String: String] = [
     "pt": "Terça-feira 9 de janeiro",
 ]
 
+/// The date the status bar of `device` shows in `language`: none on a device whose bar shows no date, and a failure for a
+/// language with no date, before any image of it is composed
+func statusBarDate(in language: String, on device: Device) throws -> String? {
+    guard device.showsDateInStatusBar else { return nil }
+    guard let date = statusBarDates[language] else {
+        throw Failure("no status bar date for \(language): add \(statusBarDay) as the \(device.label) writes it in "
+                      + "\(language) to statusBarDates")
+    }
+    return date
+}
+
 /// The iPad's status bar in a capture (iOS 27.0, a screen of scale 2): the time, the date and the app's name at the top
 /// left, in black, the date in the system font of 14 points, medium
 enum StatusBar {
@@ -576,6 +587,7 @@ func statusBarFont() throws -> CTFont {
 /// not the time, the date and the name on a plain background, as on every screen of the app, is refused rather than
 /// painted over wrong.
 func rewritingStatusBarDate(of capture: CGImage, as date: String, path: String) throws -> CGImage {
+    let font = try statusBarFont()
     let context = try makeCanvas(width: capture.width, height: capture.height)
     context.draw(capture, in: CGRect(x: 0, y: 0, width: capture.width, height: capture.height))
     guard let data = context.data else { throw Failure("could not read the status bar of \(path)") }
@@ -634,7 +646,7 @@ func rewritingStatusBarDate(of capture: CGImage, as date: String, path: String) 
         }
     }
     let line = CTLineCreateWithAttributedString(NSAttributedString(string: date, attributes: [
-        NSAttributedString.Key(kCTFontAttributeName as String): try statusBarFont(),
+        NSAttributedString.Key(kCTFontAttributeName as String): font,
         NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1),
     ]))
     context.saveGState()
@@ -809,11 +821,7 @@ func run(_ arguments: [String]) throws {
         for (locale, captions) in set {
             let language = String(locale.prefix(2))
             if let languages, !languages.contains(language) { continue }
-            let statusBarDate = statusBarDates[language]
-            guard statusBarDate != nil || !device.showsDateInStatusBar else {
-                throw Failure("no status bar date for \(language): add \(statusBarDay) as the \(device.label) writes it "
-                              + "in \(language) to statusBarDates")
-            }
+            let date = try statusBarDate(in: language, on: device)
             // All the images of the locale are composed before the first is written: a capture that is missing or
             // wrong leaves nothing of the locale half written
             var images: [CGImage] = []
@@ -821,8 +829,8 @@ func run(_ arguments: [String]) throws {
                 let number = String(format: "%02d.png", index + 1)
                 let url = capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)")
                 var capture = try loadCapture(url, for: device)
-                if device.showsDateInStatusBar, let statusBarDate {
-                    capture = try rewritingStatusBarDate(of: capture, as: statusBarDate, path: url.path)
+                if let date {
+                    capture = try rewritingStatusBarDate(of: capture, as: date, path: url.path)
                 }
                 images.append(try compose(caption: caption, capture: capture, device: device, layout: layout))
             }

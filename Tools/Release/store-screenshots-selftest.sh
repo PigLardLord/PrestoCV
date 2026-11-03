@@ -389,6 +389,24 @@ dated_languages() { sed -n '/^let statusBarDates/,/^]/s/^    "\([a-z][a-z]\)": "
 undated() { comm -23 <(listed_languages) <(dated_languages); }
 all_dated() { [ -n "$(listed_languages)" ] && [ -z "$(undated)" ]; }
 expect "the languages of the listing" "the composer has no status bar date for: $(undated | tr '\n' ' ')" all_dated
+# The dates are of the day the clock is set to: each names its day of the month, and the English one, in the device's
+# format (EEE MMM d), is that day's
+date_of() { sed -n "/^let statusBarDates/,/^]/s/^    \"$1\": \"\(.*\)\",\$/\1/p" "$COMPOSER"; }
+english_day() {
+    LC_ALL=C python3 -I -c 'import datetime, sys; day = datetime.date.fromisoformat(sys.argv[1])
+print(day.strftime("%a %b ") + str(day.day))' "$DAY"
+}
+without_the_day() {
+    local language
+    [ -n "$DAY" ] || return 0
+    for language in $(dated_languages); do
+        [[ " $(date_of "$language" | tr -d .) " == *" $((10#${DAY##*-})) "* ]] || echo "$language"
+    done
+}
+days_named() { [ -n "$DAY" ] && [ -n "$(dated_languages)" ] && [ -z "$(without_the_day)" ]; }
+expect "  each names the day of the month of ${DAY:-?}" "these do not: $(without_the_day | tr '\n' ' ')" days_named
+expect "  the English one is that day" "the English date is \"$(date_of en)\", ${DAY:-?} is \"$(english_day)\"" \
+    [ "$(date_of en)" = "$(english_day)" ]
 
 echo "store-screenshots-selftest: $pass passed, $fail failed"
 [ "$fail" = 0 ]
