@@ -11,7 +11,9 @@
 #   ipad        iPad 13-inch, on an iPad Pro 13-inch (M5): 2064 x 2752
 #
 # For each device it uses the simulator "<prefix> <device>" (default prefix "PrestoCV store"), made on the first run
-# with the newest iOS runtime or the one --ios names. The tool erases the simulators it uses, so the prefix must start
+# with the newest iOS runtime that runs the device, or the newest of the version --ios names, which is refused if none of
+# its runtimes runs the device (an Xcode can bring a runtime that runs only some devices: Xcode 27.2's iOS 27.1 runs only
+# the iPhone Duo). The tool erases the simulators it uses, so the prefix must start
 # with "PrestoCV store": that name is reserved to it, and no other simulator may carry it. It builds the
 # StoreScreenshots test plan, which holds only StoreScreenshotsUITests, once. Then, for each language, it erases the
 # simulator, so that no choice of the last language is left, and boots it in that language and region, so that the
@@ -207,8 +209,10 @@ region() {
     esac
 }
 
-# The UDID of the device's simulator, made if it does not exist yet. Returns 2 when --ios names a version the Mac has no
-# runtime of, and 1 when the Mac cannot make the device.
+# The UDID of the device's simulator, made if it does not exist yet, on the newest iOS runtime (of the --ios version) that
+# runs the device type: a runtime runs only the device types it lists, and Xcode 27.2's iOS 27.1 lists only the iPhone Duo.
+# Returns 2 when --ios names a version the Mac has no runtime of, or whose runtimes do not run the device, and 1 when the
+# Mac cannot make the device.
 simulator() {
     local name="$PREFIX $1${IOS:+ (iOS $IOS)}" type udid runtime
     udid=$(xcrun simctl list devices available -j | python3 -c '
@@ -222,11 +226,28 @@ print(next((t["identifier"] for t in json.load(sys.stdin)["devicetypes"] if t["n
         [ -n "$type" ] || { echo "store-screenshots: this Xcode has no simulator of the type $(device_type "$1")" >&2; return 1; }
         runtime=$(xcrun simctl list runtimes -j | python3 -c '
 import json, sys
-wanted = sys.argv[1]
-runtimes = [r for r in json.load(sys.stdin)["runtimes"]
-            if r["platform"] == "iOS" and r["isAvailable"] and (not wanted or r["version"] == wanted or r["version"].startswith(wanted + "."))]
-print(runtimes[-1]["identifier"] if runtimes else "")' "$IOS") || return 1
-        [ -n "$runtime" ] || { echo "store-screenshots: this Mac has no iOS ${IOS:-simulator} runtime (xcrun simctl list runtimes)" >&2; return 2; }
+wanted, device_type, device_name = sys.argv[1:4]
+version = lambda r: tuple(int(part) for part in r["version"].split("."))
+available = sorted((r for r in json.load(sys.stdin)["runtimes"] if r["platform"] == "iOS" and r["isAvailable"]), key=version)
+runs = lambda r: any(t["identifier"] == device_type for t in r.get("supportedDeviceTypes", []))
+asked = [r for r in available if not wanted or r["version"] == wanted or r["version"].startswith(wanted + ".")]
+fitting = [r for r in asked if runs(r)]
+if fitting:
+    print(fitting[-1]["identifier"])
+    sys.exit(0)
+if not asked:
+    print("store-screenshots: this Mac has no iOS %s runtime (xcrun simctl list runtimes)" % (wanted or "simulator"), file=sys.stderr)
+    sys.exit(2)
+others = ", ".join(r["version"] for r in available if runs(r))
+if not wanted:
+    print("store-screenshots: no iOS runtime of this Mac runs the %s (xcrun simctl list runtimes)" % device_name, file=sys.stderr)
+    sys.exit(1)
+versions = ", ".join(r["version"] for r in asked)
+shown = wanted if versions == wanted else "%s (%s)" % (wanted, versions)
+print("store-screenshots: --ios: no iOS %s runtime of this Mac runs the %s" % (shown, device_name)
+      + ("; the runtimes that run it: iOS %s. Leave --ios out for the newest of them, or name one of them" % others if others
+         else ", and no other iOS runtime of this Mac does (xcrun simctl list runtimes)"), file=sys.stderr)
+sys.exit(2)' "$IOS" "$type" "$(device_type "$1")") || return $?
         udid=$(xcrun simctl create "$name" "$type" "$runtime") || return 1
         echo "made the simulator $name ($udid)" >&2
     fi
