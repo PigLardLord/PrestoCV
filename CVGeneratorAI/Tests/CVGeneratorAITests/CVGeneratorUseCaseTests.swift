@@ -8,6 +8,11 @@ struct CVGeneratorUseCaseTests {
     private let validRequest = CVGenerationRequest(
         userPrompt: "I am John Doe, an engineer at Tech Corp since 2020"
     )
+    /// The fake's sample as the draft gives it: the model wrote no summary, so the summary floor names the title (#354, round 6).
+    private static let flooredSample = CVData(
+        personalInfo: FakeCVGenerationService.sample.personalInfo, summary: "I worked as an Engineer.",
+        experience: FakeCVGenerationService.sample.experience
+    )
 
     @Test("availability reports what the service reports")
     func availabilityComesFromTheService() {
@@ -45,7 +50,7 @@ struct CVGeneratorUseCaseTests {
 
         let draft = try await useCase.generateCV(from: validRequest)
 
-        #expect(draft == GeneratedDraft(cvData: FakeCVGenerationService.sample, personalItemsUnchecked: false))
+        #expect(draft == GeneratedDraft(cvData: Self.flooredSample, personalItemsUnchecked: false))
         #expect(service.generateRequests == [validRequest])
     }
 
@@ -170,6 +175,31 @@ struct CVGeneratorUseCaseTests {
         }
     }
 
+    // MARK: - The description without hidden characters (ADR 0031)
+
+    @Test("A description pasted with characters the reader cannot see is read without them: the model gets the clean text")
+    func hiddenCharactersOfTheDescriptionAreCleaned() async throws {
+        let hidden = example.description
+            .replacingOccurrences(of: "trained", with: "tra\u{00AD}ined")
+            .replacingOccurrences(of: "Since 2016", with: "Since\u{200B} 2016")
+            .replacingOccurrences(of: "Don Milani", with: "Don Milani\u{E000}")
+            .replacingOccurrences(of: "I speak Italian", with: "I speak\tItalian")
+            .replacingOccurrences(of: "Bologna.", with: "Bologna\u{0007}.")
+        #expect(hidden != example.description)
+
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(example.draft)
+        let sanitizer = CVDataSanitizer(wordList: TableWordList())
+        let useCase = CVGeneratorUseCase(service: service, claimChecker: FakeClaimChecker(), sanitizer: sanitizer)
+        let draft = try await useCase.generateCV(from: CVGenerationRequest(userPrompt: hidden))
+
+        #expect(service.generateRequests == [CVGenerationRequest(userPrompt: example.description)])
+        #expect(draft.cvData.experience.first?.achievements == ["Trained 3 new teachers"], "The soft hyphen costs the person no sentence")
+        let clean = try await generator(drafting: example.draft, checker: FakeClaimChecker())
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+        #expect(draft == clean)
+    }
+
     // MARK: - The claim check (ADR 0028)
 
     private var example: FaithfulExample { faithfulExamples[0] }
@@ -177,7 +207,7 @@ struct CVGeneratorUseCaseTests {
     private func generator(drafting draft: CVData, checker: FakeClaimChecker) -> CVGeneratorUseCase {
         let service = FakeCVGenerationService()
         service.generateResult = .success(draft)
-        return CVGeneratorUseCase(service: service, claimChecker: checker)
+        return CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: CVDataSanitizer(wordList: TableWordList()))
     }
 
     @Test("The check judges the personal items the rules kept, against the description, and nothing else")
@@ -246,7 +276,7 @@ struct CVGeneratorUseCaseTests {
         #expect(draft.personalItemsUnchecked)
     }
 
-    @Test("A check that fails withdraws all five kinds, keeps the jobs, the schools, their dates and the achievements, and says so",
+    @Test("A check that fails withdraws all five kinds, keeps the summary, the jobs, the schools, their dates and the achievements, and says so",
           arguments: [CVGenerationError.generationFailed, .busy])
     func failedCheckWithdrawsEveryPersonalItem(failure: CVGenerationError) async throws {
         let checker = FakeClaimChecker(failure: failure)
@@ -258,12 +288,55 @@ struct CVGeneratorUseCaseTests {
         #expect(draft == GeneratedDraft(
             cvData: CVData(
                 personalInfo: PersonalInfo(name: "Maria Rossi"),
+                summary: "I work as a primary school teacher. \(survivors.summary ?? "") Before that, I worked as an assistant.",
                 experience: survivors.experience,
                 education: survivors.education
             ),
             personalItemsUnchecked: true
         ))
         #expect(await checker.calls.count == 1, "No retry")
+    }
+
+    @Test("The skills the model wrote for the role go to no check, and stay beside the facts it judges (ADR 0031)")
+    func roleSkillsSkipTheCheck() async throws {
+        let checker = FakeClaimChecker()
+        let roleSkills = [Skill(name: "Lesson planning"), Skill(name: "Patience", kind: .softSkill)]
+
+        let draft = try await generator(drafting: example.draft.withSkills(roleSkills), checker: checker)
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+        #expect(await checker.calls.flatMap(\.candidates).allSatisfy { $0.kind != .skill })
+        #expect(draft.cvData.skills == roleSkills)
+        #expect(draft.personalItemsUnchecked == false)
+    }
+
+    @Test("An exam name, an address or a hidden character the model wrote as a skill never reaches the draft, with the check passed or failed (ADR 0031)",
+          arguments: [
+              "TOEFL", "Cambridge CELTA", "Green Belt", "maria.rossi@example.com", "mailto:maria.rossi@example.com", "evil.example/page",
+              "Lesson\u{202E}planning", "Lesson\u{200B}planning", "Lesson\u{0007}planning", "<b>Phonics</b>",
+          ])
+    func unplainRoleSkillsAreDropped(name: String) async throws {
+        let roleSkills = [Skill(name: "Lesson planning"), Skill(name: name), Skill(name: "Node.js"), Skill(name: "C++")]
+
+        for checker in [FakeClaimChecker(), FakeClaimChecker(failure: CVGenerationError.generationFailed)] {
+            let draft = try await generator(drafting: example.draft.withSkills(roleSkills), checker: checker)
+                .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+            #expect(draft.cvData.skills.map(\.name) == ["Lesson planning", "Node.js", "C++"] || draft.cvData.skills.isEmpty, "\(name)")
+            #expect(!draft.cvData.skills.map(\.name).contains(name), "\(name)")
+        }
+    }
+
+    @Test("A check that fails withdraws the skills the model wrote for the role too, and keeps the summary (ADR 0031)")
+    func failedCheckWithdrawsRoleSkills() async throws {
+        let checker = FakeClaimChecker(failure: CVGenerationError.generationFailed)
+
+        let draft = try await generator(drafting: example.draft.withSkills([Skill(name: "Lesson planning")]), checker: checker)
+            .generateCV(from: CVGenerationRequest(userPrompt: example.description))
+
+        #expect(draft.cvData.skills.isEmpty)
+        #expect(draft.cvData.summary == "I work as a primary school teacher. \(example.survivors.summary ?? "") Before that, I worked as an assistant.")
+        #expect(draft.personalItemsUnchecked)
     }
 
     @Test("The check is not asked when the rules left no personal item")
@@ -273,7 +346,7 @@ struct CVGeneratorUseCaseTests {
         let draft = try await generator(drafting: FakeCVGenerationService.sample, checker: checker).generateCV(from: validRequest)
 
         #expect(await checker.calls.isEmpty)
-        #expect(draft == GeneratedDraft(cvData: FakeCVGenerationService.sample, personalItemsUnchecked: false))
+        #expect(draft == GeneratedDraft(cvData: Self.flooredSample, personalItemsUnchecked: false))
     }
 
     @Test("A draft that the failed check leaves empty is still a draft, with its notice")
@@ -333,5 +406,12 @@ struct CVGeneratorUseCaseTests {
         await #expect(throws: CancellationError.self) {
             try await generation.value
         }
+    }
+}
+
+private extension CVData {
+    func withSkills(_ skills: [Skill]) -> CVData {
+        CVData(personalInfo: personalInfo, summary: summary, experience: experience, education: education, skills: skills,
+               languages: languages, certifications: certifications, interests: interests)
     }
 }

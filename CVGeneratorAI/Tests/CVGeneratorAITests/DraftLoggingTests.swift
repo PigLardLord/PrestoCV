@@ -13,7 +13,8 @@ import Testing
 struct DraftLoggingTests {
 
     /// Every reading of the clock moves it on by this step: a generation reads it at its start and at the end of each stage it
-    /// finishes (the model, grounding, the claim check, the result) or stops in, so a finished draft takes four.
+    /// finishes (the model, grounding, the writing, grounding again, the claim check, the result) or stops in, so a finished draft
+    /// takes six.
     private static let step = Duration.milliseconds(9)
 
     /// An Italian description: its grounding needs no language data of the device, so the tests do not depend on the Mac's.
@@ -119,17 +120,18 @@ struct DraftLoggingTests {
 
     // MARK: Generation
 
-    @Test("A draft logs its start with the length of the description, the claims checked and its end with the time it took")
+    @Test("A draft logs its start with the length of the description, what its sections kept, the claims checked and its end with the time it took")
     func finished() async throws {
         let logger = RecordingLogger()
         let request = CVGenerationRequest(userPrompt: example.description)
 
         _ = try await generator(drafting(example.draft), logger: logger).generateCV(from: request)
 
-        #expect(logger.events == ["draft.language", "draft.started", "draft.claims", "draft.finished"])
+        // The sections' requests log what they kept even when they wrote nothing, so a trace shows the step ran.
+        #expect(logger.events == ["draft.language", "draft.started", "draft.written", "draft.claims", "draft.finished"])
         #expect(logger.entry("draft.started")?.fields == [.count("characters", request.userPrompt.count)])
         #expect(logger.entry("draft.started")?.level == .info)
-        #expect(logger.entry("draft.finished")?.fields == [.duration("elapsed", Self.step * 4)])
+        #expect(logger.entry("draft.finished")?.fields == [.duration("elapsed", Self.step * 6)])
         #expect(logger.entry("draft.finished")?.level == .info)
     }
 
@@ -147,7 +149,7 @@ struct DraftLoggingTests {
         }
 
         let lines = logger.entries("draft.cancelled")
-        #expect(lines.map(\.line) == ["draft.cancelled stage=model elapsed=9.0ms", "draft.cancelled stage=claimCheck elapsed=27.0ms"])
+        #expect(lines.map(\.line) == ["draft.cancelled stage=model elapsed=9.0ms", "draft.cancelled stage=claimCheck elapsed=45.0ms"])
         #expect(lines.allSatisfy { $0.level == .info })
         #expect(!logger.events.contains("draft.finished"))
     }
@@ -249,7 +251,7 @@ struct DraftLoggingTests {
                 .generateCV(from: CVGenerationRequest(userPrompt: example.description))
         }
 
-        #expect(logger.entry("draft.rejected")?.line == "draft.rejected check=result error=CVGenerationError.emptyResult elapsed=36.0ms")
+        #expect(logger.entry("draft.rejected")?.line == "draft.rejected check=result error=CVGenerationError.emptyResult elapsed=54.0ms")
         #expect(logger.entry("draft.rejected")?.level == .notice)
         #expect(!logger.events.contains("draft.failed"))
         #expect(!logger.events.contains("draft.finished"))

@@ -7,9 +7,9 @@ are its planned replacement and are still empty.
 
 ## What it does
 
-- **Only what the person said.** The model fills a small schema (`CVData`) in which every detail is optional. The
-  instructions forbid inventing anything, and `CVDataSanitizer` enforces it afterwards by checking every retained
-  field against the description. The rules are conservative by construction: a token that could be read two ways is
+- **The facts are what the person said.** The model fills a small schema (`CVData`) in which every detail is optional.
+  The instructions forbid inventing any fact, and `CVDataSanitizer` enforces it afterwards by checking every retained
+  fact against the description. The rules are conservative by construction: a token that could be read two ways is
   not accepted.
   - Contact details (email, link, phone) must be whole tokens of the description. A token is a run between white
     space, brackets and quotes, without the punctuation that ends a sentence; an address is never taken out of a
@@ -18,7 +18,8 @@ are its planned replacement and are still empty.
   - Names (people, employers, schools, titles, places, certifications, skills, interests) must occur in it as a
     contiguous phrase of whole words, ignoring case and accents. An entry with nothing identifying left is dropped.
   - Prose (summary, descriptions, achievements) keeps only the sentences that state no contact detail or number the
-    description lacks. Numbers are compared with their separators and with every Unicode digit read as 0-9, so `35`,
+    description lacks, and achievements are quotes (the summary and the role descriptions also keep the plain sentences
+    below). Numbers are compared with their separators and with every Unicode digit read as 0-9, so `35`,
     `3.5` and `1.000` are three numbers, and `1.000` and `1,000` are one.
   - A skill level or language level stays only if the description states it for that item, by a CEFR code or a level
     word in the same sentence, with no negation or hedge in it ("not fluent", "a bit", "hardly"). A skill is
@@ -69,8 +70,29 @@ are its planned replacement and are still empty.
   - An employer or a school loses a leading indefinite article written in lower case ("a nursery" is "nursery"); an article
     with a capital is part of a name ("UNA Hotels").
   - A degree that only says graduating ("diplôme", "Abschluss", "laurea" or "my degree" alone) is dropped; the school stays.
+- **Written around the facts (ADR 0031).** When the draft keeps a fact about the person (a title, a job or a school), the
+  model also writes, in the language of the description, a summary of 2 to 4 sentences, the responsibilities typical of
+  each job's title, and skills of two kinds (`Skill.kind`): technologies (tools, software, methods) and soft skills. With
+  no such fact it writes nothing around it, and the draft is judged on its facts: "this is a test of the app" gives
+  `emptyResult`.
+  - A sentence of the summary or of a role description that quotes nothing stays only when it is plain (`WrittenText`): in
+    the language of the description, with no address, no number in digits or words, no month, no negation, no word of
+    duration, seniority or level that the description does not write, no word that the description holds only where the
+    person claims nothing (another person's clause, a wish, a denial), for a job no word of another job's title or
+    employer, and no name. A name is a capital after the first word, a word of capitals, or a word that neither the closed
+    vocabulary nor the device's dictionary knows; in German, where every noun has a capital, a word the device tags as a
+    name (`NLTagger`, `nameType`) or one the vocabulary and the dictionary do not know as written. The person's title and
+    the titles and degrees of the draft are no names. A summary that keeps no sentence is nil.
+  - The dictionary is the port `WordList`: `DeviceWordList` (`UITextChecker` on iOS, `NSSpellChecker` on macOS) in the
+    app. Where the device has no dictionary of a language, the other rules still apply.
+  - A skill the description names is a fact and follows the rules above. One it does not name is inferred and stays
+    (`InferredSkills`) without a level, as a name of at most 4 words and 40 characters with no digit, no word of level,
+    duration or seniority the description does not write, no language, no word of a qualification, no employer, school,
+    place, person or interest of the draft, and no word the description holds only where the person claims nothing. The
+    draft keeps at most 8 technologies and 5 soft skills, the named ones first, and no skill twice.
 - **A second check of the personal items (ADR 0028).** After the rules, the on-device model reads the description again
-  and judges each skill, language, interest, the headline title and the place that the grounded draft still keeps: whose it
+  and judges each skill the description names, each language, interest, the headline title and the place that the
+  grounded draft still keeps (an inferred skill is no candidate): whose it
   is (the writer's, someone else's, or not mentioned) and how the description states it (as true, wished, conditional or
   denied). An item stays only when it is the writer's and stated as true, so the check can only withdraw; a language's
   level goes with its language. It asks the model (`FoundationModelsClaimChecker`) in batches of at most 8 items, one
@@ -79,7 +101,7 @@ are its planned replacement and are still empty.
   the description that contain it, otherwise it is withdrawn. Employers, schools, dates and prose stay with the rules.
   When the check gives no answer (a failed call, a refusal of the model's guardrail, an answer that does not number its
   items 1 to n, or no end within its 60 seconds, `ClaimCheckLimits`), the draft keeps its jobs, schools, dates and
-  prose, every item of the five kinds is withdrawn, and `GeneratedDraft.personalItemsUnchecked` is true, so that the app
+  prose, every item of the five kinds is withdrawn (the inferred skills too), and `GeneratedDraft.personalItemsUnchecked` is true, so that the app
   can ask the person to add them; there is no retry and no fallback to the rules alone. Such a draft may be empty, and
   is still a draft. Cancellation passes through.
 - **The order of a CV.** The use case lists the jobs that go on now first, then the others by their latest year (the end,
@@ -105,7 +127,7 @@ CVGeneratorAI/
 ├── Prompt/        # CVPrompt: the fixed instructions and the prompt built from a request
 ├── Protocols/     # CVGenerationService
 ├── Services/      # FoundationModelsService, the only implementation
-├── Validation/    # CVValidator (request and answer rules) and CVDataSanitizer
+├── Validation/    # CVValidator (request and answer rules), CVDataSanitizer, WrittenText, InferredSkills, WordList
 └── UseCases/      # CVGeneratorUseCase: check, generate, sanitize, check the claims again, order the jobs (JobOrder), check
 ```
 
@@ -155,10 +177,15 @@ measured, since the rules drop those items before the check.
 
 ### The drafting evaluation
 
-`DraftingEvaluation` runs the whole path of the app on the real model: the model drafts each of 18 descriptions (the 6
-example descriptions of the app and two written ones per language, one of them with sentences that look like facts and
-are not), `CVDataSanitizer` grounds the draft, the claim check judges its personal items, and `InventedFacts` counts what
-the result keeps, loses and invents. It needs a Mac with Apple Intelligence on, and it runs only when asked:
+`DraftingEvaluation` runs the whole path of the app on the real model: the model drafts each of 30 descriptions (the 6
+example descriptions of the app and four written ones per language: a plain one, one with sentences that look like facts
+and are not, a sparse one of a title and a few words, and one that names no role), `CVDataSanitizer` grounds the draft,
+the claim check judges its personal items, and `InventedFacts` counts what the result keeps, loses and invents. A skill
+that is no phrase of the description is counted as inferred, not invented, unless a trap of the input holds it or it is a
+language, a qualification or a name. `WrittenMeasure` and `WrittenCounts` measure what the draft writes around the facts
+against the thresholds of ADR 0031: a summary, a description on each kept job, technologies and soft skills by kind, the
+written sentences in the description's language, the tools of another trade (each input's `offField` words) and the time
+at the 95th percentile. It needs a Mac with Apple Intelligence on, and it runs only when asked:
 
 ```bash
 PRESTOCV_DRAFT_EVAL=1 PRESTOCV_DRAFT_EVAL_REV=$(git rev-parse --short HEAD) swift test --filter DraftingEvaluation
@@ -178,14 +205,15 @@ model's draft, the grounded draft, the final draft, the calls of the claim check
 `summary.txt` and `review.json`. A set that stopped halfway has no summary, and cancelling the test writes none.
 
 - **A pass is "no hard finding", not GO.** The first line of `summary.txt` says which. The test fails on a field the counter
-  proves invented, on a run that threw, was refused (`contentNotAllowed`) or whose claim check gave no answer (the cause is
+  proves invented, on a tool of another trade or anything written around a description with no role, on a run that threw, was refused (`contentNotAllowed`) or whose claim check gave no answer (the cause is
   recorded), and on an example that loses its name, its title or a job. Fields the counter can only send to review (prose,
   and a word that may be a skill, a language or a hobby) cannot fail the test; they go to `review.json`, once per input and
   value, with the entry that owns them.
-- **GO needs a reading.** A person reads `review.json` and records the decision on every item in `adjudication.json` beside
+- **GO needs a reading.** A person reads `review.json`, which also lists each distinct final draft that writes around the
+  facts once, for its pertinence to the role and the field, and records the decision on every item in `adjudication.json` beside
   it: `{"reviewer": "...", "revision": "...", "entries": [{"key": "...", "decision": "accept" | "reject", "note": "..."}]}`.
   `PRESTOCV_DRAFT_EVAL_READY=<folder> swift test --filter DraftingReadiness` then fails with every reason the set is not GO: a
-  hard finding, a partial or unfinished set, an unrecorded revision, an item nobody decided, a decision of another revision, or
+  hard finding, a missed threshold, a partial or unfinished set, an unrecorded revision, an item nobody decided, a decision of another revision, or
   a rejected item.
 - **The sample is smaller than the runs.** The model runs with greedy sampling, so the runs of an input are the same draft.
   `summary.txt` says how many distinct drafts the set holds; the counts are over runs and the times stay valid.

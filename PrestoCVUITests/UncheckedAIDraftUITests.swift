@@ -12,7 +12,10 @@ final class UncheckedAIDraftUITests: XCTestCase {
 
     /// The description the scripted model answers, as `AIDraftScript.nurseDescription` in the app.
     private let nurseDescription = "Sono infermiera presso San Camillo a Roma dal 2015. Uso Excel ogni giorno."
-    private let reminder = "Draft written by AI from your description."
+    /// The notice says that the AI wrote the draft, and that the summary, the role descriptions and the skills are its suggestions
+    /// (ADR 0031).
+    private let reminder = "Draft written by AI from your description. The summary, the role descriptions and the skills are "
+        + "suggestions"
     private let unchecked = "We could not check your skills, languages, interests, job title and place, so they are left blank."
 
     override func setUpWithError() throws {

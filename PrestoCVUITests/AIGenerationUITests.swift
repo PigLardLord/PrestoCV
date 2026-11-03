@@ -90,7 +90,10 @@ final class AIGenerationUITests: XCTestCase {
     /// The note of the same overlay while the model writes. It would be false during the wait for the data, so it is not there.
     private let timeNote = "This can take up to a minute."
     private let endMessage = "This device cannot get the language data that drafts in English or German need."
-    private let reminder = "Draft written by AI from your description."
+    /// The notice says that the AI wrote the draft, and that the summary, the role descriptions and the skills are its suggestions
+    /// (ADR 0031).
+    private let reminder = "Draft written by AI from your description. The summary, the role descriptions and the skills are "
+        + "suggestions"
 
     /// The device has no English data and the system never answers: the screen says that it waits for the data until the app's
     /// bound, then says what the person can do instead, and the screen can be used again. The simulator cannot run the model, and

@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-24
 - **Amended:** 2026-10-26: the answer has a fixed length, so that a single item no longer gives no answer (Decision, "How the calls are made"; The measurement, "Measured again"; Alternatives considered)
+- **Amended by:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md) (2026-10-27): the skills the check judges are those the description names; a skill the model writes for the person's role is no candidate, and goes with the named ones when the check gives no answer (Decision, "Scope").
 - **Related:** [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0007](0007-each-package-owns-its-model.md), issues #202, #249
 
 ## Context
@@ -14,6 +15,7 @@
 ## Decision
 
 - **Scope.** After the rules of ADR 0023, `CVGeneratorUseCase.generateCV` asks the claim check about the personal items that the grounded draft still keeps: the skills, the languages, the interests, the headline title and the place (`ClaimCandidates`). It then orders the jobs and validates the draft, as before.
+  - **Amended by [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md):** the skills it asks about are those the description names. A skill the model writes for the person's role is no candidate: no clause of the description mentions it, so the check would withdraw every one. When the check gives no answer, every skill goes, named or not.
 - **What stays out.** Employers, schools, dates, certifications and prose stay with the entry rules of ADR 0023: the model judges them worse than the rules do (50 to 66 false drops on the contract in the spike).
 - **An item stays only when both checks keep it.** The check can only withdraw (`ClaimWithdrawal`); a language goes with its level.
 - **How the calls are made.** The candidates go to Apple's on-device model (`FoundationModelsClaimChecker`) in batches of at most 8, one batch after the other (`ClaimCheckLimits.standard`), each with a fixed instruction, greedy sampling and structured output. The structure is a dynamic schema (`FoundationModelsClaimChecker.schema(forCandidates:)`) whose list of verdicts holds exactly as many entries as the batch has items, no more and no fewer (the amendment of 2026-10-26): left free, the model wrote one entry for each sentence that mentions an item. In a batch the items are numbered from 1. For each item, the model copies the sentence that mentions it, then answers whose the item is (the writer, someone else, or not mentioned) and how the sentence states it (as true, wished, conditional or denied). An item is a fact only when it is the writer's and stated as true. A verdict that the withdrawal does not receive withdraws its item, so the check fails closed.

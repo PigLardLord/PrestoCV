@@ -5,6 +5,11 @@ import Testing
 struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
     enum Kind: String, Codable, CaseIterable, Sendable {
         case name, title, employer, school, language, skill
+        /// A duty the person states in no job's sentence ("I mix on digital consoles"): kept by a job's description or a skill
+        /// (#354, round 1).
+        case duty
+        /// A quality the person states of themselves ("calm under pressure"): kept by a skill.
+        case quality
     }
 
     let kind: Kind
@@ -19,6 +24,8 @@ struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvert
     static func school(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .school, forms: forms) }
     static func language(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .language, forms: forms) }
     static func skill(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .skill, forms: forms) }
+    static func duty(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .duty, forms: forms) }
+    static func quality(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .quality, forms: forms) }
 }
 
 /// A description the drafting evaluation gives the model, with what a faithful draft of it keeps and must not hold.
@@ -30,6 +37,16 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
         case plain
         /// A description with sentences that look like facts about the person and are not.
         case traps
+        /// A title and a few words, as people often write (#354): the draft writes around the title alone.
+        case sparse
+        /// No role, study or field at all: the draft writes nothing around the facts (ADR 0031).
+        case noRole
+        /// A description of the app's end-to-end campaign that the evaluation lacked (#354): an employer and a tool, no title.
+        case app
+        /// A description shaped like a person's own account of their work (#354): about eight lines in the first person, the kind of
+        /// work and the years, then four employers with dates, the position and the duties, two of them in one run-on sentence, one
+        /// with a word of the past and of doubt, the tools and the qualities, and what the person looks for.
+        case jobs
     }
 
     let id: String
@@ -46,6 +63,17 @@ struct DraftingInput: Sendable, CustomTestStringConvertible {
 }
 
 extension DraftingInput {
+    /// The person's role or field, in the description's language, as a reader of the draft's pertinence item sees it; nil when the
+    /// description names none.
+    var field: String? { DraftingInputs.fields[id]?.field }
+
+    /// Words of other trades that no summary, job description or skill of a draft of this input may hold (#354): a hit is a hard
+    /// finding. Written by hand before the first run, from `DraftingInputs.tools` less the tools of the person's own trade.
+    var offField: [String] {
+        guard let own = DraftingInputs.fields[id]?.own else { return [] }
+        return DraftingInputs.tools.filter { !own.contains($0) }
+    }
+
     /// Whether the description states `phrase`: its words, in any case, one right after the other and each of them whole. The trap
     /// "20" is not in "2024" or "20.5 beds", "Tom" is not in "Tomorrow", and an address is not in a longer one.
     func states(_ phrase: String) -> Bool {
@@ -81,14 +109,104 @@ extension DraftingInput {
     }
 }
 
-/// The 18 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
-/// cannot drift, and 2 written descriptions per language. Every person, address and number in them is invented.
+/// The 37 inputs of the drafting evaluation: the 6 example descriptions of the app, read from its string catalog so that they
+/// cannot drift, 5 written descriptions per language (plain, with traps, sparse, with no role, and one with four jobs) and the
+/// descriptions of the app's end-to-end campaign. Every person, employer, address and number in them is invented.
 enum DraftingInputs {
     static let languages = ["en", "it", "de", "es", "fr", "pt"]
 
     static func all() throws -> [DraftingInput] {
-        try examples() + written
+        try examples() + written + short + jobs + app
     }
+
+    // MARK: - Fields
+
+    /// Tools of one trade each, which a draft of another trade has no reason to write.
+    static let tools = [
+        "Kubernetes", "Java", "Photoshop", "InDesign", "Illustrator", "After Effects", "Premiere Pro", "AutoCAD", "HACCP", "KNX", "SAP",
+    ]
+
+    /// The field of each input with a role, and the tools of `tools` its trade may use.
+    static let fields: [String: (field: String, own: Set<String>)] = [
+        "example-en": ("primary school teaching", []), "example-it": ("insegnamento nella scuola primaria", []),
+        "example-de": ("Unterricht an der Grundschule", []), "example-es": ("enseñanza primaria", []),
+        "example-fr": ("enseignement primaire", []), "example-pt": ("ensino fundamental", []),
+        "en-plain": ("warehouse logistics", ["SAP"]), "en-traps": ("nursing", []),
+        "it-plain": ("cucina", ["HACCP"]), "it-traps": ("amministrazione", ["SAP"]),
+        "de-plain": ("Elektroinstallation", ["KNX", "AutoCAD", "SAP"]), "de-traps": ("Physiotherapie", []),
+        "es-plain": ("diseño gráfico", ["Photoshop", "InDesign", "Illustrator", "After Effects", "Premiere Pro", "AutoCAD"]),
+        "es-traps": ("contabilidad", ["SAP"]),
+        "fr-plain": ("boulangerie", ["HACCP"]), "fr-traps": ("informatique", ["Kubernetes", "Java", "SAP", "KNX"]),
+        "pt-plain": ("enfermagem", []), "pt-traps": ("programação", ["Kubernetes", "Java", "SAP"]),
+        "en-sparse": ("plumbing", []), "it-sparse": ("sviluppo iOS", ["Kubernetes", "Java", "Photoshop", "SAP"]),
+        "de-sparse": ("Bäckerei", ["HACCP"]), "es-sparse": ("hostelería", ["HACCP"]),
+        "fr-sparse": ("comptabilité", ["SAP"]), "pt-sparse": ("transporte de cargas", []),
+        "ai-language-data": ("work at San Camillo, with Excel", []),
+        "jobs-en": ("live sound engineering", []), "jobs-it": ("manutenzione industriale", []),
+        "jobs-de": ("Garten- und Landschaftsbau", []), "jobs-es": ("mecánica del automóvil", []),
+        "jobs-fr": ("accueil hôtelier", []), "jobs-pt": ("carpintaria", []),
+    ]
+
+    /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354,
+    /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
+    /// The list is the reader's, independent of the rules of the draft: no stationery a person of any trade uses ("cahiers"), and
+    /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4), and the tools of
+    /// round 6's answers the reader accepted ("ordinateur portable", "Java"; round 7), and those of round 7's answers ("Google Sheets",
+    /// "Werkzeugkasten"; round 8).
+    static let vocabularies: [String: [String]] = [
+        "jobs-en": [
+            "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
+            "DI boxes", "Dante", "QLab", "Pro Tools", "Logic Pro", "Reaper", "Ableton Live", "Smaart", "Yamaha CL", "DiGiCo",
+            "Avid Venue", "Allen & Heath", "Midas", "Shure", "Sennheiser", "d&b audiotechnik", "L-Acoustics", "Meyer Sound",
+            "Waves plugins", "audio interfaces", "equalizers", "compressors", "amplifiers", "speaker systems", "follow spots",
+            "lighting consoles", "rigging hardware", "chain hoists", "intercom systems", "Clear-Com", "sound mixers", "lighting rigs",
+            "follow spot rig", "lighting rig", "audio distribution box", "sound mixing software", "audio editing software",
+        ],
+        "jobs-it": [
+            "PLC Siemens", "TIA Portal", "Step 7", "multimetro", "tester", "pinza amperometrica", "oscilloscopio", "megaohmetro",
+            "termocamera", "analizzatore di vibrazioni", "allineatore laser", "inverter", "motori elettrici", "schemi pneumatici",
+            "pneumatica", "oleodinamica", "saldatrice", "trapano", "chiave dinamometrica", "avvitatore", "estrattore per cuscinetti",
+            "riduttori", "pompe", "compressori", "software CMMS", "SAP PM", "lubrificanti", "carrello elevatore", "sensori",
+            "encoder", "valvole", "strumenti di diagnostica industriale", "sensori di temperatura",
+        ],
+        "en-plain": [
+            "warehouse management system", "WMS", "reach truck", "pallet jack", "pallet truck", "order picker", "barcode scanner",
+            "handheld scanner", "RF scanner", "label printer", "stretch wrapper", "conveyor", "Microsoft Outlook", "Microsoft Word",
+            "hand truck", "digital scheduling software",
+        ],
+        "it-traps": [
+            "Excel", "Word", "Outlook", "Microsoft Office", "gestionale", "TeamSystem", "Zucchetti", "Danea Easyfatt", "PEC",
+            "Sistema di Interscambio", "home banking", "database", "stampante", "scanner", "fotocopiatrice", "fax", "calcolatrice",
+            "foglio di calcolo", "Google Calendar",
+        ],
+        "de-plain": [
+            "Multimeter", "Spannungsprüfer", "Duspol", "Isolationsmessgerät", "Installationstester", "Schaltschrank", "Verteiler",
+            "Sicherungskasten", "Abisolierzange", "Crimpzange", "Seitenschneider", "Kabelschere", "Bohrhammer", "Akkuschrauber",
+            "Schraubendreher", "Kabelsucher", "Mauernutfräse", "Steuerungstechnik", "Bussysteme", "Steuerungssystem", "Messgerät", "Werkzeugkasten",
+        ],
+        "es-traps": [
+            "Excel", "Word", "ContaPlus", "A3", "Sage", "Holded", "Factusol", "hoja de cálculo", "base de datos", "calculadora",
+            "banca electrónica", "software de contabilidad", "sistema de gestión contable", "Google Sheets",
+        ],
+        "pt-traps": [
+            "Git", "GitHub", "GitLab", "Visual Studio Code", "Android Studio", "JavaScript", "TypeScript", "React", "Node.js", "PHP",
+            "Python", "SQL", "PostgreSQL", "MySQL", "Docker", "Figma", "Postman", "Jira", "terminal", "editor de código", "IDE",
+            "plataforma de teste", "Java",
+        ],
+        "example-fr": [
+            "tableau blanc interactif", "TBI", "vidéoprojecteur", "ordinateur", "tablette", "imprimante", "manuels scolaires",
+            "tableau", "ENT", "logiciels éducatifs", "matériel de manipulation", "tableau numérique", "logiciel d'apprentissage",
+            "ordinateur portable", "logiciel de gestion de classe", "système de suivi des progrès", "imprimante multifonction scolaire",
+        ],
+    ]
+
+    /// The parts, materials and work objects a person of the trade installs, repairs or handles, which are no tool of it (#354,
+    /// rounds 3 and 7): a technology of the draft whose head noun is one is a work object (`ReaderClass.workObjectTechnology`).
+    /// The list is the reader's.
+    static let parts: [String: [String]] = [
+        "de-plain": ["Schalter", "Leitungen", "Kabel", "Steckdosen", "Sicherungen"],
+        "jobs-it": ["quadri elettrici", "nastri trasportatori", "cuscinetti", "ricambi", "impianti industriali"],
+    ]
 
     // MARK: - The app's examples
 
@@ -136,7 +254,9 @@ enum DraftingInputs {
         ],
         "fr": [
             .name("Maria Rossi"), .title("institutrice"), .employer("Don Milani"), .employer("crèche"),
-            .school("université de Bologne"), .language("italien"), .language("anglais"),
+            .school("université de Bologne"), .language("italien"), .language("anglais"), .duty("enseigne"),
+            // The person trained new teachers: a job's text keeps it, its count is theirs (#354, round 6).
+            .duty("nouveaux enseignants"),
         ],
         "pt": [
             .name("Maria Rossi"), .title("professora do ensino fundamental", "professora"), .employer("Don Milani"),
@@ -158,7 +278,7 @@ enum DraftingInputs {
             facts: [
                 .name("Daniel Hart"), .title("warehouse supervisor", "supervisor"), .employer("Northfield Logistics"),
                 .employer("Kestrel Foods"), .school("Leeds City College"), .language("English"), .language("Polish"),
-                .skill("SAP"), .skill("Excel"),
+                .skill("SAP"), .skill("Excel"), .duty("night shifts"),
             ],
             traps: []
         ),
@@ -207,7 +327,7 @@ enum DraftingInputs {
             facts: [
                 .name("Chiara Benedetti"), .title("impiegata amministrativa", "impiegata"), .employer("Ferramenta Scaligera"),
                 .employer("Studio Contabile Merlini", "Merlini"), .school("istituto tecnico Lungadige", "Lungadige"),
-                .language("italiano"), .language("inglese"),
+                .language("italiano"), .language("inglese"), .duty("fatture dei fornitori", "fatture"),
             ],
             traps: [
                 "tedesco", "paolo.greco@example.com", "Marco", "Cantina Le Tre Querce", "consulente fiscale", "spagnolo", "SAP",
@@ -226,7 +346,7 @@ enum DraftingInputs {
             facts: [
                 .name("Jonas Albrecht"), .title("Elektriker"), .employer("Elektro Brandner", "Brandner"),
                 .employer("Haustechnik Kellner", "Kellner"), .school("Berufsschule Lechfeld", "Lechfeld"), .language("Deutsch"),
-                .language("Englisch"), .skill("KNX"),
+                .language("Englisch"), .skill("KNX"), .duty("Neubauten"),
             ],
             traps: []
         ),
@@ -278,7 +398,7 @@ enum DraftingInputs {
             facts: [
                 .name("Diego Salcedo"), .title("contable"), .employer("Transportes Ebro Norte", "Ebro Norte"),
                 .employer("Aranda y Molina"), .school("Universidad del Moncayo", "Moncayo"), .language("español"),
-                .language("inglés"),
+                .language("inglés"), .duty("contabilidad"),
             ],
             traps: ["alemán", "rafael.ortiz@example.com", "Javier", "Seguros Pilar", "auditor", "francés", "SAP", "15", "300"]
         ),
@@ -347,12 +467,220 @@ enum DraftingInputs {
             facts: [
                 .name("Tiago Ferreira"), .title("programador"), .employer("Sulware Sistemas", "Sulware"),
                 .employer("Pixel Gaúcho"), .school("Universidade do Guaíba", "Guaíba"), .language("português"),
-                .language("espanhol"),
+                .language("espanhol"), .duty("aplicativos para lojas", "aplicativos"),
             ],
             traps: [
                 "japonês", "marcos.lima@example.com", "Rafael", "Nuvem Azul Tecnologia", "arquiteto de software", "alemão",
                 "Kotlin", "9", "40",
             ]
+        ),
+    ]
+
+    // MARK: - Sparse, and with no role
+
+    /// Per language a description of a title and a few words, and one that names no role, study or field (#354).
+    static let short: [DraftingInput] = [
+        DraftingInput(
+            id: "en-sparse", kind: .sparse, language: "en",
+            description: "I am a plumber and I fix pipes, taps and boilers in people's homes.",
+            facts: [.title("plumber")], traps: []
+        ),
+        DraftingInput(
+            id: "en-norole", kind: .noRole, language: "en",
+            description: "I like long walks with my dog, reading crime novels and cooking for my friends at the weekend.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "it-sparse", kind: .sparse, language: "it",
+            description: "Sono uno sviluppatore iOS e scrivo applicazioni per iPhone e iPad.",
+            facts: [.title("sviluppatore iOS", "sviluppatore")], traps: []
+        ),
+        DraftingInput(
+            id: "it-norole", kind: .noRole, language: "it",
+            description: "Mi piace camminare in montagna con il mio cane, leggere romanzi gialli e cucinare per gli amici.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "de-sparse", kind: .sparse, language: "de",
+            description: "Ich bin Bäckerin und backe jeden Morgen Brot, Brötchen und Kuchen für unsere Kunden.",
+            facts: [.title("Bäckerin")], traps: []
+        ),
+        DraftingInput(
+            id: "de-norole", kind: .noRole, language: "de",
+            description: "Ich gehe gern mit meinem Hund spazieren, lese Krimis und koche am Wochenende für meine Freunde.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "es-sparse", kind: .sparse, language: "es",
+            description: "Soy camarero y atiendo a los clientes en la terraza y en la barra del bar.",
+            facts: [.title("camarero")], traps: []
+        ),
+        DraftingInput(
+            id: "es-norole", kind: .noRole, language: "es",
+            description: "Me gusta pasear con mi perro, leer novelas policíacas y cocinar para mis amigos los fines de semana.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "fr-sparse", kind: .sparse, language: "fr",
+            description: "Je suis comptable et je tiens les comptes de petites entreprises de mon quartier.",
+            facts: [.title("comptable")], traps: []
+        ),
+        DraftingInput(
+            id: "fr-norole", kind: .noRole, language: "fr",
+            description: "J'aime me promener avec mon chien, lire des romans policiers et cuisiner pour mes amis le week-end.",
+            facts: [], traps: []
+        ),
+        DraftingInput(
+            id: "pt-sparse", kind: .sparse, language: "pt",
+            description: "Sou motorista de caminhão e faço entregas de mercadorias pelo interior do estado.",
+            facts: [.title("motorista de caminhão", "motorista")], traps: []
+        ),
+        DraftingInput(
+            id: "pt-norole", kind: .noRole, language: "pt",
+            description: "Gosto de passear com o meu cão, ler romances policiais e cozinhar para os amigos ao fim de semana.",
+            facts: [], traps: []
+        ),
+    ]
+
+    // MARK: - Four jobs, as a person tells them (#354)
+
+    /// Descriptions shaped like a person's own account of their work: the kind of work and the years, four employers with dates,
+    /// the position and the duties, two of the jobs in one run-on sentence ("..., then at B ..., <duties>"), one with a word of the
+    /// past and of doubt ("was also helping"), the tools, the qualities, and a last line on the job the person looks for, which is
+    /// a trap.
+    static let jobs: [DraftingInput] = [
+        DraftingInput(
+            id: "jobs-en", kind: .jobs, language: "en",
+            description: """
+            I have worked in live sound for theatres and touring shows for thirteen years.
+            I started in 2013 as a stagehand at the Fenwick Playhouse in Norwich, where I rigged the lights and loaded the trucks until 2016.
+            Then I was a sound technician at Brightwater Events from 2016 to 2019, then at Copperfield Arena from 2019 to 2021, setting up the PA systems and mixing the support acts.
+            At Copperfield Arena I was also helping the lighting crew with the follow spots.
+            Since 2021 I have been head of sound at the Orchard Lane Theatre, where I plan the sound design for each production and train the junior technicians.
+            I mix on digital consoles and edit the sound effects for the shows.
+            I stay calm under pressure and I like working closely with directors.
+            I am now looking for a technical manager role at a larger venue.
+            """,
+            facts: [
+                .title("head of sound"), .title("sound technician"), .title("stagehand"),
+                .employer("Fenwick Playhouse", "Fenwick"), .employer("Brightwater Events", "Brightwater"),
+                .employer("Copperfield Arena", "Copperfield"), .employer("Orchard Lane Theatre", "Orchard Lane"),
+                .duty("digital consoles"), .duty("sound effects"), .quality("calm under pressure", "pressure", "calm"),
+                .quality("working closely with directors", "directors"), .duty("lights"), .duty("trucks"), .duty("PA systems"),
+                .duty("support acts"), .duty("follow spots"), .duty("sound design"), .duty("junior technicians"),
+            ],
+            traps: ["technical manager"]
+        ),
+        DraftingInput(
+            id: "jobs-it", kind: .jobs, language: "it",
+            description: """
+            Lavoro da sedici anni nella manutenzione di impianti industriali, soprattutto nel settore alimentare.
+            Dal 2010 al 2014 sono stato operaio manutentore alla Conserve Albarella di Termoli, dove riparavo i nastri trasportatori e sostituivo i cuscinetti.
+            Poi ho fatto il manutentore elettromeccanico al Pastificio Cerreto dal 2014 al 2018, poi al Molino Fontebasso dal 2018 al 2020, controllando i quadri elettrici e programmando la manutenzione preventiva.
+            Al Molino Fontebasso davo anche una mano con gli ordini dei ricambi.
+            Dal 2020 sono capoturno della manutenzione al Birrificio Valtrigno di Campobasso, dove coordino tre tecnici e gestisco i fermi impianto.
+            Leggo gli schemi elettrici e pneumatici e uso i PLC per trovare i guasti.
+            Sono preciso e mi piace lavorare in squadra.
+            Cerco un posto da responsabile della manutenzione in un'azienda più grande.
+            """,
+            facts: [
+                .title("capoturno della manutenzione", "capoturno"), .title("manutentore elettromeccanico"),
+                .title("operaio manutentore"), .employer("Conserve Albarella", "Albarella"),
+                .employer("Pastificio Cerreto", "Cerreto"), .employer("Molino Fontebasso", "Fontebasso"),
+                .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"), .duty("schemi elettrici", "schemi"),
+                .duty("trovare i guasti", "guasti"), .quality("lavorare in squadra", "squadra"),
+                .duty("nastri trasportatori"), .duty("cuscinetti"), .duty("quadri elettrici"), .duty("manutenzione preventiva"),
+                .duty("ricambi"), .duty("fermi impianto"), .duty("tecnici"),
+            ],
+            traps: ["responsabile della manutenzione"]
+        ),
+        DraftingInput(
+            id: "jobs-de", kind: .jobs, language: "de",
+            description: """
+            Ich arbeite seit sechzehn Jahren im Garten- und Landschaftsbau.
+            Von 2009 bis 2013 war ich Gärtnerhelferin bei der Baumschule Lindenhof in Kassel, wo ich Jungpflanzen umgetopft und die Beete gepflegt habe.
+            Danach war ich Landschaftsgärtnerin bei Gartenbau Mertens von 2013 bis 2017, dann bei Grünwerk Sauer von 2017 bis 2020, mit dem Verlegen von Pflasterflächen und dem Einbau von Bewässerungsanlagen.
+            Bei Grünwerk Sauer habe ich auch mal bei der Baumpflege ausgeholfen.
+            Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, wo ich die Kolonne einteile und die Pflege der Parkanlagen plane.
+            Ich fahre Minibagger und arbeite mit Rüttelplatte und Motorsäge.
+            Ich bin zuverlässig und arbeite gern im Team.
+            Jetzt suche ich eine Stelle als Bauleiterin in einem größeren Betrieb.
+            """,
+            facts: [
+                .title("Vorarbeiterin"), .title("Landschaftsgärtnerin"), .title("Gärtnerhelferin"),
+                .employer("Baumschule Lindenhof", "Lindenhof"), .employer("Gartenbau Mertens", "Mertens"),
+                .employer("Grünwerk Sauer", "Grünwerk"), .employer("Stadtgärtnerei Hollerbach", "Hollerbach"),
+            ],
+            traps: ["Bauleiterin"]
+        ),
+        DraftingInput(
+            id: "jobs-es", kind: .jobs, language: "es",
+            description: """
+            Trabajo desde hace quince años en la mecánica del automóvil.
+            De 2011 a 2014 fui ayudante de taller en Talleres Ribera, en Zaragoza, donde cambiaba el aceite y montaba los neumáticos.
+            Después fui mecánico en Autos Montaner de 2014 a 2018, luego en Garaje Lozano de 2018 a 2021, revisando los frenos y diagnosticando averías del motor.
+            En Garaje Lozano también ayudaba a veces con los presupuestos.
+            Desde 2021 soy jefe de taller en el Concesionario Valdeolmos, donde reparto el trabajo del equipo y atiendo a los clientes.
+            Uso el equipo de diagnosis, el elevador y la llave dinamométrica.
+            Soy ordenado y me gusta trabajar en equipo.
+            Ahora busco un puesto de gerente de posventa en un concesionario más grande.
+            """,
+            facts: [
+                .title("jefe de taller"), .title("mecánico"), .title("ayudante de taller"),
+                .employer("Talleres Ribera", "Ribera"), .employer("Autos Montaner", "Montaner"),
+                .employer("Garaje Lozano", "Lozano"), .employer("Concesionario Valdeolmos", "Valdeolmos"),
+            ],
+            traps: ["gerente de posventa"]
+        ),
+        DraftingInput(
+            id: "jobs-fr", kind: .jobs, language: "fr",
+            description: """
+            Je travaille depuis quatorze ans dans l'accueil hôtelier.
+            De 2012 à 2015, j'ai été auditrice de nuit à l'Hôtel des Tilleuls à Annecy, où je faisais la clôture de caisse et je répondais au téléphone.
+            Ensuite j'ai été réceptionniste à la Résidence Belcourt de 2015 à 2018, puis à l'Hôtel du Lac Vert de 2018 à 2021, en gérant les réservations et en accueillant les groupes.
+            À l'Hôtel du Lac Vert, j'aidais aussi parfois au service des petits-déjeuners.
+            Depuis 2021, je suis chef de réception au Domaine de Mirabel à Chambéry, où j'organise les plannings de l'équipe et je traite les réclamations.
+            J'utilise un logiciel de réservation et le terminal de paiement.
+            Je suis souriante et organisée, et j'aime le travail en équipe.
+            Je cherche maintenant un poste de directrice d'hébergement dans un hôtel plus grand.
+            """,
+            facts: [
+                .title("chef de réception"), .title("réceptionniste"), .title("auditrice de nuit"),
+                .employer("Hôtel des Tilleuls", "Tilleuls"), .employer("Résidence Belcourt", "Belcourt"),
+                .employer("Hôtel du Lac Vert", "Lac Vert"), .employer("Domaine de Mirabel", "Mirabel"),
+            ],
+            traps: ["directrice d'hébergement"]
+        ),
+        DraftingInput(
+            id: "jobs-pt", kind: .jobs, language: "pt",
+            description: """
+            Trabalho há quinze anos com carpintaria, em obras e em oficinas de móveis.
+            De 2010 a 2013 fui ajudante de marcenaria na Marcenaria Ipê, em Curitiba, onde lixava as peças e cortava as chapas.
+            Depois fui carpinteiro na Móveis Araucária de 2013 a 2017, depois na Oficina Tapajós de 2017 a 2020, montando armários e instalando portas.
+            Na Oficina Tapajós também ajudava às vezes com os orçamentos.
+            Desde 2020 sou encarregado de carpintaria na Construtora Serra Azul, em Londrina, onde coordeno a equipe e confiro as medidas das fôrmas.
+            Trabalho com serra circular, tupia e plaina elétrica.
+            Sou caprichoso e gosto de trabalhar em equipe.
+            Agora procuro uma vaga de mestre de obras em uma construtora maior.
+            """,
+            facts: [
+                .title("encarregado de carpintaria"), .title("carpinteiro"), .title("ajudante de marcenaria"),
+                .employer("Marcenaria Ipê", "Ipê"), .employer("Móveis Araucária", "Araucária"),
+                .employer("Oficina Tapajós", "Tapajós"), .employer("Construtora Serra Azul", "Serra Azul"),
+            ],
+            traps: ["mestre de obras"]
+        ),
+    ]
+
+    // MARK: - The app's end-to-end campaign
+
+    /// The descriptions the app's end-to-end campaign types that the evaluation did not have. `ai-language-data` ran 265 s and
+    /// ended in `serviceFailed` at a1e64ab5 (#354).
+    static let app: [DraftingInput] = [
+        DraftingInput(
+            id: "ai-language-data", kind: .app, language: "en",
+            description: "I have worked at San Camillo in Roma since 2015. I use Excel every day.",
+            facts: [.employer("San Camillo"), .skill("Excel")], traps: []
         ),
     ]
 }

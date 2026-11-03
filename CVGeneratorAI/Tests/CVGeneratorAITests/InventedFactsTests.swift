@@ -160,11 +160,11 @@ struct InventedFactsTests {
         #expect(report.invented.first?.reason.contains("5") == true, "\(report.invented)")
     }
 
+    // German, where every noun has a capital, sends such a word to review (`InventedFactsFieldTests.germanCapitalGoesToReview`).
     @Test("A capitalised word the description lacks in prose is a hard finding; the clause alone goes to review",
           arguments: [
               ("en-plain", "where I plan the night shifts"),
               ("it-plain", "dove preparo i primi piatti"),
-              ("de-plain", "wo ich Anlagen in Neubauten installiere"),
               ("es-plain", "donde diseño carteles y catálogos"),
               ("fr-plain", "où je prépare le pain et les viennoiseries"),
               ("pt-plain", "onde cuido de doentes da cirurgia"),
@@ -266,7 +266,7 @@ struct InventedFactsTests {
         let report = InventedFacts.count(draft.cv, for: input)
 
         #expect(report.keeps(.title))
-        #expect(report.lost == input.facts.filter { $0.kind == .skill })
+        #expect(report.lost == input.facts.filter { [.skill, .duty].contains($0.kind) })
     }
 
     // MARK: - Helpers
@@ -292,14 +292,14 @@ struct Draft {
     var languages: [Language]
     var interests: [String] = []
 
-    /// A draft that holds the input's facts and nothing else, each in its first form.
+    /// A draft that holds the input's facts and nothing else, each in its first form, a duty as a skill.
     init(faithfulTo input: DraftingInput) {
         func forms(_ kind: ExpectedFact.Kind) -> [String] { input.facts.filter { $0.kind == kind }.map { $0.forms[0] } }
         name = forms(.name).first
         title = forms(.title).first
         experience = forms(.employer).map { Experience(company: $0) }
         education = forms(.school).map { Education(institution: $0) }
-        skills = forms(.skill).map { Skill(name: $0) }
+        skills = (forms(.skill) + forms(.duty)).map { Skill(name: $0) }
         languages = forms(.language).map { Language(name: $0) }
     }
 

@@ -30,6 +30,8 @@ struct Entries {
     let jobs: [Job]
     let studies: [Study]
     let certifications: [Certificate]
+    /// The person's own title, the role they put forward (`personalInfo.title`).
+    let headline: String?
     private let subjects: [Subject]
     private let clauses: DescriptionClauses
     private let grounding: Grounding
@@ -37,7 +39,7 @@ struct Entries {
     private let language: Vocabulary.Language?
 
     init(_ cvData: CVData, personalInfo: PersonalInfo, _ source: DescriptionText) {
-        let companies = cvData.experience.map { (company: source.named($0.company), title: source.named($0.title)) }
+        let companies = cvData.experience.map { (company: source.namedEmployer($0.company), title: source.named($0.title)) }
         let institutions = cvData.education.map { (institution: source.named($0.institution), degree: source.named($0.degree)) }
         var subjects: [Subject] = []
 
@@ -66,6 +68,7 @@ struct Entries {
         }
 
         person = [personalInfo.name, personalInfo.location, personalInfo.title].compactMap { $0 }.map(Self.words(of:))
+        headline = personalInfo.title
         self.subjects = subjects
         language = source.explainer.language
         clauses = DescriptionClauses(
@@ -96,6 +99,38 @@ struct Entries {
     func contacts(in source: DescriptionText) -> DescriptionText {
         DescriptionText(sentences: grounding.contactSentences, of: source)
     }
+
+    /// The duties the person said for the job, copied from its attributed clauses.
+    func pinnedDuties(of subject: Int) -> [Grounding.PinnedDuty] {
+        grounding.pinnedDuties(of: subject)
+    }
+
+    /// The duties the person said with no job, for the current job (`Grounding.generalDuties`, ADR 0031, D7).
+    func generalDuties() -> [Grounding.PinnedDuty] {
+        grounding.generalDuties()
+    }
+
+    /// The clauses of those duties, as the current job's own quotes (`Grounding.generalDutyQuotes`).
+    var generalDutyQuotes: ProseQuotes {
+        grounding.generalDutyQuotes
+    }
+
+    /// The job's title the description supports, or, for a job named only in an employer clause coordinated after
+    /// another job's ("a technician at Alpha from 2016 to 2019, then at Beta from 2019 to 2021"), the head job's supported title,
+    /// when the job's own title is empty or a part of it.
+    func jobTitle(of job: Job) -> String? {
+        if let title = supportedTitle(of: job.subject, job.title) { return title }
+        guard let head = grounding.attribution.head[job.subject], let headJob = jobs.first(where: { $0.subject == head }),
+              let headTitle = supportedTitle(of: head, headJob.title) else { return nil }
+        let own = Set(Self.words(of: job.title ?? ""))
+        return own.isSubset(of: Set(Self.words(of: headTitle))) ? headTitle : nil
+    }
+
+    /// The clause that says the person's field (`Grounding.fieldClause`).
+    func fieldClause() -> String? { grounding.fieldClause() }
+
+    /// The sentences in which the person says what they do and what they are like, with no job (`Grounding.ownSentences`).
+    func ownSentences() -> [String] { grounding.ownSentences() }
 
     func evidence(of subject: Int) -> EntryEvidence {
         grounding.evidence(of: subject)

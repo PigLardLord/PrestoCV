@@ -78,7 +78,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        gemacht habe ich mein meine meinem meinen meiner meines studium
+        ausbildung gemacht habe ich lehre mein meine meinem meinen meiner meines studium
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """

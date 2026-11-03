@@ -26,6 +26,8 @@ struct Grounding {
     private let backing: [Set<Place>]
     /// The names of the employers and schools of the draft.
     private let holders: [[String]]
+    /// The clauses of the description that belong to each job (ADR 0031): read once, after the entries.
+    private(set) var attribution = Attribution()
 
     /// - Parameter person: The quotes of the person's own name, place and title.
     init(clauses: DescriptionClauses, explainer: Explainer, subjects: [Subject], person: [[String]]) {
@@ -39,6 +41,7 @@ struct Grounding {
         backingFacts = zip(subjects, naming).map { Self.backingClauses(of: $0, naming: $1, reading: reading, explainer: explainer) }
         backing = backingFacts.map { Set($0.keys) }
         holders = subjects.compactMap(\.holder)
+        attribution = attributing()
     }
 
     /// How the clauses of the description read for the entries of a draft: through the quotes of the draft, which name something and
@@ -214,6 +217,12 @@ struct Grounding {
             return leansOnThePerson(before: place)
         }
 
+        /// Whether the clause at `place` is about a contact field of the person ("La mia email è ...", "Meu e-mail é"), or asks to be
+        /// contacted, whoever it is read as giving: with or without an address, it says nothing of the person's work (#354, round 14).
+        func offersAContact(at place: Place) -> Bool {
+            Statement(clause: clauses.clause(at: place), quotes: all, language: language).offersAContact
+        }
+
         /// Whether an address that stands alone in sentence `sentence`, with no words, is the person's: as a verbless contact, it is
         /// before the references, and what comes before it names no other person.
         func givesAnAddressAlone(inSentence sentence: Int) -> Bool {
@@ -298,7 +307,12 @@ struct Grounding {
         let joining = joiningPlaces(of: index)
         let pure = joining.filter { clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
         let graduating = subject.isEducation ? joining.filter { !pure.contains($0) && explainer.isGraduationPhrase(clauses.clause(at: $0).words) } : []
+        // The clauses attributed to the job by continuation give the second pass context, never a date or a quote:
+        // the contract keeps a year of a joined clause from the job ("and graduated in 2012", "and trained 3 teachers in 2018").
+        let attributed = subject.isEducation ? [] : attributedContinuations(of: index)
         let found = (backing[index].union(pure)).sorted(by: Self.isBefore).map { stated($0, of: index) }
+        // ADR 0031, D1: a year in a relative clause that only continues the sentence naming the job counts for its dates.
+        let continuedDated = subject.isEducation ? [] : relativeContinuations(of: index).map(clauses.clause(at:))
         // A year written with a word of graduating or completing ("2016 ... abgeschlossen") is the year the study ended, whichever
         // clause writes it: it is never the start. So for a study such a clause is a graduation clause, not a dated one.
         let completes = found.map { subject.isEducation && $0.words.contains(where: explainer.saysGraduating) }
@@ -315,7 +329,13 @@ struct Grounding {
             quotableByAchievements: ProseQuotes(sources: joined.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language),
             verbAchievements: Set(subject.achievements.indices.filter { isQuoteOfAVerb(subject.achievements[$0], of: subject) }),
             holders: holders,
-            ownHolder: subject.holder
+            ownHolder: subject.holder,
+            context: backing[index].union(mentioning[index]).union(joining).union(attributed).sorted(by: Self.isBefore).map {
+                Self.withoutTrailingConjunction(clauses.clause(at: $0).source.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters)))
+            },
+            quotableByAttribution: subject.isEducation ? nil : ownAttributedQuotes(of: index),
+            continuedDated: continuedDated,
+            ownClauseQuotes: subject.isEducation ? nil : ownClauseQuotes(of: index)
         )
     }
 
@@ -483,28 +503,47 @@ struct Grounding {
     /// for "since" only if it stands in a clause that backs an entry or joins this one: a promise ("and I will stay until 2030") backs
     /// nothing, so its year is nobody's.
     private func statesCurrent(_ index: Int, joining: [Place]) -> Bool {
-        let counted = backing.reduce(into: Set(joining)) { $0.formUnion($1) }
+        statesCurrent(periods(of: backing[index], joining: joining), counting: Set(joining))
+    }
 
-        return periods(of: index, joining: joining).contains { period in
+    /// Whether one of `periods` says that its entry goes on, its years counted in the clauses that back an entry and in `counted`.
+    private func statesCurrent(_ periods: [(place: Place, text: String)], counting counted: Set<Place>) -> Bool {
+        let counted = backing.reduce(into: counted) { $0.formUnion($1) }
+
+        return periods.contains { period in
             let years = Set(clauses.places.filter { $0.sentence == period.place.sentence && counted.contains($0) }
                 .flatMap { stated($0).words }.filter { $0.isNumber && $0.folded.count == 4 }.map(\.folded))
             return PresentStatement.holds(in: period.text, sentenceYears: years.count, language: explainer.language)
         }
     }
 
-    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause that
-    /// backs it, with the clauses of nothing but time next to it, writes two years or an end and no word for the present
-    /// (`PresentStatement.ended`). A job with no clause that backs it, one without dates in the past tense, and one that ends
-    /// "até 2018" (the word is also "even") are not found over, and keep what they keep.
+    /// Whether the description says that the job at `index` is over: no clause of it says the job goes on, and some clause of it,
+    /// with the clauses of nothing but time next to it, writes two years or an end and no word for the present
+    /// (`PresentStatement.ended`). Its clauses are those that back it, or, when none does, those that state it as a fact
+    /// (`factualMentions`) with the clauses of nothing but time next to them that back no entry: "Antes, de 2015 a 2019, trabalhei
+    /// na agência Pixel Gaúcho" says the job at Pixel is over although "agência" leaves its clause unexplained (#354). A job no
+    /// clause states as a fact, one without dates in the past tense, and one that ends "até 2018" (the word is also "even") are not
+    /// found over, and keep what they keep.
     private func hasEnded(_ index: Int) -> Bool {
-        let joining = joiningPlaces(of: index)
-        return !statesCurrent(index, joining: joining) && periods(of: index, joining: joining).contains { PresentStatement.ended(in: $0.text) }
+        let isBacked = !backing[index].isEmpty
+        let places = isBacked ? backing[index] : factualMentions(of: index)
+        let joining = isBacked ? joiningPlaces(of: index) : timePlaces(beside: places)
+        let found = periods(of: places, joining: joining)
+        return !statesCurrent(found, counting: places.union(joining)) && found.contains { PresentStatement.ended(in: $0.text) }
     }
 
-    /// The time each clause that backs the entry gives: the clause as it states the entry, with the clauses of nothing but time that
-    /// join the entry next to it.
-    private func periods(of index: Int, joining: [Place]) -> [(place: Place, text: String)] {
-        backing[index].sorted(by: Self.isBefore).map { place in
+    /// The clauses next to `places` that hold nothing but time words and back no entry.
+    private func timePlaces(beside places: Set<Place>) -> [Place] {
+        let everyBacking = backing.reduce(into: Set<Place>()) { $0.formUnion($1) }
+        return places.flatMap(clauses.neighbours(of:)).filter { place in
+            !everyBacking.contains(place) && clauses.clause(at: place).words.allSatisfy(explainer.isTimePhrase)
+        }
+    }
+
+    /// The time each of `places` gives: the clause as it states the entry, with the clauses of nothing but time of `joining` next to
+    /// it.
+    private func periods(of places: Set<Place>, joining: [Place]) -> [(place: Place, text: String)] {
+        places.sorted(by: Self.isBefore).map { place in
             let neighbours = clauses.neighbours(of: place).filter { joining.contains($0) && clauses.clause(at: $0).words.allSatisfy(explainer.isTimePhrase) }
             let texts = (neighbours + [place]).sorted(by: Self.isBefore).map { stated($0).text }
             return (place, texts.joined(separator: " "))
@@ -515,7 +554,12 @@ struct Grounding {
     /// or condition, and says it as a fact (`Statement`): a mention of work that is done. An entry the description only denies, hopes
     /// for, promises or plans has none.
     func hasFactualMention(_ index: Int) -> Bool {
-        mentioning[index].contains { place in
+        !factualMentions(of: index).isEmpty
+    }
+
+    /// The clauses that state the entry as a fact (`hasFactualMention`).
+    private func factualMentions(of index: Int) -> Set<Place> {
+        mentioning[index].filter { place in
             let clause = clauses.clause(at: place)
             guard Vocabulary.modality(in: clause.words, language: explainer.language).isEmpty else { return false }
             return reading.statement(at: place, naming: subjects[index].mentions, by: subjects[index])?.isFactual == true
@@ -524,5 +568,315 @@ struct Grounding {
 
     private static func isBefore(_ first: Place, _ second: Place) -> Bool {
         (first.sentence, first.clause) < (second.sentence, second.clause)
+    }
+}
+
+// MARK: - The clauses of each job (ADR 0031)
+
+extension Grounding {
+    /// The clauses that belong to the jobs by rules (a)-(c): (a) a clause names the job's employer; (b) a clause that
+    /// names no employer and continues the clause that names one, in the same sentence ("where...", a gerund, a verb that opens it);
+    /// (c) the shared tail of a sentence that names several employers in a row. A clause that claims nothing is never attributed.
+    struct Attribution {
+        /// The jobs each attributed clause belongs to.
+        var jobsOf: [DescriptionClauses.Place: [Int]] = [:]
+        /// The clauses attributed by rule (b) or (c).
+        var continuations: Set<DescriptionClauses.Place> = []
+        /// The clauses attributed by rule (a).
+        var naming: Set<DescriptionClauses.Place> = []
+        /// A job named in a verbless clause coordinated after another job's naming clause: that job, the head of the sentence.
+        var head: [Int: Int] = [:]
+    }
+
+    /// The jobs among the subjects: those with an employer.
+    var jobSubjects: [Int] {
+        subjects.indices.filter { subjects[$0].holder != nil && !subjects[$0].isEducation }
+    }
+
+    private static let relativeWords: Set<String> = ["where", "wherein", "dove", "ove", "wo", "wobei", "où", "donde", "onde"]
+
+    private func attributing() -> Attribution {
+        let jobs = jobSubjects
+        var result = Attribution()
+        let language = explainer.language
+        let bySentence = Dictionary(grouping: clauses.places, by: \.sentence)
+        for sentence in bySentence.keys.sorted() {
+            var chain: [Int] = []
+            var last: [Int]?
+            var previousNaming = false
+            var chainHead: Int?
+            for place in bySentence[sentence, default: []].sorted(by: { $0.clause < $1.clause }) {
+                let clause = clauses.clause(at: place)
+                let statement = Statement(clause: clause, quotes: reading.all, language: language)
+                let named = jobs.filter { mentioning[$0].contains(place) }
+                var allowed: [Int] = []
+                var isContinuation = false
+                var coordinated: [Int] = []
+                if !named.isEmpty {
+                    if !clause.isAnchored && !statement.hasVerbs && previousNaming, last != nil {
+                        chain = Array(Set(chain).union(named)).sorted()
+                        coordinated = named
+                    } else {
+                        chain = named
+                        chainHead = named.count == 1 ? named[0] : nil
+                    }
+                    last = named
+                    allowed = named
+                    previousNaming = true
+                } else if let lastJobs = last, Self.continues(clause, statement, language) {
+                    allowed = chain.count > 1 ? chain : lastJobs
+                    isContinuation = true
+                    previousNaming = false
+                } else {
+                    chain = []
+                    last = nil
+                    previousNaming = false
+                    chainHead = nil
+                }
+                guard !allowed.isEmpty, !reading.claimedWords(at: place).isEmpty else { continue }
+                result.jobsOf[place] = allowed
+                if isContinuation { result.continuations.insert(place) } else { result.naming.insert(place) }
+                if let chainHead { for job in coordinated where job != chainHead { result.head[job] = chainHead } }
+            }
+        }
+        return result
+    }
+
+    private static func continues(_ clause: Clause, _ statement: Statement, _ language: Vocabulary.Language?) -> Bool {
+        guard !clause.isAnchored, let first = clause.words.first else { return false }
+        if relativeWords.contains(first.accented) || isGerund(clause.words, language) { return true }
+        return statement.startsWithItsVerb
+    }
+
+    private static func isGerund(_ words: [Word], _ language: Vocabulary.Language?) -> Bool {
+        guard let first = words.first?.folded else { return false }
+        switch language {
+        case .english: return first.count > 4 && first.hasSuffix("ing")
+        case .italian: return first.hasSuffix("ando") || first.hasSuffix("endo")
+        case .spanish: return first.hasSuffix("ando") || first.hasSuffix("iendo") || first.hasSuffix("yendo")
+        case .portuguese: return first.hasSuffix("ando") || first.hasSuffix("endo") || first.hasSuffix("indo")
+        case .french: return first == "en" && words.count > 1 && words[1].folded.hasSuffix("ant")
+        case .german: return first.hasSuffix("end")
+        case nil: return false
+        }
+    }
+
+    /// The clauses attributed to the job at `index` alone, by naming its employer or by a relative word.
+    func ownAttributedQuotes(of index: Int) -> ProseQuotes {
+        let places = attribution.jobsOf.keys.filter { place in
+            guard attribution.jobsOf[place] == [index] else { return false }
+            if attribution.naming.contains(place) { return true }
+            guard let first = clauses.clause(at: place).words.first else { return false }
+            return Self.relativeWords.contains(first.accented)
+        }.sorted(by: Self.isBefore)
+        return ProseQuotes(sources: places.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language)
+    }
+
+    /// ADR 0031, D1: the clauses that only continue the sentence naming the job at `index`: a relative clause attributed to it
+    /// alone ("..., where I rigged the lights until 2016"), and the continuations right after it attributed to it alone, each naming
+    /// no entry and stating no wish, doubt or future. A chain that names another employer is attributed to both: it gives no year.
+    func relativeContinuations(of index: Int) -> [DescriptionClauses.Place] {
+        let language = explainer.language
+        let own = attribution.continuations.filter { place in
+            attribution.jobsOf[place] == [index]
+                && !mentioning.contains { $0.contains(place) }
+                && Vocabulary.modality(in: clauses.clause(at: place).words, language: language).isEmpty
+        }
+        var result: [DescriptionClauses.Place] = []
+        for place in own.sorted(by: Self.isBefore) {
+            if let first = clauses.clause(at: place).words.first, Self.relativeWords.contains(first.accented) {
+                result.append(place)
+            } else if let previous = result.last, previous.sentence == place.sentence, previous.clause == place.clause - 1 {
+                result.append(place)
+            }
+        }
+        return result
+    }
+
+    /// ADR 0031, D3: every clause attributed to the job at `index`, shared tails among them: what a duty may quote word for word.
+    func ownClauseQuotes(of index: Int) -> ProseQuotes {
+        let places = attribution.jobsOf.keys.filter { attribution.jobsOf[$0]?.contains(index) == true }.sorted(by: Self.isBefore)
+        return ProseQuotes(sources: places.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language)
+    }
+
+    /// A clause's text without the conjunction it ends with ("setting up the PA systems and").
+    static func withoutTrailingConjunction(_ text: String) -> String {
+        var words = text.split(separator: " ", omittingEmptySubsequences: true)
+        while let last = words.last, conjunctions.contains(last.lowercased()) { words.removeLast() }
+        return words.joined(separator: " ").trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+    }
+
+    /// The continuation clauses attributed to the job at `index`.
+    func attributedContinuations(of index: Int) -> [DescriptionClauses.Place] {
+        attribution.continuations.filter { attribution.jobsOf[$0]?.contains(index) == true }.sorted(by: Self.isBefore)
+    }
+
+    private static let conjunctions: Set<String> = ["and", "e", "ed", "und", "et", "y", "or", "o", "oder", "ou"]
+
+    /// The duties the person said for the job at `index`, copied from the description: each continuation clause
+    /// attributed to it, and each later clause that names its employer again with no year in it, cut to its duty.
+    func pinnedDuties(of index: Int) -> [PinnedDuty] {
+        let firstNamed = attribution.naming.filter { attribution.jobsOf[$0]?.contains(index) == true }.map(\.sentence).min()
+        let places = attribution.jobsOf.keys.filter { attribution.jobsOf[$0]?.contains(index) == true }.sorted(by: Self.isBefore)
+        let pieces = places.compactMap { place -> (place: Place, text: String)? in
+            let clause = clauses.clause(at: place)
+            let words = clause.words
+            var start = 0
+            if attribution.naming.contains(place) {
+                guard let firstNamed, place.sentence > firstNamed, place.clause == 0, attribution.jobsOf[place]?.count == 1,
+                      !words.contains(where: \.isNumber) else { return nil }
+                let names = Set(subjects[index].mentions.flatMap { $0 })
+                guard let end = words.lastIndex(where: { names.contains($0.folded) }) else { return nil }
+                start = end + 1
+            } else if !attribution.continuations.contains(place) {
+                return nil
+            }
+            return duty(of: clause, from: start).map { (place, $0) }
+        }
+        // Two duties of one sentence joined by a conjunction stay one duty ("I rigged the lights and loaded the
+        // trucks"), so neither is a piece without its subject.
+        var joined: [(place: Place, text: String, parts: [String])] = []
+        for piece in pieces {
+            // The conjunction is not one of the clause's words: it ends the clause as the sentence has it.
+            if let last = joined.last, last.place.sentence == piece.place.sentence, last.place.clause + 1 == piece.place.clause,
+               let conjunction = clauses.clause(at: last.place).source.split(whereSeparator: \.isWhitespace).last.map(String.init),
+               Self.conjunctions.contains(conjunction.lowercased()),
+               let head = piece.text.first {
+                let nextClause = clauses.clause(at: piece.place)
+                let firstWord = String(piece.text.prefix { !$0.isWhitespace })
+                let lowered = String(head).lowercased() + firstWord.dropFirst()
+                let written = nextClause.written(from: 0, to: nextClause.words.count)
+                let start = written.split(separator: " ").contains { $0 == lowered } ? String(head).lowercased() : String(head)
+                joined[joined.count - 1] = (
+                    piece.place, String(last.text.dropLast()) + " " + conjunction + " " + start + piece.text.dropFirst(), last.parts + [piece.text]
+                )
+            } else {
+                joined.append((piece.place, piece.text, [piece.text]))
+            }
+        }
+        return joined.map { PinnedDuty(text: $0.text, parts: $0.parts) }
+    }
+
+    /// A duty the person said, whole, and the pieces it joins (one when it joins none).
+    struct PinnedDuty: Sendable, Equatable {
+        let text: String
+        let parts: [String]
+
+        /// The whole duty when `accepts` keeps it, otherwise each piece it keeps.
+        func kept(by accepts: (String) -> String?) -> [String] {
+            if let whole = accepts(text) { return [whole] }
+            return parts.count > 1 ? parts.compactMap(accepts) : []
+        }
+    }
+
+    private func duty(of clause: Clause, from first: Int) -> String? {
+        let words = clause.words
+        let language = explainer.language
+        var start = first
+        var end = words.count
+        while end > start, Self.conjunctions.contains(words[end - 1].folded) { end -= 1 }
+        while end > start, explainer.isTimePhrase(words[end - 1]) { end -= 1 }
+        var moved: String?
+        if start < end, Self.relativeWords.contains(words[start].accented) {
+            start += 1
+            // German puts the verb last after "wo": "wo ich Anlagen installiere" is "Ich installiere Anlagen".
+            if language == .german, start < end - 2, words[start].folded == "ich" {
+                moved = "Ich " + clause.written(from: end - 1, to: end) + " " + clause.written(from: start + 1, to: end - 1)
+            }
+        }
+        guard end - start >= 2 else { return nil }
+        let text = moved ?? clause.written(from: start, to: end)
+        guard let head = text.first else { return nil }
+        return String(head).uppercased() + text.dropFirst() + "."
+    }
+
+    /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): "I mix on
+    /// digital consoles and edit the sound effects for the shows.", "Sono preciso e mi piace lavorare in squadra." Each clause of
+    /// them speaks for the person, belongs to no job, names no entry and gives no link or capitalised word of the person's name,
+    /// place or title, one of them claims something, and the sentence holds no number and no word of wish, doubt, future or search
+    /// ("I am now looking for a technical manager role"): the skills requests read them, which no job's request reads.
+    func ownSentences() -> [String] {
+        ownSentencePlaces().compactMap(text(of:))
+    }
+
+    /// The text of the clauses at `places`, whole, or nil when it is empty.
+    private func text(of places: [Place]) -> String? {
+        let text = places.map { clauses.clause(at: $0).source }.joined()
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:")))
+        return text.isEmpty ? nil : text
+    }
+
+    /// The clauses of each of the person's own sentences (`ownSentences`), in their order.
+    private func ownSentencePlaces() -> [[Place]] {
+        let language = explainer.language
+        let personWords = Set(reading.ofPerson.flatMap { $0 })
+        let bySentence = Dictionary(grouping: clauses.places, by: \.sentence)
+        return bySentence.keys.sorted().compactMap { sentence -> [Place]? in
+            let places = bySentence[sentence, default: []].sorted { $0.clause < $1.clause }
+            let words = places.flatMap { clauses.clause(at: $0).words }
+            guard !places.isEmpty, Vocabulary.modality(in: words, language: language).isEmpty,
+                  !words.contains(where: { Self.searchWords.contains($0.folded) || $0.isNumber }),
+                  // A clause that names the person ("Je suis Maria Rossi") or gives a link says nothing of their work.
+                  places.allSatisfy({ place in
+                      let clause = clauses.clause(at: place)
+                      return clause.links.isEmpty && !clause.words.indices.dropFirst().contains { i in
+                          personWords.contains(clause.words[i].folded) && clause.isCapitalised(i)
+                      }
+                  }),
+                  places.contains(where: { !reading.claimedWords(at: $0).isEmpty }),
+                  places.allSatisfy({ place in
+                      reading.speaks(at: place) && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
+                  }) else { return nil }
+            return places
+        }
+    }
+
+    /// ADR 0031, D7: the person's own sentences (`ownSentences`) that say, in the present and in the first person, what they do at
+    /// work (`GeneralDuty`), each a duty of the current job, word for word.
+    func generalDuties() -> [PinnedDuty] {
+        generalDutyPlaces().compactMap(text(of:)).map { sentence in
+            let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            let duty = text.prefix(1).uppercased() + text.dropFirst() + "."
+            return PinnedDuty(text: duty, parts: [duty])
+        }
+    }
+
+    /// The clauses of the duties the person said with no job (`generalDuties`), as the current job's own quotes: the job's rule
+    /// keeps them as it keeps the clauses attributed to it.
+    var generalDutyQuotes: ProseQuotes {
+        ProseQuotes(sources: generalDutyPlaces().flatMap { $0 }.map { ProseQuotes.Source(clauses.clause(at: $0)) }, language: explainer.language)
+    }
+
+    private func generalDutyPlaces() -> [[Place]] {
+        ownSentencePlaces().filter { places in text(of: places).map { GeneralDuty.holds($0, language: explainer.language) } ?? false }
+    }
+
+    /// The words that say the person looks for something, in the six languages: what follows is no work of theirs.
+    private static let searchWords: Set<String> = [
+        "looking", "seeking", "searching", "cerco", "cercando", "suche", "suchen", "busco", "buscando", "procuro", "procurando",
+        "cherche", "recherche",
+    ]
+
+    /// The first clause that speaks for the person, starts its sentence, names no entry, belongs to no job and gives no
+    /// contact: what the person says their field is ("I have worked in live sound for theatres").
+    func fieldClause() -> String? {
+        let personWords = Set(reading.ofPerson.flatMap { $0 })
+        return clauses.places.first { place in
+            let clause = clauses.clause(at: place)
+            return clause.isAnchored && reading.speaks(at: place) && !reading.claimedWords(at: place).isEmpty
+                && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
+                && !clause.words.contains(where: \.isNumber) && clause.words.count >= 4
+                // A clause that gives the person's contacts, or is about one ("La mia email è ..."), is no field (#354, round 14).
+                && !reading.givesContacts(at: place) && !reading.offersAContact(at: place)
+                // A clause that names the person ("Je suis Maria Rossi") is no field.
+                && !clause.words.indices.dropFirst().contains { i in
+                    personWords.contains(clause.words[i].folded) && clause.written(from: i, to: i + 1).first?.isUppercase == true
+                }
+        }.map { place in
+            let clause = clauses.clause(at: place)
+            var end = clause.words.count
+            while end > 0, Self.conjunctions.contains(clause.words[end - 1].folded) { end -= 1 }
+            return clause.written(from: 0, to: end)
+        }
     }
 }

@@ -101,7 +101,8 @@ struct ClaimCheckEvaluation {
         }
         let seconds = seconds(since: start)
         let judged = await checker.judged
-        let groundedItems = ClaimCandidates.of(grounded), keptItems = ClaimCandidates.of(checked.cvData)
+        let groundedItems = ClaimCandidates.of(grounded, in: evaluationCase.description)
+        let keptItems = ClaimCandidates.of(checked.cvData, in: evaluationCase.description)
 
         let modelStances = await checker.modelStances
 

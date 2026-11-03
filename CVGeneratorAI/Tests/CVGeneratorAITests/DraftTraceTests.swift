@@ -7,13 +7,15 @@ import Testing
 @testable import CVGeneratorAI
 
 /// What the AI draft records in the trace of a test build (ADR 0032): the description, whether the model could run, its language
-/// data, the draft the model wrote, what grounding, the claim check and the result removed, the claim check's verdicts, the time
-/// of each stage and the draft the person sees. The trace holds the text; the log still holds none of it.
+/// data, the draft the model wrote, what grounding removed, what the requests of the sections wrote around the facts and what the
+/// final grounding, the claim check and the result removed, the claim check's verdicts, the time of each stage and the draft the
+/// person sees. The trace holds the text; the log still holds none of it.
 @MainActor
 @Suite("The trace of the AI draft")
 struct DraftTraceTests {
 
-    /// Every reading of the clock moves it on by this step: one at the start of the model, one at the end of each stage.
+    /// Every reading of the clock moves it on by this step: one at the start of the model, one at the end of each stage (grounding
+    /// ends twice: once for the facts, once for the facts with the writing around them).
     private static let step = Duration.milliseconds(5)
 
     /// An Italian description: its grounding needs no language data of the device, so the tests do not depend on the Mac's.
@@ -125,7 +127,7 @@ struct DraftTraceTests {
 
     // MARK: A finished draft
 
-    @Test("A finished draft records its input, the model's draft, what each stage removed, the times and the final draft, in order")
+    @Test("A finished draft records its input, the model's draft, what each stage removed and wrote, the times and the final draft, in order")
     func steps() async throws {
         let tracer = RecordingTracer()
         let draft = try await generator(drafting(example.draft), tracer: tracer).generateCV(from: request)
@@ -134,9 +136,11 @@ struct DraftTraceTests {
         #expect(tracer.runs.count == 1)
         #expect(run.outcome == .finished)
         #expect(run.steps.map(\.name) == [
-            .input, .availability, .languageData, .response, .removal, .check, .removal, .removal, .timing, .finalDraft,
+            .input, .availability, .languageData, .response, .removal, .response, .removal, .check, .removal, .removal, .timing,
+            .finalDraft,
         ])
-        #expect(run.steps(.removal).map { $0.value("stage") } == ["grounding", "claimCheck", "result"].map { .token($0) })
+        #expect(run.steps(.removal).map { $0.value("stage") } == ["grounding", "grounding", "claimCheck", "result"].map { .token($0) })
+        #expect(run.steps(.response).map { $0.value("stage") } == ["model", "writing"].map { .token($0) })
 
         let input = try #require(run.steps(.input).first)
         #expect(input.text("description") == example.description)
@@ -146,8 +150,7 @@ struct DraftTraceTests {
         let language = try #require(run.steps(.languageData).first)
         #expect(language.fields == [.flag("supported", true), .token("language", "it"), .token("data", "notNeeded")])
 
-        let model = try #require(run.steps(.response).first)
-        #expect(model.value("stage") == .token("model"))
+        let model = try #require(run.steps(.response).first { $0.value("stage") == .token("model") })
         let written = try JSONDecoder().decode(CVData.self, from: Data(try #require(model.text("cv")).utf8))
         #expect(written == example.draft)
 
@@ -158,15 +161,15 @@ struct DraftTraceTests {
         #expect(final.value("personalItemsUnchecked") == .flag(false))
     }
 
-    @Test("The time of each stage is the clock between its start and its end, and the draft's is the sum")
+    @Test("The time of each stage is the clock between its start and its end, grounding's is both of its runs, and the draft's is the sum")
     func timing() async throws {
         let tracer = RecordingTracer()
         _ = try await generator(drafting(example.draft), tracer: tracer).generateCV(from: request)
 
         let timing = try #require(tracer.run(.aiDraft)?.steps(.timing).first)
         #expect(timing.fields == [
-            .duration("model", Self.step), .duration("grounding", Self.step), .duration("claimCheck", Self.step),
-            .duration("result", Self.step), .duration("elapsed", Self.step * 4),
+            .duration("model", Self.step), .duration("grounding", Self.step * 2), .duration("writing", Self.step),
+            .duration("claimCheck", Self.step), .duration("result", Self.step), .duration("elapsed", Self.step * 6),
         ])
     }
 
@@ -189,7 +192,84 @@ struct DraftTraceTests {
         let removed = texts("removed", of: grounding)
         #expect(removed.contains("experience[\(index)].company: Zentrix Logistica"))
         #expect(grounding.value("removals") == .count(removed.count))
-        #expect(removed.contains { $0.hasPrefix("summary: ") }, "The summary is a paraphrase, which grounding removes")
+        // The facts keep the first pass's summary when its words are the person's own, and the writing around them replaces it
+        #expect(!removed.contains { $0.hasPrefix("summary: ") })
+        #expect(texts("changed", of: run.steps(.removal).filter { $0.value("stage") == .token("grounding") }.last).contains { $0.hasPrefix("summary: ") })
+    }
+
+    // MARK: The writing
+
+    @Test("The sections' writing is a response of its own: the summary, the duties of each job and the skills their checks kept, between the two groundings")
+    func writing() async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(SectionDraftTests.extracted)
+        service.jobResults = SectionDraftTests.jobs
+        service.toolsResult = SectionDraftTests.tools
+        service.softSkillsResult = SectionDraftTests.qualities
+        service.summaryResult = SectionDraftTests.summary
+        let english = CVDataSanitizer(
+            languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([.english: .words(SectionDraftTests.verbs)]),
+            wordList: TableWordList()
+        )
+        let tracer = RecordingTracer()
+        let logger = RecordingLogger()
+
+        _ = try await generator(service, sanitizer: english, logger: logger, tracer: tracer)
+            .generateCV(from: CVGenerationRequest(userPrompt: SectionDraftTests.briefly))
+
+        let run = try #require(tracer.run(.aiDraft))
+        let stages = run.steps.compactMap { $0.value("stage") }
+        #expect(stages == ["model", "grounding", "writing", "grounding", "claimCheck", "claimCheck", "result"].map { .token($0) })
+        let writing = try #require(run.steps(.response).first { $0.value("stage") == .token("writing") })
+        #expect(writing.value("wrote") == .flag(true))
+        let duties = texts("duties", of: writing)
+        let tools = texts("technology", of: writing)
+        let qualities = texts("softSkill", of: writing)
+        #expect(!duties.isEmpty && !tools.isEmpty && !qualities.isEmpty)
+        #expect(writing.value("roles") == .count(duties.count))
+        #expect(writing.value("technologies") == .count(tools.count))
+        #expect(writing.value("softSkills") == .count(qualities.count))
+        #expect(duties.allSatisfy { $0.hasPrefix("role ") })
+        #expect(writing.text("summary") != nil)
+
+        // The final grounding reads the facts with the writing around them, and the step shows what that changed or added
+        let groundings = run.steps(.removal).filter { $0.value("stage") == .token("grounding") }
+        #expect(groundings.count == 2)
+        let final = try #require(groundings.last)
+        #expect(final.value("changes") != .count(0) || final.value("additions") != .count(0))
+
+        // The trace holds what was written; the log holds none of it
+        let summary = try #require(writing.text("summary"))
+        let dutyTexts = duties.map { String($0.drop(while: { $0 != ":" }).dropFirst(2)) }
+        #expect(run.allText.contains(summary))
+        for entry in logger.entries {
+            #expect(!entry.line.contains(summary), "\(entry.line)")
+            #expect(!dutyTexts.contains { entry.line.contains($0) }, "\(entry.line)")
+        }
+    }
+
+    // MARK: The requests of the sections
+
+    @Test("A request of a section is recorded under its call's name with its limit, instructions and prompt; its answer, or why it had none, under the same name")
+    func sectionCall() {
+        let prompt = SectionPrompts.Prompt(instructions: "the rules", text: "the brief")
+        let job = SectionCallTrace(call: "job", role: 2, tokens: 300)
+        let tools = SectionCallTrace(call: "tools", role: nil, tokens: 200)
+
+        #expect(job.request(prompt) == [
+            .token("call", "job"), .count("role", 2), .count("maximumTokens", 300), .flag("schemaInPrompt", true),
+            .token("sampling", "greedy"), .text("instructions", "the rules"), .text("prompt", "the brief"),
+        ])
+        #expect(tools.request(prompt).first == .token("call", "tools"))
+        #expect(!tools.request(prompt).contains { $0.key == "role" })
+        #expect(job.answered(raw: "{}", complete: true) == [
+            .token("call", "job"), .count("role", 2), .flag("answered", true), .flag("complete", true), .text("raw", "{}"),
+        ])
+        #expect(tools.answered(raw: "[]", complete: nil) == [.token("call", "tools"), .flag("answered", true), .text("raw", "[]")])
+        #expect(job.unanswered() == [.token("call", "job"), .count("role", 2), .flag("answered", false), .token("error", "noAnswer")])
+        #expect(tools.failed(error: "busy", framework: "rate limited") == [
+            .token("call", "tools"), .flag("answered", false), .token("error", "busy"), .text("framework", "rate limited"),
+        ])
     }
 
     // MARK: The claim check
@@ -324,9 +404,12 @@ struct DraftTraceTests {
         #expect(Array(run.steps.map(\.name).suffix(3)) == [.removal, .failure, .timing])
         #expect(run.steps(.failure).first?.fields == [.token("stage", "result"), .token("error", "emptyResult")])
         #expect(run.steps(.timing).first?.fields == [
-            .duration("model", Self.step), .duration("grounding", Self.step), .duration("claimCheck", Self.step),
-            .duration("elapsed", Self.step * 4),
+            .duration("model", Self.step), .duration("grounding", Self.step * 2), .duration("writing", Self.step),
+            .duration("claimCheck", Self.step), .duration("elapsed", Self.step * 6),
         ])
+        // With nothing to write around, nothing was written, and the groundings stay one step
+        #expect(run.steps(.response).last?.fields == [.token("stage", "writing"), .flag("wrote", false)])
+        #expect(run.steps(.removal).filter { $0.value("stage") == .token("grounding") }.count == 1)
         #expect(run.outcome == .failed(code: "emptyResult"))
     }
 
@@ -344,7 +427,8 @@ struct DraftTraceTests {
         #expect(Array(run.steps.map(\.name).suffix(2)) == [.failure, .timing])
         #expect(run.steps(.failure).first?.fields == [.token("stage", "claimCheck"), .token("error", "cancelled")])
         #expect(run.steps(.timing).first?.fields == [
-            .duration("model", Self.step), .duration("grounding", Self.step), .duration("elapsed", Self.step * 3),
+            .duration("model", Self.step), .duration("grounding", Self.step * 2), .duration("writing", Self.step),
+            .duration("elapsed", Self.step * 5),
         ])
     }
 
@@ -379,19 +463,19 @@ struct DraftTraceTests {
 
     // MARK: Names
 
-    @Test("The model's stage is its response; every later stage is a removal")
+    @Test("The model's and the writing's stages are responses; every other stage is a removal")
     func stepOfEachStage() {
-        #expect(DraftTrace.step(for: .model) == .response)
+        #expect([DraftLog.Stage.model, .writing].map(DraftTrace.step(for:)) == [.response, .response])
         #expect([DraftLog.Stage.grounding, .claimCheck, .result].map(DraftTrace.step(for:)) == [.removal, .removal, .removal])
     }
 
-    @Test("The request to the model is its instructions and its prompt, as the service sends them", arguments: [
+    @Test("The request to the model is its instructions, its prompt and its sampling, as the service sends them", arguments: [
         InstructionsDelivery.session, .promptPrefix,
     ])
     func promptFields(delivery: InstructionsDelivery) {
         let prompt = CVPrompt(request: request, delivery: delivery)
-        #expect(prompt.traceFields == [
-            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "greedy"),
+        #expect(prompt.traceFields(sampling: "top5") == [
+            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "top5"),
             .text("instructions", prompt.instructions ?? ""), .text("prompt", prompt.text),
         ])
     }

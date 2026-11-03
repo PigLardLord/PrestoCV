@@ -112,6 +112,31 @@ struct DescriptionText {
         return name
     }
 
+    /// An employer of a job, kept as `named` keeps a name, when one of its occurrences in the description can be an employer's name:
+    /// one right after a possessive of the person ("les entreprises de mon quartier", "my street") is a place or a thing of theirs, and
+    /// names no one the person works for (#354).
+    func namedEmployer(_ name: String?) -> String? {
+        guard let name = named(name) else { return nil }
+        let possessives = vocabularyLanguage.map { Self.possessives[$0] ?? [] }
+            ?? Self.possessives.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        let isAName = Self.spans(of: Self.normalized(name), in: text).contains { span in
+            let start = String.Index(utf16Offset: span.lowerBound, in: text)
+            let before = text[..<start].split(separator: " ").last.map(String.init) ?? ""
+            return !possessives.contains(before)
+        }
+        return isAName ? name : nil
+    }
+
+    /// The possessives of the person, in the first person, as `normalized` writes them.
+    private static let possessives: [Vocabulary.Language: Set<String>] = [
+        .english: ["my", "our"],
+        .italian: ["mio", "mia", "miei", "mie", "nostro", "nostra", "nostri", "nostre"],
+        .german: ["mein", "meine", "meinem", "meinen", "meiner", "meines", "unser", "unsere", "unserem", "unseren", "unserer", "unseres"],
+        .spanish: ["mi", "mis", "nuestro", "nuestra", "nuestros", "nuestras"],
+        .french: ["mon", "ma", "mes", "notre", "nos"],
+        .portuguese: ["meu", "minha", "meus", "minhas", "nosso", "nossa", "nossos", "nossas"],
+    ]
+
     // MARK: - Prose
 
     /// The sentences of `prose` each of whose clauses quotes one of the `quotes` (see `ProseQuotes`), or nil when none is left.
@@ -120,14 +145,68 @@ struct DescriptionText {
     func grounded(_ prose: String?, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> String? {
         guard let prose = prose.presentValue else { return nil }
 
-        let kept = SentenceSplitter.sentences(in: prose).filter { isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) }
+        let kept = Self.sentences(of: prose).filter { isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) }
         return kept.isEmpty ? nil : kept.joined(separator: " ")
+    }
+
+    /// The sentences of `prose` that hold a letter: one with none (" ,", "}, {", what the model leaves of its answer's punctuation)
+    /// has no word to check, so no rule would ever drop it, and it says nothing (#354).
+    private static func sentences(of prose: String) -> [String] {
+        SentenceSplitter.sentences(in: prose).filter { $0.contains(where: \.isLetter) }
+    }
+
+    /// The sentences of `prose` that are grounded (see `grounded(_:quoting:allowsNumbers:)`) or `isPlain`: the text the model writes
+    /// around the facts keeps the sentences that state no fact of their own (ADR 0031, `WrittenText`).
+    func written(
+        _ prose: String?, quoting quotes: ProseQuotes, allowsNumbers: Bool, orPlain isPlain: (String) -> Bool
+    ) -> String? {
+        guard let prose = prose.presentValue else { return nil }
+
+        let kept = Self.sentences(of: prose).filter {
+            isGrounded($0, quoting: quotes, allowsNumbers: allowsNumbers) || isPlain($0)
+        }
+        return kept.isEmpty ? nil : kept.joined(separator: " ")
+    }
+
+    /// Whether each clause of `sentence` quotes a clause of a sentence of the description that names one of `names` and none of
+    /// `own` (`ProseQuotes`): what the description says of another job ("onde desenvolvo aplicativos para lojas" in the sentence of
+    /// Sulware), restated in the text of this one (#354).
+    func repeats(_ sentence: String, ofSentencesNaming names: [String], notNaming own: [String]) -> Bool {
+        let phrases = { (names: [String]) in names.compactMap(\.presentValue).map { Self.normalized($0) } }
+        let others = phrases(names)
+        let ownNames = phrases(own)
+        let mentions = { (sentence: Sentence, phrases: [String]) in phrases.contains { !Self.spans(of: $0, in: sentence.folded).isEmpty } }
+        return restates(sentence, ofSentencesWhere: { mentions($0, others) && !mentions($0, ownNames) })
+    }
+
+    /// Whether each clause of `sentence` quotes a clause of the sentences of the description that `isSource` picks (`ProseQuotes`).
+    func restates(_ sentence: String, ofSentencesWhere isSource: (Sentence) -> Bool) -> Bool {
+        let said = sentences.filter(isSource)
+        guard !said.isEmpty else { return false }
+
+        let clauses = DescriptionClauses(sentences: said.map(\.raw), protecting: [], language: explainer.language).sentences.joined()
+        let quotes = ProseQuotes(sources: clauses.map { ProseQuotes.Source($0) }, language: explainer.language)
+        return isGrounded(sentence, quoting: quotes, allowsNumbers: true)
+    }
+
+    /// The words of the description, as `Word.folded` writes them.
+    var foldedWords: Set<String> {
+        Set(Word.words(in: text).map(\.folded))
+    }
+
+    /// The words of the description, as `Word.folded` writes them, once each of `names` is taken out of it, whatever its case.
+    func foldedWords(outside names: [String]) -> Set<String> {
+        var rest = text
+        for name in names.sorted(by: { $0.count > $1.count }) where !name.isEmpty {
+            rest = rest.replacingOccurrences(of: Self.normalized(name), with: " ", options: [.caseInsensitive, .diacriticInsensitive])
+        }
+        return Set(Word.words(in: rest).map(\.folded))
     }
 
     /// Addresses are read from the sentence as written, never with their digits folded: "alice١@example.com" is not
     /// "alice1@example.com". What is left once the addresses are taken out is read as words and numbers.
     private func isGrounded(_ sentence: String, quoting quotes: ProseQuotes, allowsNumbers: Bool) -> Bool {
-        guard isInTheLanguageOfTheDescription(sentence) else { return false }
+        guard isInTheLanguageOfTheDescription(sentence, wordList: nil) else { return false }
 
         let addresses = AddressTokens(sentence)
         guard !addresses.hasAmbiguousAddress,
@@ -139,10 +218,16 @@ struct DescriptionText {
         return (allowsNumbers || !words.contains(where: \.isNumber)) && proseClauses.allSatisfy { quotes.quotes($0.words) }
     }
 
-    /// A sentence is in another language only when the detector is sure of both languages and they differ.
-    private func isInTheLanguageOfTheDescription(_ sentence: String) -> Bool {
-        guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage) else { return true }
-        return sentenceLanguage == descriptionLanguage
+    /// A sentence is in another language only when the detector is sure of both languages and they differ, and, given a `wordList`,
+    /// the dictionary of the description's language lacks one of its words: a short sentence the detector gives to a close language
+    /// ("Gerencio fluxos de dados internos." read as Spanish in a Portuguese description) whose words are all Portuguese stays
+    /// (#354, round 13).
+    func isInTheLanguageOfTheDescription(_ sentence: String, wordList: (any WordList)?) -> Bool {
+        guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage),
+              sentenceLanguage != descriptionLanguage else { return true }
+        let words = Word.words(in: sentence).filter { !$0.isNumber }
+        guard let wordList, !words.isEmpty else { return false }
+        return words.allSatisfy { wordList.knows($0.accented, inLanguage: descriptionLanguage) == true }
     }
 
     /// "pt-PT" and "pt-BR" are both Portuguese.

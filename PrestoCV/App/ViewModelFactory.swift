@@ -266,7 +266,9 @@ final class ViewModelFactory {
             logger: environment.diagnostics,
             clock: environment.clock,
             tracer: environment.tracer,
-            sanitizer: CVDataSanitizer(languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: lexicalClasses)
+            sanitizer: CVDataSanitizer(
+                languageOfText: { DescriptionLanguageDetector.languageTag(of: $0) }, lexicalClasses: lexicalClasses, wordList: DeviceWordList()
+            )
         )
     }
 

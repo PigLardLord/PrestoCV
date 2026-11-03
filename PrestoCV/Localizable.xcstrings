@@ -1565,37 +1565,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nennen Sie, was in Ihren Lebenslauf soll: Name, Kontaktdaten, Stationen, Ausbildung, Fähigkeiten, Sprachen. Was Sie weglassen, bleibt leer."
+            "value" : "Nennen Sie, was in Ihren Lebenslauf soll: Name, Kontaktdaten, Stationen, Ausbildung, Fähigkeiten, Sprachen. Die KI schlägt eine Zusammenfassung, Rollenbeschreibungen und Fähigkeiten für Ihre Rolle vor; alles andere, was Sie weglassen, bleibt leer."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mention what you want on your CV: name, contact details, jobs, studies, skills, languages. Anything you leave out stays blank."
+            "value" : "Mention what you want on your CV: name, contact details, jobs, studies, skills, languages. The AI suggests a summary, job descriptions and skills for your role; anything else you leave out stays blank."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menciona lo que quieres en tu CV: nombre, datos de contacto, trabajos, estudios, habilidades, idiomas. Lo que no incluyas queda en blanco."
+            "value" : "Menciona lo que quieres en tu CV: nombre, datos de contacto, trabajos, estudios, habilidades, idiomas. La IA propone un resumen, las descripciones de los puestos y las competencias de tu profesión; todo lo demás que no incluyas queda en blanco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indiquez ce que vous voulez dans votre CV : nom, coordonnées, emplois, études, compétences, langues. Ce que vous omettez reste vide."
+            "value" : "Indiquez ce que vous voulez dans votre CV : nom, coordonnées, emplois, études, compétences, langues. L'IA propose un résumé, les descriptions des postes et les compétences de votre métier ; tout ce que vous omettez d'autre reste vide."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indica cosa vuoi nel tuo CV: nome, contatti, lavori, studi, competenze, lingue. Ciò che non indichi resta vuoto."
+            "value" : "Indica cosa vuoi nel tuo CV: nome, contatti, lavori, studi, competenze, lingue. L'IA propone un riepilogo, le descrizioni dei ruoli e le competenze adatte al tuo ruolo; tutto il resto che non indichi resta vuoto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mencione o que você quer no seu currículo: nome, contatos, trabalhos, estudos, habilidades, idiomas. O que você deixar de fora fica em branco."
+            "value" : "Mencione o que você quer no seu currículo: nome, contatos, trabalhos, estudos, habilidades, idiomas. A IA sugere um resumo, as descrições dos cargos e as competências da sua profissão; todo o resto que você deixar de fora fica em branco."
           }
         }
       }
@@ -3892,37 +3892,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Was Sie nicht erwähnt haben, bleibt leer."
+            "value" : "Entwurf, von der KI aus Ihrer Beschreibung erstellt. Zusammenfassung, Rollenbeschreibungen und Fähigkeiten sind Vorschläge: Prüfen Sie jedes Feld, bevor Sie den Lebenslauf versenden. Was Sie nicht erwähnt haben, bleibt leer."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Draft written by AI from your description. Check every field before you send the CV. Anything you didn't mention is left blank."
+            "value" : "Draft written by AI from your description. The summary, the role descriptions and the skills are suggestions: check every field before you send the CV. Anything you didn't mention is left blank."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Borrador escrito por la IA a partir de tu descripción. Revisa cada campo antes de enviar el CV. Lo que no mencionaste queda en blanco."
+            "value" : "Borrador escrito por la IA a partir de tu descripción. El resumen, las descripciones de los puestos y las competencias son propuestas: revisa cada campo antes de enviar el CV. Lo que no mencionaste queda en blanco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Brouillon rédigé par l'IA à partir de votre description. Vérifiez chaque champ avant d'envoyer le CV. Ce que vous n'avez pas mentionné reste vide."
+            "value" : "Brouillon rédigé par l'IA à partir de votre description. Le résumé, les descriptions des postes et les compétences sont des propositions : vérifiez chaque champ avant d'envoyer le CV. Ce que vous n'avez pas mentionné reste vide."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Controlla ogni campo prima di inviare il CV. Ciò che non hai indicato resta vuoto."
+            "value" : "Bozza scritta dall'IA a partire dalla tua descrizione. Il riepilogo, le descrizioni dei ruoli e le competenze sono proposte: controlla ogni campo prima di inviare il CV. Ciò che non hai indicato resta vuoto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rascunho escrito pela IA a partir da sua descrição. Confira cada campo antes de enviar o currículo. O que você não mencionou fica em branco."
+            "value" : "Rascunho escrito pela IA a partir da sua descrição. O resumo, as descrições dos cargos e as competências são sugestões: confira cada campo antes de enviar o currículo. O que você não mencionou fica em branco."
           }
         }
       }

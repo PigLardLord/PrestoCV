@@ -110,11 +110,18 @@ struct DefaultCVValidatorTests {
         }
     }
 
-    @Test("Any single section is enough content")
+    @Test("A summary alone is no content: the model writes it, and a draft with no fact about the person is none (ADR 0031)")
+    func summaryAloneIsNoContent() {
+        #expect(throws: CVGenerationError.emptyResult) {
+            try validator.validateCVData(CVData(summary: "A dedicated professional who works well with others."))
+        }
+    }
+
+    @Test("Any single section of facts is enough content")
     func anySectionIsContent() throws {
         let cvs = [
             CVData(personalInfo: PersonalInfo(name: "Mario Rossi")),
-            CVData(summary: "A nurse."),
+            CVData(personalInfo: PersonalInfo(title: "Nurse"), summary: "A nurse."),
             CVData(experience: [Experience(company: "Hospital")]),
             CVData(education: [Education(degree: "Nursing")]),
             CVData(skills: [Skill(name: "Care")]),

@@ -63,7 +63,7 @@ The text of ADR 0030 stays as it was decided.
 - **CV text sits in plain files on a test device.** Mitigated by the protection class, the backup exclusion, the retention, the notice, and the share being the person's own act.
 - **The gate fails closed.** An offline first launch hides the entry until a later launch. A tester must open the app online once.
 - **No test can run a real App Store binary.** The production case rests on the gate's unit tests, the wiring test, the folder that is never made, and a UI test that forces each answer. The owner's TestFlight build shows the sandbox case.
-- **What waits:** the trace points of the PDF import (it adds only the layout stage); those of the new draft pipeline of #355, added through `DraftTrace` in its own pull request; the individual grounding rule that removed a value. Diagnostics for every user (#269) may reuse the share plumbing and the session events, never the trace itself.
+- **What waits:** the trace points of the PDF import (it adds only the layout stage); the individual grounding rule that removed a value. The steps of the new draft pipeline of #355 (a request and an answer per section, what the sections wrote, the second grounding) are recorded through `DraftTrace` in the pull request that brings the pipeline. Diagnostics for every user (#269) may reuse the share plumbing and the session events, never the trace itself.
 
 ## Alternatives considered
 

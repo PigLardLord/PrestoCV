@@ -64,7 +64,7 @@ enum ClaimWithdrawal {
     /// each, and why the check gave no answer when it did not.
     static func report(on grounded: CVData, in description: String, with checker: any ClaimChecking,
                        within limits: ClaimCheckLimits = .standard) async throws -> ClaimCheckReport {
-        let candidates = ClaimCandidates.of(grounded)
+        let candidates = ClaimCandidates.of(grounded, in: description)
         guard !candidates.isEmpty else {
             return ClaimCheckReport(draft: GeneratedDraft(cvData: grounded, personalItemsUnchecked: false), candidates: [],
                                     judgements: [], failure: nil)
@@ -72,7 +72,8 @@ enum ClaimWithdrawal {
 
         do {
             let judgements = try await judgementsInBatches(of: candidates, in: description, with: checker, within: limits)
-            let draft = GeneratedDraft(cvData: keepingFacts(of: grounded, candidates: candidates, judgements: judgements),
+            let checked = keepingFacts(of: grounded, candidates: candidates, judgements: judgements)
+            let draft = GeneratedDraft(cvData: keepingTheSelfTitle(of: grounded, in: checked, description: description),
                                        personalItemsUnchecked: false)
             return ClaimCheckReport(draft: draft, candidates: candidates, judgements: judgements, failure: nil)
         } catch let cancellation as CancellationError {
@@ -80,9 +81,28 @@ enum ClaimWithdrawal {
         } catch {
             // A check stopped by a cancellation may report it with an error of its own.
             try Task.checkCancellation()
-            return ClaimCheckReport(draft: GeneratedDraft(cvData: withdrawingAll(from: grounded), personalItemsUnchecked: true),
-                                    candidates: candidates, judgements: [], failure: ClaimCheckFailure(error))
+            let draft = GeneratedDraft(
+                cvData: keepingTheSelfTitle(of: grounded, in: withdrawingAll(from: grounded), description: description),
+                personalItemsUnchecked: true)
+            return ClaimCheckReport(draft: draft, candidates: candidates, judgements: [], failure: ClaimCheckFailure(error))
         }
+    }
+
+    /// `checked` with the headline of `grounded` again when the person writes it word for word as what they are
+    /// (`StatedTitle.isSaidOfItself`, the lead's decision D5 of #354): the check may judge "sono impiegata amministrativa a Verona"
+    /// no fact, and the person's own words are the headline.
+    static func keepingTheSelfTitle(of grounded: CVData, in checked: CVData, description: String) -> CVData {
+        guard checked.personalInfo.title == nil, let title = grounded.personalInfo.title,
+              StatedTitle.isSaidOfItself(title, in: description) else { return checked }
+        let info = checked.personalInfo
+        return CVData(
+            personalInfo: PersonalInfo(
+                name: info.name, email: info.email, phone: info.phone, location: info.location, website: info.website,
+                linkedin: info.linkedin, github: info.github, title: title
+            ),
+            summary: checked.summary, experience: checked.experience, education: checked.education, skills: checked.skills,
+            languages: checked.languages, certifications: checked.certifications, interests: checked.interests
+        )
     }
 
     /// The judgement of each candidate, from one call of `checker` for each batch, within `limits.time`.
@@ -115,11 +135,16 @@ enum ClaimWithdrawal {
     }
 
     /// The draft without the personal items that the judgements do not call a fact. `judgements` answer `candidates` one for one, in
-    /// order; an item that is not a candidate is withdrawn. A language goes with its level.
+    /// order; an item that is not a candidate is withdrawn, apart from a skill that the check did not judge: the model wrote it for the
+    /// person's role, and it stays as the rules left it (ADR 0031). A blank one goes. A language goes with its level.
     static func keepingFacts(of cvData: CVData, candidates: [ClaimCandidate], judgements: [ClaimJudgement]) -> CVData {
         let facts = Set(zip(candidates, judgements).filter { $0.1.stance == .fact }.map(\.0))
+        let judged = Set(candidates)
         func isFact(_ kind: ClaimCandidate.Kind, _ value: String?) -> Bool {
             ClaimCandidates.candidate(kind, value).map(facts.contains) ?? false
+        }
+        func staysAsASkill(_ name: String) -> Bool {
+            ClaimCandidates.candidate(.skill, name).map { !judged.contains($0) || facts.contains($0) } ?? false
         }
         let info = cvData.personalInfo
         return CVData(
@@ -130,15 +155,21 @@ enum ClaimWithdrawal {
                 title: isFact(.title, info.title) ? info.title : nil
             ),
             summary: cvData.summary, experience: cvData.experience, education: cvData.education,
-            skills: cvData.skills.filter { isFact(.skill, $0.name) },
+            skills: cvData.skills.filter { staysAsASkill($0.name) },
             languages: cvData.languages.filter { isFact(.language, $0.name) },
             certifications: cvData.certifications,
             interests: cvData.interests.filter { isFact(.interest, $0) }
         )
     }
 
-    /// The draft without any of the personal items the check judges, for when it gave no answer: the person adds them by hand.
+    /// The draft without any of the personal items the check judges, for when it gave no answer: the person adds them by hand. The
+    /// skills the model wrote for the role go with those the description names: the person then writes the list whole (ADR 0031).
     static func withdrawingAll(from cvData: CVData) -> CVData {
-        keepingFacts(of: cvData, candidates: [], judgements: [])
+        let withdrawn = keepingFacts(of: cvData, candidates: [], judgements: [])
+        return CVData(
+            personalInfo: withdrawn.personalInfo, summary: withdrawn.summary, experience: withdrawn.experience,
+            education: withdrawn.education, skills: [], languages: withdrawn.languages, certifications: withdrawn.certifications,
+            interests: withdrawn.interests
+        )
     }
 }

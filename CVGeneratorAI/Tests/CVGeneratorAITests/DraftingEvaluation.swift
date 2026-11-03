@@ -22,17 +22,19 @@ import FoundationModels
 // - PRESTOCV_DRAFT_EVAL_ONLY: comma-separated input ids, for a re-run after a fix. The set is then partial, and never GO.
 //
 // The folder holds manifest.json (written first, updated after every run), one JSON per input and run, summary.json, summary.txt
-// (its first line is the verdict) and review.json (the fields a person reads once per set). A set that stopped halfway has no
-// summary.
+// (its first line is the verdict) and review.json (the fields, and the drafts written around the facts, a person reads once per set).
+// A set that stopped halfway has no summary.
 //
 // A pass here means NO HARD FINDING, not GO: no field the counter proves invented in any run, no run of any input that threw, was
-// refused or whose claim check gave no answer, and an example that keeps its name, its title and a job. The fields the counter can
-// only send to review need a recorded reading (adjudication.json) before the set is GO: see `DraftingReadiness`.
+// refused or whose claim check gave no answer, an example that keeps its name, its title and a job, and no tool of another trade
+// written around the facts (ADR 0031). The thresholds of what the drafts write around the facts (`WrittenCounts`), the fields the
+// counter can only send to review and the pertinence of each draft need a recorded reading (adjudication.json) before the set is GO:
+// see `DraftingReadiness`.
 
 private let environment = ProcessInfo.processInfo.environment
 
 @Suite(
-    "Drafting evaluation: ADR 0023 and 0028 on the real model (a pass is no hard finding, not GO)", .serialized,
+    "Drafting evaluation: ADR 0023, 0028 and 0031 on the real model (a pass is no hard finding, not GO)", .serialized,
     .enabled(if: DraftingSettings.isOn(environment["PRESTOCV_DRAFT_EVAL"]))
 )
 @MainActor
@@ -76,6 +78,7 @@ struct DraftingEvaluation {
         #expect(summary.invented.isEmpty, "invented: \(summary.invented)")
         #expect(summary.failures.isEmpty, "failed runs: \(summary.failures)")
         #expect(summary.exampleMisses.isEmpty, "example misses: \(summary.exampleMisses)")
+        #expect(summary.offField.isEmpty, "off-field hits: \(summary.offField)")
     }
 
     // MARK: - One draft
@@ -91,6 +94,7 @@ struct DraftingEvaluation {
         )
         let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(tracer: NoTracer()), log: log)
         let useCase = CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: sanitizer)
+        useCase.observeWriting = { [service] writing, draft in service.record(writing, around: draft) }
         let load = loadAverage()
         let start = ContinuousClock.now
         let result: GeneratedDraft?
@@ -107,11 +111,16 @@ struct DraftingEvaluation {
         }
         let seconds = seconds(since: start)
         try Task.checkCancellation()
-        // The rules again on the model's draft, outside the timed path: they are deterministic, so this is the draft the check saw.
-        let grounded = service.raw.flatMap { try? sanitizer.sanitize($0, against: input.description) }
+        // The rules again on the draft the sections were written around, outside the timed path: they are deterministic, so this is
+        // the draft the check saw.
+        let grounded = (service.dated ?? service.raw).flatMap {
+            try? sanitizer.sanitize($0, writing: service.writing, against: input.description)
+        }
         let checks = await log.events
         return DraftMeasure(
-            input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, grounded: grounded,
+            input: input, run: run, revision: revision, seconds: seconds, load: load, raw: service.raw, writing: service.writing,
+            requests: service.requests,
+            grounded: grounded,
             result: result, error: failure, checks: checks
         )
     }
@@ -137,11 +146,22 @@ struct DraftingEvaluation {
 
     // MARK: - What is recorded
 
-    /// The model of the app, keeping the draft it wrote before the rules and the check.
+    /// The model of the app, keeping the draft it wrote before the rules and the check, and what the requests of the sections wrote
+    /// around it (ADR 0031, "A request per section").
     @MainActor
     final class RecordingService: CVGenerationService {
         private let model = FoundationModelsService(tracer: NoTracer())
         private(set) var raw: CVData?
+        private(set) var writing: DraftWriting?
+        /// The facts the sections were written around, with the years the jobs' requests read.
+        private(set) var dated: CVData?
+        /// Each request of the sections and its answer before the rules.
+        private(set) var requests: [RequestRecord] = []
+
+        func record(_ writing: DraftWriting, around draft: CVData) {
+            self.writing = writing
+            dated = draft
+        }
 
         func availability() -> AIAvailability { model.availability() }
 
@@ -149,6 +169,90 @@ struct DraftingEvaluation {
             let draft = try await model.generateCV(from: request)
             raw = draft
             return draft
+        }
+
+        func writeJob(number: Int, of brief: DraftBrief) async throws -> RoleWriting? {
+            let job = try await recorded("job \(number)") { try await model.writeJob(number: number, of: brief) }
+            log("job \(number)", job.map { [$0.startDate ?? "-", $0.endDate ?? "-", $0.duties ?? ""] })
+            return job
+        }
+
+        func repairJob(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) async throws -> [String]? {
+            let duties = try await recorded("job \(number) repair") {
+                try await model.repairJob(number: number, of: brief, kept: kept, rejected: rejected)
+            }
+            log("job \(number) repair", duties)
+            return duties
+        }
+
+        func writeTools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) async throws -> [String]? {
+            let tools = try await recorded("tools") { try await model.writeTools(for: brief, roles: roles, count: count) }
+            log("tools " + roles.map(String.init).joined(separator: ","), tools.map { [$0.joined(separator: " | ")] })
+            return tools
+        }
+
+        func writeSoftSkills(for brief: DraftBrief) async throws -> [String]? {
+            let qualities = try await recorded("soft skills") { try await model.writeSoftSkills(for: brief) }
+            log("soft skills", qualities)
+            return qualities
+        }
+
+        func writeMoreSkills(
+            for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
+            rejected: [String]
+        ) async throws -> DraftWriting? {
+            let more = try await recorded("more skills") {
+                try await model.writeMoreSkills(
+                    for: brief, title: title, tools: tools, qualities: qualities, listedTools: listedTools,
+                    listedQualities: listedQualities, rejected: rejected
+                )
+            }
+            log("more skills \(tools)+\(qualities)", more.map { $0.technologies + ["/"] + $0.softSkills })
+            return more
+        }
+
+        func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String? {
+            let sentence = try await recorded("summary") {
+                try await model.writeSummarySentence(for: brief, topic: topic, written: written)
+            }
+            let slot = ([topic.title, topic.field].compactMap { $0 } + topic.work).joined(separator: ": ")
+            let studies = topic.studies.map { [$0.course, $0.school].compactMap { $0 }.joined(separator: ", ") }
+            log("summary", [sentence ?? "none", "topic: " + slot] + topic.qualities + studies + topic.languages)
+            return sentence
+        }
+
+        func repairSummarySentence(
+            for brief: DraftBrief, topic: SummaryTopic, written: [String], rejected: String
+        ) async throws -> String? {
+            let sentence = try await recorded("summary repair") {
+                try await model.repairSummarySentence(for: brief, topic: topic, written: written, rejected: rejected)
+            }
+            log("summary repair", [sentence ?? "none", "rejected: " + rejected])
+            return sentence
+        }
+
+        /// The time of the request that answered last, which its log reads.
+        private var answeredIn: Duration?
+
+        private func log(_ step: String, _ answer: [String]?) {
+            let seconds = answeredIn.map { Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18 }
+            answeredIn = nil
+            requests.append(RequestRecord(step: step, answer: answer, seconds: seconds))
+        }
+
+        /// What `work` answers, with its time; a request that throws is logged with its error and its time, so that a draft stopped
+        /// by a failed or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no
+        /// trace).
+        private func recorded<Value>(_ step: String, _ work: () async throws -> Value) async throws -> Value {
+            let start = ContinuousClock.now
+            do {
+                let value = try await work()
+                answeredIn = ContinuousClock.now - start
+                return value
+            } catch {
+                log(step + " failed", [String(reflecting: error), "after \(ContinuousClock.now - start)"])
+                throw error
+            }
         }
     }
 }

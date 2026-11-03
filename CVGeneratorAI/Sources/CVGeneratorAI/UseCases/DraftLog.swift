@@ -19,6 +19,8 @@ struct DraftLog {
         case model
         /// The rules keep what the description supports (ADR 0023).
         case grounding
+        /// The model writes around the facts, a section at a time (ADR 0031).
+        case writing
         /// The second check of the personal items (ADR 0028).
         case claimCheck
         /// The check of what is left.
@@ -28,6 +30,7 @@ struct DraftLog {
             switch self {
             case .model: "model"
             case .grounding: "grounding"
+            case .writing: "writing"
             case .claimCheck: "claimCheck"
             case .result: "result"
             }
@@ -86,11 +89,31 @@ struct DraftLog {
         logger.info(.draft, "draft.started", .count("characters", characters))
     }
 
+    /// A request of the model tried once more, after a failure from below the model: a notice, since the draft takes longer.
+    func retried(at stage: Stage, by error: any Error) {
+        logger.notice(.draft, "draft.retried", .token("stage", stage.logName), .error(error))
+    }
+
+    /// What the requests of the sections wrote around the facts and their checks kept, before the final check reads it: whether
+    /// there is a summary, how many jobs got duties and how many skills.
+    func written(_ writing: DraftWriting) {
+        logger.info(.draft, "draft.written", .flag("summary", writing.summary?.presentValue != nil),
+            .count("roles", writing.roleDescriptions.count { $0?.presentValue != nil }),
+            .count("technologies", writing.technologies.count), .count("softSkills", writing.softSkills.count)
+        )
+    }
+
+    /// A request that failed or ran out of time at `step`: a notice, since its part stays unwritten; at the second, the draft keeps
+    /// only what the earlier requests wrote, and no section of the model's own after it.
+    func unwritten(at step: DraftStep, by error: any Error) {
+        logger.notice(.draft, "draft.unwritten", .token("step", step.logName), .error(error))
+    }
+
     /// The personal items the claim check judged and those it withdrew, and whether it gave no answer: a notice when it withdrew
     /// one, since the person then sees fewer items than the model wrote.
-    func claims(of grounded: CVData, checked: GeneratedDraft) {
-        let candidates = ClaimCandidates.of(grounded)
-        let kept = Set(ClaimCandidates.of(checked.cvData))
+    func claims(of grounded: CVData, checked: GeneratedDraft, in description: String) {
+        let candidates = ClaimCandidates.of(grounded, in: description)
+        let kept = Set(ClaimCandidates.of(checked.cvData, in: description))
         let withdrawn = candidates.count { !kept.contains($0) }
         let fields: [LogField] = [
             .count("checked", candidates.count), .count("withdrawn", withdrawn), .flag("unchecked", checked.personalItemsUnchecked),

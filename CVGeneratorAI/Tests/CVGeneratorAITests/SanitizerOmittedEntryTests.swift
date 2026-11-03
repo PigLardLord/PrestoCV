@@ -338,9 +338,10 @@ struct SanitizerOmittedEntryTests {
 
         let alpha = try sanitized(draft, from: description).education.first
 
-        // 2010 is written with "graduated": the year of the degree, never the start (ADR 0023). Beta's 2014 is not Alpha's.
+        // 2010 is written with "graduated": the year of the degree, so the end date and never the start (ADR 0023, #354). Beta's
+        // 2014 is not Alpha's.
         #expect(alpha?.startDate == nil)
-        #expect(alpha?.endDate == nil)
+        #expect(alpha?.endDate == "2010")
     }
 
     @Test("An issuer and a date given for a certification the draft left out are not the draft's")
@@ -363,7 +364,7 @@ struct SanitizerOmittedEntryTests {
         let result = try sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
         let skillResult = try sanitized(skills, from: "I know Python (expert), Swift (advanced) and Go (beginner).")
 
-        #expect(result.languages.map(\.name) == ["Italian"])
+        #expect(result.languages == [Language(name: "Italian", proficiency: .native), Language(name: "English")], "English keeps no level (#354)")
         #expect(skillResult.skills == [Skill(name: "Python")])
     }
 

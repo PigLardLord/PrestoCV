@@ -26,10 +26,11 @@ struct JobOrderTests {
         #expect(companies(jobs) == ["Gamma", "Beta", "Alpha"])
     }
 
-    @Test("The latest year is that of the end, else that of the start")
-    func endElseStart() {
-        #expect(companies([job("Beta", from: "2016"), job("Alpha", from: "2010", to: "2018")]) == ["Alpha", "Beta"])
-        #expect(companies([job("Alpha", to: "2016 – 2018"), job("Beta", from: "2017")]) == ["Alpha", "Beta"])
+    @Test("The end year orders the jobs, whatever else the date says; a job with no end date may go on: it comes before those that ended")
+    func endYearElseOpen() {
+        #expect(companies([job("Beta", from: "2010", to: "2017"), job("Alpha", to: "2016 – 2018")]) == ["Alpha", "Beta"])
+        #expect(companies([job("Alpha", from: "2010", to: "2018"), job("Beta", from: "2016")]) == ["Beta", "Alpha"])
+        #expect(companies([job("Beta", from: "2019"), job("School", from: "2016", current: true)]) == ["School", "Beta"])
     }
 
     @Test("A job without a year keeps its place among the others")
@@ -40,11 +41,28 @@ struct JobOrderTests {
         #expect(companies([job("Molinette"), job("Sorriso", from: "2016", to: "2019")]) == ["Molinette", "Sorriso"])
     }
 
-    @Test("Jobs of the same latest year keep the model's order, and so do two jobs that go on now")
+    @Test("The start settles a tie of the end; jobs of the same years keep the model's order, and so do two jobs that go on now")
     func sameYearKeepsTheOrder() {
-        #expect(companies([job("Alpha", from: "2012", to: "2016"), job("Beta", from: "2014", to: "2016")]) == ["Alpha", "Beta"])
+        #expect(companies([job("Alpha", from: "2012", to: "2016"), job("Beta", from: "2014", to: "2016")]) == ["Beta", "Alpha"])
+        #expect(companies([job("Alpha", from: "2014", to: "2016"), job("Beta", from: "2014", to: "2016")]) == ["Alpha", "Beta"])
         #expect(companies([job("Alpha", from: "2015", current: true), job("Beta", from: "2019", current: true)]) == ["Beta", "Alpha"])
         #expect(companies([job("Alpha", current: true), job("Beta", current: true)]) == ["Alpha", "Beta"])
+    }
+
+    @Test("The CV lists first the job the draft reads as the latest, the one its summary opens with")
+    func firstJobIsTheLatest() {
+        let drafts = [
+            [job("Alpha", from: "2010", to: "2019"), job("Beta", from: "2018", to: "2019")],
+            [job("Alpha", from: "2010", to: "2019"), job("Beta", from: "March 2012")],
+            [job("Alpha", from: "March 2015", to: "2016"), job("Beta", from: "2016", current: true), job("Gamma", from: "2019")],
+            [job("Alpha", from: "2012", to: "2014"), job("Beta"), job("Gamma", from: "settembre 2016", to: "gennaio 2019")],
+        ]
+
+        for jobs in drafts {
+            #expect(JobOrder.ordered(jobs).map(\.company) == JobRecency.latestFirst(jobs).map { jobs[$0].company })
+        }
+        #expect(companies(drafts[0]) == ["Beta", "Alpha"])
+        #expect(companies(drafts[1]) == ["Beta", "Alpha"])
     }
 
     @Test("The draft keeps everything but the order of its jobs")

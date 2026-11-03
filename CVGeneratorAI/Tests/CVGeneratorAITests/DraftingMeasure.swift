@@ -80,6 +80,16 @@ enum UncheckedCause: Equatable, Sendable, CustomStringConvertible {
     }
 }
 
+// MARK: - One request
+
+/// One request of the sections and the model's answer to it, before the rules: nil when it gave none. Its seconds show how close an
+/// answer came to the request's time limit (#354, probe round 7: on macOS 26 the first job's request ran out of time).
+struct RequestRecord: Encodable, Equatable {
+    let step: String
+    let answer: [String]?
+    var seconds: Double? = nil
+}
+
 // MARK: - One run
 
 /// One input drafted once: the three drafts, what the check did, and the counts of the final one.
@@ -92,8 +102,13 @@ struct DraftMeasure: Encodable {
     let run: Int
     let seconds: Double
     let load: Double?
-    /// The model's draft, before the rules.
+    /// The model's draft, before the rules: the facts of the first pass.
     let raw: CVData?
+    /// What the second pass wrote around the facts, before the rules (ADR 0031); nil when it was not asked, failed or wrote nothing.
+    let writing: DraftWriting?
+    /// Each request of the sections in the order it ran, with what the model answered before any rule: a rejected summary or a
+    /// dropped skill shows here and nowhere else.
+    let requests: [RequestRecord]
     /// The model's draft after the rules of ADR 0023, before the claim check.
     let grounded: CVData?
     /// What the use case returns, and the app shows.
@@ -112,6 +127,8 @@ struct DraftMeasure: Encodable {
     let report: InventedFacts.Report
     /// The fields of the model's draft that the counter calls invented: what the rules and the check had to remove.
     let rawInvented: [InventedFacts.Finding]
+    /// What the final draft writes around the facts (ADR 0031); nil for a run that gave no draft.
+    let written: WrittenMeasure?
     /// Why an example's draft misses the name, the title or a job; empty for the other inputs, and for a run that gave no draft (its
     /// `failure` says why).
     let misses: [String]
@@ -119,8 +136,8 @@ struct DraftMeasure: Encodable {
     let failure: String?
 
     init(
-        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, grounded: CVData?,
-        result: GeneratedDraft?, error: (any Error)?, checks: [CheckEvent]
+        input: DraftingInput, run: Int, revision: String, seconds: Double, load: Double?, raw: CVData?, writing: DraftWriting? = nil, requests: [RequestRecord] = [],
+        grounded: CVData?, result: GeneratedDraft?, error: (any Error)?, checks: [CheckEvent]
     ) {
         self.revision = revision
         id = input.id
@@ -130,6 +147,8 @@ struct DraftMeasure: Encodable {
         self.seconds = seconds
         self.load = load
         self.raw = raw
+        self.writing = writing
+        self.requests = requests
         self.grounded = grounded
         self.final = result?.cvData
         unchecked = result?.personalItemsUnchecked ?? false
@@ -139,8 +158,13 @@ struct DraftMeasure: Encodable {
         self.error = error.map { String(describing: $0) }
         let refused = Self.isRefusal(error)
         self.refused = refused
-        report = InventedFacts.count(result?.cvData ?? CVData(), for: input)
+        let report = InventedFacts.count(result?.cvData ?? CVData(), for: input)
+        self.report = report
         rawInvented = raw.map { InventedFacts.count($0, for: input).invented } ?? []
+        written = result.map { WrittenMeasure(
+            $0.cvData, for: input, report: report, answers: requests.flatMap { $0.answer ?? [] }, requests: requests,
+            wordList: DeviceWordList()
+        ) }
 
         var misses: [String] = []
         if input.kind == .example, result != nil {

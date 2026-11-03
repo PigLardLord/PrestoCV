@@ -5,9 +5,10 @@ import Foundation
 // MARK: - What the AI draft records in the trace of a test build (ADR 0032)
 
 /// The run of one AI draft in the trace: the description, whether the model could run, its language data, what each stage gave
-/// or removed, the claim check's verdicts, the time of each stage and the draft the person sees. Unlike `DraftLog`, it holds
-/// the text, so it goes only to the trace, which a closed gate drops whole in an App Store build. The model service and the claim
-/// checker add the requests and the raw answers to the same run (`CVPrompt.traceFields`).
+/// or removed, what the sections wrote around the facts, the claim check's verdicts, the time of each stage and the draft the
+/// person sees. Unlike `DraftLog`, it holds the text, so it goes only to the trace, which a closed gate drops whole in an App Store
+/// build. The model service and the claim checker add the requests and the raw answers to the same run (`CVPrompt.traceFields(sampling:)`,
+/// `SectionCallTrace`).
 struct DraftTrace {
     private let run: any TraceRunRecording
 
@@ -23,7 +24,7 @@ struct DraftTrace {
     /// The step that records what a stage gave. A switch over every stage, so that a new one cannot be added without its step.
     static func step(for stage: DraftLog.Stage) -> TraceStepName {
         switch stage {
-        case .model: .response
+        case .model, .writing: .response
         case .grounding, .claimCheck, .result: .removal
         }
     }
@@ -76,6 +77,26 @@ struct DraftTrace {
             fields.append(.text("cv", Self.json(after)))
         }
         run.record(Self.step(for: stage), fields)
+    }
+
+    /// What the requests of the sections wrote around the facts and their checks kept, before the final check reads it: the summary,
+    /// the duties of each job and the skills. Nothing was written when the description left nothing to write around.
+    func written(_ writing: DraftWriting?) {
+        guard run.isRecording else { return }
+        var fields: [TraceField] = [.token("stage", "\(DraftLog.Stage.writing.logName)"), .flag("wrote", writing != nil)]
+        if let writing {
+            fields += [
+                .count("roles", writing.roleDescriptions.count { $0?.presentValue != nil }),
+                .count("technologies", writing.technologies.count), .count("softSkills", writing.softSkills.count),
+            ]
+            if let summary = writing.summary?.presentValue { fields.append(.text("summary", summary)) }
+            for (number, duties) in writing.roleDescriptions.enumerated() {
+                if let duties = duties?.presentValue { fields.append(.text("duties", "role \(number): \(duties)")) }
+            }
+            fields += writing.technologies.map { TraceField.text("technology", $0) }
+            fields += writing.softSkills.map { TraceField.text("softSkill", $0) }
+        }
+        run.record(Self.step(for: .writing), fields)
     }
 
     /// What the claim check said of each personal item, and why it gave no answer when it did not.
@@ -187,10 +208,14 @@ struct DraftTiming {
         stopwatch = Stopwatch(started: clock)
     }
 
-    /// Ends a stage.
+    /// Ends a stage. A stage that runs twice, as grounding does, keeps one time: the sum of both.
     mutating func lap(_ stage: DraftLog.Stage) {
         let now = stopwatch.elapsed
-        laps.append((stage, now - elapsed))
+        if let index = laps.firstIndex(where: { $0.stage == stage }) {
+            laps[index].time += now - elapsed
+        } else {
+            laps.append((stage, now - elapsed))
+        }
         elapsed = now
     }
 
@@ -208,11 +233,50 @@ struct DraftTiming {
 // MARK: - The requests to the model
 
 extension CVPrompt {
-    /// What the model service asks the model for a draft, for the trace: the instructions, the prompt and how it is asked.
-    var traceFields: [TraceField] {
+    /// What the model service asks the model for a draft, for the trace: the instructions, the prompt and how it is asked; the
+    /// `sampling` names how the answer is sampled, which changes when an answer that repeats is asked again (#354).
+    func traceFields(sampling: String) -> [TraceField] {
         [
-            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", "greedy"),
+            .token("call", "draft"), .flag("schemaInPrompt", true), .token("sampling", sampling),
             .text("instructions", instructions ?? ""), .text("prompt", text),
         ]
+    }
+}
+
+/// One request of a section of the draft (ADR 0031, "A request per section") in the trace: a `request` step with the instructions and
+/// the prompt, and a `response` step with the raw answer, or with why there was none. Both name the call, so that the steps of a
+/// draft's many requests read apart; the first pass and the claim check name theirs `draft` and `claimCheck`.
+struct SectionCallTrace: Equatable {
+    /// The request: `job`, `jobRepair`, `tools`, `softSkills`, `moreSkills`, `summarySentence` or `summarySentenceRepair`.
+    let call: String
+    /// The number in the brief of the job a job request writes for.
+    let role: Int?
+    /// The most tokens the answer may take.
+    let tokens: Int
+
+    func request(_ prompt: SectionPrompts.Prompt) -> [TraceField] {
+        named + [
+            .count("maximumTokens", tokens), .flag("schemaInPrompt", true), .token("sampling", "greedy"),
+            .text("instructions", prompt.instructions), .text("prompt", prompt.text),
+        ]
+    }
+
+    /// The raw answer; `complete` says whether a streamed answer ended on its own and not cut, and is nil for an answer that is not streamed.
+    func answered(raw: String, complete: Bool?) -> [TraceField] {
+        named + [.flag("answered", true)] + (complete.map { [TraceField.flag("complete", $0)] } ?? []) + [.text("raw", raw)]
+    }
+
+    /// A stream that ended with no answer at all.
+    func unanswered() -> [TraceField] {
+        named + [.flag("answered", false), .token("error", "noAnswer")]
+    }
+
+    /// A request that failed: the error the use case sees, and the framework's own words.
+    func failed(error code: String, framework: String) -> [TraceField] {
+        named + [.flag("answered", false), .token("error", code), .text("framework", framework)]
+    }
+
+    private var named: [TraceField] {
+        [TraceField.token("call", call)] + (role.map { [TraceField.count("role", $0)] } ?? [])
     }
 }

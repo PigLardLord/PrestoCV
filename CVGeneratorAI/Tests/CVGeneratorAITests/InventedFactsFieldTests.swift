@@ -70,14 +70,109 @@ struct InventedFactsFieldTests {
     func sentenceStart(_ id: String, _ sentence: String) throws {
         let input = try InventedFactsTests.input(id)
         var draft = Draft(faithfulTo: input)
-        draft.summary = sentence
+        draft.experience[0] = Experience(company: draft.experience[0].company, achievements: [sentence])
 
         let report = InventedFacts.count(draft.cv, for: input)
 
         #expect(report.invented.isEmpty, "\(report.invented)")
-        let finding = try #require(report.finding(at: "summary"))
+        let finding = try #require(report.finding(at: "experience[0].achievements[0]"))
         #expect(finding.kind == .review, "\(finding)")
         #expect(finding.reason.contains(try #require(sentence.split(separator: " ").first)), "\(finding)")
+    }
+
+    @Test("A summary or a job's description written around the facts is inferred, its first capital included (ADR 0031)",
+          arguments: [
+              ("en-plain", "Reliable supervisor who keeps every shift safe and orderly."),
+              ("it-plain", "Cuoco attento, preciso e abituato al lavoro di squadra."),
+              ("de-plain", "Zuverlässiger Elektriker, sorgfältig, genau und pünktlich."),
+              ("es-plain", "Diseñadora creativa, organizada y atenta al detalle."),
+              ("fr-plain", "Boulangère soigneuse, organisée et attentive aux clients."),
+              ("pt-plain", "Enfermeira atenciosa, organizada e dedicada aos doentes."),
+          ])
+    func writtenProseIsInferred(_ id: String, _ sentence: String) throws {
+        let input = try InventedFactsTests.input(id)
+        var draft = Draft(faithfulTo: input)
+        draft.summary = sentence
+        draft.experience[0] = Experience(company: draft.experience[0].company, description: sentence)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.invented.isEmpty, "\(report.invented)")
+        #expect(report.inferred.map(\.path) == ["summary", "experience[0].description"], "\(report.findings)")
+    }
+
+    @Test("A capital of a technology the draft lists is no invented name in written text; one it does not list still is (O1)")
+    func listedToolInProse() throws {
+        let input = try InventedFactsTests.input("it-traps")
+        var draft = Draft(faithfulTo: input)
+        draft.skills.append(Skill(name: "Microsoft Excel"))
+        let path = "experience[0].description"
+        draft.summary = "Lavoro come impiegata amministrativa. Uso Microsoft Excel per organizzare i dati."
+        draft.experience[0] = Experience(company: draft.experience[0].company, description: "Registro le fatture in Excel.")
+
+        let listed = InventedFacts.count(draft.cv, for: input)
+        draft.summary = "Lavoro come impiegata amministrativa. Uso Google Sheets per organizzare i dati."
+        let unlisted = InventedFacts.count(draft.cv, for: input)
+
+        #expect(listed.invented.isEmpty, "\(listed.invented)")
+        #expect(listed.inferred.map(\.path).contains("summary"), "\(listed.findings)")
+        #expect(listed.inferred.map(\.path).contains(path), "\(listed.findings)")
+        #expect(unlisted.invented.map(\.path) == ["summary"], "\(unlisted.findings)")
+        #expect(unlisted.invented.first?.reason.contains("Google, Sheets") == true, "\(unlisted.invented)")
+    }
+
+    @Test("A length or a rank the description lacks is invented in a summary", arguments: [
+        ("en-plain", "A seasoned supervisor who keeps every shift safe."),
+        ("it-plain", "Cuoco con esperienza pluriennale in cucina."),
+        ("de-plain", "Ein langjähriger Elektriker für Neubauten."),
+    ])
+    func lengthInSummary(_ id: String, _ summary: String) throws {
+        let input = try InventedFactsTests.input(id)
+        var draft = Draft(faithfulTo: input)
+        draft.summary = summary
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.invented.map(\.path) == ["summary"], "\(report.findings)")
+        #expect(report.invented.first?.reason.contains("a length or a rank") == true, "\(report.invented)")
+    }
+
+    @Test("A capital the description lacks inside a German sentence goes to review: every German noun has one")
+    func germanCapitalGoesToReview() throws {
+        let input = try InventedFactsTests.input("de-plain")
+        var draft = Draft(faithfulTo: input)
+        draft.summary = "Elektriker mit Sorgfalt bei der Montage von Halvorsen."
+
+        let finding = try #require(InventedFacts.count(draft.cv, for: input).finding(at: "summary"))
+
+        #expect(finding.kind == .review, "\(finding)")
+        #expect(finding.reason.contains("Halvorsen"), "\(finding)")
+    }
+
+    @Test("A level of a skill the description does not name is invented: the person never gave it")
+    func levelOfAnUnnamedSkill() throws {
+        let input = try InventedFactsTests.input("en-plain")
+        var draft = Draft(faithfulTo: input)
+        draft.skills.append(Skill(name: "Route planning", level: .advanced))
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.invented.map(\.path) == ["skills[\(draft.skills.count - 1)].level"], "\(report.findings)")
+        #expect(report.inferred.map(\.path) == ["skills[\(draft.skills.count - 1)].name"], "\(report.findings)")
+    }
+
+    @Test("A skill's kind groups the skill and states no fact: it is derived, never invented")
+    func kindOfASkill() throws {
+        let input = try InventedFactsTests.input("en-plain")
+        var draft = Draft(faithfulTo: input)
+        draft.skills.append(Skill(name: "Teamwork", kind: .softSkill))
+        let path = "skills[\(draft.skills.count - 1)]"
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.finding(at: path + ".kind")?.kind == .derived, "\(report.findings)")
+        #expect(report.invented.isEmpty, "\(report.invented)")
+        #expect(report.inferred.map(\.path) == [path + ".name"], "\(report.findings)")
     }
 
     @Test("Every sentence of the prose starts again, after a full stop and after a new line; a capital inside one is still invented",
@@ -158,6 +253,18 @@ struct FieldCase: Sendable, CustomTestStringConvertible {
         // A skill the description says, and nothing else it could be.
         FieldCase(input: "en-plain", field: .skill, value: "Excel", kind: .quote),
         FieldCase(input: "it-plain", field: .skill, value: "HACCP", kind: .quote),
+        // A skill the description does not name, written for the person's role (ADR 0031): counted, and a person judges whether
+        // it fits in the pertinence item of the draft.
+        FieldCase(input: "en-plain", field: .skill, value: "Route planning", kind: .inferred),
+        FieldCase(input: "it-plain", field: .skill, value: "Lavoro di squadra", kind: .inferred),
+        // ... unless it holds what the person would have had to say: a figure, a qualification, a language, a name of the draft.
+        FieldCase(input: "en-plain", field: .skill, value: "Excel 365", kind: .invented),
+        FieldCase(input: "en-plain", field: .skill, value: "Certified forklift operation", kind: .invented),
+        FieldCase(input: "it-plain", field: .skill, value: "Abilitazione HACCP", kind: .invented),
+        FieldCase(input: "en-plain", field: .skill, value: "Business English", kind: .invented),
+        FieldCase(input: "it-plain", field: .skill, value: "Inglese commerciale", kind: .invented),
+        FieldCase(input: "en-plain", field: .skill, value: "Leeds City College tutoring", kind: .invented),
+        FieldCase(input: "en-plain", field: .skill, value: "Daniel Hart coaching", kind: .invented),
         // A language, an employer, a school, the person, or a piece of one of them, listed as a skill.
         FieldCase(input: "en-plain", field: .skill, value: "English", kind: .review),
         FieldCase(input: "en-plain", field: .skill, value: "Polish", kind: .review),

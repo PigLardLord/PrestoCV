@@ -23,18 +23,36 @@ struct InventedFactsEntryTests {
 
     @Test("Each employer and school of an input is named by one sentence of its own", arguments: DraftingInputs.languages)
     func everyEntryHasASentence(_ language: String) throws {
-        for input in try DraftingInputs.all() where input.language == language {
-            let sentences = InventedFacts.sentences(of: input.description)
-            let entries = input.facts.filter { $0.kind == .employer || $0.kind == .school }
-            var named: [Int] = []
-            for fact in entries {
-                let holding = sentences.indices.filter { index in
-                    fact.forms.contains { InventedFacts.holds(sentences[index], run: InventedFacts.words(of: $0)) }
-                }
+        for input in try DraftingInputs.all() where input.language == language && input.kind != .jobs {
+            let named = Self.sentencesNaming(input)
+            for (fact, holding) in named {
                 #expect(holding.count == 1, "\(input.id): \(fact) is named by \(holding.count) sentences")
-                named += holding
             }
-            #expect(Set(named).count == named.count, "\(input.id): two entries share a sentence")
+            let all = named.flatMap(\.holding)
+            #expect(Set(all).count == all.count, "\(input.id): two entries share a sentence")
+        }
+    }
+
+    @Test("A description with four jobs names two of them in one run-on sentence, and one of those again in a sentence of its own",
+          arguments: DraftingInputs.languages)
+    func fourJobsShareASentence(_ language: String) throws {
+        let input = try #require(try DraftingInputs.all().first { $0.language == language && $0.kind == .jobs })
+
+        let named = Self.sentencesNaming(input)
+        let counts = Dictionary(named.flatMap(\.holding).map { ($0, 1) }, uniquingKeysWith: +)
+
+        #expect(named.allSatisfy { !$0.holding.isEmpty }, "\(input.id): an employer no sentence names")
+        #expect(named.map(\.holding.count).sorted() == [1, 1, 1, 2], "\(input.id): \(named.map(\.holding))")
+        #expect(counts.values.filter { $0 == 2 }.count == 1, "\(input.id): \(counts)")
+    }
+
+    /// Each employer and school of `input`, with the sentences of its description that name it.
+    private static func sentencesNaming(_ input: DraftingInput) -> [(fact: ExpectedFact, holding: [Int])] {
+        let sentences = InventedFacts.sentences(of: input.description)
+        return input.facts.filter { $0.kind == .employer || $0.kind == .school }.map { fact in
+            (fact, sentences.indices.filter { index in
+                fact.forms.contains { InventedFacts.holds(sentences[index], run: InventedFacts.words(of: $0)) }
+            })
         }
     }
 

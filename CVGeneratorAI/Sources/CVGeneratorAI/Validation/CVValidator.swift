@@ -41,12 +41,13 @@ public struct DefaultCVValidator: CVValidator {
 
     // MARK: - Private Validation Helpers
 
+    /// The draft is judged on its facts: the summary is written by the model (ADR 0031), so a draft with nothing but a summary is
+    /// no CV of the person.
     private func hasContent(_ cvData: CVData) -> Bool {
         let info = cvData.personalInfo
         let personalFields = [
             info.name, info.email, info.phone, info.location,
             info.website, info.linkedin, info.github, info.title,
-            cvData.summary,
         ]
 
         return personalFields.contains { $0.trimmedNonEmpty != nil }
