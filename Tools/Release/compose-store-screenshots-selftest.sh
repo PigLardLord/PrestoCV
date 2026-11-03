@@ -12,7 +12,10 @@
 #   - never take for whole a set that a run was killed while it put in place, also when there was no earlier output (an
 #     empty output folder): the file it writes before the first move, and removes after the last, makes the next run
 #     refuse, at every point of the promotion, the first move, the last move and before any move (the kill is the
-#     composer's COMPOSE_TEST_KILL_AFTER_MOVE hook, which does nothing when it is not set).
+#     composer's COMPOSE_TEST_KILL_AFTER_MOVE hook, which does nothing when it is not set),
+#   - write the date of the iPad's status bar again in the language of each locale, which the simulator writes in English,
+#     and change nothing else of the image, and refuse, before it writes anything, a capture whose bar is not the time,
+#     the date and the name on a plain background, and a language whose date it does not have.
 #
 #   Tools/Release/compose-store-screenshots-selftest.sh
 set -u
@@ -27,18 +30,31 @@ pass=0; fail=0
 swiftc -O -swift-version 6 -o "$T/compose" "$HERE/compose-store-screenshots.swift" 2>"$T/swiftc.log" \
     || { cat "$T/swiftc.log"; echo "compose-store-screenshots-selftest: the composer does not compile"; exit 1; }
 
-# A plain PNG of a size, as the simulator takes it: <width> <height> <file>
+# A plain PNG of a size, as the simulator takes it: <width> <height> <file> [bar | bar-on-a-mark]. With "bar" it has the
+# iPad's status bar where the simulator puts it: the time, the date and the app's name, each a black block; with
+# "bar-on-a-mark" also a mark right of the name, too faint to be text, on what must be a plain background
 png() {
     python3 - "$@" <<'PY'
 import struct, sys, zlib
 width, height, path = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+bar = sys.argv[4] if len(sys.argv) > 4 else ""
 def chunk(kind, data):
     body = kind + data
     return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
-row = b"\x00" + bytes([0xF0, 0xF0, 0xF0]) * width
+plain = bytearray(b"\x00" + bytes([0xF0, 0xF0, 0xF0]) * width)
+rows = [bytes(plain)] * height
+if bar:
+    text = bytearray(plain)
+    for start, end in ((51, 122), (147, 275), (299, 427)):
+        text[1 + 3 * start:1 + 3 * end] = bytes(3 * (end - start))
+    rows[22:42] = [bytes(text)] * 20
+    if bar == "bar-on-a-mark":
+        marked = bytearray(text)
+        marked[1 + 3 * 600:1 + 3 * 610] = bytes([0xE8]) * 30
+        rows[30] = bytes(marked)
 with open(path, "wb") as out:
     out.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-              + chunk(b"IDAT", zlib.compress(row * height)) + chunk(b"IEND", b""))
+              + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
 PY
 }
 
@@ -239,6 +255,84 @@ killed_at_every_move() {
 # set aside, the new one) over an earlier set
 killed_at_every_move "an empty output folder" empty_output 3
 killed_at_every_move "an earlier set" earlier_run 6
+
+# The iPad's status bar shows a date, which the simulator writes in English in every language: the composer writes it again
+# in the language of the locale. Three locales of two languages, with the same captions and the same captures (each with
+# the bar), so that only the date can tell their images apart.
+ipad_locales() {
+    rm -rf "$T/captures" "$T/out"
+    { for locale in "English, en-US" "English, en-GB" "German, de-DE"; do
+        printf '## %s\n\n### Screenshot captions\n\n```text\n' "$locale"; printf '%s\n' "${SIX[@]}"; printf '```\n\n'
+      done; } > "$T/listing.md"
+    for language in en de; do
+        mkdir -p "$T/captures/ipad/$language"
+        for number in 01 02 03 04 05 06; do png 2064 2752 "$T/captures/ipad/$language/$number.png" bar; done
+    done
+}
+# rows_differing <a.png> <b.png>: prints the first and the last row from the top where the two images differ, and how many
+# rows do. sips makes each a BMP, whose rows are uncompressed
+rows_differing() {
+    sips -s format bmp "$1" --out "$T/a.bmp" > /dev/null && sips -s format bmp "$2" --out "$T/b.bmp" > /dev/null \
+        || { echo "sips failed"; return; }
+    python3 - "$T/a.bmp" "$T/b.bmp" <<'PY'
+import struct, sys
+def rows(path):
+    data = open(path, "rb").read()
+    start, = struct.unpack("<I", data[10:14])
+    width, height = struct.unpack("<ii", data[18:26])
+    depth, = struct.unpack("<H", data[28:30])
+    stride = (depth * width + 31) // 32 * 4
+    out = [data[start + y * stride:start + (y + 1) * stride] for y in range(abs(height))]
+    return out[::-1] if height > 0 else out  # a positive height lists the rows from the bottom
+a, b = rows(sys.argv[1]), rows(sys.argv[2])
+different = [y for y in range(len(a)) if a[y] != b[y]] if len(a) == len(b) else [0, len(a) - 1]
+print(different[0], different[-1], len(different)) if different else print("none")
+PY
+}
+# The rows of the date, and the bar around it, are a band at most as high as in the capture: StatusBar.rows, 44
+in_the_bar() {
+    [[ "$DIFFERING" =~ ^([0-9]+)\ ([0-9]+)\ [0-9]+$ ]] && [ "$((BASH_REMATCH[2] - BASH_REMATCH[1]))" -lt 44 ]
+}
+
+# 12. The iPad's images of each locale show the date in its language: those of en-US and en-GB are the same, and those of
+#     de-DE differ from them only in the band of the status bar
+ipad_locales
+compose_all ipad
+expect "the iPad's status bar" "exit $RC" [ "$RC" = 0 ]
+expect "  writes six images of each locale" "$(cd "$T/out" 2>/dev/null && find . -name '*.png' | sort | tr '\n' ' ')" \
+    [ "$(find "$T/out" -path '*/ipad/*.png' | wc -l | tr -d ' ')" = 18 ]
+expect "  writes the same images for two locales of one language" "en-US and en-GB differ" \
+    cmp -s "$T/out/en-US/ipad/03.png" "$T/out/en-GB/ipad/03.png"
+DIFFERING="$(rows_differing "$T/out/en-US/ipad/03.png" "$T/out/de-DE/ipad/03.png")"
+OUT="rows that differ (first, last, count): $DIFFERING"
+expect "  writes the date of each language in the status bar, and nothing else differs" "$OUT" in_the_bar
+
+# 13. A capture without the status bar is refused, and nothing is written: its date could not be found
+ipad_locales; png 2064 2752 "$T/captures/ipad/en/03.png"
+compose_all ipad
+expect "an iPad capture without the status bar" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  names the capture and what it shows" "the message is: $OUT" grep -q "ipad/en/03.png.*shows 0 items" <<< "$OUT"
+expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
+
+# 14. A status bar over something that is not a plain background is refused, and nothing is written: painting over the
+#     date would leave a patch
+ipad_locales; png 2064 2752 "$T/captures/ipad/de/05.png" bar-on-a-mark
+compose_all ipad
+expect "an iPad status bar that is not on a plain background" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  names the capture and the reason" "the message is: $OUT" grep -q "ipad/de/05.png.*not on a plain background" <<< "$OUT"
+expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
+
+# 15. A language with no date in the composer's table is refused on the iPad, before anything is written, and composed on
+#     the iPhone, whose status bar shows no date
+rm -rf "$T/captures" "$T/out"
+{ printf '## Japanese, ja-JP\n\n### Screenshot captions\n\n```text\n'; printf '%s\n' "${SIX[@]}"; printf '```\n'; } > "$T/listing.md"
+captures_for "$T/captures" ipad ja 2064 2752 6; captures_for "$T/captures" iphone ja 1320 2868 6
+compose_all ipad
+expect "a language with no date of the status bar, on the iPad" "exit $RC, want a failure" [ "$RC" != 0 ]
+expect "  names the language" "the message is: $OUT" grep -q "no status bar date for ja" <<< "$OUT"
+expect "  writes nothing" "$(find "$T/out" 2>&1)" nothing_written
+compose_all iphone
+expect "  is composed on the iPhone" "exit $RC" [ "$RC" = 0 ]
 
 echo "compose-store-screenshots-selftest: $pass passed, $fail failed"
 [ "$fail" = 0 ]

@@ -156,9 +156,13 @@ expect "  exports the six screenshots" "the captures are: $(captures iphone en)"
 expect "  leaves no half-made set" "a .partial is left" no_partial
 expect "  composes them" "the composer did not run" composed
 # simctl takes an ISO 8601 date-time with fractional seconds and reads it in the simulator's time zone, so that the offset must
-# be the one of the Mac on that day: a date makes the iPad's bar the same in every capture, and 09:41 is the local time of it
-fixed_clock() { grep -qE '^xcrun simctl status_bar OWN-UDID override --time 2007-01-09T09:41:00\.000[+-][0-9]{2}:[0-9]{2} ' "$LOG"; }
-expect "  sets the clock to a fixed date at 9:41 local time" "the override has no ISO date-time at 09:41" fixed_clock
+# be the one of the Mac on that day: a date makes the iPad's bar the same in every capture, and 09:41 is the local time of it.
+# The day is the one the composer writes again in each language (statusBarDay), so the two must agree.
+COMPOSER="$HERE/compose-store-screenshots.swift"
+DAY="$(sed -n 's/^let statusBarDay = "\([0-9-]*\)"$/\1/p' "$COMPOSER")"
+expect "  the composer names the day of the status bar" "no statusBarDay in $COMPOSER" [ -n "$DAY" ]
+fixed_clock() { grep -qE "^xcrun simctl status_bar OWN-UDID override --time ${DAY}T09:41:00\.000[+-][0-9]{2}:[0-9]{2} " "$LOG"; }
+expect "  sets the clock to the composer's day at 9:41 local time" "the override has no ISO date-time at 09:41 on ${DAY:-?}" fixed_clock
 
 # 2. The name of the simulators is reserved to the tool: another name is refused before anything is erased
 run -- --simulator-prefix "MyTests"
@@ -376,6 +380,15 @@ expect "    composes it" "the composer did not run" composed
 # The test sets a time allowance for each language, and Xcode enforces it only where the plan turns test timeouts on
 PLAN="$HERE/../../TestPlans/StoreScreenshots.xctestplan"
 expect "the StoreScreenshots plan" "does not turn test timeouts on, so a test that hangs is never ended" grep -q '"testTimeoutsEnabled" : true' "$PLAN"
+
+# The composer writes the iPad's date again in the language of each locale, and refuses a language it has no date for: every
+# language of the listing has one
+LISTING="$HERE/../../docs/release/store-listing.md"
+listed_languages() { sed -n 's/^## .*, \([a-z][a-z]\)\(-[A-Z][A-Z]\)\{0,1\}$/\1/p' "$LISTING" | sort -u; }
+dated_languages() { sed -n '/^let statusBarDates/,/^]/s/^    "\([a-z][a-z]\)": ".*",$/\1/p' "$COMPOSER" | sort -u; }
+undated() { comm -23 <(listed_languages) <(dated_languages); }
+all_dated() { [ -n "$(listed_languages)" ] && [ -z "$(undated)" ]; }
+expect "the languages of the listing" "the composer has no status bar date for: $(undated | tr '\n' ' ')" all_dated
 
 echo "store-screenshots-selftest: $pass passed, $fail failed"
 [ "$fail" = 0 ]

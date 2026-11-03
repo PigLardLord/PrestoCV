@@ -12,6 +12,11 @@
 // listing asks; apostrophes are typeset as ’, and "Apple Intelligence" is kept on one line. The images have no alpha
 // channel, which the App Store rejects. Tools/Release/store-screenshots.sh runs it.
 //
+// The iPad's status bar shows the date next to the time. store-screenshots.sh sets the simulator's clock to 9:41 on one
+// fixed day, which the simulator writes with English words in every language, so the composer writes that day again in
+// the language of the capture, as the device writes it, and moves the app's name after it to follow. A capture whose
+// status bar is not the time, the date and the app's name on a plain background is refused, as one of the wrong size is.
+//
 // A locale needs exactly six captions, one for each capture, and each capture the size of the device's screen: the
 // composer fails otherwise, before it writes anything of that locale. It makes the whole output aside, in
 // <output dir>/.compose-staging, and puts it in place only when all of it is made: each folder <locale>/<device> and each
@@ -59,6 +64,8 @@ struct Device: Sendable {
     let line: Style
     /// The corner radius of the screen, as a share of its width
     let cornerRadius: CGFloat
+    /// Whether the status bar shows the date, which the composer writes again (`rewritingStatusBarDate`)
+    let showsDateInStatusBar: Bool
 }
 
 func titleStyle(_ size: CGFloat) -> Style {
@@ -71,11 +78,11 @@ func lineStyle(_ size: CGFloat) -> Style {
 
 let devices: [String: Device] = [
     "iphone": Device(width: 1320, height: 2868, name: "iPhone", label: "iPhone 6.9-inch",
-                     title: titleStyle(112), line: lineStyle(62), cornerRadius: 0.13),
+                     title: titleStyle(112), line: lineStyle(62), cornerRadius: 0.13, showsDateInStatusBar: false),
     "iphone-6.3": Device(width: 1206, height: 2622, name: "iPhone", label: "iPhone 6.3-inch",
-                         title: titleStyle(102), line: lineStyle(57), cornerRadius: 0.13),
+                         title: titleStyle(102), line: lineStyle(57), cornerRadius: 0.13, showsDateInStatusBar: false),
     "ipad": Device(width: 2064, height: 2752, name: "iPad", label: "iPad 13-inch",
-                   title: titleStyle(132), line: lineStyle(76), cornerRadius: 0.035),
+                   title: titleStyle(132), line: lineStyle(76), cornerRadius: 0.035, showsDateInStatusBar: true),
 ]
 
 // MARK: - Layout
@@ -509,6 +516,149 @@ func contactSheet(_ rows: [(locale: String, images: [CGImage])], device: Device)
     return image
 }
 
+// MARK: - Status bar
+
+/// The day the iPad's status bar shows in every screenshot: store-screenshots.sh sets the simulator's clock to 9:41 on it
+/// (`status_bar_time`), and its self-test checks that the two agree
+let statusBarDay = "2007-01-09"
+
+/// That day, a Tuesday, as the iPad's status bar writes it in each language of the listing, in the device's own format.
+/// A locale uses the date of its language, as it uses its captures.
+let statusBarDates: [String: String] = [
+    "de": "Dienstag 9. Jan.",
+    "en": "Tue Jan 9",
+    "es": "Martes 9 de enero",
+    "fr": "Mardi 9 janvier",
+    "it": "Mar 9 gen",
+    "pt": "Terça-feira 9 de janeiro",
+]
+
+/// The iPad's status bar in a capture (iOS 27.0, a screen of scale 2): the time, the date and the app's name at the top
+/// left, in black, the date in the system font of 14 points, medium
+enum StatusBar {
+    /// The rows of the bar's text, with some background above and below it, from the top: the text is in rows 21 to 42,
+    /// and the corner of a sheet comes up to row 55
+    static let rows = 10..<54
+    /// The baseline of the text, from the top
+    static let baseline = 42
+    /// The share of the width, from the left, that holds the time, the date and the name
+    static let searchedShare = 0.4
+    static let scale: CGFloat = 2
+    static let fontSize: CGFloat = 14
+    static let fontWeight: CGFloat = 0.23
+    /// How much darker than the background, in luminance, a pixel of text is
+    static let inkContrast = 16
+    /// The least space between two items of the bar, in pixels: the words of the date are closer
+    static let itemGap = 16
+    /// How far a pixel of the background around the date and the name may be from the plain colour, in each channel
+    static let tolerance = 4
+    /// The pixels on each side of the date and the name that belong to them: the soft edges of their letters
+    static let margin = 3
+    /// How far left of the ink of its first letter the date starts: that letter is the S of the "Sun" the simulator
+    /// writes
+    static let originBeforeInk = 1
+    /// How far right of the date's width, in whole pixels from its start, the ink of the app's name starts
+    static let nameAfterDate = 22
+}
+
+func statusBarFont() throws -> CTFont {
+    guard let system = CTFontCreateUIFontForLanguage(.system, StatusBar.fontSize, nil) else {
+        throw Failure("could not make the font of the status bar")
+    }
+    let medium = CTFontDescriptorCreateCopyWithAttributes(
+        CTFontCopyFontDescriptor(system), [kCTFontTraitsAttribute: [kCTFontWeightTrait: StatusBar.fontWeight]] as CFDictionary
+    )
+    return CTFontCreateWithFontDescriptor(medium, StatusBar.fontSize, nil)
+}
+
+/// The capture with its status bar showing `date`: the date there is painted over with the background and written again,
+/// and the app's name after it is moved to keep its space from the date, as the device places it. A capture whose bar is
+/// not the time, the date and the name on a plain background, as on every screen of the app, is refused rather than
+/// painted over wrong.
+func rewritingStatusBarDate(of capture: CGImage, as date: String, path: String) throws -> CGImage {
+    let context = try makeCanvas(width: capture.width, height: capture.height)
+    context.draw(capture, in: CGRect(x: 0, y: 0, width: capture.width, height: capture.height))
+    guard let data = context.data else { throw Failure("could not read the status bar of \(path)") }
+    // Row 0 of the bitmap is the top of the image; its pixels are red, green, blue and a byte left unused
+    let rowLength = context.bytesPerRow
+    let bytes = data.bindMemory(to: UInt8.self, capacity: rowLength * capture.height)
+    func channel(_ x: Int, _ y: Int, _ c: Int) -> Int { Int(bytes[y * rowLength + x * 4 + c]) }
+    func luminance(_ rgb: [Int]) -> Int { (2126 * rgb[0] + 7152 * rgb[1] + 722 * rgb[2]) / 10_000 }
+    func luminance(_ x: Int, _ y: Int) -> Int { luminance((0..<3).map { channel(x, y, $0) }) }
+    func median(_ values: [Int]) -> Int { values.sorted()[values.count / 2] }
+    let rows = Array(StatusBar.rows)
+    let searched = Int(Double(capture.width) * StatusBar.searchedShare)
+    let margin = StatusBar.margin
+
+    /// The items of text in `columns`: runs of columns with a pixel darker than the background of its row, those closer
+    /// than an item's gap joined
+    func items(in columns: Range<Int>, background: [Int]) -> [Range<Int>] {
+        var items: [Range<Int>] = []
+        for x in columns
+        where rows.indices.contains(where: { luminance(x, rows[$0]) < background[$0] - StatusBar.inkContrast }) {
+            if let last = items.last, x - last.upperBound < StatusBar.itemGap {
+                items[items.count - 1] = last.lowerBound..<(x + 1)
+            } else {
+                items.append(x..<(x + 1))
+            }
+        }
+        return items
+    }
+    let found = items(in: 0..<searched, background: rows.map { y in median((0..<searched).map { luminance($0, y) }) })
+    guard found.count == 3 else {
+        throw Failure("\(path): the status bar shows \(found.count) items at the top left, where the iPad's shows three (the "
+                      + "time, the date and the app's name), so its date cannot be written again")
+    }
+    let oldDate = found[1]
+    let name = (found[2].lowerBound - margin)..<(found[2].upperBound + margin)
+
+    // The plain colour of each row, from the date on: every pixel there that is not of the date or the name is close to it
+    let repainted = (oldDate.lowerBound - margin)..<searched
+    let clear = repainted.filter { x in
+        !((oldDate.lowerBound - margin)..<(oldDate.upperBound + margin)).contains(x) && !name.contains(x)
+    }
+    let plain = rows.map { y in (0..<3).map { c in median(clear.map { channel($0, y, c) }) } }
+    for (row, y) in rows.enumerated() {
+        for x in clear where (0..<3).contains(where: { abs(channel(x, y, $0) - plain[row][$0]) > StatusBar.tolerance }) {
+            throw Failure("\(path): the status bar is not on a plain background around its date (at x \(x), y \(y)), so "
+                          + "its date cannot be written again")
+        }
+    }
+
+    // The name is kept aside, the date and the name painted over, and the date written where the old one started
+    let nameBlock = rows.map { y in Array(UnsafeBufferPointer(start: bytes + y * rowLength + name.lowerBound * 4,
+                                                              count: name.count * 4)) }
+    for (row, y) in rows.enumerated() {
+        for x in repainted {
+            for c in 0..<3 { bytes[y * rowLength + x * 4 + c] = UInt8(plain[row][c]) }
+        }
+    }
+    let line = CTLineCreateWithAttributedString(NSAttributedString(string: date, attributes: [
+        NSAttributedString.Key(kCTFontAttributeName as String): try statusBarFont(),
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1),
+    ]))
+    context.saveGState()
+    context.setShouldSmoothFonts(false)
+    context.scaleBy(x: StatusBar.scale, y: StatusBar.scale)
+    context.textPosition = CGPoint(x: CGFloat(oldDate.lowerBound - StatusBar.originBeforeInk) / StatusBar.scale,
+                                   y: CGFloat(capture.height - StatusBar.baseline) / StatusBar.scale)
+    CTLineDraw(line, context)
+    context.restoreGState()
+
+    // The name follows the new date where the device puts it: at a fixed space after the date's width, which the device
+    // rounds up to a whole pixel
+    let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)) * StatusBar.scale
+    let nameStart = oldDate.lowerBound - StatusBar.originBeforeInk + Int(width.rounded(.up)) + StatusBar.nameAfterDate - margin
+    guard nameStart + name.count <= searched else {
+        throw Failure("\(path): the date \"\(date)\" leaves no room for the app's name in the status bar")
+    }
+    for (row, y) in rows.enumerated() {
+        (bytes + y * rowLength + nameStart * 4).update(from: nameBlock[row], count: nameBlock[row].count)
+    }
+    guard let image = context.makeImage() else { throw Failure("could not write the status bar of \(path)") }
+    return image
+}
+
 // MARK: - Output
 
 /// Where a run makes its output before it puts it in place, where it moves what it replaces, and the file that says that a
@@ -659,13 +809,21 @@ func run(_ arguments: [String]) throws {
         for (locale, captions) in set {
             let language = String(locale.prefix(2))
             if let languages, !languages.contains(language) { continue }
+            let statusBarDate = statusBarDates[language]
+            guard statusBarDate != nil || !device.showsDateInStatusBar else {
+                throw Failure("no status bar date for \(language): add \(statusBarDay) as the \(device.label) writes it "
+                              + "in \(language) to statusBarDates")
+            }
             // All the images of the locale are composed before the first is written: a capture that is missing or
             // wrong leaves nothing of the locale half written
             var images: [CGImage] = []
             for (index, caption) in captions.enumerated() {
                 let number = String(format: "%02d.png", index + 1)
-                let capture = try loadCapture(capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)"),
-                                              for: device)
+                let url = capturesDirectory.appendingPathComponent("\(key)/\(language)/\(number)")
+                var capture = try loadCapture(url, for: device)
+                if device.showsDateInStatusBar, let statusBarDate {
+                    capture = try rewritingStatusBarDate(of: capture, as: statusBarDate, path: url.path)
+                }
                 images.append(try compose(caption: caption, capture: capture, device: device, layout: layout))
             }
             // Written aside: the folder replaces the one of an earlier run, as a whole, once the run has made everything
