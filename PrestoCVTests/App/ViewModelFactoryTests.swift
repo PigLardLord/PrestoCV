@@ -500,6 +500,21 @@ struct ViewModelFactoryTests {
         #expect(screen.draft?.cv.skills.isEmpty == true)
     }
 
+    @Test("An AI draft of an Italian description ends the current job with the Italian word, with the app in English (#363)")
+    func draftEndsTheCurrentJobInTheLanguageOfTheCV() async throws {
+        let arguments = ["PrestoCV", AIDraftScript.scriptedDraftArgument, "nurse", AIDraftScript.claimCheckArgument, "fail"]
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs, environment: .fixed(clock: clock, arguments: arguments)
+        )
+        let screen = factory.makeAIGenerationViewModel()
+        screen.prompt = AIDraftScript.nurseDescription
+
+        await screen.generateCV()
+
+        #expect(screen.draft?.cv.documentLanguage == "it")
+        #expect(screen.draft?.cv.relevant_experience.map(\.period) == ["2015 – Presente"])
+    }
+
     @Test("A debug launch whose language data arrives when the app asks drafts an English description with one tap (#270)")
     func scriptedLanguageDataArrivesForTheDraft() async throws {
         let arguments = [
