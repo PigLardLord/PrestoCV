@@ -50,8 +50,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An interest of one noun that the description says after a verb in its infinitive form ("football" of "I play football"): the
     /// pastime's phrase without its verb (#354, round 1).
     case bareInterest
-    /// A duty or a quality the person states that no job description and no skill of the draft holds (`ExpectedFact.duty`,
-    /// `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra" (#354, round 1).
+    /// A duty or a quality the person states that no skill of the draft holds and, for a duty the person states in the sentence of a
+    /// job, no description of that job: the same words under another job are lost (`ExpectedFact.duty`, `.quality`): "I mix on
+    /// digital consoles", "mi piace lavorare in squadra" (#354, round 1; #362).
     case unwrittenStatement
     /// A summary sentence whose subject is the person's work, not the person: a bare word of a title or of the field followed by a
     /// verb "to be" ("Manutenzione è la mia attività principale."; #354, round 1), or a word of the work after an article, with any
@@ -229,7 +230,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .toolAsSoftSkill: "a tool as a soft skill"
         case .thirdPersonSummary: "a summary in the third person"
         case .bareInterest: "an interest without the verb of its phrase"
-        case .unwrittenStatement: "a stated duty or quality the draft does not hold"
+        case .unwrittenStatement: "a stated duty or quality the draft does not hold, or holds only under another job"
         case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
         case .offTradeTechnology: "a technology neither stated nor of the trade"
         case .categoryAsTechnology: "a category as a technology"

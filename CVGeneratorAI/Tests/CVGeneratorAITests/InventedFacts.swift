@@ -1028,7 +1028,9 @@ enum InventedFacts {
     // MARK: - Kept and lost
 
     /// The fields that keep a fact: a field of its kind that holds one of its forms and is not invented. A title kept on a
-    /// job counts only when a sentence of the description names that job's employer.
+    /// job counts only when a sentence of the description names that job's employer. A duty the person states in the sentence of a
+    /// job (`ExpectedFact.jobs`) counts in a job description only when that job's employer is one of those (#362): the same words
+    /// under another job say something the person did not say of it. A skill that holds the duty keeps it whatever the job.
     private static func keptPaths(
         of fact: ExpectedFact, in leaves: [Sheet.Leaf], findings: [Finding], source: Source
     ) -> [String] {
@@ -1042,14 +1044,27 @@ enum InventedFacts {
         case .duty: ["experience.description", "skills.name"]
         }
         let forms = fact.forms.map(words(of:))
+        let employers = fact.jobs.map(words(of:))
         return zip(leaves, findings).compactMap { leaf, finding in
             let field = "\(leaf.steps.first?.name ?? "").\(leaf.steps.last?.name ?? "")"
             guard fields.contains(field), finding.kind != .invented else { return nil }
             let words = words(of: leaf.value)
             guard forms.contains(where: { holds(words, run: $0) }) else { return nil }
             if field == "experience.title", source.entry(of: leaf)?.owners.isEmpty ?? true { return nil }
+            if field == "experience.description", !employers.isEmpty, !isAt(employers, leaf, in: leaves) { return nil }
             return leaf.path
         }
+    }
+
+    /// Whether the job a field belongs to has one of the employers: its company holds one of their forms.
+    private static func isAt(_ employers: [[String]], _ leaf: Sheet.Leaf, in leaves: [Sheet.Leaf]) -> Bool {
+        guard let index = leaf.steps.first?.index else { return false }
+        let company = leaves.first { other in
+            other.steps.first?.name == "experience" && other.steps.first?.index == index && other.steps.last?.name == "company"
+        }
+        guard let company else { return false }
+        let words = words(of: company.value)
+        return employers.contains { holds(words, run: $0) }
     }
 
     /// The years the sentence of a job or a school gives, that no date of that entry in the draft holds.
