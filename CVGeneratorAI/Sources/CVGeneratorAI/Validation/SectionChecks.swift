@@ -124,11 +124,13 @@ extension CVDataSanitizer {
     }
 
     /// The duties of the job at `index` of `cvData.experience`, sentence by sentence: a sentence that is no whole sentence, that the
-    /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, or that is written in
-    /// another form than the job's first duty (`DutyForm`) goes with its reason. A duty typical of the job stays beside the person's,
-    /// and so does how often it is done, which is draft content under the owner's decision O1 (ADR 0031); a number still goes by
-    /// the rules. A duty said with a gerund is read, and kept, in the job's first
-    /// person (`FirstPersonDuty`).
+    /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, that is written in
+    /// another form than the job's first duty (`DutyForm`), or that joins a gerund to a verb in the first person
+    /// (`FirstPersonDuty.joinsAGerund`, #362) goes with its reason. A duty in the present (`dutyTense`) of a job that is not current
+    /// goes after a duty in the past; in a job the description says is over (`EntryEvidence.statesEnded`), it also goes before any
+    /// duty is held, and stays only beside duties held in the present and none in the past (#362). A duty typical of the job stays
+    /// beside the person's, and so does how often it is done, which is draft content under the owner's decision O1 (ADR 0031); a
+    /// number still goes by the rules. A duty said with a gerund is read, and kept, in the job's first person (`FirstPersonDuty`).
     func dutyCheck(
         of cvData: CVData, job index: Int, duties: String?, keeping earlier: [String] = [], against description: String
     ) throws(CVGenerationError) -> DutyVerdicts {
@@ -190,6 +192,8 @@ extension CVDataSanitizer {
                     rejection = Self.repeatsWordsReason
                 } else if held.contains(where: { Self.namesAgain(sentence, $0, language: language) }) {
                     rejection = Self.namesAgainReason
+                } else if FirstPersonDuty.joinsAGerund(sentence, language: language, wordList: wordList) {
+                    rejection = Self.joinsAGerundReason
                 } else if let own = Self.form(sentence, language: language) {
                     if let form, form != own {
                         rejection = "it is written in another form: " + form.advice
@@ -199,9 +203,13 @@ extension CVDataSanitizer {
                         form = own
                     }
                 }
-                if rejection == nil, !current, Self.tense(of: sentence, language: language) == .present,
-                   held.contains(where: { Self.tense(of: $0, language: language) == .past }) {
-                    rejection = "it is in the present, and the job has ended: write it in the past, as the other duties"
+                let heldTenses: Set<DutyTense> = Set(held.compactMap { Self.dutyTense(of: $0, language: language) })
+                let hasEnded: Bool = !current && rule.evidence.statesEnded
+                if rejection == nil, !current, Self.dutyTense(of: sentence, language: language) == .present,
+                   heldTenses.contains(.past) || (hasEnded && !heldTenses.contains(.present)) {
+                    rejection = heldTenses.contains(.past)
+                        ? "it is in the present, and the job has ended: write it in the past, as the other duties"
+                        : "it is in the present, and the job has ended: write it in the past"
                 }
                 if rejection == nil, let opening = Self.opening(of: sentence), held.count { Self.opening(of: $0) == opening } >= 2 {
                     rejection = Self.opensAsTwoEarlierOnes
@@ -219,6 +227,7 @@ extension CVDataSanitizer {
     }
 
     static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
+    static let joinsAGerundReason = "it joins a gerund to a verb in the first person: write each part in the first person"
 
     // MARK: Filler and vague duties (#354, round 11)
 
@@ -686,6 +695,28 @@ extension CVDataSanitizer {
 
     /// The tense of a duty said in the first person (#354): an ended job's duties keep the past they started in.
     enum DutyTense: Equatable, Sendable { case past, present }
+
+    /// The tense of a duty at its verb (`tense(of:language:)`, #362): after the words that come before it ("Spesso controllavo",
+    /// "Luego revisé", "Depois atendia"), and after the clause that "quando" or "cuando" opens, up to its comma ("Quando serviva,
+    /// cambiavo"); nil for such a clause with no comma. An ended job keeps a duty in the past that opens with one of them.
+    static func dutyTense(of sentence: String, language: Vocabulary.Language?) -> DutyTense? {
+        var rest = Substring(sentence)
+        while let opener = rest.split(whereSeparator: { !$0.isLetter }).first(where: { !wordsBeforeTheVerb.contains($0.lowercased()) }) {
+            guard clauseOpeners.contains(opener.lowercased()) else { return tense(of: String(rest[opener.startIndex...]), language: language) }
+            guard let comma = rest[opener.endIndex...].firstIndex(of: ",") else { return nil }
+            rest = rest[rest.index(after: comma)...]
+        }
+        return nil
+    }
+
+    /// The words that come before the verb of a duty in Italian, Spanish and Portuguese, and end as a tense or hide it.
+    private static let wordsBeforeTheVerb: Set<String> = [
+        "spesso", "sempre", "inoltre", "poi", "anche", "quindi", "solo", "soltanto", "subito", "soprattutto", "dopo", "frequentemente",
+        "luego", "después", "también", "además", "siempre", "sólo", "pronto", "primero",
+        "depois", "também", "além", "disso", "logo", "primeiro", "ainda",
+    ]
+    /// The words that open a clause before the verb of a duty: its tense is read after the clause's comma.
+    private static let clauseOpeners: Set<String> = ["quando", "cuando"]
 
     /// The tense of a duty by the ending of its first word, in Italian, Spanish and Portuguese, whose duties start with the verb in the
     /// first person ("Gestivo", "Coordiné", "Colaboro"); nil in the other languages, whose verbs do not tell it by their ending, and

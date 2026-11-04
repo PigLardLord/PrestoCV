@@ -111,4 +111,45 @@ struct FirstPersonDutyTests {
         let duty = FirstPersonDuty.written("controllando i quadri elettrici.", current: false, language: .italian, wordList: list)
         #expect(duty == "Controllando i quadri elettrici.")
     }
+
+    // MARK: A gerund in a later part of a duty in the first person (#362)
+
+    /// A word list that knows no verb whose first person ends as one of `gerunds` ("programmandare"), as no dictionary does, and
+    /// none of `others`.
+    private static func knowingNoVerb(of gerunds: [String], nor others: Set<String> = []) -> TableWordList {
+        let verbs: [String] = gerunds.flatMap { gerund in ["are", "ere", "ire", "ar", "er", "ir"].map { String(gerund.dropLast()) + $0 } }
+        return TableWordList(names: TableWordList.inventedNames.union(verbs).union(others))
+    }
+
+    @Test("A gerund that opens a later part of a duty in the first person, or after an infinitive, is written in the job's first person (#362)")
+    func laterGerundWritten() {
+        let list = Self.knowingNoVerb(of: ["programmando", "revisando"])
+
+        #expect(FirstPersonDuty.written("Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian, wordList: list)
+            == "Controllavo i quadri e programmavo la manutenzione.")
+        #expect(FirstPersonDuty.written("controllo i quadri, programmando i turni.", current: true, language: .italian, wordList: list)
+            == "Controllo i quadri, programmo i turni.")
+        #expect(FirstPersonDuty.written("Organizo los turnos y revisando las facturas.", current: true, language: .spanish, wordList: list)
+            == "Organizo los turnos y reviso las facturas.")
+        #expect(FirstPersonDuty.written("Organizava as prateleiras e revisando as notas.", current: false, language: .portuguese, wordList: list)
+            == "Organizava as prateleiras e revisava as notas.")
+        #expect(FirstPersonDuty.written("controlar os quadros e revisando as notas.", current: false, language: .portuguese, wordList: list)
+            == "Controlava os quadros e revisava as notas.")
+    }
+
+    @Test("A later part that opens with a first person in -ndo, a word of no verb, or a gerund of an unknown first person keeps the duty (#362)")
+    func laterPartKept() {
+        #expect(FirstPersonDuty.written("Controllo i quadri e prendo in carico i guasti.", current: true, language: .italian, wordList: words)
+            == "Controllo i quadri e prendo in carico i guasti.")
+        #expect(FirstPersonDuty.written("Organizo as prateleiras e atendo os clientes.", current: true, language: .portuguese, wordList: words)
+            == "Organizo as prateleiras e atendo os clientes.")
+        #expect(FirstPersonDuty.written(
+            "Controllo i quadri e quando serve cambio i fusibili.", current: true, language: .italian,
+            wordList: Self.knowingNoVerb(of: ["quando"], nor: ["quare"])
+        ) == "Controllo i quadri e quando serve cambio i fusibili.")
+        #expect(FirstPersonDuty.written(
+            "Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian,
+            wordList: Self.knowingNoVerb(of: ["programmando"], nor: ["programmavo"])
+        ) == "Controllavo i quadri e programmando la manutenzione.")
+    }
 }

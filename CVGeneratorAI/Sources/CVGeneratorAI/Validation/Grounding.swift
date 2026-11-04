@@ -335,7 +335,8 @@ struct Grounding {
             },
             quotableByAttribution: subject.isEducation ? nil : ownAttributedQuotes(of: index),
             continuedDated: continuedDated,
-            ownClauseQuotes: subject.isEducation ? nil : ownClauseQuotes(of: index)
+            ownClauseQuotes: subject.isEducation ? nil : ownClauseQuotes(of: index),
+            statesEnded: !subject.isEducation && hasEnded(index)
         )
     }
 

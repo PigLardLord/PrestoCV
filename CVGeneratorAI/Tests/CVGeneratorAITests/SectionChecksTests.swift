@@ -634,6 +634,59 @@ struct SectionChecksTests {
         #expect(current.kept == ["Controllo i pagamenti dei fornitori.", "Registro le fatture dei clienti."])
     }
 
+    @Test("An ended job's duty in the present goes before any duty in the past is held; after duties held in the present, it stays (#362)")
+    func presentOfAnEndedJobWithNoPast() throws {
+        let first = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Controllo i pagamenti dei fornitori. Registravo le fatture dei clienti.", against: Self.clerk
+        )
+        let afterPresent = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Registro le fatture dei clienti.", keeping: ["Controllo i pagamenti dei fornitori."],
+            against: Self.clerk
+        )
+
+        #expect(first.kept == ["Registravo le fatture dei clienti."])
+        #expect(first.rejected.map(\.sentence) == ["Controllo i pagamenti dei fornitori."])
+        #expect(first.rejected.first?.reason.hasPrefix("it is in the present, and the job has ended") == true)
+        #expect(afterPresent.kept == ["Registro le fatture dei clienti."])
+    }
+
+    @Test("A duty's tense is its verb's, after the words that come before it: an ended job keeps a duty in the past that opens with one (#362)")
+    func tenseAtTheVerb() throws {
+        let ended = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Spesso controllavo i pagamenti dei fornitori.", against: Self.clerk
+        )
+
+        #expect(CVDataSanitizer.dutyTense(of: "Spesso controllavo i quadri.", language: .italian) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Quando serviva, cambiavo i fusibili.", language: .italian) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Quando serve, cambio i fusibili.", language: .italian) == .present)
+        #expect(CVDataSanitizer.dutyTense(of: "Luego revisé las facturas.", language: .spanish) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Depois atendia os clientes.", language: .portuguese) == .past)
+        #expect(ended.kept == ["Spesso controllavo i pagamenti dei fornitori."])
+    }
+
+    @Test("A duty in the first person with a later part that opens with a gerund it cannot write goes; a later first person in -ndo stays (#362)")
+    func dutyJoiningAGerund() throws {
+        let unknown: Set<String> = ["preparandare", "preparandere", "preparandire", "preparo", "preparavo"]
+        let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList(names: TableWordList.inventedNames.union(unknown)))
+        let ended = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Controllavo i pagamenti dei fornitori e preparando i documenti per la banca.",
+            against: Self.clerk
+        )
+        let current = try sanitizer.dutyCheck(
+            of: Self.clerkJobNow, job: 0, duties: "Controllo i pagamenti dei fornitori e preparando i documenti per la banca.",
+            against: Self.clerkNow
+        )
+        let firstPerson = try sanitizer.dutyCheck(
+            of: Self.clerkJobNow, job: 0, duties: "Controllo i pagamenti dei fornitori e prendo in carico le fatture.", against: Self.clerkNow
+        )
+
+        #expect(ended.kept.isEmpty)
+        #expect(ended.rejected.map(\.reason) == [CVDataSanitizer.joinsAGerundReason])
+        #expect(current.kept.isEmpty)
+        #expect(current.rejected.map(\.reason) == [CVDataSanitizer.joinsAGerundReason])
+        #expect(firstPerson.kept == ["Controllo i pagamenti dei fornitori e prendo in carico le fatture."])
+    }
+
     @Test("A duty's tense is the ending of its first word in Italian, Spanish and Portuguese, and none in English (#354)")
     func tenseOfADuty() {
         #expect(CVDataSanitizer.tense(of: "Colaboro com as equipas de design.", language: .portuguese) == .present)

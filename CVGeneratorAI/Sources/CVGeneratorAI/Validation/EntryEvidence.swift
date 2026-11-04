@@ -35,6 +35,10 @@ struct EntryEvidence {
     /// ADR 0031, D3: every clause attributed to the job, shared tails among them: a duty that quotes one word for word may
     /// keep its acronyms, number words and seniority words.
     var ownClauseQuotes: ProseQuotes? = nil
+    /// Whether the description says that the job is over: no clause of it says it goes on, and one writes two years or an end with
+    /// no word for the present ("Dal 2013 al 2017 sono stata impiegata"). The duty check keeps its duties in the past (#362). Never
+    /// true for a study.
+    var statesEnded: Bool = false
 
     /// What the achievement at `number` may quote.
     func quotable(byAchievement number: Int) -> ProseQuotes {
