@@ -131,7 +131,7 @@ struct FirstPersonDutyTests {
 
     @Test("A gerund that opens a duty is still written in the job's first person, and a first person in -endo after it keeps its words (#362)")
     func openingGerundWritten() {
-        let list = Self.knowingNoVerb(of: ["programmando"])
+        let list = TableWordList.knowingNoVerb(of: ["programmando"], nor: [])
 
         #expect(FirstPersonDuty.written("Programmando la manutenzione.", current: false, language: .italian, wordList: list)
             == "Programmavo la manutenzione.")
@@ -141,16 +141,9 @@ struct FirstPersonDutyTests {
 
     // MARK: A gerund in a later part of a duty in the first person (#362)
 
-    /// A word list that knows no verb whose first person ends as one of `gerunds` ("programmandare"), as no dictionary does, and
-    /// none of `others`.
-    private static func knowingNoVerb(of gerunds: [String], nor others: Set<String> = []) -> TableWordList {
-        let verbs: [String] = gerunds.flatMap { gerund in ["are", "ere", "ire", "ar", "er", "ir"].map { String(gerund.dropLast()) + $0 } }
-        return TableWordList(names: TableWordList.inventedNames.union(verbs).union(others))
-    }
-
     @Test("A gerund that opens a later part of a duty in the first person, or after an infinitive, is written in the job's first person (#362)")
     func laterGerundWritten() {
-        let list = Self.knowingNoVerb(of: ["programmando", "revisando"])
+        let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"], nor: [])
 
         #expect(FirstPersonDuty.written("Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian, wordList: list)
             == "Controllavo i quadri e programmavo la manutenzione.")
@@ -172,11 +165,105 @@ struct FirstPersonDutyTests {
             == "Organizo as prateleiras e atendo os clientes.")
         #expect(FirstPersonDuty.written(
             "Controllo i quadri e quando serve cambio i fusibili.", current: true, language: .italian,
-            wordList: Self.knowingNoVerb(of: ["quando"], nor: ["quare"])
+            wordList: TableWordList.knowingNoVerb(of: ["quando"], nor: ["quare"])
         ) == "Controllo i quadri e quando serve cambio i fusibili.")
         #expect(FirstPersonDuty.written(
             "Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian,
-            wordList: Self.knowingNoVerb(of: ["programmando"], nor: ["programmavo"])
+            wordList: TableWordList.knowingNoVerb(of: ["programmando"], nor: ["programmavo"])
         ) == "Controllavo i quadri e programmando la manutenzione.")
+    }
+
+    // MARK: A gerund whose verb the word list cannot find from the gerund (#362)
+
+    /// A gerund of a verb whose stem the gerund does not keep ("facendo" is of "fare", "sirviendo" of "servir"), with the first
+    /// person of the imperfect and of the present, and what the duty goes on with.
+    struct IrregularGerund: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        /// The gerund's stem: the word list knows no verb that is this stem and an infinitive ending ("facere"), as no dictionary does.
+        let stem: String
+        let gerund: String
+        let past: String
+        let present: String
+        let object: String
+
+        var testDescription: String { gerund }
+
+        /// A word list that knows no verb of the gerund, neither one that makes it ("facere") nor one that it ends as the first person of.
+        var words: TableWordList {
+            TableWordList.knowingNoVerb(of: [gerund], nor: Set(["are", "ere", "ire", "ar", "er", "ir"].map { stem + $0 }))
+        }
+
+        static let all: [IrregularGerund] = [
+            italian("fac", "facendo", "facevo", "faccio"),
+            italian("dic", "dicendo", "dicevo", "dico"),
+            italian("traduc", "traducendo", "traducevo", "traduco"),
+            italian("propon", "proponendo", "proponevo", "propongo"),
+            italian("conduc", "conducendo", "conducevo", "conduco"),
+            italian("produc", "producendo", "producevo", "produco"),
+            italian("manten", "mantenendo", "mantenevo", "mantengo"),
+            italian("otten", "ottenendo", "ottenevo", "ottengo"),
+            spanish("sirv", "sirviendo", "servía", "sirvo"),
+            spanish("pid", "pidiendo", "pedía", "pido"),
+            spanish("durm", "durmiendo", "dormía", "duermo"),
+            spanish("dic", "diciendo", "decía", "digo"),
+            spanish("hac", "haciendo", "hacía", "hago"),
+            spanish("sig", "siguiendo", "seguía", "sigo"),
+            spanish("ten", "teniendo", "tenía", "tengo"),
+            portuguese("faz", "fazendo", "fazia", "faço"),
+            portuguese("diz", "dizendo", "dizia", "digo"),
+            portuguese("traz", "trazendo", "trazia", "trago"),
+            portuguese("mant", "mantendo", "mantinha", "mantenho"),
+            portuguese("ped", "pedindo", "pedia", "peço"),
+        ]
+
+        private static func italian(_ stem: String, _ gerund: String, _ past: String, _ present: String) -> IrregularGerund {
+            IrregularGerund(language: .italian, stem: stem, gerund: gerund, past: past, present: present, object: "i documenti del reparto")
+        }
+
+        private static func spanish(_ stem: String, _ gerund: String, _ past: String, _ present: String) -> IrregularGerund {
+            IrregularGerund(language: .spanish, stem: stem, gerund: gerund, past: past, present: present, object: "los documentos del taller")
+        }
+
+        private static func portuguese(_ stem: String, _ gerund: String, _ past: String, _ present: String) -> IrregularGerund {
+            IrregularGerund(language: .portuguese, stem: stem, gerund: gerund, past: past, present: present, object: "os documentos da loja")
+        }
+    }
+
+    @Test("A duty that opens with the gerund of an irregular verb is written in the imperfect of an ended job and in the present of the current one, though the word list has no verb that the gerund makes (#362)",
+          arguments: IrregularGerund.all)
+    func irregularGerundWritten(row: IrregularGerund) {
+        let said = row.gerund.prefix(1).uppercased() + row.gerund.dropFirst() + " " + row.object + "."
+        func written(_ form: String) -> String { form.prefix(1).uppercased() + form.dropFirst() + " " + row.object + "." }
+
+        #expect(FirstPersonDuty.written(said, current: false, language: row.language, wordList: row.words) == written(row.past))
+        #expect(FirstPersonDuty.written(said, current: true, language: row.language, wordList: row.words) == written(row.present))
+    }
+
+    @Test("A gerund of an irregular verb that follows a joiner is written in the job's first person, after a gerund or a verb in the first person (#362)")
+    func irregularGerundAfterAJoiner() {
+        let fare = TableWordList.knowingNoVerb(of: ["controllando", "facendo", "dicendo"], nor: ["facere", "facire", "dicere", "dicire"])
+        let servir = TableWordList.knowingNoVerb(of: ["sirviendo"], nor: ["sirvir", "sirver"])
+
+        #expect(FirstPersonDuty.written(
+            "Controllando i quadri elettrici e facendo la manutenzione preventiva.", current: false, language: .italian, wordList: fare
+        ) == "Controllavo i quadri elettrici e facevo la manutenzione preventiva.")
+        #expect(FirstPersonDuty.written("Gestivo gli ordini e facendo l'inventario.", current: false, language: .italian, wordList: fare)
+            == "Gestivo gli ordini e facevo l'inventario.")
+        #expect(FirstPersonDuty.written(
+            "Dicendo ai clienti i tempi di consegna e controllando i preventivi.", current: true, language: .italian, wordList: fare
+        ) == "Dico ai clienti i tempi di consegna e controllo i preventivi.")
+        #expect(FirstPersonDuty.written("Organizo los turnos y sirviendo a los clientes.", current: true, language: .spanish, wordList: servir)
+            == "Organizo los turnos y sirvo a los clientes.")
+    }
+
+    @Test("An irregular gerund whose first person the word list does not know keeps the duty as the person said it, and the duty check sees the gerund it joins to a verb (#362)")
+    func irregularGerundOfAnUnknownFormKept() {
+        let list = TableWordList.knowingNoVerb(of: ["facendo"], nor: ["facere", "facire", "facevo"])
+
+        #expect(FirstPersonDuty.written("Facendo la manutenzione preventiva.", current: false, language: .italian, wordList: list)
+            == "Facendo la manutenzione preventiva.")
+        #expect(FirstPersonDuty.written("Gestivo gli ordini e facendo l'inventario.", current: false, language: .italian, wordList: list)
+            == "Gestivo gli ordini e facendo l'inventario.")
+        #expect(FirstPersonDuty.joinsAGerund("Gestivo gli ordini e facendo l'inventario.", language: .italian, wordList: list))
     }
 }

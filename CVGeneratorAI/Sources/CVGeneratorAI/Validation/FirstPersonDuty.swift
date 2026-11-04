@@ -4,13 +4,13 @@ import Foundation
 /// "controllando i quadri elettrici e programmando la manutenzione preventiva"), in the first person of the job's other duties, so
 /// one job does not mix two forms. English puts "I was" (a past job) or "I am" (the current one) before it. Italian, Spanish and
 /// Portuguese write each gerund that starts the duty or follows a conjunction or a comma in the first person of the imperfect (a past
-/// job) or of the present (the current one), when the word list knows that form. A duty in the first person keeps its words, but for
-/// a gerund that opens a later part ("Controllavo i quadri e programmando la manutenzione", #362), which is written the same way when
-/// it is the gerund of a verb the word list knows and no first person of another (`isWritten`: "e prendo" stays), as does a first
-/// word in the first person that ends as one ("Prendo le ordinazioni"). A duty with a
-/// form the list does not know keeps its words; each duty starts with a capital letter. A duty that starts with an Italian infinitive
-/// in -are or a Portuguese one in -ar is written the same way (#354, round 10), and one in -ere or -ire of an ended Italian job
-/// (round 14).
+/// job) or of the present (the current one), when the word list knows that form. A duty in the first person keeps its words, but
+/// for a gerund that opens a later part ("Controllavo i quadri e programmando la manutenzione", #362), which is written the same way
+/// when it is the gerund of a verb the word list knows, or of an irregular verb (`irregular`: "facendo" is of "fare", and the word
+/// list has no verb it could find from the gerund), and no first person of another (`isWritten`: "e prendo" stays), as does a first
+/// word in the first person that ends as one ("Prendo le ordinazioni"). A duty with a form the list does not know keeps its words;
+/// each duty starts with a capital letter. A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is
+/// written the same way (#354, round 10), and one in -ere or -ire of an ended Italian job (round 14).
 enum FirstPersonDuty {
     private struct Endings {
         /// The endings of the form the rewrite reads: a gerund's, or an infinitive's.
@@ -58,6 +58,62 @@ enum FirstPersonDuty {
             exceptions: ["fare", "essere"]
         ),
         .portuguese: Endings(gerunds: ["ar"], past: ["ar": ["ava"]], present: ["ar": ["o"]], exceptions: ["estar"], unwritten: ["er", "ir"]),
+    ]
+
+    /// A gerund of a verb whose stem the gerund does not keep: the word list has no verb that is the gerund's stem and an infinitive
+    /// ending ("facere" for "facendo", "sirvir" for "sirviendo"), so the rewrite cannot find the verb from the gerund. Each is
+    /// written in the form listed, which the word list must still know. The imperfect of the Italian ones is the gerund's stem and
+    /// "evo" or "ivo"; the lists hold the verbs of CV duties, not every irregular verb, and a gerund that is not on one keeps the
+    /// duty as the person said it (#362).
+    private struct Irregular {
+        let past: String
+        let present: String
+    }
+
+    private static let irregular: [Vocabulary.Language: [String: Irregular]] = [
+        .italian: [
+            "facendo": Irregular(past: "facevo", present: "faccio"),
+            "dicendo": Irregular(past: "dicevo", present: "dico"),
+            "traducendo": Irregular(past: "traducevo", present: "traduco"),
+            "proponendo": Irregular(past: "proponevo", present: "propongo"),
+            "ponendo": Irregular(past: "ponevo", present: "pongo"),
+            "conducendo": Irregular(past: "conducevo", present: "conduco"),
+            "producendo": Irregular(past: "producevo", present: "produco"),
+            "mantenendo": Irregular(past: "mantenevo", present: "mantengo"),
+            "ottenendo": Irregular(past: "ottenevo", present: "ottengo"),
+            "tenendo": Irregular(past: "tenevo", present: "tengo"),
+            "sostenendo": Irregular(past: "sostenevo", present: "sostengo"),
+            "scegliendo": Irregular(past: "sceglievo", present: "scelgo"),
+        ],
+        .spanish: [
+            "sirviendo": Irregular(past: "servía", present: "sirvo"),
+            "pidiendo": Irregular(past: "pedía", present: "pido"),
+            "repitiendo": Irregular(past: "repetía", present: "repito"),
+            "durmiendo": Irregular(past: "dormía", present: "duermo"),
+            "diciendo": Irregular(past: "decía", present: "digo"),
+            "haciendo": Irregular(past: "hacía", present: "hago"),
+            "siguiendo": Irregular(past: "seguía", present: "sigo"),
+            "consiguiendo": Irregular(past: "conseguía", present: "consigo"),
+            "eligiendo": Irregular(past: "elegía", present: "elijo"),
+            "teniendo": Irregular(past: "tenía", present: "tengo"),
+            "manteniendo": Irregular(past: "mantenía", present: "mantengo"),
+            "obteniendo": Irregular(past: "obtenía", present: "obtengo"),
+            "sosteniendo": Irregular(past: "sostenía", present: "sostengo"),
+            "proponiendo": Irregular(past: "proponía", present: "propongo"),
+            "produciendo": Irregular(past: "producía", present: "produzco"),
+            "traduciendo": Irregular(past: "traducía", present: "traduzco"),
+            "trayendo": Irregular(past: "traía", present: "traigo"),
+        ],
+        .portuguese: [
+            "fazendo": Irregular(past: "fazia", present: "faço"),
+            "dizendo": Irregular(past: "dizia", present: "digo"),
+            "trazendo": Irregular(past: "trazia", present: "trago"),
+            "mantendo": Irregular(past: "mantinha", present: "mantenho"),
+            "obtendo": Irregular(past: "obtinha", present: "obtenho"),
+            "pedindo": Irregular(past: "pedia", present: "peço"),
+            "seguindo": Irregular(past: "seguia", present: "sigo"),
+            "servindo": Irregular(past: "servia", present: "sirvo"),
+        ],
     ]
 
     /// The words that join two parts of a duty.
@@ -146,9 +202,9 @@ enum FirstPersonDuty {
     }
 
     /// Whether `word`, which opens a part of a duty, is a gerund the rewrite writes (#362): the gerund of a verb the word list knows
-    /// ("programmando", of "programmare"), and no first person of another verb ("prendo", of "prendere"; "atendo", of "atender")
-    /// nor a word that ends as one and is no verb's ("quando"). Those keep their words. A form with no verbs (an infinitive's) is
-    /// written when it ends as one.
+    /// ("programmando", of "programmare") or of an irregular one (`irregular`: "facendo"), and no first person of another verb
+    /// ("prendo", of "prendere"; "atendo", of "atender") nor a word that ends as one and is no verb's ("quando"). Those keep their
+    /// words. A form with no verbs (an infinitive's) is written when it ends as one.
     private static func isWritten(_ word: String, _ rules: Endings, language: Vocabulary.Language, wordList: any WordList) -> Bool {
         guard isGerund(word, rules) else { return false }
         guard !rules.verbs.isEmpty else { return true }
@@ -157,7 +213,7 @@ enum FirstPersonDuty {
         let stem = String(word.dropLast(ending.count))
         let verbs: [String] = (rules.verbs[ending] ?? []).map { stem + $0 }
         let verbsOfAFirstPerson: [String] = Set(rules.verbs.values.joined()).map { String(word.dropLast()) + $0 }
-        return verbs.contains(where: knows) && !verbsOfAFirstPerson.contains(where: knows)
+        return (irregular[language]?[word] != nil || verbs.contains(where: knows)) && !verbsOfAFirstPerson.contains(where: knows)
     }
 
     /// The perfective past of each language that has two pasts: the word its first duty opens with that marks it, the ending of
@@ -231,7 +287,13 @@ enum FirstPersonDuty {
         let word = String(token.dropLast(trailing.count))
         guard let ending = rules.gerunds.first(where: { word.lowercased().hasSuffix($0) }) else { return nil }
         let stem = String(word.dropLast(ending.count))
-        let candidates = ((current ? rules.present : rules.past)[ending] ?? []).map { stem + $0 }
+        let candidates: [String]
+        if let form = irregular[language]?[word.lowercased()] {
+            let written = current ? form.present : form.past
+            candidates = [word.first?.isUppercase == true ? capitalised(written) : written]
+        } else {
+            candidates = ((current ? rules.present : rules.past)[ending] ?? []).map { stem + $0 }
+        }
         guard let known = candidates.first(where: { wordList.knows($0.lowercased(), inLanguage: language.rawValue) == true }) else { return nil }
         return known + trailing
     }

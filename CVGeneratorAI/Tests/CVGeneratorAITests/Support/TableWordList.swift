@@ -21,6 +21,13 @@ struct TableWordList: WordList {
     /// when no verb of another form makes it (#362).
     static let inventedNames: Set<String> = madeUpVerbs.union(people)
 
+    /// A dictionary that knows no verb whose first person ends as one of `gerunds` ("programmandare" for "programmando"), as no
+    /// dictionary does, and none of `others`: the check then reads a gerund as one (#362).
+    static func knowingNoVerb(of gerunds: [String], nor others: Set<String>) -> TableWordList {
+        let verbs: [String] = gerunds.flatMap { gerund in ["are", "ere", "ire", "ar", "er", "ir"].map { String(gerund.dropLast()) + $0 } }
+        return TableWordList(names: inventedNames.union(verbs).union(others))
+    }
+
     private static let madeUpVerbs: Set<String> = Set(["controllando", "programmando", "usando"].flatMap { gerund in
         ["are", "ere", "ire"].map { String(gerund.dropLast()) + $0 }
     })
