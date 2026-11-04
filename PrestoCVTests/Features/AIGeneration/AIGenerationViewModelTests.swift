@@ -21,7 +21,7 @@ enum LateEnd: Sendable {
 @Suite("AIGenerationViewModel Tests", .timeLimit(.minutes(1)))
 struct AIGenerationViewModelTests {
     private let service = FakeCVGenerationService()
-    private let labels = AIDraftLabels(present: "Oggi")
+    private let labels = AIDraftLabels(present: { _ in "Oggi" }, presentInAppLanguage: "Oggi")
     private let validPrompt = "I am John Doe, an engineer at Tech Corp since 2020. I speak Italian (native) and French."
 
     private let languageData = LanguageDataSpy()
