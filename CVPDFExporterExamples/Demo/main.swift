@@ -78,9 +78,6 @@ struct DemoApp {
         #endif
         return
 
-        // Other demos below (disabled)
-        // await RenderCVDemo.main()
-
         // Original demo below (disabled)
         do {
             try await runDemo()

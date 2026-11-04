@@ -18,6 +18,17 @@ final class NewRowFocus {
         requestedRow = nil
         return true
     }
+
+    /// The identity of the row at `index` of this section, by which the form scrolls to it.
+    func identity(ofRow index: Int) -> RowIdentity {
+        RowIdentity(section: ObjectIdentifier(self), index: index)
+    }
+}
+
+/// A row of a section, told apart from the rows of the other sections of the same form.
+struct RowIdentity: Hashable {
+    let section: ObjectIdentifier
+    let index: Int
 }
 
 extension EnvironmentValues {
@@ -25,6 +36,8 @@ extension EnvironmentValues {
     @Entry var newRowFocus: NewRowFocus? = nil
     /// The place of a row in its section.
     @Entry var rowIndex = 0
+    /// Scrolls the form a row is in; nil outside a form that brings its new rows into view.
+    @Entry var formScroll: ScrollViewProxy? = nil
 }
 
 extension View {
@@ -32,11 +45,19 @@ extension View {
     func firstFieldOfRow() -> some View {
         modifier(FirstFieldOfRow())
     }
+
+    /// Lets the rows added to the sections of this form, which scrolls, bring themselves into view.
+    func bringsNewRowsIntoView() -> some View {
+        ScrollViewReader { form in
+            self.environment(\.formScroll, form)
+        }
+    }
 }
 
 private struct FirstFieldOfRow: ViewModifier {
     @Environment(\.newRowFocus) private var newRowFocus
     @Environment(\.rowIndex) private var rowIndex
+    @Environment(\.formScroll) private var formScroll
     @FocusState private var isFocused: Bool
 
     func body(content: Content) -> some View {
@@ -44,8 +65,12 @@ private struct FirstFieldOfRow: ViewModifier {
             .focused($isFocused)
             .task {
                 // The field takes the focus once it is on the screen, not while its row is still being inserted
-                if newRowFocus?.take(row: rowIndex) == true {
-                    isFocused = true
+                guard let newRowFocus, newRowFocus.take(row: rowIndex) else { return }
+                isFocused = true
+                // Since iOS 27 the form brings a field that takes the focus low on the screen only to the keyboard's top
+                // edge, under the Done button that floats over it: the new row comes up to the top of the form instead
+                withAnimation(DesignTokens.Animations.standardEaseInOut) {
+                    formScroll?.scrollTo(newRowFocus.identity(ofRow: rowIndex), anchor: .top)
                 }
             }
     }

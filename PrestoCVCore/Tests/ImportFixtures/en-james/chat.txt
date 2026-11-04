@@ -1,0 +1,41 @@
+Sure! Here's a polished version of your CV:
+
+# James O'Neill
+**Data Analyst**
+📍 Dublin, Ireland | 📞 +44 7700 900456 | ✉️ james.oneill@example.org | 🔗 linkedin.com/in/james-oneill-example
+
+---
+
+## Professional Summary
+Data analyst who turns messy spreadsheets into dashboards people use, with a background in logistics.
+
+## Work Experience
+**Data Analyst** | Example Logistics Ltd | Dublin | June 2021 – Present
+- Built weekly dashboards for the operations team
+- Automated reports that took a day each week
+
+**Operations Coordinator** | Acme Freight Ltd | Cork | September 2017 – May 2021
+- Planned routes for a fleet of forty vans
+
+## Education
+### MSc in Business Analytics
+University College Dublin, Dublin | 2016 – 2017
+
+## Skills
+- SQL, Python, Power BI
+
+## Languages
+| Language | Level |
+|---|---|
+| English | native |
+| Spanish | conversational |
+
+## Certifications
+- Microsoft Certified: Power BI Data Analyst Associate – Microsoft (2022)
+
+## Interests
+Hiking, Chess
+
+---
+
+Let me know if you'd like me to tailor it to a specific job ad.

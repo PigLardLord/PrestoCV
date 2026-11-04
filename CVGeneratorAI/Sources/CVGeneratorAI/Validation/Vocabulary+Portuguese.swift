@@ -153,7 +153,7 @@ extension Vocabulary {
         /// Words of studying and graduating.
         studying: """
         academia colegio curso cursos diploma doutorado escola escolas estudante estudantes estudos exame faculdade
-        graduacao instituto licenciatura mestrado primaria secundaria tese universidade universidades
+        fundamental graduacao instituto licenciatura mestrado primaria secundaria tese universidade universidades
         """,
         /// Prepositions and adverbs of time, and the conjunctions that join them: what a pure time phrase is made of, with years.
         timePhrase: """
@@ -161,7 +161,8 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        formada formadas formado formados formei formou graduei graduou
+        completei conclui concluida concluido finalizei formada formadas formado formados formei formou graduei graduou
+        terminada terminado terminei
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
@@ -319,6 +320,9 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        seria serias seriamos seriam faria farias fariamos fariam teria terias teriamos teriam adoraria adorarias adorariamos
+        adorariam quereria quererias quereriamos quereriam
+        sonho_em sonho_com intencao_de
         acompanhara acompanharao acompanharas acompanharei acompanhareis acompanharemos acompanharia acompanhariam
         acompanhariamos acompanharias acompanharieis administrara administrarao administraras administrarei
         administrareis administraremos administraria administrariam administrariamos administrarias administrarieis

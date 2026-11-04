@@ -1,0 +1,11 @@
+{
+ "id": "traps/qualificacoes-pt", "language": "pt", "form": "trap",
+ "person": {"name": "Tiago Ferreira", "title": "Técnico de informática", "email": "tiago.ferreira@example.com", "phone": "+351 910 000 606",
+            "location": "Coimbra", "links": [], "summary": null},
+ "experience": [
+  {"role": "Técnico de informática", "employer": "Serviços Exemplo S.A.", "location": "Coimbra", "start": [2020, 1], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "Licenciatura em Informática", "school": "Universidade de Coimbra", "start": [2016, null], "end": [2019, null]}],
+ "skills": ["Redes", "Linux", "Suporte técnico"],
+ "languages": [], "certifications": [], "interests": []
+}

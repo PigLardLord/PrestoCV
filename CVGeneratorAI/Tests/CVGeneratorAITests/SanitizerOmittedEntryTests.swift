@@ -10,8 +10,8 @@ import Foundation
 struct SanitizerOmittedEntryTests {
     private let sanitizer = CVDataSanitizer()
 
-    private func sanitized(_ cvData: CVData, from description: String) -> CVData {
-        sanitizer.sanitize(cvData, against: description)
+    private func sanitized(_ cvData: CVData, from description: String) throws -> CVData {
+        try sanitizer.sanitize(cvData, against: description)
     }
 
     private func job(
@@ -25,14 +25,14 @@ struct SanitizerOmittedEntryTests {
     // MARK: - The example of the review
 
     @Test("A draft with only the first employer keeps neither the date nor the figure of the second")
-    func secondEmployerIsLeftOut() {
+    func secondEmployerIsLeftOut() throws {
         let description = "At Acme in 2012 I worked for 3 years and at Beta in 2019 I worked for 5 years."
         let draft = CVData(experience: [job(
             "Acme", from: "2012", to: "2019", description: "At Beta in 2019 I worked for 5 years.",
             achievements: ["At Acme in 2012 I worked for 3 years", "At Beta in 2019 I worked for 5 years"]
         )])
 
-        let acme = sanitized(draft, from: description).experience.first
+        let acme = try sanitized(draft, from: description).experience.first
 
         #expect(acme?.startDate == "2012")
         #expect(acme?.endDate == nil)
@@ -41,22 +41,22 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("Figures with no dates are bounded in the same way")
-    func figuresOfAnOmittedEmployer() {
+    func figuresOfAnOmittedEmployer() throws {
         let description = "At Acme I worked for 3 years and at Beta I worked for 5 years."
         let draft = CVData(experience: [job("Acme", achievements: ["At Acme I worked for 3 years", "At Beta I worked for 5 years"])])
 
-        #expect(sanitized(draft, from: description).experience.first?.achievements == ["At Acme I worked for 3 years"])
+        #expect(try sanitized(draft, from: description).experience.first?.achievements == ["At Acme I worked for 3 years"])
     }
 
     @Test("An employer written in lower case after \"and at\" is still the start of another job")
-    func lowerCaseEmployerAfterAConjunction() {
+    func lowerCaseEmployerAfterAConjunction() throws {
         let description = "At Acme in 2012 I worked for 3 years and at the clinic in 2019 I worked for 5 years."
         let draft = CVData(experience: [job(
             "Acme", from: "2012", to: "2019",
             achievements: ["At Acme in 2012 I worked for 3 years", "at the clinic in 2019 I worked for 5 years"]
         )])
 
-        let acme = sanitized(draft, from: description).experience.first
+        let acme = try sanitized(draft, from: description).experience.first
 
         #expect(acme?.endDate == nil)
         #expect(acme?.achievements == ["At Acme in 2012 I worked for 3 years"])
@@ -103,13 +103,13 @@ struct SanitizerOmittedEntryTests {
 
     @Test("What a job keeps is the same whether or not the draft has the job beside it",
           arguments: twoEmployers + employerNamedAnyhow)
-    func omittingTheOtherJobChangesNothing(language: String, description: String, achievements: [String]) {
+    func omittingTheOtherJobChangesNothing(language: String, description: String, achievements: [String]) throws {
         let acme = job("Acme", from: "2012", to: "2019", current: true, description: achievements[1] + ".", achievements: achievements)
         let beta = job("Beta", from: "2012", to: "2019", current: true, description: achievements[0] + ".", achievements: achievements)
 
-        let withBoth = sanitized(CVData(experience: [acme, beta]), from: description).experience
-        let acmeAlone = sanitized(CVData(experience: [acme]), from: description).experience
-        let betaAlone = sanitized(CVData(experience: [beta]), from: description).experience
+        let withBoth = try sanitized(CVData(experience: [acme, beta]), from: description).experience
+        let acmeAlone = try sanitized(CVData(experience: [acme]), from: description).experience
+        let betaAlone = try sanitized(CVData(experience: [beta]), from: description).experience
 
         #expect(acmeAlone.first == withBoth.first { $0.company == "Acme" }, "\(language): Acme")
         #expect(betaAlone.first == withBoth.first { $0.company == "Beta" }, "\(language): Beta")
@@ -121,14 +121,14 @@ struct SanitizerOmittedEntryTests {
 
     @Test("The same, whatever place the draft gives to the job or to the person",
           arguments: employerNamedAnyhow)
-    func placeOfTheOmittedEmployer(language: String, description: String, achievements: [String]) {
+    func placeOfTheOmittedEmployer(language: String, description: String, achievements: [String]) throws {
         let plain = Experience(title: "", company: "Acme", startDate: "2012", endDate: "2019", current: true, achievements: achievements)
         let atBeta = Experience(title: "", company: "Acme", location: "Beta", startDate: "2012", endDate: "2019", current: true, achievements: achievements)
 
         let results = [
-            sanitized(CVData(experience: [plain]), from: description).experience.first,
-            sanitized(CVData(experience: [atBeta]), from: description).experience.first,
-            sanitized(CVData(personalInfo: PersonalInfo(location: "Beta"), experience: [plain]), from: description).experience.first,
+            try sanitized(CVData(experience: [plain]), from: description).experience.first,
+            try sanitized(CVData(experience: [atBeta]), from: description).experience.first,
+            try sanitized(CVData(personalInfo: PersonalInfo(location: "Beta"), experience: [plain]), from: description).experience.first,
         ]
 
         for acme in results {
@@ -145,12 +145,12 @@ struct SanitizerOmittedEntryTests {
             "Ho lavorato presso Acme e Beta dal 2012 al 2019.",
             "Ich habe bei Acme und Beta von 2012 bis 2019 gearbeitet.",
           ])
-    func coordinatedEmployers(description: String) {
+    func coordinatedEmployers(description: String) throws {
         let acme = job("Acme", from: "2012", to: "2019")
         let beta = job("Beta", from: "2012", to: "2019")
 
-        let alone = sanitized(CVData(experience: [acme]), from: description).experience.first
-        let withBoth = sanitized(CVData(experience: [acme, beta]), from: description).experience.first { $0.company == "Acme" }
+        let alone = try sanitized(CVData(experience: [acme]), from: description).experience.first
+        let withBoth = try sanitized(CVData(experience: [acme, beta]), from: description).experience.first { $0.company == "Acme" }
 
         #expect(alone?.startDate == nil, "\(description)")
         #expect(alone?.endDate == nil, "\(description)")
@@ -166,10 +166,10 @@ struct SanitizerOmittedEntryTests {
             ("de", "Bei Acme habe ich 2012 3 Jahre gearbeitet und als Leiter habe ich 2019 5 Jahre gearbeitet.",
              ["Bei Acme habe ich 2012 3 Jahre gearbeitet", "als Leiter habe ich 2019 5 Jahre gearbeitet"]),
           ])
-    func periodWithoutAName(language: String, description: String, achievements: [String]) {
+    func periodWithoutAName(language: String, description: String, achievements: [String]) throws {
         let acme = job("Acme", from: "2012", to: "2019", achievements: achievements)
 
-        let result = sanitized(CVData(experience: [acme]), from: description).experience.first
+        let result = try sanitized(CVData(experience: [acme]), from: description).experience.first
 
         #expect(result?.startDate == "2012", "\(language)")
         #expect(result?.endDate == nil, "\(language)")
@@ -179,7 +179,7 @@ struct SanitizerOmittedEntryTests {
     // MARK: - What joins the clause that names the employer, and what does not
 
     @Test("A clause that names no employer joins the clause of the employer next to it, in the same sentence")
-    func factsOfAClauseWithoutTheEmployer() {
+    func factsOfAClauseWithoutTheEmployer() throws {
         let teacher = job("Don Milani school", from: "2016", current: true, achievements: ["Trained 3 new teachers"])
         let assistant = Experience(title: "assistant", company: "nursery", startDate: "2012", endDate: "2016")
         let school = Education(degree: "Education Sciences", institution: "University of Bologna", endDate: "2012")
@@ -189,7 +189,7 @@ struct SanitizerOmittedEntryTests {
             I studied Education Sciences at the University of Bologna and graduated in 2012.
             """
 
-        let result = sanitized(CVData(experience: [teacher, assistant], education: [school]), from: description)
+        let result = try sanitized(CVData(experience: [teacher, assistant], education: [school]), from: description)
 
         #expect(result.experience[0].startDate == "2016")
         #expect(result.experience[0].current == true)
@@ -201,20 +201,20 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("A lead-in at the start of the sentence still belongs to the clause after it")
-    func leadInBelongsToTheClauseAfterIt() {
+    func leadInBelongsToTheClauseAfterIt() throws {
         let draft = CVData(experience: [job("Acme", from: "2019", current: true)])
 
-        let result = sanitized(draft, from: "Since 2019, I work at Acme.").experience.first
+        let result = try sanitized(draft, from: "Since 2019, I work at Acme.").experience.first
 
         #expect(result?.startDate == "2019")
         #expect(result?.current == true)
     }
 
     @Test("Nothing outside the clauses that name the employer backs it, even when the description names one employer only")
-    func soleEmployerOfTheDescription() {
+    func soleEmployerOfTheDescription() throws {
         let draft = CVData(experience: [job("Acme", from: "2018", current: true, achievements: ["Worked for 3 years"])])
 
-        let result = sanitized(draft, from: "I work at Acme. Since 2018 I cook there. I work for 3 years now.").experience.first
+        let result = try sanitized(draft, from: "I work at Acme. Since 2018 I cook there. I work for 3 years now.").experience.first
 
         #expect(result?.startDate == nil)
         #expect(result?.current == false)
@@ -222,13 +222,13 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("The first word of a sentence is no exception: a sentence that does not name the employer backs nothing")
-    func sentenceThatStartsWithAnEmployer() {
+    func sentenceThatStartsWithAnEmployer() throws {
         let draft = CVData(experience: [job(
             "Acme", from: "2012", to: "2019", current: true,
             achievements: ["Worked for 3 years at Acme", "Beta employed me now in 2019 for 9 years"]
         )])
 
-        let result = sanitized(draft, from: "Beta employed me now in 2019 for 9 years. I worked for 3 years at Acme.").experience.first
+        let result = try sanitized(draft, from: "Beta employed me now in 2019 for 9 years. I worked for 3 years at Acme.").experience.first
 
         #expect(result?.startDate == nil)
         #expect(result?.endDate == nil)
@@ -237,11 +237,11 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("Capitals are not read: a clause in capitals is explained as one in lower case, and a capitalised word nothing explains blocks it")
-    func capitalsAreNotRead() {
+    func capitalsAreNotRead() throws {
         let draft = CVData(experience: [job("Acme", from: "2012", achievements: ["At Acme in 2012 I worked for 3 years"])])
 
-        let shouting = sanitized(draft, from: "AT ACME IN 2012 I WORKED FOR 3 YEARS.").experience.first
-        let withAName = sanitized(draft, from: "At Acme in 2012 I used Python for 3 years.").experience.first
+        let shouting = try sanitized(draft, from: "AT ACME IN 2012 I WORKED FOR 3 YEARS.").experience.first
+        let withAName = try sanitized(draft, from: "At Acme in 2012 I used Python for 3 years.").experience.first
 
         #expect(shouting?.startDate == "2012")
         #expect(shouting?.achievements == ["At Acme in 2012 I worked for 3 years"])
@@ -250,11 +250,11 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("A description typed in lower case is read in the same way")
-    func lowerCaseDescription() {
+    func lowerCaseDescription() throws {
         let description = "i worked at acme in 2012 and beta employed me in 2019"
         let draft = CVData(experience: [job("acme", from: "2012", to: "2019")])
 
-        let acme = sanitized(draft, from: description).experience.first
+        let acme = try sanitized(draft, from: description).experience.first
 
         #expect(acme?.startDate == "2012")
         #expect(acme?.endDate == nil)
@@ -266,30 +266,30 @@ struct SanitizerOmittedEntryTests {
             ("From 2004 to 2008 I worked at Procter and Gamble.", "Procter and Gamble"),
             ("Von 2004 bis 2008 habe ich bei Müller und Söhne gearbeitet.", "Müller und Söhne"),
           ])
-    func employerWithAConjunction(description: String, company: String) {
-        let result = sanitized(CVData(experience: [job(company, from: "2004", to: "2008")]), from: description).experience.first
+    func employerWithAConjunction(description: String, company: String) throws {
+        let result = try sanitized(CVData(experience: [job(company, from: "2004", to: "2008")]), from: description).experience.first
 
         #expect(result?.startDate == "2004", "\(description)")
         #expect(result?.endDate == "2008", "\(description)")
     }
 
     @Test("A clause that names no employer backs nothing of a description that names two")
-    func clauseWithoutAnEmployer() {
+    func clauseWithoutAnEmployer() throws {
         let description = "At Acme I worked, from 2012 to 2016, and at Beta I worked, from 2019 to 2023."
         let draft = CVData(experience: [job("Acme", from: "2012", to: "2016")])
 
-        let acme = sanitized(draft, from: description).experience.first
+        let acme = try sanitized(draft, from: description).experience.first
 
         #expect(acme?.startDate == nil)
         #expect(acme?.endDate == nil)
     }
 
     @Test("A clause that names two employers says nothing of either")
-    func clauseWithTwoEmployers() {
+    func clauseWithTwoEmployers() throws {
         let description = "I left Beta for Acme in 2019 and I still work there now."
         let draft = CVData(experience: [job("Acme", from: "2019", current: true), job("Beta", to: "2019")])
 
-        let result = sanitized(draft, from: description).experience
+        let result = try sanitized(draft, from: description).experience
 
         #expect(result.map(\.startDate) == [nil, nil])
         #expect(result.map(\.endDate) == [nil, nil])
@@ -297,11 +297,11 @@ struct SanitizerOmittedEntryTests {
     }
 
     @Test("A name that goes on past the employer's is another employer when the draft has it")
-    func employerWhoseNameGoesOn() {
+    func employerWhoseNameGoesOn() throws {
         let description = "I worked at Acme in 2012. I work at Acme Labs since 2019."
         let draft = CVData(experience: [job("Acme", from: "2012", to: "2019", current: true), job("Acme Labs", from: "2012", current: true)])
 
-        let result = sanitized(draft, from: description).experience
+        let result = try sanitized(draft, from: description).experience
 
         #expect(result.map(\.startDate) == ["2012", nil], "The 2012 of Acme Labs is not in its clause")
         #expect(result.map(\.endDate) == [nil, nil])
@@ -311,20 +311,20 @@ struct SanitizerOmittedEntryTests {
     // MARK: - Titles and prose
 
     @Test("A title stated outside the clauses that name the employer is not the job's, whatever the sentence says of the person")
-    func titleOutsideTheEmployersClauses() {
+    func titleOutsideTheEmployersClauses() throws {
         let description = "I was head nurse at Beta in 2019. I was a cook at Acme in 2012."
         let draft = CVData(experience: [Experience(title: "head nurse", company: "Acme")])
 
-        #expect(sanitized(draft, from: description).experience.first?.title == "")
+        #expect(try sanitized(draft, from: description).experience.first?.title == "")
     }
 
     @Test("A sentence of a job's text that names another employer of the draft is dropped")
-    func proseNamingAnotherEmployer() {
+    func proseNamingAnotherEmployer() throws {
         let description = "I worked at Acme. Later I moved to Beta."
         let acme = job("Acme", description: "Worked at Acme. Later moved to Beta.")
         let beta = job("Beta")
 
-        let result = sanitized(CVData(experience: [acme, beta]), from: description).experience
+        let result = try sanitized(CVData(experience: [acme, beta]), from: description).experience
 
         #expect(result.first?.description == "Worked at Acme.")
     }
@@ -332,45 +332,47 @@ struct SanitizerOmittedEntryTests {
     // MARK: - Schools and certifications
 
     @Test("A school the draft left out still ends the evidence of the school before it")
-    func omittedSchool() {
+    func omittedSchool() throws {
         let description = "At Alpha University in 2010 I graduated and at Beta University in 2014 I did a master."
         let draft = CVData(education: [Education(institution: "Alpha University", startDate: "2010", endDate: "2014")])
 
-        let alpha = sanitized(draft, from: description).education.first
+        let alpha = try sanitized(draft, from: description).education.first
 
-        #expect(alpha?.startDate == "2010")
-        #expect(alpha?.endDate == nil)
+        // 2010 is written with "graduated": the year of the degree, so the end date and never the start (ADR 0023, #354). Beta's
+        // 2014 is not Alpha's.
+        #expect(alpha?.startDate == nil)
+        #expect(alpha?.endDate == "2010")
     }
 
     @Test("An issuer and a date given for a certification the draft left out are not the draft's")
-    func omittedCertification() {
+    func omittedCertification() throws {
         let description = "I hold a BLS from the Italian Resuscitation Council in 2023 and a PALS from the American Heart Association in 2019."
         let right = CVData(certifications: [Certification(name: "BLS", issuer: "Italian Resuscitation Council", date: "2023")])
         let wrong = CVData(certifications: [Certification(name: "BLS", issuer: "American Heart Association", date: "2019")])
 
-        #expect(sanitized(right, from: description).certifications.first == right.certifications.first)
-        #expect(sanitized(wrong, from: description).certifications.first == Certification(name: "BLS"))
+        #expect(try sanitized(right, from: description).certifications.first == right.certifications.first)
+        #expect(try sanitized(wrong, from: description).certifications.first == Certification(name: "BLS"))
     }
 
     // MARK: - Levels
 
     @Test("The level of a language or skill the draft left out is not the level of the one beside it")
-    func levelOfAnOmittedItem() {
+    func levelOfAnOmittedItem() throws {
         let languages = CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .a2)])
         let skills = CVData(skills: [Skill(name: "Python", level: .advanced)])
 
-        let result = sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
-        let skillResult = sanitized(skills, from: "I know Python (expert), Swift (advanced) and Go (beginner).")
+        let result = try sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
+        let skillResult = try sanitized(skills, from: "I know Python (expert), Swift (advanced) and Go (beginner).")
 
-        #expect(result.languages.map(\.name) == ["Italian"])
+        #expect(result.languages == [Language(name: "Italian", proficiency: .native), Language(name: "English")], "English keeps no level (#354)")
         #expect(skillResult.skills == [Skill(name: "Python")])
     }
 
     @Test("A level stated in the same clause as the item is still that item's")
-    func levelInTheSameClause() {
+    func levelInTheSameClause() throws {
         let languages = CVData(languages: [Language(name: "Italian", proficiency: .native), Language(name: "English", proficiency: .b2)])
 
-        let result = sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
+        let result = try sanitized(languages, from: "I speak Italian (native), French (A2) and English (B2).")
 
         #expect(result.languages.map(\.proficiency) == [.native, .b2])
     }

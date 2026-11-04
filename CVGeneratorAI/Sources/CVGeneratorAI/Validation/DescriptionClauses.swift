@@ -40,6 +40,14 @@ struct Clause {
         )
     }
 
+    /// The clause as the sentence writes it from word `start` to the end of word `end - 1`, punctuation inside kept.
+    func written(from start: Int, to end: Int) -> String {
+        guard start >= 0, start < end, end <= words.count else { return "" }
+        let lower = max(words[start].range.lowerBound - offset, 0)
+        let upper = min(words[end - 1].range.upperBound - offset, original.count)
+        return lower < upper ? String(original[lower..<upper]) : ""
+    }
+
     /// Whether the word at `index` is written with a capital letter in the description.
     func isCapitalised(_ index: Int) -> Bool {
         let start = words[index].range.lowerBound - offset
@@ -50,6 +58,45 @@ struct Clause {
     /// the first clause): the addresses, the punctuation and the conjunction that ends it are in it.
     var source: String {
         preamble + String(original)
+    }
+
+    /// The clause as the sentence has it (`source`), with every run of words that `kept` leaves out written as a semicolon, so that
+    /// the words around it stay apart. A clause none of whose words is kept is a semicolon.
+    func source(keeping kept: Set<Int>) -> String {
+        guard !kept.isEmpty else { return "; " }
+        guard words.indices.contains(where: { !kept.contains($0) }) else { return source }
+
+        var text = preamble
+        var cursor = 0
+        var index = 0
+        while index < words.count {
+            guard !kept.contains(index) else {
+                index += 1
+                continue
+            }
+            let start = min(words[index].range.lowerBound - offset, original.count)
+            while index < words.count, !kept.contains(index) { index += 1 }
+            text += String(original[min(cursor, start)..<start]) + "; "
+            cursor = index < words.count ? min(words[index].range.lowerBound - offset, original.count) : original.count
+        }
+        return text + String(original[cursor...])
+    }
+
+    /// Whether the clause ends with a question mark, past the spaces, the punctuation and the closing marks after it: "Parlo
+    /// francese?", "«Parli francese?»".
+    var endsAQuestion: Bool {
+        lastMark == "?"
+    }
+
+    /// Whether the clause ends with a colon: "My colleague wrote:".
+    var endsWithAColon: Bool {
+        lastMark == ":"
+    }
+
+    private static let trailing: Set<Character> = [",", ";", "!", ")", "]", "}", "\"", "'", "»", "«", "”", "“", "’", "‘", "›", "‹"]
+
+    private var lastMark: Character? {
+        source.last { !$0.isWhitespace && !Self.trailing.contains($0) }
     }
 
     /// Where `phrase` (the folded words of a quote) stands in the clause, as ranges of word positions.
@@ -71,6 +118,15 @@ struct Clause {
     func standaloneSpans(of phrase: [String], amongQuotes quotes: [[String]]) -> [Range<Int>] {
         let covering = quotes.filter { $0.count > phrase.count }.flatMap { spans(of: $0) }
         return spans(of: phrase).filter { span in !covering.contains { $0.contains(span.lowerBound) && span.upperBound <= $0.upperBound } }
+    }
+
+    /// Where `phrase` says something of its own beside the names of employers and schools: where it stands as itself among them
+    /// (`standaloneSpans`), and, when the entry's own name is the phrase itself, only if the clause writes it once more than that
+    /// name takes. "Bristol" in "I worked at Bristol" is the name of the employer and no place; in "I worked at Bristol in Bristol"
+    /// the second is. The name of another entry that is the phrase says nothing about this one: it leaves the phrase as it stands.
+    func spans(of phrase: [String], besideNames names: [[String]], ownName: [String]?) -> [Range<Int>] {
+        let standalone = standaloneSpans(of: phrase, amongQuotes: names)
+        return ownName == phrase && standalone.count < 2 ? [] : standalone
     }
 
     /// Where the clause begins to name the phrases: the last, among them, of the places where each first stands as itself. Nil when
@@ -97,6 +153,10 @@ struct DescriptionClauses {
     let sentences: [[Clause]]
     /// The sentences as written.
     private let texts: [String]
+    /// The offsets of the characters of each sentence that stand inside quotation marks (`QuotedSpeech`).
+    private let quoted: [IndexSet]
+    /// The sentences that start a line of the description: the first one, and each one after a line break.
+    private let lineStarts: Set<Int>
     /// A clause by where it stands: its sentence, and its place in the sentence.
     struct Place: Hashable {
         let sentence: Int
@@ -107,8 +167,11 @@ struct DescriptionClauses {
     ///   - sentences: The sentences of the description, as written.
     ///   - protecting: The quotes of the draft, as the folded words they are made of.
     ///   - language: The language of the description, to tell which words are verbs (`Word.isTaggedVerb`); with none, no word is.
-    init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil) {
+    ///   - lineStarts: The sentences that start a line of the description; with none, no sentence is known to.
+    init(sentences: [String], protecting quotes: [[String]], language: Vocabulary.Language? = nil, lineStarts: Set<Int> = []) {
         texts = sentences
+        quoted = QuotedSpeech.offsets(in: sentences, lineStarts: lineStarts)
+        self.lineStarts = lineStarts
         self.sentences = sentences.map { sentence in
             Self.clauses(of: sentence, blanked: AddressTokens(sentence).remainder, protecting: quotes, language: language)
         }
@@ -126,13 +189,30 @@ struct DescriptionClauses {
     /// so that the ones around it stay apart. A sentence of no words (an address on its own) stays as written, if `keepsAnAddress` lets
     /// it (it gets the sentence's position), and is left out otherwise.
     func sentences(keeping isKept: (Place) -> Bool, keepsAnAddress: (Int) -> Bool = { _ in true }) -> [String] {
+        sentences(keepingWords: { isKept($0) ? Set(clause(at: $0).words.indices) : [] }, keepsAnAddress: keepsAnAddress)
+    }
+
+    /// The sentences as written, each clause with only the words that `kept` gives it (`Clause.source(keeping:)`): a word left out
+    /// becomes a semicolon, as a clause left out does. A sentence of no words is kept as `sentences(keeping:keepsAnAddress:)` keeps it.
+    func sentences(keepingWords kept: (Place) -> Set<Int>, keepsAnAddress: (Int) -> Bool = { _ in true }) -> [String] {
         sentences.indices.map { sentence in
             guard !sentences[sentence].isEmpty else { return keepsAnAddress(sentence) ? texts[sentence] : "" }
 
             return sentences[sentence].indices.map { clause in
-                isKept(Place(sentence: sentence, clause: clause)) ? sentences[sentence][clause].source : "; "
+                sentences[sentence][clause].source(keeping: kept(Place(sentence: sentence, clause: clause)))
             }.joined()
         }
+    }
+
+    /// The positions of the words of the clause at `place` that stand inside quotation marks (`QuotedSpeech`).
+    func quotedWords(at place: Place) -> Set<Int> {
+        let words = clause(at: place).words
+        return Set(words.indices.filter { quoted[place.sentence].contains(words[$0].range.lowerBound) })
+    }
+
+    /// The sentence that starts the line of sentence `sentence`, or nil when no sentence before it is known to start one.
+    func lineStart(of sentence: Int) -> Int? {
+        (0...sentence).last { lineStarts.contains($0) }
     }
 
     /// The places of the clauses next to `place` in its sentence.

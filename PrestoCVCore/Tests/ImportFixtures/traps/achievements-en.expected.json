@@ -1,0 +1,10 @@
+{
+ "id": "traps/achievements-en", "language": "en", "form": "trap",
+ "person": {"name": "Harriet Dunn", "title": "Registered Nurse", "email": "harriet.dunn@example.com", "phone": "+44 7700 900611",
+            "location": "Leeds, UK", "links": [], "summary": null},
+ "experience": [
+  {"role": "Staff Nurse", "employer": "Example NHS Trust", "location": "Leeds", "start": [2019, 6], "end": "current", "details": 1}
+ ],
+ "education": [{"degree": "BSc Nursing", "school": "University of Leeds", "start": [2016, null], "end": null}],
+ "skills": [], "languages": [], "certifications": [], "interests": []
+}

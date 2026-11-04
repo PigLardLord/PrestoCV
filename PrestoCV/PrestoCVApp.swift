@@ -8,22 +8,50 @@
 import SwiftUI
 import PrestoCVCore
 import CVPDFExporter
+import DiagnosticLoggingOSLog
+import os
 
+private let launchLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "launch")
+
+/// The entry point, and the composition root of the app: the only place that reads the device and makes the real
+/// services, which the view model factory then hands out.
 @main
 struct PrestoCVApp: App {
-    private static let storage = LaunchEnvironment.storage()
-    /// The unsaved edits of the whole app, made once and shared by every window, so that each set of edits has one
-    /// holder at a time, and is never offered while an editor holds it.
-    private static let unsavedEdits = Result {
-        try UnsavedEditsUseCase.inDirectory(storage.unsavedEdits())
-    }
+    private static let environment = AppEnvironment.device(
+        diagnostics: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
+    private static let storage = LaunchEnvironment.storage(arguments: environment.arguments, diagnostics: environment.diagnostics)
 
     var body: some Scene {
         WindowGroup {
-            AppLaunchView(
-                makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
-                makeUnsavedEdits: { try Self.unsavedEdits.get() }
-            )
+            if LaunchEnvironment.hostsUnitTests(arguments: Self.environment.arguments) {
+                EmptyView()
+            } else {
+                AppLaunchView(
+                    viewModel: AppLaunchViewModel(
+                        makeDependencyContainer: { DependencyContainer(storageDirectory: Self.storage.cvs) },
+                        makeLeftoverEdits: { cvs in
+                            try DependencyContainer.makeLeftoverEditsImport(
+                                in: Self.storage.unsavedEdits(),
+                                cvs: cvs,
+                                recoveredName: { $0.recoveredCopyName }
+                            )
+                        },
+                        environment: Self.environment,
+                        bootstrapTemplates: { await Self.installBundledTemplates() }
+                    )
+                )
+            }
+        }
+    }
+
+    /// Installs the templates that ship with the app. A failure is logged and does not block the launch.
+    nonisolated private static func installBundledTemplates() async {
+        do {
+            let bootstrapService = try TemplateBootstrapService()
+            try await bootstrapService.syncBundledTemplates()
+        } catch {
+            launchLogger.error("Bundled templates were not installed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

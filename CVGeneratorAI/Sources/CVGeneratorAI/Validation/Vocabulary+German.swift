@@ -74,11 +74,11 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        abgeschlossen abschliessen abschluss
+        abgeschlossen abschliessen abschluss absolviert beendet
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        gemacht habe ich mein meine meinem meinen meiner meines studium
+        ausbildung gemacht habe ich lehre mein meine meinem meinen meiner meines studium
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """
@@ -102,7 +102,10 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
-        beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
+        würde würdest würden würdet wäre wärest wärst wären wäret wärt hätte hättest hätten hättet müsste müsstest müssten
+        müsstet dürfte dürftest dürften dürftet
+        wurde~gern wurde~gerne wurde~lieber traume~davon traume~von
+        plane beabsichtige beinahe darf duerfen durfen etwa eventuell falls fast hoffe hoffen kann kannst kaum kein keine
         keinem keinen keiner keines koennen koennte konnen konnte konnten mochte mochten moechte moechten
         moeglicherweise moglicherweise muessen muss mussen musst nicht nichts nie niemals niemand ob ohne sofern soll
         sollen sollte teilweise ungefaehr ungefahr vielleicht wahrscheinlich weder wenn werde werden werdet will

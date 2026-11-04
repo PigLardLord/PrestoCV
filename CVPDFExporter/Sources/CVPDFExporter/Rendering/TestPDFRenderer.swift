@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 // MARK: - Test PDF Renderer
 
@@ -9,16 +10,17 @@ public final class TestPDFRenderer: HTMLToPDFRenderer, PDFRendererProtocol, @unc
     /// Debug mode flag for testing configuration
     public var debugMode: Bool = false
 
-    /// Counter for tracking render calls (useful for testing)
-    private var renderCount = 0
+    /// Counter for tracking render calls (useful for testing). Renders may run at the same time.
+    private let renderCount = Mutex(0)
 
     public init() {}
 
     /// Generate mock PDF data from HTML
     public func renderToPDF(html: String, options: ExportOptions) async throws -> Data {
-        // Thread-safe increment using atomic operation
-        renderCount += 1
-        let currentCount = renderCount
+        let currentCount = renderCount.withLock { count in
+            count += 1
+            return count
+        }
 
         // Simulate async processing
         try await Task.sleep(nanoseconds: 10_000_000) // 10ms

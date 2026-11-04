@@ -1,5 +1,5 @@
 {
- "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012); targets listed in modules.md but not built yet are in notYetImplemented.",
+ "_comment": "Architecture rules of the repository (ADR 0006). Every Swift file belongs to exactly one target. Legacy targets are exempt until deleted (ADR 0012), except from the rules listed for them (ADR 0025); targets listed in modules.md but not built yet are in notYetImplemented.",
  "rules": {
   "R1": [
    "exportedImport"
@@ -14,6 +14,10 @@
   "R4": [
    "singleton",
    "infrastructureConstruction"
+  ],
+  "R5": [
+   "viewDependency",
+   "viewModelImport"
   ],
   "R7": [
    "swallowedError"
@@ -34,17 +38,79 @@
   "R9m": [
    "swift5Mode",
    "unsafeFlags"
+  ],
+  "R15": [
+   "bundleLayout"
+  ],
+  "R16": [
+   "sourceTreePath"
+  ],
+  "R17": [
+   "defaultDependency"
+  ],
+  "R18": [
+   "appleOnlyImport",
+   "bundleAccess",
+   "fullFoundation"
   ]
  },
+ "warningDetectors": [
+  "fullFoundation"
+ ],
  "infrastructureTypes": [
   "FileCVRepository",
   "FileDesignStore",
   "BundleDesignSource",
+  "BundleHeadingTableSource",
   "IOSPDFRenderer",
   "MacPDFRenderer",
-  "FoundationModelsDrafter"
+  "FoundationModelsDrafter",
+  "PDFKitTextExtractor",
+  "OSLogDiagnosticLogger",
+  "TraceFileStore",
+  "AppTransactionDistribution",
+  "TraceRecorder",
+  "DistributionGate",
+  "TracingLogger",
+  "GatedTracer"
  ],
- "exceptions": [],
+ "serviceSuffixes": [
+  "UseCase",
+  "Repository",
+  "Service",
+  "Container"
+ ],
+ "dependencySuffixes": [
+  "UseCase",
+  "Repository",
+  "Service",
+  "Container",
+  "Store",
+  "Detector",
+  "Provider",
+  "Manager",
+  "Client",
+  "Loader",
+  "Renderer",
+  "Engine",
+  "Requester",
+  "Factory",
+  "Logger"
+ ],
+ "exceptions": [
+  {
+   "path": "CVPDFExporter/Tests/CVRenderingTests/GoldenFile.swift",
+   "detector": "sourceTreePath",
+   "adr": "0011",
+   "reason": "UPDATE_GOLDEN=1 rewrites the committed golden file in the checkout, for review like code; the golden test reads it through Bundle.module"
+  },
+  {
+   "path": "PrestoCVTests/Features/Export/BundledDesignThumbnails.swift",
+   "detector": "sourceTreePath",
+   "adr": "0022",
+   "reason": "PRESTOCV_REGENERATE_THUMBNAILS=1 rewrites the thumbnails of version 1's bundled designs in the checkout with the real iOS renderer; without it the test is skipped"
+  }
+ ],
  "notYetImplemented": [
   "App/",
   "Features/",
@@ -52,6 +118,25 @@
   "Platform/",
   "Resources/"
  ],
+ "compositionOnly": {
+  "adr": "0032",
+  "files": [
+   "PrestoCV/PrestoCVApp.swift",
+   "PrestoCV/App/AppEnvironment.swift"
+  ],
+  "modules": [
+   "DiagnosticTraceFiles",
+   "DiagnosticTraceDistribution"
+  ],
+  "types": [
+   "TracingLogger",
+   "GatedTracer",
+   "TraceRecorder",
+   "DistributionGate",
+   "TraceFileStore",
+   "AppTransactionDistribution"
+  ]
+ },
  "targets": [
   {
    "name": "PrestoCVDomain",
@@ -67,7 +152,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -85,7 +172,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -96,14 +185,16 @@
     "PrestoCVDomain",
     "Foundation",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
    "rules": [
     "R1",
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -127,6 +218,7 @@
     "Foundation",
     "Glibc",
     "Darwin",
+    "Android",
     "PrestoCVDomain",
     "PrestoCVApplication",
     "PrestoCVPersistence",
@@ -148,6 +240,85 @@
    "rules": []
   },
   {
+   "name": "PrestoCVImporting",
+   "path": "PrestoCVCore/Sources/PrestoCVImporting",
+   "allowedImports": [
+    "PrestoCVDomain",
+    "Foundation",
+    "DiagnosticLogging",
+    "DiagnosticTrace"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "PrestoCVImportingTests",
+   "path": "PrestoCVCore/Tests/PrestoCVImportingTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PrestoCVImporting",
+    "PrestoCVDomain",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVImportingPDFKit",
+   "path": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
+   "allowedImports": [
+    "PrestoCVImporting",
+    "PDFKit",
+    "UIKit",
+    "AppKit",
+    "CoreGraphics",
+    "Foundation",
+    "DiagnosticLogging"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVImportingPDFKitTests",
+   "path": "PrestoCVCore/Tests/PrestoCVImportingPDFKitTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PDFKit",
+    "PrestoCVImporting",
+    "PrestoCVImportingPDFKit",
+    "CoreGraphics",
+    "CoreText",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
    "name": "CVDocumentModel",
    "path": "CVPDFExporter/Sources/CVDocumentModel",
    "allowedImports": [
@@ -161,7 +332,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -178,7 +351,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -188,14 +363,16 @@
     "CVDesignCatalog",
     "Foundation",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
    "rules": [
     "R1",
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -210,7 +387,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -229,7 +407,25 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "CVBundledHeadings",
+   "path": "CVPDFExporter/Sources/CVBundledHeadings",
+   "allowedImports": [
+    "CVRendering",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
    ]
   },
   {
@@ -245,7 +441,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -263,7 +460,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -281,7 +479,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -297,7 +496,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -307,9 +507,12 @@
     "CVRendering",
     "CVDocumentModel",
     "CVDesignCatalog",
+    "CVBundledHeadings",
     "Foundation"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -322,9 +525,12 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVRenderingTestSupport",
-    "CVBundledDesigns"
+    "CVBundledDesigns",
+    "CVBundledHeadings"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -333,7 +539,9 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "AppKit",
     "PDFKit",
+    "WebKit",
     "CVRendering",
     "CVRenderingMacOS",
     "CVRenderingWebKitSupport",
@@ -354,7 +562,9 @@
     "WebKit",
     "CVRenderingWebKitSupport"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -367,9 +577,12 @@
     "CVDesignCatalogFileStore",
     "CVRenderingTestSupport",
     "Glibc",
-    "Darwin"
+    "Darwin",
+    "Android"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -381,7 +594,9 @@
     "CVDesignCatalog",
     "CVBundledDesigns"
    ],
-   "rules": [],
+   "rules": [
+    "R16"
+   ],
    "kind": "test"
   },
   {
@@ -398,7 +613,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -414,7 +631,8 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
    ]
   },
   {
@@ -433,7 +651,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -457,7 +677,9 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R17",
+    "R18"
    ]
   },
   {
@@ -478,7 +700,10 @@
     "R9",
     "R11",
     "R13",
-    "R14"
+    "R14",
+    "R5",
+    "R17",
+    "R18"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",
@@ -499,6 +724,7 @@
     "CVDesignCatalog",
     "CVDesignCatalogFileStore",
     "CVBundledDesigns",
+    "CVBundledHeadings",
     "CVRendering",
     "CVRenderingWebKitSupport",
     "CVRenderingIOS",
@@ -513,7 +739,185 @@
     "R7",
     "R9",
     "R13",
-    "R14"
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticLogging",
+   "path": "DiagnosticLogging/Sources/DiagnosticLogging",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingOSLog",
+   "path": "DiagnosticLogging/Sources/DiagnosticLoggingOSLog",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "os"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingTestSupport",
+   "path": "DiagnosticLogging/Sources/DiagnosticLoggingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingTests",
+   "path": "DiagnosticLogging/Tests/DiagnosticLoggingTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingOSLogTests",
+   "path": "DiagnosticLogging/Tests/DiagnosticLoggingOSLogTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "DiagnosticLogging",
+    "DiagnosticLoggingOSLog",
+    "os"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticTrace",
+   "path": "DiagnosticTrace/Sources/DiagnosticTrace",
+   "allowedImports": [
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R1",
+    "R2",
+    "R4",
+    "R7",
+    "R9",
+    "R11",
+    "R13",
+    "R14",
+    "R17",
+    "R18"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceFiles",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceFiles",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceDistribution",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceDistribution",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "StoreKit"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceTestSupport",
+   "path": "DiagnosticTrace/Sources/DiagnosticTraceTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "DiagnosticTrace",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceTests",
+   "path": "DiagnosticTrace/Tests/DiagnosticTraceTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceFilesTests",
+   "path": "DiagnosticTrace/Tests/DiagnosticTraceFilesTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "DiagnosticTraceFiles",
+    "DiagnosticTrace",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": [
+    "R16"
    ]
   },
   {
@@ -521,7 +925,10 @@
    "path": "PrestoCVCore/Sources/PrestoCVCore",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R5",
+    "R17"
+   ]
   },
   {
    "name": "PrestoCVCoreTests",
@@ -560,26 +967,8 @@
    "rules": []
   },
   {
-   "name": "TestExport",
-   "path": "CVPDFExporterExamples/Demo/TestExport.swift",
-   "kind": "legacy",
-   "allowedImports": [
-    "CVPDFExporter"
-   ],
-   "rules": []
-  },
-  {
    "name": "CVExportDemoApp",
    "path": "CVPDFExporterExamples/Example",
-   "kind": "legacy",
-   "allowedImports": [
-    "CVPDFExporter"
-   ],
-   "rules": []
-  },
-  {
-   "name": "TemplateViewer",
-   "path": "CVPDFExporterExamples/TemplateViewer",
    "kind": "legacy",
    "allowedImports": [
     "CVPDFExporter"
@@ -590,7 +979,10 @@
    "name": "CVGeneratorAI",
    "path": "CVGeneratorAI/Sources/CVGeneratorAI",
    "kind": "legacy",
-   "allowedImports": [],
+   "allowedImports": [
+    "DiagnosticLogging",
+    "DiagnosticTrace"
+   ],
    "rules": []
   },
   {
@@ -598,7 +990,11 @@
    "path": "CVGeneratorAI/Tests/CVGeneratorAITests",
    "kind": "legacy",
    "allowedImports": [
-    "CVGeneratorAI"
+    "CVGeneratorAI",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
    ],
    "rules": []
   },
@@ -607,21 +1003,28 @@
    "path": "PrestoCV",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R5",
+    "R17"
+   ]
   },
   {
    "name": "PrestoCVTests",
    "path": "PrestoCVTests",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "PrestoCVUITests",
    "path": "PrestoCVUITests",
    "kind": "legacy",
    "allowedImports": [],
-   "rules": []
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "ArchitectureCheck",
@@ -631,6 +1034,29 @@
     "Foundation",
     "SwiftSyntax",
     "SwiftParser"
+   ],
+   "rules": []
+  },
+  {
+   "name": "SourceChecksTests",
+   "path": "Tools/SourceChecks/Tests/SourceChecksTests",
+   "kind": "tool",
+   "allowedImports": [
+    "Testing",
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
+   "name": "StoreScreenshotComposer",
+   "path": "Tools/Release/compose-store-screenshots.swift",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation",
+    "CoreGraphics",
+    "CoreText",
+    "ImageIO",
+    "UniformTypeIdentifiers"
    ],
    "rules": []
   },
@@ -649,7 +1075,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -660,7 +1087,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -671,7 +1099,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -682,7 +1111,8 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -693,7 +1123,20 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "SourceChecksManifest",
+   "path": "Tools/SourceChecks/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
    ]
   },
   {
@@ -704,7 +1147,32 @@
     "PackageDescription"
    ],
    "rules": [
-    "R9m"
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "DiagnosticLoggingManifest",
+   "path": "DiagnosticLogging/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
+   ]
+  },
+  {
+   "name": "DiagnosticTraceManifest",
+   "path": "DiagnosticTrace/Package.swift",
+   "kind": "manifest",
+   "allowedImports": [
+    "PackageDescription"
+   ],
+   "rules": [
+    "R9m",
+    "R15"
    ]
   }
  ]

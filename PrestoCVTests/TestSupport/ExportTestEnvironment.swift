@@ -35,10 +35,18 @@ struct ExportTestEnvironment {
         return ExportTestEnvironment(root: root, repository: BundledTemplateRepository(fileRepository: fileRepository))
     }
 
-    func makeService() -> CVExportService {
+    /// The real renderer, as the tests use it: a page that is not ready in time fails the render instead of being drawn
+    /// as it is, and a newly created simulator has all the time it needs to start its web content.
+    /// `onePageFit` is how the renderer tightens a CV of two pages onto one; `.disabled` prints it as its design lays it out.
+    @MainActor
+    static func makeRenderer(onePageFit: OnePageFit = OnePageFit()) -> EnhancedWKWebViewPDFRenderer {
+        EnhancedWKWebViewPDFRenderer(pageLoadTimeout: patience, readinessTimeout: patience, onReadinessTimeout: .fail, onePageFit: onePageFit)
+    }
+
+    func makeService(onePageFit: OnePageFit = OnePageFit()) -> CVExportService {
         CVExportService(
-            container: PDFExportDependencyContainer(templateRepository: repository),
-            fileNames: ExportFileName(titlePattern: "%@ – CV"),
+            container: PDFExportDependencyContainer(templateRepository: repository, makeRenderer: { Self.makeRenderer(onePageFit: onePageFit) }),
+            fileNames: ExportFileName(titlePattern: { _ in "%@ – CV" }),
             temporaryDirectory: exportsDirectory
         )
     }
@@ -47,7 +55,15 @@ struct ExportTestEnvironment {
     @MainActor
     func exportOptions(for design: String) -> ExportOptions {
         let viewModel = CVExportSheetViewModel(
-            cv: CVModel(), exportService: makeService(), preferencesStore: InMemoryExportPreferencesStore(), previewDebounce: .zero
+            cv: CVModel(),
+            exportService: makeService(),
+            preferencesStore: InMemoryExportPreferencesStore(),
+            documentLanguageSink: { _ in },
+            lookSink: { _ in },
+            exportPolicy: .standard,
+            documentLanguageDetector: englishDocumentLanguageDetector,
+            appLocale: Locale(identifier: "en"),
+            previewDebounce: .zero
         )
         viewModel.selectedTemplateId = design
         return viewModel.currentExportOptions()

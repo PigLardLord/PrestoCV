@@ -4,8 +4,9 @@ import FoundationModels
 
 /// Core CV data model for AI generation
 ///
-/// It holds only what the on-device model can fill from a short description. The lists have no length guide:
-/// a limit is taken as a number to reach, and the model then fills every list with entries it made up.
+/// It holds only what the on-device model can fill from a short description, in the first pass of a draft, which extracts the facts
+/// (ADR 0031). The lists have no length guide: a limit is taken as a number to reach, and the model then fills every list with
+/// entries it made up. The second pass writes the summary, the role descriptions and the role's skills (`DraftWriting`).
 @Generable
 public struct CVData: Codable, Equatable, Sendable {
     @Guide(description: "Personal and contact information")
@@ -29,7 +30,7 @@ public struct CVData: Codable, Equatable, Sendable {
     @Guide(description: "Certifications the person named; empty if none was mentioned")
     public let certifications: [Certification]
 
-    @Guide(description: "Hobbies and interests the person named; empty if none was mentioned")
+    @Guide(description: "Hobbies and pastimes the person named, a few words each, never a quality or a way of working; otherwise empty")
     public let interests: [String]
 
     public init(

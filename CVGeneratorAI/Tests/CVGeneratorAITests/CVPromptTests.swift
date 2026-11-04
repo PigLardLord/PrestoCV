@@ -39,15 +39,18 @@ struct CVPromptTests {
         #expect(prompt.text == "Description:\nI'm a nurse.")
     }
 
-    @Test("The instructions forbid invention and keep the person's wording")
+    @Test("The instructions forbid invented facts and keep the person's wording")
     func instructionsKeepTheRules() {
         let instructions = CVPrompt.instructionsText
 
         #expect(instructions.contains("Never invent or guess"))
-        #expect(instructions.contains("leave that field null"))
         #expect(instructions.contains("exactly as written"))
         #expect(instructions.contains("language of the description"))
         #expect(!instructions.contains("metrics"))
+        #expect(instructions.contains("Use only what the description says"), "The first pass extracts with the instructions of #202 (ADR 0031)")
+        #expect(instructions.contains("If the description does not say something, leave that field null"))
+        #expect(!instructions.contains("responsibilities typical of"), "The first pass writes nothing around the facts: the second does")
+        #expect(!instructions.contains("Technologies"))
     }
 
     @Test("The instructions ask for achievements copied from the description, from the verb, without the employer")
@@ -56,5 +59,13 @@ struct CVPromptTests {
 
         #expect(instructions.contains("Write each achievement by copying the person's own words exactly, starting with the verb"))
         #expect(instructions.contains("leaving out the name of the employer"))
+    }
+
+    @Test("The instructions ask for hobbies in the person's own words and keep languages, hobbies and the job title out of the skills (#354)")
+    func instructionsKeepHobbiesAndLanguagesApart() {
+        let instructions = CVPrompt.instructionsText
+
+        #expect(instructions.contains("Copy each hobby or interest in the person's own words exactly as written"))
+        #expect(instructions.contains("A language, a hobby or the person's job title is never a skill"))
     }
 }

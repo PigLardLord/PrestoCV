@@ -1,88 +1,41 @@
 import Foundation
+import PrestoCVCore
+import struct PrestoCVDomain.PDFFileName
 
-/// Names an exported CV: the title stored in the PDF and the name of the file the user shares,
-/// "<Full name> – CV" and "<Full name> – CV.pdf" in English.
-///
-/// The name comes from the CV's owner, or from the CV's own name when the owner has none, and ends up in a file
-/// system path, so it is cleaned: no path separators or other characters file systems reject, no control characters,
-/// one space between words, at most `maxNameLength` characters, and a whole file name of at most `maxFileNameBytes`
-/// bytes, cut between characters, never inside one.
+/// Names an exported CV in the language of its PDF, by `PDFFileName`: the title stored in the PDF and the name of the
+/// file the person shares, "<Full name> – Lebenslauf.pdf" for a CV printed in German, whatever language the app is in.
 struct ExportFileName {
+    /// The pattern of the title in a language of the PDF, with %@ where the name goes
+    private let titlePattern: (DocumentLanguage) -> String
 
-    static let pathExtension = "pdf"
-    static let maxNameLength = 100
-    static let fallbackTitle = "CV"
-
-    /// The longest file name, with its pattern and extension, counted in UTF-8 bytes. A path component is limited
-    /// to 255 bytes, and the atomic write of the file adds a suffix to the name while it works, so this stays well
-    /// below. A name never has more UTF-16 units than UTF-8 bytes, so this bounds both encodings.
-    static let maxFileNameBytes = 200
-
-    private static let forbiddenCharacters: Set<Character> = ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
-
-    /// The scalars that reorder text on screen, so that a name can look like another one: bidirectional controls
-    private static let bidirectionalControls: ClosedRange<Unicode.Scalar> = "\u{202A}"..."\u{202E}"
-    private static let bidirectionalIsolates: ClosedRange<Unicode.Scalar> = "\u{2066}"..."\u{2069}"
-
-    /// The localized pattern of the title, with `%@` where the name goes
-    private let titlePattern: String
-
-    init(titlePattern: String = String(localized: "export.file_name")) {
+    /// - Parameter titlePattern: The pattern of the title in each language of the PDF: "%@ – CV" in English.
+    init(titlePattern: @escaping (DocumentLanguage) -> String) {
         self.titlePattern = titlePattern
     }
 
-    /// "<Full name> – CV", or just "CV" when neither name is usable
-    func title(personName: String, cvName: String) -> String {
-        let nameBudget = Self.maxFileNameBytes - titleOverheadBytes
-        guard let name = [personName, cvName].lazy.map({ Self.fitted(Self.cleaned($0), toBytes: nameBudget) })
-            .first(where: { !$0.isEmpty }) else {
-            return Self.fallbackTitle
-        }
-        return String(format: titlePattern, name)
+    /// "<Full name> – CV", in the language the CV is printed in
+    func title(for cv: CVModel) -> String {
+        name(for: cv).title(personName: cv.personalInfo.name, cvName: cv.name)
     }
 
     /// The title with the PDF extension: "<Full name> – CV.pdf"
-    func fileName(personName: String, cvName: String) -> String {
-        "\(title(personName: personName, cvName: cvName)).\(Self.pathExtension)"
+    func fileName(for cv: CVModel) -> String {
+        name(for: cv).fileName(personName: cv.personalInfo.name, cvName: cv.name)
     }
 
-    /// The bytes of the file name that do not belong to the person's name: the pattern around it and the extension
-    private var titleOverheadBytes: Int {
-        String(format: titlePattern, "").utf8.count + ".".utf8.count + Self.pathExtension.utf8.count
+    /// The CV is printed in the language chosen for it, which the export sheet sets; English without one
+    private func name(for cv: CVModel) -> PDFFileName {
+        PDFFileName(titlePattern: titlePattern(cv.chosenDocumentLanguage ?? .english))
     }
+}
 
-    // MARK: - Cleaning
+/// The pattern of an exported CV's title in each language of the PDF, as the app's string catalog writes it in that
+/// language, whatever language the app is shown in.
+struct DocumentTitlePatterns {
+    /// The bundle that holds the catalog's languages
+    let bundle: Bundle
 
-    private static func cleaned(_ name: String) -> String {
-        let withoutForbidden = name.precomposedStringWithCanonicalMapping.filter { character in
-            !forbiddenCharacters.contains(character) && !character.unicodeScalars.contains(where: isInvisibleControl)
-        }
-        let singleSpaced = withoutForbidden.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        return String(singleSpaced.drop(while: { $0 == "." }))
-    }
-
-    /// The longest start of the name that has at most `maxNameLength` characters and `budget` bytes in UTF-8.
-    /// It ends between characters: a character that does not fit, however long its sequence of code points is, is
-    /// left out whole.
-    private static func fitted(_ name: String, toBytes budget: Int) -> String {
-        var result = ""
-        var bytes = 0
-        for character in name.prefix(maxNameLength) {
-            let size = String(character).utf8.count
-            guard bytes + size <= budget else { break }
-            result.append(character)
-            bytes += size
-        }
-        return result.trimmingCharacters(in: .whitespaces)
-    }
-
-    /// Control characters other than the whitespace ones, which separate words instead
-    private static func isInvisibleControl(_ scalar: Unicode.Scalar) -> Bool {
-        if scalar.properties.isWhitespace {
-            return false
-        }
-        return scalar.properties.generalCategory == .control
-            || bidirectionalControls.contains(scalar)
-            || bidirectionalIsolates.contains(scalar)
+    func pattern(in language: DocumentLanguage) -> String {
+        language.localizedString(forKey: "export.file_name", in: bundle)
     }
 }

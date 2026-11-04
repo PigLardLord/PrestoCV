@@ -11,7 +11,7 @@ public final class CVRepository: CVRepositoryProtocol, Sendable {
     /// - Parameter now: The clock that stamps the CVs when they are saved.
     public init(
         storageService: StorageServiceProtocol,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date
     ) {
         self.storageService = storageService
         self.now = now

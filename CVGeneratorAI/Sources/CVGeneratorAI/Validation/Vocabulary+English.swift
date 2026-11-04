@@ -7,7 +7,7 @@ extension Vocabulary {
         a across after again against all along already also although am among an and another any are as at be because
         been before being between beyond both but by d did do does doing done during each either even ever every for
         from had has have having here how i in inside into is it its itself just m me mine my myself of on once one
-        ones onto or other our ours ourselves out outside own quite re s same since so some still such that the then
+        ones onto or other our ours ourselves out outside own per quite re s same since so some still such that the then
         there these this those though through throughout till to too toward towards until upon us ve very via was we
         were what whatever when whenever where whereas wherever which while who whoever whom whose why with within you
         your yours yourself
@@ -75,7 +75,7 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        graduate graduated graduating graduation
+        completed finished graduate graduated graduating graduation
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
@@ -108,9 +108,9 @@ extension Vocabulary {
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
         aim aimed aims almost barely can cannot could dream dreams gonna hardly hope hoped hopes if intend intended
-        intends ll may maybe might mostly must nearly neither never no nobody none nor not nothing nowhere otherwise
-        partially partly perhaps plan planned planning plans possibly probably scarcely shall should slightly somewhat
-        unless want wanted wants whether will wish wished wishes without would
+        intention_of intention_to intends ll may maybe might mostly must nearly neither never no nobody none nor not
+        nothing nowhere otherwise partially partly perhaps plan planned planning plans possibly probably scarcely shall
+        should slightly somewhat unless want wanted wants whether will wish wished wishes without would
         """
     )
 }

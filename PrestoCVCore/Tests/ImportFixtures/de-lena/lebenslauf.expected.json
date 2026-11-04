@@ -1,0 +1,82 @@
+{
+ "id": "de-lena/lebenslauf",
+ "language": "de",
+ "form": "lebenslauf",
+ "person": {
+  "name": "Lena Hartmann",
+  "title": null,
+  "email": "lena.hartmann@example.com",
+  "phone": "+49 170 0000101",
+  "location": "Musterstraße 5, 04109 Leipzig",
+  "links": [],
+  "summary": null
+ },
+ "experience": [
+  {
+   "role": "Projektleiterin Elektrotechnik",
+   "employer": "Beispiel GmbH",
+   "location": "Leipzig",
+   "details": 2,
+   "start": [
+    2019,
+    3
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Elektrikerin",
+   "employer": "Muster Elektro AG",
+   "location": "Dresden",
+   "details": 1,
+   "start": [
+    2015,
+    9
+   ],
+   "end": [
+    2019,
+    2
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Ausbildung zur Elektronikerin für Energie- und Gebäudetechnik",
+   "school": "Berufsschule Leipzig",
+   "start": [
+    2012,
+    9
+   ],
+   "end": [
+    2015,
+    7
+   ],
+   "location": "Leipzig"
+  }
+ ],
+ "skills": [
+  "KNX",
+  "SPS-Programmierung",
+  "AutoCAD"
+ ],
+ "languages": [
+  {
+   "name": "Deutsch",
+   "level": "native"
+  },
+  {
+   "name": "Englisch",
+   "level": "c1"
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Elektrofachkraft für Prüfungen",
+   "issuer": "TÜV Beispiel",
+   "year": 2020
+  }
+ ],
+ "interests": [
+  "Klettern",
+  "Fotografie"
+ ]
+}

@@ -176,7 +176,8 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        diplomata diplomate diplomati diplomato laureai laureata laureate laureati laureato laureo
+        completata completato conclusa concluso conseguii conseguita conseguito diplomata diplomate diplomati diplomato
+        laureai laureata laureate laureati laureato laureo terminai terminata terminato
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
@@ -351,6 +352,9 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        sarei saresti sarebbe saremmo sareste sarebbero avrei avresti avrebbe avremmo avreste avrebbero farei faresti farebbe
+        faremmo fareste farebbero
+        sogno_di lo_sogno intenzione_di
         aiutera aiuterai aiuteranno aiuterebbe aiuterebbero aiuterei aiuteremmo aiuteremo aiutereste aiuteresti
         aiuterete aiutero amministrera amministrerai amministreranno amministrerebbe amministrerebbero amministrerei
         amministreremmo amministreremo amministrereste amministreresti amministrerete amministrero analizzera

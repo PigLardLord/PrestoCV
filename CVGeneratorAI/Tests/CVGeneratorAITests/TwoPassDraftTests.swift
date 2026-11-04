@@ -1,0 +1,478 @@
+import DiagnosticLogging
+import DiagnosticLoggingTestSupport
+import DiagnosticTrace
+import Foundation
+import Testing
+@testable import CVGeneratorAI
+
+/// The two passes of a draft (ADR 0031): the first extracts the facts with the instructions of #202, the second writes the summary,
+/// the duties of each role and the role's skills from the facts the rules kept, never from the description; each within its time, and
+/// tried once more when it fails below the model.
+@MainActor
+@Suite("The two passes of the AI draft")
+struct TwoPassDraftTests {
+    private let sanitizer = CVDataSanitizer(lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+    private var english: FaithfulExample { faithfulExamples[0] }
+
+    /// Invented wording that states no fact of its own: no number, date, name, length, rank or level.
+    private let plainSummary = "A caring teacher who plans lessons and works closely with families."
+    private let plainDuties = "Plans lessons, teaches reading and writing, and keeps in touch with families."
+
+    /// What a pass under test counts, from the main actor that runs it.
+    @MainActor
+    private final class Calls {
+        var count = 0
+        var retries: [String] = []
+    }
+
+    private func writing(
+        summary: String? = nil, duties: [String?] = [], technologies: [String] = [], softSkills: [String] = []
+    ) -> DraftWriting {
+        DraftWriting(summary: summary, roleDescriptions: duties, technologies: technologies, softSkills: softSkills)
+    }
+
+    private func generator(_ service: FakeCVGenerationService, limits: DraftingLimits = .standard,
+                           logger: any DiagnosticLogger = SilentLogger()) -> CVGeneratorUseCase {
+        CVGeneratorUseCase(
+            service: service, claimChecker: FakeClaimChecker(), logger: logger, clock: ContinuousClock(),
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: sanitizer, limits: limits
+        )
+    }
+
+    private func drafting(_ example: FaithfulExample) -> FakeCVGenerationService {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(example.draft)
+        return service
+    }
+
+    // MARK: The brief
+
+    @Test("The brief holds the language, the titles, the employers, which roles have ended, the studies and the named skills, and no school, place, person or date")
+    func briefOfTheFacts() throws {
+        let facts = try sanitizer.sanitize(english.draft, against: english.description)
+
+        let brief = try #require(DraftBrief(facts, language: .english))
+
+        #expect(brief.language == "English")
+        #expect(brief.headline == "primary school teacher")
+        #expect(brief.roles == [
+            DraftBrief.Role(title: "primary school teacher", employer: "Don Milani school", hasEnded: false),
+            DraftBrief.Role(title: "assistant", employer: "nursery", hasEnded: true),
+        ])
+        #expect(brief.studies == ["Education Sciences"])
+        let text = DraftWritingPrompt(brief: brief).text
+        // The employer tells the trade of a role: an assistant at a nursery looks after small children, not pupils (#354)
+        #expect(text.contains("2. assistant; employer: nursery; ended"))
+        for name in ["Bologna", "Maria", "2016", "2012"] {
+            #expect(!text.contains(name), "The second pass never sees \(name): it has nothing to copy")
+        }
+    }
+
+    @Test("There is no brief without a title, a job title or a degree, nor without a language of the six")
+    func noBriefWithoutARole() {
+        let interestsOnly = CVData(personalInfo: PersonalInfo(name: "Anna"), interests: ["chess"])
+        let employerOnly = CVData(experience: [Experience(title: "", company: "Acme")])
+
+        #expect(DraftBrief(interestsOnly, language: .english) == nil)
+        #expect(DraftBrief(employerOnly, language: .english) == nil)
+        #expect(DraftBrief(english.draft, language: nil) == nil)
+        #expect(DraftBrief(CVData(education: [Education(degree: "Nursing")]), language: .italian)?.language == "Italian")
+    }
+
+    // MARK: The prompt of the second pass
+
+    @Test("The prompt numbers the roles by their place in the brief, with their employers, marks the ended ones and lists the skills already named")
+    func promptOfTheBrief() {
+        let brief = DraftBrief(
+            language: "Italian", headline: "infermiera",
+            roles: [
+                .init(title: "infermiera", employer: "Ospedale Civile", hasEnded: false), .init(title: "", employer: "Casa di Cura", hasEnded: true),
+                .init(title: "barista", hasEnded: true),
+            ],
+            studies: ["Scienze infermieristiche"], namedSkills: ["HACCP"]
+        )
+
+        let prompt = DraftWritingPrompt(brief: brief)
+
+        #expect(prompt.instructions == DraftWritingPrompt.instructionsText)
+        #expect(prompt.text == """
+            Language: Italian
+            Scrivi in italiano.
+            Headline title: infermiera
+            Roles:
+            1. infermiera; employer: Ospedale Civile
+            2. no title given; employer: Casa di Cura; ended
+            3. barista; ended
+            Studies: Scienze infermieristiche
+            Skills already listed: HACCP
+            """)
+    }
+
+    @Test("A role with no title is described from the headline title, and with no headline it has nothing to describe (#354)")
+    func roleWithNoTitle() {
+        let roles: [DraftBrief.Role] = [.init(title: "nurse", employer: "City Hospital", hasEnded: false), .init(title: "", employer: "Care Home", hasEnded: true)]
+        let withHeadline = DraftBrief(language: "English", headline: "nurse", roles: roles, studies: [], namedSkills: [])
+        let withoutHeadline = DraftBrief(language: "English", headline: nil, roles: roles, studies: [], namedSkills: [])
+        let answers = [(number: 1, text: "Cares for patients."), (number: 2, text: "Looked after residents.")]
+
+        #expect(DraftWritingPrompt.descriptions(answers, of: withHeadline) == ["Cares for patients.", "Looked after residents."])
+        #expect(DraftWritingPrompt.descriptions(answers, of: withoutHeadline) == ["Cares for patients.", nil])
+        #expect(!DraftWritingPrompt(brief: withoutHeadline).text.contains("Care Home"))
+        #expect(DraftWritingPrompt.instructionsText.contains(
+            "For a role with no title given, the responsibilities typical of the headline title there, without naming a title"
+        ))
+    }
+
+    @Test("Each description goes to the role of its number; a number of no role and a second answer for a number are ignored")
+    func descriptionsByNumber() {
+        let brief = DraftBrief(
+            language: "English", headline: nil,
+            roles: [.init(title: "nurse", hasEnded: false), .init(title: "", hasEnded: false), .init(title: "waiter", hasEnded: true)],
+            studies: [], namedSkills: []
+        )
+
+        let descriptions = DraftWritingPrompt.descriptions(
+            [(number: 3, text: "Served tables."), (number: 2, text: "Untitled."), (number: 7, text: "None."), (number: 3, text: "Again."),
+             (number: 0, text: "Zero.")],
+            of: brief
+        )
+
+        #expect(descriptions == [nil, nil, "Served tables."])
+    }
+
+    @Test("The instructions of the second pass ask for a summary, the typical duties of each role, technologies and soft skills, with no fact of their own (ADR 0031)")
+    func instructionsAskForTheWrittenText() {
+        let instructions = DraftWritingPrompt.instructionsText
+
+        #expect(instructions.contains("2 to 4 sentences"))
+        #expect(instructions.contains("No number, date, company, school, place or person's name"))
+        #expect(instructions.contains("no \"experience\", \"years\""), "A summary that claims experience states a fact of its own")
+        #expect(instructions.contains("responsibilities typical of that title"))
+        #expect(instructions.contains("For a role marked ended, write in the past tense"))
+        #expect(instructions.contains("Technologies: 4 to 8"))
+        #expect(instructions.contains("Soft skills: 3 to 5"))
+        #expect(instructions.contains("no level, none of the skills already listed"))
+        #expect(instructions.contains("Never add a language, job, study, certification, hobby, achievement or result"))
+    }
+
+    @Test("The second pass is asked to write in the description's language, in that language, with whole sentences and skill names in it (#354)")
+    func promptAsksForTheLanguageInItself() {
+        let lines = ["English": "Write in English.", "Italian": "Scrivi in italiano.", "German": "Schreibe auf Deutsch.",
+                     "Spanish": "Escribe en español.", "French": "Rédige en français.", "Portuguese": "Escreva em português."]
+        for (language, line) in lines {
+            let brief = DraftBrief(language: language, headline: "x", roles: [], studies: [], namedSkills: [])
+            #expect(DraftWritingPrompt(brief: brief).text.components(separatedBy: "\n").dropFirst().first == line, "\(language)")
+        }
+        let instructions = DraftWritingPrompt.instructionsText
+        #expect(instructions.contains("at least 120 characters"))
+        #expect(instructions.contains("Each sentence starts with a capital letter and ends with a full stop"))
+        #expect(instructions.contains("never a list of phrases or a copy of a title"))
+        #expect(instructions.contains("Name each technology and soft skill in that language too"))
+    }
+
+    @Test("The second pass is asked for technologies of the trade that are no soft skill, and for no voice: a rule on the voice drew Italian drafts into English (#354)")
+    func promptAsksForTheTradeAndNoVoice() {
+        let instructions = DraftWritingPrompt.instructionsText
+
+        #expect(!instructions.contains("subject"), "A rule on the voice, in English or in the language line, drew the drafts into English")
+        #expect(instructions.contains("tools, methods or techniques of the trade"))
+        #expect(!instructions.contains("knowledge of the trade"), "Knowledge invites abstract nouns such as communication or analysis")
+        #expect(instructions.contains("a soft skill is never a technology"))
+    }
+
+    @Test("A role line joins its title, employer and end with labels, never with an English word: \"cuoco at Il Gabbiano\" drew the Italian drafts into English (#354)")
+    func roleLinesHoldNoEnglishWord() {
+        let brief = DraftBrief(
+            language: "Italian", headline: "cuoco",
+            roles: [.init(title: "cuoco", employer: "Il Gabbiano", hasEnded: false), .init(title: "", employer: "Hotel Belvedere", hasEnded: true)],
+            studies: [], namedSkills: []
+        )
+        let roles = DraftWritingPrompt(brief: brief).text.split(separator: "\n").filter { $0.first?.isNumber == true }
+
+        #expect(roles == ["1. cuoco; employer: Il Gabbiano", "2. no title given; employer: Hotel Belvedere; ended"])
+        for role in roles {
+            #expect(!Word.words(in: String(role)).contains { $0.folded == "at" }, "\(role)")
+        }
+    }
+
+    @Test("The rule of the skills quotes no word: the model copied each quoted English example into drafts of other trades and languages (#354)")
+    func skillRuleQuotesNoWord() {
+        let rules = DraftWritingPrompt.instructionsText.split(separator: "\n").filter { $0.contains("- Technologies") }
+
+        #expect(rules.count == 1)
+        for rule in rules {
+            #expect(!rule.contains("\""), "\(rule)")
+        }
+    }
+
+    // MARK: Grounding what the second pass wrote
+
+    @Test("What the second pass writes stays only when it states no fact: a number, a name or a level goes, the plain text stays")
+    func writtenTextIsGrounded() throws {
+        let written = writing(
+            summary: plainSummary + " She has taught for ten years at Acme.",
+            duties: [plainDuties + " Trained 12 teachers.", "Looked after the children during play."],
+            technologies: ["Lesson planning", "Classroom management", "Advanced Excel", "Business English"],
+            softSkills: ["Patience", "Teamwork"]
+        )
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+        let facts = try sanitizer.sanitize(english.draft, against: english.description)
+
+        #expect(result.summary == plainSummary)
+        #expect(result.experience.map(\.description) == [plainDuties, "Looked after the children during play."])
+        #expect(result.skills == [
+            Skill(name: "Lesson planning", kind: .technology), Skill(name: "Classroom management", kind: .technology),
+            Skill(name: "Patience", kind: .softSkill), Skill(name: "Teamwork", kind: .softSkill),
+        ])
+        #expect(result.personalInfo == facts.personalInfo, "The written text changes no fact")
+        #expect(result.experience.map(\.title) == facts.experience.map(\.title))
+        #expect(result.experience.map(\.achievements) == facts.experience.map(\.achievements))
+        #expect(result.education == facts.education)
+        #expect(result.languages == facts.languages)
+        #expect(result.interests == facts.interests)
+    }
+
+    @Test("A written summary that keeps no sentence leaves the first pass's summary, and a role the second pass skipped keeps its own text")
+    func firstPassTextRemains() throws {
+        let written = writing(summary: "Taught for 12 years at Acme.", duties: [nil])
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+
+        #expect(result.summary == english.draft.summary)
+        #expect(result.experience.map(\.description) == [nil, nil])
+    }
+
+    @Test("A sentence of the duties that the role's own text holds already is not written twice")
+    func dutiesAreNotRepeated() throws {
+        let school = english.draft.experience[0]
+        let draft = CVData(personalInfo: english.draft.personalInfo, experience: [Experience(
+            title: school.title, company: school.company, location: school.location, startDate: school.startDate,
+            endDate: school.endDate, current: school.current, description: plainDuties, achievements: school.achievements
+        )])
+        let written = writing(duties: [plainDuties + " Looks after the children during play."])
+
+        let result = try sanitizer.sanitize(draft, writing: written, against: english.description)
+
+        #expect(result.experience.first?.description == plainDuties + " Looks after the children during play.")
+    }
+
+    @Test("The duties start a sentence of their own after the role's quote: the quote gets its full stop, the duties their capital")
+    func dutiesStartTheirOwnSentence() throws {
+        let description = "Since 2019 I have worked as a teacher at Acme, where I plan the night shifts."
+        let quote = "I plan the night shifts"
+        let draft = CVData(experience: [Experience(title: "teacher", company: "Acme", startDate: "2019", current: true, description: quote)])
+        let lowercased = plainDuties.prefix(1).lowercased() + plainDuties.dropFirst()
+        let written = writing(duties: [lowercased])
+
+        let result = try sanitizer.sanitize(draft, writing: written, against: description)
+
+        #expect(result.experience.first?.description == quote + ". " + plainDuties)
+    }
+
+    /// Invented wording: a description in each language, a role's quote that says only that the person held the job, and plain duties.
+    /// The employer is a common noun: a quote that names a capitalised employer is a name the written text drops already (`WrittenText`).
+    private nonisolated static let stubs: [(description: String, title: String, company: String, quote: String, duties: String)] = [
+        ("From 2018 to 2021 I worked as a cook in a bakery.", "cook", "bakery",
+         "I worked as a cook in a bakery.", "Prepared meals and kept the kitchen clean."),
+        ("Dal 2018 al 2021 sono stato aiuto cuoco in una trattoria.", "aiuto cuoco", "trattoria",
+         "Sono stato aiuto cuoco in una trattoria.", "Preparava i piatti e teneva pulita la cucina."),
+        ("De 2018 a 2021 trabajé como auxiliar en una guardería.", "auxiliar", "guardería",
+         "Trabajé como auxiliar en una guardería.", "Cuidaba a los niños y preparaba las actividades del día."),
+    ]
+
+    @Test("A role's quote that says only that the person held the job goes when the duties are written, and stays as the only text (#354)",
+          arguments: stubs)
+    func stubGivesWayToTheDuties(
+        _ stub: (description: String, title: String, company: String, quote: String, duties: String)
+    ) throws {
+        let draft = CVData(experience: [Experience(
+            title: stub.title, company: stub.company, startDate: "2018", endDate: "2021", description: stub.quote
+        )])
+
+        let written = try sanitizer.sanitize(draft, writing: writing(duties: [stub.duties]), against: stub.description)
+        let unwritten = try sanitizer.sanitize(draft, writing: writing(duties: [nil]), against: stub.description)
+
+        #expect(written.experience.first?.description == stub.duties)
+        #expect(unwritten.experience.first?.description == stub.quote)
+    }
+
+    @Test("A role's quote that only says the person worked, with no word of the job, goes even as the only text (#354, round 11)")
+    func bareWorkQuoteGoes() throws {
+        let description = "De 2014 a 2018 trabajé en la gestoría Aranda y Molina."
+        let draft = CVData(experience: [Experience(
+            company: "gestoría Aranda y Molina", startDate: "2014", endDate: "2018", description: "Trabajé."
+        )])
+
+        let result = try sanitizer.sanitize(draft, writing: writing(duties: [nil]), against: description)
+
+        #expect(result.experience.map(\.company) == ["gestoría Aranda y Molina"])
+        #expect(result.experience.first?.description == nil)
+    }
+
+    @Test("A role's quote that says what the person did stays in front of the written duties (#354)")
+    func quoteOfADutyStays() throws {
+        let description = "From 2018 to 2021 I worked as a cook in a bakery, where I baked the bread."
+        let quote = "I worked as a cook in a bakery, where I baked the bread."
+        let duties = "Prepared meals and kept the kitchen clean."
+        let draft = CVData(experience: [Experience(
+            title: "cook", company: "bakery", startDate: "2018", endDate: "2021", description: quote
+        )])
+
+        let result = try sanitizer.sanitize(draft, writing: writing(duties: [duties]), against: description)
+
+        #expect(result.experience.first?.description == quote + " " + duties)
+    }
+
+    @Test("A fragment with no letter, what the model leaves of its answer's punctuation, goes from the written text (#354)")
+    func fragmentsWithoutALetterGo() throws {
+        let written = writing(
+            summary: plainSummary + "  ,",
+            duties: [plainDuties + "  }, {", "Looked after the children during play.  ,"]
+        )
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+
+        #expect(result.summary == plainSummary)
+        #expect(result.experience.map(\.description) == [plainDuties, "Looked after the children during play."])
+    }
+
+    @Test("A written skill whose words hold, or are held by, those of one written before it goes; one sharing a word stays (#354)")
+    func writtenSkillsAreNotRepeated() throws {
+        let written = writing(
+            technologies: ["Lesson planning", "Planning", "Lesson design"],
+            softSkills: ["Listening", "Active listening", "Patience"]
+        )
+
+        let result = try sanitizer.sanitize(english.draft, writing: written, against: english.description)
+
+        #expect(result.skills == [
+            Skill(name: "Lesson planning", kind: .technology), Skill(name: "Lesson design", kind: .technology),
+            Skill(name: "Listening", kind: .softSkill), Skill(name: "Patience", kind: .softSkill),
+        ])
+    }
+
+    @Test("With no title, job or school there is nothing to write around: the written summary and skills go")
+    func noFactNoWriting() throws {
+        let description = "This is a test of the app, I like chess."
+        let draft = CVData(interests: ["chess"])
+        let written = writing(summary: plainSummary, technologies: ["Lesson planning"], softSkills: ["Patience"])
+
+        let result = try sanitizer.sanitize(draft, writing: written, against: description)
+
+        #expect(result.summary == nil)
+        #expect(result.skills.isEmpty)
+    }
+
+    // MARK: One call of a pass
+
+    @Test("A pass that runs past its time fails with generationFailed, and is not tried again")
+    func timeout() async {
+        let calls = Calls()
+
+        await #expect(throws: CVGenerationError.generationFailed) {
+            try await DraftAttempt.run(within: .milliseconds(20)) {
+                calls.count += 1
+                try await Task.sleep(for: .seconds(30))
+                return 1
+            }
+        }
+        #expect(calls.count == 1)
+    }
+
+    @Test("A pass that fails below the model is tried once more, and the retry is told the error")
+    func retryOnServiceFailure() async throws {
+        let calls = Calls()
+
+        let value = try await DraftAttempt.run(within: .seconds(30), retried: { calls.retries.append(String(describing: $0)) }) {
+            calls.count += 1
+            if calls.count == 1 { throw CVGenerationError.serviceFailed }
+            return 7
+        }
+
+        #expect(value == 7)
+        #expect(calls.count == 2)
+        #expect(calls.retries == [String(describing: CVGenerationError.serviceFailed)])
+    }
+
+    @Test("A pass that fails below the model twice fails, after two calls")
+    func secondServiceFailureFails() async {
+        let calls = Calls()
+
+        await #expect(throws: CVGenerationError.serviceFailed) {
+            try await DraftAttempt.run(within: .seconds(30)) { () async throws -> Int in
+                calls.count += 1
+                throw CVGenerationError.serviceFailed
+            }
+        }
+        #expect(calls.count == 2)
+    }
+
+    @Test("A pass that the model refuses or that fails for its answer is not tried again", arguments: [
+        CVGenerationError.generationFailed, .contentNotAllowed, .busy, .emptyResult,
+    ])
+    func noRetryOnOtherErrors(error: CVGenerationError) async {
+        let calls = Calls()
+
+        await #expect(throws: error) {
+            try await DraftAttempt.run(within: .seconds(30)) { () async throws -> Int in
+                calls.count += 1
+                throw error
+            }
+        }
+        #expect(calls.count == 1)
+    }
+
+    @Test("A cancelled pass throws the cancellation, not a timeout")
+    func cancellation() async {
+        let task = Task { @MainActor in
+            try await DraftAttempt.run(within: .seconds(30)) {
+                try await Task.sleep(for: .seconds(30))
+                return 1
+            }
+        }
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    // MARK: The use case
+
+    @Test("A first pass that runs out of time fails the draft with generationFailed, and no section is asked")
+    func firstPassTimeout() async {
+        let service = drafting(english)
+        service.generateDelay = .seconds(30)
+        let limits = DraftingLimits(extraction: .milliseconds(20), section: .seconds(30))
+
+        await #expect(throws: CVGenerationError.generationFailed) {
+            try await generator(service, limits: limits).generateCV(from: CVGenerationRequest(userPrompt: english.description))
+        }
+        #expect(service.generateRequests.count == 1)
+        #expect(service.sectionCalls.isEmpty)
+    }
+
+    @Test("A first pass that fails below the model once is tried again and the draft goes on")
+    func firstPassRetry() async throws {
+        let service = drafting(english)
+        service.generateFailures = [CVGenerationError.serviceFailed]
+
+        let draft = try await generator(service).generateCV(from: CVGenerationRequest(userPrompt: english.description))
+
+        #expect(service.generateRequests.count == 2)
+        #expect(!draft.cvData.experience.isEmpty)
+    }
+
+    // MARK: The log
+
+    @Test("The log says why the first pass was tried again")
+    func log() async throws {
+        let logger = RecordingLogger()
+        let service = drafting(english)
+        service.generateFailures = [CVGenerationError.serviceFailed]
+
+        _ = try await generator(service, logger: logger).generateCV(from: CVGenerationRequest(userPrompt: english.description))
+
+        #expect(logger.entry("draft.retried")?.line == "draft.retried stage=model error=CVGenerationError.serviceFailed")
+        #expect(logger.entry("draft.retried")?.level == .notice)
+    }
+}

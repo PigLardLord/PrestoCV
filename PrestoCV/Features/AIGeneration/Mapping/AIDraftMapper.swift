@@ -2,6 +2,17 @@ import Foundation
 import PrestoCVCore
 import CVGeneratorAI
 
+/// A CV drafted by AI, not stored yet, and whether its personal items were left blank because the claim check gave no answer
+/// (ADR 0028). The editor opens it with the notice that matches.
+struct AIDraft: Equatable, Sendable {
+    let cv: CVModel
+    let personalItemsUnchecked: Bool
+
+    var notice: EditorNotice {
+        personalItemsUnchecked ? .aiDraftUnchecked : .aiDraft
+    }
+}
+
 /// Turns what the on-device model produced into a CV the editor can open.
 ///
 /// Pure: the same CV data and labels always give the same CV (apart from fresh ids). It lives in
@@ -12,15 +23,25 @@ struct AIDraftMapper {
     /// The BCP 47 tag of the language a text is written in, or nil when it cannot tell
     let languageOfText: (String) -> String?
 
+    /// The draft of a generation, with whether its personal items went unchecked.
+    /// - Parameters:
+    ///   - draft: What the generation gave from the description.
+    ///   - description: The person's own text.
+    func map(_ draft: GeneratedDraft, writtenIn description: String) -> AIDraft {
+        AIDraft(cv: map(draft.cvData, writtenIn: description), personalItemsUnchecked: draft.personalItemsUnchecked)
+    }
+
     /// - Parameters:
     ///   - cvData: What the model produced from the description.
     ///   - description: The person's own text. The CV is printed in its language when the templates
-    ///     support it, and otherwise follows the app's language.
+    ///     support it, and otherwise follows the app's language; its words (the end of a current job) follow the same language.
     func map(_ cvData: CVGeneratorAI.CVData, writtenIn description: String) -> CVModel {
         let info = cvData.personalInfo
+        let cvLanguage = languageOfText(description).flatMap(DocumentLanguage.init(languageTag:))
+        let present = cvLanguage.map(labels.present) ?? labels.presentInAppLanguage
 
+        // No name of its own: the list calls the draft by its person, otherwise by its role (CVTitle), until it is renamed
         return CVModel(
-            name: labels.cvName(for: info.name),
             personalInfo: PrestoCVCore.PersonalInfo(
                 name: info.name ?? "",
                 title: info.title ?? "",
@@ -30,20 +51,20 @@ struct AIDraftMapper {
                 portfolio: info.website ?? "",
                 profile: cvData.summary ?? ""
             ),
-            relevant_experience: cvData.experience.map(experience),
+            relevant_experience: cvData.experience.map { experience($0, endingCurrentJobWith: present) },
             education: cvData.education.map(education),
-            skills: cvData.skills.map(skill),
+            skills: ordered(cvData.skills).map(skill),
             languages: cvData.languages.compactMap(language),
             certifications: cvData.certifications.map(certification),
             interests: interests(cvData.interests),
             social: socialLinks(info),
-            documentLanguage: documentLanguage(of: description)
+            documentLanguage: cvLanguage?.rawValue
         )
     }
 
     // MARK: - Sections
 
-    private func experience(_ entry: CVGeneratorAI.Experience) -> PrestoCVCore.Experience {
+    private func experience(_ entry: CVGeneratorAI.Experience, endingCurrentJobWith present: String) -> PrestoCVCore.Experience {
         let achievements = entry.achievements.map { "• \($0)" }
         let description = ([entry.description].compactMap { $0 } + achievements).joined(separator: "\n")
 
@@ -51,7 +72,7 @@ struct AIDraftMapper {
             title: entry.title,
             company: entry.company,
             location: entry.location ?? "",
-            period: period(start: entry.startDate, end: entry.endDate, isCurrent: entry.current),
+            period: period(start: entry.startDate, end: entry.endDate, endOfCurrent: entry.current ? present : nil),
             description: description
         )
     }
@@ -60,9 +81,14 @@ struct AIDraftMapper {
         PrestoCVCore.Education(
             degree: entry.degree ?? "",
             school: entry.institution ?? "",
-            period: period(start: entry.startDate, end: entry.endDate, isCurrent: false),
+            period: period(start: entry.startDate, end: entry.endDate, endOfCurrent: nil),
             description: entry.description ?? ""
         )
+    }
+
+    /// The technologies first, then the soft skills (ADR 0031): the CV has one list of skills, and each kind keeps the draft's order.
+    private func ordered(_ skills: [CVGeneratorAI.Skill]) -> [CVGeneratorAI.Skill] {
+        skills.filter { $0.kind == .technology } + skills.filter { $0.kind == .softSkill }
     }
 
     private func skill(_ entry: CVGeneratorAI.Skill) -> PrestoCVCore.Skill {
@@ -102,14 +128,10 @@ struct AIDraftMapper {
 
     // MARK: - Values
 
-    private func documentLanguage(of description: String) -> String? {
-        languageOfText(description).flatMap(DocumentLanguage.init(languageTag:))?.rawValue
-    }
-
-    /// "start – end"; just the one date when only one is known. A current job has no end, so it ends with the
-    /// injected word, unless the draft states an end date: that date always wins.
-    private func period(start: String?, end: String?, isCurrent: Bool) -> String {
-        let finish = end ?? (isCurrent ? labels.present : nil)
+    /// "start – end"; just the one date when only one is known. A current job has no end, so it ends with
+    /// `endOfCurrent`, the word for "present" in the CV's language, unless the draft states an end date: that date always wins.
+    private func period(start: String?, end: String?, endOfCurrent: String?) -> String {
+        let finish = end ?? endOfCurrent
 
         switch (start, finish) {
         case let (start?, finish?): return "\(start) – \(finish)"
@@ -119,14 +141,14 @@ struct AIDraftMapper {
         }
     }
 
-    /// The editor rates skills from 0 to 5 stars; no level is no stars.
+    /// The editor rates skills with up to `Skill.maxLevel` stars; no level is no stars, and an expert gets them all.
     private func skillLevel(_ level: CVGeneratorAI.SkillLevel?) -> Int {
         switch level {
         case nil: return 0
         case .beginner?: return 1
         case .intermediate?: return 3
         case .advanced?: return 4
-        case .expert?: return 5
+        case .expert?: return PrestoCVCore.Skill.maxLevel
         }
     }
 

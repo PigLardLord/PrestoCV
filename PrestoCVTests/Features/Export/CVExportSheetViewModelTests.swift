@@ -3,6 +3,7 @@ import Foundation
 @testable import PrestoCV
 @testable import PrestoCVCore
 @testable import CVPDFExporter
+import struct PrestoCVDomain.ExportPolicy
 
 // MARK: - Mock CVExportService
 
@@ -46,6 +47,7 @@ actor MockCVExportService: CVExportServiceProtocol {
 
     private var heldCalls: [Call: [CheckedContinuation<Void, Never>]] = [:]
     private var waiters: [(call: Call, count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var cleanupWaiters = CountWaiters()
 
     private(set) var availableTemplatesCalled = false
     private(set) var generatePreviewHTMLCallCount = 0
@@ -159,6 +161,23 @@ actor MockCVExportService: CVExportServiceProtocol {
 
     func cleanupTempFile(at url: URL) async {
         cleanedUpURLs.append(url)
+        cleanupWaiters.reach(cleanedUpURLs.count)
+    }
+
+    /// Returns once `count` files have been removed, or when the task that waits is cancelled
+    func waitUntilCleanedUp(_ count: Int = 1) async {
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                cleanupWaiters.add(id, waitingFor: count, continuation, reached: cleanedUpURLs.count)
+            }
+        } onCancel: {
+            Task { await self.stopWaitingForCleanup(id) }
+        }
+    }
+
+    private func stopWaitingForCleanup(_ id: UUID) {
+        cleanupWaiters.cancel(id)
     }
 }
 
@@ -176,15 +195,17 @@ extension CVModel {
 @Suite("CVExportSheetViewModel Tests")
 struct CVExportSheetViewModelTests {
 
-    private let cv = CVModel.exportable
-
     private func makeViewModel(
         _ service: MockCVExportService,
+        cv: CVModel = .exportable,
         template: String? = "modern",
         debounce: Duration = .zero,
         store: InMemoryExportPreferencesStore = InMemoryExportPreferencesStore()
     ) -> CVExportSheetViewModel {
-        let viewModel = CVExportSheetViewModel(cv: cv, exportService: service, preferencesStore: store, previewDebounce: debounce)
+        let viewModel = CVExportSheetViewModel(
+            cv: cv, exportService: service, preferencesStore: store, documentLanguageSink: { _ in }, lookSink: { _ in }, exportPolicy: .standard,
+            documentLanguageDetector: englishDocumentLanguageDetector, appLocale: Locale(identifier: "en"), previewDebounce: debounce
+        )
         viewModel.selectedTemplateId = template
         return viewModel
     }
@@ -249,7 +270,7 @@ struct CVExportSheetViewModelTests {
         viewModel.selectedColorPalette = .creative
         viewModel.selectedFontScheme = .serif
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.previewHTML?.contains("Preview") == true)
         #expect(viewModel.previewOptions?.templateId == "modern")
@@ -261,10 +282,10 @@ struct CVExportSheetViewModelTests {
     func requestPreviewClearsWithoutTemplate() async {
         let mockService = MockCVExportService()
         let viewModel = makeViewModel(mockService)
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
         viewModel.selectedTemplateId = nil
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.previewHTML == nil)
         #expect(viewModel.previewOptions == nil)
@@ -279,7 +300,7 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueuePreview(.success("<html>held</html>"), held: true)
         let viewModel = makeViewModel(mockService)
 
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview)
 
         #expect(viewModel.isPreviewLoading, "isPreviewLoading should be true during generation")
@@ -294,7 +315,7 @@ struct CVExportSheetViewModelTests {
         await mockService.setGeneratePreviewHTMLResult(.failure(AppError.unknown("Template engine exploded")))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(!viewModel.isPreviewLoading)
         #expect(!viewModel.isPreparingPDF)
@@ -311,9 +332,9 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueuePreview(.success("<html>second</html>"))
         let viewModel = makeViewModel(mockService)
 
-        let first = viewModel.requestPreview(for: cv)
+        let first = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview)
-        let second = viewModel.requestPreview(for: cv)
+        let second = viewModel.requestPreview()
         await second.value
         #expect(viewModel.previewHTML == "<html>second</html>")
 
@@ -331,9 +352,9 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueuePreview(.success("<html>second</html>"), held: true)
         let viewModel = makeViewModel(mockService)
 
-        let first = viewModel.requestPreview(for: cv)
+        let first = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview, count: 1)
-        let second = viewModel.requestPreview(for: cv)
+        let second = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview, count: 2)
         await mockService.releaseHeld(.preview)
         await first.value
@@ -353,11 +374,11 @@ struct CVExportSheetViewModelTests {
         let viewModel = makeViewModel(mockService, debounce: .milliseconds(500))
 
         // The three requests follow each other without a pause, so the first two are cancelled while they wait
-        viewModel.requestPreview(for: cv)
+        viewModel.requestPreview()
         viewModel.selectedColorPalette = .modern
-        viewModel.requestPreview(for: cv)
+        viewModel.requestPreview()
         viewModel.selectedFontScheme = .serif
-        let last = viewModel.requestPreview(for: cv)
+        let last = viewModel.requestPreview()
         await last.value
 
         #expect(await mockService.generatePreviewHTMLCallCount == 1)
@@ -371,7 +392,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.enqueuePreview(.success("<html>late</html>"), held: true)
         let viewModel = makeViewModel(mockService)
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview)
 
         await viewModel.stop().value
@@ -389,7 +410,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.enqueuePreview(.failure(AppError.unknown("late failure")), held: true)
         let viewModel = makeViewModel(mockService)
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview)
 
         await viewModel.stop().value
@@ -406,10 +427,10 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueueExport(.failure(PDFExportError.renderingFailed("late failure")), held: true)
         await mockService.enqueueExport(.success(secondFile))
         let viewModel = makeViewModel(mockService)
-        let first = viewModel.requestPreview(for: cv)
+        let first = viewModel.requestPreview()
         await mockService.waitUntilHeld(.export)
 
-        let second = viewModel.requestPreview(for: cv)
+        let second = viewModel.requestPreview()
         await second.value
         await mockService.releaseHeld(.export)
         await first.value
@@ -424,7 +445,7 @@ struct CVExportSheetViewModelTests {
         await mockService.setGeneratePreviewHTMLResult(.failure(CancellationError()))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.errorMessage == nil)
         #expect(!viewModel.isPreviewLoading)
@@ -440,7 +461,7 @@ struct CVExportSheetViewModelTests {
         await mockService.setExportedPDF(ExportedPDF(url: URL(fileURLWithPath: "/tmp/three.pdf"), pageCount: 3, thumbnail: thumbnail))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.sharePDF?.pageCount == 3)
         #expect(viewModel.sharePDF?.thumbnail == thumbnail)
@@ -453,7 +474,7 @@ struct CVExportSheetViewModelTests {
         let viewModel = makeViewModel(mockService)
         #expect(viewModel.pageCountText == nil)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.pageCountText == String(format: String(localized: "export.page_count"), 3))
     }
@@ -462,7 +483,7 @@ struct CVExportSheetViewModelTests {
     func pagesHaveAUniformBorder() {
         let margins = makeViewModel(MockCVExportService()).currentExportOptions().margins
 
-        #expect(margins.top == CVExportSheetViewModel.pageMargin)
+        #expect(margins.top == ExportPolicy.standard.margin)
         #expect(margins.left == margins.top)
         #expect(margins.bottom == margins.top)
         #expect(margins.right == margins.top)
@@ -475,14 +496,14 @@ struct CVExportSheetViewModelTests {
         viewModel.selectedColorPalette = .creative
         viewModel.selectedFontScheme = .serif
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.sharePDF == ExportedPDF(testFile: URL(fileURLWithPath: "/tmp/test.pdf")))
         #expect(viewModel.sharePDF?.fileName == "test.pdf")
         #expect(!viewModel.isPreparingPDF)
         let exportOptions = await mockService.lastExportOptions
         let previewOptions = viewModel.previewOptions
-        #expect(exportOptions?.maxPages == CVExportSheetViewModel.maxPages)
+        #expect(exportOptions?.maxPages == ExportPolicy.standard.maxPages)
         #expect(exportOptions?.maxPages == previewOptions?.maxPages)
         #expect(exportOptions?.templateId == "modern")
         #expect(exportOptions?.customization == previewOptions?.customization)
@@ -497,7 +518,7 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueuePreview(.success("<html>held</html>"), held: true)
         let viewModel = makeViewModel(mockService)
 
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
         await mockService.waitUntilHeld(.preview)
 
         #expect(await mockService.exportCallCount == 0)
@@ -514,7 +535,7 @@ struct CVExportSheetViewModelTests {
         await mockService.setExportResult(.failure(AppError.unknown("Export error 0x7")))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.sharePDF == nil)
         #expect(!viewModel.isPreparingPDF)
@@ -528,21 +549,21 @@ struct CVExportSheetViewModelTests {
         await mockService.setExportResult(.failure(PDFExportError.tooManyPages(count: 12, limit: 10)))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.errorMessage == String(format: String(localized: "export.error.too_many_pages"), 12, 10))
         #expect(viewModel.sharePDF == nil)
     }
 
-    @Test("a CV without name or email asks for them")
-    func missingNameAndEmailAsksForThem() async {
+    @Test("a CV the exporter refuses for its name asks for it")
+    func refusedNameAsksForIt() async {
         let mockService = MockCVExportService()
-        await mockService.setExportResult(.failure(PDFExportError.invalidContent("Document must have an email")))
+        await mockService.setExportResult(.failure(PDFExportError.invalidContent("Document must have a name")))
         let viewModel = makeViewModel(mockService)
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
-        #expect(viewModel.errorMessage == String(localized: "export.error.missing_name_email"))
+        #expect(viewModel.errorMessage == String(localized: "export.readiness.name_required"))
     }
 
     @Test("a new selection removes the PDF of the old one at once and its file after")
@@ -551,11 +572,11 @@ struct CVExportSheetViewModelTests {
         let oldFile = URL(fileURLWithPath: "/tmp/old.pdf")
         await mockService.enqueueExport(.success(oldFile))
         let viewModel = makeViewModel(mockService)
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
         #expect(viewModel.sharePDF?.url == oldFile)
 
         viewModel.selectedColorPalette = .minimal
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
 
         #expect(viewModel.sharePDF == nil, "the old PDF no longer matches the selection")
         #expect(viewModel.isPreparingPDF)
@@ -573,10 +594,10 @@ struct CVExportSheetViewModelTests {
         await mockService.enqueueExport(.success(currentFile))
         let viewModel = makeViewModel(mockService)
 
-        let first = viewModel.requestPreview(for: cv)
+        let first = viewModel.requestPreview()
         await mockService.waitUntilHeld(.export)
         viewModel.selectedFontScheme = .serif
-        let second = viewModel.requestPreview(for: cv)
+        let second = viewModel.requestPreview()
         await second.value
         await mockService.releaseHeld(.export)
         await first.value
@@ -589,7 +610,7 @@ struct CVExportSheetViewModelTests {
     func stopRemovesThePDFOfAReleasedViewModel() async {
         let mockService = MockCVExportService()
         var viewModel: CVExportSheetViewModel? = makeViewModel(mockService)
-        await viewModel?.requestPreview(for: cv).value
+        await viewModel?.requestPreview().value
         #expect(viewModel?.sharePDF != nil)
 
         // The sheet is dismissed and its view model released before the cleanup task gets to run
@@ -604,10 +625,10 @@ struct CVExportSheetViewModelTests {
     func newRequestRemovesTheDisplacedPDFOfAReleasedViewModel() async {
         let mockService = MockCVExportService()
         var viewModel: CVExportSheetViewModel? = makeViewModel(mockService)
-        await viewModel?.requestPreview(for: cv).value
+        await viewModel?.requestPreview().value
         #expect(viewModel?.sharePDF != nil)
 
-        let task = viewModel?.requestPreview(for: cv)
+        let task = viewModel?.requestPreview()
         viewModel = nil
         await task?.value
 
@@ -618,7 +639,7 @@ struct CVExportSheetViewModelTests {
     func stopRemovesThePDF() async {
         let mockService = MockCVExportService()
         let viewModel = makeViewModel(mockService)
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
         #expect(viewModel.sharePDF != nil)
 
         await viewModel.stop().value
@@ -634,7 +655,7 @@ struct CVExportSheetViewModelTests {
         let mockService = MockCVExportService()
         await mockService.enqueueExport(.success(URL(fileURLWithPath: "/tmp/late.pdf")), held: true)
         let viewModel = makeViewModel(mockService)
-        let task = viewModel.requestPreview(for: cv)
+        let task = viewModel.requestPreview()
         await mockService.waitUntilHeld(.export)
 
         await viewModel.stop().value
@@ -647,48 +668,76 @@ struct CVExportSheetViewModelTests {
 
     // MARK: - A CV the exporter would refuse
 
-    @Test("a CV without a name or an email gets its preview but no PDF, and a hint instead of an alert",
+    @Test("a CV without a name gets its preview but no PDF, and a hint that asks for the name instead of an alert",
           arguments: [
               PrestoCVCore.PersonalInfo(name: "", email: ""),
-              PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: ""),
-              PrestoCVCore.PersonalInfo(name: "", email: "ada@example.com"),
+              PrestoCVCore.PersonalInfo(name: "", email: "ada@example.com", phone: "+39 06 1234567"),
               PrestoCVCore.PersonalInfo(name: "   ", email: "\n")
           ])
     func incompleteCVGetsNoPDF(personalInfo: PrestoCVCore.PersonalInfo) async {
         let mockService = MockCVExportService()
-        let viewModel = makeViewModel(mockService)
+        let viewModel = makeViewModel(mockService, cv: CVModel(name: "Draft", personalInfo: personalInfo))
 
-        await viewModel.requestPreview(for: CVModel(name: "Draft", personalInfo: personalInfo)).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.previewHTML != nil, "the preview shows what is missing")
-        #expect(viewModel.shareBlocker == String(localized: "export.error.missing_name_email"))
+        #expect(viewModel.shareBlocker == String(localized: "export.readiness.name_required"))
         #expect(viewModel.sharePDF == nil)
         #expect(!viewModel.isPreparingPDF)
         #expect(viewModel.errorMessage == nil, "no alert when the sheet opens")
         #expect(await mockService.exportCallCount == 0)
     }
 
+    @Test("a CV without an email address or a phone number gets its PDF, with a warning that says which is missing",
+          arguments: [
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: ""), "export.readiness.no_email_phone"),
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "", phone: "+39 06 1234567"), "export.readiness.no_email"),
+              (PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "ada@example.com"), "export.readiness.no_phone"),
+          ])
+    func missingContactsOnlyWarn(personalInfo: PrestoCVCore.PersonalInfo, warning: String) async {
+        let mockService = MockCVExportService()
+        let viewModel = makeViewModel(mockService, cv: CVModel(name: "Draft", personalInfo: personalInfo))
+
+        await viewModel.requestPreview().value
+
+        #expect(viewModel.shareBlocker == nil)
+        #expect(viewModel.shareWarning == String(localized: String.LocalizationValue(warning)))
+        #expect(viewModel.sharePDF != nil)
+        #expect(await mockService.exportCallCount == 1)
+    }
+
+    @Test("a CV with a name, an email address and a phone number has nothing to say")
+    func readyCVHasNoWarning() async {
+        let personalInfo = PrestoCVCore.PersonalInfo(name: "Ada Lovelace", email: "ada@example.com", phone: "+39 06 1234567")
+        let viewModel = makeViewModel(MockCVExportService(), cv: CVModel(name: "Draft", personalInfo: personalInfo))
+
+        await viewModel.requestPreview().value
+
+        #expect(viewModel.shareBlocker == nil && viewModel.shareWarning == nil)
+    }
+
     @Test("a complete CV has nothing in the way of the PDF")
     func completeCVHasNoBlocker() async {
         let viewModel = makeViewModel(MockCVExportService())
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         #expect(viewModel.shareBlocker == nil)
         #expect(viewModel.sharePDF != nil)
     }
 
-    @Test("a CV that becomes complete gets its PDF at the next request")
+    @Test("each sheet judges its own CV: the incomplete one gets no PDF, the complete one does")
     func blockerClearsWhenCVIsComplete() async {
         let mockService = MockCVExportService()
-        let viewModel = makeViewModel(mockService)
-        await viewModel.requestPreview(for: CVModel(name: "Draft")).value
-        #expect(viewModel.shareBlocker != nil)
+        let incomplete = makeViewModel(mockService, cv: CVModel(name: "Draft"))
+        await incomplete.requestPreview().value
+        #expect(incomplete.shareBlocker != nil)
 
-        await viewModel.requestPreview(for: cv).value
+        let complete = makeViewModel(mockService)
+        await complete.requestPreview().value
 
-        #expect(viewModel.shareBlocker == nil)
-        #expect(viewModel.sharePDF != nil)
+        #expect(complete.shareBlocker == nil)
+        #expect(complete.sharePDF != nil)
         #expect(await mockService.exportCallCount == 1)
     }
 
@@ -724,7 +773,7 @@ struct CVExportSheetViewModelTests {
         #expect(options.templateId == "modern")
         #expect(options.customization.colorPalette == .minimal)
         #expect(options.customization.fontScheme == .modern)
-        #expect(options.maxPages == CVExportSheetViewModel.maxPages)
+        #expect(options.maxPages == ExportPolicy.standard.maxPages)
         #expect(options.maxPages != ExportOptions.default.maxPages)
     }
 
@@ -732,7 +781,7 @@ struct CVExportSheetViewModelTests {
     func aspectRatioUsesPreviewOptions() async {
         let viewModel = makeViewModel(MockCVExportService())
 
-        await viewModel.requestPreview(for: cv).value
+        await viewModel.requestPreview().value
 
         // A4 aspect ratio is approximately 0.707 (210/297)
         #expect(abs(viewModel.aspectRatio - 0.707) < 0.01, "A4 aspect ratio should be approximately 0.707")

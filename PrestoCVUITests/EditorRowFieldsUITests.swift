@@ -34,7 +34,7 @@ final class EditorRowFieldsUITests: XCTestCase {
     /// Closes the keyboard that the first field of a new row opens, with the Done button above it.
     private func closeTheKeyboard() {
         let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "The new row should open the keyboard")
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "The new row should open the keyboard. " + XCUIApplication.noSoftwareKeyboard)
         app.toolbars.buttons["Done"].tap()
         let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: keyboard)
         XCTAssertEqual(XCTWaiter().wait(for: [closed], timeout: 10), .completed, "Done should close the keyboard")
@@ -57,8 +57,10 @@ final class EditorRowFieldsUITests: XCTestCase {
         let title = app.textFields["Job Title"]
         XCTAssertTrue(title.waitForExistence(timeout: 10), "A new experience should have a job title to type into")
         title.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
         title.typeText("Ward Nurse\n")
 
+        XCTAssertTrue(title.waitForKeyboardFocus(false), "Return should end the entry of the job title")
         let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: app.keyboards.firstMatch)
         XCTAssertEqual(XCTWaiter().wait(for: [closed], timeout: 10), .completed, "Return should close the keyboard")
         XCTAssertEqual(title.value as? String, "Ward Nurse", "Return should not add a line to the job title")

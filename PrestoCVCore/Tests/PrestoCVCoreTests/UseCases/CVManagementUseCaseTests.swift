@@ -445,11 +445,11 @@ struct CVManagementUseCaseTests {
         let originalCV = CVTestDataBuilder.completeCV().withName("Original CV").build()
         _ = try await cvRepository.saveCV(originalCV)
         
-        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
+        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id, named: "Original CV (Copy)")
         
-        // Should have different ID but same content (with modified name)
+        // Should have different ID but same content (with the name it was given)
         #expect(duplicatedCV.id != originalCV.id)
-        #expect(duplicatedCV.name == "Original CV action.copy_suffix")
+        #expect(duplicatedCV.name == "Original CV (Copy)")
         #expect(duplicatedCV.personalInfo.name == originalCV.personalInfo.name)
         #expect(duplicatedCV.personalInfo.title == originalCV.personalInfo.title)
         #expect(duplicatedCV.personalInfo.email == originalCV.personalInfo.email)
@@ -471,7 +471,7 @@ struct CVManagementUseCaseTests {
         let originalCV = CVTestDataBuilder.minimalCV().withName("Test CV").build()
         _ = try await cvRepository.saveCV(originalCV)
         
-        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
+        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id, named: "Test CV (Copy)")
         
         // Verify both CVs exist in repository
         let allCVs = try await cvRepository.getAllCVs()
@@ -479,11 +479,11 @@ struct CVManagementUseCaseTests {
         
         let retrievedDuplicate = try await cvRepository.getCV(by: duplicatedCV.id)
         #expect(retrievedDuplicate != nil)
-        #expect(retrievedDuplicate?.name == "Test CV action.copy_suffix")
+        #expect(retrievedDuplicate?.name == "Test CV (Copy)")
     }
     
-    @Test("DuplicateCV appends '(Copy)' to name")
-    func duplicateCVAppendsCoypToName() async throws {
+    @Test("DuplicateCV gives the copy the name it is given")
+    func duplicateCVGivesTheCopyItsName() async throws {
         let mockStorage = MockStorageService()
         let cvRepository = CVRepository(storageService: mockStorage)
         let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
@@ -496,29 +496,9 @@ struct CVManagementUseCaseTests {
         let originalCV = CVTestDataBuilder.minimalCV().withName("My Professional CV").build()
         _ = try await cvRepository.saveCV(originalCV)
         
-        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
+        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id, named: "My Professional CV (Copy)")
         
-        #expect(duplicatedCV.name == "My Professional CV action.copy_suffix")
-    }
-    
-    @Test("DuplicateCV names a copy of an unnamed CV after the name the list shows, Untitled CV", arguments: ["", "   "])
-    func duplicateCVHandlesEmptyName(name: String) async throws {
-        let mockStorage = MockStorageService()
-        let cvRepository = CVRepository(storageService: mockStorage)
-        let sampleRepository = SampleCVRepository(storageService: mockStorage, categoryService: TemplateCategoryService(), bundleResourceService: MockBundleResourceService(), templateLoader: MockJSONTemplateLoader(), parallelSearchService: MockParallelSearchService())
-        
-        let useCase = CVManagementUseCase(
-            cvRepository: cvRepository,
-            sampleRepository: sampleRepository
-        )
-        
-        let originalCV = CVTestDataBuilder.minimalCV().withName(name).build()
-        _ = try await cvRepository.saveCV(originalCV)
-        
-        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
-        
-        // The package has no string catalog, so a text is its key
-        #expect(duplicatedCV.name == "cv.untitled action.copy_suffix")
+        #expect(duplicatedCV.name == "My Professional CV (Copy)")
     }
     
     @Test("DuplicateCV throws error for non-existent CV")
@@ -535,7 +515,7 @@ struct CVManagementUseCaseTests {
         let nonExistentId = UUID()
         
         await #expect(throws: AppError.self) {
-            _ = try await useCase.duplicateCV(id: nonExistentId)
+            _ = try await useCase.duplicateCV(id: nonExistentId, named: "Copy")
         }
     }
     
@@ -553,7 +533,7 @@ struct CVManagementUseCaseTests {
         let originalCV = CVTestDataBuilder.completeCV().build()
         _ = try await cvRepository.saveCV(originalCV)
         
-        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id)
+        let duplicatedCV = try await useCase.duplicateCV(id: originalCV.id, named: "Copy")
         
         // Verify all fields except name and ID are identical
         #expect(duplicatedCV.personalInfo.name == originalCV.personalInfo.name)
@@ -647,11 +627,11 @@ struct CVManagementUseCaseTests {
         #expect(updatedCV?.personalInfo.title == "Updated Title")
         
         // 5. Duplicate second CV
-        let duplicatedCV = try await useCase.duplicateCV(id: secondCV.id)
+        let duplicatedCV = try await useCase.duplicateCV(id: secondCV.id, named: "Second CV (Copy)")
         
         allCVs = try await useCase.getAllCVs()
         #expect(allCVs.count == 3)
-        #expect(duplicatedCV.name == "Second CV action.copy_suffix")
+        #expect(duplicatedCV.name == "Second CV (Copy)")
         
         // 6. Delete original second CV
         try await useCase.deleteCV(id: secondCV.id)
@@ -660,7 +640,7 @@ struct CVManagementUseCaseTests {
         #expect(allCVs.count == 2)
         
         let remainingNames = allCVs.map { $0.name }.sorted()
-        #expect(remainingNames == ["Second CV action.copy_suffix", "Updated First CV"])
+        #expect(remainingNames == ["Second CV (Copy)", "Updated First CV"])
         
         // 7. Delete all remaining CVs
         try await useCase.deleteCV(id: firstCV.id)
@@ -725,7 +705,7 @@ struct CVManagementUseCaseTests {
         let nonExistentId = UUID()
         
         await #expect(throws: AppError.self) {
-            _ = try await useCase.duplicateCV(id: nonExistentId)
+            _ = try await useCase.duplicateCV(id: nonExistentId, named: "Copy")
         }
     }
 }

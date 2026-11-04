@@ -182,11 +182,8 @@ public extension PDFRendererPool {
     /// - Returns: The result of the closure
     func withRenderer<T>(_ block: (PDFRendererProtocol) async throws -> T) async rethrows -> T {
         let renderer = await acquire()
-        defer {
-            Task {
-                await self.release(renderer)
-            }
-        }
+        // The pool is an actor and release is synchronous: the renderer is back as soon as the block ends.
+        defer { release(renderer) }
         return try await block(renderer)
     }
 }

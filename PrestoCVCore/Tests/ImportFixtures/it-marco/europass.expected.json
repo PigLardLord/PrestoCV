@@ -1,0 +1,73 @@
+{
+ "id": "it-marco/europass",
+ "language": "it",
+ "form": "europass",
+ "person": {
+  "name": "Esposito Marco",
+  "title": null,
+  "email": "marco.esposito@example.org",
+  "phone": "+39 347 000 0202",
+  "location": "Via Esempio 12, 40121 Bologna",
+  "links": [],
+  "summary": null
+ },
+ "experience": [
+  {
+   "role": "Senior Developer",
+   "employer": "Esempio Software S.r.l.",
+   "location": "Via Esempio 1, Bologna",
+   "details": 2,
+   "start": [
+    2020,
+    1
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Sviluppatore web",
+   "employer": "Agenzia Esempio",
+   "location": "Via Esempio 1, Modena",
+   "details": 2,
+   "start": [
+    2016,
+    6
+   ],
+   "end": [
+    2019,
+    12
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Laurea in Informatica",
+   "school": "Università di Bologna",
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Swift",
+  "Kotlin",
+  "TypeScript",
+  "Git"
+ ],
+ "languages": [
+  {
+   "name": "Italiano",
+   "level": "native"
+  },
+  {
+   "name": "Inglese",
+   "level": null
+  }
+ ],
+ "certifications": [],
+ "interests": []
+}

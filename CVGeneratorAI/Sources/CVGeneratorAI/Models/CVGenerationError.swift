@@ -32,4 +32,8 @@ public enum CVGenerationError: Error, Equatable, Sendable {
 
     /// The model answered, but nothing usable was left once the unsupported parts were removed
     case emptyResult
+
+    /// The description is in a language whose grounding needs the device's language data, and the device has not got it yet: the
+    /// lexical class of English or German. The system downloads it on request. The language is a BCP 47 code: "en", "de".
+    case languageDataUnavailable(languageCode: String)
 }

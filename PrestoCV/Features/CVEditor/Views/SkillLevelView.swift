@@ -1,8 +1,11 @@
 import SwiftUI
+import PrestoCVCore
 
+/// The stars of a skill's level. A tap on a star is handed to `onChoose`, counted from one.
 struct SkillLevelView: View {
-    @Binding var level: Int
+    let level: Int
     let maxLevel: Int
+    let onChoose: (Int) -> Void
     
     var body: some View {
         HStack(spacing: DesignTokens.Spacing.xxs) {
@@ -10,9 +13,7 @@ struct SkillLevelView: View {
                 Image(systemName: index < level ? "star.fill" : "star")
                     .foregroundColor(index < level ? .yellow : DesignTokens.Colors.tertiary)
                     .onTapGesture {
-                        // Update level to the tapped star's position + 1
-                        // If tapping the same star, toggle it off (set to 0)
-                        level = (index + 1) == level ? 0 : index + 1
+                        onChoose(index + 1)
                     }
                     .accessibilityLabel("accessibility.skill_level_value".localizedWithArgs(index + 1, maxLevel))
                     .accessibilityRemoveTraits(.isImage)
@@ -29,10 +30,8 @@ struct SkillLevelView: View {
 }
 
 struct SkillLevelView_Previews: PreviewProvider {
-    @State static var level = 3
-    
     static var previews: some View {
-        SkillLevelView(level: $level, maxLevel: 5)
+        SkillLevelView(level: 3, maxLevel: Skill.maxLevel) { _ in }
             .padding()
             .previewLayout(.sizeThatFits)
     }

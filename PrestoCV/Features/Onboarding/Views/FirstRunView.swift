@@ -1,12 +1,22 @@
 import SwiftUI
 import PrestoCVCore
 
-/// What the user sees before having any CV: it fills the empty state of the CV list. Where the device can run it, the
-/// AI draft leads; a blank CV and the examples follow.
+/// What the user sees before having any CV: it fills the empty state of the CV list. The import of a CV the person
+/// already has leads; the AI draft, where the device shows it, the examples and a blank CV follow. At the accessibility
+/// sizes and in landscape on an iPhone the ways to start come before the welcome (see `FirstRunLayout`), and at the
+/// accessibility sizes they sit close together, so that they fit a short screen (see `FirstRunActionDensity`).
 struct FirstRunView: View {
     @StateObject private var viewModel: NewCVChoicesViewModel
     @EnvironmentObject var router: AppRouter
     @State private var showingExamples = false
+    /// The reason of the dimmed AI draft while its full explanation is shown.
+    @State private var explainedReason: AIEntry.Reason?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    
+    private var density: FirstRunActionDensity {
+        FirstRunActionDensity.resolve(dynamicTypeSize: dynamicTypeSize)
+    }
     
     /// The view model is built once, when the view first appears, and survives every re-render of the list.
     init(viewModel: @autoclosure @escaping () -> NewCVChoicesViewModel) {
@@ -16,9 +26,16 @@ struct FirstRunView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: DesignTokens.Spacing.xxl) {
-                headerSection
-                contentSection
-                actionSection
+                switch FirstRunLayout.resolve(dynamicTypeSize: dynamicTypeSize, verticalSizeClass: verticalSizeClass) {
+                case .welcomeFirst:
+                    headerSection
+                    contentSection
+                    actionSection
+                case .actionsFirst:
+                    actionSection
+                    headerSection
+                    contentSection
+                }
             }
             .padding(DesignTokens.Spacing.xl)
             .frame(maxWidth: DesignTokens.Layout.readableContentWidth)
@@ -31,6 +48,7 @@ struct FirstRunView: View {
         .exampleSelection(isPresented: $showingExamples, from: viewModel) { draft in
             router.navigateToEditorWithTemplate(draft)
         }
+        .aiEntryExplanation(for: $explainedReason)
     }
     
     // MARK: - View Sections
@@ -55,8 +73,7 @@ struct FirstRunView: View {
                 .foregroundColor(DesignTokens.Colors.primary)
                 .multilineTextAlignment(.center)
             
-            // The welcome promises the AI draft only where the device can make it
-            Text(viewModel.offersAI ? "welcome.description.ai".localized : "welcome.description".localized)
+            Text(viewModel.aiEntry.welcomeKey.localized)
                 .typography(.body)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
@@ -64,11 +81,11 @@ struct FirstRunView: View {
         }
     }
     
-    /// The choices in the order of the view model. The one that leads is the primary button.
+    /// The choices in the order of the view model. The import leads, and is the primary button.
     private var actionSection: some View {
-        VStack(spacing: DesignTokens.Spacing.lg) {
+        VStack(spacing: density.spacing) {
             ForEach(viewModel.choices, id: \.self) { choice in
-                action(for: choice, leads: choice == viewModel.choices.first)
+                action(for: choice)
             }
         }
         .frame(maxWidth: DesignTokens.Layout.standaloneButtonWidth)
@@ -76,37 +93,42 @@ struct FirstRunView: View {
     }
     
     @ViewBuilder
-    private func action(for choice: NewCVChoice, leads: Bool) -> some View {
+    private func action(for choice: NewCVChoice) -> some View {
         switch choice {
-        case .aiDraft:
-            PrimaryButton(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-        case .aiDraftUnavailable(let explanation):
-            unavailableAIDraft(explanation)
-        case .blank:
-            if leads {
-                PrimaryButton(title: "onboarding.create.button".localized, icon: "plus.circle.fill", action: openBlankCV)
-            } else {
-                SecondaryButton.text(title: "onboarding.create.button".localized, action: openBlankCV)
+        case .importCV:
+            PrimaryButton(title: "onboarding.import.button".localized, icon: density.symbol("doc.on.clipboard")) {
+                router.navigate(to: .importCV)
             }
+            .accessibilityIdentifier("firstrun.import")
+        case .aiDraft:
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: density.symbol("sparkles"), action: openAIDraft)
+        case .aiDraftUnavailable(let reason):
+            unavailableAIDraft(reason)
         case .example:
             SecondaryButton.text(title: "onboarding.start_from_example".localized) {
                 showingExamples = true
             }
+        case .blank:
+            SecondaryButton.text(title: "onboarding.create.button".localized, action: openBlankCV)
         }
     }
     
-    /// The AI draft, dimmed and off, with the sentence that says what to do before it can be used
-    private func unavailableAIDraft(_ explanation: AIEntry.Explanation) -> some View {
+    /// The AI draft, dimmed, with the line that says why. A tap, or an activation by VoiceOver, Voice Control or Switch
+    /// Control, shows the full explanation, which grows to every text size.
+    private func unavailableAIDraft(_ reason: AIEntry.Reason) -> some View {
         VStack(spacing: DesignTokens.Spacing.xs) {
-            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: "sparkles", action: openAIDraft)
-                .disabled(true)
-                .opacity(DesignTokens.Opacity.subtle)
-                .accessibilityHint(explanation.key.localized)
+            SecondaryButton.text(title: "onboarding.ai.button".localized, icon: density.symbol("sparkles")) {
+                explainedReason = reason
+            }
+            .opacity(DesignTokens.Opacity.subtle)
+            .announcedAsUnavailableAIDraft(title: "onboarding.ai.button".localized, reason: reason)
             
-            Text(explanation.key.localized)
+            Text(reason.lineKey.localized)
                 .typography(.caption1)
+                .dynamicTypeSize(...FirstRunActionDensity.largestReasonLineSize)
                 .foregroundColor(DesignTokens.Colors.secondary)
                 .multilineTextAlignment(.center)
+                .accessibilityHidden(true)
         }
     }
     
@@ -117,7 +139,7 @@ struct FirstRunView: View {
     }
     
     private func openBlankCV() {
-        router.navigateToEditorWithTemplate(CVModel())
+        router.navigateToEditorWithTemplate(viewModel.makeBlankDraft())
     }
 }
 
@@ -125,13 +147,7 @@ struct FirstRunView: View {
 
 #if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let viewModel = NewCVChoicesViewModel(
-        aiAvailability: { .available },
-        sampleRepository: try! container.makeSampleCVRepository()
-    )
-    
-    return FirstRunView(viewModel: viewModel)
+    FirstRunView(viewModel: PreviewDependencies.newCVChoices())
         .environmentObject(AppRouter())
 }
 #endif

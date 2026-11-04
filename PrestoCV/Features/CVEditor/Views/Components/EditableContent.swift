@@ -6,7 +6,8 @@ struct EditableContent<Item, RowContent: View>: View {
     let icon: String
     let emptyStateTitle: String
     let emptyStateSubtitle: String
-    let rowContent: (Binding<Item>, @escaping () -> Void) -> RowContent
+    let rowContent: (Binding<Item>) -> RowContent
+    let deleteLabel: (Item) -> String
     let onRemove: (Int) -> Void
     
     var body: some View {
@@ -20,6 +21,7 @@ struct EditableContent<Item, RowContent: View>: View {
             EditableItemsList(
                 items: $items,
                 rowContent: rowContent,
+                deleteLabel: deleteLabel,
                 onRemove: onRemove
             )
         }

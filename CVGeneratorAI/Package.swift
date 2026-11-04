@@ -16,17 +16,36 @@ targets.append(.target(name: "CVDraftingFoundationModels", dependencies: ["CVDra
 #endif
 
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
+var dependencies: [Package.Dependency] = []
 #if !os(Linux)
+dependencies += [.package(path: "../DiagnosticLogging"), .package(path: "../DiagnosticTrace")]
 products.append(.library(name: "CVGeneratorAI", targets: ["CVGeneratorAI"]))
 targets += [
-    .target(name: "CVGeneratorAI", dependencies: [], path: "Sources/CVGeneratorAI"),
-    .testTarget(name: "CVGeneratorAITests", dependencies: ["CVGeneratorAI"], path: "Tests/CVGeneratorAITests"),
+    .target(
+        name: "CVGeneratorAI",
+        dependencies: [
+            .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+            .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+        ],
+        path: "Sources/CVGeneratorAI"
+    ),
+    .testTarget(
+        name: "CVGeneratorAITests",
+        dependencies: [
+            "CVGeneratorAI", .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+            .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+            .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+            .product(name: "DiagnosticTraceTestSupport", package: "DiagnosticTrace"),
+        ],
+        path: "Tests/CVGeneratorAITests"
+    ),
 ]
 #endif
 
 let package = Package(
     name: "CVGeneratorAI",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
+    dependencies: dependencies,
     targets: targets
 )

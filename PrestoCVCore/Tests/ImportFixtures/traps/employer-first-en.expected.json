@@ -1,0 +1,13 @@
+{
+ "id": "traps/employer-first-en", "language": "en", "form": "trap",
+ "person": {"name": "Priya Nair", "title": "Registered Nurse", "email": "priya.nair@example.com", "phone": "+44 7700 900555",
+            "location": "Leicester, UK", "links": [],
+            "summary": "Registered nurse with five years on acute medical wards, known for calm handovers and patient education."},
+ "experience": [
+  {"role": "Staff Nurse", "employer": "Example NHS Trust", "location": null, "start": [2021, 9], "end": "current", "details": 2},
+  {"role": "Healthcare Assistant", "employer": "Acme Care Homes Ltd", "location": null, "start": [2018, 1], "end": [2021, 8], "details": 1}
+ ],
+ "education": [{"degree": "BSc (Hons) Adult Nursing", "school": "University of Leicester", "start": [2018, null], "end": [2021, null]}],
+ "skills": ["Wound care", "IV therapy", "Patient education"],
+ "languages": [], "certifications": [], "interests": []
+}

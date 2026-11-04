@@ -10,18 +10,15 @@ struct DocumentLanguageDetectionTests {
 
     private static let samples = ["technical_cv", "business_cv", "creative_cv", "academic_cv", "healthcare_cv"]
 
-    private static let resources = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("PrestoCV/Resources", isDirectory: true)
-
-    /// A bundled sample CV, in one of the six languages
+    /// A sample CV the app bundle carries, in one of the six languages
     private static func sample(_ name: String, in language: DocumentLanguage) throws -> CVModel {
-        let file = language == .english ? "\(name).json" : "\(name).\(language.rawValue).json"
-        return try JSONDecoder().decode(CVModel.self, from: Data(contentsOf: resources.appendingPathComponent(file)))
+        let resource = language == .english ? name : "\(name).\(language.rawValue)"
+        let url = try #require(Bundle(for: AppRouter.self).url(forResource: resource, withExtension: "json"), "The app bundle has no \(resource).json")
+        return try JSONDecoder().decode(CVModel.self, from: Data(contentsOf: url))
     }
 
     private func detector(appLanguage: String) -> DocumentLanguageDetector {
-        DocumentLanguageDetector(preferredLanguages: [appLanguage], read: NaturalLanguageReader.read)
+        DocumentLanguageDetector(preferredLanguages: [appLanguage], read: { NaturalLanguageReader.read($0) })
     }
 
     /// A summary and two jobs, as Luca wrote them: in English, for a job abroad

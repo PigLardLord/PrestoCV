@@ -36,10 +36,10 @@ struct CVListRowTextTests {
 
     /// What the row of a CV that was saved at `savedAt` says when it is looked at in `moment`, in a time zone.
     private func line(saved savedAt: Date, at moment: Date, zone: String = "UTC") -> String {
-        LastSavedDescription(calendar: TestZone(zone).calendar).text(for: savedAt, relativeTo: moment)
+        LastSavedDescription(locale: Locale(identifier: "en"), calendar: TestZone(zone).calendar).text(for: savedAt, relativeTo: moment)
     }
 
-    private static let calendar: Calendar = {
+    private nonisolated static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar
@@ -53,35 +53,50 @@ struct CVListRowTextTests {
         CVModel(name: name, personalInfo: PersonalInfo(name: person, title: jobTitle))
     }
 
-    // MARK: - The person
+    // MARK: - The line under the title
 
-    @Test("The person line gives the name of the person and the job title")
-    func personLineHasNameAndJobTitle() {
+    @Test("Under a CV titled by its own name, the line gives the name of the person and the job title")
+    func subtitleOfANamedCVHasNameAndJobTitle() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "Alex Morgan", jobTitle: "Product Designer")) == "Alex Morgan\(separator)Product Designer")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "Alex Morgan", jobTitle: "Product Designer")) == "Alex Morgan\(separator)Product Designer")
     }
 
-    @Test("The person line has what is there when the name or the job title is missing")
-    func personLineHasWhatIsThere() {
+    @Test("Under a CV titled by its own name, the line has what is there when the name or the job title is missing")
+    func subtitleOfANamedCVHasWhatIsThere() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "Alex Morgan")) == "Alex Morgan")
-        #expect(viewModel.personLine(of: cv(jobTitle: "Product Designer")) == "Product Designer")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "Alex Morgan")) == "Alex Morgan")
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", jobTitle: "Product Designer")) == "Product Designer")
     }
 
-    @Test("The person line is nil when the CV has neither a name nor a job title, or only white space", arguments: ["", "  ", " \n "])
-    func personLineIsNilWithoutPersonOrTitle(blank: String) {
+    @Test("Under a CV titled by its person, the line gives only the job title, and nothing without one")
+    func subtitleOfACVTitledByItsPersonIsTheJobTitle() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: blank, jobTitle: blank)) == nil)
+        #expect(viewModel.subtitle(of: cv(person: "Alex Morgan", jobTitle: "Product Designer")) == "Product Designer")
+        #expect(viewModel.subtitle(of: cv(person: "Alex Morgan")) == nil)
     }
 
-    @Test("The person line trims the white space around the parts")
-    func personLineTrims() {
+    @Test("Under a CV titled by its job title there is no line: it has no person")
+    func subtitleOfACVTitledByItsRoleIsNil() {
         let viewModel = makeViewModel(repository: InMemoryCVRepository())
 
-        #expect(viewModel.personLine(of: cv(person: "  Alex Morgan ", jobTitle: " Designer\n")) == "Alex Morgan\(separator)Designer")
+        #expect(viewModel.subtitle(of: cv(jobTitle: "Product Designer")) == nil)
+    }
+
+    @Test("There is no line when the CV has neither a name nor a job title, or only white space", arguments: ["", "  ", " \n "])
+    func subtitleIsNilWithoutPersonOrTitle(blank: String) {
+        let viewModel = makeViewModel(repository: InMemoryCVRepository())
+
+        #expect(viewModel.subtitle(of: cv(person: blank, jobTitle: blank)) == nil)
+    }
+
+    @Test("The line trims the white space around the parts")
+    func subtitleTrims() {
+        let viewModel = makeViewModel(repository: InMemoryCVRepository())
+
+        #expect(viewModel.subtitle(of: cv(name: "Portfolio", person: "  Alex Morgan ", jobTitle: " Designer\n")) == "Alex Morgan\(separator)Designer")
     }
 
     // MARK: - The last save
@@ -180,6 +195,25 @@ struct CVListRowTextTests {
         #expect(Set([justNow, minutesLater, hoursLater].compactMap { $0 }).count == 3)
     }
 
+    @Test("Coming back to the foreground tells the times of the rows again; leaving it does not")
+    func foregroundTellsTheTimesAgain() async {
+        let saved = cv(name: "A")
+        let savedAt = moment(14, 12)
+        let repository = InMemoryCVRepository(cvs: [saved])
+        await repository.setLastSaved(savedAt, for: saved.id)
+        let clock = TestClock(savedAt.addingTimeInterval(30))
+        let viewModel = makeViewModel(repository: repository, clock: clock)
+        await viewModel.loadCVs()
+        let justNow = viewModel.lastSavedLine(of: saved)
+
+        clock.advance(by: 2 * 3_600)
+        viewModel.sceneDidChange(isActive: false)
+        #expect(viewModel.lastSavedLine(of: saved) == justNow, "Leaving the foreground moves nothing")
+
+        viewModel.sceneDidChange(isActive: true)
+        #expect(viewModel.lastSavedLine(of: saved) == line(saved: savedAt, at: savedAt.addingTimeInterval(30 + 2 * 3_600)))
+    }
+
     @Test("A CV saved in the evening reads yesterday once the clock passes midnight")
     func eveningSaveReadsYesterdayAfterMidnight() async {
         let saved = cv(name: "A")
@@ -262,11 +296,11 @@ struct CVListRowTextTests {
         await repository.setLastSaved(savedAt, for: saved.id)
         let clock = TestClock(savedAt)
         let waits = WaitLog()
-        let viewModel = makeViewModel(repository: repository, clock: clock) { duration in
+        let viewModel = makeViewModel(repository: repository, clock: clock, sleep: { duration in
             await waits.record(duration)
             guard await waits.count <= 3 else { throw CancellationError() }
             clock.advance(by: 60)
-        }
+        })
         await viewModel.loadCVs()
 
         await viewModel.keepPresentationDateCurrent()

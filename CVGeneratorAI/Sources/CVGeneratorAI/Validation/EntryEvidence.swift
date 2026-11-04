@@ -19,16 +19,38 @@ struct EntryEvidence {
     let quotableByAchievements: ProseQuotes
     /// The achievements of the draft (by position) that begin with a verb of a CV.
     let verbAchievements: Set<Int>
+    /// The names of the employers and schools of the draft: their words say nothing but the name (ADR 0023, rule (b)).
+    let holders: [[String]]
+    /// The name of the entry's own employer or school: the whole of it says nothing but the name either, unless the clause writes
+    /// it once more. Nil for an entry with none (a certification).
+    let ownHolder: [String]?
+    /// The text of the clauses that back the entry and those that join it, in the order of the description.
+    var context: [String] = []
+    /// What a written duty of the entry may quote besides: the clause that names its employer alone (rule (a))
+    /// and the relative clauses after it that only it holds (rule (b), "where ..."); never a shared tail (rule (c)).
+    var quotableByAttribution: ProseQuotes? = nil
+    /// ADR 0031, D1: the relative clauses that only continue the sentence naming the job: their years back its dates, and
+    /// nothing else of them.
+    var continuedDated: [Clause] = []
+    /// ADR 0031, D3: every clause attributed to the job, shared tails among them: a duty that quotes one word for word may
+    /// keep its acronyms, number words and seniority words.
+    var ownClauseQuotes: ProseQuotes? = nil
+    /// Whether the description says that the job is over: no clause of it says it goes on, and one writes two years or an end with
+    /// no word for the present ("Dal 2013 al 2017 sono stata impiegata"). The duty check keeps its duties in the past (#362). Never
+    /// true for a study.
+    var statesEnded: Bool = false
 
     /// What the achievement at `number` may quote.
     func quotable(byAchievement number: Int) -> ProseQuotes {
         verbAchievements.contains(number) ? quotable.adding(quotableByAchievements) : quotable
     }
 
-    /// Whether `phrase` (as `DescriptionText.normalized` writes it) stands in a clause that backs the entry: a place, an issuer.
+    /// Whether `phrase` (as `DescriptionText.normalized` writes it) stands in a clause that backs the entry, as itself and not as a
+    /// word of the name of an employer or a school, nor as the whole of the entry's own: a place, an issuer. "Vale Verde" is not the
+    /// place of a job that the description only places at the "Centro de Saúde de Vale Verde", nor "Bristol" of one at "Bristol".
     func backs(_ phrase: String) -> Bool {
         let words = Self.foldedWords(of: phrase)
-        return backing.contains { $0.contains(words) }
+        return backing.contains { !$0.spans(of: words, besideNames: holders, ownName: ownHolder).isEmpty }
     }
 
     /// The links a clause that backs the entry writes.
@@ -44,11 +66,21 @@ struct EntryEvidence {
     /// - Parameter graduationDate: The place, among `dates`, of the one that a graduation phrase may give: the end date of a
     ///   study. No other date takes a year of a graduation phrase.
     func supportedDates(_ dates: [String?], graduationDate: Int? = nil) -> [String?] {
-        var budget = YearBudget(pure: Self.yearCounts(of: dated), graduation: Self.yearCounts(of: graduation))
+        var budget = YearBudget(pure: Self.yearCounts(of: dated + continuedDated), graduation: Self.yearCounts(of: graduation))
         return dates.enumerated().map { index, date in
             guard let date = date.presentValue else { return nil }
             return supported(date, spending: &budget, mayTakeGraduation: index == graduationDate)
         }
+    }
+
+    /// The year the graduation clauses give the study, when they give one alone and none of `dates` holds it: the year the person
+    /// says they finished it ("2011 meine Ausbildung abgeschlossen"), for a study whose end date the model wrote with another year or
+    /// left out (#354). Nil when the clauses give no year, or more than one.
+    func completionYear(besides dates: [String?]) -> String? {
+        let years = Set(Self.yearCounts(of: graduation).keys)
+        let held = Set(dates.compactMap { $0 }.flatMap { Digits.runs(in: Digits.ascii($0)).filter { $0.count == 4 } })
+        guard years.count == 1, let year = years.first, !held.contains(year) else { return nil }
+        return year
     }
 
     // MARK: - Dates

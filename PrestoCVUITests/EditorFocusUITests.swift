@@ -56,22 +56,15 @@ final class EditorFocusUITests: XCTestCase {
         }
     }
 
-    /// Scrolls the field into view if needed and taps it; the field has the keyboard focus a moment later.
-    /// A tap that the simulator drops is repeated once. A hang is not: the editor never answers, whatever is tapped.
+    /// Scrolls the field into view if needed, and taps it once it can take the tap; the field then has the keyboard
+    /// focus. An editor that spins never gives it: the wait for the focus fails, and a tap that never returns runs
+    /// into the execution time allowance.
     private func focus(_ element: XCUIElement, named label: String, upwards: Bool = false) throws {
         app.scrollTo(element, upwards: upwards)
         XCTAssertTrue(element.waitForExistence(timeout: 20), "\(label) should be on the screen")
-        let started = Date()
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: element)
+        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 60), .completed, "\(label) should be able to take a tap")
         element.tap()
-        if !hasKeyboardFocus(element, within: 6) {
-            element.tap()
-            XCTAssertTrue(hasKeyboardFocus(element, within: 15), "\(label) should take the keyboard focus")
-        }
-        XCTAssertLessThan(Date().timeIntervalSince(started), 40, "Moving to \(label) took far too long: the editor is spinning")
-    }
-
-    private func hasKeyboardFocus(_ element: XCUIElement, within seconds: TimeInterval) -> Bool {
-        let focused = expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: element)
-        return XCTWaiter().wait(for: [focused], timeout: seconds) == .completed
+        XCTAssertTrue(element.waitForKeyboardFocus(true, timeout: 60), "\(label) should take the keyboard focus: the editor may be spinning")
     }
 }

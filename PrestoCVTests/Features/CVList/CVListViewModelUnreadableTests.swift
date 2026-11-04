@@ -34,7 +34,7 @@ private final class StubListingUseCase: CVManagementUseCaseProtocol, @unchecked 
     func storeNewCV(_ cv: CVModel) async throws -> CVModel { cv }
     func updateCV(_ cv: CVModel) async throws -> CVModel { cv }
     func deleteCV(id: UUID) async throws {}
-    func duplicateCV(id: UUID) async throws -> CVModel { CVModel() }
+    func duplicateCV(id: UUID, named name: String) async throws -> CVModel { CVModel() }
     func getCV(by id: UUID) async throws -> CVModel? { nil }
 }
 

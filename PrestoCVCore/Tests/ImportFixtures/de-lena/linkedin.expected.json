@@ -1,0 +1,80 @@
+{
+ "id": "de-lena/linkedin",
+ "language": "de",
+ "form": "linkedin",
+ "person": {
+  "name": "Lena Hartmann",
+  "title": "Elektrikerin",
+  "email": "lena.hartmann@example.com",
+  "phone": "+49 170 0000101",
+  "location": "Leipzig, Deutschland",
+  "links": [
+   "https://www.linkedin.com/in/lena-hartmann-example"
+  ],
+  "summary": "Elektrikerin mit zehn Jahren Erfahrung in der Gebäudetechnik, zuverlässig und gern im Team unterwegs."
+ },
+ "experience": [
+  {
+   "role": "Projektleiterin Elektrotechnik",
+   "employer": "Beispiel GmbH",
+   "location": "Leipzig, Deutschland",
+   "details": 2,
+   "start": [
+    2019,
+    3
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Elektrikerin",
+   "employer": "Muster Elektro AG",
+   "location": "Dresden, Deutschland",
+   "details": 1,
+   "start": [
+    2015,
+    9
+   ],
+   "end": [
+    2019,
+    2
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Ausbildung zur Elektronikerin für Energie- und Gebäudetechnik",
+   "school": "Berufsschule Leipzig",
+   "start": [
+    2012,
+    null
+   ],
+   "end": [
+    2015,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "KNX",
+  "SPS-Programmierung",
+  "AutoCAD"
+ ],
+ "languages": [
+  {
+   "name": "Deutsch",
+   "level": "native"
+  },
+  {
+   "name": "Englisch",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Elektrofachkraft für Prüfungen",
+   "issuer": null,
+   "year": null
+  }
+ ],
+ "interests": []
+}

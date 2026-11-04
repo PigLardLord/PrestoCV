@@ -1,6 +1,8 @@
-import SwiftUI
+import Combine
+import Foundation
 import PrestoCVCore
 import CVGeneratorAI
+import enum PrestoCVDomain.ExampleDraft
 import os
 
 private let newCVLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "new-cv")
@@ -11,8 +13,9 @@ typealias AIAvailabilityProvider = @MainActor () -> AIAvailability
 /// The wait between two reads of an availability that is still changing. It throws when the wait is cancelled.
 typealias AIAvailabilityPause = @MainActor () async throws -> Void
 
-/// The ways to start a new CV that the first run and the "New CV" screen offer: an AI draft where the device can run
-/// it, a blank CV, and the example CVs.
+/// The ways to start a new CV that the first run and the "New CV" screen offer: a CV the person already has, pasted or
+/// from a PDF, an AI draft, which is dimmed with the reason where it cannot be made now, the example CVs, and a blank
+/// CV.
 @MainActor
 final class NewCVChoicesViewModel: ObservableObject {
 
@@ -24,53 +27,56 @@ final class NewCVChoicesViewModel: ObservableObject {
     private let aiAvailability: AIAvailabilityProvider
     private let pause: AIAvailabilityPause
     private let isAIShipped: Bool
+    private let platform: AIPlatform
     private let sampleRepository: SampleCVRepositoryProtocol
 
     /// How long the screen waits before it reads again whether the model has finished downloading.
     nonisolated static let downloadCheckInterval: Duration = .seconds(5)
 
     // MARK: - Initialization
+
+    /// - Parameter platform: Where the app runs. The factory gives the platform of the process; the default keeps the
+    ///   tests and the previews the same on every machine.
     init(
         aiAvailability: @escaping AIAvailabilityProvider,
         sampleRepository: SampleCVRepositoryProtocol,
-        pause: @escaping AIAvailabilityPause = { try await Task.sleep(for: NewCVChoicesViewModel.downloadCheckInterval) },
-        isAIShipped: Bool = AIFeature.isShipped
+        pause: @escaping AIAvailabilityPause,
+        isAIShipped: Bool = AIFeature.isShipped,
+        platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.aiAvailability = aiAvailability
         self.sampleRepository = sampleRepository
         self.pause = pause
         self.isAIShipped = isAIShipped
-        self.aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
+        self.platform = platform
+        self.aiEntry = AIEntry(availability: aiAvailability(), platform: platform, isShipped: isAIShipped)
     }
 
     // MARK: - Choices
 
-    /// The ways to start, in the order the screens show them. The AI draft leads where it works. Where it does not
-    /// work yet, it follows the choices that do, with the sentence that says what to do. The examples are there once
-    /// they are loaded.
+    /// The ways to start, in the order the screens show them: the import of a CV the person already has, the AI draft
+    /// where `aiEntry` shows it, the examples once they are loaded, and a blank CV last.
     var choices: [NewCVChoice] {
-        let others: [NewCVChoice] = samples.isEmpty ? [.blank] : [.blank, .example]
-        switch aiEntry {
-        case .available:
-            return [.aiDraft] + others
-        case .disabled(let explanation):
-            return others + [.aiDraftUnavailable(explanation)]
-        case .hidden:
-            return others
-        }
+        var choices: [NewCVChoice] = [.importCV]
+        if let ai = aiChoice { choices.append(ai) }
+        if !samples.isEmpty { choices.append(.example) }
+        choices.append(.blank)
+        return choices
     }
 
-    /// Whether the screens may speak of AI drafting: only where the device can make a draft, now or once the person
-    /// has turned Apple Intelligence on or the model has finished downloading.
-    var offersAI: Bool {
-        aiEntry != .hidden
+    private var aiChoice: NewCVChoice? {
+        switch aiEntry {
+        case .available: return .aiDraft
+        case .disabled(let reason): return .aiDraftUnavailable(reason)
+        case .hidden: return nil
+        }
     }
 
     // MARK: - AI Drafting
 
     /// Reads whether AI drafting can run again, for example after the person turned Apple Intelligence on in Settings.
     func refreshAIAvailability() {
-        aiEntry = AIEntry(availability: aiAvailability(), isShipped: isAIShipped)
+        aiEntry = AIEntry(availability: aiAvailability(), platform: platform, isShipped: isAIShipped)
     }
 
     /// Reads the availability again after each pause for as long as the model is still downloading, so that the card
@@ -89,6 +95,14 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Blank CV
+
+    /// The CV the editor opens for a blank start: empty, with an identity of its own. Nothing is stored until the
+    /// person saves it.
+    func makeBlankDraft() -> CVModel {
+        CVModel()
+    }
+
     // MARK: - Examples
 
     /// Loads the sample CVs the person can start from. Without samples the person can still start from a blank CV.
@@ -102,17 +116,17 @@ final class NewCVChoicesViewModel: ObservableObject {
         }
     }
 
-    /// The CV the editor opens for a sample: its content under a new identity, with the details of the person
-    /// the sample describes left blank. Nothing is stored until the person saves it.
+    /// The examples as the sheet of examples lists them.
+    var examples: [ExampleChoice] {
+        samples.map { sample in
+            let job = sample.personalInfo.title
+            return ExampleChoice(sample: sample, title: job.isEmpty ? "cv.untitled".localized : job, summary: sample.personalInfo.profile)
+        }
+    }
+
+    /// The CV the editor opens for a sample: its content under a new identity, with what `ExampleDraft` leaves blank.
+    /// Nothing is stored until the person saves it.
     func makeDraft(from sample: CVModel) -> CVModel {
-        var draft = sample.copy()
-        draft.name = ""
-        draft.personalInfo.name = ""
-        draft.personalInfo.email = ""
-        draft.personalInfo.phone = ""
-        draft.personalInfo.location = ""
-        draft.personalInfo.portfolio = ""
-        draft.social = draft.social.map { Social(id: $0.id, platform: $0.platform, url: "") }
-        return draft
+        sample.copy().clearing(ExampleDraft.clearedFields)
     }
 }

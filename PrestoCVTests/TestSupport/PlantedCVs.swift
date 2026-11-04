@@ -161,7 +161,7 @@ enum PlantedCVs {
     }
 
     /// Ten entries of about 1,300 characters, with the certificates, languages and links that go after them.
-    /// Their number is chosen so that the last page is between 20% and 85% full in each design, on iOS 26.2 and 27.0:
+    /// Their number is chosen so that the last page is between 20% and 85% full in each design, on iOS 26.5 and 27.0:
     /// a page nearly empty or nearly full would be one more or fewer on another version of the system.
     private static func tenLongEntries() -> CVModel {
         var cv = long(name: "Long 10", experiences: 10, paragraphs: 4, certifications: 8)

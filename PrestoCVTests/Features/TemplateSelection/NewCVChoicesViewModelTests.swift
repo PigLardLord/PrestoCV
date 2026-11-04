@@ -35,17 +35,22 @@ struct NewCVChoicesViewModelTests {
     }
 
     /// A view model of a release that ships AI drafting, so that the tests do not depend on the release switch.
-    private func makeViewModel(_ availability: Availability, pauses: Pauses) -> NewCVChoicesViewModel {
+    private func makeViewModel(
+        _ availability: Availability,
+        pauses: Pauses,
+        platform: AIPlatform = .iPhoneOrIPad
+    ) -> NewCVChoicesViewModel {
         NewCVChoicesViewModel(
             aiAvailability: { availability.read() },
             sampleRepository: MockSampleCVRepository(),
             pause: { try await pauses.pause() },
-            isAIShipped: true
+            isAIShipped: true,
+            platform: platform
         )
     }
 
-    private func makeViewModel(_ availability: Availability) -> NewCVChoicesViewModel {
-        makeViewModel(availability, pauses: Pauses())
+    private func makeViewModel(_ availability: Availability, platform: AIPlatform = .iPhoneOrIPad) -> NewCVChoicesViewModel {
+        makeViewModel(availability, pauses: Pauses(), platform: platform)
     }
 
     @Test("The entry is read from the provider when the view model is made")
@@ -82,7 +87,7 @@ struct NewCVChoicesViewModelTests {
         #expect(viewModel.aiEntry == .available)
     }
 
-    @Test("While the model downloads, the card is read again after each pause and turns on by itself when it is ready")
+    @Test("While the model downloads, the card is read again after each pause and turns on by itself when it is ready, without a relaunch")
     func followingEnablesTheCardWhenTheDownloadEnds() async {
         let availability = Availability(.unavailable(.modelNotReady))
         let pauses = Pauses()
@@ -90,10 +95,14 @@ struct NewCVChoicesViewModelTests {
             if count == 3 { availability.current = .available }
         }
         let viewModel = makeViewModel(availability, pauses: pauses)
+        #expect(viewModel.choices == [.importCV, .aiDraftUnavailable(.modelStillDownloading), .blank])
+        #expect(viewModel.aiEntry.welcomeKey == "welcome.description")
 
         await viewModel.followAIAvailability()
 
         #expect(viewModel.aiEntry == .available)
+        #expect(viewModel.choices == [.importCV, .aiDraft, .blank], "The AI draft turns on where it stands")
+        #expect(viewModel.aiEntry.welcomeKey == "welcome.description.ai", "The welcome promises it once it works")
         #expect(pauses.count == 3, "The reads stop once the card works")
         #expect(availability.reads == 4)
     }
@@ -111,7 +120,7 @@ struct NewCVChoicesViewModelTests {
         #expect(availability.reads == 1)
     }
 
-    @Test("A model that stops being ready for good, on a device found not eligible, ends the reads and hides the card")
+    @Test("A model that stops being ready for good, on a device found not eligible, ends the reads and says the device cannot draft")
     func followingStopsAtAFinalState() async {
         let availability = Availability(.unavailable(.modelNotReady))
         let pauses = Pauses()
@@ -120,7 +129,7 @@ struct NewCVChoicesViewModelTests {
 
         await viewModel.followAIAvailability()
 
-        #expect(viewModel.aiEntry == .hidden)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDevice))
         #expect(pauses.count == 1)
     }
 
@@ -145,14 +154,30 @@ struct NewCVChoicesViewModelTests {
         #expect(viewModel.aiEntry == .disabled(.modelStillDownloading))
     }
 
-    @Test("A device that is not eligible has no entry, and still has none after a refresh")
-    func notEligibleStaysHidden() {
+    @Test("A device that is not eligible shows the entry off, with the sentence that it cannot draft, and keeps it after a refresh")
+    func notEligibleShowsTheEntryOff() {
         let availability = Availability(.unavailable(.deviceNotEligible))
         let viewModel = makeViewModel(availability)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDevice))
 
         viewModel.refreshAIAvailability()
 
-        #expect(viewModel.aiEntry == .hidden)
+        #expect(viewModel.aiEntry == .disabled(.notOnThisDevice))
+        #expect(viewModel.choices.contains(.aiDraftUnavailable(.notOnThisDevice)), "The entry is shown")
+        #expect(!viewModel.choices.contains(.aiDraft), "The entry cannot be used")
+        #expect(viewModel.aiEntry.explanationKey == "ai.unavailable.not_on_this_device")
+    }
+
+    @Test("On a Mac a device found not eligible points to System Settings, and still does after a refresh")
+    func theMacKeepsPointingToSystemSettings() {
+        let availability = Availability(.unavailable(.deviceNotEligible))
+        let viewModel = makeViewModel(availability, platform: .mac)
+        #expect(viewModel.aiEntry == .disabled(.turnOnAppleIntelligenceInSystemSettings))
+
+        viewModel.refreshAIAvailability()
+
+        #expect(viewModel.aiEntry == .disabled(.turnOnAppleIntelligenceInSystemSettings))
+        #expect(viewModel.aiEntry.explanationKey == "ai.unavailable.not_enabled.mac")
     }
 
     @Test("A release that does not ship AI drafting has no entry whatever the availability, and does not follow it",
@@ -253,13 +278,38 @@ struct NewCVChoicesViewModelTests {
         #expect(sampleRepository.getAllSamplesCallCount == 2)
     }
 
+    @Test("A blank draft is an empty CV, and each one is a CV of its own")
+    func blankDraftIsEmpty() {
+        let viewModel = makeViewModel(sampleRepository: MockSampleCVRepository())
+
+        let draft = viewModel.makeBlankDraft()
+
+        #expect(draft == CVModel(id: draft.id), "Nothing is filled in")
+        #expect(viewModel.makeBlankDraft().id != draft.id)
+    }
+
+    @Test("Each example is listed under the job it is for, with what it says of its person; one without a job as Untitled CV")
+    func examplesAreListedUnderTheirJob() async {
+        let sampleRepository = MockSampleCVRepository()
+        let withoutJob = CVModel(name: "Second", personalInfo: PersonalInfo(profile: "A summary."))
+        sampleRepository.samples = [makeSample(), withoutJob]
+        let viewModel = makeViewModel(sampleRepository: sampleRepository)
+
+        await viewModel.loadSamples()
+
+        #expect(viewModel.examples == [
+            ExampleChoice(sample: viewModel.samples[0], title: "Senior Software Engineer", summary: "Senior engineer with 8+ years of experience."),
+            ExampleChoice(sample: withoutJob, title: "cv.untitled".localized, summary: "A summary."),
+        ])
+    }
+
     @Test("A draft has a new identity and no name of its own")
     func draftHasNewIdentityAndNoName() {
         let sample = makeSample()
         let draft = makeViewModel(sampleRepository: MockSampleCVRepository()).makeDraft(from: sample)
 
         #expect(draft.id != sample.id)
-        #expect(draft.name.isEmpty, "The list shows an unnamed CV as Untitled CV")
+        #expect(draft.name.isEmpty, "Without a name of its own, the CV is called by the name of its person or its role")
     }
 
     @Test("A draft leaves the details of the person of the sample blank")

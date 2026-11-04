@@ -1,0 +1,81 @@
+{
+ "id": "es-javier/railpdf",
+ "language": "es",
+ "form": "railpdf",
+ "person": {
+  "name": "Javier Romero",
+  "title": "Cocinero",
+  "email": "javier.romero@example.net",
+  "phone": "+34 611 000 202",
+  "location": "Avenida Ejemplo 22, 41001 Sevilla",
+  "links": [],
+  "summary": "Cocinero con experiencia en cocina andaluza y de mercado, acostumbrado a servicios de más de cien comensales."
+ },
+ "experience": [
+  {
+   "role": "Jefe de cocina",
+   "employer": "Restaurante Ejemplo",
+   "location": "Sevilla",
+   "details": 2,
+   "start": [
+    2021,
+    4
+   ],
+   "end": "current"
+  },
+  {
+   "role": "Cocinero",
+   "employer": "Hotel Ejemplo",
+   "location": "Málaga",
+   "details": 1,
+   "start": [
+    2016,
+    6
+   ],
+   "end": [
+    2021,
+    3
+   ]
+  }
+ ],
+ "education": [
+  {
+   "degree": "Técnico Superior en Dirección de Cocina",
+   "school": "Escuela de Hostelería de Sevilla",
+   "start": [
+    2014,
+    null
+   ],
+   "end": [
+    2016,
+    null
+   ]
+  }
+ ],
+ "skills": [
+  "Cocina de mercado",
+  "Control de costes",
+  "APPCC"
+ ],
+ "languages": [
+  {
+   "name": "Español",
+   "level": "native"
+  },
+  {
+   "name": "Inglés",
+   "level": null
+  }
+ ],
+ "certifications": [
+  {
+   "name": "Manipulador de alimentos",
+   "issuer": "Junta Ejemplo",
+   "year": 2020
+  }
+ ],
+ "interests": [
+  "Ciclismo",
+  "Fotografía"
+ ]
+}

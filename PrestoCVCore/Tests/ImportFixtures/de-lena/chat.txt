@@ -1,0 +1,41 @@
+Gerne! Hier ist dein Lebenslauf in einer übersichtlichen Form:
+
+# Lena Hartmann
+**Elektrikerin**
+📍 Leipzig, Deutschland | 📞 +49 170 0000101 | ✉️ lena.hartmann@example.com | 🔗 linkedin.com/in/lena-hartmann-example
+
+---
+
+## Profil
+Elektrikerin mit zehn Jahren Erfahrung in der Gebäudetechnik, zuverlässig und gern im Team unterwegs.
+
+## Berufserfahrung
+### Projektleiterin Elektrotechnik — Beispiel GmbH, Leipzig
+*03/2019 – heute*
+- Planung von Elektroinstallationen in Bürogebäuden
+- Leitung eines Teams von fünf Monteuren
+
+### Elektrikerin — Muster Elektro AG, Dresden
+*09/2015 – 02/2019*
+- Installation und Wartung von Schaltanlagen
+
+## Ausbildung
+### Ausbildung zur Elektronikerin für Energie- und Gebäudetechnik
+Berufsschule Leipzig, Leipzig | 09/2012 – 07/2015
+
+## Kenntnisse
+- KNX, SPS-Programmierung, AutoCAD
+
+## Sprachen
+- **Deutsch:** Muttersprache
+- **Englisch:** C1
+
+## Weiterbildungen
+- Elektrofachkraft für Prüfungen – TÜV Beispiel (2020)
+
+## Interessen
+Klettern, Fotografie
+
+---
+
+Wenn du möchtest, kann ich ihn auch kürzen oder ins Englische übersetzen.

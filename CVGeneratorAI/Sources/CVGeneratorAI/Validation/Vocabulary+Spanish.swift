@@ -153,7 +153,8 @@ extension Vocabulary {
         """,
         /// Words of graduating: a time phrase that holds one joins an education entry and gives its end date.
         graduating: """
-        graduada graduado gradue graduo
+        completada completado conclui concluida concluido finalice graduada graduado gradue graduo terminada terminado
+        termine
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
@@ -317,6 +318,9 @@ extension Vocabulary {
         """,
         /// Words of negation, doubt or degree, wish or intention, future and condition: in no other list.
         modality: """
+        sería serías seríamos seríais serían haria harias hariamos hariais harian tendria tendrias tendriamos tendriais tendrian
+        encantaria encantarian
+        sueno_con lo_sueno intencion_de
         administrara administraran administraras administrare administrareis administraremos administraria
         administrariais administrariamos administrarian administrarias analizara analizaran analizaras analizare
         analizareis analizaremos analizaria analizariais analizariamos analizarian analizarias apenas aprendera

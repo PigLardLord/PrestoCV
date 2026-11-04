@@ -114,6 +114,9 @@ extension PrimaryButton {
 /// label and its fill.
 struct PrimaryButtonStyle: ButtonStyle {
     let isDisabled: Bool
+    /// The least width and height of what a finger can hit, when the button is smaller than that. The fill stays as small
+    /// as the label; the space around it, up to the target, is part of the button, whatever it draws.
+    var minimumTarget: CGFloat?
 
     func makeBody(configuration: Configuration) -> some View {
         let look = PrimaryButton.Look(isDisabled: isDisabled, isPressed: configuration.isPressed)
@@ -122,6 +125,8 @@ struct PrimaryButtonStyle: ButtonStyle {
             .background(look.background)
             .cornerRadius(DesignTokens.CornerRadius.md)
             .opacity(look.opacity)
+            .frame(minWidth: minimumTarget, minHeight: minimumTarget)
+            .contentShape(Rectangle())
     }
 }
 

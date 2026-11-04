@@ -9,6 +9,7 @@ var products: [Product] = [
     .library(name: "CVDesignCatalogFileStore", targets: ["CVDesignCatalogFileStore"]),
     .library(name: "CVBundledDesigns", targets: ["CVBundledDesigns"]),
     .library(name: "CVRendering", targets: ["CVRendering"]),
+    .library(name: "CVBundledHeadings", targets: ["CVBundledHeadings"]),
     .library(name: "CVRenderingTestSupport", targets: ["CVRenderingTestSupport"]),
 ]
 var dependencies: [Package.Dependency] = []
@@ -17,13 +18,16 @@ var targets: [Target] = [
     .target(name: "CVDesignCatalog"),
     .target(name: "CVDesignCatalogFileStore", dependencies: ["CVDesignCatalog"]),
     .target(name: "CVBundledDesigns", dependencies: ["CVDesignCatalog"], resources: [.copy("Designs")]),
-    .target(name: "CVRendering", dependencies: ["CVDocumentModel", "CVDesignCatalog"], resources: [.copy("Resources")]),
-    .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog"]),
-    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"]),
+    .target(name: "CVRendering", dependencies: ["CVDocumentModel", "CVDesignCatalog"]),
+    .target(name: "CVBundledHeadings", dependencies: ["CVRendering"], resources: [.copy("Headings")]),
+    .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings"]),
+    // The markup contract page, which MarkupContractPageTests holds the code to. The test reads it from its bundle: a
+    // simulator may run it where the repository is not.
+    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"], resources: [.copy("../../Docs/markup-contract.md")]),
     .testTarget(name: "CVDesignCatalogFileStoreTests", dependencies: ["CVDesignCatalogFileStore", "CVDesignCatalog", "CVRenderingTestSupport"]),
     .testTarget(
         name: "CVRenderingTests",
-        dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVDesignCatalog"],
+        dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVBundledHeadings", "CVDesignCatalog"],
         resources: [.copy("Golden")]
     ),
 ]
@@ -65,7 +69,7 @@ targets += [
 
 let package = Package(
     name: "CVPDFExporter",
-    platforms: [.iOS("26.0"), .macOS("26.0")],
+    platforms: [.iOS("26.5"), .macOS("26.0")],
     products: products,
     dependencies: dependencies,
     targets: targets

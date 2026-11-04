@@ -1,0 +1,15 @@
+Camille Exemple
+Développeuse mobile
+Lyon – camille.exemple@example.org – 06 39 98 05 05
+
+EXPÉRIENCES
+Depuis mars 2021 : Développeuse mobile – Applis Exemple SA, Lyon
+Développement de l'application de réservation en Swift.
+Juin 2018 – février 2021 : Développeuse junior – Logiciels Exemple SA, Grenoble
+
+FORMATION
+2015 – 2018 : Licence Informatique, Université de Lyon
+
+STACK TECHNIQUE
+Swift, SwiftUI, Combine
+Kotlin, Docker

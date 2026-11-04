@@ -8,6 +8,12 @@ struct PersonalInfoSection: View {
     let automaticLanguageTitle: String
     /// The language chosen, or what automatic stands for
     let documentLanguageTitle: String
+    let nameStatus: FieldStatus
+    let emailStatus: FieldStatus
+    let phoneStatus: FieldStatus
+    let portfolioStatus: FieldStatus
+    /// Tells the editor that the person left a contact field, which checks it
+    let onLeave: (ContactField) -> Void
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
@@ -20,12 +26,14 @@ struct PersonalInfoSection: View {
         return layout {
             LabeledTextField.email(
                 text: $cv.personalInfo.email,
-                isRequired: true
+                state: emailStatus.fieldState,
+                onLeave: { onLeave(.email) }
             )
             
             LabeledTextField.phone(
                 text: $cv.personalInfo.phone,
-                lacksDigits: cv.personalInfo.phoneLacksDigits
+                state: phoneStatus.fieldState,
+                onLeave: { onLeave(.phone) }
             )
         }
     }
@@ -48,7 +56,7 @@ struct PersonalInfoSection: View {
             // Personal Information - High Priority
             Section {
                 VStack(spacing: DesignTokens.Spacing.sm) {
-                    LabeledTextField(label: "field.full_name".localized, text: $cv.personalInfo.name)
+                    LabeledTextField(label: "field.full_name".localized, text: $cv.personalInfo.name, state: nameStatus.fieldState)
                     
                     LabeledTextField(label: "field.professional_title".localized, text: $cv.personalInfo.title)
                     
@@ -58,7 +66,9 @@ struct PersonalInfoSection: View {
                     
                     LabeledTextField.url(
                         label: "field.portfolio_url".localized,
-                        text: $cv.personalInfo.portfolio
+                        text: $cv.personalInfo.portfolio,
+                        state: portfolioStatus.fieldState,
+                        onLeave: { onLeave(.portfolio) }
                     )
                 }
             } header: {
@@ -169,6 +179,11 @@ struct SectionHeader: View {
         cv: .constant(CVModel()),
         documentLanguage: .constant(nil),
         automaticLanguageTitle: "Automatic (English)",
-        documentLanguageTitle: "Automatic (English)"
+        documentLanguageTitle: "Automatic (English)",
+        nameStatus: FieldStatus(validity: .none, isRequired: true, note: .required),
+        emailStatus: FieldStatus(validity: .none, isRequired: false, note: nil),
+        phoneStatus: FieldStatus(validity: .none, isRequired: false, note: .phoneHelp),
+        portfolioStatus: FieldStatus(validity: .none, isRequired: false, note: .webAddressHelp),
+        onLeave: { _ in }
     )
 }

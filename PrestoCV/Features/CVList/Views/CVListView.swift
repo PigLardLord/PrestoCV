@@ -4,9 +4,13 @@ import PrestoCVCore
 /// The list of the user's CVs, which is the root of the app. `emptyState` is what it shows while there is no CV.
 struct CVListView<EmptyState: View>: View {
     @ObservedObject var viewModel: CVListViewModel
+    /// The diagnostics screen of a TestFlight or Debug build, offered only while the trace records
+    @ObservedObject var diagnostics: DiagnosticsViewModel
     @EnvironmentObject var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
-    @State private var exportTarget: CVModel?
+    @State private var exportSheet: ExportSheet?
+    /// The export sheet of a row is being made: another tap on a row waits for it, so that one sheet is shown
+    @State private var isMakingExportSheet = false
     @State private var deleteTarget: CVModel?
     @State private var rowFrames = ScreenFrames<UUID>()
     @State private var showDeleteConfirmation = false
@@ -14,10 +18,21 @@ struct CVListView<EmptyState: View>: View {
     @State private var deleteAnchor: CGRect?
     @State private var renameTarget: CVModel?
     @State private var renameText = ""
+    @State private var isShowingDiagnostics = false
+    private let makeExportSheet: @MainActor (UUID) async -> CVExportSheetViewModel?
     private let emptyState: EmptyState
 
-    init(viewModel: CVListViewModel, @ViewBuilder emptyState: () -> EmptyState) {
+    /// - Parameter makeExportSheet: Gives the export sheet of the CV of the list with the given id, or nil when that CV
+    ///   cannot be read, which the list view model has reported.
+    init(
+        viewModel: CVListViewModel,
+        diagnostics: DiagnosticsViewModel,
+        makeExportSheet: @escaping @MainActor (UUID) async -> CVExportSheetViewModel?,
+        @ViewBuilder emptyState: () -> EmptyState
+    ) {
         self.viewModel = viewModel
+        self.diagnostics = diagnostics
+        self.makeExportSheet = makeExportSheet
         self.emptyState = emptyState()
     }
     
@@ -49,6 +64,18 @@ struct CVListView<EmptyState: View>: View {
         }
         .screenTitle("navigation.my_cvs".localized, large: true)
         .toolbar {
+            if diagnostics.isAvailable {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        isShowingDiagnostics = true
+                    } label: {
+                        Image(systemName: "ladybug")
+                    }
+                    .accessibilityLabel("diagnostics.entry.label".localized)
+                    .accessibilityHint("diagnostics.entry.hint".localized)
+                    .accessibilityIdentifier("diagnostics.entry")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
                     router.navigate(to: .templateSelection)
@@ -57,24 +84,26 @@ struct CVListView<EmptyState: View>: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingDiagnostics, onDismiss: { Task { await diagnostics.finishSharing() } }) {
+            DiagnosticsView(viewModel: diagnostics)
+        }
         .task {
             await viewModel.loadCVs()
+        }
+        .task {
+            await diagnostics.checkAvailability()
         }
         .task {
             await viewModel.keepPresentationDateCurrent()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                viewModel.refreshPresentationDate()
-            }
+            viewModel.sceneDidChange(isActive: phase == .active)
         }
         .refreshable {
             await viewModel.loadCVs()
         }
-        .sheet(item: $exportTarget) { cv in
-            CVExportSheetView(cv: cv) { language in
-                Task { await viewModel.setDocumentLanguage(language, ofCVWithId: cv.id) }
-            }
+        .sheet(item: $exportSheet, onDismiss: viewModel.storeChoicesNow) { sheet in
+            CVExportSheetView(viewModel: sheet.viewModel)
         }
         .anchoredConfirmationDialog(
             String(localized: "cv.delete.confirmation.title"),
@@ -94,7 +123,7 @@ struct CVListView<EmptyState: View>: View {
                 deleteTarget = nil
             }
         } message: { target in
-            Text("cv.delete.confirmation.message_named".localizedWithArgs(target.listTitle))
+            Text("cv.delete.confirmation.message_named".localizedWithArgs(viewModel.title(of: target)))
         }
         .alert(
             "cv.rename.title".localized,
@@ -117,26 +146,37 @@ struct CVListView<EmptyState: View>: View {
         }
     }
     
+    // MARK: - Actions
+
+    private func showExportSheet(ofCVWithId id: UUID) async {
+        guard !isMakingExportSheet else { return }
+        isMakingExportSheet = true
+        defer { isMakingExportSheet = false }
+        if let viewModel = await makeExportSheet(id) {
+            exportSheet = ExportSheet(viewModel: viewModel)
+        }
+    }
+
     // MARK: - View Components
     
     private var cvListView: some View {
         DeletableList(items: viewModel.cvs) { cv in
             CVRowView(
-                cv: cv,
-                subtitle: viewModel.personLine(of: cv),
+                title: viewModel.title(of: cv),
+                subtitle: viewModel.subtitle(of: cv),
                 caption: viewModel.lastSavedLine(of: cv),
                 onTap: {
-                    router.navigate(to: .cvEditor(cvId: cv.id.uuidString))
+                    router.openEditor(.stored(cvId: cv.id.uuidString))
                 },
                 onDuplicate: {
                     Task { await viewModel.duplicateCV(withId: cv.id) }
                 },
                 onRename: {
-                    renameText = cv.name
+                    renameText = viewModel.title(of: cv)
                     renameTarget = cv
                 },
                 onExport: {
-                    exportTarget = cv
+                    Task { await showExportSheet(ofCVWithId: cv.id) }
                 },
                 onDelete: {
                     deleteAnchor = rowFrames.rect(for: cv.id)
@@ -150,10 +190,18 @@ struct CVListView<EmptyState: View>: View {
     }
 }
 
+// MARK: - Export Sheet
+
+/// The export sheet that is shown: the view model it was made with, which the sheet keeps for as long as it is shown
+private struct ExportSheet: Identifiable {
+    let id = UUID()
+    let viewModel: CVExportSheetViewModel
+}
+
 // MARK: - CV Row View
 
 private struct CVRowView: View {
-    let cv: CVModel
+    let title: String
     let subtitle: String?
     let caption: String?
     let onTap: () -> Void
@@ -164,7 +212,7 @@ private struct CVRowView: View {
 
     var body: some View {
         NavigationRow(
-            title: cv.listTitle,
+            title: title,
             subtitle: subtitle,
             caption: caption,
             action: onTap
@@ -205,23 +253,28 @@ private struct CVRowView: View {
 
 // MARK: - Previews
 
+#if DEBUG
 struct CVListView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            CVListView(viewModel: createMockViewModel()) {
+            CVListView(viewModel: makeViewModel(), diagnostics: PreviewDependencies.diagnostics(), makeExportSheet: makeExportSheet) {
                 Text("navigation.my_cvs".localized)
             }
         }
         .environmentObject(AppRouter())
     }
     
-    private static func createMockViewModel() -> CVListViewModel {
-        let container = DependencyContainer()
-        do {
-            let cvManagementUseCase = try container.makeCVManagementUseCase()
-            return CVListViewModel(cvManagementUseCase: cvManagementUseCase)
-        } catch {
-            fatalError("Failed to create mock view model: \(error)")
-        }
+    private static let cvs = [
+        CVModel(name: "Backend Engineer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Software Engineer")),
+        CVModel(name: "Product Designer", personalInfo: PersonalInfo(name: "Alex Morgan", title: "Designer")),
+    ]
+
+    private static func makeExportSheet(_ id: UUID) -> CVExportSheetViewModel? {
+        cvs.first { $0.id == id }.map { PreviewDependencies.exportSheet(for: $0, sink: { _ in }) }
+    }
+    
+    private static func makeViewModel() -> CVListViewModel {
+        PreviewDependencies.list(of: cvs)
     }
 }
+#endif

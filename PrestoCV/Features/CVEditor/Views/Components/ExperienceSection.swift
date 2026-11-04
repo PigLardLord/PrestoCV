@@ -30,12 +30,10 @@ struct WorkExperienceSubsection: View {
             emptyStateSubtitle: "empty.experience_subtitle".localized,
             addButtonTitle: "action.add_experience".localized,
             items: $viewModel.cv.relevant_experience,
-            rowContent: { experience, onDelete in
-                ExperienceRowView(
-                    experience: experience,
-                    onDelete: onDelete
-                )
+            rowContent: { experience in
+                ExperienceRowView(experience: experience)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addExperience,
             onRemove: { viewModel.requestRemoval(of: .experience, at: $0) }
         )
@@ -53,12 +51,10 @@ struct SkillsSubsection: View {
             emptyStateSubtitle: "empty.skills_subtitle".localized,
             addButtonTitle: "action.add_skill".localized,
             items: $viewModel.cv.skills,
-            rowContent: { skill, onDelete in
-                SkillRowView(
-                    skill: skill,
-                    onDelete: onDelete
-                )
+            rowContent: { skill in
+                SkillRowView(skill: skill)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addSkill,
             onRemove: { viewModel.requestRemoval(of: .skills, at: $0) }
         )
@@ -76,22 +72,18 @@ struct EducationSubsection: View {
             emptyStateSubtitle: "empty.education_subtitle".localized,
             addButtonTitle: "action.add_education".localized,
             items: $viewModel.cv.education,
-            rowContent: { education, onDelete in
-                EducationRowView(
-                    education: education,
-                    onDelete: onDelete
-                )
+            rowContent: { education in
+                EducationRowView(education: education)
             },
+            deleteLabel: { $0.deleteActionLabel },
             onAdd: viewModel.addEducation,
             onRemove: { viewModel.requestRemoval(of: .education, at: $0) }
         )
     }
 }
 
+#if DEBUG
 #Preview {
-    let container = DependencyContainer()
-    let cvManagementUseCase = try! container.makeCVManagementUseCase()
-    let viewModel = CVEditorViewModel(cvId: nil, cvManagementUseCase: cvManagementUseCase)
-    
-    return ExperienceSection(viewModel: viewModel)
+    ExperienceSection(viewModel: PreviewDependencies.editor())
 }
+#endif
