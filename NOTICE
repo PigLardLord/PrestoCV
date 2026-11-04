@@ -5,6 +5,22 @@ This product is licensed under the Apache License, Version 2.0 (the "License").
 The full text is in the LICENSE file.
 
 
+Attribution
+-----------
+
+Section 4(d) of the License asks whoever distributes a work derived from
+PrestoCV to keep the attribution notices of this file: in a NOTICE file of the
+derived work, in its documentation, or on the screen where it lists third-party
+notices (for an app, its acknowledgements or licenses screen). This line is the
+notice to keep:
+
+    This product includes PrestoCV, Copyright 2026 Giovanni Trovato, licensed
+    under the Apache License, Version 2.0.
+
+The notices under "Trademarks" and "Third-party components" below are not
+attribution notices in this sense: a derived work does not have to repeat them.
+
+
 Trademarks
 ----------
 

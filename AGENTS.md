@@ -51,4 +51,5 @@
 - Commits use short, imperative summaries (`Restore delete confirmation...`); keep body text for context or follow-up instructions.
 - Reference issue numbers or Linear tickets in the body when available and list any follow-up tasks.
 - Pull requests include: purpose summary, screenshots for UI-visible changes, validation notes (tests run, simulator device), and mention of localization impacts.
+- Documentation is part of the change: a pull request that changes behaviour, a command or a path updates the documents that describe it, in the same pull request, in English. `Tools/SourceChecks` holds the documents to it: every tracked Markdown file is English (the store listing's translated sections are the only exception), every path in the README's "Where things are" table exists, every top-level folder is in the table, and the open-source files exist and are linked from the README.
 - Run the full test suite before submission and flag any remaining flakiness or simulator prerequisites in the PR description.

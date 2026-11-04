@@ -4,8 +4,8 @@
 
 Report a vulnerability privately. Do not open a public issue, discussion or pull request about it.
 
-- **On GitHub:** use private vulnerability reporting, with the "Report a vulnerability" button in the Security tab of the repository.
-- **By email:** CONTACT_EMAIL.
+- **On GitHub (preferred):** use private vulnerability reporting, with the "Report a vulnerability" button in the Security tab of the repository.
+- **By email:** support@prestocv.app, if you cannot use GitHub.
 
 Include what is needed to reproduce it: the app version or the commit, the device and its iOS version, the steps or a proof of concept, and what an attacker gains. If the report needs a CV, use invented data, never a real person's.
 

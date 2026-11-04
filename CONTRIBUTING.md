@@ -12,7 +12,7 @@ Taking part means following the [Code of Conduct](CODE_OF_CONDUCT.md). A vulnera
 ## Requirements
 
 - Xcode 27, which reads the project in its JSON format (`PrestoCV.xcodeproj/project.xcproj`), and the iOS 26.5 simulator.
-- On Linux, Swift 6.3. It builds and tests the new targets of the packages and runs the architecture checker; the app and the legacy targets need macOS.
+- On Linux, Swift 6.4, the version that CI runs ([ADR 0026](docs/architecture/adr/0026-keep-the-core-portable-to-android.md)). It builds and tests the new targets of the packages and runs the architecture checker and the source checks; the app and the legacy targets need macOS.
 
 ## Building and testing
 
@@ -22,23 +22,28 @@ From the repository root:
 xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug build
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -testPlan CI -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
+swift test --package-path DiagnosticLogging
+swift test --package-path DiagnosticTrace
 swift test --package-path PrestoCVCore
 swift test --package-path CVPDFExporter
 swift test --package-path CVGeneratorAI
+swift test --package-path Tools/SourceChecks
 swift build --package-path PrestoCVApp
 swift build --package-path CVPDFExporterExamples
 Tools/ArchitectureCheck/check.sh
+Tools/ArchitectureCheck/selftest.sh
 ```
 
 - **The `PrestoCV` scheme** builds the app and has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour.
-- **`swift test --package-path`** tests a package in isolation. On Linux, run it for `PrestoCVCore` and `CVPDFExporter`, and build `CVGeneratorAI` and `PrestoCVApp`: only the new targets exist there. `CVPDFExporterExamples`, the demos and the template viewer, builds on macOS only.
+- **`swift test --package-path`** tests a package in isolation. On Linux, run it for `DiagnosticLogging`, `DiagnosticTrace`, `PrestoCVCore`, `CVPDFExporter` and `Tools/SourceChecks`, and build `CVGeneratorAI` and `PrestoCVApp`: only the new targets exist there. `CVPDFExporterExamples`, the demos and the template viewer, builds on macOS only.
+- **`Tools/SourceChecks`** reads the repository, so it runs with `swift test`, not in the test plans. Besides the string catalog and the rules the views follow, it checks the documents: every tracked Markdown file is in English, the paths in the README's table exist and every top-level folder is in it, and the open-source files are there and linked.
 - **A change to navigation or to the exporter's integration** also runs the simulator tests, not only the package tests.
 
 ## Architecture rules and the checker
 
 The rules are strict, and a change that breaks one does not merge ([ADR 0006](docs/architecture/adr/0006-enforce-architecture-mechanically.md)).
 
-- **The rules:** R1–R14 in [rules.md](docs/architecture/rules.md). Every target, its responsibility and the imports it may use are in [modules.md](docs/architecture/modules.md). Decisions are ADRs in [docs/architecture/adr/](docs/architecture/adr/README.md).
+- **The rules:** R1–R18 in [rules.md](docs/architecture/rules.md). Every target, its responsibility and the imports it may use are in [modules.md](docs/architecture/modules.md). Decisions are ADRs in [docs/architecture/adr/](docs/architecture/adr/README.md).
 - **The checker:** `Tools/ArchitectureCheck/check.sh` must report 0 findings. Its first build takes a few minutes, because it compiles SwiftSyntax. [Its README](Tools/ArchitectureCheck/README.md) explains its options and how to install it as a pre-commit hook.
 - **Violations:** a temporary one is a baseline entry, and the baseline may only shrink. A permanent one is an exception in `Tools/ArchitectureCheck/rules.json` that cites an ADR.
 - **A new target, or a new dependency between targets,** updates `docs/architecture/modules.md` and `Tools/ArchitectureCheck/rules.json` in the same pull request.
@@ -69,7 +74,8 @@ The rules are strict, and a change that breaks one does not merge ([ADR 0006](do
 
 - **The description** gives the purpose, screenshots for a change the user can see, the validation (the tests run and the simulator device), and the impact on localization.
 - **Before opening one,** run the full test suite and the architecture check. Report any flaky test or simulator prerequisite in the description.
-- **CI** runs on every pull request: on GitHub Actions on Linux (the architecture check with its self-test, and the packages' new targets), and on Xcode Cloud on macOS (the check, the package tests, the package builds, and the `CI` test plan on an iPhone and an iPad simulator).
+- **Documentation** is part of the change. A pull request that changes behaviour, a command or a path updates the documents that describe it, in the same pull request, and in English.
+- **CI** runs on every pull request: on GitHub Actions on Linux (the architecture check with its self-test, the source checks, the packages' new targets, and their build for Android), and on the maintainer's Mac mini on macOS ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md): the `CI` test plan on an iPhone and an iPad simulator, the package tests and builds, the source checks and the architecture check). Xcode Cloud checks no pull request; it builds the releases.
 - **Reviews** follow the process in [AGENTS.md](AGENTS.md#reviews).
 
 ## Licence
