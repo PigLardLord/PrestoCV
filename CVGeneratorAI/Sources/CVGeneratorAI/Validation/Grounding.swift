@@ -576,8 +576,10 @@ struct Grounding {
 
 extension Grounding {
     /// The clauses that belong to the jobs by rules (a)-(c): (a) a clause names the job's employer; (b) a clause that
-    /// names no employer and continues the clause that names one, in the same sentence ("where...", a gerund, a verb that opens it);
-    /// (c) the shared tail of a sentence that names several employers in a row. A clause that claims nothing is never attributed.
+    /// names no employer and continues the clause that names one, in the same sentence ("where...", a gerund, a verb that opens it,
+    /// or one in the form of the verb of the continuation before it: `goesOn`); (c) the shared tail of a sentence that names several
+    /// employers in a row. The place of a job said after its employer ("at Alpha, in Leeds, where ...") is no clause of its own: the
+    /// clauses after it still continue the employer's (#362). A clause that claims nothing is never attributed.
     struct Attribution {
         /// The jobs each attributed clause belongs to.
         var jobsOf: [DescriptionClauses.Place: [Int]] = [:]
@@ -606,6 +608,7 @@ extension Grounding {
             var last: [Int]?
             var previousNaming = false
             var chainHead: Int?
+            var continued: Clause?
             for place in bySentence[sentence, default: []].sorted(by: { $0.clause < $1.clause }) {
                 let clause = clauses.clause(at: place)
                 let statement = Statement(clause: clause, quotes: reading.all, language: language)
@@ -624,15 +627,21 @@ extension Grounding {
                     last = named
                     allowed = named
                     previousNaming = true
-                } else if let lastJobs = last, Self.continues(clause, statement, language) {
+                    continued = nil
+                } else if let lastJobs = last,
+                          Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true {
                     allowed = chain.count > 1 ? chain : lastJobs
                     isContinuation = true
                     previousNaming = false
+                    continued = clause
+                } else if previousNaming, Self.isPlace(clause) {
+                    continue
                 } else {
                     chain = []
                     last = nil
                     previousNaming = false
                     chainHead = nil
+                    continued = nil
                 }
                 guard !allowed.isEmpty, !reading.claimedWords(at: place).isEmpty else { continue }
                 result.jobsOf[place] = allowed
@@ -647,6 +656,43 @@ extension Grounding {
         guard !clause.isAnchored, let first = clause.words.first else { return false }
         if relativeWords.contains(first.accented) || isGerund(clause.words, language) { return true }
         return statement.startsWithItsVerb
+    }
+
+    /// Whether `clause` goes on with the duty of `continuation`, the continuation before it (#362): it opens with a verb in the
+    /// first person of the imperfect, as the continuation does after its relative word ("donde cambiaba el aceite y montaba los
+    /// neumáticos", "où je faisais la caisse et je répondais au téléphone"), in Italian, Spanish, Portuguese and French, whose lists
+    /// miss many of these verbs. A clause that opens with another word ("y mi hermano montaba ...") goes on with no duty of the person.
+    private static func goesOn(_ clause: Clause, _ continuation: Clause, _ language: Vocabulary.Language?) -> Bool {
+        let endings: [String] = switch language {
+        case .italian: ["avo", "evo", "ivo"]
+        case .spanish: ["aba", "ía"]
+        case .portuguese: ["ava", "ia"]
+        case .french: ["ais"]
+        case .english, .german, nil: []
+        }
+        guard !clause.isAnchored, clause.words.count > 1 else { return false }
+        let isImperfect = { (words: [Word]) -> Bool in
+            var index = words.first.map { relativeWords.contains($0.accented) } == true ? 1 : 0
+            if language == .french, index < words.count, ["je", "j"].contains(words[index].folded) { index += 1 }
+            guard index < words.count else { return false }
+            let verb = words[index].accented
+            return endings.contains { verb.count > $0.count + 2 && verb.hasSuffix($0) }
+        }
+        return isImperfect(continuation.words) && isImperfect(clause.words)
+    }
+
+    /// The prepositions that open the place of a job ("in Leeds", "a Termoli", "en Logroño", "em Maringá", "à Annecy"), folded.
+    private static let placePrepositions: Set<String> = ["in", "at", "a", "en", "em", "no", "na", "bei"]
+    /// The words that link the words of a place's name ("Reggio di Calabria", "Santiago de Compostela").
+    private static let placeLinks: Set<String> = ["di", "de", "del", "da", "do", "dos", "das", "la", "le", "el", "des", "du", "am"]
+
+    /// Whether `clause` only says a place, between commas: a preposition and a name of two to four words, each capitalised
+    /// but the words that link them ("in Leeds", "en Logroño", "a Reggio di Calabria"), with no number.
+    private static func isPlace(_ clause: Clause) -> Bool {
+        let words = clause.words
+        guard !clause.isAnchored, (2...5).contains(words.count), placePrepositions.contains(words[0].folded),
+              !words.contains(where: \.isNumber), clause.isCapitalised(words.count - 1) else { return false }
+        return words.indices.dropFirst().allSatisfy { clause.isCapitalised($0) || placeLinks.contains(words[$0].folded) }
     }
 
     private static func isGerund(_ words: [Word], _ language: Vocabulary.Language?) -> Bool {

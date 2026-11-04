@@ -40,6 +40,8 @@ struct UseCaseSurfaceTests {
         ]
         // The reading of an interest's verb, which the sanitising of an interest and its rows call.
         let interests: Set = ["isConjugated"]
-        #expect(functions == Set(["sanitize", "languageCheck", "require"]).union(sections).union(interests))
+        // The forms of a word of a job's title or employer, which the reading of a role stub calls too (#362).
+        let forms: Set = ["isAForm"]
+        #expect(functions == Set(["sanitize", "languageCheck", "require"]).union(sections).union(interests).union(forms))
     }
 }

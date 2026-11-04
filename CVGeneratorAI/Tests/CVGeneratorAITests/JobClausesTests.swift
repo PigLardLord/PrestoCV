@@ -370,6 +370,100 @@ struct JobClausesTests {
         #expect(forTheTense.count == (row.outcome == .goesForTheTense ? 1 : 0), "\(verdicts.rejected)")
     }
 
+    // MARK: A duty said after the place of its job, or joined by a verb of no list (#362)
+
+    /// The mechanic's description, with the place of the first job after a comma.
+    private static let placedMechanic = mechanic.replacingOccurrences(
+        of: "Talleres Arbizu de Logroño,", with: "Talleres Arbizu, en Logroño,"
+    )
+
+    struct PinRow: Sendable, CustomTestStringConvertible {
+        let language: String
+        let title: String
+        let company: String
+        let sentence: String
+        let pinned: [String]
+        var testDescription: String { "\(language): \(sentence)" }
+    }
+
+    @Test("The duty the person said after the place of the job, joined to another by a verb in the same form, is the job's, whole (#362)",
+          arguments: [
+              PinRow(
+                  language: "es", title: "ayudante de taller", company: "Talleres Arbizu",
+                  sentence: "De 2009 a 2013 fui ayudante de taller en Talleres Arbizu, en Logroño, donde cambiaba el aceite y montaba los neumáticos.",
+                  pinned: ["Cambiaba el aceite y montaba los neumáticos."]
+              ),
+              PinRow(
+                  language: "es", title: "ayudante de taller", company: "Talleres Arbizu",
+                  sentence: "De 2009 a 2013 fui ayudante de taller en Talleres Arbizu de Logroño, donde cambiaba el aceite y montaba los neumáticos.",
+                  pinned: ["Cambiaba el aceite y montaba los neumáticos."]
+              ),
+              PinRow(
+                  language: "es", title: "ayudante de taller", company: "Talleres Arbizu",
+                  sentence: "De 2009 a 2013 fui ayudante de taller en Talleres Arbizu, en Logroño, donde cambiaba el aceite y mi hermano montaba los neumáticos.",
+                  pinned: ["Cambiaba el aceite."]
+              ),
+              PinRow(
+                  language: "it", title: "operaio manutentore", company: "Conserve Albarella",
+                  sentence: "Dal 2009 al 2013 sono stato operaio manutentore alla Conserve Albarella, a Termoli, dove riparavo i nastri trasportatori e sostituivo i cuscinetti.",
+                  pinned: ["Riparavo i nastri trasportatori e sostituivo i cuscinetti."]
+              ),
+              PinRow(
+                  language: "pt", title: "ajudante de marcenaria", company: "Marcenaria Jatobá",
+                  sentence: "De 2009 a 2013 fui ajudante de marcenaria na Marcenaria Jatobá, em Maringá, onde cortava as chapas e lixava as peças.",
+                  pinned: ["Cortava as chapas e lixava as peças."]
+              ),
+              PinRow(
+                  language: "fr", title: "auditrice de nuit", company: "Hôtel des Tilleuls",
+                  sentence: "De 2009 à 2013, j'ai été auditrice de nuit à l'Hôtel des Tilleuls, à Annecy, où je faisais la clôture de caisse et je répondais au téléphone.",
+                  pinned: ["Je faisais la clôture de caisse et je répondais au téléphone."]
+              ),
+          ])
+    func dutyAfterThePlace(row: PinRow) throws {
+        let sanitizer = CVDataSanitizer(
+            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
+        )
+        let jobs = CVData(experience: [Self.job(row.title, row.company, from: "2009", to: "2013")])
+
+        let verdicts = try sanitizer.dutyCheck(of: jobs, job: 0, duties: nil, against: row.sentence)
+
+        #expect(verdicts.pinned == row.pinned)
+    }
+
+    @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
+          arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
+    func dutyOfAJobBeforeItsPlace(duty: String) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdicts = try sanitizer.dutyCheck(of: Self.staff("es").jobs, job: 3, duties: duty, against: Self.placedMechanic)
+
+        #expect(verdicts.kept.isEmpty)
+        #expect(verdicts.rejected.map(\.reason) == ["it says what the person did at another job"])
+    }
+
+    @Test("A quoted line that only says the person worked where the jobs were goes beside the person's duty, in any tense; one with a word of the work stays (#362)",
+          arguments: [
+              (0, "Trabajo en talleres y garajes.", "Cambiaba el aceite y montaba los neumáticos."),
+              (0, "Trabajé en talleres y garajes.", "Cambiaba el aceite y montaba los neumáticos."),
+              (0, "Trabajo en equipo.", "Trabajo en equipo. Cambiaba el aceite y montaba los neumáticos."),
+              (0, "Mantenimiento preventivo de los vehículos.", "Mantenimiento preventivo de los vehículos. Cambiaba el aceite y montaba los neumáticos."),
+              (3, "Atiendo a los clientes del taller.", "Atiendo a los clientes del taller. Reparto el trabajo del equipo."),
+          ] as [(Int, String, String)])
+    func whereTheJobsWere(job: Int, quote: String, text: String) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let jobs = Self.staff("es").jobs.experience.enumerated().map { index, entry in
+            Self.job(entry.title, entry.company, from: entry.startDate ?? "", to: entry.endDate, description: index == job ? quote : nil)
+        }
+        let written = DraftWriting(summary: nil, roleDescriptions: [nil, nil, nil, nil], technologies: [], softSkills: [])
+
+        // The goal names a garage too, so "garajes" says no employer's name (`employerWord`).
+        let description = Self.placedMechanic + "\nAhora busco un puesto en un garaje más grande."
+
+        let result = try sanitizer.sanitize(CVData(experience: jobs), writing: written, against: description)
+
+        #expect(result.experience.map { $0.description ?? "" }[job] == text)
+    }
+
     private static let spareParts = """
         Dal 2015 al 2019 ho fatto il magazziniere all'Officina Ferrante di Isernia, dove ho aiutato con gli ordini dei ricambi.
         """

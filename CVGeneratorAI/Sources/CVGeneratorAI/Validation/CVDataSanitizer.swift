@@ -250,8 +250,8 @@ public struct CVDataSanitizer: Sendable {
     /// Its description also keeps the sentences that state no fact of their own (`WrittenText`), with no word of the title or the
     /// employer of another job, and that restate no sentence of the description about another job alone (ADR 0031): those of its own
     /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result. When
-    /// the job has duties, a sentence of its own description that only says the person held the job (`RoleStub`) goes: it restates
-    /// the title and the employer in front of them; with none, it is the job's only text, and stays. A sentence of its own
+    /// the job has duties, a sentence of its own description that only says the person held the job, or worked where the jobs were
+    /// (`RoleStub`), goes: it restates the titles and the employers in front of them; with none, it is the job's only text, and stays. A sentence of its own
     /// description that says one of its duties again, in any tense (`saysTheDuty`), goes too: the duty stays (#362).
     ///
     /// With duties, the job's text also holds the duties the person said for it (ADR 0031): copied from the clauses of the description
@@ -262,6 +262,7 @@ public struct CVDataSanitizer: Sendable {
     ) -> [Experience] {
         let retained = keptJobs(jobs, source, entries)
         let general = Self.generalDutyJob(among: retained.map(\.experience))
+        let jobWords = Self.words(of: retained.flatMap { [$0.experience.title, $0.experience.company] })
         return retained.enumerated().map { position, kept in
             let (job, experience) = kept
             let rule = DutyRule(
@@ -294,7 +295,6 @@ public struct CVDataSanitizer: Sendable {
                 Self.letterWords(of: sentence).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains)
                     || dutySentences.contains { Self.saysTheDuty(sentence, $0) }
             }
-            let jobWords = Self.words(of: [experience.title, experience.company])
             let quote = description(experience.description, evidence.quotable).flatMap { quote in
                 roleDuties == nil ? Self.withoutBareWork(quote, language: source.explainer.language) : SentenceSplitter.sentences(in: quote)
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
@@ -630,7 +630,7 @@ public struct CVDataSanitizer: Sendable {
 
     /// Whether two folded words are one, or forms of one: of 5 letters or more, at most 2 letters apart in length, and alike but
     /// for their last 2 letters ("event", "events").
-    private static func isAForm(_ word: String, of other: String) -> Bool {
+    static func isAForm(_ word: String, of other: String) -> Bool {
         guard word != other else { return true }
         let shorter = min(word.count, other.count)
         guard abs(word.count - other.count) <= 2, shorter >= 5 else { return false }
