@@ -3,14 +3,16 @@ import Foundation
 /// ADR 0031: a duty the person said with a gerund, shared by two jobs ("setting up the PA systems and mixing the support acts",
 /// "controllando i quadri elettrici e programmando la manutenzione preventiva"), in the first person of the job's other duties, so
 /// one job does not mix two forms. English puts "I was" (a past job) or "I am" (the current one) before it. Italian, Spanish and
-/// Portuguese write each gerund that starts the duty or follows a conjunction or a comma in the first person of the imperfect (a past
-/// job) or of the present (the current one), when the word list knows that form. A duty in the first person keeps its words, but
-/// for a gerund that opens a later part ("Controllavo i quadri e programmando la manutenzione", #362), which is written the same way
-/// when it is the gerund of a verb the word list knows, or of an irregular verb (`irregular`: "facendo" is of "fare", and the word
-/// list has no verb it could find from the gerund), and no first person of another (`isWritten`: "e prendo" stays), as does a first
-/// word in the first person that ends as one ("Prendo le ordinazioni"). A duty with a form the list does not know keeps its words;
-/// each duty starts with a capital letter. A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is
-/// written the same way (#354, round 10), and one in -ere or -ire of an ended Italian job (round 14).
+/// Portuguese write each gerund that starts the duty or follows a conjunction in the first person of the imperfect (a past job) or
+/// of the present (the current one), when the word list knows that form; a gerund after a comma follows only when no verb in the
+/// first person comes before it (a list of gerunds), as it is otherwise the adjunct of that verb ("gestivo gli ordini,
+/// coordinando i fornitori", #362). A duty in the first person keeps its words, but for a gerund that opens a later part
+/// ("Controllavo i quadri e programmando la manutenzione", #362), which is written the same way when it is the gerund of a verb the
+/// word list knows, or of an irregular verb (`irregular`: "facendo" is of "fare", and the word list has no verb it could find
+/// from the gerund), and no first person of another (`isWritten`: "e prendo" stays), as does a first word in the first person that
+/// ends as one ("Prendo le ordinazioni"). A duty with a form the list does not know keeps its words; each duty starts with a
+/// capital letter. A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is written the same way (#354,
+/// round 10), and one in -ere or -ire of an ended Italian job (round 14).
 enum FirstPersonDuty {
     private struct Endings {
         /// The endings of the form the rewrite reads: a gerund's, or an infinitive's.
@@ -133,44 +135,61 @@ enum FirstPersonDuty {
             guard word.count > 4, word.hasSuffix("ing"), !notGerunds.contains(word), first != first.uppercased() else { return capitalised(duty) }
             return (current ? "I am " : "I was ") + String(first.prefix(1)).lowercased() + duty.dropFirst()
         case let language?:
-            guard let rules = opening(letters(first), language: language, wordList: wordList) else {
+            guard let opened = opening(letters(first), language: language, wordList: wordList) else {
                 return capitalised(withLaterGerundsWritten(tokens, current: current, language: language, wordList: wordList) ?? duty)
             }
+            let rules = opened.rules
+            // A verb in the first person has come before a part once an earlier part opened with a word that is no gerund of the
+            // list, or the duty opened with an infinitive: a gerund after a comma is then the adjunct of that verb, and keeps its
+            // words, where in a list of gerunds each one is written (#362).
+            var finite = !opened.ofGerunds
             var converted: [String] = []
             for (index, token) in tokens.enumerated() {
-                let opens = index == 0 || opensAPart(after: tokens[index - 1])
-                guard opens, isOfTheForm(letters(token), rules) else { converted.append(token); continue }
-                guard isGerund(letters(token), rules) else { return capitalised(duty) }
+                let word = letters(token)
+                guard index == 0 || opensAPart(after: tokens[index - 1]) else { converted.append(token); continue }
+                guard isOfTheForm(word, rules) else {
+                    finite = finite || !joiners.contains(word)
+                    converted.append(token)
+                    continue
+                }
+                guard isGerund(word, rules) else { return capitalised(duty) }
                 // A first person that ends as a gerund ("prendo") keeps its words (#362).
-                guard isWritten(letters(token), rules, language: language, wordList: wordList) else { converted.append(token); continue }
+                guard isWritten(word, rules, language: language, wordList: wordList) else {
+                    finite = true
+                    converted.append(token)
+                    continue
+                }
+                if opened.ofGerunds, finite, index > 0, tokens[index - 1].hasSuffix(",") { converted.append(token); continue }
                 guard let form = firstPerson(of: token, rules, current: current, language: language, wordList: wordList) else {
                     return capitalised(duty)
                 }
                 converted.append(form)
             }
             // A part after an infinitive may open with a gerund ("controlar os quadros e revisando as notas").
-            let opened = converted.joined(separator: " ")
-            return capitalised(withLaterGerundsWritten(converted, current: current, language: language, wordList: wordList) ?? opened)
+            let joined = converted.joined(separator: " ")
+            return capitalised(withLaterGerundsWritten(converted, current: current, language: language, wordList: wordList) ?? joined)
         case nil:
             return capitalised(duty)
         }
     }
 
-    /// Whether `duty`, which opens in the first person, has a later part that opens with a gerund (`isWritten`), as the rewrite
-    /// leaves one whose first person the word list does not know (#362): "Sostituisco i cuscinetti e lubrificando i motori" mixes two
-    /// forms, and the duty check drops it.
+    /// Whether `duty`, which opens in the first person, has a later part that a joiner opens with a gerund (`isWritten`), as the
+    /// rewrite leaves one whose first person the word list does not know (#362): "Sostituisco i cuscinetti e lubrificando i motori"
+    /// mixes two forms, and the duty check drops it. A gerund after a comma is the adjunct of the verb before it ("gestivo gli
+    /// ordini, coordinando i fornitori"), and mixes nothing.
     static func joinsAGerund(_ duty: String, language: Vocabulary.Language?, wordList: any WordList) -> Bool {
         guard let language, let rules = endings[language] else { return false }
         let tokens = duty.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         guard let first = tokens.first, opening(letters(first), language: language, wordList: wordList) == nil else { return false }
         return tokens.indices.dropFirst().contains { index in
-            opensAPart(after: tokens[index - 1]) && isWritten(letters(tokens[index]), rules, language: language, wordList: wordList)
+            joins(tokens[index - 1]) && isWritten(letters(tokens[index]), rules, language: language, wordList: wordList)
         }
     }
 
-    /// `tokens`, of a duty that opens in the first person, with each later part that opens with a gerund (`isWritten`) in the
-    /// first person of the job (#362), or nil when the word list knows the first person of none of one such gerund's forms.
+    /// `tokens`, of a duty that opens in the first person, with each later part that a joiner opens with a gerund (`isWritten`) in
+    /// the first person of the job (#362), or nil when the word list knows the first person of none of one such gerund's forms. A
+    /// gerund after a comma follows a verb in the first person, which it is the adjunct of, and keeps its words.
     private static func withLaterGerundsWritten(
         _ tokens: [String], current: Bool, language: Vocabulary.Language, wordList: any WordList
     ) -> String? {
@@ -178,7 +197,7 @@ enum FirstPersonDuty {
         let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         var converted: [String] = []
         for (index, token) in tokens.enumerated() {
-            guard index > 0, opensAPart(after: tokens[index - 1]),
+            guard index > 0, joins(tokens[index - 1]),
                   isWritten(letters(token), rules, language: language, wordList: wordList) else {
                 converted.append(token)
                 continue
@@ -191,14 +210,21 @@ enum FirstPersonDuty {
 
     /// Whether the word after `previous` opens a part of a duty: `previous` ends with a comma or joins two parts.
     private static func opensAPart(after previous: String) -> Bool {
-        previous.hasSuffix(",") || joiners.contains(previous.lowercased().filter(\.isLetter))
+        previous.hasSuffix(",") || joins(previous)
+    }
+
+    /// Whether `previous` is a word that joins two parts of a duty.
+    private static func joins(_ previous: String) -> Bool {
+        joiners.contains(previous.lowercased().filter(\.isLetter))
     }
 
     /// The form of `language` that the first word of a duty, `word`, is written in: the gerund's when `isWritten`, else the
     /// infinitive's, or nil when it is neither ("prendo" keeps the duty as the person said it, #362).
-    private static func opening(_ word: String, language: Vocabulary.Language, wordList: any WordList) -> Endings? {
-        if let rules = endings[language], isWritten(word, rules, language: language, wordList: wordList) { return rules }
-        return infinitives[language].flatMap { isGerund(word, $0) ? $0 : nil }
+    private static func opening(
+        _ word: String, language: Vocabulary.Language, wordList: any WordList
+    ) -> (rules: Endings, ofGerunds: Bool)? {
+        if let rules = endings[language], isWritten(word, rules, language: language, wordList: wordList) { return (rules, true) }
+        return infinitives[language].flatMap { isGerund(word, $0) ? ($0, false) : nil }
     }
 
     /// Whether `word`, which opens a part of a duty, is a gerund the rewrite writes (#362): the gerund of a verb the word list knows

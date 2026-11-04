@@ -141,14 +141,12 @@ struct FirstPersonDutyTests {
 
     // MARK: A gerund in a later part of a duty in the first person (#362)
 
-    @Test("A gerund that opens a later part of a duty in the first person, or after an infinitive, is written in the job's first person (#362)")
+    @Test("A gerund that opens a later part of a duty in the first person, after a joiner, or after an infinitive, is written in the job's first person (#362)")
     func laterGerundWritten() {
         let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"], nor: [])
 
         #expect(FirstPersonDuty.written("Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian, wordList: list)
             == "Controllavo i quadri e programmavo la manutenzione.")
-        #expect(FirstPersonDuty.written("controllo i quadri, programmando i turni.", current: true, language: .italian, wordList: list)
-            == "Controllo i quadri, programmo i turni.")
         #expect(FirstPersonDuty.written("Organizo los turnos y revisando las facturas.", current: true, language: .spanish, wordList: list)
             == "Organizo los turnos y reviso las facturas.")
         #expect(FirstPersonDuty.written("Organizava as prateleiras e revisando as notas.", current: false, language: .portuguese, wordList: list)
@@ -265,5 +263,34 @@ struct FirstPersonDutyTests {
         #expect(FirstPersonDuty.written("Gestivo gli ordini e facendo l'inventario.", current: false, language: .italian, wordList: list)
             == "Gestivo gli ordini e facendo l'inventario.")
         #expect(FirstPersonDuty.joinsAGerund("Gestivo gli ordini e facendo l'inventario.", language: .italian, wordList: list))
+    }
+
+    // MARK: A gerund after a comma is an adjunct (#362)
+
+    @Test("A gerund after a comma is the adjunct of a verb in the first person (\"by coordinating the suppliers\"), so it keeps its words, and the duty check does not take it for a mixed form (#362)",
+          arguments: [
+              ("Gestivo gli ordini, coordinando i fornitori.", false, Vocabulary.Language.italian, "coordinando"),
+              ("Gestisco gli ordini, coordinando i fornitori.", true, .italian, "coordinando"),
+              ("Gestiono los pedidos, coordinando a los proveedores.", true, .spanish, "coordinando"),
+              ("Gerenciava os pedidos, coordenando os fornecedores.", false, .portuguese, "coordenando"),
+          ] as [(String, Bool, Vocabulary.Language, String)])
+    func gerundAfterACommaKept(duty: String, current: Bool, language: Vocabulary.Language, gerund: String) {
+        let list = TableWordList.knowingNoVerb(of: [gerund], nor: [])
+
+        #expect(FirstPersonDuty.written(duty, current: current, language: language, wordList: list) == duty)
+        #expect(!FirstPersonDuty.joinsAGerund(duty, language: language, wordList: list))
+    }
+
+    @Test("A gerund after a comma keeps its words when a part before it is no gerund of the list, or the duty opens with an infinitive; after a joiner it is still written (#362)")
+    func gerundAfterACommaOutsideAList() {
+        let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"], nor: [])
+
+        #expect(FirstPersonDuty.written(
+            "Controllando i quadri e prendo le misure, programmando i turni.", current: true, language: .italian, wordList: list
+        ) == "Controllo i quadri e prendo le misure, programmando i turni.")
+        #expect(FirstPersonDuty.written("Controlar os quadros, revisando as notas.", current: false, language: .portuguese, wordList: list)
+            == "Controlava os quadros, revisando as notas.")
+        #expect(FirstPersonDuty.written("Controlar os quadros, revisando as notas e revisando os turnos.", current: false, language: .portuguese, wordList: list)
+            == "Controlava os quadros, revisando as notas e revisava os turnos.")
     }
 }
