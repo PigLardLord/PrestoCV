@@ -601,10 +601,17 @@ extension CVDataSanitizer {
 
     /// The words of a duty after its subject, auxiliary and verb, lowercased.
     private static func objectWords(of duty: String) -> ArraySlice<String> {
-        var words = letterWords(of: duty)[...]
-        while let first = words.first, subjectWords.contains(first) { words = words.dropFirst() }
+        let words = wordsAfterTheSubject(of: duty)
         guard let first = words.first else { return words }
         return words.dropFirst(auxiliaries.contains(first) || germanAuxiliaries.contains(first) ? 2 : 1)
+    }
+
+    /// The words of a clause of a duty after its subject pronouns, lowercased. "i" is the English pronoun only as "I": in Italian
+    /// it is the article ("i quadri"), and the noun after it is no verb (#362).
+    private static func wordsAfterTheSubject(of clause: String) -> ArraySlice<String> {
+        var words = clause.split { !$0.isLetter }.map(String.init)[...]
+        while let first = words.first, first != "i", subjectWords.contains(first.lowercased()) { words = words.dropFirst() }
+        return ArraySlice(words.map { $0.lowercased() })
     }
 
     /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb, by its first four
@@ -653,8 +660,7 @@ extension CVDataSanitizer {
     /// The verb of a duty after its subject, lowercased: the participle after an auxiliary ("Ho riparato"), the last word after a
     /// German one.
     private static func dutyVerb(of duty: String) -> String? {
-        var words = letterWords(of: duty)[...]
-        while let first = words.first, subjectWords.contains(first) { words = words.dropFirst() }
+        let words = wordsAfterTheSubject(of: duty)
         guard let first = words.first else { return nil }
         if germanAuxiliaries.contains(first) { return words.dropFirst().last }
         return auxiliaries.contains(first) ? words.dropFirst().first : first

@@ -209,6 +209,14 @@ struct JobClausesTests {
             duties: ["Controllavo i quadri elettrici.", nil, nil, nil], texts: [belts, panels, panels, crew]
         ),
         TextRow(
+            name: "a quote whose verb starts like a noun the duty lists after an article", quotes: [nil, "Motorizzavo i quadri elettrici.", nil, nil],
+            duties: [nil, "Controllavo i quadri elettrici, i motori e le pompe idrauliche.", nil, nil],
+            texts: [
+                belts, "Motorizzavo i quadri elettrici. " + panels + " Controllavo i quadri elettrici, i motori e le pompe idrauliche.",
+                panels, crew,
+            ]
+        ),
+        TextRow(
             name: "duties with the verb of a said duty and other objects", quotes: [nil, "Controllavo la qualità dei pezzi.", nil, nil],
             duties: [nil, nil, "Controllavo la qualità delle saldature.", "Controllo la manutenzione. Controllo la qualità dei pezzi."],
             texts: [
@@ -246,6 +254,29 @@ struct JobClausesTests {
 
         #expect(verdicts.kept == (stays ? [duty] : []), "\(verdicts.rejected)")
         #expect(verdicts.rejected.map(\.reason) == (stays ? [] : ["it says what the person did at another job"]))
+    }
+
+    // MARK: What a sentence needs to say a duty again (#362)
+
+    struct SaysRow: Sendable, CustomTestStringConvertible {
+        let sentence: String
+        let duty: String
+        let says: Bool
+        var testDescription: String { "\(sentence) / \(duty)" }
+    }
+
+    static let saysRows: [SaysRow] = [
+        // The same duty in another tense, with a gerund, or with a part of the duty: said again.
+        SaysRow(sentence: "Controllo i quadri elettrici", duty: "Controllavo i quadri elettrici e programmavo la manutenzione", says: true),
+        SaysRow(sentence: "Controllando i quadri elettrici", duty: "Controllavo i quadri elettrici", says: true),
+        // The Italian article "i" is no pronoun: the noun after it opens no clause (E).
+        SaysRow(sentence: "Motorizzavo i quadri elettrici", duty: "Controllo i quadri elettrici, i motori e le pompe", says: false),
+        SaysRow(sentence: "Controllavo i motori", duty: "Controllo i quadri elettrici, i motori e le pompe", says: true),
+    ]
+
+    @Test("A sentence says a duty again only with the same verb, the same objects and the same figures (#362)", arguments: saysRows)
+    func saysTheDuty(row: SaysRow) {
+        #expect(CVDataSanitizer.saysTheDuty(row.sentence, row.duty) == row.says)
     }
 
     // MARK: A duty of another job joined to another, or in the third person (#362)
