@@ -358,7 +358,7 @@ extension CVDataSanitizer {
         "funzionamento", "operazioni", "processi", "attivita", "gestione",
         "movimiento", "movimientos", "flujo", "flujos", "integridad", "calidad", "eficiencia", "continuidad", "funcionamiento",
         "operaciones", "procesos", "actividades",
-        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement", "operations",
+        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement",
         "processus", "activites",
         "fluxo", "fluxos", "integridade", "qualidade", "continuidade", "operacoes", "processos", "atividades",
         "bewegung", "ablauf", "ablaufe", "fluss", "integritat", "qualitat", "effizienz", "betrieb", "prozesse",
