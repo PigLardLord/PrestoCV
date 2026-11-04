@@ -1365,13 +1365,9 @@ enum ReaderRules {
         "it": ["scanner"], "pt": ["scanner"], "fr": ["scanner"], "de": ["scanner"],
     ]
 
-    /// Empty words as a soft skill, folded: experience, or being a professional, which name no quality. The words for a skill or a
-    /// knowledge are `skillWords`.
-    static let emptyWords: Set<String> = [
-        "professional", "professionale", "professionell", "professionnel", "professionnelle", "profesional", "profissional",
-        "experience", "esperienza", "erfahrung", "experiencia", "competent", "competente", "kompetent",
-        "qualified", "qualificato", "qualifiziert", "qualifie", "qualifiee", "cualificado", "qualificado",
-    ]
+    /// Empty words as a soft skill, folded: experience, being a professional, or a bare word for a group (#362), which name no
+    /// quality. The skill check's own list, so the two cannot differ. The words for a skill or a knowledge are `skillWords`.
+    static let emptyWords: Set<String> = CVDataSanitizer.emptyQualities
 
     /// Whether a technology is a part, a material or a work object the person handles (`DraftingInputs.parts`), by the stem of its
     /// head noun (the last word in English and German, the first in the other languages), unless the description writes it after
