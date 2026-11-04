@@ -112,6 +112,33 @@ struct FirstPersonDutyTests {
         #expect(duty == "Controllando i quadri elettrici.")
     }
 
+    // MARK: A first person in -endo that opens a duty (#362)
+
+    @Test("A duty that opens with a first person in -endo (\"prendo\", \"vendo\", \"atendo\") keeps its words, in the current job and in an ended one (#362)",
+          arguments: [
+              ("Prendo le ordinazioni ai tavoli.", true, Vocabulary.Language.italian),
+              ("Prendo le ordinazioni ai tavoli.", false, .italian),
+              ("Vendo polizze ai clienti.", true, .italian),
+              ("Vendo polizze ai clienti.", false, .italian),
+              ("Vendo os produtos da loja.", true, .portuguese),
+              ("Vendo os produtos da loja.", false, .portuguese),
+              ("Atendo os clientes da loja.", true, .portuguese),
+              ("Atendo os clientes da loja.", false, .portuguese),
+          ] as [(String, Bool, Vocabulary.Language)])
+    func firstPersonInEndoKept(duty: String, current: Bool, language: Vocabulary.Language) {
+        #expect(FirstPersonDuty.written(duty, current: current, language: language, wordList: words) == duty)
+    }
+
+    @Test("A gerund that opens a duty is still written in the job's first person, and a first person in -endo after it keeps its words (#362)")
+    func openingGerundWritten() {
+        let list = Self.knowingNoVerb(of: ["programmando"])
+
+        #expect(FirstPersonDuty.written("Programmando la manutenzione.", current: false, language: .italian, wordList: list)
+            == "Programmavo la manutenzione.")
+        #expect(FirstPersonDuty.written("Programmando la manutenzione e prendo le ordinazioni.", current: true, language: .italian, wordList: list)
+            == "Programmo la manutenzione e prendo le ordinazioni.")
+    }
+
     // MARK: A gerund in a later part of a duty in the first person (#362)
 
     /// A word list that knows no verb whose first person ends as one of `gerunds` ("programmandare"), as no dictionary does, and

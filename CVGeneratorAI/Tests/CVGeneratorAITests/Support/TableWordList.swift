@@ -16,8 +16,16 @@ struct TableWordList: WordList {
         !names.contains(word.lowercased())
     }
 
-    /// The employers, schools, places and people the tests invent.
-    static let inventedNames: Set<String> = [
+    /// The employers, schools, places and people the tests invent, and the infinitives that no dictionary has, made from the gerunds
+    /// the tests write ("controllandare" for "controllando"): the first-person check reads a word that ends as a gerund as one only
+    /// when no verb of another form makes it (#362).
+    static let inventedNames: Set<String> = madeUpVerbs.union(people)
+
+    private static let madeUpVerbs: Set<String> = Set(["controllando", "programmando", "usando"].flatMap { gerund in
+        ["are", "ere", "ire"].map { String(gerund.dropLast()) + $0 }
+    })
+
+    private static let people: Set<String> = [
         "acme", "beta", "globex", "initech", "umbrella", "milani", "rossi", "maria", "bianchi", "verdi", "anna", "jane", "smith",
         "john", "doe", "raffaele", "bologna", "bolonia", "bologne", "bolonha", "turia", "mondego", "kassel", "siemens", "lincoln",
         "ferrara", "luce", "torino", "milano", "berlin", "madrid", "lisboa", "paris", "rossini", "schmidt", "dupont", "garcia",
