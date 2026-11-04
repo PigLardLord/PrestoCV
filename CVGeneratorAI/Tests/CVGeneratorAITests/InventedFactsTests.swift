@@ -312,6 +312,17 @@ struct InventedFactsTests {
         #expect(report.lost.filter { $0.kind == .duty }.isEmpty, "\(report.lost)")
     }
 
+    @Test("A duty the person states for two jobs is held under each: left out of one job it is lost for that job only, and kept for the other (#362)",
+          arguments: SharedDutyCase.all)
+    func dutyOfTwoJobs(_ row: SharedDutyCase) throws {
+        let made = try row.made()
+
+        let report = InventedFacts.count(made.cv, for: made.input)
+
+        #expect(made.places(of: report.lost) == row.places(written: false, in: made), "lost \(report.lost)")
+        #expect(made.places(of: report.kept) == row.places(written: true, in: made), "kept \(report.kept)")
+    }
+
     // MARK: - Helpers
 
     static func input(_ id: String) throws -> DraftingInput {
@@ -454,6 +465,66 @@ struct DutyJobCase: Sendable, CustomTestStringConvertible {
     ]
 
     static let all: [DutyJobCase] = ofTheJobs + ofNoJob
+}
+
+/// The sentence two jobs of an input share ("..., then at B ..., <duties>"), written as the description of none, one or both of them
+/// (a draft with no skills): each duty of the sentence is lost for a job whose description lacks it (#362).
+struct SharedDutyCase: Sendable, CustomTestStringConvertible {
+    let language: String
+    /// Which of the two jobs of the sentence (0 the first, 1 the second) have it as their description.
+    let writtenAt: Set<Int>
+
+    var testDescription: String { "\(language), written at \(writtenAt.sorted())" }
+
+    static let all: [SharedDutyCase] = DutyJobCase.wordings.flatMap { wording -> [SharedDutyCase] in
+        let rows: [Set<Int>] = [[], [0], [1], [0, 1]]
+        return rows.map { SharedDutyCase(language: wording.language, writtenAt: $0) }
+    }
+
+    /// What the row is about: the input, the draft, and the duties of the sentence with the employers of the two jobs that state them.
+    struct Made {
+        let input: DraftingInput
+        let cv: CVData
+        let duties: [String]
+        let jobs: [String]
+
+        /// The duties of the sentence among `facts`, each as "duty at employer", sorted.
+        func places(of facts: [ExpectedFact]) -> [String] {
+            var places: [String] = []
+            for fact in facts where duties.contains(fact.forms[0]) {
+                places.append("\(fact.forms[0]) at \(fact.jobs.joined(separator: ", "))")
+            }
+            return places.sorted()
+        }
+    }
+
+    func made() throws -> Made {
+        let wording = try #require(DutyJobCase.wordings.first { $0.language == language })
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(language)" })
+        let first = try #require(input.facts.first { $0.forms[0] == wording.sharedDuties[0] })
+        let employers = input.facts.filter { $0.kind == .employer }
+        var draft = Draft(faithfulTo: input)
+        draft.skills = []
+        for position in writtenAt {
+            let job = try #require(employers.firstIndex { $0.forms.contains(first.jobs[position]) })
+            draft.experience[job] = Experience(company: draft.experience[job].company, description: wording.shared)
+        }
+        return Made(input: input, cv: draft.cv, duties: wording.sharedDuties, jobs: first.jobs)
+    }
+
+    /// The employers of the two jobs whose description holds the sentence (or does not).
+    func jobs(written: Bool, in made: Made) -> [String] {
+        made.jobs.indices.filter { writtenAt.contains($0) == written }.map { made.jobs[$0] }
+    }
+
+    /// Each duty of the sentence at those employers, as "duty at employer", sorted.
+    func places(written: Bool, in made: Made) -> [String] {
+        var places: [String] = []
+        for duty in made.duties {
+            for job in jobs(written: written, in: made) { places.append("\(duty) at \(job)") }
+        }
+        return places.sorted()
+    }
 }
 
 struct AccentCase: Sendable, CustomTestStringConvertible {

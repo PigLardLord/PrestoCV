@@ -17,10 +17,24 @@ struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvert
     let forms: [String]
     /// For a duty the person states in a job's sentence: the forms of the employers of the jobs whose sentence states it (one form
     /// of each employer fact of the input), two employers when one sentence runs over two jobs. A job description of another job
-    /// does not keep it (#362). Empty for every other fact, and for a duty the person states in no job's sentence.
+    /// does not keep it, and a duty stated for several jobs counts under each of them (#362). Empty for every other fact, and for
+    /// a duty the person states in no job's sentence.
     let jobs: [String]
 
-    var description: String { "\(kind.rawValue) \"\(forms[0])\"" }
+    var description: String {
+        let named = "\(kind.rawValue) \"\(forms[0])\""
+        return jobs.isEmpty ? named : "\(named) at \(jobs.joined(separator: ", "))"
+    }
+
+    /// What the counter expects: a duty stated for several jobs is one expected fact for each of them, the others are themselves.
+    var perJob: [ExpectedFact] {
+        jobs.count < 2 ? [self] : jobs.map { ExpectedFact(kind: kind, forms: forms, jobs: [$0]) }
+    }
+
+    /// Where the fact is expected, for a finding to name: "duty at Fenwick" for a duty of one job, the kind for the others.
+    var place: String {
+        jobs.count == 1 ? "\(kind.rawValue) at \(jobs[0])" : kind.rawValue
+    }
 
     static func name(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .name, forms: forms, jobs: []) }
     static func title(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .title, forms: forms, jobs: []) }

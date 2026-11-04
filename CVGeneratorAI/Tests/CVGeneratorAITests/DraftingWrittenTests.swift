@@ -575,7 +575,7 @@ struct DraftingWrittenTests {
                 ),
                 Experience(
                     title: "sound technician", company: "Copperfield Arena",
-                    description: "I set up the PA systems and ran the follow spots."
+                    description: "I set up the PA systems, mixed the support acts and ran the follow spots."
                 ),
                 Experience(
                     title: "head of sound", company: "Orchard Lane Theatre",
@@ -597,7 +597,10 @@ struct DraftingWrittenTests {
                     title: "manutentore elettromeccanico", company: "Pastificio Cerreto",
                     description: "Controllavo i quadri elettrici e programmavo la manutenzione preventiva."
                 ),
-                Experience(title: "manutentore elettromeccanico", company: "Molino Fontebasso", description: "Ordinavo i ricambi."),
+                Experience(
+                    title: "manutentore elettromeccanico", company: "Molino Fontebasso",
+                    description: "Ordinavo i ricambi, controllavo i quadri elettrici e programmavo la manutenzione preventiva."
+                ),
                 Experience(
                     title: "capoturno della manutenzione", company: "Birrificio Valtrigno",
                     description: "Coordino i tecnici e gestisco i fermi impianto. Leggo gli schemi elettrici e uso i PLC per trovare i guasti."
@@ -607,14 +610,14 @@ struct DraftingWrittenTests {
         )
 
         #expect(unwritten(missing, english) == [
-            "sound effects", "working closely with directors", "lights", "trucks", "PA systems", "support acts", "follow spots",
-            "junior technicians",
+            "sound effects", "working closely with directors", "lights", "trucks", "PA systems", "PA systems", "support acts",
+            "support acts", "follow spots", "junior technicians",
         ])
         #expect(unwritten(held, english).isEmpty)
         #expect(unwritten(described, italian).isEmpty)
         #expect(unwritten(CVData(skills: [Skill(name: "PLC")]), italian) == [
             "schemi elettrici", "trovare i guasti", "lavorare in squadra", "nastri trasportatori", "cuscinetti", "quadri elettrici",
-            "manutenzione preventiva", "ricambi", "fermi impianto", "tecnici",
+            "quadri elettrici", "manutenzione preventiva", "manutenzione preventiva", "ricambi", "fermi impianto", "tecnici",
         ])
     }
 
@@ -640,8 +643,23 @@ struct DraftingWrittenTests {
         let unwritten = ReaderRules.findings(in: misplaced, for: english, report: InventedFacts.count(misplaced, for: english))
             .filter { $0.kind == .unwrittenStatement }.map(\.value)
 
-        #expect(unwritten == ["lights", "trucks", "PA systems", "support acts", "follow spots", "sound design"])
+        #expect(unwritten == ["lights", "trucks", "PA systems", "PA systems", "support acts", "support acts", "follow spots", "sound design"])
         #expect(ReaderClass.unwrittenStatement.label.contains("another job"), "\(ReaderClass.unwrittenStatement.label)")
+    }
+
+    @Test("A duty stated for two jobs and left out of one is counted for that job, and the finding names the job (#362)",
+          arguments: SharedDutyCase.all)
+    func dutyOfTwoJobsLeftOutOfOne(_ row: SharedDutyCase) throws {
+        let made = try row.made()
+        var missing: [String] = []
+        for duty in made.duties {
+            for job in row.jobs(written: false, in: made) { missing.append("duty at \(job): \(duty)") }
+        }
+
+        let found = ReaderRules.findings(in: made.cv, for: made.input, report: InventedFacts.count(made.cv, for: made.input))
+            .filter { $0.kind == .unwrittenStatement && made.duties.contains($0.value) }
+
+        #expect(found.map { "\($0.path): \($0.value)" }.sorted() == missing.sorted(), "\(found)")
     }
 
     @Test("A year the description gives a school and the draft does not hold is counted")

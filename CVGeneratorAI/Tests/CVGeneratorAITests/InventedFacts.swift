@@ -75,10 +75,13 @@ enum InventedFacts {
         let names = Names(cv: cv, facts: facts)
         let leaves = Sheet.leaves(of: cv)
         let findings = leaves.map { classify($0, of: cv, against: source, traps: trapWords, names: names, language: language) }
-        let kept = facts.filter { !keptPaths(of: $0, in: leaves, findings: findings, source: source).isEmpty }
-        let titleAt = Set(facts.filter { $0.kind == .title }.flatMap { keptPaths(of: $0, in: leaves, findings: findings, source: source) })
+        let expected = facts.flatMap(\.perJob)
+        let kept = expected.filter { !keptPaths(of: $0, in: leaves, findings: findings, source: source).isEmpty }
+        let titleAt = Set(
+            expected.filter { $0.kind == .title }.flatMap { keptPaths(of: $0, in: leaves, findings: findings, source: source) }
+        )
         return Report(
-            findings: findings, kept: kept, lost: facts.filter { !kept.contains($0) },
+            findings: findings, kept: kept, lost: expected.filter { !kept.contains($0) },
             titleAt: leaves.map(\.path).filter(titleAt.contains), lostYears: lostYears(of: leaves, source: source)
         )
     }

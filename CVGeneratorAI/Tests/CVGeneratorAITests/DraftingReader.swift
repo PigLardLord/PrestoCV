@@ -51,8 +51,9 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// pastime's phrase without its verb (#354, round 1).
     case bareInterest
     /// A duty or a quality the person states that no skill of the draft holds and, for a duty the person states in the sentence of a
-    /// job, no description of that job: the same words under another job are lost (`ExpectedFact.duty`, `.quality`): "I mix on
-    /// digital consoles", "mi piace lavorare in squadra" (#354, round 1; #362).
+    /// job, no description of that job: the same words under another job are lost, and a duty stated for several jobs is expected
+    /// under each of them (`ExpectedFact.duty`, `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra"
+    /// (#354, round 1; #362).
     case unwrittenStatement
     /// A summary sentence whose subject is the person's work, not the person: a bare word of a title or of the field followed by a
     /// verb "to be" ("Manutenzione è la mia attività principale."; #354, round 1), or a word of the work after an article, with any
@@ -428,7 +429,7 @@ enum ReaderRules {
         found += roundSixteen(in: cv, for: input)
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         found += report.lost.filter { [.duty, .quality].contains($0.kind) }
-            .map { ReaderFinding(kind: .unwrittenStatement, path: $0.kind.rawValue, value: $0.forms[0]) }
+            .map { ReaderFinding(kind: .unwrittenStatement, path: $0.place, value: $0.forms[0]) }
         return found
     }
 
