@@ -2235,14 +2235,16 @@ extension CVDataSanitizer {
         "warnweste", "auffanggurt", "schutzbrille",
     ].map(skillKey))
 
-    /// The words that say only that the person is a professional or has experience, folded: no quality a reader can weigh, so no
-    /// soft skill (#354, round 3). A quality said with one of them ("atteggiamento professionale") stays.
+    /// The words that say only that the person is a professional or has experience (#354, round 3), and the bare words that name a
+    /// group of people ("team", "staff", "squad"; #362), folded: no quality a reader can weigh, so no soft skill. A quality said with
+    /// one of them ("atteggiamento professionale") stays, and so does a loanword that holds one ("teamwork").
     static let emptyQualities: Set<String> = [
         "professional", "professionale", "professionell", "professionnel", "professionnelle", "profesional", "profissional",
         "experience", "experienced", "esperienza", "esperto", "esperta", "erfahrung", "erfahren", "experiencia", "experimentado",
         "experimentada", "experimente", "experimentee", "experiente", "competent", "competente", "kompetent",
         "qualified", "qualificato", "qualificata", "qualifiziert", "qualifie", "qualifiee",
         "cualificado", "cualificada", "qualificado", "qualificada",
+        "team", "staff", "squad",
     ]
 
     /// The languages whose own words end in a vowel, each with the words of English it writes as its own: there, a lower-case word
