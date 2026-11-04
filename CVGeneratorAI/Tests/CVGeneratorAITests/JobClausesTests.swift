@@ -246,6 +246,8 @@ struct JobClausesTests {
               (2, "Controllavo la qualità delle saldature.", true),
               (3, "Controllo la manutenzione dei forni.", true),
               (3, "Sostituisco i nastri trasportatori.", true),
+              (0, "Progettavo la manutenzione preventiva.", true),
+              (3, "Ripasso i nastri trasportatori.", true),
           ])
     func dutyOfAnotherJob(index: Int, duty: String, stays: Bool) throws {
         let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -275,6 +277,18 @@ struct JobClausesTests {
         SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo 40 quadri elettrici", says: true),
         SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo 40 quadri elettrici e 12 pompe idrauliche", says: true),
         SaysRow(sentence: "Controllavo i quadri elettrici", duty: "Controllo 40 quadri elettrici", says: true),
+        // A verb that starts with the same four letters as another is another verb (C).
+        SaysRow(sentence: "Collaudavo i quadri elettrici", duty: "Collegavo i quadri elettrici e programmavo i controllori", says: false),
+        SaysRow(sentence: "Progettavo gli impianti elettrici", duty: "Programmo gli impianti elettrici", says: false),
+        SaysRow(sentence: "Contattavo i fornitori abituali", duty: "Controllo i fornitori abituali", says: false),
+        SaysRow(sentence: "Collegavo i quadri elettrici", duty: "Collegavo i quadri elettrici e programmavo i controllori", says: true),
+        // The forms of one verb meet in its stem, in every language.
+        SaysRow(sentence: "Sostituisce i cuscinetti usurati", duty: "Sostituivo i cuscinetti usurati", says: true),
+        SaysRow(sentence: "Revisó las facturas pendientes", duty: "Revisaba las facturas pendientes", says: true),
+        SaysRow(sentence: "Cortou as chapas metálicas", duty: "Cortava as chapas metálicas", says: true),
+        SaysRow(sentence: "Ich montiere die Regale", duty: "Ich habe die Regale montiert", says: true),
+        SaysRow(sentence: "Setting up the sound equipment", duty: "I set up the sound equipment", says: true),
+        SaysRow(sentence: "Testing the sound equipment", duty: "I test the sound equipment", says: true),
         // The Italian article "i" is no pronoun: the noun after it opens no clause (E).
         SaysRow(sentence: "Motorizzavo i quadri elettrici", duty: "Controllo i quadri elettrici, i motori e le pompe", says: false),
         SaysRow(sentence: "Controllavo i motori", duty: "Controllo i quadri elettrici, i motori e le pompe", says: true),
@@ -301,6 +315,7 @@ struct JobClausesTests {
         RestatedRow(sentence: "Controllavo 40 quadri elettrici.", duties: ["Controllo i quadri elettrici.", "Ordino 40 pompe idrauliche."], restated: false),
         // Another tense of a duty is said again, and another verb with the same first letters is not.
         RestatedRow(sentence: "Controllando i quadri elettrici.", duties: ["Controllavo i quadri elettrici."], restated: true),
+        RestatedRow(sentence: "Contattavo i fornitori abituali.", duties: ["Controllo i fornitori abituali."], restated: false),
     ]
 
     @Test("A sentence is restated by the duties of its job only with the figures they state (#362)", arguments: restatedRows)

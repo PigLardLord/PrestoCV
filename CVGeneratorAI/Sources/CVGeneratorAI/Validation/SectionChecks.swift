@@ -614,8 +614,8 @@ extension CVDataSanitizer {
         return ArraySlice(words.map { $0.lowercased() })
     }
 
-    /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb, by its first four
-    /// letters, opens a clause of `duty`, each figure it holds is a figure of `duty`, and each word of 5 letters or more after it
+    /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb is the verb of a
+    /// clause of `duty` (`isSameVerb`), each figure it holds is a figure of `duty`, and each word of 5 letters or more after the verb
     /// that names a work (no idle word), by its first four letters, is a word of `duty`. "Controllo i quadri elettrici" says
     /// "Controllavo i quadri elettrici e programmavo la manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another
     /// duty with the same verb, "Gestivo gli ordini dei ricambi" another duty on the same object, which may state more than the
@@ -625,7 +625,7 @@ extension CVDataSanitizer {
         let objects: Set<String> = Set(
             objectWords(of: sentence).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(4)) }
         )
-        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(String(verb.prefix(4))),
+        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(where: { isSameVerb(verb, $0) }),
               figures(in: sentence).isSubset(of: figures(in: duty)) else {
             return false
         }
@@ -647,6 +647,43 @@ extension CVDataSanitizer {
         Set(Digits.runs(in: Digits.ascii(text)))
     }
 
+    /// The endings of a verb form: the present, the imperfect and the past, the gerund, the participle and the infinitive of the
+    /// six languages ("controllo", "controllavo", "controlla", "controllando", "controllato", "controllare"). A form of one verb
+    /// loses its ending, and the stem is the rest (`verbStems`).
+    private static let verbEndings: [String] = [
+        "avano", "evano", "ivano", "iscono", "ieron", "ábamos", "iendo", "aient", "ando", "endo", "indo", "aban", "aron", "aram",
+        "iram", "avam", "avas", "aste", "iste", "isco", "isci", "isce", "amos", "emos", "imos", "ions", "avo", "avi", "ava", "evo",
+        "evi", "eva", "ivo", "ivi", "iva", "ato", "ata", "ati", "ate", "uto", "ita", "iti", "ite", "ito", "ado", "ido", "aba",
+        "ías", "ían", "iam", "ant", "ing", "ais", "ait", "iez", "ons", "ano", "ono", "are", "ere", "ire", "ía", "ia", "ou", "eu",
+        "iu", "ió", "ed", "es", "en", "et", "st", "te", "ez", "ar", "er", "ir", "ai", "ei", "as", "é", "ó", "ò", "ì", "í", "e", "o",
+        "a", "i", "s", "t",
+    ]
+
+    /// The stems a verb form may have: the form whole, and the form without each of the endings it has (`verbEndings`), a doubled
+    /// consonant at the end of a stem once, so that "controllavo", "controllo" and "controlled" meet in "control". An ending never
+    /// takes the stem below three letters. A form has more than one, as an ending may be part of the stem of another form
+    /// ("montiere" is "montier" and "e", or "monti" and "ere").
+    private static func verbStems(_ verb: String) -> [String] {
+        let withoutAnEnding = verbEndings.filter { verb.hasSuffix($0) && verb.count - $0.count >= 3 }.map { String(verb.dropLast($0.count)) }
+        return ([verb] + withoutAnEnding).map { stem in
+            guard let last = stem.last, stem.count > 3, !"aeiouàèéìíòóù".contains(last), stem.dropLast().last == last else { return stem }
+            return String(stem.dropLast())
+        }
+    }
+
+    /// Whether two verb forms are of one verb (#362): a stem of one equals a stem of the other, or is it with one letter more. A
+    /// single letter ends a form in one language and belongs to the stem in another ("test" and "testing", "focus" and "focuses").
+    /// Two verbs that start with the same four letters are two ("collaudavo", "collegavo").
+    private static func isSameVerb(_ verb: String, _ other: String) -> Bool {
+        let others = verbStems(other)
+        return verbStems(verb).contains { stem in
+            others.contains { other in
+                let (short, long) = stem.count <= other.count ? (stem, other) : (other, stem)
+                return long.hasPrefix(short) && long.count - short.count <= 1
+            }
+        }
+    }
+
     /// Whether `sentence`, or one of its clauses, says the duty `duty` (`saysTheDuty`, #362): "Ripara i nastri trasportatori e
     /// sostituisce i cuscinetti" says "sostituivo i cuscinetti" in its second clause, as its words together are no single
     /// duty's.
@@ -654,9 +691,9 @@ extension CVDataSanitizer {
         ([sentence] + clauses(of: sentence)).contains { saysTheDuty($0, duty) }
     }
 
-    /// The verbs that open the clauses of `duty`, by their first four letters.
-    private static func clauseVerbs(of duty: String) -> Set<String> {
-        Set(clauses(of: duty).compactMap { dutyVerb(of: $0).map { String($0.prefix(4)) } })
+    /// The verbs that open the clauses of `duty`.
+    private static func clauseVerbs(of duty: String) -> [String] {
+        clauses(of: duty).compactMap { dutyVerb(of: $0) }
     }
 
     /// The clauses of `duty`: the words up to a comma or a joiner ("e", "and"), which ends the clause before the next.
