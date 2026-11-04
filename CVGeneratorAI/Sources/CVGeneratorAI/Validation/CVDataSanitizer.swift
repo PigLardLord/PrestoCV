@@ -251,7 +251,8 @@ public struct CVDataSanitizer: Sendable {
     /// employer of another job, and that restate no sentence of the description about another job alone (ADR 0031): those of its own
     /// description, then those of its `duties`, the text the second pass wrote for the job at the same position of the result. When
     /// the job has duties, a sentence of its own description that only says the person held the job (`RoleStub`) goes: it restates
-    /// the title and the employer in front of them; with none, it is the job's only text, and stays.
+    /// the title and the employer in front of them; with none, it is the job's only text, and stays. A sentence of its own
+    /// description that says one of its duties again, in any tense (`saysTheDuty`), goes too: the duty stays (#362).
     ///
     /// With duties, the job's text also holds the duties the person said for it (ADR 0031): copied from the clauses of the description
     /// that belong to it, in front of the written ones, and all of it in the job's first person. A job named after another in one
@@ -286,12 +287,18 @@ public struct CVDataSanitizer: Sendable {
             }
             let roleDuties = position < duties.count ? Self.joined(pinned.joined(separator: " ").presentValue, newDuties) : nil
             let dutyWords = Set(Self.letterWords(of: roleDuties ?? ""))
+            let dutySentences: [String] = SentenceSplitter.sentences(in: roleDuties ?? "")
+            // A quoted sentence the duties restate goes, in their words or with their verb and objects in another tense
+            // (`saysTheDuty`; #362), so the job's text keeps one voice and says the duty once, in the person's words.
+            let restated: (String) -> Bool = { sentence in
+                Self.letterWords(of: sentence).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains)
+                    || dutySentences.contains { Self.saysTheDuty(sentence, $0) }
+            }
             let jobWords = Self.words(of: [experience.title, experience.company])
             let quote = description(experience.description, evidence.quotable).flatMap { quote in
                 roleDuties == nil ? Self.withoutBareWork(quote, language: source.explainer.language) : SentenceSplitter.sentences(in: quote)
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
-                    // A quoted sentence the duties restate goes, so the job's text keeps one voice.
-                    .filter { !Self.letterWords(of: $0).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains) }
+                    .filter { !restated($0) }
                     .map { Self.withoutClausesSaid($0, in: pinned) }
                     .joined(separator: " ").presentValue
             }

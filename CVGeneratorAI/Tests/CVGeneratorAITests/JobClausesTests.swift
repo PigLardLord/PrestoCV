@@ -153,4 +153,118 @@ struct JobClausesTests {
         #expect(text.contains("una mano con le consegne dei fornitori") == staysWhole, "\(text)")
         #expect(text.contains("Davo anche una mano con le consegne ai clienti."), "\(text)")
     }
+
+    // MARK: A duty said again in another tense, or under another job (#362)
+
+    private static func maintenance(quotes: [String?]) -> CVData {
+        CVData(experience: [
+            job("operaio manutentore", "Conserve Albarella", from: "2010", to: "2014", description: quotes[0]),
+            job("manutentore elettromeccanico", "Pastificio Cerreto", from: "2014", to: "2018", description: quotes[1]),
+            job("manutentore elettromeccanico", "Molino Fontebasso", from: "2018", to: "2020", description: quotes[2]),
+            job("capoturno della manutenzione", "Birrificio Valtrigno", from: "2020", description: quotes[3]),
+        ])
+    }
+
+    private static let belts = "Riparavo i nastri trasportatori."
+    private static let panels = "Controllavo i quadri elettrici e programmavo la manutenzione preventiva."
+    private static let crew = "Coordino tre tecnici."
+    private static let noText: [String?] = [nil, nil, nil, nil]
+
+    struct TextRow: Sendable, CustomTestStringConvertible {
+        let name: String
+        let quotes: [String?]
+        let duties: [String?]
+        let texts: [String]
+        var testDescription: String { name }
+    }
+
+    static let textRows: [TextRow] = [
+        TextRow(
+            name: "a quote in the present of a said duty",
+            quotes: [nil, "Controllo i quadri elettrici e programmo la manutenzione preventiva.", nil, nil], duties: noText,
+            texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a quote in the present of a part of a said duty", quotes: [nil, "Controllo i quadri elettrici.", nil, nil],
+            duties: noText, texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a quote with a gerund of a part of a said duty", quotes: [nil, "controllando i quadri elettrici", nil, nil],
+            duties: noText, texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a quote in the present of an ended job's said duty", quotes: ["Riparo i nastri trasportatori.", nil, nil, nil],
+            duties: noText, texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a quote that copies another job's said duty", quotes: [nil, nil, nil, "Riparo i nastri trasportatori."],
+            duties: noText, texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a written duty that copies another job's said duty", quotes: noText,
+            duties: [nil, nil, nil, "Riparo i nastri trasportatori."], texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "a written duty that copies the tail two other jobs share", quotes: noText,
+            duties: ["Controllavo i quadri elettrici.", nil, nil, nil], texts: [belts, panels, panels, crew]
+        ),
+        TextRow(
+            name: "duties with the verb of a said duty and other objects", quotes: [nil, "Controllavo la qualità dei pezzi.", nil, nil],
+            duties: [nil, nil, "Controllavo la qualità delle saldature.", "Controllo la manutenzione. Controllo la qualità dei pezzi."],
+            texts: [
+                belts, "Controllavo la qualità dei pezzi. " + panels, panels + " Controllavo la qualità delle saldature.",
+                crew + " Controllo la manutenzione. Controllo la qualità dei pezzi.",
+            ]
+        ),
+    ]
+
+    @Test("A job says a duty once, in its own tense, and says no duty the person said only for another job; other duties stay (#362)",
+          arguments: textRows)
+    func dutySaidOnce(row: TextRow) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let written = DraftWriting(summary: nil, roleDescriptions: row.duties, technologies: [], softSkills: [])
+
+        let result = try sanitizer.sanitize(Self.maintenance(quotes: row.quotes), writing: written, against: Self.italian)
+        let texts: [String] = result.experience.map { $0.description ?? "" }
+
+        #expect(texts == row.texts)
+    }
+
+    @Test("A written duty that copies, in any tense, a duty the person said only for another job goes; a shared tail and another object stay (#362)",
+          arguments: [
+              (3, "Riparo i nastri trasportatori.", false),
+              (0, "Controllavo i quadri elettrici.", false),
+              (0, "Sostituivo i cuscinetti dei motori.", true),
+              (2, "Controllavo la qualità delle saldature.", true),
+              (3, "Controllo la manutenzione dei forni.", true),
+              (3, "Sostituisco i nastri trasportatori.", true),
+          ])
+    func dutyOfAnotherJob(index: Int, duty: String, stays: Bool) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+
+        let verdicts = try sanitizer.dutyCheck(of: Self.maintenance(quotes: Self.noText), job: index, duties: duty, against: Self.italian)
+
+        #expect(verdicts.kept == (stays ? [duty] : []), "\(verdicts.rejected)")
+        #expect(verdicts.rejected.map(\.reason) == (stays ? [] : ["it says what the person did at another job"]))
+    }
+
+    private static let spareParts = """
+        Dal 2015 al 2019 ho fatto il magazziniere all'Officina Ferrante di Isernia, dove ho aiutato con gli ordini dei ricambi.
+        """
+
+    @Test("A duty on the object of a said duty with another verb is another duty: it stays beside the person's, quoted or written (#362)",
+          arguments: [
+              (nil, "Gestivo gli ordini dei ricambi.", "Ho aiutato con gli ordini dei ricambi. Gestivo gli ordini dei ricambi."),
+              ("Gestivo gli ordini dei ricambi.", nil, "Gestivo gli ordini dei ricambi. Ho aiutato con gli ordini dei ricambi."),
+          ] as [(String?, String?, String)])
+    func dutyWithAnotherVerb(quote: String?, duty: String?, text: String) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let draft = CVData(experience: [Self.job("magazziniere", "Officina Ferrante", from: "2015", to: "2019", description: quote)])
+        let written = DraftWriting(summary: nil, roleDescriptions: [duty], technologies: [], softSkills: [])
+
+        let result = try sanitizer.sanitize(draft, writing: written, against: Self.spareParts)
+        let texts: [String] = result.experience.map { $0.description ?? "" }
+
+        #expect(texts == [text])
+    }
 }

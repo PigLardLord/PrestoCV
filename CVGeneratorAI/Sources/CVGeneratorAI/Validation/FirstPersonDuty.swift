@@ -51,7 +51,8 @@ enum FirstPersonDuty {
         .portuguese: Endings(gerunds: ["ar"], past: ["ar": ["ava"]], present: ["ar": ["o"]], exceptions: ["estar"], unwritten: ["er", "ir"]),
     ]
 
-    private static let joiners: Set<String> = ["e", "ed", "y", "and"]
+    /// The words that join two parts of a duty.
+    static let joiners: Set<String> = ["e", "ed", "y", "and"]
     /// English words in -ing that are no gerund of a duty.
     private static let notGerunds: Set<String> = [
         "bring", "string", "spring", "swing", "sling", "sting", "during", "nothing", "something", "everything", "anything", "morning", "evening", "ceiling",

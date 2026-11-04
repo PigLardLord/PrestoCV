@@ -596,6 +596,48 @@ extension CVDataSanitizer {
         return words.dropFirst(auxiliaries.contains(first) || germanAuxiliaries.contains(first) ? 2 : 1)
     }
 
+    /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb, by its first four
+    /// letters, opens a clause of `duty`, and each word of 5 letters or more after it that names a work (no idle word), by its
+    /// first four letters, is a word of `duty`. "Controllo i quadri elettrici" says "Controllavo i quadri elettrici e programmavo la
+    /// manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another duty with the same verb, and "Gestivo gli ordini
+    /// dei ricambi" another duty on the same object, which may state more than the person said ("Ho aiutato con gli ordini dei
+    /// ricambi").
+    static func saysTheDuty(_ sentence: String, _ duty: String) -> Bool {
+        let objects: Set<String> = Set(
+            objectWords(of: sentence).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(4)) }
+        )
+        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(String(verb.prefix(4))) else {
+            return false
+        }
+        return objects.isSubset(of: stems(of: duty))
+    }
+
+    /// The verbs that open the clauses of `duty`, by their first four letters: its first, and the first after a comma or a joiner
+    /// ("e", "and").
+    private static func clauseVerbs(of duty: String) -> Set<String> {
+        var clauses: [[String]] = []
+        var previous: String?
+        for token in duty.split(whereSeparator: \.isWhitespace).map(String.init) {
+            let opensAClause = previous.map {
+                $0.hasSuffix(",") || FirstPersonDuty.joiners.contains(letterWords(of: $0).joined())
+            } ?? true
+            if opensAClause { clauses.append([]) }
+            clauses[clauses.count - 1].append(token)
+            previous = token
+        }
+        return Set(clauses.compactMap { dutyVerb(of: $0.joined(separator: " ")).map { String($0.prefix(4)) } })
+    }
+
+    /// The verb of a duty after its subject, lowercased: the participle after an auxiliary ("Ho riparato"), the last word after a
+    /// German one.
+    private static func dutyVerb(of duty: String) -> String? {
+        var words = letterWords(of: duty)[...]
+        while let first = words.first, subjectWords.contains(first) { words = words.dropFirst() }
+        guard let first = words.first else { return nil }
+        if germanAuxiliaries.contains(first) { return words.dropFirst().last }
+        return auxiliaries.contains(first) ? words.dropFirst().first : first
+    }
+
     /// The form a duty starts with (ADR 0031): one job's text keeps one.
     enum DutyForm: Equatable, Sendable {
         /// "I plan the menus".
@@ -664,8 +706,8 @@ extension CVDataSanitizer {
 
     /// The rule a job's duty passes (ADR 0031, D3 and D4): a sentence that quotes, with no number, a clause of this job alone is the
     /// person's own; any other states no fact (`WrittenText`), names no other job's title whole, and restates no sentence of the
-    /// description about another employer, nor says the person is, or works as, what none of the person's titles names
-    /// (`RoleAssertion`; #354, the final gate).
+    /// description about another employer, nor copies in any tense a duty the person said only for another job (`saysTheDuty`,
+    /// #362), nor says the person is, or works as, what none of the person's titles names (`RoleAssertion`; #354, the final gate).
     struct DutyRule {
         let evidence: EntryEvidence
         private let job: Entries.Job
@@ -678,6 +720,9 @@ extension CVDataSanitizer {
         private let source: DescriptionText
         private let written: WrittenText
         private let generalQuotes: ProseQuotes?
+        /// The parts of the duties the person said for another job and not for this one: a part two jobs of a chain share is
+        /// the person's own at both (ADR 0031, D3).
+        private let otherDuties: [String]
 
         /// `takesGeneralDuties` when the job is the current one, which takes the duties the person said with no job (ADR 0031, D7):
         /// a sentence that quotes them is then the person's own too.
@@ -698,6 +743,10 @@ extension CVDataSanitizer {
             otherEmployers = otherJobs.compactMap(\.company)
             self.source = source
             self.written = written
+            let ownDuties: Set<String> = Set(
+                (entries.pinnedDuties(of: job.subject) + (takesGeneralDuties ? entries.generalDuties() : [])).flatMap(\.parts)
+            )
+            otherDuties = otherJobs.flatMap { entries.pinnedDuties(of: $0.subject).flatMap(\.parts) }.filter { !ownDuties.contains($0) }
         }
 
         /// Whether `sentence` quotes, with no number, the clauses of this job alone: then it is the person's own.
@@ -721,6 +770,9 @@ extension CVDataSanitizer {
                 return "the word \"\(word)\" comes from an employer's name: say the work in other words"
             }
             if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 }) {
+                return "it says what the person did at another job"
+            }
+            if otherDuties.contains(where: { CVDataSanitizer.saysTheDuty(sentence, $0) }) {
                 return "it says what the person did at another job"
             }
             // Last, so that a word the other checks name ("certified") is the reason the model reads.
