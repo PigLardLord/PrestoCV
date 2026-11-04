@@ -27,6 +27,18 @@ struct JobClausesTests {
         Dal 2020 sono capoturno della manutenzione al Birrificio Valtrigno di Campobasso, dove coordino tre tecnici.
         """
 
+    /// The dictionary `italian` needs: the check that writes a gerund in the first person reads "controllando" as one only when no
+    /// dictionary has a verb of another form for it (#362), as none has.
+    static let italianWords = TableWordList.knowingNoVerb(of: ["controllando", "programmando"])
+
+    /// A sanitizer that reads every text as `language`, whatever the device guesses; the Italian one has `italianWords`.
+    private static func makeSanitizer(in language: String) -> CVDataSanitizer {
+        CVDataSanitizer(
+            languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]),
+            wordList: language == "it" ? italianWords : TableWordList()
+        )
+    }
+
     private static func job(
         _ title: String, _ company: String, from start: String, to end: String? = nil, description: String? = nil
     ) -> Experience {
@@ -142,7 +154,7 @@ struct JobClausesTests {
               ("sistemando gli scaffali, dando una mano con le consegne dei fornitori", true),
           ])
     func clauseSaidTwice(quote: String, staysWhole: Bool) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let sanitizer = Self.makeSanitizer(in: "it")
         let draft = CVData(experience: [Self.job("magazziniere", "Ferramenta Bruni", from: "2016", to: "2021", description: quote)])
         let written = DraftWriting(summary: nil, roleDescriptions: ["Controllavo le bolle di carico."], technologies: [], softSkills: [])
 
@@ -229,7 +241,7 @@ struct JobClausesTests {
     @Test("A job says a duty once, in its own tense, and says no duty the person said only for another job; other duties stay (#362)",
           arguments: textRows)
     func dutySaidOnce(row: TextRow) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let sanitizer = Self.makeSanitizer(in: "it")
         let written = DraftWriting(summary: nil, roleDescriptions: row.duties, technologies: [], softSkills: [])
 
         let result = try sanitizer.sanitize(Self.maintenance(quotes: row.quotes), writing: written, against: Self.italian)
@@ -238,24 +250,31 @@ struct JobClausesTests {
         #expect(texts == row.texts)
     }
 
+    struct AnotherJobRow: Sendable, CustomTestStringConvertible {
+        let job: Int
+        let duty: String
+        let stays: Bool
+        var testDescription: String { "job \(job): \(duty)" }
+    }
+
     @Test("A written duty that copies, in any tense, a duty the person said only for another job goes; a shared tail and another object stay (#362)",
           arguments: [
-              (3, "Riparo i nastri trasportatori.", false),
-              (0, "Controllavo i quadri elettrici.", false),
-              (0, "Sostituivo i cuscinetti dei motori.", true),
-              (2, "Controllavo la qualità delle saldature.", true),
-              (3, "Controllo la manutenzione dei forni.", true),
-              (3, "Sostituisco i nastri trasportatori.", true),
-              (0, "Progettavo la manutenzione preventiva.", true),
-              (3, "Ripasso i nastri trasportatori.", true),
+              AnotherJobRow(job: 3, duty: "Riparo i nastri trasportatori.", stays: false),
+              AnotherJobRow(job: 0, duty: "Controllavo i quadri elettrici.", stays: false),
+              AnotherJobRow(job: 0, duty: "Sostituivo i cuscinetti dei motori.", stays: true),
+              AnotherJobRow(job: 2, duty: "Controllavo la qualità delle saldature.", stays: true),
+              AnotherJobRow(job: 3, duty: "Controllo la manutenzione dei forni.", stays: true),
+              AnotherJobRow(job: 3, duty: "Sostituisco i nastri trasportatori.", stays: true),
+              AnotherJobRow(job: 0, duty: "Progettavo la manutenzione preventiva.", stays: true),
+              AnotherJobRow(job: 3, duty: "Ripasso i nastri trasportatori.", stays: true),
           ])
-    func dutyOfAnotherJob(index: Int, duty: String, stays: Bool) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+    func dutyOfAnotherJob(row: AnotherJobRow) throws {
+        let verdicts = try Self.makeSanitizer(in: "it").dutyCheck(
+            of: Self.maintenance(quotes: Self.noText), job: row.job, duties: row.duty, against: Self.italian
+        )
 
-        let verdicts = try sanitizer.dutyCheck(of: Self.maintenance(quotes: Self.noText), job: index, duties: duty, against: Self.italian)
-
-        #expect(verdicts.kept == (stays ? [duty] : []), "\(verdicts.rejected)")
-        #expect(verdicts.rejected.map(\.reason) == (stays ? [] : ["it says what the person did at another job"]))
+        #expect(verdicts.kept == (row.stays ? [row.duty] : []), "\(verdicts.rejected)")
+        #expect(verdicts.rejected.map(\.reason) == (row.stays ? [] : ["it says what the person did at another job"]))
     }
 
     // MARK: What a sentence needs to say a duty again (#362)
@@ -390,9 +409,7 @@ struct JobClausesTests {
               DutyRow(language: "pt", job: 3, duty: "Corto as portas dos armários.", stays: true),
           ])
     func joinedDutyOfAnotherJob(row: DutyRow) throws {
-        let sanitizer = CVDataSanitizer(
-            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
-        )
+        let sanitizer = Self.makeSanitizer(in: row.language)
         let (jobs, description) = Self.staff(row.language)
 
         let verdicts = try sanitizer.dutyCheck(of: jobs, job: row.job, duties: row.duty, against: description)
@@ -431,9 +448,7 @@ struct JobClausesTests {
               TenseRow(language: "pt", job: 0, duty: "Limpeza das ferramentas.", outcome: .neverForTheTense),
           ])
     func thirdPersonTense(row: TenseRow) throws {
-        let sanitizer = CVDataSanitizer(
-            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
-        )
+        let sanitizer = Self.makeSanitizer(in: row.language)
         let (jobs, description) = Self.staff(row.language)
 
         let verdicts = try sanitizer.dutyCheck(
@@ -495,9 +510,7 @@ struct JobClausesTests {
               ),
           ])
     func dutyAfterThePlace(row: PinRow) throws {
-        let sanitizer = CVDataSanitizer(
-            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
-        )
+        let sanitizer = Self.makeSanitizer(in: row.language)
         let jobs = CVData(experience: [Self.job(row.title, row.company, from: "2009", to: "2013")])
 
         let verdicts = try sanitizer.dutyCheck(of: jobs, job: 0, duties: nil, against: row.sentence)
@@ -508,7 +521,7 @@ struct JobClausesTests {
     @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
           arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
     func dutyOfAJobBeforeItsPlace(duty: String) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let sanitizer = Self.makeSanitizer(in: "es")
 
         let verdicts = try sanitizer.dutyCheck(of: Self.staff("es").jobs, job: 3, duties: duty, against: Self.placedMechanic)
 
@@ -525,7 +538,7 @@ struct JobClausesTests {
               (3, "Atiendo a los clientes del taller.", "Atiendo a los clientes del taller. Reparto el trabajo del equipo."),
           ] as [(Int, String, String)])
     func whereTheJobsWere(job: Int, quote: String, text: String) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let sanitizer = Self.makeSanitizer(in: "es")
         let jobs = Self.staff("es").jobs.experience.enumerated().map { index, entry in
             Self.job(entry.title, entry.company, from: entry.startDate ?? "", to: entry.endDate, description: index == job ? quote : nil)
         }
@@ -549,7 +562,7 @@ struct JobClausesTests {
               ("Gestivo gli ordini dei ricambi.", nil, "Gestivo gli ordini dei ricambi. Ho aiutato con gli ordini dei ricambi."),
           ] as [(String?, String?, String)])
     func dutyWithAnotherVerb(quote: String?, duty: String?, text: String) throws {
-        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let sanitizer = Self.makeSanitizer(in: "it")
         let draft = CVData(experience: [Self.job("magazziniere", "Officina Ferrante", from: "2015", to: "2019", description: quote)])
         let written = DraftWriting(summary: nil, roleDescriptions: [duty], technologies: [], softSkills: [])
 

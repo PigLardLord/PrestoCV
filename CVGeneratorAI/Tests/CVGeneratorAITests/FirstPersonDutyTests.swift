@@ -7,6 +7,9 @@ import Testing
 struct FirstPersonDutyTests {
     private let words = TableWordList()
 
+    /// A dictionary with no verb for the gerunds of the Italian tests below ("controllando", "programmando", "usando"), as none has.
+    private let gerunds = TableWordList.knowingNoVerb(of: ["controllando", "programmando", "usando"])
+
     @Test("An English gerund duty of a past job is written after I was")
     func englishPastGerund() {
         let duty = FirstPersonDuty.written(
@@ -30,20 +33,20 @@ struct FirstPersonDutyTests {
     @Test("Each Italian gerund that opens a part is written in the imperfect for a past job")
     func italianPastGerunds() {
         let duty = FirstPersonDuty.written(
-            "controllando i quadri elettrici e programmando la manutenzione preventiva.", current: false, language: .italian, wordList: words
+            "controllando i quadri elettrici e programmando la manutenzione preventiva.", current: false, language: .italian, wordList: gerunds
         )
         #expect(duty == "Controllavo i quadri elettrici e programmavo la manutenzione preventiva.")
     }
 
     @Test("Each Italian gerund is written in the present for the current job")
     func italianPresentGerunds() {
-        let duty = FirstPersonDuty.written("controllando i quadri, programmando i turni.", current: true, language: .italian, wordList: words)
+        let duty = FirstPersonDuty.written("controllando i quadri, programmando i turni.", current: true, language: .italian, wordList: gerunds)
         #expect(duty == "Controllo i quadri, programmo i turni.")
     }
 
     @Test("A word that ends as a gerund after an article keeps its form")
     func italianNounKept() {
-        let duty = FirstPersonDuty.written("usando il comando del quadro.", current: false, language: .italian, wordList: words)
+        let duty = FirstPersonDuty.written("usando il comando del quadro.", current: false, language: .italian, wordList: gerunds)
         #expect(duty == "Usavo il comando del quadro.")
     }
 
@@ -107,7 +110,7 @@ struct FirstPersonDutyTests {
 
     @Test("A gerund whose first person the word list does not know keeps the duty as the person said it")
     func unknownFormKept() {
-        let list = TableWordList(names: ["controllavo"])
+        let list = TableWordList.knowingNoVerb(of: ["controllando"], nor: ["controllavo"])
         let duty = FirstPersonDuty.written("controllando i quadri elettrici.", current: false, language: .italian, wordList: list)
         #expect(duty == "Controllando i quadri elettrici.")
     }
@@ -131,7 +134,7 @@ struct FirstPersonDutyTests {
 
     @Test("A gerund that opens a duty is still written in the job's first person, and a first person in -endo after it keeps its words (#362)")
     func openingGerundWritten() {
-        let list = TableWordList.knowingNoVerb(of: ["programmando"], nor: [])
+        let list = TableWordList.knowingNoVerb(of: ["programmando"])
 
         #expect(FirstPersonDuty.written("Programmando la manutenzione.", current: false, language: .italian, wordList: list)
             == "Programmavo la manutenzione.")
@@ -143,7 +146,7 @@ struct FirstPersonDutyTests {
 
     @Test("A gerund that opens a later part of a duty in the first person, after a joiner, or after an infinitive, is written in the job's first person (#362)")
     func laterGerundWritten() {
-        let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"], nor: [])
+        let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"])
 
         #expect(FirstPersonDuty.written("Controllavo i quadri e programmando la manutenzione.", current: false, language: .italian, wordList: list)
             == "Controllavo i quadri e programmavo la manutenzione.")
@@ -275,7 +278,7 @@ struct FirstPersonDutyTests {
               ("Gerenciava os pedidos, coordenando os fornecedores.", false, .portuguese, "coordenando"),
           ] as [(String, Bool, Vocabulary.Language, String)])
     func gerundAfterACommaKept(duty: String, current: Bool, language: Vocabulary.Language, gerund: String) {
-        let list = TableWordList.knowingNoVerb(of: [gerund], nor: [])
+        let list = TableWordList.knowingNoVerb(of: [gerund])
 
         #expect(FirstPersonDuty.written(duty, current: current, language: language, wordList: list) == duty)
         #expect(!FirstPersonDuty.joinsAGerund(duty, language: language, wordList: list))
@@ -283,7 +286,7 @@ struct FirstPersonDutyTests {
 
     @Test("A gerund after a comma keeps its words when a part before it is no gerund of the list, or the duty opens with an infinitive; after a joiner it is still written (#362)")
     func gerundAfterACommaOutsideAList() {
-        let list = TableWordList.knowingNoVerb(of: ["programmando", "revisando"], nor: [])
+        let list = TableWordList.knowingNoVerb(of: ["controllando", "programmando", "revisando"])
 
         #expect(FirstPersonDuty.written(
             "Controllando i quadri e prendo le misure, programmando i turni.", current: true, language: .italian, wordList: list

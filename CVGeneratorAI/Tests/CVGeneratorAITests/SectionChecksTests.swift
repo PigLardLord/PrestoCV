@@ -7,7 +7,7 @@ import Testing
 /// trade and date is invented.
 @Suite("The checks of a draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionChecksTests {
-    private let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList())
+    private let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: JobClausesTests.italianWords)
 
     /// A sanitizer that reads every text as Italian: without it, the language of a description is the device's guess, which some
     /// platforms do not make.
@@ -699,8 +699,8 @@ struct SectionChecksTests {
 
     @Test("A duty in the first person with a later part that opens with a gerund it cannot write goes; a later first person in -ndo stays (#362)")
     func dutyJoiningAGerund() throws {
-        let unknown: Set<String> = ["preparandare", "preparandere", "preparandire", "preparo", "preparavo"]
-        let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList(names: TableWordList.inventedNames.union(unknown)))
+        let words = TableWordList.knowingNoVerb(of: ["preparando"], nor: ["preparo", "preparavo"])
+        let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: words)
         let ended = try sanitizer.dutyCheck(
             of: Self.clerkJob, job: 0, duties: "Controllavo i pagamenti dei fornitori e preparando i documenti per la banca.",
             against: Self.clerk
