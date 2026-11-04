@@ -664,6 +664,38 @@ struct SectionChecksTests {
         #expect(ended.kept == ["Spesso controllavo i pagamenti dei fornitori."])
     }
 
+    struct OpeningWordRow: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        let duty: String
+        var testDescription: String { duty }
+    }
+
+    /// The first word of each is no verb: read as the verb, "Sempre", "Siempre", "Também" and the like give no tense (#362).
+    static let presentAfterAnOpening: [OpeningWordRow] = [
+        OpeningWordRow(language: .italian, duty: "Spesso controllo i conti."),
+        OpeningWordRow(language: .italian, duty: "Sempre controllo i conti."),
+        OpeningWordRow(language: .italian, duty: "Inoltre controllo i conti."),
+        OpeningWordRow(language: .spanish, duty: "Siempre reviso las facturas."),
+        OpeningWordRow(language: .spanish, duty: "Además reviso las facturas."),
+        OpeningWordRow(language: .portuguese, duty: "Também atendo os clientes."),
+        OpeningWordRow(language: .portuguese, duty: "Depois atendo os clientes."),
+    ]
+
+    @Test("A duty in the present that opens with a word before its verb is in the present, whatever the word ends as (#362)",
+          arguments: presentAfterAnOpening)
+    func presentAtTheVerb(row: OpeningWordRow) {
+        #expect(CVDataSanitizer.dutyTense(of: row.duty, language: row.language) == .present)
+    }
+
+    @Test("An ended job drops a duty in the present that opens with a word before its verb (#362)",
+          arguments: ["Spesso controllo i pagamenti dei fornitori.", "Sempre controllo i pagamenti dei fornitori."])
+    func presentAfterAnOpeningWord(duty: String) throws {
+        let ended = try sanitizer.dutyCheck(of: Self.clerkJob, job: 0, duties: duty, against: Self.clerk)
+
+        #expect(ended.kept.isEmpty)
+        #expect(ended.rejected.map(\.reason) == [CVDataSanitizer.presentAtEndedJobReason])
+    }
+
     struct ThirdPersonRow: Sendable, CustomTestStringConvertible {
         let language: Vocabulary.Language
         let duty: String
