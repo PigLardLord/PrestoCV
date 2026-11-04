@@ -43,9 +43,11 @@
 - **1.0.1 can fix the draft the owner tried.** #363, #362 and #359 are bugs of the published draft. #359 names the trade-tools source as the lever for its first item, the tools that are verbs, concepts or the machines of another job. That source corrects what the draft writes, so it is a fix under this rule.
 - **Features wait for the new stack:**
   - #356, which fills the draft in on screen as each part is ready: it is a new way to show a result;
-  - the 1.1 import (#167, #166, #265: a PDF or a scan, LinkedIn's archive, other files): it is a new way to bring a CV in.
+  - the 1.1 import, the forms that version 1 does not read (#167, #166, #265: a scan, LinkedIn's archive, other files): each is a new way to bring a CV in.
 
     Its readers can be built in the new targets, such as `PrestoCVImporting`, at any time. It reaches users only after migration step 5, because offering it in the legacy app would change a legacy target for a feature.
+
+    The import that version 1 has, pasted text and text PDFs ([ADR 0027](0027-import-a-cv-from-its-text-with-rules.md), phase F1), is a version 1 feature: a bug in it is fixed like any other.
 - **A fix's test moves with its code.** When the code a fix covers moves to the new stack (steps 5 and 6), its test moves too, so the switch does not bring the bug back.
 - **"Frozen" in ADR 0030 and #325 now means this ADR's rule.** A fix leaves the legacy code's direct `os.Logger` calls as they are: they move to the interface with their code ([ADR 0030](0030-log-through-one-interface-that-carries-no-cv-content.md)). #325 covers only the new targets, so it does not change.
 - **No check enforces it.** The checker cannot tell a fix from a feature, and it does not see the legacy targets. The review of each legacy change checks three things, once, against the review checklist, as ADR 0022 said:
