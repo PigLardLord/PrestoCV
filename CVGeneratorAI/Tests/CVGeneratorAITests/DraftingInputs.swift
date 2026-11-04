@@ -5,8 +5,8 @@ import Testing
 struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
     enum Kind: String, Codable, CaseIterable, Sendable {
         case name, title, employer, school, language, skill
-        /// A duty the person states in no job's sentence ("I mix on digital consoles"): kept by a job's description or a skill
-        /// (#354, round 1).
+        /// A duty the person states, in a job's sentence ("where I rigged the lights") or in none ("I mix on digital consoles"):
+        /// kept by a job's description or a skill (#354, round 1). Each input with four jobs states the duties of its jobs (#362).
         case duty
         /// A quality the person states of themselves ("calm under pressure"): kept by a skill.
         case quality
@@ -610,6 +610,8 @@ enum DraftingInputs {
                 .title("Vorarbeiterin"), .title("Landschaftsgärtnerin"), .title("Gärtnerhelferin"),
                 .employer("Baumschule Lindenhof", "Lindenhof"), .employer("Gartenbau Mertens", "Mertens"),
                 .employer("Grünwerk Sauer", "Grünwerk"), .employer("Stadtgärtnerei Hollerbach", "Hollerbach"),
+                .duty("Jungpflanzen"), .duty("Beete"), .duty("Pflasterflächen"), .duty("Bewässerungsanlagen"), .duty("Baumpflege"),
+                .duty("Kolonne"), .duty("Parkanlagen"),
             ],
             traps: ["Bauleiterin"]
         ),
@@ -629,6 +631,8 @@ enum DraftingInputs {
                 .title("jefe de taller"), .title("mecánico"), .title("ayudante de taller"),
                 .employer("Talleres Ribera", "Ribera"), .employer("Autos Montaner", "Montaner"),
                 .employer("Garaje Lozano", "Lozano"), .employer("Concesionario Valdeolmos", "Valdeolmos"),
+                .duty("aceite"), .duty("neumáticos"), .duty("frenos"), .duty("averías del motor", "averías"), .duty("presupuestos"),
+                .duty("trabajo del equipo"), .duty("clientes"),
             ],
             traps: ["gerente de posventa"]
         ),
@@ -648,6 +652,8 @@ enum DraftingInputs {
                 .title("chef de réception"), .title("réceptionniste"), .title("auditrice de nuit"),
                 .employer("Hôtel des Tilleuls", "Tilleuls"), .employer("Résidence Belcourt", "Belcourt"),
                 .employer("Hôtel du Lac Vert", "Lac Vert"), .employer("Domaine de Mirabel", "Mirabel"),
+                .duty("clôture de caisse", "caisse"), .duty("téléphone"), .duty("réservations"), .duty("groupes"),
+                .duty("petits-déjeuners"), .duty("plannings"), .duty("réclamations"),
             ],
             traps: ["directrice d'hébergement"]
         ),
@@ -667,6 +673,8 @@ enum DraftingInputs {
                 .title("encarregado de carpintaria"), .title("carpinteiro"), .title("ajudante de marcenaria"),
                 .employer("Marcenaria Ipê", "Ipê"), .employer("Móveis Araucária", "Araucária"),
                 .employer("Oficina Tapajós", "Tapajós"), .employer("Construtora Serra Azul", "Serra Azul"),
+                .duty("peças"), .duty("chapas"), .duty("armários"), .duty("portas"), .duty("orçamentos"), .duty("coordeno a equipe"),
+                .duty("medidas das fôrmas", "fôrmas"),
             ],
             traps: ["mestre de obras"]
         ),

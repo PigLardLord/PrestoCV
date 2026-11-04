@@ -88,7 +88,7 @@ struct DraftingInputsTests {
         }
     }
 
-    @Test("A description with four jobs states no name, three titles and four employers, and the job the person looks for is its one trap",
+    @Test("A description with four jobs states no name, three titles, four employers and the duties of its jobs, and the job the person looks for is its one trap",
           arguments: DraftingInputs.languages)
     func factsOfFourJobs(_ language: String) throws {
         let input = try #require(try DraftingInputs.all().first { $0.language == language && $0.kind == .jobs })
@@ -98,6 +98,7 @@ struct DraftingInputsTests {
         #expect(!kinds.contains(.name) && !kinds.contains(.school) && !kinds.contains(.language), "\(input.id)")
         #expect(kinds.filter { $0 == .title }.count == 3, "\(input.id)")
         #expect(kinds.filter { $0 == .employer }.count == 4, "\(input.id)")
+        #expect(kinds.filter { $0 == .duty }.count >= 7, "\(input.id)")
         #expect(input.traps.count == 1, "\(input.id)")
         #expect(input.description.split(separator: "\n").count == 8, "\(input.id)")
     }

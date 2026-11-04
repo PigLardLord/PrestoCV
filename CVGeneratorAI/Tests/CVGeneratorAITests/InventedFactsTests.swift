@@ -269,6 +269,21 @@ struct InventedFactsTests {
         #expect(report.lost == input.facts.filter { [.skill, .duty].contains($0.kind) })
     }
 
+    @Test("A duty of the first of four jobs is lost when its description says only where the person worked, and kept when it says the duty, in every language (#362)",
+          arguments: LostDutyCase.all)
+    func dutyOfTheFirstJob(_ row: LostDutyCase) throws {
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(row.language)" })
+        var draft = Draft(faithfulTo: input)
+        draft.skills = []
+        draft.experience[0] = Experience(company: draft.experience[0].company, description: row.description)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+        let duties = { (facts: [ExpectedFact]) in Set(facts.filter { $0.kind == .duty }.map { $0.forms[0] }) }
+
+        #expect(duties(report.lost).isSuperset(of: row.lost), "\(report.lost)")
+        #expect(duties(report.kept).isSuperset(of: row.kept), "\(report.kept)")
+    }
+
     // MARK: - Helpers
 
     static func input(_ id: String) throws -> DraftingInput {
@@ -310,6 +325,35 @@ struct Draft {
             interests: interests
         )
     }
+}
+
+/// The description a draft writes for the first job of an input with four jobs, with the duties of that job it loses and keeps.
+struct LostDutyCase: Sendable, CustomTestStringConvertible {
+    let language: String
+    let description: String
+    var lost: Set<String> = []
+    var kept: Set<String> = []
+
+    var testDescription: String { "\(language): \(description)" }
+
+    static let all: [LostDutyCase] = [
+        LostDutyCase(language: "en", description: "I worked in theatres.", lost: ["lights", "trucks"]),
+        LostDutyCase(language: "en", description: "I rigged the lights and loaded the trucks.", kept: ["lights", "trucks"]),
+        LostDutyCase(language: "it", description: "Lavoro in fabbriche e stabilimenti.", lost: ["nastri trasportatori", "cuscinetti"]),
+        LostDutyCase(
+            language: "it", description: "Riparavo i nastri trasportatori e sostituivo i cuscinetti.", kept: ["nastri trasportatori", "cuscinetti"]
+        ),
+        LostDutyCase(language: "de", description: "Ich arbeite in Gärtnereien.", lost: ["Jungpflanzen", "Beete"]),
+        LostDutyCase(language: "de", description: "Ich habe Jungpflanzen umgetopft und die Beete gepflegt.", kept: ["Jungpflanzen", "Beete"]),
+        LostDutyCase(language: "es", description: "Trabajo en talleres y concesionarios.", lost: ["aceite", "neumáticos"]),
+        LostDutyCase(language: "es", description: "Cambiaba el aceite y montaba los neumáticos.", kept: ["aceite", "neumáticos"]),
+        LostDutyCase(language: "fr", description: "Je travaille dans des hôtels.", lost: ["clôture de caisse", "téléphone"]),
+        LostDutyCase(
+            language: "fr", description: "Je faisais la clôture de caisse et je répondais au téléphone.", kept: ["clôture de caisse", "téléphone"]
+        ),
+        LostDutyCase(language: "pt", description: "Trabalho em marcenarias.", lost: ["peças", "chapas"]),
+        LostDutyCase(language: "pt", description: "Lixava as peças e cortava as chapas.", kept: ["peças", "chapas"]),
+    ]
 }
 
 struct AccentCase: Sendable, CustomTestStringConvertible {
