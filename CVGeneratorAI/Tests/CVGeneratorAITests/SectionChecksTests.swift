@@ -1548,6 +1548,24 @@ struct SectionChecksTests {
         #expect(verdict.dropped.first { $0.sentence == "Team" }?.reason == "an empty word, not a quality")
     }
 
+    @Test("A bare word for a group of people is no soft skill in any language, with a capital, an accent or a full stop (#362)",
+          arguments: ["Squadra", "squadra.", "Equipo", "Équipe", "equipe", " Equipa ", "Mannschaft"])
+    func groupWordInAnyLanguage(word: String) {
+        let verdict = sanitizer.skillCheck(technologies: [], softSkills: [word], against: JobClausesTests.italian)
+
+        #expect(verdict.softSkills.isEmpty)
+        #expect(verdict.dropped.map(\.reason) == ["an empty word, not a quality"])
+    }
+
+    @Test("A phrase that says teamwork, in any language, is a soft skill (#362)",
+          arguments: ["Lavoro di squadra", "Trabajo en equipo", "Travail d'équipe", "Trabalho em equipa", "Teamarbeit", "Teamwork"])
+    func teamworkPhraseStays(phrase: String) {
+        let verdict = sanitizer.skillCheck(technologies: [], softSkills: [phrase], against: JobClausesTests.italian)
+
+        #expect(verdict.softSkills == [phrase])
+        #expect(verdict.dropped.isEmpty)
+    }
+
     @Test("Of two soft skills of one quality, care or teamwork, the second goes; qualities of other kinds stay (#354, round 2)")
     func oneQualityOnce() {
         let verdict = sanitizer.skillCheck(
