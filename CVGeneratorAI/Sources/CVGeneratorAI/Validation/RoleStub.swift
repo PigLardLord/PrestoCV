@@ -3,13 +3,15 @@ import Foundation
 /// A sentence of a job's description that says nothing but that the person held the job (#354): "Lavoro.", "Trabajé como auxiliar
 /// en una guardería.", "Sono stato aiuto cuoco." The first pass quotes such a sentence of the description as the job's text, and the
 /// draft shows it in front of the duties the second pass wrote, where it restates the title and the employer the job already shows.
+/// One that only says the person worked where the jobs were ("Trabajo en talleres y concesionarios.") says no more (#362).
 enum RoleStub {
     /// Whether every word of `sentence` is a function, time or modality word (`Vocabulary.isNeutral`), a form of "be" or an auxiliary,
-    /// a form of "work", or a word of `jobWords` (the job's title and employer, as `Word.folded` writes them).
+    /// a form of "work", or a word of `jobWords` (the jobs' titles and employers, as `Word.folded` writes them) or a form of one
+    /// ("concesionarios" of "Concesionario Valdeolmos").
     static func isStub(_ sentence: String, jobWords: Set<String>, language: Vocabulary.Language?) -> Bool {
         let words = Word.words(in: sentence)
         return !words.isEmpty && words.allSatisfy { word in
-            jobWords.contains(word.folded)
+            jobWords.contains(word.folded) || jobWords.contains { CVDataSanitizer.isAForm(word.folded, of: $0) }
                 || Vocabulary.isNeutral(word.folded, in: language)
                 || Vocabulary.isBeForm(word.accented, in: language)
                 || Vocabulary.isAuxiliary(word.accented, in: language)

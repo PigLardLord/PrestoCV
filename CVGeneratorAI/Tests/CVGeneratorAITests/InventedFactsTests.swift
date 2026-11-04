@@ -269,6 +269,60 @@ struct InventedFactsTests {
         #expect(report.lost == input.facts.filter { [.skill, .duty].contains($0.kind) })
     }
 
+    @Test("A duty of the first of four jobs is lost when its description says only where the person worked, and kept when it says the duty, in every language (#362)",
+          arguments: LostDutyCase.all)
+    func dutyOfTheFirstJob(_ row: LostDutyCase) throws {
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(row.language)" })
+        var draft = Draft(faithfulTo: input)
+        draft.skills = []
+        draft.experience[0] = Experience(company: draft.experience[0].company, description: row.description)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+        let duties = { (facts: [ExpectedFact]) in Set(facts.filter { $0.kind == .duty }.map { $0.forms[0] }) }
+
+        #expect(duties(report.lost).isSuperset(of: row.lost), "\(report.lost)")
+        #expect(duties(report.kept).isSuperset(of: row.kept), "\(report.kept)")
+    }
+
+    @Test("A duty counts under the job whose sentence states it: written under another job it is lost, and a duty of two jobs counts under either (#362)",
+          arguments: DutyJobCase.all)
+    func dutyUnderItsJob(_ row: DutyJobCase) throws {
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(row.language)" })
+        var draft = Draft(faithfulTo: input)
+        draft.skills = []
+        draft.experience[row.job] = Experience(company: draft.experience[row.job].company, description: row.description)
+
+        let report = InventedFacts.count(draft.cv, for: input)
+        let duties = { (facts: [ExpectedFact]) in Set(facts.filter { $0.kind == .duty }.map { $0.forms[0] }) }
+
+        #expect(duties(report.lost).isSuperset(of: row.lost), "lost \(report.lost)")
+        #expect(duties(report.kept).isSuperset(of: row.kept), "kept \(report.kept)")
+        #expect(duties(report.kept).isDisjoint(with: row.lost), "kept \(report.kept)")
+    }
+
+    @Test("A duty a skill names counts whatever job states it, and so does a duty the person states in no job's sentence (#362)",
+          arguments: DraftingInputs.languages)
+    func dutyOfASkill(_ language: String) throws {
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(language)" })
+        var draft = Draft(faithfulTo: input)
+        draft.skills = input.facts.filter { $0.kind == .duty }.map { Skill(name: $0.forms[0]) }
+
+        let report = InventedFacts.count(draft.cv, for: input)
+
+        #expect(report.lost.filter { $0.kind == .duty }.isEmpty, "\(report.lost)")
+    }
+
+    @Test("A duty the person states for two jobs is held under each: left out of one job it is lost for that job only, and kept for the other (#362)",
+          arguments: SharedDutyCase.all)
+    func dutyOfTwoJobs(_ row: SharedDutyCase) throws {
+        let made = try row.made()
+
+        let report = InventedFacts.count(made.cv, for: made.input)
+
+        #expect(made.places(of: report.lost) == row.places(written: false, in: made), "lost \(report.lost)")
+        #expect(made.places(of: report.kept) == row.places(written: true, in: made), "kept \(report.kept)")
+    }
+
     // MARK: - Helpers
 
     static func input(_ id: String) throws -> DraftingInput {
@@ -309,6 +363,167 @@ struct Draft {
             summary: summary, experience: experience, education: education, skills: skills, languages: languages,
             interests: interests
         )
+    }
+}
+
+/// The description a draft writes for the first job of an input with four jobs, with the duties of that job it loses and keeps.
+struct LostDutyCase: Sendable, CustomTestStringConvertible {
+    let language: String
+    let description: String
+    var lost: Set<String> = []
+    var kept: Set<String> = []
+
+    var testDescription: String { "\(language): \(description)" }
+
+    static let all: [LostDutyCase] = [
+        LostDutyCase(language: "en", description: "I worked in theatres.", lost: ["lights", "trucks"]),
+        LostDutyCase(language: "en", description: "I rigged the lights and loaded the trucks.", kept: ["lights", "trucks"]),
+        LostDutyCase(language: "it", description: "Lavoro in fabbriche e stabilimenti.", lost: ["nastri trasportatori", "cuscinetti"]),
+        LostDutyCase(
+            language: "it", description: "Riparavo i nastri trasportatori e sostituivo i cuscinetti.", kept: ["nastri trasportatori", "cuscinetti"]
+        ),
+        LostDutyCase(language: "de", description: "Ich arbeite in Gärtnereien.", lost: ["Jungpflanzen", "Beete"]),
+        LostDutyCase(language: "de", description: "Ich habe Jungpflanzen umgetopft und die Beete gepflegt.", kept: ["Jungpflanzen", "Beete"]),
+        LostDutyCase(language: "es", description: "Trabajo en talleres y concesionarios.", lost: ["aceite", "neumáticos"]),
+        LostDutyCase(language: "es", description: "Cambiaba el aceite y montaba los neumáticos.", kept: ["aceite", "neumáticos"]),
+        LostDutyCase(language: "fr", description: "Je travaille dans des hôtels.", lost: ["clôture de caisse", "téléphone"]),
+        LostDutyCase(
+            language: "fr", description: "Je faisais la clôture de caisse et je répondais au téléphone.", kept: ["clôture de caisse", "téléphone"]
+        ),
+        LostDutyCase(language: "pt", description: "Trabalho em marcenarias.", lost: ["peças", "chapas"]),
+        LostDutyCase(language: "pt", description: "Lixava as peças e cortava as chapas.", kept: ["peças", "chapas"]),
+    ]
+}
+
+/// A description a draft writes for one job of an input with four jobs, with the duties that count and the ones that do not: the
+/// last job's duties, written under the first job, and the duties of two jobs' one sentence, written under the third job.
+struct DutyJobCase: Sendable, CustomTestStringConvertible {
+    let language: String
+    /// The job whose description holds the text: its index among the employers of the input.
+    let job: Int
+    let description: String
+    var lost: Set<String> = []
+    var kept: Set<String> = []
+
+    var testDescription: String { "\(language), job \(job): \(description)" }
+
+    /// What a language says of the last job and of the two jobs of one sentence (the second and the third), in the first person.
+    struct Wording: Sendable {
+        let language: String
+        let last: String
+        let lastDuties: [String]
+        let shared: String
+        let sharedDuties: [String]
+    }
+
+    static let wordings: [Wording] = [
+        Wording(
+            language: "en", last: "I plan the sound design and train the junior technicians.", lastDuties: ["sound design", "junior technicians"],
+            shared: "I set up the PA systems and mixed the support acts.", sharedDuties: ["PA systems", "support acts"]
+        ),
+        Wording(
+            language: "it", last: "Coordino i tecnici e gestisco i fermi impianto.", lastDuties: ["tecnici", "fermi impianto"],
+            shared: "Controllavo i quadri elettrici e programmavo la manutenzione preventiva.",
+            sharedDuties: ["quadri elettrici", "manutenzione preventiva"]
+        ),
+        Wording(
+            language: "de", last: "Ich teile die Kolonne ein und plane die Pflege der Parkanlagen.", lastDuties: ["Kolonne", "Parkanlagen"],
+            shared: "Ich habe Pflasterflächen verlegt und Bewässerungsanlagen eingebaut.",
+            sharedDuties: ["Pflasterflächen", "Bewässerungsanlagen"]
+        ),
+        Wording(
+            language: "es", last: "Reparto el trabajo del equipo y atiendo a los clientes.", lastDuties: ["trabajo del equipo", "clientes"],
+            shared: "Revisaba los frenos y diagnosticaba averías del motor.", sharedDuties: ["frenos", "averías del motor"]
+        ),
+        Wording(
+            language: "fr", last: "J'organise les plannings de l'équipe et je traite les réclamations.", lastDuties: ["plannings", "réclamations"],
+            shared: "Je gérais les réservations et j'accueillais les groupes.", sharedDuties: ["réservations", "groupes"]
+        ),
+        Wording(
+            language: "pt", last: "Coordeno a equipe e confiro as medidas das fôrmas.", lastDuties: ["coordeno a equipe", "medidas das fôrmas"],
+            shared: "Montava armários e instalava portas.", sharedDuties: ["armários", "portas"]
+        ),
+    ]
+
+    private static let ofTheJobs: [DutyJobCase] = wordings.flatMap { (wording: Wording) -> [DutyJobCase] in
+        let language = wording.language
+        return [
+            DutyJobCase(language: language, job: 3, description: wording.last, kept: Set(wording.lastDuties)),
+            DutyJobCase(language: language, job: 0, description: wording.last, lost: Set(wording.lastDuties)),
+            DutyJobCase(language: language, job: 1, description: wording.shared, kept: Set(wording.sharedDuties)),
+            DutyJobCase(language: language, job: 2, description: wording.shared, kept: Set(wording.sharedDuties)),
+            DutyJobCase(language: language, job: 0, description: wording.shared, lost: Set(wording.sharedDuties)),
+            DutyJobCase(language: language, job: 3, description: wording.shared, lost: Set(wording.sharedDuties)),
+        ]
+    }
+
+    /// A duty the person states in no job's sentence counts under any job.
+    private static let ofNoJob: [DutyJobCase] = [
+        DutyJobCase(language: "en", job: 0, description: "I mix on digital consoles.", kept: ["digital consoles"]),
+        DutyJobCase(language: "en", job: 3, description: "I mix on digital consoles.", kept: ["digital consoles"]),
+        DutyJobCase(language: "it", job: 0, description: "Leggo gli schemi elettrici.", kept: ["schemi elettrici"]),
+    ]
+
+    static let all: [DutyJobCase] = ofTheJobs + ofNoJob
+}
+
+/// The sentence two jobs of an input share ("..., then at B ..., <duties>"), written as the description of none, one or both of them
+/// (a draft with no skills): each duty of the sentence is lost for a job whose description lacks it (#362).
+struct SharedDutyCase: Sendable, CustomTestStringConvertible {
+    let language: String
+    /// Which of the two jobs of the sentence (0 the first, 1 the second) have it as their description.
+    let writtenAt: Set<Int>
+
+    var testDescription: String { "\(language), written at \(writtenAt.sorted())" }
+
+    static let all: [SharedDutyCase] = DutyJobCase.wordings.flatMap { wording -> [SharedDutyCase] in
+        let rows: [Set<Int>] = [[], [0], [1], [0, 1]]
+        return rows.map { SharedDutyCase(language: wording.language, writtenAt: $0) }
+    }
+
+    /// What the row is about: the input, the draft, and the duties of the sentence with the employers of the two jobs that state them.
+    struct Made {
+        let input: DraftingInput
+        let cv: CVData
+        let duties: [String]
+        let jobs: [String]
+
+        /// The duties of the sentence among `facts`, each as "duty at employer", sorted.
+        func places(of facts: [ExpectedFact]) -> [String] {
+            var places: [String] = []
+            for fact in facts where duties.contains(fact.forms[0]) {
+                places.append("\(fact.forms[0]) at \(fact.jobs.joined(separator: ", "))")
+            }
+            return places.sorted()
+        }
+    }
+
+    func made() throws -> Made {
+        let wording = try #require(DutyJobCase.wordings.first { $0.language == language })
+        let input = try #require(DraftingInputs.jobs.first { $0.id == "jobs-\(language)" })
+        let first = try #require(input.facts.first { $0.forms[0] == wording.sharedDuties[0] })
+        let employers = input.facts.filter { $0.kind == .employer }
+        var draft = Draft(faithfulTo: input)
+        draft.skills = []
+        for position in writtenAt {
+            let job = try #require(employers.firstIndex { $0.forms.contains(first.jobs[position]) })
+            draft.experience[job] = Experience(company: draft.experience[job].company, description: wording.shared)
+        }
+        return Made(input: input, cv: draft.cv, duties: wording.sharedDuties, jobs: first.jobs)
+    }
+
+    /// The employers of the two jobs whose description holds the sentence (or does not).
+    func jobs(written: Bool, in made: Made) -> [String] {
+        made.jobs.indices.filter { writtenAt.contains($0) == written }.map { made.jobs[$0] }
+    }
+
+    /// Each duty of the sentence at those employers, as "duty at employer", sorted.
+    func places(written: Bool, in made: Made) -> [String] {
+        var places: [String] = []
+        for duty in made.duties {
+            for job in jobs(written: written, in: made) { places.append("\(duty) at \(job)") }
+        }
+        return places.sorted()
     }
 }
 

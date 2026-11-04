@@ -88,7 +88,7 @@ struct DraftingInputsTests {
         }
     }
 
-    @Test("A description with four jobs states no name, three titles and four employers, and the job the person looks for is its one trap",
+    @Test("A description with four jobs states no name, three titles, four employers and the duties of its jobs, and the job the person looks for is its one trap",
           arguments: DraftingInputs.languages)
     func factsOfFourJobs(_ language: String) throws {
         let input = try #require(try DraftingInputs.all().first { $0.language == language && $0.kind == .jobs })
@@ -98,8 +98,37 @@ struct DraftingInputsTests {
         #expect(!kinds.contains(.name) && !kinds.contains(.school) && !kinds.contains(.language), "\(input.id)")
         #expect(kinds.filter { $0 == .title }.count == 3, "\(input.id)")
         #expect(kinds.filter { $0 == .employer }.count == 4, "\(input.id)")
+        #expect(kinds.filter { $0 == .duty }.count >= 7, "\(input.id)")
         #expect(input.traps.count == 1, "\(input.id)")
         #expect(input.description.split(separator: "\n").count == 8, "\(input.id)")
+    }
+
+    @Test("A duty stated in a job's sentence names the employers of that sentence, as forms of the employer facts, and no other",
+          arguments: DraftingInputs.languages)
+    func dutiesNameTheirJobs(_ language: String) throws {
+        let input = try #require(try DraftingInputs.all().first { $0.language == language && $0.kind == .jobs })
+        let employers = input.facts.filter { $0.kind == .employer }
+        let lines = input.description.split(separator: "\n").map { DraftingInput.words(String($0)) }
+        func stated(_ phrase: String, in words: [String]) -> Bool {
+            let wanted = DraftingInput.words(phrase)
+            guard !wanted.isEmpty, wanted.count <= words.count else { return false }
+            return (0...(words.count - wanted.count)).contains { Array(words[$0..<($0 + wanted.count)]) == wanted }
+        }
+        for duty in input.facts where duty.kind == .duty && !duty.jobs.isEmpty {
+            let sentences: [[String]] = lines.filter { line in duty.forms.contains { stated($0, in: line) } }
+            let line: [String] = try #require(sentences.first, "\(input.id): \(duty)")
+            var named: Set<String> = []
+            for employer in employers where employer.forms.contains(where: { stated($0, in: line) }) { named.insert(employer.forms[0]) }
+            var declared: Set<String> = []
+            for job in duty.jobs {
+                if let employer = employers.first(where: { $0.forms.contains(job) }) { declared.insert(employer.forms[0]) }
+            }
+
+            #expect(sentences.count == 1, "\(input.id): \(duty) is stated in \(sentences.count) lines")
+            #expect(declared.count == duty.jobs.count, "\(input.id): \(duty) names a job that is no form of an employer fact")
+            #expect(named == declared, "\(input.id): \(duty) declares \(declared), its sentence names \(named)")
+        }
+        #expect(input.facts.filter { $0.kind != .duty }.allSatisfy { $0.jobs.isEmpty }, "\(input.id)")
     }
 
     @Test("No trap is a phrase of an expected fact, so a kept fact never counts as a trap",

@@ -124,11 +124,13 @@ extension CVDataSanitizer {
     }
 
     /// The duties of the job at `index` of `cvData.experience`, sentence by sentence: a sentence that is no whole sentence, that the
-    /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, or that is written in
-    /// another form than the job's first duty (`DutyForm`) goes with its reason. A duty typical of the job stays beside the person's,
-    /// and so does how often it is done, which is draft content under the owner's decision O1 (ADR 0031); a number still goes by
-    /// the rules. A duty said with a gerund is read, and kept, in the job's first
-    /// person (`FirstPersonDuty`).
+    /// rules drop (`DutyRule`), that says again a duty of `earlier`, of the person's or of an earlier sentence, that is written in
+    /// another form than the job's first duty (`DutyForm`), or that joins a gerund to a verb in the first person
+    /// (`FirstPersonDuty.joinsAGerund`, #362) goes with its reason. A duty in the present (`dutyTense`, in the third person too when
+    /// it says a duty the person said) of a job that is not current goes after a duty in the past; in a job the description says is over (`EntryEvidence.statesEnded`), it also goes before any
+    /// duty is held, and stays only beside duties held in the present and none in the past (#362). A duty typical of the job stays
+    /// beside the person's, and so does how often it is done, which is draft content under the owner's decision O1 (ADR 0031); a
+    /// number still goes by the rules. A duty said with a gerund is read, and kept, in the job's first person (`FirstPersonDuty`).
     func dutyCheck(
         of cvData: CVData, job index: Int, duties: String?, keeping earlier: [String] = [], against description: String
     ) throws(CVGenerationError) -> DutyVerdicts {
@@ -147,6 +149,7 @@ extension CVDataSanitizer {
                 source.written(sentence, quoting: quotes, allowsNumbers: true) { _ in false } != nil ? nil : rule.rejection(of: sentence)
             }
             let current = job.entry.current && rule.evidence.statesCurrent
+            let hasEnded = !current && rule.evidence.statesEnded
             let names = Self.ownNames(of: cvData)
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
@@ -159,6 +162,8 @@ extension CVDataSanitizer {
             var held = earlier + verdicts.pinned
             var form = held.first.flatMap { Self.form($0, language: language) }.flatMap { $0 == .infinitive ? nil : $0 }
             let quotes = rule.evidence.quotable.adding(rule.evidence.quotableByAchievements)
+            // A duty in the third person tells its tense when it says one of these (`dutyTense`, #362).
+            let stated = entries.jobs.flatMap { entries.pinnedDuties(of: $0.subject).flatMap(\.parts) } + entries.generalDuties().flatMap(\.parts)
             for raw in SentenceSplitter.sentences(in: duties ?? "") {
                 var sentence = FirstPersonDuty.written(
                     raw.trimmingCharacters(in: .whitespacesAndNewlines), current: current, language: language, wordList: wordList
@@ -190,6 +195,8 @@ extension CVDataSanitizer {
                     rejection = Self.repeatsWordsReason
                 } else if held.contains(where: { Self.namesAgain(sentence, $0, language: language) }) {
                     rejection = Self.namesAgainReason
+                } else if FirstPersonDuty.joinsAGerund(sentence, language: language, wordList: wordList) {
+                    rejection = Self.joinsAGerundReason
                 } else if let own = Self.form(sentence, language: language) {
                     if let form, form != own {
                         rejection = "it is written in another form: " + form.advice
@@ -199,9 +206,14 @@ extension CVDataSanitizer {
                         form = own
                     }
                 }
-                if rejection == nil, !current, Self.tense(of: sentence, language: language) == .present,
-                   held.contains(where: { Self.tense(of: $0, language: language) == .past }) {
-                    rejection = "it is in the present, and the job has ended: write it in the past, as the other duties"
+                if rejection == nil, !current, Self.dutyTense(of: sentence, language: language, stated: stated) == .present {
+                    // `held` grows with each duty that stays, so the tenses it holds are read here, when a duty is in the present.
+                    let heldTenses = Set(held.compactMap { Self.dutyTense(of: $0, language: language, stated: stated) })
+                    if heldTenses.contains(.past) {
+                        rejection = Self.presentAfterPastReason
+                    } else if hasEnded, !heldTenses.contains(.present) {
+                        rejection = Self.presentAtEndedJobReason
+                    }
                 }
                 if rejection == nil, let opening = Self.opening(of: sentence), held.count { Self.opening(of: $0) == opening } >= 2 {
                     rejection = Self.opensAsTwoEarlierOnes
@@ -219,6 +231,13 @@ extension CVDataSanitizer {
     }
 
     static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
+    static let joinsAGerundReason = "it joins a gerund to a verb in the first person: write each part in the first person"
+    /// Why a duty in the present of an ended job goes when the job holds a duty in the past (`dutyTense`, #362).
+    static let presentAfterPastReason = "it is in the present, and the job has ended: write it in the past, as the other duties"
+    /// Why a duty in the present of an ended job goes when the job holds no duty in the present (`dutyTense`, #362).
+    static let presentAtEndedJobReason = "it is in the present, and the job has ended: write it in the past"
+    /// Why a written duty goes that says what the person did at another job (`DutyRule.rejection(of:)`, #362).
+    static let atAnotherJobReason = "it says what the person did at another job"
 
     // MARK: Filler and vague duties (#354, round 11)
 
@@ -349,7 +368,7 @@ extension CVDataSanitizer {
         "funzionamento", "operazioni", "processi", "attivita", "gestione",
         "movimiento", "movimientos", "flujo", "flujos", "integridad", "calidad", "eficiencia", "continuidad", "funcionamiento",
         "operaciones", "procesos", "actividades",
-        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement", "operations",
+        "mouvement", "mouvements", "flux", "integrite", "qualite", "efficacite", "continuite", "fonctionnement",
         "processus", "activites",
         "fluxo", "fluxos", "integridade", "qualidade", "continuidade", "operacoes", "processos", "atividades",
         "bewegung", "ablauf", "ablaufe", "fluss", "integritat", "qualitat", "effizienz", "betrieb", "prozesse",
@@ -590,10 +609,128 @@ extension CVDataSanitizer {
 
     /// The words of a duty after its subject, auxiliary and verb, lowercased.
     private static func objectWords(of duty: String) -> ArraySlice<String> {
-        var words = letterWords(of: duty)[...]
-        while let first = words.first, subjectWords.contains(first) { words = words.dropFirst() }
-        guard let first = words.first else { return words }
-        return words.dropFirst(auxiliaries.contains(first) || germanAuxiliaries.contains(first) ? 2 : 1)
+        let words = wordsAfterTheSubject(of: duty)
+        return words.dropFirst(opensWithAnAuxiliary(words) ? 2 : 1)
+    }
+
+    /// Whether `words`, a clause of a duty after its subject, open with an auxiliary ("ho" of "ho riparato"): the verb is then the
+    /// word after it, or the last word of the clause after a German one (`germanAuxiliaries`, which `auxiliaries` holds too).
+    private static func opensWithAnAuxiliary(_ words: ArraySlice<String>) -> Bool {
+        words.first.map(auxiliaries.contains) ?? false
+    }
+
+    /// The words of a clause of a duty after its subject pronouns, lowercased. "i" is the English pronoun only as "I": in Italian
+    /// it is the article ("i quadri"), and the noun after it is no verb (#362).
+    private static func wordsAfterTheSubject(of clause: String) -> ArraySlice<String> {
+        var words = clause.split { !$0.isLetter }.map(String.init)[...]
+        while let first = words.first, first != "i", subjectWords.contains(first.lowercased()) { words = words.dropFirst() }
+        return ArraySlice(words.map { $0.lowercased() })
+    }
+
+    /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb is the verb of a
+    /// clause of `duty` (`isSameVerb`), each figure it holds is a figure of `duty`, and each word of 5 letters or more after the verb
+    /// that names a work (no idle word), by its first four letters, is a word of `duty`. "Controllo i quadri elettrici" says
+    /// "Controllavo i quadri elettrici e programmavo la manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another
+    /// duty with the same verb, "Gestivo gli ordini dei ricambi" another duty on the same object, which may state more than the
+    /// person said ("Ho aiutato con gli ordini dei ricambi"), and "Controllavo 40 quadri elettrici" another fact than
+    /// "Controllo i quadri elettrici": the figure is the sentence's own. Unlike `saysAgain`, which compares every word of the two by
+    /// its first four letters, and `restates`, which compares the words after the first whatever the verb, it needs the verb of the
+    /// duty's clause: the same object with another verb is another duty.
+    static func saysTheDuty(_ sentence: String, _ duty: String) -> Bool {
+        let objects: Set<String> = Set(
+            objectWords(of: sentence).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(4)) }
+        )
+        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(where: { isSameVerb(verb, $0) }),
+              figures(in: sentence).isSubset(of: figures(in: duty)) else {
+            return false
+        }
+        return objects.isSubset(of: stems(of: duty))
+    }
+
+    /// Whether `sentence` says again what the `duties` of its job say: all its words of three letters or more are words of the
+    /// duties, or it says one of them (`saysTheDuty`); either way each figure it holds is a figure of the duties, as a sentence
+    /// with a figure they lack states another fact (#362).
+    static func isRestated(_ sentence: String, by duties: [String]) -> Bool {
+        let text = duties.joined(separator: " ")
+        let inTheWords = figures(in: sentence).isSubset(of: figures(in: text))
+            && letterWords(of: sentence).filter { $0.count >= 3 }.allSatisfy(Set(letterWords(of: text)).contains)
+        return inTheWords || duties.contains { saysTheDuty(sentence, $0) }
+    }
+
+    /// The runs of digits of `text`: the figures it states.
+    private static func figures(in text: String) -> Set<String> {
+        Set(Digits.runs(in: Digits.ascii(text)))
+    }
+
+    /// The endings of a verb form: the present, the imperfect and the past, the gerund, the participle and the infinitive of the
+    /// six languages ("controllo", "controllavo", "controlla", "controllando", "controllato", "controllare"). A form of one verb
+    /// loses its ending, and the stem is the rest (`verbStems`).
+    private static let verbEndings: [String] = [
+        "avano", "evano", "ivano", "iscono", "ieron", "ábamos", "iendo", "aient", "ando", "endo", "indo", "aban", "aron", "aram",
+        "iram", "avam", "avas", "aste", "iste", "isco", "isci", "isce", "amos", "emos", "imos", "ions", "avo", "avi", "ava", "evo",
+        "evi", "eva", "ivo", "ivi", "iva", "ato", "ata", "ati", "ate", "uto", "ita", "iti", "ite", "ito", "ado", "ido", "aba",
+        "ías", "ían", "iam", "ant", "ing", "ais", "ait", "iez", "ons", "ano", "ono", "are", "ere", "ire", "ía", "ia", "ou", "eu",
+        "iu", "ió", "ed", "es", "en", "et", "st", "te", "ez", "ar", "er", "ir", "ai", "ei", "as", "é", "ó", "ò", "ì", "í", "e", "o",
+        "a", "i", "s", "t",
+    ]
+
+    /// The stems a verb form may have: the form whole, and the form without each of the endings it has (`verbEndings`), a doubled
+    /// consonant at the end of a stem once, so that "controllavo", "controllo" and "controlled" meet in "control". An ending never
+    /// takes the stem below three letters. A form has more than one, as an ending may be part of the stem of another form
+    /// ("montiere" is "montier" and "e", or "monti" and "ere").
+    private static func verbStems(_ verb: String) -> [String] {
+        let withoutAnEnding = verbEndings.filter { verb.hasSuffix($0) && verb.count - $0.count >= 3 }.map { String(verb.dropLast($0.count)) }
+        return ([verb] + withoutAnEnding).map { stem in
+            guard let last = stem.last, stem.count > 3, !"aeiouàèéìíòóù".contains(last), stem.dropLast().last == last else { return stem }
+            return String(stem.dropLast())
+        }
+    }
+
+    /// Whether two verb forms are of one verb (#362): a stem of one equals a stem of the other, or is it with one letter more. A
+    /// single letter ends a form in one language and belongs to the stem in another ("test" and "testing", "focus" and "focuses").
+    /// Two verbs that start with the same four letters are two ("collaudavo", "collegavo").
+    private static func isSameVerb(_ verb: String, _ other: String) -> Bool {
+        let others = verbStems(other)
+        return verbStems(verb).contains { stem in
+            others.contains { other in
+                let (short, long) = stem.count <= other.count ? (stem, other) : (other, stem)
+                return long.hasPrefix(short) && long.count - short.count <= 1
+            }
+        }
+    }
+
+    /// Whether `sentence`, or one of its clauses, says the duty `duty` (`saysTheDuty`, #362): "Ripara i nastri trasportatori e
+    /// sostituisce i cuscinetti" says "sostituivo i cuscinetti" in its second clause, as its words together are no single
+    /// duty's.
+    static func saysInAClause(_ sentence: String, _ duty: String) -> Bool {
+        ([sentence] + clauses(of: sentence)).contains { saysTheDuty($0, duty) }
+    }
+
+    /// The verbs that open the clauses of `duty`.
+    private static func clauseVerbs(of duty: String) -> [String] {
+        clauses(of: duty).compactMap { dutyVerb(of: $0) }
+    }
+
+    /// The clauses of `duty`: the words up to a comma or a joiner ("e", "and"), which ends the clause before the next.
+    private static func clauses(of duty: String) -> [String] {
+        var clauses: [[String]] = []
+        var previous: String?
+        for token in duty.split(whereSeparator: \.isWhitespace).map(String.init) {
+            let opensAClause = previous.map(FirstPersonDuty.opensAPart(after:)) ?? true
+            if opensAClause { clauses.append([]) }
+            clauses[clauses.count - 1].append(token)
+            previous = token
+        }
+        return clauses.map { $0.joined(separator: " ") }
+    }
+
+    /// The verb of a duty after its subject, lowercased: the participle after an auxiliary ("Ho riparato"), the last word after a
+    /// German one.
+    private static func dutyVerb(of duty: String) -> String? {
+        let words = wordsAfterTheSubject(of: duty)
+        guard let first = words.first else { return nil }
+        if germanAuxiliaries.contains(first) { return words.dropFirst().last }
+        return opensWithAnAuxiliary(words) ? words.dropFirst().first : first
     }
 
     /// The form a duty starts with (ADR 0031): one job's text keeps one.
@@ -645,9 +782,145 @@ extension CVDataSanitizer {
     /// The tense of a duty said in the first person (#354): an ended job's duties keep the past they started in.
     enum DutyTense: Equatable, Sendable { case past, present }
 
+    /// The tense of a duty at its verb, the one reader of it (`tense(of:language:)`, #362): after the words that come before it
+    /// ("Spesso controllavo", "Luego revisé", "Depois atendia"), after the clause that "quando" or "cuando" opens, up to its comma
+    /// ("Quando serviva, cambiavo"; nil for such a clause with no comma), and after a phrase that opens with a preposition or a
+    /// quantity ("Presso il reparto controllavo", "Tutto il giorno controllavo", "Como encargado atendía"), at the first verb the
+    /// vocabulary lists in it (`firstVerb`). A phrase with no listed verb, and a first word that is no opener and ends as no tense,
+    /// have none: the line stays. An ended job keeps a duty in the past that opens with one of them. A verb in the third person
+    /// counts when the duty says one of the duties in `stated` (`thirdPersonTense`).
+    static func dutyTense(of sentence: String, language: Vocabulary.Language?, stated: [String] = []) -> DutyTense? {
+        var rest = Substring(sentence)
+        while let opener = rest.split(whereSeparator: { !$0.isLetter }).first(where: { !wordsBeforeTheVerb.contains($0.lowercased()) }) {
+            if clauseOpeners.contains(opener.lowercased()) {
+                guard let comma = rest[opener.endIndex...].firstIndex(of: ",") else { return nil }
+                rest = rest[rest.index(after: comma)...]
+                continue
+            }
+            guard phraseOpeners(language).contains(opener.lowercased()) else {
+                return tenseFrom(rest[opener.startIndex...], saying: stated, language: language)
+            }
+            return firstVerb(in: rest[opener.endIndex...], opener: opener.lowercased(), saying: stated, language: language)
+        }
+        return nil
+    }
+
+    /// The tense of the text that starts at its verb: the ending of a first person, or a third person that says a stated duty.
+    private static func tenseFrom(_ text: Substring, saying stated: [String], language: Vocabulary.Language?) -> DutyTense? {
+        let fromTheVerb = String(text)
+        return tense(of: fromTheVerb, language: language) ?? thirdPersonTense(of: fromTheVerb, saying: stated, language: language)
+    }
+
+    /// The tense at the first verb of `text`, the rest of a sentence after its opening phrase: the first word that the vocabulary
+    /// lists as a verb and that reads a tense, past the words an article or a preposition leads ("controllo" in "il controllo
+    /// qualità" is a noun) and the participles ("encargado" in "Como encargado" is a role). Nil when there is none.
+    private static func firstVerb(
+        in text: Substring, opener: String, saying stated: [String], language: Vocabulary.Language?
+    ) -> DutyTense? {
+        guard let language else { return nil }
+        var previous = opener
+        for word in text.split(whereSeparator: { !$0.isLetter }) {
+            let lowered = word.lowercased()
+            let folded = DescriptionText.normalized(lowered)
+            defer { previous = lowered }
+            guard !leadsANoun(previous, language: language), !isParticiple(folded, language: language),
+                  Vocabulary.isVerb(folded, in: language) else { continue }
+            if let tense = tenseFrom(text[word.startIndex...], saying: stated, language: language) { return tense }
+        }
+        return nil
+    }
+
+    /// The words that open a phrase of place, time or role before the verb of a duty ("Presso il reparto", "Tutto il giorno",
+    /// "Como encargado"): the first word of a duty that is one of them is no verb.
+    private static func phraseOpeners(_ language: Vocabulary.Language?) -> Set<String> {
+        switch language {
+        case .italian:
+            ["a", "al", "alla", "alle", "agli", "ai", "allo", "come", "con", "da", "dal", "dalla", "durante", "fino", "in", "nel", "nella",
+             "nelle", "nei", "negli", "nello", "ogni", "per", "presso", "sul", "sulla", "tutta", "tutte", "tutti", "tutto"]
+        case .spanish:
+            ["a", "cada", "como", "con", "de", "desde", "durante", "en", "para", "por", "toda", "todas", "todo", "todos"]
+        case .portuguese:
+            ["a", "cada", "como", "com", "de", "desde", "durante", "em", "na", "nas", "no", "nos", "para", "por", "toda", "todas", "todo",
+             "todos"]
+        case .english, .german, .french, nil: []
+        }
+    }
+
+    /// The articles of the three languages.
+    private static let articles: Set<String> = [
+        "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "l", "el", "los", "las", "o", "os", "as", "um", "uma",
+    ]
+
+    /// Whether a word that follows `previous` is a noun, not a verb: `previous` is an article, a preposition, or opens a phrase.
+    private static func leadsANoun(_ previous: String, language: Vocabulary.Language) -> Bool {
+        articles.contains(previous) || nounLinks.contains(previous) || phraseOpeners(language).contains(previous)
+    }
+
+    /// The tense of a duty that opens with a verb in the third person singular, in Italian, Spanish and Portuguese ("Ripara",
+    /// "Sostituiva", "Cambia", "Revisó", "Cortou"; #362): its first clause says a clause of a duty in `stated` (`saysTheDuty`), and
+    /// its first word is a form of that clause's verb in the third person. A first word that may be a noun is no verb: one before
+    /// "di", "de" or "da" ("Programma di manutenzione", "Limpieza de las piezas"), or one of no stated duty ("Manutenzione
+    /// preventiva"). Nil when it cannot tell, so that a duty is never dropped on a tense it may not have.
+    private static func thirdPersonTense(of text: String, saying stated: [String], language: Vocabulary.Language?) -> DutyTense? {
+        let words = letterWords(of: text)
+        guard words.count > 1, !nounLinks.contains(words[1]), let first = clauses(of: text).first else { return nil }
+        for clause in stated.flatMap(clauses(of:)) where saysTheDuty(first, clause) {
+            guard let verb = dutyVerb(of: clause) else { continue }
+            if let tense = thirdPersons(of: verb, language: language).first(where: { $0.form == words[0] })?.tense { return tense }
+        }
+        return nil
+    }
+
+    /// The words that link a noun to the next ("Programma di", "Limpieza de las", "Limpeza das"): a word before one is no verb.
+    private static let nounLinks: Set<String> = [
+        "di", "del", "dello", "della", "dei", "degli", "delle", "dell", "de", "do", "da", "dos", "das",
+    ]
+
+    /// The forms in the third person singular of `verb`, a verb of a duty in the first person, a gerund, an infinitive or a
+    /// participle: the present and the imperfect in Italian, the present and the simple past in Spanish and Portuguese, whose
+    /// imperfect is the first person's. A verb that changes its stem ("atiendo", "atiende") has none it can tell.
+    private static func thirdPersons(of verb: String, language: Vocabulary.Language?) -> [(form: String, tense: DutyTense)] {
+        let table: [(ending: String, present: [String], past: [String])] = switch language {
+        case .italian: [
+            ("isco", ["isce"], ["iva"]), ("ando", ["a"], ["ava"]), ("endo", ["e", "isce"], ["eva", "iva"]),
+            ("avo", ["a"], ["ava"]), ("evo", ["e"], ["eva"]), ("ivo", ["e", "isce"], ["iva"]), ("are", ["a"], ["ava"]),
+            ("ere", ["e"], ["eva"]), ("ire", ["e", "isce"], ["iva"]), ("ato", ["a"], ["ava"]), ("uto", ["e"], ["eva"]),
+            ("ito", ["e", "isce"], ["iva"]), ("o", ["a", "e"], ["ava", "eva", "iva"]),
+        ]
+        case .spanish: [
+            ("iendo", ["e"], ["ió"]), ("ando", ["a"], ["ó"]), ("aba", ["a"], ["ó"]), ("ado", ["a"], ["ó"]), ("ido", ["e"], ["ió"]),
+            ("ía", ["e"], ["ió"]), ("ar", ["a"], ["ó"]), ("er", ["e"], ["ió"]), ("ir", ["e"], ["ió"]), ("é", ["a"], ["ó"]),
+            ("í", ["e"], ["ió"]), ("o", ["a", "e"], ["ó", "ió"]),
+        ]
+        case .portuguese: [
+            ("ando", ["a"], ["ou"]), ("endo", ["e"], ["eu"]), ("indo", ["e"], ["iu"]), ("ava", ["a"], ["ou"]),
+            ("ia", ["e"], ["eu", "iu"]), ("ar", ["a"], ["ou"]), ("er", ["e"], ["eu"]), ("ir", ["e"], ["iu"]), ("ei", ["a"], ["ou"]),
+            ("i", ["e"], ["eu", "iu"]), ("o", ["a", "e"], ["ou", "eu", "iu"]),
+        ]
+        case .english, .german, .french, nil: []
+        }
+        guard let row = table.first(where: { verb.count > $0.ending.count + 2 && verb.hasSuffix($0.ending) }) else { return [] }
+        let stem = String(verb.dropLast(row.ending.count))
+        return row.present.map { (stem + $0, .present) } + row.past.map { (stem + $0, .past) }
+    }
+
+    /// The words that come before the verb of a duty in Italian, Spanish and Portuguese, and end as a tense or hide it. They overlap
+    /// `clauseConnectors` and `summaryConnectors`, which serve other checks and are written folded; the lists are not shared, as
+    /// one list would change what each check drops.
+    private static let wordsBeforeTheVerb: Set<String> = [
+        "spesso", "sempre", "inoltre", "poi", "anche", "quindi", "solo", "soltanto", "subito", "soprattutto", "dopo", "frequentemente",
+        "luego", "después", "también", "además", "siempre", "sólo", "pronto", "primero",
+        "depois", "também", "além", "disso", "logo", "primeiro", "ainda",
+    ]
+    /// The words that open a clause before the verb of a duty: its tense is read after the clause's comma. Not `clauseConnectors`:
+    /// those join a clause to the one before it, and these open a clause of their own.
+    private static let clauseOpeners: Set<String> = ["quando", "cuando"]
+
     /// The tense of a duty by the ending of its first word, in Italian, Spanish and Portuguese, whose duties start with the verb in the
     /// first person ("Gestivo", "Coordiné", "Colaboro"); nil in the other languages, whose verbs do not tell it by their ending, and
-    /// for a first word with no ending of a tense.
+    /// for a first word with no ending of a tense. A first person of the present that ends as an imperfect ("lavo", "rilevo") is the
+    /// present (`presentsEndingAsAnImperfect`). It reads the first word whatever it is: `dutyTense` reads a duty that an opening
+    /// phrase leads.
     static func tense(of sentence: String, language: Vocabulary.Language?) -> DutyTense? {
         // "Sono" starts the present ("Sono responsabile") and the past ("Sono stato responsabile") alike.
         guard let first = sentence.split(whereSeparator: { !$0.isLetter }).first.map({ $0.lowercased() }), first.count > 1,
@@ -658,13 +931,25 @@ extension CVDataSanitizer {
         case .portuguese: (["fui"], ["ei", "ava", "ia", "i"], ["o"])
         case .english, .german, .french, nil: ([], [], [])
         }
+        if language == .italian, presentsEndingAsAnImperfect.contains(first) { return .present }
         if pastWords.contains(first) || past.contains(where: first.hasSuffix) { return .past }
         return present.contains(where: first.hasSuffix) ? .present : nil
     }
 
+    /// The Italian first persons of the present of the verbs whose stem ends in "v", which end as the imperfect of another verb
+    /// ("lavo" is the present of "lavare", not the imperfect of a "lare"; "rilevo", "ricevo", "scrivo", "arrivo"): the present wins.
+    /// Their imperfects ("lavavo", "ricevevo") end in the imperfect, and a verb of this kind that the list lacks reads as the
+    /// imperfect: a present read as the past never drops a duty.
+    private static let presentsEndingAsAnImperfect: Set<String> = [
+        "lavo", "levo", "rilevo", "sollevo", "prelevo", "elevo", "ricevo", "bevo", "devo", "scrivo", "descrivo", "trascrivo", "iscrivo",
+        "riscrivo", "vivo", "convivo", "arrivo", "derivo", "attivo", "riattivo", "disattivo", "motivo", "cavo", "aggravo", "privo",
+        "ravvivo",
+    ]
+
     /// The rule a job's duty passes (ADR 0031, D3 and D4): a sentence that quotes, with no number, a clause of this job alone is the
     /// person's own; any other states no fact (`WrittenText`), names no other job's title whole, and restates no sentence of the
-    /// description about another employer, nor says the person is, or works as, what none of the person's titles names
+    /// description about another employer, nor copies in any tense or person, alone or joined to another, a duty the person said
+    /// only for another job (`saysInAClause`, #362), nor says the person is, or works as, what none of the person's titles names
     /// (`RoleAssertion`; #354, the final gate).
     struct DutyRule {
         let evidence: EntryEvidence
@@ -678,6 +963,9 @@ extension CVDataSanitizer {
         private let source: DescriptionText
         private let written: WrittenText
         private let generalQuotes: ProseQuotes?
+        /// The parts of the duties the person said for another job and not for this one: a part two jobs of a chain share is
+        /// the person's own at both (ADR 0031, D3).
+        private let otherDuties: [String]
 
         /// `takesGeneralDuties` when the job is the current one, which takes the duties the person said with no job (ADR 0031, D7):
         /// a sentence that quotes them is then the person's own too.
@@ -698,6 +986,10 @@ extension CVDataSanitizer {
             otherEmployers = otherJobs.compactMap(\.company)
             self.source = source
             self.written = written
+            let ownDuties: Set<String> = Set(
+                (entries.pinnedDuties(of: job.subject) + (takesGeneralDuties ? entries.generalDuties() : [])).flatMap(\.parts)
+            )
+            otherDuties = otherJobs.flatMap { entries.pinnedDuties(of: $0.subject).flatMap(\.parts) }.filter { !ownDuties.contains($0) }
         }
 
         /// Whether `sentence` quotes, with no number, the clauses of this job alone: then it is the person's own.
@@ -720,8 +1012,9 @@ extension CVDataSanitizer {
             if let word = CVDataSanitizer.employerWord(in: sentence, names: [job.company].compactMap { $0 } + otherEmployers, in: source) {
                 return "the word \"\(word)\" comes from an employer's name: say the work in other words"
             }
-            if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 }) {
-                return "it says what the person did at another job"
+            if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 })
+                || otherDuties.contains(where: { CVDataSanitizer.saysInAClause(sentence, $0) }) {
+                return CVDataSanitizer.atAnotherJobReason
             }
             // Last, so that a word the other checks name ("certified") is the reason the model reads.
             if let role = RoleAssertion.unkeptRole(in: sentence, titles: titles, name: nil, language: language) {
@@ -1237,7 +1530,8 @@ extension CVDataSanitizer {
 
     /// Whether a sentence said in the first person is in the present, by its verb after the words that join it to the one before
     /// ("Inoltre", "Then"): in English, German and French the verb after "I", "ich" or "je", in the past when it is an auxiliary
-    /// of the past or ends as a past ("-ed", "-te", "-ais"); in Italian, Spanish and Portuguese the first word (`tense(of:language:)`).
+    /// of the past or ends as a past ("-ed", "-te", "-ais"); in Italian, Spanish and Portuguese the tense of the duty's verb
+    /// (`dutyTense`, past the words and the phrase that open it).
     /// A rough rule: false when it cannot tell.
     static func isInThePresent(_ sentence: String, language: Vocabulary.Language?) -> Bool {
         let words = Array(letterWords(of: sentence).drop(while: summaryConnectors.contains))
@@ -1253,7 +1547,7 @@ extension CVDataSanitizer {
             return (first == "je" || first == "j") && !verb.isEmpty && !["ai", "avais", "étais", "suis"].contains(verb)
                 && !verb.hasSuffix("ais")
         case .italian, .spanish, .portuguese:
-            return tense(of: words.joined(separator: " "), language: language) == .present
+            return dutyTense(of: sentence, language: language) == .present
         case nil:
             return false
         }
@@ -2152,14 +2446,17 @@ extension CVDataSanitizer {
         "warnweste", "auffanggurt", "schutzbrille",
     ].map(skillKey))
 
-    /// The words that say only that the person is a professional or has experience, folded: no quality a reader can weigh, so no
-    /// soft skill (#354, round 3). A quality said with one of them ("atteggiamento professionale") stays.
+    /// The words that say only that the person is a professional or has experience (#354, round 3), and the bare words that name a
+    /// group of people in any of the six languages ("team", "squadra", "equipo", "equipe", "equipa", "mannschaft"; #362), folded: no
+    /// quality a reader can weigh, so no soft skill. A quality said with one of them ("atteggiamento professionale", "lavoro di
+    /// squadra", "trabajo en equipo") stays, and so does a loanword that holds one ("teamwork").
     static let emptyQualities: Set<String> = [
         "professional", "professionale", "professionell", "professionnel", "professionnelle", "profesional", "profissional",
         "experience", "experienced", "esperienza", "esperto", "esperta", "erfahrung", "erfahren", "experiencia", "experimentado",
         "experimentada", "experimente", "experimentee", "experiente", "competent", "competente", "kompetent",
         "qualified", "qualificato", "qualificata", "qualifiziert", "qualifie", "qualifiee",
         "cualificado", "cualificada", "qualificado", "qualificada",
+        "team", "staff", "squad", "squadra", "equipo", "equipe", "equipa", "mannschaft",
     ]
 
     /// The languages whose own words end in a vowel, each with the words of English it writes as its own: there, a lower-case word

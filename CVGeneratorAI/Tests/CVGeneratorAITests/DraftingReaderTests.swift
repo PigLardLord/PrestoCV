@@ -209,6 +209,30 @@ struct DraftingReaderTests {
         #expect(Self.reader(german, "de").filter { $0.kind == .emptySoftSkill }.map(\.value) == ["Erfahrung"])
     }
 
+    @Test("A soft skill that is a bare word for a group of people is counted in every language; the phrase that says teamwork is not (#362)")
+    func groupWordAsSoftSkill() {
+        let italian = CVData(skills: ["Squadra", "Precisione", "Lavoro di squadra"].map { Skill(name: $0, kind: .softSkill) })
+        let spanish = CVData(skills: ["Equipo", "Trabajo en equipo"].map { Skill(name: $0, kind: .softSkill) })
+        let others = CVData(skills: ["Équipe", "equipa", "Mannschaft", "Team"].map { Skill(name: $0, kind: .softSkill) })
+
+        #expect(Self.reader(italian, "it").filter { $0.kind == .emptySoftSkill }.map(\.value) == ["Squadra"])
+        #expect(Self.reader(spanish, "es").filter { $0.kind == .emptySoftSkill }.map(\.value) == ["Equipo"])
+        #expect(Self.reader(others, "fr").filter { $0.kind == .emptySoftSkill }.map(\.value) == ["Équipe", "equipa", "Mannschaft", "Team"])
+    }
+
+    @Test("Every empty word the reader counts as a soft skill is one the skill check drops: the reader's list is its own, so a gap shows (#362)")
+    func emptyWordsAreDroppedByTheCheck() {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let description = "Lavoro da sedici anni nella manutenzione di impianti industriali."
+
+        let kept = ReaderRules.emptyWords.sorted().filter { word in
+            !sanitizer.skillCheck(technologies: [], softSkills: [word], against: description).softSkills.isEmpty
+        }
+
+        #expect(kept.isEmpty)
+        #expect(ReaderRules.emptyWords.isSuperset(of: ["team", "staff", "squad", "squadra", "equipo", "equipe", "equipa", "mannschaft"]))
+    }
+
     @Test("A loanword a language writes as its own is no skill in another language there, and is one in a language that does not")
     func loanwordByLanguage() {
         let cv = CVData(skills: [Skill(name: "scanner"), Skill(name: "printer")])

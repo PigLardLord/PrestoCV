@@ -50,8 +50,10 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// An interest of one noun that the description says after a verb in its infinitive form ("football" of "I play football"): the
     /// pastime's phrase without its verb (#354, round 1).
     case bareInterest
-    /// A duty or a quality the person states that no job description and no skill of the draft holds (`ExpectedFact.duty`,
-    /// `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra" (#354, round 1).
+    /// A duty or a quality the person states that no skill of the draft holds and, for a duty the person states in the sentence of a
+    /// job, no description of that job: the same words under another job are lost, and a duty stated for several jobs is expected
+    /// under each of them (`ExpectedFact.duty`, `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra"
+    /// (#354, round 1; #362).
     case unwrittenStatement
     /// A summary sentence whose subject is the person's work, not the person: a bare word of a title or of the field followed by a
     /// verb "to be" ("Manutenzione è la mia attività principale."; #354, round 1), or a word of the work after an article, with any
@@ -229,7 +231,7 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
         case .toolAsSoftSkill: "a tool as a soft skill"
         case .thirdPersonSummary: "a summary in the third person"
         case .bareInterest: "an interest without the verb of its phrase"
-        case .unwrittenStatement: "a stated duty or quality the draft does not hold"
+        case .unwrittenStatement: "a stated duty or quality the draft does not hold, or holds only under another job"
         case .bareSubjectSummary: "a summary sentence with a bare work word as its subject"
         case .offTradeTechnology: "a technology neither stated nor of the trade"
         case .categoryAsTechnology: "a category as a technology"
@@ -427,7 +429,7 @@ enum ReaderRules {
         found += roundSixteen(in: cv, for: input)
         found += report.lostYears.map { ReaderFinding(kind: .lostYear, path: $0.entry, value: $0.year) }
         found += report.lost.filter { [.duty, .quality].contains($0.kind) }
-            .map { ReaderFinding(kind: .unwrittenStatement, path: $0.kind.rawValue, value: $0.forms[0]) }
+            .map { ReaderFinding(kind: .unwrittenStatement, path: $0.place, value: $0.forms[0]) }
         return found
     }
 
@@ -1365,12 +1367,17 @@ enum ReaderRules {
         "it": ["scanner"], "pt": ["scanner"], "fr": ["scanner"], "de": ["scanner"],
     ]
 
-    /// Empty words as a soft skill, folded: experience, or being a professional, which name no quality. The words for a skill or a
-    /// knowledge are `skillWords`.
+    /// Empty words as a soft skill, folded: experience, being a professional, or a bare word for a group of people, which name no
+    /// quality (#362). The reader's own list, written apart from the skill check's (`CVDataSanitizer.emptyQualities`) so the two
+    /// are independent: a test checks that the check drops every word of this list. The words for a skill or a knowledge are
+    /// `skillWords`.
     static let emptyWords: Set<String> = [
         "professional", "professionale", "professionell", "professionnel", "professionnelle", "profesional", "profissional",
-        "experience", "esperienza", "erfahrung", "experiencia", "competent", "competente", "kompetent",
-        "qualified", "qualificato", "qualifiziert", "qualifie", "qualifiee", "cualificado", "qualificado",
+        "experience", "experienced", "esperienza", "esperto", "esperta", "erfahrung", "erfahren", "experiencia", "experimentado",
+        "experimentada", "experimente", "experimentee", "experiente", "competent", "competente", "kompetent",
+        "qualified", "qualificato", "qualificata", "qualifiziert", "qualifie", "qualifiee",
+        "cualificado", "cualificada", "qualificado", "qualificada",
+        "team", "staff", "squad", "squadra", "equipo", "equipe", "equipa", "mannschaft",
     ]
 
     /// Whether a technology is a part, a material or a work object the person handles (`DraftingInputs.parts`), by the stem of its

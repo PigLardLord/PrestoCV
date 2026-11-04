@@ -7,7 +7,7 @@ import Testing
 /// trade and date is invented.
 @Suite("The checks of a draft written a section at a time (ADR 0031)", .plainDraft)
 struct SectionChecksTests {
-    private let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: TableWordList())
+    private let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: JobClausesTests.italianWords)
 
     /// A sanitizer that reads every text as Italian: without it, the language of a description is the device's guess, which some
     /// platforms do not make.
@@ -634,6 +634,124 @@ struct SectionChecksTests {
         #expect(current.kept == ["Controllo i pagamenti dei fornitori.", "Registro le fatture dei clienti."])
     }
 
+    @Test("An ended job's duty in the present goes before any duty in the past is held; after duties held in the present, it stays (#362)")
+    func presentOfAnEndedJobWithNoPast() throws {
+        let first = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Controllo i pagamenti dei fornitori. Registravo le fatture dei clienti.", against: Self.clerk
+        )
+        let afterPresent = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Registro le fatture dei clienti.", keeping: ["Controllo i pagamenti dei fornitori."],
+            against: Self.clerk
+        )
+
+        #expect(first.kept == ["Registravo le fatture dei clienti."])
+        #expect(first.rejected.map(\.sentence) == ["Controllo i pagamenti dei fornitori."])
+        #expect(first.rejected.first?.reason.hasPrefix("it is in the present, and the job has ended") == true)
+        #expect(afterPresent.kept == ["Registro le fatture dei clienti."])
+    }
+
+    @Test("A duty's tense is its verb's, after the words that come before it: an ended job keeps a duty in the past that opens with one (#362)")
+    func tenseAtTheVerb() throws {
+        let ended = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Spesso controllavo i pagamenti dei fornitori.", against: Self.clerk
+        )
+
+        #expect(CVDataSanitizer.dutyTense(of: "Spesso controllavo i quadri.", language: .italian) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Quando serviva, cambiavo i fusibili.", language: .italian) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Quando serve, cambio i fusibili.", language: .italian) == .present)
+        #expect(CVDataSanitizer.dutyTense(of: "Luego revisé las facturas.", language: .spanish) == .past)
+        #expect(CVDataSanitizer.dutyTense(of: "Depois atendia os clientes.", language: .portuguese) == .past)
+        #expect(ended.kept == ["Spesso controllavo i pagamenti dei fornitori."])
+    }
+
+    struct OpeningWordRow: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        let duty: String
+        var testDescription: String { duty }
+    }
+
+    /// The first word of each is no verb: read as the verb, "Sempre", "Siempre", "Também" and the like give no tense (#362).
+    static let presentAfterAnOpening: [OpeningWordRow] = [
+        OpeningWordRow(language: .italian, duty: "Spesso controllo i conti."),
+        OpeningWordRow(language: .italian, duty: "Sempre controllo i conti."),
+        OpeningWordRow(language: .italian, duty: "Inoltre controllo i conti."),
+        OpeningWordRow(language: .spanish, duty: "Siempre reviso las facturas."),
+        OpeningWordRow(language: .spanish, duty: "Además reviso las facturas."),
+        OpeningWordRow(language: .portuguese, duty: "Também atendo os clientes."),
+        OpeningWordRow(language: .portuguese, duty: "Depois atendo os clientes."),
+    ]
+
+    @Test("A duty in the present that opens with a word before its verb is in the present, whatever the word ends as (#362)",
+          arguments: presentAfterAnOpening)
+    func presentAtTheVerb(row: OpeningWordRow) {
+        #expect(CVDataSanitizer.dutyTense(of: row.duty, language: row.language) == .present)
+    }
+
+    @Test("An ended job drops a duty in the present that opens with a word before its verb (#362)",
+          arguments: ["Spesso controllo i pagamenti dei fornitori.", "Sempre controllo i pagamenti dei fornitori."])
+    func presentAfterAnOpeningWord(duty: String) throws {
+        let ended = try sanitizer.dutyCheck(of: Self.clerkJob, job: 0, duties: duty, against: Self.clerk)
+
+        #expect(ended.kept.isEmpty)
+        #expect(ended.rejected.map(\.reason) == [CVDataSanitizer.presentAtEndedJobReason])
+    }
+
+    struct ThirdPersonRow: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        let duty: String
+        let stated: String
+        let tense: CVDataSanitizer.DutyTense?
+        var testDescription: String { "\(duty) (\(stated))" }
+    }
+
+    @Test("A duty in the third person has the tense of its verb when it says a said duty, and none when its first word may be a noun or it says none (#362)",
+          arguments: [
+              ThirdPersonRow(language: .italian, duty: "Lubrifica i motori.", stated: "Lubrificavo i motori.", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Lubrificava i motori.", stated: "Lubrifico i motori.", tense: .past),
+              ThirdPersonRow(language: .italian, duty: "Spesso pulisce i filtri.", stated: "Pulivo i filtri.", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Sostituisce i cuscinetti.", stated: "riparavo i nastri e sostituivo i cuscinetti", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Lubrifica le pompe.", stated: "Lubrificavo i motori.", tense: nil),
+              ThirdPersonRow(language: .italian, duty: "Programma di manutenzione.", stated: "Programmavo la manutenzione.", tense: nil),
+              ThirdPersonRow(language: .italian, duty: "Manutenzione preventiva.", stated: "Programmavo la manutenzione preventiva.", tense: nil),
+              ThirdPersonRow(language: .spanish, duty: "Revisa los frenos.", stated: "revisando los frenos", tense: .present),
+              ThirdPersonRow(language: .spanish, duty: "Revisó los frenos.", stated: "revisando los frenos", tense: .past),
+              ThirdPersonRow(language: .spanish, duty: "Revisión de los frenos.", stated: "revisando los frenos", tense: nil),
+              ThirdPersonRow(language: .portuguese, duty: "Corta as chapas.", stated: "cortava as chapas", tense: .present),
+              ThirdPersonRow(language: .portuguese, duty: "Cortou as chapas.", stated: "cortava as chapas", tense: .past),
+              ThirdPersonRow(language: .portuguese, duty: "Corte das chapas.", stated: "cortava as chapas", tense: nil),
+          ])
+    func thirdPersonTense(row: ThirdPersonRow) {
+        #expect(CVDataSanitizer.dutyTense(of: row.duty, language: row.language, stated: [row.stated]) == row.tense)
+    }
+
+    @Test("A duty in the third person has no tense of its own: it takes one only from a said duty (#362)")
+    func thirdPersonWithNoSaidDuty() {
+        #expect(CVDataSanitizer.dutyTense(of: "Lubrifica i motori.", language: .italian) == nil)
+    }
+
+    @Test("A duty in the first person with a later part that opens with a gerund it cannot write goes; a later first person in -ndo stays (#362)")
+    func dutyJoiningAGerund() throws {
+        let words = TableWordList.knowingNoVerb(of: ["preparando"], nor: ["preparo", "preparavo"])
+        let sanitizer = Self.italian(ForcedLexicalTagger([:]), wordList: words)
+        let ended = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Controllavo i pagamenti dei fornitori e preparando i documenti per la banca.",
+            against: Self.clerk
+        )
+        let current = try sanitizer.dutyCheck(
+            of: Self.clerkJobNow, job: 0, duties: "Controllo i pagamenti dei fornitori e preparando i documenti per la banca.",
+            against: Self.clerkNow
+        )
+        let firstPerson = try sanitizer.dutyCheck(
+            of: Self.clerkJobNow, job: 0, duties: "Controllo i pagamenti dei fornitori e prendo in carico le fatture.", against: Self.clerkNow
+        )
+
+        #expect(ended.kept.isEmpty)
+        #expect(ended.rejected.map(\.reason) == [CVDataSanitizer.joinsAGerundReason])
+        #expect(current.kept.isEmpty)
+        #expect(current.rejected.map(\.reason) == [CVDataSanitizer.joinsAGerundReason])
+        #expect(firstPerson.kept == ["Controllo i pagamenti dei fornitori e prendo in carico le fatture."])
+    }
+
     @Test("A duty's tense is the ending of its first word in Italian, Spanish and Portuguese, and none in English (#354)")
     func tenseOfADuty() {
         #expect(CVDataSanitizer.tense(of: "Colaboro com as equipas de design.", language: .portuguese) == .present)
@@ -643,6 +761,69 @@ struct SectionChecksTests {
         #expect(CVDataSanitizer.tense(of: "Ho gestito le fatture.", language: .italian) == .past)
         #expect(CVDataSanitizer.tense(of: "Sono responsabile delle fatture.", language: .italian) == nil)
         #expect(CVDataSanitizer.tense(of: "I plan the menus.", language: .english) == nil)
+    }
+
+    @Test("A first person in the present that ends as an imperfect reads as the present, and the imperfect of its verb as the past (#362)")
+    func presentEndingLikeAnImperfect() {
+        #expect(CVDataSanitizer.tense(of: "Rilevo le misure dei pezzi.", language: .italian) == .present)
+        #expect(CVDataSanitizer.tense(of: "Lavo i pavimenti della cucina.", language: .italian) == .present)
+        #expect(CVDataSanitizer.tense(of: "Ricevo i pezzi in magazzino.", language: .italian) == .present)
+        #expect(CVDataSanitizer.tense(of: "Scrivo i rapporti di turno.", language: .italian) == .present)
+        #expect(CVDataSanitizer.tense(of: "Rilevavo le misure dei pezzi.", language: .italian) == .past)
+        #expect(CVDataSanitizer.tense(of: "Lavavo i pavimenti della cucina.", language: .italian) == .past)
+        #expect(CVDataSanitizer.tense(of: "Ricevevo i pezzi in magazzino.", language: .italian) == .past)
+        #expect(CVDataSanitizer.tense(of: "Scrivevo i rapporti di turno.", language: .italian) == .past)
+        #expect(CVDataSanitizer.tense(of: "Usavo il muletto.", language: .italian) == .past)
+    }
+
+    struct OpeningRow: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        let sentence: String
+        let tense: CVDataSanitizer.DutyTense?
+        var testDescription: String { sentence }
+    }
+
+    @Test("A duty's tense is read at its first verb, past a phrase that opens it; with no verb the vocabulary lists it has none (#362)",
+          arguments: [
+              OpeningRow(language: .italian, sentence: "Presso il reparto controllavo i quadri elettrici.", tense: .past),
+              OpeningRow(language: .italian, sentence: "Tutto il giorno controllavo i quadri.", tense: .past),
+              OpeningRow(language: .italian, sentence: "Presso il reparto controllo i quadri elettrici.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Nel reparto ricevo i pezzi.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Nel reparto ricevevo i pezzi.", tense: .past),
+              OpeningRow(language: .italian, sentence: "Presso il reparto quadri elettrici.", tense: nil),
+              OpeningRow(language: .italian, sentence: "Così controllavo i quadri.", tense: nil),
+              OpeningRow(language: .spanish, sentence: "Como encargado atendía a los clientes.", tense: .past),
+              OpeningRow(language: .spanish, sentence: "Como encargado revisaba las facturas.", tense: nil),
+              OpeningRow(language: .portuguese, sentence: "Como responsável atendia os clientes.", tense: .past),
+              OpeningRow(language: .portuguese, sentence: "Como responsável atendo os clientes.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Rilevo le misure dei pezzi.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Lavo i pavimenti della cucina.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Ricevo i pezzi in magazzino.", tense: .present),
+              OpeningRow(language: .italian, sentence: "Rilevavo le misure dei pezzi.", tense: .past),
+          ])
+    func tenseAfterAnOpeningPhrase(row: OpeningRow) {
+        #expect(CVDataSanitizer.dutyTense(of: row.sentence, language: row.language) == row.tense)
+    }
+
+    @Test("An ended job keeps a duty in the past that a phrase opens, and drops one in the present that ends as an imperfect (#362)")
+    func endedJobAfterAnOpeningPhrase() throws {
+        let kept = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Presso il reparto controllavo i pagamenti dei fornitori.", against: Self.clerk
+        )
+        let present = try sanitizer.dutyCheck(
+            of: Self.clerkJob, job: 0, duties: "Ricevo i pagamenti dei fornitori.", against: Self.clerk
+        )
+
+        #expect(kept.kept == ["Presso il reparto controllavo i pagamenti dei fornitori."])
+        #expect(present.kept.isEmpty)
+        #expect(present.rejected.first?.reason == "it is in the present, and the job has ended: write it in the past")
+    }
+
+    @Test("A sentence of the summary that a phrase opens is in the present at its verb, not at the phrase (#362)")
+    func summaryAfterAnOpeningPhrase() {
+        #expect(CVDataSanitizer.isInThePresent("Presso il reparto controllavo i quadri elettrici.", language: .italian) == false)
+        #expect(CVDataSanitizer.isInThePresent("Presso il reparto controllo i quadri elettrici.", language: .italian) == true)
+        #expect(CVDataSanitizer.isInThePresent("Lavo i pavimenti della cucina.", language: .italian) == true)
     }
 
     // MARK: The duties said with no job (ADR 0031, D7)
@@ -1386,6 +1567,35 @@ struct SectionChecksTests {
 
         #expect(verdict.softSkills == ["puntualità", "atteggiamento professionale", "pazienza"])
         #expect(verdict.dropped.map(\.reason) == ["an empty word, not a quality", "an empty word, not a quality", "an empty word, not a quality"])
+    }
+
+    @Test("A soft skill that is a bare word for a group of people goes; a quality, and a loanword that holds the word, stay (#362)")
+    func groupWordIsNoQuality() {
+        let verdict = sanitizer.skillCheck(
+            technologies: [], softSkills: ["Team", "Precisione", "Staff", "Teamwork", "Squad"], against: JobClausesTests.italian
+        )
+
+        #expect(verdict.softSkills == ["Precisione", "Teamwork"])
+        #expect(Set(verdict.dropped.map(\.sentence)) == ["Team", "Staff", "Squad"])
+        #expect(verdict.dropped.first { $0.sentence == "Team" }?.reason == "an empty word, not a quality")
+    }
+
+    @Test("A bare word for a group of people is no soft skill in any language, with a capital, an accent or a full stop (#362)",
+          arguments: ["Squadra", "squadra.", "Equipo", "Équipe", "equipe", " Equipa ", "Mannschaft"])
+    func groupWordInAnyLanguage(word: String) {
+        let verdict = sanitizer.skillCheck(technologies: [], softSkills: [word], against: JobClausesTests.italian)
+
+        #expect(verdict.softSkills.isEmpty)
+        #expect(verdict.dropped.map(\.reason) == ["an empty word, not a quality"])
+    }
+
+    @Test("A phrase that says teamwork, in any language, is a soft skill (#362)",
+          arguments: ["Lavoro di squadra", "Trabajo en equipo", "Travail d'équipe", "Trabalho em equipa", "Teamarbeit", "Teamwork"])
+    func teamworkPhraseStays(phrase: String) {
+        let verdict = sanitizer.skillCheck(technologies: [], softSkills: [phrase], against: JobClausesTests.italian)
+
+        #expect(verdict.softSkills == [phrase])
+        #expect(verdict.dropped.isEmpty)
     }
 
     @Test("Of two soft skills of one quality, care or teamwork, the second goes; qualities of other kinds stay (#354, round 2)")

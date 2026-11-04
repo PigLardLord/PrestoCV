@@ -5,8 +5,8 @@ import Testing
 struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
     enum Kind: String, Codable, CaseIterable, Sendable {
         case name, title, employer, school, language, skill
-        /// A duty the person states in no job's sentence ("I mix on digital consoles"): kept by a job's description or a skill
-        /// (#354, round 1).
+        /// A duty the person states, in a job's sentence ("where I rigged the lights") or in none ("I mix on digital consoles"):
+        /// kept by a job's description or a skill (#354, round 1). Each input with four jobs states the duties of its jobs (#362).
         case duty
         /// A quality the person states of themselves ("calm under pressure"): kept by a skill.
         case quality
@@ -15,17 +15,38 @@ struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvert
     let kind: Kind
     /// The words that show the fact is kept, the full form first: a draft keeps it when one field of its kind holds one of them.
     let forms: [String]
+    /// For a duty the person states in a job's sentence: the forms of the employers of the jobs whose sentence states it (one form
+    /// of each employer fact of the input), two employers when one sentence runs over two jobs. A job description of another job
+    /// does not keep it, and a duty stated for several jobs counts under each of them (#362). Empty for every other fact, and for
+    /// a duty the person states in no job's sentence.
+    let jobs: [String]
 
-    var description: String { "\(kind.rawValue) \"\(forms[0])\"" }
+    var description: String {
+        let named = "\(kind.rawValue) \"\(forms[0])\""
+        return jobs.isEmpty ? named : "\(named) at \(jobs.joined(separator: ", "))"
+    }
 
-    static func name(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .name, forms: forms) }
-    static func title(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .title, forms: forms) }
-    static func employer(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .employer, forms: forms) }
-    static func school(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .school, forms: forms) }
-    static func language(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .language, forms: forms) }
-    static func skill(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .skill, forms: forms) }
-    static func duty(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .duty, forms: forms) }
-    static func quality(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .quality, forms: forms) }
+    /// What the counter expects: a duty stated for several jobs is one expected fact for each of them, the others are themselves.
+    var perJob: [ExpectedFact] {
+        jobs.count < 2 ? [self] : jobs.map { ExpectedFact(kind: kind, forms: forms, jobs: [$0]) }
+    }
+
+    /// Where the fact is expected, for a finding to name: "duty at Fenwick" for a duty of one job, the kind for the others.
+    var place: String {
+        jobs.count == 1 ? "\(kind.rawValue) at \(jobs[0])" : kind.rawValue
+    }
+
+    static func name(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .name, forms: forms, jobs: []) }
+    static func title(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .title, forms: forms, jobs: []) }
+    static func employer(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .employer, forms: forms, jobs: []) }
+    static func school(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .school, forms: forms, jobs: []) }
+    static func language(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .language, forms: forms, jobs: []) }
+    static func skill(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .skill, forms: forms, jobs: []) }
+    static func duty(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .duty, forms: forms, jobs: []) }
+    /// A duty the person states in the sentence of a job, or of two jobs when one sentence runs over both: `jobs` are forms of the
+    /// employers of those jobs.
+    static func duty(_ forms: String..., at jobs: [String]) -> ExpectedFact { ExpectedFact(kind: .duty, forms: forms, jobs: jobs) }
+    static func quality(_ forms: String...) -> ExpectedFact { ExpectedFact(kind: .quality, forms: forms, jobs: []) }
 }
 
 /// A description the drafting evaluation gives the model, with what a faithful draft of it keeps and must not hold.
@@ -566,8 +587,10 @@ enum DraftingInputs {
                 .employer("Fenwick Playhouse", "Fenwick"), .employer("Brightwater Events", "Brightwater"),
                 .employer("Copperfield Arena", "Copperfield"), .employer("Orchard Lane Theatre", "Orchard Lane"),
                 .duty("digital consoles"), .duty("sound effects"), .quality("calm under pressure", "pressure", "calm"),
-                .quality("working closely with directors", "directors"), .duty("lights"), .duty("trucks"), .duty("PA systems"),
-                .duty("support acts"), .duty("follow spots"), .duty("sound design"), .duty("junior technicians"),
+                .quality("working closely with directors", "directors"), .duty("lights", at: ["Fenwick"]),
+                .duty("trucks", at: ["Fenwick"]), .duty("PA systems", at: ["Brightwater", "Copperfield"]),
+                .duty("support acts", at: ["Brightwater", "Copperfield"]), .duty("follow spots", at: ["Copperfield"]),
+                .duty("sound design", at: ["Orchard Lane"]), .duty("junior technicians", at: ["Orchard Lane"]),
             ],
             traps: ["technical manager"]
         ),
@@ -589,8 +612,10 @@ enum DraftingInputs {
                 .employer("Pastificio Cerreto", "Cerreto"), .employer("Molino Fontebasso", "Fontebasso"),
                 .employer("Birrificio Valtrigno", "Valtrigno"), .skill("PLC"), .duty("schemi elettrici", "schemi"),
                 .duty("trovare i guasti", "guasti"), .quality("lavorare in squadra", "squadra"),
-                .duty("nastri trasportatori"), .duty("cuscinetti"), .duty("quadri elettrici"), .duty("manutenzione preventiva"),
-                .duty("ricambi"), .duty("fermi impianto"), .duty("tecnici"),
+                .duty("nastri trasportatori", at: ["Albarella"]), .duty("cuscinetti", at: ["Albarella"]),
+                .duty("quadri elettrici", at: ["Cerreto", "Fontebasso"]),
+                .duty("manutenzione preventiva", at: ["Cerreto", "Fontebasso"]), .duty("ricambi", at: ["Fontebasso"]),
+                .duty("fermi impianto", at: ["Valtrigno"]), .duty("tecnici", at: ["Valtrigno"]),
             ],
             traps: ["responsabile della manutenzione"]
         ),
@@ -610,6 +635,9 @@ enum DraftingInputs {
                 .title("Vorarbeiterin"), .title("Landschaftsgärtnerin"), .title("Gärtnerhelferin"),
                 .employer("Baumschule Lindenhof", "Lindenhof"), .employer("Gartenbau Mertens", "Mertens"),
                 .employer("Grünwerk Sauer", "Grünwerk"), .employer("Stadtgärtnerei Hollerbach", "Hollerbach"),
+                .duty("Jungpflanzen", at: ["Lindenhof"]), .duty("Beete", at: ["Lindenhof"]),
+                .duty("Pflasterflächen", at: ["Mertens", "Grünwerk"]), .duty("Bewässerungsanlagen", at: ["Mertens", "Grünwerk"]),
+                .duty("Baumpflege", at: ["Grünwerk"]), .duty("Kolonne", at: ["Hollerbach"]), .duty("Parkanlagen", at: ["Hollerbach"]),
             ],
             traps: ["Bauleiterin"]
         ),
@@ -629,6 +657,9 @@ enum DraftingInputs {
                 .title("jefe de taller"), .title("mecánico"), .title("ayudante de taller"),
                 .employer("Talleres Ribera", "Ribera"), .employer("Autos Montaner", "Montaner"),
                 .employer("Garaje Lozano", "Lozano"), .employer("Concesionario Valdeolmos", "Valdeolmos"),
+                .duty("aceite", at: ["Ribera"]), .duty("neumáticos", at: ["Ribera"]), .duty("frenos", at: ["Montaner", "Lozano"]),
+                .duty("averías del motor", "averías", at: ["Montaner", "Lozano"]), .duty("presupuestos", at: ["Lozano"]),
+                .duty("trabajo del equipo", at: ["Valdeolmos"]), .duty("clientes", at: ["Valdeolmos"]),
             ],
             traps: ["gerente de posventa"]
         ),
@@ -648,6 +679,10 @@ enum DraftingInputs {
                 .title("chef de réception"), .title("réceptionniste"), .title("auditrice de nuit"),
                 .employer("Hôtel des Tilleuls", "Tilleuls"), .employer("Résidence Belcourt", "Belcourt"),
                 .employer("Hôtel du Lac Vert", "Lac Vert"), .employer("Domaine de Mirabel", "Mirabel"),
+                .duty("clôture de caisse", "caisse", at: ["Tilleuls"]), .duty("téléphone", at: ["Tilleuls"]),
+                .duty("réservations", at: ["Belcourt", "Lac Vert"]), .duty("groupes", at: ["Belcourt", "Lac Vert"]),
+                .duty("petits-déjeuners", at: ["Lac Vert"]), .duty("plannings", at: ["Mirabel"]),
+                .duty("réclamations", at: ["Mirabel"]),
             ],
             traps: ["directrice d'hébergement"]
         ),
@@ -667,6 +702,9 @@ enum DraftingInputs {
                 .title("encarregado de carpintaria"), .title("carpinteiro"), .title("ajudante de marcenaria"),
                 .employer("Marcenaria Ipê", "Ipê"), .employer("Móveis Araucária", "Araucária"),
                 .employer("Oficina Tapajós", "Tapajós"), .employer("Construtora Serra Azul", "Serra Azul"),
+                .duty("peças", at: ["Ipê"]), .duty("chapas", at: ["Ipê"]), .duty("armários", at: ["Araucária", "Tapajós"]),
+                .duty("portas", at: ["Araucária", "Tapajós"]), .duty("orçamentos", at: ["Tapajós"]),
+                .duty("coordeno a equipe", at: ["Serra Azul"]), .duty("medidas das fôrmas", "fôrmas", at: ["Serra Azul"]),
             ],
             traps: ["mestre de obras"]
         ),

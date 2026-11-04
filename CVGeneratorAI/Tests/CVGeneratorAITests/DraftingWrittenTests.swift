@@ -554,7 +554,7 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .clauseAsInterest }.isEmpty)
     }
 
-    @Test("A duty or a quality the person states and no job description or skill holds is counted; one a skill or a description holds is not (#354, round 1)")
+    @Test("A duty or a quality the person states and no skill or description of its job holds is counted; one a skill or the description of its job holds is not (#354, round 1; #362)")
     func unwrittenStatement() throws {
         let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
         let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
@@ -567,36 +567,99 @@ struct DraftingWrittenTests {
             skills: [Skill(name: "digital consoles"), Skill(name: "calm under pressure", kind: .softSkill)]
         )
         let held = CVData(
-            experience: [Experience(
-                title: "head of sound", company: "Orchard Lane Theatre",
-                description: "I rigged the lights and loaded the trucks. I set up the PA systems, mixed the support acts and ran the "
-                    + "follow spots. I plan the sound design and train the junior technicians."
-            )],
+            experience: [
+                Experience(title: "stagehand", company: "Fenwick Playhouse", description: "I rigged the lights and loaded the trucks."),
+                Experience(
+                    title: "sound technician", company: "Brightwater Events",
+                    description: "I set up the PA systems and mixed the support acts."
+                ),
+                Experience(
+                    title: "sound technician", company: "Copperfield Arena",
+                    description: "I set up the PA systems, mixed the support acts and ran the follow spots."
+                ),
+                Experience(
+                    title: "head of sound", company: "Orchard Lane Theatre",
+                    description: "I plan the sound design and train the junior technicians."
+                ),
+            ],
             skills: [
                 Skill(name: "digital consoles"), Skill(name: "sound effects editing"), Skill(name: "stress resistance under pressure", kind: .softSkill),
                 Skill(name: "collaboration with directors", kind: .softSkill),
             ]
         )
         let described = CVData(
-            experience: [Experience(
-                title: "capoturno della manutenzione", company: "Birrificio Valtrigno",
-                description: "Riparavo i nastri trasportatori e sostituivo i cuscinetti. Controllavo i quadri elettrici e programmavo "
-                    + "la manutenzione preventiva. Ordinavo i ricambi. Coordino i tecnici e gestisco i fermi impianto. Leggo gli schemi "
-                    + "elettrici e uso i PLC per trovare i guasti."
-            )],
+            experience: [
+                Experience(
+                    title: "operaio manutentore", company: "Conserve Albarella",
+                    description: "Riparavo i nastri trasportatori e sostituivo i cuscinetti."
+                ),
+                Experience(
+                    title: "manutentore elettromeccanico", company: "Pastificio Cerreto",
+                    description: "Controllavo i quadri elettrici e programmavo la manutenzione preventiva."
+                ),
+                Experience(
+                    title: "manutentore elettromeccanico", company: "Molino Fontebasso",
+                    description: "Ordinavo i ricambi, controllavo i quadri elettrici e programmavo la manutenzione preventiva."
+                ),
+                Experience(
+                    title: "capoturno della manutenzione", company: "Birrificio Valtrigno",
+                    description: "Coordino i tecnici e gestisco i fermi impianto. Leggo gli schemi elettrici e uso i PLC per trovare i guasti."
+                ),
+            ],
             skills: [Skill(name: "PLC"), Skill(name: "lavoro di squadra", kind: .softSkill)]
         )
 
         #expect(unwritten(missing, english) == [
-            "sound effects", "working closely with directors", "lights", "trucks", "PA systems", "support acts", "follow spots",
-            "junior technicians",
+            "sound effects", "working closely with directors", "lights", "trucks", "PA systems", "PA systems", "support acts",
+            "support acts", "follow spots", "junior technicians",
         ])
         #expect(unwritten(held, english).isEmpty)
         #expect(unwritten(described, italian).isEmpty)
         #expect(unwritten(CVData(skills: [Skill(name: "PLC")]), italian) == [
             "schemi elettrici", "trovare i guasti", "lavorare in squadra", "nastri trasportatori", "cuscinetti", "quadri elettrici",
-            "manutenzione preventiva", "ricambi", "fermi impianto", "tecnici",
+            "quadri elettrici", "manutenzione preventiva", "manutenzione preventiva", "ricambi", "fermi impianto", "tecnici",
         ])
+    }
+
+    @Test("A duty written under the description of another job is counted, and the class says so (#362)")
+    func dutyUnderAnotherJob() throws {
+        let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
+        let misplaced = CVData(
+            experience: [
+                Experience(title: "stagehand", company: "Fenwick Playhouse", description: "I plan the sound design."),
+                Experience(title: "sound technician", company: "Brightwater Events"),
+                Experience(title: "sound technician", company: "Copperfield Arena", description: "I rigged the lights and loaded the trucks."),
+                Experience(
+                    title: "head of sound", company: "Orchard Lane Theatre",
+                    description: "I set up the PA systems, mixed the support acts and ran the follow spots. I train the junior technicians."
+                ),
+            ],
+            skills: [
+                Skill(name: "digital consoles"), Skill(name: "sound effects editing"), Skill(name: "stress resistance under pressure", kind: .softSkill),
+                Skill(name: "collaboration with directors", kind: .softSkill),
+            ]
+        )
+
+        let unwritten = ReaderRules.findings(in: misplaced, for: english, report: InventedFacts.count(misplaced, for: english))
+            .filter { $0.kind == .unwrittenStatement }.map(\.value)
+
+        #expect(unwritten == ["lights", "trucks", "PA systems", "PA systems", "support acts", "support acts", "follow spots", "sound design"])
+        #expect(ReaderClass.unwrittenStatement.label.contains("another job"), "\(ReaderClass.unwrittenStatement.label)")
+    }
+
+    @Test("A duty stated for two jobs and left out of one is counted for that job, and the finding names the job (#362)",
+          arguments: SharedDutyCase.all)
+    func dutyOfTwoJobsLeftOutOfOne(_ row: SharedDutyCase) throws {
+        let made = try row.made()
+        var missing: [String] = []
+        for duty in made.duties {
+            for job in row.jobs(written: false, in: made) { missing.append("duty at \(job): \(duty)") }
+        }
+
+        let found = ReaderRules.findings(in: made.cv, for: made.input, report: InventedFacts.count(made.cv, for: made.input))
+            .filter { $0.kind == .unwrittenStatement && made.duties.contains($0.value) }
+
+        #expect(found.map { "\($0.path): \($0.value)" }.sorted() == missing.sorted(), "\(found)")
     }
 
     @Test("A year the description gives a school and the draft does not hold is counted")
