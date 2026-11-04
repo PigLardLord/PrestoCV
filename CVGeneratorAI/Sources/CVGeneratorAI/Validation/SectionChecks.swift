@@ -610,8 +610,13 @@ extension CVDataSanitizer {
     /// The words of a duty after its subject, auxiliary and verb, lowercased.
     private static func objectWords(of duty: String) -> ArraySlice<String> {
         let words = wordsAfterTheSubject(of: duty)
-        guard let first = words.first else { return words }
-        return words.dropFirst(auxiliaries.contains(first) || germanAuxiliaries.contains(first) ? 2 : 1)
+        return words.dropFirst(opensWithAnAuxiliary(words) ? 2 : 1)
+    }
+
+    /// Whether `words`, a clause of a duty after its subject, open with an auxiliary ("ho" of "ho riparato"): the verb is then the
+    /// word after it, or the last word of the clause after a German one (`germanAuxiliaries`, which `auxiliaries` holds too).
+    private static func opensWithAnAuxiliary(_ words: ArraySlice<String>) -> Bool {
+        words.first.map(auxiliaries.contains) ?? false
     }
 
     /// The words of a clause of a duty after its subject pronouns, lowercased. "i" is the English pronoun only as "I": in Italian
@@ -628,7 +633,9 @@ extension CVDataSanitizer {
     /// "Controllavo i quadri elettrici e programmavo la manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another
     /// duty with the same verb, "Gestivo gli ordini dei ricambi" another duty on the same object, which may state more than the
     /// person said ("Ho aiutato con gli ordini dei ricambi"), and "Controllavo 40 quadri elettrici" another fact than
-    /// "Controllo i quadri elettrici": the figure is the sentence's own.
+    /// "Controllo i quadri elettrici": the figure is the sentence's own. Unlike `saysAgain`, which compares every word of the two by
+    /// its first four letters, and `restates`, which compares the words after the first whatever the verb, it needs the verb of the
+    /// duty's clause: the same object with another verb is another duty.
     static func saysTheDuty(_ sentence: String, _ duty: String) -> Bool {
         let objects: Set<String> = Set(
             objectWords(of: sentence).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(4)) }
@@ -723,7 +730,7 @@ extension CVDataSanitizer {
         let words = wordsAfterTheSubject(of: duty)
         guard let first = words.first else { return nil }
         if germanAuxiliaries.contains(first) { return words.dropFirst().last }
-        return auxiliaries.contains(first) ? words.dropFirst().first : first
+        return opensWithAnAuxiliary(words) ? words.dropFirst().first : first
     }
 
     /// The form a duty starts with (ADR 0031): one job's text keeps one.
@@ -897,13 +904,16 @@ extension CVDataSanitizer {
         return row.present.map { (stem + $0, .present) } + row.past.map { (stem + $0, .past) }
     }
 
-    /// The words that come before the verb of a duty in Italian, Spanish and Portuguese, and end as a tense or hide it.
+    /// The words that come before the verb of a duty in Italian, Spanish and Portuguese, and end as a tense or hide it. They overlap
+    /// `clauseConnectors` and `summaryConnectors`, which serve other checks and are written folded; the lists are not shared, as
+    /// one list would change what each check drops.
     private static let wordsBeforeTheVerb: Set<String> = [
         "spesso", "sempre", "inoltre", "poi", "anche", "quindi", "solo", "soltanto", "subito", "soprattutto", "dopo", "frequentemente",
         "luego", "después", "también", "además", "siempre", "sólo", "pronto", "primero",
         "depois", "também", "além", "disso", "logo", "primeiro", "ainda",
     ]
-    /// The words that open a clause before the verb of a duty: its tense is read after the clause's comma.
+    /// The words that open a clause before the verb of a duty: its tense is read after the clause's comma. Not `clauseConnectors`:
+    /// those join a clause to the one before it, and these open a clause of their own.
     private static let clauseOpeners: Set<String> = ["quando", "cuando"]
 
     /// The tense of a duty by the ending of its first word, in Italian, Spanish and Portuguese, whose duties start with the verb in the
