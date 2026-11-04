@@ -248,6 +248,128 @@ struct JobClausesTests {
         #expect(verdicts.rejected.map(\.reason) == (stays ? [] : ["it says what the person did at another job"]))
     }
 
+    // MARK: A duty of another job joined to another, or in the third person (#362)
+
+    /// The maintenance description, with a first job whose duty joins two.
+    private static let joinedItalian = italian.replacingOccurrences(
+        of: "riparavo i nastri trasportatori.", with: "riparavo i nastri trasportatori e sostituivo i cuscinetti."
+    )
+
+    private static let mechanic = """
+        Trabajo desde hace catorce años en la mecánica del automóvil.
+        De 2009 a 2013 fui ayudante de taller en Talleres Arbizu de Logroño, donde cambiaba el aceite y montaba los neumáticos.
+        Después fui mecánico en Autos Cendal de 2013 a 2017, luego en Garaje Olmedo de 2017 a 2020, revisando los frenos y \
+        diagnosticando averías.
+        Desde 2020 soy jefe de taller en Motor Valdecanas de Haro, donde reparto el trabajo del equipo.
+        """
+
+    private static let carpenter = """
+        Trabalho há catorze anos com carpintaria.
+        De 2010 a 2013 fui ajudante de marcenaria na Marcenaria Jatobá de Maringá, onde cortava as chapas e lixava as peças.
+        Depois fui carpinteiro na Móveis Guaraci de 2013 a 2017, depois na Oficina Itaúna de 2017 a 2020, montando armários e \
+        instalando portas.
+        Desde 2020 sou encarregado de carpintaria na Construtora Pedra Branca de Londrina, onde coordeno a equipe.
+        """
+
+    /// Four jobs of `language`'s description, the last current, and the description.
+    private static func staff(_ language: String) -> (jobs: CVData, description: String) {
+        switch language {
+        case "es":
+            (CVData(experience: [
+                job("ayudante de taller", "Talleres Arbizu", from: "2009", to: "2013"), job("mecánico", "Autos Cendal", from: "2013", to: "2017"),
+                job("mecánico", "Garaje Olmedo", from: "2017", to: "2020"), job("jefe de taller", "Motor Valdecanas", from: "2020"),
+            ]), mechanic)
+        case "pt":
+            (CVData(experience: [
+                job("ajudante de marcenaria", "Marcenaria Jatobá", from: "2010", to: "2013"),
+                job("carpinteiro", "Móveis Guaraci", from: "2013", to: "2017"), job("carpinteiro", "Oficina Itaúna", from: "2017", to: "2020"),
+                job("encarregado de carpintaria", "Construtora Pedra Branca", from: "2020"),
+            ]), carpenter)
+        default:
+            (maintenance(quotes: noText), joinedItalian)
+        }
+    }
+
+    struct DutyRow: Sendable, CustomTestStringConvertible {
+        let language: String
+        let job: Int
+        let duty: String
+        let stays: Bool
+        var testDescription: String { "\(language), job \(job): \(duty)" }
+    }
+
+    @Test("A written duty that joins a duty the person said only for another job to another, or says it in the third person, goes; another object stays (#362)",
+          arguments: [
+              DutyRow(language: "it", job: 1, duty: "Ripara i nastri trasportatori e sostituisce i cuscinetti.", stays: false),
+              DutyRow(language: "it", job: 1, duty: "Riparavo i nastri trasportatori e sostituivo i cuscinetti.", stays: false),
+              DutyRow(language: "it", job: 3, duty: "Coordino i turni e sostituisco i cuscinetti.", stays: false),
+              DutyRow(language: "it", job: 1, duty: "Sostituiva i cuscinetti.", stays: false),
+              DutyRow(language: "it", job: 3, duty: "Sostituisco i filtri delle pompe.", stays: true),
+              DutyRow(language: "es", job: 1, duty: "Cambia el aceite y monta los neumáticos.", stays: false),
+              DutyRow(language: "es", job: 2, duty: "Cambiaba el aceite y montaba los neumáticos.", stays: false),
+              DutyRow(language: "es", job: 3, duty: "Reparto el trabajo del equipo y cambio el aceite.", stays: false),
+              DutyRow(language: "es", job: 3, duty: "Cambio los filtros del aire.", stays: true),
+              DutyRow(language: "pt", job: 1, duty: "Lixa as peças e corta as chapas.", stays: false),
+              DutyRow(language: "pt", job: 2, duty: "Lixava as peças e cortava as chapas.", stays: false),
+              DutyRow(language: "pt", job: 3, duty: "Coordeno a equipe e corto as chapas.", stays: false),
+              DutyRow(language: "pt", job: 3, duty: "Corto as portas dos armários.", stays: true),
+          ])
+    func joinedDutyOfAnotherJob(row: DutyRow) throws {
+        let sanitizer = CVDataSanitizer(
+            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
+        )
+        let (jobs, description) = Self.staff(row.language)
+
+        let verdicts = try sanitizer.dutyCheck(of: jobs, job: row.job, duties: row.duty, against: description)
+
+        #expect(verdicts.kept == (row.stays ? [row.duty] : []), "\(verdicts.rejected)")
+        #expect(verdicts.rejected.map(\.reason) == (row.stays ? [] : ["it says what the person did at another job"]))
+    }
+
+    /// A duty the person said in the present with no job (ADR 0031, D7), after the description of `language` in `staff`.
+    private static let generalDuty = [
+        "it": "Lubrifico i motori e pulisco i filtri delle pompe.", "es": "Limpio las piezas desmontadas.", "pt": "Limpo as ferramentas.",
+    ]
+
+    enum TenseOutcome: Sendable { case stays, goesForTheTense, neverForTheTense }
+
+    struct TenseRow: Sendable, CustomTestStringConvertible {
+        let language: String
+        let job: Int
+        let duty: String
+        let outcome: TenseOutcome
+        var testDescription: String { "\(language), job \(job): \(duty)" }
+    }
+
+    @Test("At an ended job with a duty in the past, a duty in the third person present of a said duty goes for its tense; in the past it stays, and a noun never goes for a tense (#362)",
+          arguments: [
+              TenseRow(language: "it", job: 1, duty: "Lubrifica i motori.", outcome: .goesForTheTense),
+              TenseRow(language: "it", job: 1, duty: "Pulisce i filtri delle pompe.", outcome: .goesForTheTense),
+              TenseRow(language: "it", job: 1, duty: "Lubrificava i motori.", outcome: .stays),
+              TenseRow(language: "it", job: 1, duty: "Lubrificazione dei motori.", outcome: .neverForTheTense),
+              TenseRow(language: "it", job: 1, duty: "Pulizia dei filtri delle pompe.", outcome: .neverForTheTense),
+              TenseRow(language: "es", job: 0, duty: "Limpia las piezas desmontadas.", outcome: .goesForTheTense),
+              TenseRow(language: "es", job: 0, duty: "Limpió las piezas desmontadas.", outcome: .stays),
+              TenseRow(language: "es", job: 0, duty: "Limpieza de las piezas desmontadas.", outcome: .neverForTheTense),
+              TenseRow(language: "pt", job: 0, duty: "Limpa as ferramentas.", outcome: .goesForTheTense),
+              TenseRow(language: "pt", job: 0, duty: "Limpou as ferramentas.", outcome: .stays),
+              TenseRow(language: "pt", job: 0, duty: "Limpeza das ferramentas.", outcome: .neverForTheTense),
+          ])
+    func thirdPersonTense(row: TenseRow) throws {
+        let sanitizer = CVDataSanitizer(
+            languageOfText: { _ in row.language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList()
+        )
+        let (jobs, description) = Self.staff(row.language)
+
+        let verdicts = try sanitizer.dutyCheck(
+            of: jobs, job: row.job, duties: row.duty, against: description + "\n" + (Self.generalDuty[row.language] ?? "")
+        )
+        let forTheTense = verdicts.rejected.filter { $0.reason.hasPrefix("it is in the present, and the job has ended") }
+
+        if row.outcome != .neverForTheTense { #expect(verdicts.kept == (row.outcome == .stays ? [row.duty] : []), "\(verdicts.rejected)") }
+        #expect(forTheTense.count == (row.outcome == .goesForTheTense ? 1 : 0), "\(verdicts.rejected)")
+    }
+
     private static let spareParts = """
         Dal 2015 al 2019 ho fatto il magazziniere all'Officina Ferrante di Isernia, dove ho aiutato con gli ordini dei ricambi.
         """

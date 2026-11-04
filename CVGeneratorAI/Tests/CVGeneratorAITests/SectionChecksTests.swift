@@ -664,6 +664,39 @@ struct SectionChecksTests {
         #expect(ended.kept == ["Spesso controllavo i pagamenti dei fornitori."])
     }
 
+    struct ThirdPersonRow: Sendable, CustomTestStringConvertible {
+        let language: Vocabulary.Language
+        let duty: String
+        let stated: String
+        let tense: CVDataSanitizer.DutyTense?
+        var testDescription: String { "\(duty) (\(stated))" }
+    }
+
+    @Test("A duty in the third person has the tense of its verb when it says a said duty, and none when its first word may be a noun or it says none (#362)",
+          arguments: [
+              ThirdPersonRow(language: .italian, duty: "Lubrifica i motori.", stated: "Lubrificavo i motori.", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Lubrificava i motori.", stated: "Lubrifico i motori.", tense: .past),
+              ThirdPersonRow(language: .italian, duty: "Spesso pulisce i filtri.", stated: "Pulivo i filtri.", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Sostituisce i cuscinetti.", stated: "riparavo i nastri e sostituivo i cuscinetti", tense: .present),
+              ThirdPersonRow(language: .italian, duty: "Lubrifica le pompe.", stated: "Lubrificavo i motori.", tense: nil),
+              ThirdPersonRow(language: .italian, duty: "Programma di manutenzione.", stated: "Programmavo la manutenzione.", tense: nil),
+              ThirdPersonRow(language: .italian, duty: "Manutenzione preventiva.", stated: "Programmavo la manutenzione preventiva.", tense: nil),
+              ThirdPersonRow(language: .spanish, duty: "Revisa los frenos.", stated: "revisando los frenos", tense: .present),
+              ThirdPersonRow(language: .spanish, duty: "Revisó los frenos.", stated: "revisando los frenos", tense: .past),
+              ThirdPersonRow(language: .spanish, duty: "Revisión de los frenos.", stated: "revisando los frenos", tense: nil),
+              ThirdPersonRow(language: .portuguese, duty: "Corta as chapas.", stated: "cortava as chapas", tense: .present),
+              ThirdPersonRow(language: .portuguese, duty: "Cortou as chapas.", stated: "cortava as chapas", tense: .past),
+              ThirdPersonRow(language: .portuguese, duty: "Corte das chapas.", stated: "cortava as chapas", tense: nil),
+          ])
+    func thirdPersonTense(row: ThirdPersonRow) {
+        #expect(CVDataSanitizer.dutyTense(of: row.duty, language: row.language, stated: [row.stated]) == row.tense)
+    }
+
+    @Test("A duty in the third person has no tense of its own: it takes one only from a said duty (#362)")
+    func thirdPersonWithNoSaidDuty() {
+        #expect(CVDataSanitizer.dutyTense(of: "Lubrifica i motori.", language: .italian) == nil)
+    }
+
     @Test("A duty in the first person with a later part that opens with a gerund it cannot write goes; a later first person in -ndo stays (#362)")
     func dutyJoiningAGerund() throws {
         let unknown: Set<String> = ["preparandare", "preparandere", "preparandire", "preparo", "preparavo"]
