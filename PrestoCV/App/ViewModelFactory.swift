@@ -273,6 +273,6 @@ final class ViewModelFactory {
     }
 
     private func makeAIDraftLabels() -> AIDraftLabels {
-        return AIDraftLabels(present: String(localized: "template.present"))
+        return AIDraftLabels(catalog: environment.bundle)
     }
 }

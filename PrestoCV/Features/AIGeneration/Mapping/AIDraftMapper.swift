@@ -34,9 +34,11 @@ struct AIDraftMapper {
     /// - Parameters:
     ///   - cvData: What the model produced from the description.
     ///   - description: The person's own text. The CV is printed in its language when the templates
-    ///     support it, and otherwise follows the app's language.
+    ///     support it, and otherwise follows the app's language; its words (the end of a current job) follow the same language.
     func map(_ cvData: CVGeneratorAI.CVData, writtenIn description: String) -> CVModel {
         let info = cvData.personalInfo
+        let cvLanguage = languageOfText(description).flatMap(DocumentLanguage.init(languageTag:))
+        let present = cvLanguage.map(labels.present) ?? labels.presentInAppLanguage
 
         // No name of its own: the list calls the draft by its person, otherwise by its role (CVTitle), until it is renamed
         return CVModel(
@@ -49,20 +51,20 @@ struct AIDraftMapper {
                 portfolio: info.website ?? "",
                 profile: cvData.summary ?? ""
             ),
-            relevant_experience: cvData.experience.map(experience),
+            relevant_experience: cvData.experience.map { experience($0, endingCurrentJobWith: present) },
             education: cvData.education.map(education),
             skills: ordered(cvData.skills).map(skill),
             languages: cvData.languages.compactMap(language),
             certifications: cvData.certifications.map(certification),
             interests: interests(cvData.interests),
             social: socialLinks(info),
-            documentLanguage: documentLanguage(of: description)
+            documentLanguage: cvLanguage?.rawValue
         )
     }
 
     // MARK: - Sections
 
-    private func experience(_ entry: CVGeneratorAI.Experience) -> PrestoCVCore.Experience {
+    private func experience(_ entry: CVGeneratorAI.Experience, endingCurrentJobWith present: String) -> PrestoCVCore.Experience {
         let achievements = entry.achievements.map { "• \($0)" }
         let description = ([entry.description].compactMap { $0 } + achievements).joined(separator: "\n")
 
@@ -70,7 +72,7 @@ struct AIDraftMapper {
             title: entry.title,
             company: entry.company,
             location: entry.location ?? "",
-            period: period(start: entry.startDate, end: entry.endDate, isCurrent: entry.current),
+            period: period(start: entry.startDate, end: entry.endDate, endOfCurrent: entry.current ? present : nil),
             description: description
         )
     }
@@ -79,7 +81,7 @@ struct AIDraftMapper {
         PrestoCVCore.Education(
             degree: entry.degree ?? "",
             school: entry.institution ?? "",
-            period: period(start: entry.startDate, end: entry.endDate, isCurrent: false),
+            period: period(start: entry.startDate, end: entry.endDate, endOfCurrent: nil),
             description: entry.description ?? ""
         )
     }
@@ -126,14 +128,10 @@ struct AIDraftMapper {
 
     // MARK: - Values
 
-    private func documentLanguage(of description: String) -> String? {
-        languageOfText(description).flatMap(DocumentLanguage.init(languageTag:))?.rawValue
-    }
-
-    /// "start – end"; just the one date when only one is known. A current job has no end, so it ends with the
-    /// injected word, unless the draft states an end date: that date always wins.
-    private func period(start: String?, end: String?, isCurrent: Bool) -> String {
-        let finish = end ?? (isCurrent ? labels.present : nil)
+    /// "start – end"; just the one date when only one is known. A current job has no end, so it ends with
+    /// `endOfCurrent`, the word for "present" in the CV's language, unless the draft states an end date: that date always wins.
+    private func period(start: String?, end: String?, endOfCurrent: String?) -> String {
+        let finish = end ?? endOfCurrent
 
         switch (start, finish) {
         case let (start?, finish?): return "\(start) – \(finish)"
