@@ -2,17 +2,25 @@ import Foundation
 
 /// ADR 0031: a duty the person said with a gerund, shared by two jobs ("setting up the PA systems and mixing the support acts",
 /// "controllando i quadri elettrici e programmando la manutenzione preventiva"), in the first person of the job's other duties, so
-/// one job does not mix two forms. English puts "I was" (a past job) or "I am" (the current one) before it. Italian, Spanish and
-/// Portuguese write each gerund that starts the duty or follows a conjunction in the first person of the imperfect (a past job) or
-/// of the present (the current one), when the word list knows that form; a gerund after a comma follows only when no verb in the
-/// first person comes before it (a list of gerunds), as it is otherwise the adjunct of that verb ("gestivo gli ordini,
-/// coordinando i fornitori", #362). A duty in the first person keeps its words, but for a gerund that opens a later part
-/// ("Controllavo i quadri e programmando la manutenzione", #362), which is written the same way when it is the gerund of a verb the
-/// word list knows, or of an irregular verb (`irregular`: "facendo" is of "fare", and the word list has no verb it could find
-/// from the gerund), and no first person of another (`isWritten`: "e prendo" stays), as does a first word in the first person that
-/// ends as one ("Prendo le ordinazioni"). A duty with a form the list does not know keeps its words; each duty starts with a
-/// capital letter. A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is written the same way (#354,
-/// round 10), and one in -ere or -ire of an ended Italian job (round 14).
+/// one job does not mix two forms.
+///
+/// English puts "I was" (a past job) or "I am" (the current one) before it.
+///
+/// Italian, Spanish and Portuguese write each gerund that starts the duty or follows a conjunction in the first person of the
+/// imperfect (a past job) or of the present (the current one), when the word list knows that form. A gerund after a comma follows
+/// only when no verb in the first person comes before it (a list of gerunds); otherwise it is the adjunct of that verb ("gestivo gli
+/// ordini, coordinando i fornitori", #362).
+///
+/// A duty in the first person keeps its words, with one exception: a gerund that opens a later part ("Controllavo i quadri e
+/// programmando la manutenzione", #362) is written the same way when both hold:
+/// - it is the gerund of a verb the word list knows, or of an irregular verb (`irregular`: "facendo" is of "fare", and the word
+///   list has no verb it could find from the gerund);
+/// - it is the first person of no other verb (`isWritten`: "e prendo" stays).
+/// A first word in the first person that ends as a gerund ("Prendo le ordinazioni") keeps its words too, as does a duty with a form
+/// the list does not know. Each duty starts with a capital letter.
+///
+/// A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is written the same way (#354, round 10), and
+/// so is one in -ere or -ire of an ended Italian job (round 14).
 enum FirstPersonDuty {
     private struct Endings {
         /// The endings of the form the rewrite reads: a gerund's, or an infinitive's.
@@ -119,16 +127,16 @@ enum FirstPersonDuty {
     ]
 
     /// The words that join two parts of a duty.
-    static let joiners: Set<String> = ["e", "ed", "y", "and"]
+    private static let joiners: Set<String> = ["e", "ed", "y", "and"]
     /// English words in -ing that are no gerund of a duty.
     private static let notGerunds: Set<String> = [
         "bring", "string", "spring", "swing", "sling", "sting", "during", "nothing", "something", "everything", "anything", "morning", "evening", "ceiling",
     ]
 
+    /// `duty` in the first person of the job (a past job unless `current`), as the header says, starting with a capital letter.
     static func written(_ duty: String, current: Bool, language: Vocabulary.Language?, wordList: any WordList) -> String {
         let tokens = duty.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         guard let first = tokens.first else { return duty }
-        let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         switch language {
         case .english:
             let word = letters(first)
@@ -180,7 +188,6 @@ enum FirstPersonDuty {
     static func joinsAGerund(_ duty: String, language: Vocabulary.Language?, wordList: any WordList) -> Bool {
         guard let language, let rules = endings[language] else { return false }
         let tokens = duty.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-        let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         guard let first = tokens.first, opening(letters(first), language: language, wordList: wordList) == nil else { return false }
         return tokens.indices.dropFirst().contains { index in
             joins(tokens[index - 1]) && isWritten(letters(tokens[index]), rules, language: language, wordList: wordList)
@@ -194,7 +201,6 @@ enum FirstPersonDuty {
         _ tokens: [String], current: Bool, language: Vocabulary.Language, wordList: any WordList
     ) -> String? {
         guard let rules = endings[language] else { return nil }
-        let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         var converted: [String] = []
         for (index, token) in tokens.enumerated() {
             guard index > 0, joins(tokens[index - 1]),
@@ -209,13 +215,23 @@ enum FirstPersonDuty {
     }
 
     /// Whether the word after `previous` opens a part of a duty: `previous` ends with a comma or joins two parts.
-    private static func opensAPart(after previous: String) -> Bool {
+    static func opensAPart(after previous: String) -> Bool {
         previous.hasSuffix(",") || joins(previous)
     }
 
     /// Whether `previous` is a word that joins two parts of a duty.
     private static func joins(_ previous: String) -> Bool {
-        joiners.contains(previous.lowercased().filter(\.isLetter))
+        joiners.contains(letters(previous))
+    }
+
+    /// The letters of `token`, lowercased: the word without its punctuation.
+    private static func letters(_ token: String) -> String {
+        token.lowercased().filter(\.isLetter)
+    }
+
+    /// The ending of `rules` that `word` ends with: the first one, in the order of `rules.gerunds`.
+    private static func gerundEnding(of word: String, rules: Endings) -> String? {
+        rules.gerunds.first { word.hasSuffix($0) }
     }
 
     /// The form of `language` that the first word of a duty, `word`, is written in: the gerund's when `isWritten`, else the
@@ -234,7 +250,7 @@ enum FirstPersonDuty {
     private static func isWritten(_ word: String, _ rules: Endings, language: Vocabulary.Language, wordList: any WordList) -> Bool {
         guard isGerund(word, rules) else { return false }
         guard !rules.verbs.isEmpty else { return true }
-        guard let ending = rules.gerunds.first(where: { word.hasSuffix($0) }) else { return false }
+        guard let ending = gerundEnding(of: word, rules: rules) else { return false }
         let knows = { (candidate: String) in wordList.knows(candidate, inLanguage: language.rawValue) == true }
         let stem = String(word.dropLast(ending.count))
         let verbs: [String] = (rules.verbs[ending] ?? []).map { stem + $0 }
@@ -273,16 +289,16 @@ enum FirstPersonDuty {
               let opening = held.first?.split(whereSeparator: { !$0.isLetter }).first.map({ $0.lowercased() }), rules.marks(opening)
         else { return duty }
         let tokens = duty.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-        let letters = { (token: String) in token.lowercased().filter(\.isLetter) }
         guard let first = tokens.first, letters(first).count > rules.imperfect.count + 1, letters(first).hasSuffix(rules.imperfect) else {
             return duty
         }
         var converted: [String] = []
         for (index, token) in tokens.enumerated() {
             let word = letters(token)
-            let previous = index > 0 ? tokens[index - 1] : nil
-            let opensAPart = previous == nil || previous.map { $0.hasSuffix(",") || joiners.contains(letters($0)) } == true
-            guard opensAPart, word.count > rules.imperfect.count + 1 else { converted.append(token); continue }
+            guard index == 0 || opensAPart(after: tokens[index - 1]), word.count > rules.imperfect.count + 1 else {
+                converted.append(token)
+                continue
+            }
             if rules.unwritten.contains(where: word.hasSuffix) { return duty }
             guard word.hasSuffix(rules.imperfect) else { converted.append(token); continue }
             let trailing = String(token.reversed().prefix { !$0.isLetter }.reversed())
@@ -301,6 +317,7 @@ enum FirstPersonDuty {
         (rules.gerunds + rules.unwritten).contains { word.count > $0.count + 1 && word.hasSuffix($0) }
     }
 
+    /// Whether `word` ends as a word of the form that the rewrite writes (not one of `rules.exceptions`).
     private static func isGerund(_ word: String, _ rules: Endings) -> Bool {
         !rules.exceptions.contains(word) && rules.gerunds.contains { word.count > $0.count + 1 && word.hasSuffix($0) }
     }
@@ -311,7 +328,7 @@ enum FirstPersonDuty {
     ) -> String? {
         let trailing = String(token.reversed().prefix { !$0.isLetter }.reversed())
         let word = String(token.dropLast(trailing.count))
-        guard let ending = rules.gerunds.first(where: { word.lowercased().hasSuffix($0) }) else { return nil }
+        guard let ending = gerundEnding(of: word.lowercased(), rules: rules) else { return nil }
         let stem = String(word.dropLast(ending.count))
         let candidates: [String]
         if let form = irregular[language]?[word.lowercased()] {
@@ -324,6 +341,7 @@ enum FirstPersonDuty {
         return known + trailing
     }
 
+    /// `text` with its first letter in capital.
     private static func capitalised(_ text: String) -> String {
         guard let head = text.first else { return text }
         return String(head).uppercased() + text.dropFirst()

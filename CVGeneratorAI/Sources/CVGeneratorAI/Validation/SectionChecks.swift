@@ -701,9 +701,7 @@ extension CVDataSanitizer {
         var clauses: [[String]] = []
         var previous: String?
         for token in duty.split(whereSeparator: \.isWhitespace).map(String.init) {
-            let opensAClause = previous.map {
-                $0.hasSuffix(",") || FirstPersonDuty.joiners.contains(letterWords(of: $0).joined())
-            } ?? true
+            let opensAClause = previous.map(FirstPersonDuty.opensAPart(after:)) ?? true
             if opensAClause { clauses.append([]) }
             clauses[clauses.count - 1].append(token)
             previous = token
