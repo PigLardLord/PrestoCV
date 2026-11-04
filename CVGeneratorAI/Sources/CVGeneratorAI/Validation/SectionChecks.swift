@@ -149,6 +149,7 @@ extension CVDataSanitizer {
                 source.written(sentence, quoting: quotes, allowsNumbers: true) { _ in false } != nil ? nil : rule.rejection(of: sentence)
             }
             let current = job.entry.current && rule.evidence.statesCurrent
+            let hasEnded = !current && rule.evidence.statesEnded
             let names = Self.ownNames(of: cvData)
             var verdicts = DutyVerdicts()
             // The said duties are pinned with the job's own quotes, as the final check pins them: a clause that is one of the job's
@@ -205,13 +206,14 @@ extension CVDataSanitizer {
                         form = own
                     }
                 }
-                let heldTenses: Set<DutyTense> = Set(held.compactMap { Self.dutyTense(of: $0, language: language, stated: stated) })
-                let hasEnded: Bool = !current && rule.evidence.statesEnded
-                if rejection == nil, !current, Self.dutyTense(of: sentence, language: language, stated: stated) == .present,
-                   heldTenses.contains(.past) || (hasEnded && !heldTenses.contains(.present)) {
-                    rejection = heldTenses.contains(.past)
-                        ? "it is in the present, and the job has ended: write it in the past, as the other duties"
-                        : "it is in the present, and the job has ended: write it in the past"
+                if rejection == nil, !current, Self.dutyTense(of: sentence, language: language, stated: stated) == .present {
+                    // `held` grows with each duty that stays, so the tenses it holds are read here, when a duty is in the present.
+                    let heldTenses = Set(held.compactMap { Self.dutyTense(of: $0, language: language, stated: stated) })
+                    if heldTenses.contains(.past) {
+                        rejection = Self.presentAfterPastReason
+                    } else if hasEnded, !heldTenses.contains(.present) {
+                        rejection = Self.presentAtEndedJobReason
+                    }
                 }
                 if rejection == nil, let opening = Self.opening(of: sentence), held.count { Self.opening(of: $0) == opening } >= 2 {
                     rejection = Self.opensAsTwoEarlierOnes
@@ -230,6 +232,12 @@ extension CVDataSanitizer {
 
     static let opensAsTwoEarlierOnes = "it opens with the words of two earlier duties: start it with another verb"
     static let joinsAGerundReason = "it joins a gerund to a verb in the first person: write each part in the first person"
+    /// Why a duty in the present of an ended job goes when the job holds a duty in the past (`dutyTense`, #362).
+    static let presentAfterPastReason = "it is in the present, and the job has ended: write it in the past, as the other duties"
+    /// Why a duty in the present of an ended job goes when the job holds no duty in the present (`dutyTense`, #362).
+    static let presentAtEndedJobReason = "it is in the present, and the job has ended: write it in the past"
+    /// Why a written duty goes that says what the person did at another job (`DutyRule.rejection(of:)`, #362).
+    static let atAnotherJobReason = "it says what the person did at another job"
 
     // MARK: Filler and vague duties (#354, round 11)
 
@@ -994,11 +1002,9 @@ extension CVDataSanitizer {
             if let word = CVDataSanitizer.employerWord(in: sentence, names: [job.company].compactMap { $0 } + otherEmployers, in: source) {
                 return "the word \"\(word)\" comes from an employer's name: say the work in other words"
             }
-            if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 }) {
-                return "it says what the person did at another job"
-            }
-            if otherDuties.contains(where: { CVDataSanitizer.saysInAClause(sentence, $0) }) {
-                return "it says what the person did at another job"
+            if source.repeats(sentence, ofSentencesNaming: otherEmployers, notNaming: [job.company].compactMap { $0 })
+                || otherDuties.contains(where: { CVDataSanitizer.saysInAClause(sentence, $0) }) {
+                return CVDataSanitizer.atAnotherJobReason
             }
             // Last, so that a word the other checks name ("certified") is the reason the model reads.
             if let role = RoleAssertion.unkeptRole(in: sentence, titles: titles, name: nil, language: language) {
