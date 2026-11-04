@@ -19,7 +19,7 @@ The app is called PrestoCV on the App Store ("PrestoCV: CV & Resume Maker"), und
 
 ## Status
 
-Version 1.0, for iPhone and iPad, is submitted to the App Store. It is the legacy app with its bugs fixed ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)). A macOS version comes later.
+Version 1.0 is for iPhone and iPad. It is the legacy app with its bugs fixed ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)). A macOS version comes later.
 
 The code is being rebuilt on a target architecture that is enforced mechanically (ADR 0001), one context at a time. The current app and packages are the legacy code that the migration replaces, and it goes on after version 1:
 - the architecture is in `docs/architecture/`;
