@@ -269,6 +269,12 @@ struct JobClausesTests {
         // The same duty in another tense, with a gerund, or with a part of the duty: said again.
         SaysRow(sentence: "Controllo i quadri elettrici", duty: "Controllavo i quadri elettrici e programmavo la manutenzione", says: true),
         SaysRow(sentence: "Controllando i quadri elettrici", duty: "Controllavo i quadri elettrici", says: true),
+        // A figure the duty lacks is another fact, and the sentence that holds it says another duty (D).
+        SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo i quadri elettrici", says: false),
+        SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo 4 quadri elettrici", says: false),
+        SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo 40 quadri elettrici", says: true),
+        SaysRow(sentence: "Controllavo 40 quadri elettrici", duty: "Controllo 40 quadri elettrici e 12 pompe idrauliche", says: true),
+        SaysRow(sentence: "Controllavo i quadri elettrici", duty: "Controllo 40 quadri elettrici", says: true),
         // The Italian article "i" is no pronoun: the noun after it opens no clause (E).
         SaysRow(sentence: "Motorizzavo i quadri elettrici", duty: "Controllo i quadri elettrici, i motori e le pompe", says: false),
         SaysRow(sentence: "Controllavo i motori", duty: "Controllo i quadri elettrici, i motori e le pompe", says: true),
@@ -277,6 +283,29 @@ struct JobClausesTests {
     @Test("A sentence says a duty again only with the same verb, the same objects and the same figures (#362)", arguments: saysRows)
     func saysTheDuty(row: SaysRow) {
         #expect(CVDataSanitizer.saysTheDuty(row.sentence, row.duty) == row.says)
+    }
+
+    struct RestatedRow: Sendable, CustomTestStringConvertible {
+        let sentence: String
+        let duties: [String]
+        let restated: Bool
+        var testDescription: String { "\(sentence) / \(duties.joined(separator: " "))" }
+    }
+
+    static let restatedRows: [RestatedRow] = [
+        // Its words are the duties' words, in whatever order, with the figures they state.
+        RestatedRow(sentence: "Controllo i quadri elettrici.", duties: ["Controllo i quadri elettrici e le pompe idrauliche."], restated: true),
+        RestatedRow(sentence: "Controllavo 40 quadri elettrici.", duties: ["Controllo 40 quadri elettrici."], restated: true),
+        // A figure the duties lack is another fact, though every word of the letters is theirs.
+        RestatedRow(sentence: "Controllavo 40 quadri elettrici.", duties: ["Controllo i quadri elettrici."], restated: false),
+        RestatedRow(sentence: "Controllavo 40 quadri elettrici.", duties: ["Controllo i quadri elettrici.", "Ordino 40 pompe idrauliche."], restated: false),
+        // Another tense of a duty is said again, and another verb with the same first letters is not.
+        RestatedRow(sentence: "Controllando i quadri elettrici.", duties: ["Controllavo i quadri elettrici."], restated: true),
+    ]
+
+    @Test("A sentence is restated by the duties of its job only with the figures they state (#362)", arguments: restatedRows)
+    func isRestated(row: RestatedRow) {
+        #expect(CVDataSanitizer.isRestated(row.sentence, by: row.duties) == row.restated)
     }
 
     // MARK: A duty of another job joined to another, or in the third person (#362)

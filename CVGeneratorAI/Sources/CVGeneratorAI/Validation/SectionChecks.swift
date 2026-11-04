@@ -615,19 +615,36 @@ extension CVDataSanitizer {
     }
 
     /// Whether `sentence` says the duty `duty` says, in any tense and with or without a gerund (#362): its verb, by its first four
-    /// letters, opens a clause of `duty`, and each word of 5 letters or more after it that names a work (no idle word), by its
-    /// first four letters, is a word of `duty`. "Controllo i quadri elettrici" says "Controllavo i quadri elettrici e programmavo la
-    /// manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another duty with the same verb, and "Gestivo gli ordini
-    /// dei ricambi" another duty on the same object, which may state more than the person said ("Ho aiutato con gli ordini dei
-    /// ricambi").
+    /// letters, opens a clause of `duty`, each figure it holds is a figure of `duty`, and each word of 5 letters or more after it
+    /// that names a work (no idle word), by its first four letters, is a word of `duty`. "Controllo i quadri elettrici" says
+    /// "Controllavo i quadri elettrici e programmavo la manutenzione preventiva"; "Controllavo la qualità dei pezzi" says another
+    /// duty with the same verb, "Gestivo gli ordini dei ricambi" another duty on the same object, which may state more than the
+    /// person said ("Ho aiutato con gli ordini dei ricambi"), and "Controllavo 40 quadri elettrici" another fact than
+    /// "Controllo i quadri elettrici": the figure is the sentence's own.
     static func saysTheDuty(_ sentence: String, _ duty: String) -> Bool {
         let objects: Set<String> = Set(
             objectWords(of: sentence).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(4)) }
         )
-        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(String(verb.prefix(4))) else {
+        guard !objects.isEmpty, let verb = dutyVerb(of: sentence), clauseVerbs(of: duty).contains(String(verb.prefix(4))),
+              figures(in: sentence).isSubset(of: figures(in: duty)) else {
             return false
         }
         return objects.isSubset(of: stems(of: duty))
+    }
+
+    /// Whether `sentence` says again what the `duties` of its job say: all its words of three letters or more are words of the
+    /// duties, or it says one of them (`saysTheDuty`); either way each figure it holds is a figure of the duties, as a sentence
+    /// with a figure they lack states another fact (#362).
+    static func isRestated(_ sentence: String, by duties: [String]) -> Bool {
+        let text = duties.joined(separator: " ")
+        let inTheWords = figures(in: sentence).isSubset(of: figures(in: text))
+            && letterWords(of: sentence).filter { $0.count >= 3 }.allSatisfy(Set(letterWords(of: text)).contains)
+        return inTheWords || duties.contains { saysTheDuty(sentence, $0) }
+    }
+
+    /// The runs of digits of `text`: the figures it states.
+    private static func figures(in text: String) -> Set<String> {
+        Set(Digits.runs(in: Digits.ascii(text)))
     }
 
     /// Whether `sentence`, or one of its clauses, says the duty `duty` (`saysTheDuty`, #362): "Ripara i nastri trasportatori e

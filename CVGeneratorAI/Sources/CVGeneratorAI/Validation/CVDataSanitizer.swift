@@ -287,14 +287,10 @@ public struct CVDataSanitizer: Sendable {
                 SentenceSplitter.sentences(in: text).filter { !Self.stems(of: $0).isSubset(of: pinnedStems) }.joined(separator: " ").presentValue
             }
             let roleDuties = position < duties.count ? Self.joined(pinned.joined(separator: " ").presentValue, newDuties) : nil
-            let dutyWords = Set(Self.letterWords(of: roleDuties ?? ""))
             let dutySentences: [String] = SentenceSplitter.sentences(in: roleDuties ?? "")
             // A quoted sentence the duties restate goes, in their words or with their verb and objects in another tense
             // (`saysTheDuty`; #362), so the job's text keeps one voice and says the duty once, in the person's words.
-            let restated: (String) -> Bool = { sentence in
-                Self.letterWords(of: sentence).filter { $0.count >= 3 }.allSatisfy(dutyWords.contains)
-                    || dutySentences.contains { Self.saysTheDuty(sentence, $0) }
-            }
+            let restated: (String) -> Bool = { Self.isRestated($0, by: dutySentences) }
             let quote = description(experience.description, evidence.quotable).flatMap { quote in
                 roleDuties == nil ? Self.withoutBareWork(quote, language: source.explainer.language) : SentenceSplitter.sentences(in: quote)
                     .filter { !RoleStub.isStub($0, jobWords: jobWords, language: source.explainer.language) }
