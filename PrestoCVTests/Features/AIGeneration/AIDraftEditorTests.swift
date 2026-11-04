@@ -9,7 +9,7 @@ import CVGeneratorAI
 @MainActor
 @Suite("AI draft in the editor Tests")
 struct AIDraftEditorTests {
-    private let labels = AIDraftLabels(present: "Oggi")
+    private let labels = AIDraftLabels(present: { _ in "Oggi" }, presentInAppLanguage: "Oggi")
 
     private func editor(opening draft: CVData, useCase: MockCVManagementUseCase = MockCVManagementUseCase()) -> CVEditorViewModel {
         let cv = AIDraftMapper(labels: labels, languageOfText: { _ in nil }).map(draft, writtenIn: "A description.")

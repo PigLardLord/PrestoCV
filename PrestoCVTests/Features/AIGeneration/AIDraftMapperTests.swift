@@ -7,7 +7,7 @@ import CVGeneratorAI
 @Suite("AIDraftMapper Tests")
 struct AIDraftMapperTests {
     /// Words that appear nowhere in the mapper, so a test fails if it falls back to English.
-    private let labels = AIDraftLabels(present: "Oggi")
+    private let labels = AIDraftLabels(present: { _ in "Oggi" }, presentInAppLanguage: "Oggi")
 
     private func map(_ cvData: CVData, writtenIn description: String = "A description.", language: String? = nil) -> CVModel {
         AIDraftMapper(labels: labels, languageOfText: { _ in language }).map(cvData, writtenIn: description)
@@ -130,6 +130,39 @@ struct AIDraftMapperTests {
         let experience = CVGeneratorAI.Experience(title: "Cook", current: true)
 
         #expect(map(CVData(experience: [experience])).relevant_experience.first?.period == "Oggi")
+    }
+
+    // MARK: - The present, in the language of the CV (#363)
+
+    /// A word for each language a CV is printed in, and one for the app's: a test fails if the mapper takes the wrong one
+    private let presentInEachLanguage = AIDraftLabels(present: { "present-\($0.rawValue)" }, presentInAppLanguage: "present-app")
+
+    private let currentJob = CVData(experience: [CVGeneratorAI.Experience(title: "Cook", startDate: "2016", current: true)])
+
+    @Test("A current job ends with the word for the present in the language of the description, which the CV is printed in",
+          arguments: DocumentLanguage.allCases)
+    func currentJobEndsInTheLanguageOfTheCV(language: DocumentLanguage) {
+        let cv = AIDraftMapper(labels: presentInEachLanguage, languageOfText: { _ in language.rawValue })
+            .map(currentJob, writtenIn: "A description.")
+
+        #expect(cv.documentLanguage == language.rawValue)
+        #expect(cv.relevant_experience.map(\.period) == ["2016 – present-\(language.rawValue)"])
+    }
+
+    @Test("A current job ends with the app's word when the CV follows the app: a language that cannot be told, or one no CV is printed in",
+          arguments: [nil, "nl"] as [String?])
+    func currentJobEndsInTheAppLanguage(tag: String?) {
+        let cv = AIDraftMapper(labels: presentInEachLanguage, languageOfText: { _ in tag }).map(currentJob, writtenIn: "A description.")
+
+        #expect(cv.documentLanguage == nil)
+        #expect(cv.relevant_experience.map(\.period) == ["2016 – present-app"])
+    }
+
+    @Test("The catalog gives the word for the present in each language a CV is printed in, whatever language the app is shown in")
+    func catalogGivesThePresentInEachLanguage() {
+        let labels = AIDraftLabels(catalog: Bundle(for: AppRouter.self))
+
+        #expect(DocumentLanguage.allCases.map(labels.present) == ["Present", "Presente", "Heute", "Actualidad", "Aujourd'hui", "Atual"])
     }
 
     @Test("The description is followed by one bullet line per achievement")

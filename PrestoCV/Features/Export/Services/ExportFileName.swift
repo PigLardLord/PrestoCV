@@ -36,7 +36,6 @@ struct DocumentTitlePatterns {
     let bundle: Bundle
 
     func pattern(in language: DocumentLanguage) -> String {
-        let languageBundle = bundle.path(forResource: language.rawValue, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
-        return languageBundle.localizedString(forKey: "export.file_name", value: nil, table: nil)
+        language.localizedString(forKey: "export.file_name", in: bundle)
     }
 }

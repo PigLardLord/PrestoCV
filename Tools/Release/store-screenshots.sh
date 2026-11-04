@@ -18,7 +18,8 @@
 # StoreScreenshots test plan, which holds only StoreScreenshotsUITests, once. Then, for each language, it erases the
 # simulator, so that no choice of the last language is left, and boots it in that language and region, so that the
 # system's own screens (the share sheet) and the clock speak it too: the status bar at 9:41 on a fixed date (09:41 where the region
-# writes it so), full battery and full signal, the light appearance, and a keyboard without autocorrection, spell check
+# writes it so; the iPad's bar shows the date too, which the simulator writes in English, so the composer writes it again in
+# the language), full battery and full signal, the light appearance, and a keyboard without autocorrection, spell check
 # or predictions, which would change or underline the description the test types. It runs the language's test, handing
 # it the app's texts in that language from the string catalog (the test does not read the source tree), and exports the
 # screenshots the test attached.
@@ -284,7 +285,9 @@ prepare() {
 
 # The clock of the status bar: simctl reads an ISO 8601 date-time (with fractional seconds) in the Mac's time zone, so the
 # offset is the Mac's on that day. A bare "9:41" leaves the real date on the iPad's bar, so a capture would carry the day it
-# was made. The date is fixed, and 9:41 is the local time of it.
+# was made. The date is fixed, and 9:41 is the local time of it. With it the iPad's bar writes the date in English, with
+# another weekday, in every language: the composer paints it over with the same day, its statusBarDay, as the iPad writes
+# it in the capture's language (the self-test checks that the two days agree).
 status_bar_time() {
     python3 -c 'import datetime
 offset = datetime.datetime(2007, 1, 9, 9, 41).astimezone().strftime("%z")
