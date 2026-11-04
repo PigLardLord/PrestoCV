@@ -17,9 +17,10 @@ extension AIDraftLabels {
     /// The words as the app's string catalog writes them: in each language a CV is printed in, whatever language the app
     /// is shown in, and in the app's own language (#363)
     init(catalog bundle: Bundle) {
+        let presentKey = "template.present"
         self.init(
-            present: { $0.localizedString(forKey: "template.present", in: bundle) },
-            presentInAppLanguage: bundle.localizedString(forKey: "template.present", value: nil, table: nil)
+            present: { $0.localizedString(forKey: presentKey, in: bundle) },
+            presentInAppLanguage: bundle.localizedString(forKey: presentKey, value: nil, table: nil)
         )
     }
 }
