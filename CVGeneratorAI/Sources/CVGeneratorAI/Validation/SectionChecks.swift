@@ -769,21 +769,78 @@ extension CVDataSanitizer {
     /// The tense of a duty said in the first person (#354): an ended job's duties keep the past they started in.
     enum DutyTense: Equatable, Sendable { case past, present }
 
-    /// The tense of a duty at its verb (`tense(of:language:)`, #362): after the words that come before it ("Spesso controllavo",
-    /// "Luego revisé", "Depois atendia"), and after the clause that "quando" or "cuando" opens, up to its comma ("Quando serviva,
-    /// cambiavo"); nil for such a clause with no comma. An ended job keeps a duty in the past that opens with one of them. A verb in
-    /// the third person counts when the duty says one of the duties in `stated` (`thirdPersonTense`).
+    /// The tense of a duty at its verb, the one reader of it (`tense(of:language:)`, #362): after the words that come before it
+    /// ("Spesso controllavo", "Luego revisé", "Depois atendia"), after the clause that "quando" or "cuando" opens, up to its comma
+    /// ("Quando serviva, cambiavo"; nil for such a clause with no comma), and after a phrase that opens with a preposition or a
+    /// quantity ("Presso il reparto controllavo", "Tutto il giorno controllavo", "Como encargado atendía"), at the first verb the
+    /// vocabulary lists in it (`firstVerb`). A phrase with no listed verb, and a first word that is no opener and ends as no tense,
+    /// have none: the line stays. An ended job keeps a duty in the past that opens with one of them. A verb in the third person
+    /// counts when the duty says one of the duties in `stated` (`thirdPersonTense`).
     static func dutyTense(of sentence: String, language: Vocabulary.Language?, stated: [String] = []) -> DutyTense? {
         var rest = Substring(sentence)
         while let opener = rest.split(whereSeparator: { !$0.isLetter }).first(where: { !wordsBeforeTheVerb.contains($0.lowercased()) }) {
-            guard clauseOpeners.contains(opener.lowercased()) else {
-                let fromTheVerb = String(rest[opener.startIndex...])
-                return tense(of: fromTheVerb, language: language) ?? thirdPersonTense(of: fromTheVerb, saying: stated, language: language)
+            if clauseOpeners.contains(opener.lowercased()) {
+                guard let comma = rest[opener.endIndex...].firstIndex(of: ",") else { return nil }
+                rest = rest[rest.index(after: comma)...]
+                continue
             }
-            guard let comma = rest[opener.endIndex...].firstIndex(of: ",") else { return nil }
-            rest = rest[rest.index(after: comma)...]
+            guard phraseOpeners(language).contains(opener.lowercased()) else {
+                return tenseFrom(rest[opener.startIndex...], saying: stated, language: language)
+            }
+            return firstVerb(in: rest[opener.endIndex...], opener: opener.lowercased(), saying: stated, language: language)
         }
         return nil
+    }
+
+    /// The tense of the text that starts at its verb: the ending of a first person, or a third person that says a stated duty.
+    private static func tenseFrom(_ text: Substring, saying stated: [String], language: Vocabulary.Language?) -> DutyTense? {
+        let fromTheVerb = String(text)
+        return tense(of: fromTheVerb, language: language) ?? thirdPersonTense(of: fromTheVerb, saying: stated, language: language)
+    }
+
+    /// The tense at the first verb of `text`, the rest of a sentence after its opening phrase: the first word that the vocabulary
+    /// lists as a verb and that reads a tense, past the words an article or a preposition leads ("controllo" in "il controllo
+    /// qualità" is a noun) and the participles ("encargado" in "Como encargado" is a role). Nil when there is none.
+    private static func firstVerb(
+        in text: Substring, opener: String, saying stated: [String], language: Vocabulary.Language?
+    ) -> DutyTense? {
+        guard let language else { return nil }
+        var previous = opener
+        for word in text.split(whereSeparator: { !$0.isLetter }) {
+            let lowered = word.lowercased()
+            let folded = DescriptionText.normalized(lowered)
+            defer { previous = lowered }
+            guard !leadsANoun(previous, language: language), !isParticiple(folded, language: language),
+                  Vocabulary.isVerb(folded, in: language) else { continue }
+            if let tense = tenseFrom(text[word.startIndex...], saying: stated, language: language) { return tense }
+        }
+        return nil
+    }
+
+    /// The words that open a phrase of place, time or role before the verb of a duty ("Presso il reparto", "Tutto il giorno",
+    /// "Como encargado"): the first word of a duty that is one of them is no verb.
+    private static func phraseOpeners(_ language: Vocabulary.Language?) -> Set<String> {
+        switch language {
+        case .italian:
+            ["a", "al", "alla", "alle", "agli", "ai", "allo", "come", "con", "da", "dal", "dalla", "durante", "fino", "in", "nel", "nella",
+             "nelle", "nei", "negli", "nello", "ogni", "per", "presso", "sul", "sulla", "tutta", "tutte", "tutti", "tutto"]
+        case .spanish:
+            ["a", "cada", "como", "con", "de", "desde", "durante", "en", "para", "por", "toda", "todas", "todo", "todos"]
+        case .portuguese:
+            ["a", "cada", "como", "com", "de", "desde", "durante", "em", "na", "nas", "no", "nos", "para", "por", "toda", "todas", "todo",
+             "todos"]
+        case .english, .german, .french, nil: []
+        }
+    }
+
+    /// The articles of the three languages.
+    private static let articles: Set<String> = [
+        "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "l", "el", "los", "las", "o", "os", "as", "um", "uma",
+    ]
+
+    /// Whether a word that follows `previous` is a noun, not a verb: `previous` is an article, a preposition, or opens a phrase.
+    private static func leadsANoun(_ previous: String, language: Vocabulary.Language) -> Bool {
+        articles.contains(previous) || nounLinks.contains(previous) || phraseOpeners(language).contains(previous)
     }
 
     /// The tense of a duty that opens with a verb in the third person singular, in Italian, Spanish and Portuguese ("Ripara",
@@ -845,7 +902,9 @@ extension CVDataSanitizer {
 
     /// The tense of a duty by the ending of its first word, in Italian, Spanish and Portuguese, whose duties start with the verb in the
     /// first person ("Gestivo", "Coordiné", "Colaboro"); nil in the other languages, whose verbs do not tell it by their ending, and
-    /// for a first word with no ending of a tense.
+    /// for a first word with no ending of a tense. A first person of the present that ends as an imperfect ("lavo", "rilevo") is the
+    /// present (`presentsEndingAsAnImperfect`). It reads the first word whatever it is: `dutyTense` reads a duty that an opening
+    /// phrase leads.
     static func tense(of sentence: String, language: Vocabulary.Language?) -> DutyTense? {
         // "Sono" starts the present ("Sono responsabile") and the past ("Sono stato responsabile") alike.
         guard let first = sentence.split(whereSeparator: { !$0.isLetter }).first.map({ $0.lowercased() }), first.count > 1,
@@ -856,9 +915,20 @@ extension CVDataSanitizer {
         case .portuguese: (["fui"], ["ei", "ava", "ia", "i"], ["o"])
         case .english, .german, .french, nil: ([], [], [])
         }
+        if language == .italian, presentsEndingAsAnImperfect.contains(first) { return .present }
         if pastWords.contains(first) || past.contains(where: first.hasSuffix) { return .past }
         return present.contains(where: first.hasSuffix) ? .present : nil
     }
+
+    /// The Italian first persons of the present of the verbs whose stem ends in "v", which end as the imperfect of another verb
+    /// ("lavo" is the present of "lavare", not the imperfect of a "lare"; "rilevo", "ricevo", "scrivo", "arrivo"): the present wins.
+    /// Their imperfects ("lavavo", "ricevevo") end in the imperfect, and a verb of this kind that the list lacks reads as the
+    /// imperfect: a present read as the past never drops a duty.
+    private static let presentsEndingAsAnImperfect: Set<String> = [
+        "lavo", "levo", "rilevo", "sollevo", "prelevo", "elevo", "ricevo", "bevo", "devo", "scrivo", "descrivo", "trascrivo", "iscrivo",
+        "riscrivo", "vivo", "convivo", "arrivo", "derivo", "attivo", "riattivo", "disattivo", "motivo", "cavo", "aggravo", "privo",
+        "ravvivo",
+    ]
 
     /// The rule a job's duty passes (ADR 0031, D3 and D4): a sentence that quotes, with no number, a clause of this job alone is the
     /// person's own; any other states no fact (`WrittenText`), names no other job's title whole, and restates no sentence of the
@@ -1446,7 +1516,8 @@ extension CVDataSanitizer {
 
     /// Whether a sentence said in the first person is in the present, by its verb after the words that join it to the one before
     /// ("Inoltre", "Then"): in English, German and French the verb after "I", "ich" or "je", in the past when it is an auxiliary
-    /// of the past or ends as a past ("-ed", "-te", "-ais"); in Italian, Spanish and Portuguese the first word (`tense(of:language:)`).
+    /// of the past or ends as a past ("-ed", "-te", "-ais"); in Italian, Spanish and Portuguese the tense of the duty's verb
+    /// (`dutyTense`, past the words and the phrase that open it).
     /// A rough rule: false when it cannot tell.
     static func isInThePresent(_ sentence: String, language: Vocabulary.Language?) -> Bool {
         let words = Array(letterWords(of: sentence).drop(while: summaryConnectors.contains))
@@ -1462,7 +1533,7 @@ extension CVDataSanitizer {
             return (first == "je" || first == "j") && !verb.isEmpty && !["ai", "avais", "étais", "suis"].contains(verb)
                 && !verb.hasSuffix("ais")
         case .italian, .spanish, .portuguese:
-            return tense(of: words.joined(separator: " "), language: language) == .present
+            return dutyTense(of: sentence, language: language) == .present
         case nil:
             return false
         }
