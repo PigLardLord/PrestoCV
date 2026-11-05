@@ -1193,6 +1193,10 @@ extension CVDataSanitizer {
             var endings = Set<[String]>()
             var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            // The qualities of the soft skills the draft keeps, and those the description states, are the only ones the summary names as
+            // a manner (#359, N1): with no soft skill known, the summary is not read for them.
+            let heldQualities: Set<String>? = qualities.isEmpty
+                ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: source.foldedWords)
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
@@ -1221,6 +1225,16 @@ extension CVDataSanitizer {
                        written.rejection(of: $0, ownWords: summaryOwnWords, ownQualifications: ownQualifications) == nil
                    }) {
                     sentence = head
+                }
+                // A manner phrase of qualities that are not all soft skills loses the ones that are not (#359, N1): "with focus and
+                // precision" of a draft that holds only "precision" says "with precision"; the sentence goes when it cannot be cut clean.
+                var unheldQualities: [String]?
+                if let heldQualities {
+                    switch UnheldQualities.check(sentence, language: language, held: heldQualities) {
+                    case .unchanged: break
+                    case .without(let cut): sentence = cut
+                    case .unheld(let names): unheldQualities = names
+                    }
                 }
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
@@ -1269,6 +1283,10 @@ extension CVDataSanitizer {
                           RoleAssertion.unkeptRole(in: sentence, titles: keptTitles, name: personName, language: language) != nil {
                     // Last, so that a word the written check names ("certified") is the reason the model reads.
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesAnUnstatedRole))
+                } else if let unheldQualities {
+                    verdict.rejected.append(Rejection(
+                        sentence: sentence, reason: Self.namesAnUnheldQuality + ": " + unheldQualities.joined(separator: ", ")
+                    ))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
@@ -1478,6 +1496,8 @@ extension CVDataSanitizer {
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
+    /// A manner phrase of a quality that is none of the kept soft skills, which cannot be cut clean (#359, N1).
+    static let namesAnUnheldQuality = "it names a quality that is none of the person's soft skills: leave it out, or name a soft skill"
     static let namesAnUnstatedRole = "it names a role the person did not state: say the person's own title, or none"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
