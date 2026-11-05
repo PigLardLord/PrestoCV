@@ -335,14 +335,54 @@ struct EnglishTextTests {
 
     // MARK: - Quotations
 
-    @Test("Text between double quotation marks is a quotation and does not count: straight or curly, across sentences")
-    func quotationsDoNotCount() {
+    @Test("A short quotation does not count: one sentence of at most twenty words, between straight or curly marks")
+    func shortQuotationsDoNotCount() {
         let straight = #"- "gern", "gerne" or "lieber" with a past "wurde" reads as a wish: "Gerne wurde ich in Python geschult" gives no Python."#
-        let curly = "The test says \u{201C}Die App speichert jeden Lebenslauf auf dem Gerät. Wer einen Lebenslauf teilen will, exportiert ihn.\u{201D} and passes with that."
+        let curly = "The test says \u{201C}Die App speichert jeden Lebenslauf auf dem Gerät.\u{201D} and passes with that."
 
         #expect(EnglishText.firstNotEnglish(in: straight) == nil)
         #expect(EnglishText.firstNotEnglish(in: curly) == nil)
         #expect(EnglishText.passages(in: curly) == ["The test says and passes with that."])
+    }
+
+    @Test("A quotation of more than one sentence is text: each of its sentences is a passage, after the text around it")
+    func aQuotationOfSentencesIsText() {
+        let curly = "The test says \u{201C}Die App speichert jeden Lebenslauf auf dem Gerät. Wer einen Lebenslauf teilen will, exportiert ihn.\u{201D} and passes with that."
+
+        #expect(EnglishText.passages(in: curly) == [
+            "The test says and passes with that.",
+            "Die App speichert jeden Lebenslauf auf dem Gerät.",
+            "Wer einen Lebenslauf teilen will, exportiert ihn.",
+        ])
+        #expect(EnglishText.firstNotEnglish(in: curly)?.verdict == .language(.german))
+    }
+
+    @Test("A quotation of more than twenty words is text: twenty words between quotation marks do not count, twenty-one do")
+    func aLongQuotationIsText() {
+        let twenty = "Die App speichert jeden Lebenslauf auf dem Gerät und sendet ihn nie an einen Server, auch nicht für die Sicherung"
+        let twentyOne = "Die App speichert jeden Lebenslauf auf dem Gerät und sendet ihn nie an einen Server, auch nicht für die eigene Sicherung"
+
+        #expect(EnglishText.words(in: twenty).count == EnglishText.maximumQuotationWords)
+        #expect(EnglishText.firstNotEnglish(in: "The page quotes \"\(twenty)\" as it is.") == nil)
+        #expect(EnglishText.firstNotEnglish(in: "The page quotes \"\(twentyOne)\" as it is.")?.passage == twentyOne)
+    }
+
+    @Test("A paragraph in another language between quotation marks, in a document that is otherwise English, is found")
+    func aQuotedParagraphIsFound() {
+        let german = Self.germanSentences.joined(separator: " ")
+        let markdown = "\(Self.english.text)\n\nThe page then says:\n\n\"\(german)\"\n\n\(Self.english.text)"
+
+        let found = EnglishText.firstNotEnglish(in: markdown)
+
+        #expect(found?.verdict == .language(.german))
+        #expect(found?.passage == Self.germanSentences[0])
+    }
+
+    @Test("Backticks indented four spaces open no fence, so the text in another language after them is found")
+    func anIndentedFenceHidesNothing() {
+        let markdown = "The page starts in English.\n\n    ```\nDie App speichert jeden Lebenslauf auf dem Gerät.\n"
+
+        #expect(EnglishText.firstNotEnglish(in: markdown)?.verdict == .language(.german))
     }
 
     @Test("A quotation is no cover: text outside the quotation marks is still judged, and so is text with a mark that has no partner")

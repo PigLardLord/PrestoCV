@@ -6,9 +6,9 @@ import Foundation
 /// text is prose, what the blocks of a document are and which files its links point at. Everything here is a function of the
 /// text, so it is tested without git and without files (`MarkdownTextTests`).
 ///
-/// It is not a Markdown parser. It follows CommonMark where a check would otherwise be wrong: a fence is closed only by a
-/// fence at least as long, an unclosed fence or comment runs to the end of the file, a heading needs a space after its hashes,
-/// and any line ending (line feed, carriage return, or both) ends a line.
+/// It is not a Markdown parser. It follows CommonMark where a check would otherwise be wrong: a fence has at most three
+/// spaces of indent and is closed only by a fence at least as long, an unclosed fence or comment runs to the end of the file,
+/// a heading needs a space after its hashes, and any line ending (line feed, carriage return, or both) ends a line.
 enum MarkdownText {
 
     // MARK: - Files
@@ -51,8 +51,10 @@ enum MarkdownText {
         private var open: (character: Character, length: Int)?
 
         /// Whether `line` is in fenced code, the lines of the two fences included. A fence is three or more backticks or
-        /// tildes; one of backticks has no backtick in its info string. It is closed by a fence of the same character, at
-        /// least as long, with nothing after it, and a fence never closed runs to the end of the file.
+        /// tildes after at most three spaces of indent (a tab reaches the fourth column, so it is too much); one of backticks
+        /// has no backtick in its info string. It is closed by a fence of the same character, at least as long, with nothing
+        /// after it, and a fence never closed runs to the end of the file. A fence indented four or more inside a list item
+        /// is read as text: the strict side, since its lines are then judged.
         mutating func contains(_ line: Substring) -> Bool {
             let marker = Self.marker(of: line)
             if let open {
@@ -67,7 +69,9 @@ enum MarkdownText {
         }
 
         private static func marker(of line: Substring) -> (character: Character, length: Int, info: Substring)? {
-            let trimmed = line.drop { $0 == " " || $0 == "\t" }
+            let indent = line.prefix { $0 == " " || $0 == "\t" }
+            guard indent.count <= 3, !indent.contains("\t") else { return nil }
+            let trimmed = line.dropFirst(indent.count)
             guard let character = trimmed.first, character == "`" || character == "~" else { return nil }
             let length = trimmed.prefix { $0 == character }.count
             guard length >= 3 else { return nil }

@@ -119,6 +119,29 @@ struct MarkdownTextTests {
         #expect(closed.contains("Visible."))
     }
 
+    @Test("A fence has at most three spaces of indent: backticks after four spaces or a tab open no fence, and the text after them stays")
+    func anIndentedMarkerOpensNoFence() {
+        let fourSpaces = MarkdownText.withoutFencesAndComments("Before.\n\n    ```\nText that stays.\n")
+        let tab = MarkdownText.withoutFencesAndComments("Before.\n\n\t```\nText that stays.\n")
+        let threeSpaces = MarkdownText.withoutFencesAndComments("Before.\n\n   ```\nhidden\n   ```\nAfter.")
+
+        #expect(fourSpaces.contains("Text that stays."))
+        #expect(tab.contains("Text that stays."))
+        #expect(!threeSpaces.contains("hidden"))
+        #expect(threeSpaces.contains("After."))
+    }
+
+    @Test("A fence line indented four spaces or a tab does not close a fence")
+    func anIndentedMarkerClosesNoFence() {
+        let fourSpaces = MarkdownText.withoutFencesAndComments("```\nhidden\n    ```\nstill hidden\n```\nVisible.")
+        let tab = MarkdownText.withoutFencesAndComments("```\nhidden\n\t```\nstill hidden\n```\nVisible.")
+
+        #expect(!fourSpaces.contains("still hidden"))
+        #expect(fourSpaces.contains("Visible."))
+        #expect(!tab.contains("still hidden"))
+        #expect(tab.contains("Visible."))
+    }
+
     @Test("Comments are left out, on one line and over several lines")
     func commentsAreLeftOut() {
         let markdown = "One <!-- hidden --> two.\n\n<!-- hidden\nacross\nlines -->\n\nThree."

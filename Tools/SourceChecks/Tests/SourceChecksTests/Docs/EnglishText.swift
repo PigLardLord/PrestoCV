@@ -14,9 +14,10 @@ import Foundation
 ///   short German sentence is German, and one with fewer than `minimumHits` such words says nothing.
 /// - A document is not judged as a whole but passage by passage (`passages(in:)`: each heading, table row and list item, and
 ///   each sentence of a paragraph), because a bilingual document has English enough to hide its German.
-/// - Text between double quotation marks is a quotation, and does not count: the decision records quote examples in the
-///   languages of the app inside English sentences. A passage that is only a quotation says nothing; German that stands
-///   outside quotation marks is a foreign passage, and so is a mark that has no partner.
+/// - A short quotation, one sentence of at most `maximumQuotationWords` words between double quotation marks, does not count:
+///   the decision records quote examples in the languages of the app inside English sentences. A longer quotation, or one of
+///   more sentences, is text, and its sentences are passages. German that stands outside quotation marks is a foreign
+///   passage, and so is a mark that has no partner.
 /// - A passage in another script (Cyrillic, Greek, Arabic, Chinese, ...) is not English: a tenth of its letters, and at least
 ///   `minimumOtherScriptLetters` of them, are outside the Latin script. A Greek letter in an equation is not a script.
 /// - Latin-script languages other than the six of the app are out of scope: a Dutch passage has no word of the lists and
@@ -55,6 +56,10 @@ enum EnglishText {
 
     /// The fewest letters in another script that make a script, so that a Greek letter or two in an equation is not one.
     static let minimumOtherScriptLetters = 3
+
+    /// The most words of a quotation that does not count, which is also one sentence at most. The decision records quote
+    /// examples of one sentence, the longest of them fifteen words; a longer quotation, or one of more sentences, is text.
+    static let maximumQuotationWords = 20
 
     private static let functionWords: [Language: Set<String>] = [
         .english: [
@@ -128,23 +133,43 @@ enum EnglishText {
     }
 
     /// The passages a document is judged by: each heading, table row and list item, and each sentence of a paragraph, without
-    /// the quotations in them. A sentence ends at `.`, `!` or `?` and a space, unless a lowercase letter follows (`e.g. the`,
-    /// `U.S. text`); a quotation is taken out before the text is split, so that it may hold sentences of its own.
+    /// the short quotations in them; then each sentence of the other quotations of the block. A sentence ends at `.`, `!` or
+    /// `?` and a space, unless a lowercase letter follows (`e.g. the`, `U.S. text`); a quotation is taken out before the text
+    /// is split, so that it may hold sentences of its own.
     static func passages(in markdown: String) -> [String] {
         MarkdownText.blocks(in: markdown).flatMap { block -> [String] in
-            let text = withoutQuotations(block.text)
+            let (text, judged) = quotations(in: block.text)
+            let own: [String]
             switch block.kind {
-            case .heading, .tableRow: return text.isEmpty ? [] : [text]
-            case .listItem, .paragraph: return sentences(in: text)
+            case .heading, .tableRow: own = text.isEmpty ? [] : [text]
+            case .listItem, .paragraph: own = sentences(in: text)
             }
+            return own + judged.flatMap(sentences(in:))
         }
     }
 
-    /// `text` without the text between double quotation marks, straight (`"..."`) or curly (`“...”`), and with one space between
-    /// the words that are left. A mark that has no partner in the text quotes nothing.
-    private static func withoutQuotations(_ text: String) -> String {
-        let unquoted = text.replacing(/"[^"]*"|\u{201C}[^\u{201D}]*\u{201D}/, with: " ")
-        return unquoted.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    /// `text` without the text between double quotation marks, straight (`"..."`) or curly (`“...”`), and the quotations that
+    /// are judged as text: those that are not short (`isShortQuotation`). A mark that has no partner in the text quotes nothing.
+    private static func quotations(in text: String) -> (outside: String, judged: [String]) {
+        var judged: [String] = []
+        let outside = text.replacing(/"([^"]*)"|\u{201C}([^\u{201D}]*)\u{201D}/) { match in
+            let quoted = String(match.output.1 ?? match.output.2 ?? "")
+            if !isShortQuotation(quoted) { judged.append(collapsed(quoted)) }
+            return " "
+        }
+        return (collapsed(outside), judged)
+    }
+
+    /// Whether a quotation does not count: one sentence at most, of at most `maximumQuotationWords` words. Each quotation is
+    /// measured alone, so a run of short quotations does not count either; the check finds documents written in another
+    /// language, not text hidden from it on purpose.
+    private static func isShortQuotation(_ quoted: String) -> Bool {
+        sentences(in: collapsed(quoted)).count <= 1 && words(in: quoted).count <= maximumQuotationWords
+    }
+
+    /// `text` with one space between its words, and none around them.
+    private static func collapsed(_ text: some StringProtocol) -> String {
+        text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
     }
 
     private static func sentences(in text: String) -> [String] {
