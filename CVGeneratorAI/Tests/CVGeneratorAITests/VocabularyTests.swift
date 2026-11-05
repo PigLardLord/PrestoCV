@@ -48,7 +48,7 @@ struct VocabularyTests {
         "worked", "taught", "trained", "studied", "graduated", "started", "moved", "employed", "since", "from", "years", "now", "degree",
         "ho", "lavorato", "insegno", "dal", "anni", "laureata", "scuola", "habe", "gearbeitet", "unterrichte", "seit", "jahre", "abschluss",
         "trabaje", "desde", "anos", "gradue", "travaille", "enseigne", "depuis", "diplome", "ecole", "trabalhei", "leciono",
-        "universidade", "formei", "j", "l", "dell",
+        "universidade", "formei", "j", "l", "dell", "formation", "carrera",
     ])
     func plainWords(word: String) {
         #expect(Vocabulary.explains(word), "\(word)")
@@ -125,7 +125,8 @@ struct VocabularyTests {
         #expect(Vocabulary.isGraduating(word), "\(word)")
     }
 
-    @Test("Obtained, made and the pronouns only go with the words of graduating, and are no word of graduating", arguments: ["obtenu", "gemacht", "mi", "sono", "mon", "meinen", "me"])
+    @Test("Obtained, made, the pronouns and articles, and the course or the studies only go with the words of graduating, and are no word of graduating",
+          arguments: ["obtenu", "gemacht", "mi", "sono", "mon", "meinen", "me", "the", "o", "course", "curso", "corso", "formation", "studies", "estudios"])
     func graduationFrameWords(word: String) {
         #expect(Vocabulary.isGraduationFrame(word), "\(word)")
         #expect(!Vocabulary.isGraduating(word), "\(word)")
