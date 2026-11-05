@@ -43,7 +43,7 @@ This is the target. Version 1 offers a blank CV, an example, or, on devices with
 - **Optional in-app purchases** buy stronger cloud models, as credit packs or a non-renewing pass. Their price covers the model and server costs they cause.
 - **Bring your own key.** Technical users can use their own key for free. It unlocks nothing that is sold.
 - **A tip jar.**
-- **Success is measured in adoption, not revenue.** Revenue has to cover the costs of running and maintaining PrestoCV; anything beyond that is a bonus.
+- **Success is measured in adoption, not revenue.** Revenue has to cover the costs of running, maintaining and developing PrestoCV; anything beyond that is a bonus.
 
 ## Releases
 

@@ -1,6 +1,6 @@
 # PrestoCV target architecture
 
-This directory defines the architecture PrestoCV must converge to before its first release, and the rules that keep it there. It describes the **target**. The code does not match it yet; the migration plan at the end says how it gets there.
+This directory defines the architecture PrestoCV converges to, and the rules that keep it there. It describes the **target**. The code does not match it yet: version 1 ships the legacy app ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), and the migration plan at the end says how the code gets there after it.
 
 Every rule here is meant to be checked by a machine: by the compiler through module boundaries, by the architecture checker in CI, or by a test. A rule without a check is a wish. See [ADR 0006](adr/0006-enforce-architecture-mechanically.md).
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The .mcvt (CV Template) system provides a flexible, extensible architecture for CV template distribution and management. It follows Clean Architecture principles with clear separation between domain logic, use cases, and infrastructure.
+The .mcvt template system provides a flexible, extensible architecture for CV template distribution and management. It follows Clean Architecture principles with clear separation between domain logic, use cases, and infrastructure.
 
 ## Architecture Layers
 
