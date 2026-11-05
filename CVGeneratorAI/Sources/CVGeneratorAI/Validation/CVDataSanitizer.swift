@@ -154,6 +154,7 @@ public struct CVDataSanitizer: Sendable {
             .union(languageWords)
         // A written sentence says the person is, or works as, only what a kept title names (#354, round 7 and the final gate).
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
+        let workWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + experience.map(\.company))
         let language = source.explainer.language
         // The qualities the summary names as a manner are the kept soft skills' or the description's (#359, N1), as in the summary check.
         let softSkills = skills.filter { $0.kind == .softSkill }.map(\.name)
@@ -163,6 +164,9 @@ public struct CVDataSanitizer: Sendable {
             source.written(UnheldQualities.applied(to: text, language: language, held: heldQualities), quoting: entries.summaryQuotes, allowsNumbers: false) {
                 written.isPlain($0, ownWords: words, ownQualifications: ownQualifications)
                     && RoleAssertion.unkeptRole(in: $0, titles: keptTitles, name: personalInfo.name, language: language) == nil
+                    && !(DraftDepth.isRich && OwnQualifications.tiesAStudyToALanguage(
+                        $0, education: education, languages: languages, apart: workWords, source: source
+                    ))
             }
         }
 

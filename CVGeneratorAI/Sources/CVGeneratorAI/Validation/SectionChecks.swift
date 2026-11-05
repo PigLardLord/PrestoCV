@@ -1186,6 +1186,8 @@ extension CVDataSanitizer {
             // I coordinate patient care" of a nursing assistant. The person's own words, quoted, stay.
             let keptTitles = titles.compactMap { $0?.presentValue }
             let personName = facts.personalInfo.name
+            // The words of the person's work, which a school may share (#359, P3): a sentence of them and a language is no study tied to it.
+            let ownWorkWords = Self.words(of: titles + facts.experience.map(\.company))
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -1274,6 +1276,10 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
                 } else if Self.copiesADuty(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
+                } else if DraftDepth.isRich, OwnQualifications.tiesAStudyToALanguage(
+                    sentence, education: facts.education, languages: facts.languages, apart: ownWorkWords, source: source
+                ) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.tiesAStudyToALanguage))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
@@ -1498,6 +1504,8 @@ extension CVDataSanitizer {
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
     /// A manner phrase of a quality that is none of the kept soft skills, which cannot be cut clean (#359, N1).
     static let namesAnUnheldQuality = "it names a quality that is none of the person's soft skills: leave it out, or name a soft skill"
+    /// A sentence of a rich summary that says a school or a course taught the person's languages (#359, P3).
+    static let tiesAStudyToALanguage = "it says a school or a course taught the languages: say the studies and the languages in separate sentences"
     static let namesAnUnstatedRole = "it names a role the person did not state: say the person's own title, or none"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
