@@ -29,8 +29,9 @@ are not licensed under the Apache License, Version 2.0: section 6 of the License
 grants no permission to use them, and neither does this notice.
 
 - The app icon is the artwork in PrestoCV/PrestoCV.icon, and every image built
-  from it. Its files are in this repository only so that the official app can
-  be built. They are not covered by the License: all rights reserved.
+  from it. The licensor does not license it: it is not part of the Work that
+  the License covers, and all rights in it are reserved. Its files are in this
+  repository only so that the official app can be built.
 - A fork, or any other app built from this source, must use a name and an icon
   of its own, and must not suggest that it is PrestoCV or that the author
   endorses it. It also needs its own bundle identifier and signing team.
@@ -69,3 +70,6 @@ Used by the project, not included in this repository:
   platforms.
 - The GitHub Actions actions/checkout and actions/cache (MIT License) and the
   swift container image, which the CI workflow in .github/workflows uses.
+- The Swift toolchain and the Swift SDK for Android from swift.org, and the
+  Android NDK of the runner image, which the CI workflow's Android job uses to
+  build the portable targets. Nothing it builds is distributed.

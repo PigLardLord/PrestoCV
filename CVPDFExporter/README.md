@@ -402,9 +402,3 @@ Remember:
 ## License
 
 Copyright 2026 Giovanni Trovato. Licensed under the Apache License, Version 2.0: see [LICENSE](../LICENSE) and [NOTICE](../NOTICE) at the repository root.
-
----
-
-**Last Updated**: 2024-11-27
-**Version**: 2.0.0 (Dependency Injection Architecture)
-**Status**: Active Development

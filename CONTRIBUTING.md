@@ -34,7 +34,7 @@ Tools/ArchitectureCheck/check.sh
 Tools/ArchitectureCheck/selftest.sh
 ```
 
-- **The `PrestoCV` scheme** builds the app and has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour.
+- **The `PrestoCV` scheme** builds the app and has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`, the app's UI tests. `CI` leaves out `PrestoCVUITests`, which take most of an hour; the pull request check runs them in a step of their own.
 - **`swift test --package-path`** tests a package in isolation. On Linux, run it for `DiagnosticLogging`, `DiagnosticTrace`, `PrestoCVCore`, `CVPDFExporter` and `Tools/SourceChecks`, and build `CVGeneratorAI` and `PrestoCVApp`: only the new targets exist there. `CVPDFExporterExamples`, the demos and the template viewer, builds on macOS only.
 - **`Tools/SourceChecks`** reads the repository, so it runs with `swift test`, not in the test plans. Besides the string catalog and the rules the views follow, it checks the documents: every tracked Markdown file is in English, the paths in the README's table exist and every top-level folder is in it, and the open-source files are there and linked.
 - **A change to navigation or to the exporter's integration** also runs the simulator tests, not only the package tests.
@@ -75,7 +75,7 @@ The rules are strict, and a change that breaks one does not merge ([ADR 0006](do
 - **The description** gives the purpose, screenshots for a change the user can see, the validation (the tests run and the simulator device), and the impact on localization.
 - **Before opening one,** run the full test suite and the architecture check. Report any flaky test or simulator prerequisite in the description.
 - **Documentation** is part of the change. A pull request that changes behaviour, a command or a path updates the documents that describe it, in the same pull request, and in English.
-- **CI** runs on every pull request: on GitHub Actions on Linux (the architecture check with its self-test, the source checks, the packages' new targets, and their build for Android), and on the maintainer's Mac mini on macOS ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md): the `CI` test plan on an iPhone and an iPad simulator, the package tests and builds, the source checks and the architecture check). Xcode Cloud checks no pull request; it builds the releases.
+- **CI** runs on every pull request: on GitHub Actions on Linux (the architecture check with its self-test, the source checks, the packages' new targets, and their build for Android), and on the maintainer's Mac mini on macOS ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md): the `CI` test plan on an iPhone and an iPad simulator, the package tests and builds, the source checks, the architecture check and the self-tests of the release scripts in `Tools/Release/`, then `PrestoCVUITests` on the iPhone unless every changed file is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`). Xcode Cloud checks no pull request; it builds the releases.
 - **Reviews** follow the process in [AGENTS.md](AGENTS.md#reviews).
 
 ## Licence

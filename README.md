@@ -7,11 +7,11 @@ The source is licensed under the [Apache License 2.0](LICENSE). The name and the
 ## Privacy
 
 PrestoCV collects no data. It has no account, no analytics, no advertising and no server of its own:
-- the CVs and the unsaved edits stay on the device, in the app's `Application Support/PrestoCV` folder;
+- the CVs and the unsaved edits stay on the device, in the app's `Application Support/PrestoCV` folder, and go into the device's backups like the data of any app;
 - the AI draft is written on the device by Apple's Foundation Models, so the description is not sent anywhere;
-- a CV leaves the device only as a PDF that the person shares or saves.
+- in a release build, a CV leaves the device only as a PDF that the person shares or saves. A TestFlight or Debug build also keeps a trace of each step of the AI draft and the import on the device, and it leaves the device only when the person shares it ([ADR 0032](docs/architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)).
 
-The privacy manifest, `PrestoCV/PrivacyInfo.xcprivacy`, declares no tracking and no collected data. A feature that sends data off the device would need its own ADR, and would change this section and the manifest in the same pull request.
+The privacy manifest, `PrestoCV/PrivacyInfo.xcprivacy`, declares no tracking and no collected data. A feature that sends data off the device would need its own ADR, and would change this section and the manifest in the same pull request. A privacy or security problem is reported as [SECURITY.md](SECURITY.md) says.
 
 ## Name
 
@@ -62,11 +62,11 @@ swift test --package-path Tools/SourceChecks
 Tools/ArchitectureCheck/check.sh
 ```
 
-The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour and check nothing.
+The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`, the app's UI tests. `CI` leaves out `PrestoCVUITests`, which take most of an hour: the pull request check runs them in a step of their own (see [Releasing](#releasing)).
 
 On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the source checks and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
 
-[CONTRIBUTING.md](CONTRIBUTING.md) lists every command a pull request runs, the other packages' tests and builds among them.
+[CONTRIBUTING.md](CONTRIBUTING.md) lists the commands to run before a pull request, the other packages' tests and builds among them.
 
 ## Development data
 
@@ -84,7 +84,7 @@ Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
-Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, and the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
+Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
 The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 
@@ -99,4 +99,4 @@ The repository side is `ci_scripts/` (it sets an archive's version from its tag 
 
 Copyright 2026 Giovanni Trovato. The source is licensed under the [Apache License, Version 2.0](LICENSE).
 
-"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. A fork uses its own name and icon. [NOTICE](NOTICE) has the details and the components the project uses.
+"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. The icon's artwork, in `PrestoCV/PrestoCV.icon`, is not under the License either: all rights are reserved, and its files are in the repository only so that the official app can be built. A fork uses its own name and icon. [NOTICE](NOTICE) has the details and the components the project uses.
