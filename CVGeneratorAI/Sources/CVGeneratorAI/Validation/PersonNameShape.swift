@@ -10,6 +10,9 @@ import Foundation
 /// - In the languages that drop the pronoun (Italian, Spanish, Portuguese) a clause starts with its verb ("Lavoro come cuoco", "Soy
 ///   Pedro Gil"): a name that starts with a verb, or holds a verb in lower case, is none. A capital verb form further in ("Giulia
 ///   Vivo") is a surname.
+/// - A first-person object or possessive is the person naming themselves ("Mi chiamo Giulia Bianchi", "Me llamo Pedro Gil",
+///   "Chamo-me Ana Costa", "My name is Tom Cook"): it is no name in lower case, nor as the first word before a word in lower case or
+///   a field ("Mein Name"). Before a capital it is a given name ("Mia Rossi", "Ma Lin").
 /// - A name has no sentence punctuation and no more words than a name has.
 ///
 /// Such a name is left empty: the first words of a clause are no name either.
@@ -28,7 +31,8 @@ enum PersonNameShape {
         guard !tokens.isEmpty, tokens.count <= mostWords, !holdsSentencePunctuation(name) else { return false }
         let characters = Array(Digits.ascii(name))
         let words = Word.words(in: name)
-        return !holdsAPronoun(words, characters, in: language) && !startsAsAClause(words, characters, in: language)
+        return !holdsAPronoun(words, characters, in: language) && !namesThePerson(words, characters, in: language)
+            && !startsAsAClause(words, characters, in: language)
     }
 
     /// A mark of a sentence, or a comma that goes on in lower case ("serralharia, em obras"): "Rossi, Giulia" is a name.
@@ -47,6 +51,17 @@ enum PersonNameShape {
             guard pronouns.contains(word.accented) else { return false }
             guard word.accented.count == 1 else { return true }
             return words.count == 1 || word.range.upperBound < characters.count && apostrophes.contains(characters[word.range.upperBound])
+        }
+    }
+
+    private static func namesThePerson(_ words: [Word], _ characters: [Character], in language: Vocabulary.Language?) -> Bool {
+        let rules = language.flatMap { Voice.words[$0] } ?? Voice.everyWord
+        let ownWords = rules.objects.union(rules.possessives)
+        return words.enumerated().contains { index, word in
+            guard ownWords.contains(word.accented) else { return false }
+            if characters[word.range.lowerBound].isLowercase { return true }
+            guard index == 0, !word.isHyphenated, words.count > 1 else { return false }
+            return characters[words[1].range.lowerBound].isLowercase || rules.fields.contains(words[1].folded)
         }
     }
 

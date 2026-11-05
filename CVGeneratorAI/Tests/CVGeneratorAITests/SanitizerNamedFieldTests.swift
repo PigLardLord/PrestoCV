@@ -118,6 +118,24 @@ struct SanitizerNamedFieldTests {
         #expect(result.personalInfo.name == nil)
     }
 
+    @Test("A clause in which the person names themselves is no name: the name is empty (#359)",
+          arguments: [
+            ("Mi chiamo Giulia Bianchi", "Mi chiamo Giulia Bianchi e faccio la parrucchiera a Bari.", "it"),
+            ("Il mio nome è Giulia Bianchi", "Il mio nome è Giulia Bianchi e faccio la parrucchiera a Bari.", "it"),
+            ("Me llamo Pedro Gil", "Me llamo Pedro Gil y arreglo bicicletas en Zaragoza.", "es"),
+            ("Mi nombre es Pedro Gil", "Mi nombre es Pedro Gil y arreglo bicicletas en Zaragoza.", "es"),
+            ("Chamo-me Ana Costa", "Chamo-me Ana Costa e trabalho como cabeleireira em Braga.", "pt"),
+            ("O meu nome é Ana Costa", "O meu nome é Ana Costa e trabalho como cabeleireira em Braga.", "pt"),
+            ("My name is Tom Cook", "My name is Tom Cook and I repair bicycles in Leeds.", "en"),
+            ("Mein Name ist Anna Müller", "Mein Name ist Anna Müller und ich arbeite als Gärtnerin in Erfurt.", "de"),
+            ("Mon nom est Claire Moreau", "Mon nom est Claire Moreau et je suis menuisière à Lyon.", "fr"),
+          ])
+    func selfNamingClauseAsName(name: String, description: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(CVData(personalInfo: PersonalInfo(name: name)), against: description)
+
+        #expect(result.personalInfo.name == nil)
+    }
+
     @Test("A name stays, whatever its parts: a hyphen, a particle, an initial, a surname that is also a verb or a trade (#359)",
           arguments: [
             ("Maria da Silva", "Eu sou a Maria da Silva e trabalho como cabeleireira em Braga.", "pt"),
@@ -130,6 +148,9 @@ struct SanitizerNamedFieldTests {
             ("J. Smith", "I am J. Smith, a florist in Leeds.", "en"),
             ("I. M. Calder", "I am I. M. Calder, an architect in Leeds.", "en"),
             ("Tom Cook", "My name is Tom Cook and I repair bicycles in Leeds.", "en"),
+            ("Mia Rossi", "Mi chiamo Mia Rossi e faccio la sarta a Lecce.", "it"),
+            ("Ma Lin", "Je m'appelle Ma Lin et je suis menuisière à Lyon.", "fr"),
+            ("Ana Costa", "Chamo-me Ana Costa e trabalho como cabeleireira em Braga.", "pt"),
           ])
     func realNameStays(name: String, description: String, language: String) throws {
         let result = try sanitizer(in: language).sanitize(CVData(personalInfo: PersonalInfo(name: name)), against: description)
