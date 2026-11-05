@@ -85,6 +85,8 @@ The tables list every event the code writes; the source checks fail when the cod
 | `import.failed` | error | `kind`, `error`, `limit` (when a bound was reached, whether the core or the PDF reader found it: `bytes`, `pages`, `characters`, `words`, `lines`, `cells` or `steps`), `elapsed` | The import failed, and the person is told why. |
 | `import.cancelled` | info | `kind`, `elapsed` | The screen went away while the import ran. |
 
+The AI screen reads every text with the import before it asks for a draft ([ADR 0034](architecture/adr/0034-read-a-text-that-is-already-a-cv-with-the-import.md)), so the import's events, with `kind=text`, come before the draft's. When the import fails, or reads a text that is not a CV, the person is not told and the AI draft starts; the diagnostics of a TestFlight install then list a CV import before the AI draft.
+
 ### The AI draft (category `draft`)
 
 A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `draft.rejected` or `draft.failed`; one asked for while the model cannot run ends with `draft.unavailable`.

@@ -31,7 +31,8 @@
 - **A wrong "no" is today's behaviour.** A CV with no dates, or with headings the import does not know, still goes to the AI draft.
 - **Sections the import does not read,** such as projects or volunteering, stay in the review list as text not imported, as [ADR 0027](0027-import-a-cv-from-its-text-with-rules.md) decided.
 - **The AI draft's own defects are fixed in its code,** after #359. This decision takes the pasted CV away from the model; it does not change what the model writes from a description.
-- **The rule lives in a new target** and follows the target architecture: it is pure, holds no user text and builds on Linux. The app wires it in the AI draft's view model through an injected intake, so no rule sits in a view or a view model. Its tests are the rule's table of invented texts (CVs in several languages, free descriptions, the boundaries of both numbers) and the app's routing tests.
+- **The rule lives in `PrestoCVImporting`,** a target of the new architecture, and follows its rules: it is pure, holds no user text and builds on Linux. The app wires it in the AI draft's view model through an injected intake, so no rule sits in a view or a view model. Its tests are the rule's table of invented texts (CVs in several languages, free descriptions, the boundaries of both numbers) and the app's routing tests.
+- **Every text given to the AI draft is read by the import first,** so the app's log and the diagnostics of a TestFlight install show an import before each AI draft ([logging](../../logging.md)).
 - **No check enforces the choice of the path.** The tests pin the rule and the routing; the review of the change checks that the model is not called for a recognised text.
 
 ## Alternatives considered
