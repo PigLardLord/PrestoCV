@@ -84,6 +84,59 @@ struct SanitizerNamedFieldTests {
         #expect(try sanitized(draft, from: description) == CVData())
     }
 
+    /// A sanitizer for a description in `language`, with no device data: only the rules of the sanitizer decide.
+    private func sanitizer(in language: String) -> CVDataSanitizer {
+        CVDataSanitizer(
+            languageOfText: { _ in language },
+            lexicalClasses: ForcedLexicalTagger([.english: .words([]), .german: .words([])]),
+            wordList: TableWordList()
+        )
+    }
+
+    @Test("A pronoun, or a clause of the description, is no name: the name is empty, never the first words of the clause (#359)",
+          arguments: [
+            ("Ich", "Ich arbeite seit zehn Jahren als Tischler bei der Werkstatt Brandt in Suhl.", "de"),
+            ("I", "I repair bicycles at the Wheelhouse in Leeds.", "en"),
+            ("Io", "Io faccio la sarta a Lecce.", "it"),
+            ("Yo", "Yo cocino en un restaurante de Sevilla.", "es"),
+            ("Eu", "Eu trabalho numa padaria em Braga.", "pt"),
+            ("Je", "Je suis menuisière à Lyon.", "fr"),
+            ("I'm Tom Hartley", "I'm Tom Hartley and I repair bicycles in Leeds.", "en"),
+            ("Je m'appelle Claire Moreau", "Je m'appelle Claire Moreau, je suis menuisière à Lyon.", "fr"),
+            ("Lavoro come cuoco", "Lavoro come cuoco in una trattoria di Parma da molti anni.", "it"),
+            ("Soy Pedro Gil", "Soy Pedro Gil y arreglo bicicletas en Zaragoza.", "es"),
+            ("Trabalho há doze anos com serralharia, em obras e em oficinas de portões.",
+             "Trabalho há doze anos com serralharia, em obras e em oficinas de portões. Gosto de pintar.", "pt"),
+            ("Trabajo desde hace nueve años en la reparación de bicicletas de carretera.",
+             "Trabajo desde hace nueve años en la reparación de bicicletas de carretera.", "es"),
+            ("Arbeite seit zehn Jahren als Tischler bei der Werkstatt Brandt in Suhl",
+             "Arbeite seit zehn Jahren als Tischler bei der Werkstatt Brandt in Suhl, in Thüringen, mit Holz.", "de"),
+          ])
+    func pronounOrClauseAsName(name: String, description: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(CVData(personalInfo: PersonalInfo(name: name)), against: description)
+
+        #expect(result.personalInfo.name == nil)
+    }
+
+    @Test("A name stays, whatever its parts: a hyphen, a particle, an initial, a surname that is also a verb or a trade (#359)",
+          arguments: [
+            ("Maria da Silva", "Eu sou a Maria da Silva e trabalho como cabeleireira em Braga.", "pt"),
+            ("Maria Fernanda de la Cruz Gómez", "Me llamo Maria Fernanda de la Cruz Gómez y soy electricista en Sevilla.", "es"),
+            ("Jean-Pierre Dupont", "Je m'appelle Jean-Pierre Dupont et je suis menuisier à Lyon.", "fr"),
+            ("José de la Cruz", "Me llamo José de la Cruz y soy electricista en Sevilla.", "es"),
+            ("Anna-Lena Müller", "Ich heiße Anna-Lena Müller und arbeite als Gärtnerin in Erfurt.", "de"),
+            ("Giulia Rossi", "Mi chiamo Giulia Rossi e faccio la parrucchiera a Bari.", "it"),
+            ("Giulia Vivo", "Sono Giulia Vivo e faccio la sarta a Lecce.", "it"),
+            ("J. Smith", "I am J. Smith, a florist in Leeds.", "en"),
+            ("I. M. Calder", "I am I. M. Calder, an architect in Leeds.", "en"),
+            ("Tom Cook", "My name is Tom Cook and I repair bicycles in Leeds.", "en"),
+          ])
+    func realNameStays(name: String, description: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(CVData(personalInfo: PersonalInfo(name: name)), against: description)
+
+        #expect(result.personalInfo.name == name)
+    }
+
     @Test("A name the description never mentions is dropped")
     func inventedName() throws {
         let result = try sanitized(CVData(personalInfo: PersonalInfo(name: "Mario Rossi")), from: "I'm a nurse in Turin")

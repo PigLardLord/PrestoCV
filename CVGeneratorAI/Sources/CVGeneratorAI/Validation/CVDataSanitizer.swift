@@ -179,7 +179,8 @@ public struct CVDataSanitizer: Sendable {
     // MARK: - Sections
 
     /// The name must not be a title: for "I'm a nurse" the model writes "Nurse" as the name, and the description does
-    /// contain the word.
+    /// contain the word. Nor must it be a pronoun or a clause of the description ("Ich", "Trabajo desde hace nueve años en ..."):
+    /// such a name is left empty (`PersonNameShape`, #359).
     ///
     /// - Parameters:
     ///   - claimed: What the headline title and the place are looked up in, when it is not `source`: the clauses that claim them,
@@ -191,7 +192,9 @@ public struct CVDataSanitizer: Sendable {
         let claimed = claimed ?? source
         let contacts = contacts ?? source
         let titles = ([info.title] + jobTitles.map { Optional($0) }).compactMap { $0.presentValue }.map { DescriptionText.normalized($0) }
-        let name = source.named(info.name).flatMap { titles.contains(DescriptionText.normalized($0)) ? nil : $0 }
+        let name = source.named(info.name).flatMap {
+            titles.contains(DescriptionText.normalized($0)) || !PersonNameShape.isName($0, in: source.explainer.language) ? nil : $0
+        }
 
         return PersonalInfo(
             name: name,
