@@ -75,6 +75,20 @@ struct AppRouterTests {
         #expect(router.navigationPath.count == 1)
     }
 
+    @Test("A CV pasted in the AI screen opens as the import read it, with its notice and review, in place of the AI screen")
+    func pastedCVReplacesTheAIScreen() {
+        let router = AppRouter(isAIShipped: true)
+        router.navigate(to: .templateSelection)
+        router.navigate(to: .aiGeneration)
+        let review = ImportReview(items: [ImportReview.Item(field: .language, reason: .languageNotAdded, text: "Welsh")], notImported: "")
+        let cv = CVModel(relevant_experience: [Experience(title: "Line Cook", company: "The Copper Pot")])
+
+        router.navigateToEditorWithImportedDescription(ImportedDraft(cv: cv, review: review))
+
+        #expect(router.currentRoute == .cvEditor(.new(template: cv, notice: .importedDescription(review))))
+        #expect(router.navigationPath.count == 1, "Back returns to the list, as after an AI draft")
+    }
+
     @Test("An AI draft whose personal items could not be checked opens with the notice that says so (ADR 0028)")
     func uncheckedDraftOpensWithItsNotice() {
         let router = AppRouter(isAIShipped: true)

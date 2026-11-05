@@ -4009,6 +4009,47 @@
         }
       }
     },
+    "editor.notice.imported.from_description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihr Text war bereits ein Lebenslauf und wurde daher so übernommen, wie er ist. Es wurde nichts hinzugefügt oder umgeschrieben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your text was already a CV, so it was read as written. Nothing was added or rewritten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu texto ya era un CV, así que se leyó tal como estaba escrito. No se añadió ni se reescribió nada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre texte était déjà un CV : il a donc été lu tel quel. Rien n'a été ajouté ni réécrit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo testo era già un CV, quindi è stato letto così com'è. Non è stato aggiunto né riscritto nulla."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu texto já era um currículo, por isso foi lido como está. Nada foi adicionado nem reescrito."
+          }
+        }
+      }
+    },
     "editor.notice.imported.review" : {
       "extractionState" : "manual",
       "localizations" : {

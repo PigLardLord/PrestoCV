@@ -55,6 +55,9 @@ struct EditorNoticeBanner_Previews: PreviewProvider {
             EditorNoticeBanner(notice: .imported(ImportReview(
                 items: [ImportReview.Item(field: .name, reason: .byPosition, text: "Lena Hartmann")], notImported: "Geburtsdatum: 14.05.1992"
             )))
+            EditorNoticeBanner(notice: .importedDescription(ImportReview(
+                items: [ImportReview.Item(field: .language, reason: .languageNotAdded, text: "Welsh")], notImported: ""
+            )))
         }
     }
 }
