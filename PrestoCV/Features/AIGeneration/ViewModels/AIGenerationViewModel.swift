@@ -8,7 +8,10 @@ final class AIGenerationViewModel: ObservableObject {
     /// The description, kept in the session as it is typed, so that it survives leaving the screen until a draft is
     /// made from it.
     @Published var prompt: String {
-        didSet { session?.text = prompt }
+        didSet {
+            session?.text = prompt
+            announceCrossingTheLimit(from: oldValue)
+        }
     }
     @Published private(set) var isGenerating: Bool = false
     /// The busy screen waits for the language data that the system downloads, up to `LanguageDataPreparation.bound`, and not for the
@@ -20,6 +23,9 @@ final class AIGenerationViewModel: ObservableObject {
     /// The text was already a CV, and this is what the import read in it: the editor opens it as written, in place of a
     /// draft, and stores it as it is (ADR 0034).
     @Published private(set) var imported: ImportedDraft?
+    /// What VoiceOver is told at once when the text goes over the limit, as in a paste of a whole CV: the hint of the editor
+    /// says it only when the person reaches the editor. Set when the text crosses the limit, not while it stays over.
+    @Published private(set) var overLimitAnnouncement: OverLimitAnnouncement?
 
     /// The running generation started by `startGenerating()`, kept so `cancel()` can stop it.
     private(set) var generationTask: Task<Void, Never>?
@@ -37,6 +43,9 @@ final class AIGenerationViewModel: ObservableObject {
     /// The generation allowed to report its outcome. It is set before its task runs and cleared by `cancel()`,
     /// so a cancelled generation, even one that returns later, finds it changed and stays silent.
     private var activeGeneration: UUID?
+
+    /// How many times the text has crossed the limit, to tell one announcement from the next.
+    private var overLimitAnnouncements = 0
 
     /// One request to the generator: its identity, and the request as it was when the person tapped Generate.
     private struct Generation {
@@ -70,6 +79,34 @@ final class AIGenerationViewModel: ObservableObject {
     var characterCount: Int { prompt.count }
 
     var isOverCharacterLimit: Bool { characterCount > characterLimit }
+
+    /// The counter as VoiceOver reads it: the count in words, not "slash", and that it is over the limit.
+    var characterCountAccessibilityLabel: String {
+        if isOverCharacterLimit {
+            return "ai.generation.character_count.accessibility_over".localizedWithArgs(characterCount, characterLimit)
+        }
+        return "ai.generation.character_count.accessibility".localizedWithArgs(characterCount, characterLimit)
+    }
+
+    /// The hint of the description's editor. Its value is the text the person wrote, so the count and what happens over the limit
+    /// are said here: a CV pasted whole is still read as written, and a free description is refused as too long, as
+    /// `ai.error.too_long` says after the press.
+    var promptAccessibilityHint: String {
+        if isOverCharacterLimit {
+            return "ai.generation.prompt_hint_over".localizedWithArgs(characterCount, characterLimit)
+        }
+        return "ai.generation.character_count.accessibility".localizedWithArgs(characterCount, characterLimit)
+    }
+
+    /// The text crossed the limit, in one keystroke or in a paste: VoiceOver says so at once. Staying over, or going back under,
+    /// says nothing.
+    private func announceCrossingTheLimit(from previous: String) {
+        guard prompt.count > characterLimit, previous.count <= characterLimit else { return }
+        overLimitAnnouncements += 1
+        overLimitAnnouncement = OverLimitAnnouncement(
+            text: "ai.generation.over_limit_announcement".localizedWithArgs(characterLimit), sequence: overLimitAnnouncements
+        )
+    }
 
     /// Generate stays on over the limit: a CV pasted whole is read by the import whatever its length, and the AI draft refuses
     /// a free description over its limit with its own message.

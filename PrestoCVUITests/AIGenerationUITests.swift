@@ -224,7 +224,8 @@ final class AIGenerationUITests: XCTestCase {
         let description = String(repeating: "I cook in a busy kitchen in Leeds and I train the new staff every week. ", count: 30)
         let generate = pasteAsTheDescription(description)
 
-        XCTAssertTrue(app.staticTexts["\(description.count) / 2000"].exists, "The counter should show the text is over the limit")
+        XCTAssertTrue(app.staticTexts["\(description.count) of 2000 characters, over the limit"].exists,
+                      "The counter should be read as words, with the text over the limit")
         XCTAssertTrue(generate.isEnabled, "Generate should be on over the limit")
         generate.tap()
         let alert = app.alerts["Error"]

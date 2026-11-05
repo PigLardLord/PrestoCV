@@ -1272,6 +1272,88 @@
         }
       }
     },
+    "ai.generation.character_count.accessibility" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld Zeichen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld characters"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld caractères"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld di %2$lld caratteri"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres"
+          }
+        }
+      }
+    },
+    "ai.generation.character_count.accessibility_over" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld Zeichen, über dem Limit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld characters, over the limit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres, por encima del límite"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld caractères, au-delà de la limite"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld di %2$lld caratteri, oltre il limite"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres, acima do limite"
+          }
+        }
+      }
+    },
     "ai.generation.example_section_title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1518,6 +1600,47 @@
         }
       }
     },
+    "ai.generation.over_limit_announcement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Über dem Limit von %lld Zeichen. Ein eingefügter Lebenslauf wird weiterhin so gelesen, wie er geschrieben ist. Eine Beschreibung über dem Limit wird als zu lang abgelehnt: Kürzen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Over the limit of %lld characters. A CV you pasted is still read as written. A description over the limit is refused as too long: shorten it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por encima del límite de %lld caracteres. Un CV que pegues se sigue leyendo tal como está escrito. Una descripción por encima del límite se rechaza por demasiado larga: acórtala."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au-delà de la limite de %lld caractères. Un CV collé est toujours lu tel qu'il est écrit. Une description au-delà de la limite est refusée comme trop longue : raccourcissez-la."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oltre il limite di %lld caratteri. Un CV incollato viene comunque letto così com'è. Una descrizione oltre il limite viene rifiutata perché troppo lunga: accorciala."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acima do limite de %lld caracteres. Um currículo colado continua sendo lido como foi escrito. Uma descrição acima do limite é recusada por ser longa demais: encurte-a."
+          }
+        }
+      }
+    },
     "ai.generation.privacy_note" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1555,6 +1678,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sua descrição é processada neste dispositivo pelo Apple Intelligence. Ela não é enviada para lugar nenhum."
+          }
+        }
+      }
+    },
+    "ai.generation.prompt_hint_over" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld Zeichen, über dem Limit. Ein eingefügter Lebenslauf wird weiterhin so gelesen, wie er geschrieben ist. Eine Beschreibung über dem Limit wird als zu lang abgelehnt: Kürzen Sie sie."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld characters, over the limit. A CV you pasted is still read as written. A description over the limit is refused as too long: shorten it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres, por encima del límite. Un CV que pegues se sigue leyendo tal como está escrito. Una descripción por encima del límite se rechaza por demasiado larga: acórtala."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld caractères, au-delà de la limite. Un CV collé est toujours lu tel qu'il est écrit. Une description au-delà de la limite est refusée comme trop longue : raccourcissez-la."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld di %2$lld caratteri, oltre il limite. Un CV incollato viene comunque letto così com'è. Una descrizione oltre il limite viene rifiutata perché troppo lunga: accorciala."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld caracteres, acima do limite. Um currículo colado continua sendo lido como foi escrito. Uma descrição acima do limite é recusada por ser longa demais: encurte-a."
           }
         }
       }

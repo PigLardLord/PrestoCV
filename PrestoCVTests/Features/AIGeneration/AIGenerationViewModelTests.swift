@@ -530,6 +530,118 @@ struct AIGenerationViewModelTests {
         #expect(viewModel.canGenerate)
     }
 
+    // MARK: - Description limit, for VoiceOver (#371)
+
+    /// A text of `count` characters, typed or pasted as the description.
+    private func describe(with viewModel: AIGenerationViewModel, characters count: Int) {
+        viewModel.prompt = String(repeating: "a", count: count)
+    }
+
+    @Test("At the limit the counter and the editor's hint give the count in words and say nothing of a refusal")
+    func accessibilityAtTheLimit() {
+        let viewModel = makeViewModel()
+        describe(with: viewModel, characters: 2000)
+
+        let counted = "ai.generation.character_count.accessibility".localizedWithArgs(2000, 2000)
+        #expect(counted != "ai.generation.character_count.accessibility", "The key is missing from the string catalog")
+        #expect(counted.contains("2000"))
+        #expect(viewModel.characterCountAccessibilityLabel == counted, "VoiceOver reads the count as words, not 'slash'")
+        #expect(viewModel.promptAccessibilityHint == counted)
+    }
+
+    @Test("Over the limit the counter says so in words and the editor's hint says what happens to a CV and to a description")
+    func accessibilityOverTheLimit() {
+        let viewModel = makeViewModel()
+        describe(with: viewModel, characters: 2001)
+
+        let label = "ai.generation.character_count.accessibility_over".localizedWithArgs(2001, 2000)
+        let hint = "ai.generation.prompt_hint_over".localizedWithArgs(2001, 2000)
+        #expect(label != "ai.generation.character_count.accessibility_over", "The key is missing from the string catalog")
+        #expect(hint != "ai.generation.prompt_hint_over", "The key is missing from the string catalog")
+        #expect(label.contains("2001") && label.contains("2000"))
+        #expect(hint.contains("2001") && hint.contains("2000"))
+        #expect(viewModel.characterCountAccessibilityLabel == label)
+        #expect(viewModel.promptAccessibilityHint == hint)
+        #expect(label != "ai.generation.character_count.accessibility".localizedWithArgs(2001, 2000), "Over the limit is not read as within it")
+    }
+
+    @Test("The hint and the counter label follow the text across the limit, both ways")
+    func accessibilityFollowsTheText() {
+        let viewModel = makeViewModel()
+        describe(with: viewModel, characters: 2001)
+        let over = viewModel.promptAccessibilityHint
+
+        describe(with: viewModel, characters: 2000)
+
+        #expect(viewModel.promptAccessibilityHint != over, "Back within the limit, the hint no longer says a description is refused")
+        #expect(viewModel.characterCountAccessibilityLabel == "ai.generation.character_count.accessibility".localizedWithArgs(2000, 2000))
+    }
+
+    @Test("Going over the limit is announced once, at the moment the text crosses it")
+    func announcementOnCrossingTheLimit() throws {
+        let viewModel = makeViewModel()
+        #expect(viewModel.overLimitAnnouncement == nil)
+
+        describe(with: viewModel, characters: 2000)
+        #expect(viewModel.overLimitAnnouncement == nil, "At the limit is not over it")
+
+        describe(with: viewModel, characters: 2001)
+        let announced = try #require(viewModel.overLimitAnnouncement, "Crossing the limit is announced")
+        let expected = "ai.generation.over_limit_announcement".localizedWithArgs(2000)
+        #expect(expected != "ai.generation.over_limit_announcement", "The key is missing from the string catalog")
+        #expect(announced.text == expected)
+        #expect(announced.text.contains("2000"), "VoiceOver hears the limit")
+    }
+
+    @Test("A paste of a whole CV into an empty description is announced at once")
+    func announcementOnAPaste() {
+        let viewModel = makeViewModel()
+
+        viewModel.prompt = pastedText + "\n" + String(repeating: "• Kept the shelves in order\n", count: 80)
+
+        #expect(viewModel.isOverCharacterLimit)
+        #expect(viewModel.overLimitAnnouncement != nil, "A paste that goes over the limit in one step is announced")
+    }
+
+    @Test("While the text stays over the limit nothing more is announced, on every keystroke")
+    func noAnnouncementWhileOverTheLimit() {
+        let viewModel = makeViewModel()
+        describe(with: viewModel, characters: 2001)
+        let first = viewModel.overLimitAnnouncement
+
+        viewModel.prompt += "b"
+        describe(with: viewModel, characters: 3000)
+        describe(with: viewModel, characters: 2001)
+
+        #expect(viewModel.overLimitAnnouncement == first, "The announcement did not change: the view posts nothing")
+    }
+
+    @Test("Going back under the limit announces nothing, and going over again is announced again")
+    func announcementAfterGoingUnderAndOverAgain() throws {
+        let viewModel = makeViewModel()
+        describe(with: viewModel, characters: 2001)
+        let first = try #require(viewModel.overLimitAnnouncement)
+
+        describe(with: viewModel, characters: 2000)
+        #expect(viewModel.overLimitAnnouncement == first, "Going back under announces nothing")
+
+        describe(with: viewModel, characters: 2001)
+        let second = try #require(viewModel.overLimitAnnouncement)
+        #expect(second != first, "Each crossing is an event of its own, the same words included")
+        #expect(second.text == first.text)
+    }
+
+    @Test("A screen that opens on a description already over the limit announces nothing")
+    func noAnnouncementForAKeptDescription() {
+        let session = AIDescriptionSession()
+        session.text = String(repeating: "a", count: 2500)
+
+        let viewModel = makeViewModel(session: session)
+
+        #expect(viewModel.isOverCharacterLimit)
+        #expect(viewModel.overLimitAnnouncement == nil, "The hint says it when the person reaches the editor")
+    }
+
     @Test("A free description over the limit is refused with the too-long message, and nothing is sent")
     func freeDescriptionOverTheLimitIsRefused() async {
         let viewModel = makeViewModel()

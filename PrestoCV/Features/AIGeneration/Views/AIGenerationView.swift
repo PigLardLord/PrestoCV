@@ -49,6 +49,12 @@ struct AIGenerationView: View {
                 router.navigateToEditorWithImportedDescription(imported)
             }
         }
+        // VoiceOver hears at once that the text went over the limit, as after a paste, and not on every keystroke over it
+        .onChange(of: viewModel.overLimitAnnouncement) { _, announcement in
+            if let announcement {
+                AccessibilityNotification.Announcement(announcement.text).post()
+            }
+        }
         .onDisappear {
             viewModel.cancel()
         }
@@ -78,9 +84,11 @@ struct AIGenerationView: View {
                 .typography(.headline)
                 .foregroundColor(DesignTokens.Colors.primary)
 
-            // A text editor has no label of its own: VoiceOver names it by the title above it
+            // A text editor has no label of its own: VoiceOver names it by the title above it. Its value is the person's text, so
+            // the count and the limit are in the hint.
             TextEditor(text: $viewModel.prompt)
                 .accessibilityLabel("ai.generation.prompt_section_title".localized)
+                .accessibilityHint(viewModel.promptAccessibilityHint)
                 .frame(minHeight: 200)
                 .padding(DesignTokens.Spacing.sm)
                 .background(DesignTokens.Colors.backgroundSecondary)
@@ -101,6 +109,7 @@ struct AIGenerationView: View {
                 Text("ai.generation.character_count".localizedWithArgs(viewModel.characterCount, viewModel.characterLimit))
                     .typography(.caption1)
                     .foregroundColor(viewModel.isOverCharacterLimit ? DesignTokens.Colors.error : DesignTokens.Colors.secondary)
+                    .accessibilityLabel(viewModel.characterCountAccessibilityLabel)
             }
         }
     }
