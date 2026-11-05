@@ -44,6 +44,11 @@ struct AIGenerationView: View {
                 router.navigateToEditorWithAIDraft(draft)
             }
         }
+        .onChange(of: viewModel.imported) { _, imported in
+            if let imported {
+                router.navigateToEditorWithImportedDescription(imported)
+            }
+        }
         .onDisappear {
             viewModel.cancel()
         }

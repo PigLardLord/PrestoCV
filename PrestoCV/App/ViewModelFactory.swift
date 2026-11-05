@@ -167,6 +167,7 @@ final class ViewModelFactory {
                 requester: languageData.requester, bound: languageData.bound, sleep: environment.sleep,
                 logger: environment.diagnostics, clock: environment.clock
             ),
+            pastedCV: PastedCVIntake(importer: makeImportCV(), mapper: ImportedCVMapper()),
             appLanguageCode: environment.appLanguage,
             session: aiDescriptionSession,
             platform: environment.platform
@@ -177,17 +178,21 @@ final class ViewModelFactory {
     /// read and how it failed to the app's log (ADR 0030).
     @MainActor
     func makeImportViewModel() -> ImportViewModel {
-        let limits = ImportLimits.standard
-        return ImportViewModel(
-            importer: ImportCV(
-                pdfReader: PDFKitTextExtractor(logger: environment.diagnostics),
-                limits: limits,
-                logger: environment.diagnostics,
-                clock: environment.clock,
-                tracer: environment.tracer
-            ),
+        ImportViewModel(
+            importer: makeImportCV(),
             mapper: ImportedCVMapper(),
-            fileReader: ChosenFileReader(maximumBytes: limits.maximumPDFBytes, copies: openedFileCopies)
+            fileReader: ChosenFileReader(maximumBytes: ImportLimits.standard.maximumPDFBytes, copies: openedFileCopies)
+        )
+    }
+
+    /// The import, for the import screen and for a CV pasted in the AI screen: one set of limits, and the app's log (ADR 0030)
+    private func makeImportCV() -> ImportCV {
+        ImportCV(
+            pdfReader: PDFKitTextExtractor(logger: environment.diagnostics),
+            limits: ImportLimits.standard,
+            logger: environment.diagnostics,
+            clock: environment.clock,
+            tracer: environment.tracer
         )
     }
 

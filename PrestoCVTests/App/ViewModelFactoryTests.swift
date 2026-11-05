@@ -465,6 +465,41 @@ struct ViewModelFactoryTests {
         #expect(log.lines.allSatisfy { !$0.contains("Hartmann") }, "No word of the CV reaches the log")
     }
 
+    @Test("A CV pasted in the AI screen is read by the app's import, which logs to the environment's log, and the model is never asked (ADR 0034)")
+    func pastedCVIsReadByTheImport() async throws {
+        let log = LogSpy()
+        let factory = try ViewModelFactory(
+            dependencyContainer: UnusedContainer(), cvManagementUseCase: cvs, environment: .fixed(clock: clock, diagnostics: log)
+        )
+        let screen = factory.makeAIGenerationViewModel()
+        screen.prompt = """
+        Priya Nair
+        Florist
+
+        Experience
+        Florist, Petal & Stem, Bristol
+        2018 – Present
+        • Made bridal bouquets
+
+        Shop Assistant, Green Corner, Bath
+        2015 – 2018
+        • Watered the plants
+
+        Languages
+        English – Native
+        """
+
+        await screen.generateCV()
+
+        #expect(screen.imported?.cv.relevant_experience.map(\.company) == ["Petal & Stem", "Green Corner"])
+        #expect(screen.draft == nil)
+        #expect(screen.errorMessage.isEmpty)
+        #expect(log.events.contains("import.finished"))
+        let draftEvents = log.events.filter { $0.hasPrefix("draft.") }
+        #expect(draftEvents.isEmpty, "No step of the AI draft runs")
+        #expect(log.lines.allSatisfy { !$0.contains("Nair") }, "No word of the CV reaches the log")
+    }
+
     #if DEBUG
     @Test("The AI draft writes its steps to the log of the environment the factory was given (ADR 0030)")
     func draftLogsToTheEnvironmentsLog() async throws {

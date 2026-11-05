@@ -17,6 +17,9 @@ final class AIGenerationViewModel: ObservableObject {
     @Published private(set) var errorMessage: String = ""
     /// The generated CV, not stored yet: the editor opens it for review, with the notice it calls for, and stores it as it is.
     @Published private(set) var draft: AIDraft?
+    /// The text was already a CV, and this is what the import read in it: the editor opens it as written, in place of a
+    /// draft, and stores it as it is (ADR 0034).
+    @Published private(set) var imported: ImportedDraft?
 
     /// The running generation started by `startGenerating()`, kept so `cancel()` can stop it.
     private(set) var generationTask: Task<Void, Never>?
@@ -24,6 +27,7 @@ final class AIGenerationViewModel: ObservableObject {
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let mapper: AIDraftMapper
     private let languageData: LanguageDataPreparation
+    private let pastedCV: any PastedCVReading
     private let appLanguageCode: String?
     private let platform: AIPlatform
     /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
@@ -42,15 +46,17 @@ final class AIGenerationViewModel: ObservableObject {
 
     /// - Parameters:
     ///   - languageData: The wait for the language data that grounding a description needs, when the device has not got it.
+    ///   - pastedCV: Reads a text that is already a CV with the import, before any model is asked.
     ///   - platform: Where the app runs, for the words of an unavailable model. The factory gives the platform of the process; the
     ///     default keeps the tests the same on every machine.
     init(
-        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataPreparation, appLanguageCode: String?,
-        session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
+        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataPreparation,
+        pastedCV: any PastedCVReading, appLanguageCode: String?, session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.cvGenerationUseCase = cvGenerationUseCase
         self.mapper = mapper
         self.languageData = languageData
+        self.pastedCV = pastedCV
         self.appLanguageCode = appLanguageCode
         self.platform = platform
         self.session = session
@@ -65,9 +71,11 @@ final class AIGenerationViewModel: ObservableObject {
 
     var isOverCharacterLimit: Bool { characterCount > characterLimit }
 
+    /// Generate stays on over the limit: a CV pasted whole is read by the import whatever its length, and the AI draft refuses
+    /// a free description over its limit with its own message.
     var canGenerate: Bool {
         let hasText = !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasText && !isOverCharacterLimit && !isGenerating
+        return hasText && !isGenerating
     }
 
     // MARK: - Generation
@@ -96,6 +104,14 @@ final class AIGenerationViewModel: ObservableObject {
 
     private func run(_ generation: Generation) async {
         guard mayAct(generation) else { return finish(generation) }
+
+        if let read = pastedCV.read(generation.request.userPrompt) {
+            imported = read
+            // The CV goes to the editor as written and this creation is complete, as after a draft
+            session?.text = ""
+            session = nil
+            return finish(generation)
+        }
 
         do {
             let generated = try await generateWithLanguageData(generation)

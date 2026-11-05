@@ -31,7 +31,7 @@ struct AIGenerationViewModelTests {
     private func makeViewModel(
         appLanguageCode: String? = "it", session: AIDescriptionSession = AIDescriptionSession(),
         lexicalClasses: any LexicalTagger = FakeLexicalTagger.english, platform: AIPlatform = .iPhoneOrIPad,
-        claimChecker: FakeClaimChecker = FakeClaimChecker()
+        claimChecker: FakeClaimChecker = FakeClaimChecker(), pastedCV: ScriptedPastedCV = ScriptedPastedCV()
     ) -> AIGenerationViewModel {
         let sleeps = sleeps
         return AIGenerationViewModel(
@@ -42,11 +42,19 @@ struct AIGenerationViewModelTests {
             languageData: LanguageDataPreparation(
                 requester: languageData, sleep: { try await sleeps.sleep(for: $0) }, logger: SilentLogger(), clock: ContinuousClock()
             ),
+            pastedCV: pastedCV,
             appLanguageCode: appLanguageCode,
             session: session,
             platform: platform
         )
     }
+
+    /// A text that is already a CV, made up, and what the import reads in it
+    private let pastedText = "Experience\nSales Assistant, Corner Books, York\n2021 – 2024\n\nLanguages\nEnglish – Native"
+    private let pastedDraft = ImportedDraft(
+        cv: CVModel(relevant_experience: [Experience(title: "Sales Assistant", company: "Corner Books", period: "2021 – 2024")]),
+        review: ImportReview(items: [], notImported: "")
+    )
 
     // MARK: - Keeping the description
 
@@ -513,17 +521,97 @@ struct AIGenerationViewModelTests {
         #expect(!viewModel.isOverCharacterLimit)
     }
 
-    @Test("Generate is off over the limit, and nothing is sent")
-    func overTheLimit() async {
+    @Test("Generate stays on over the limit: a CV pasted whole is read by the import, whatever its length (#371)")
+    func generateIsOnOverTheLimit() {
         let viewModel = makeViewModel()
         viewModel.prompt = String(repeating: "a", count: 2001)
 
-        #expect(viewModel.isOverCharacterLimit)
-        #expect(!viewModel.canGenerate)
+        #expect(viewModel.isOverCharacterLimit, "The counter still shows the text is over the AI draft's limit")
+        #expect(viewModel.canGenerate)
+    }
+
+    @Test("A free description over the limit is refused with the too-long message, and nothing is sent")
+    func freeDescriptionOverTheLimitIsRefused() async {
+        let viewModel = makeViewModel()
+        viewModel.prompt = String(repeating: "a", count: 2001)
 
         await viewModel.generateCV()
 
-        #expect(service.generateRequests.isEmpty)
+        #expect(viewModel.errorMessage == "ai.error.too_long".localized, "The AI draft's own limit words the refusal")
+        #expect(service.generateRequests.isEmpty, "The model is never asked")
+        #expect(viewModel.imported == nil)
+        #expect(viewModel.draft == nil)
+        #expect(!viewModel.isGenerating)
+    }
+
+    @Test("A CV pasted whole over the limit is read by the import, and the model is never asked")
+    func pastedCVOverTheLimitIsImported() async throws {
+        let longCV = pastedText + "\n" + String(repeating: "• Kept the shelves in order\n", count: 80)
+        let viewModel = makeViewModel(pastedCV: ScriptedPastedCV(drafts: [longCV: pastedDraft]))
+        viewModel.prompt = longCV
+        try #require(viewModel.isOverCharacterLimit)
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.imported == pastedDraft, "The editor gets the CV as the import read it")
+        #expect(service.generateRequests.isEmpty, "The model is never asked")
+        #expect(viewModel.draft == nil)
+        #expect(viewModel.errorMessage.isEmpty, "A CV is not refused for the AI draft's limit")
+        #expect(!viewModel.isGenerating)
+    }
+
+    @Test("A CV pasted whole within the limit is read by the import too, and the model is never asked")
+    func pastedCVWithinTheLimitIsImported() async {
+        let viewModel = makeViewModel(pastedCV: ScriptedPastedCV(drafts: [pastedText: pastedDraft]))
+        viewModel.prompt = pastedText
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.imported == pastedDraft)
+        #expect(service.generateRequests.isEmpty, "The AI would rewrite the person's words")
+        #expect(viewModel.draft == nil)
+    }
+
+    @Test("A free description still goes to the AI draft when the intake knows other texts")
+    func freeDescriptionStillGetsADraft() async {
+        let viewModel = makeViewModel(pastedCV: ScriptedPastedCV(drafts: [pastedText: pastedDraft]))
+        viewModel.prompt = validPrompt
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.draft != nil)
+        #expect(viewModel.imported == nil)
+        #expect(service.generateRequests.count == 1)
+    }
+
+    @Test("A CV read by the import completes the creation: the screen is idle, and the next AI screen starts empty")
+    func importedCVCompletesTheCreation() async {
+        let session = AIDescriptionSession()
+        let viewModel = makeViewModel(session: session, pastedCV: ScriptedPastedCV(drafts: [pastedText: pastedDraft]))
+        viewModel.prompt = pastedText
+
+        await viewModel.generateCV()
+
+        #expect(viewModel.imported != nil)
+        #expect(!viewModel.isGenerating)
+        #expect(viewModel.prompt == pastedText, "The screen the CV came from still shows its text")
+        #expect(makeViewModel(session: session).prompt.isEmpty, "One CV's text does not carry into the next creation")
+    }
+
+    @Test("cancel right after Generate leaves a pasted CV unread: no imported CV and no draft")
+    func cancelBeforeTheIntake() async {
+        let viewModel = makeViewModel(pastedCV: ScriptedPastedCV(drafts: [pastedText: pastedDraft]))
+        viewModel.prompt = pastedText
+
+        viewModel.startGenerating()
+        let task = viewModel.generationTask
+        viewModel.cancel()
+        await task?.value
+
+        #expect(viewModel.imported == nil)
+        #expect(viewModel.draft == nil)
+        #expect(viewModel.errorMessage.isEmpty)
+        #expect(!viewModel.isGenerating)
     }
 
     // MARK: - Cancelling
