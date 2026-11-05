@@ -2107,10 +2107,16 @@ extension CVDataSanitizer {
 
     /// The first five letters of each word of five letters or more of `texts` that says nothing of a work: how a summary sentence
     /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354, round 6).
+    /// A stem is read without its accents, as a title and a verb of one stock write them differently ("Bäckerin", "backe"; #359,
+    /// P4): the sentence "Ich backe Brot mit Präzision" of a baker said nothing of the work.
     private static func workStems(of texts: [String]) -> Set<String> {
-        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(5)) } })
-            .subtracting(idleStems)
+        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map(stem(of:)) })
+            .subtracting(foldedIdleStems)
     }
+
+    private static func stem(of word: String) -> String { String(DescriptionText.normalized(word).prefix(5)) }
+
+    private static let foldedIdleStems = Set(idleStems.map(stem(of:)))
 
     /// The words of five letters or more that say nothing of a work, in the six languages: quantifiers, connectives, auxiliaries.
     private static let idleWords: Set<String> = [
@@ -2314,7 +2320,7 @@ extension CVDataSanitizer {
             }
         }
         for raw in softSkills {
-            guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
+            guard let item = check(capitalisedNoun(raw, language: language), false), keys.insert(Self.skillKey(item)).inserted else { continue }
             guard !Self.emptyQualities.contains(DescriptionText.normalized(item)) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "an empty word, not a quality"))
                 continue
@@ -2323,7 +2329,7 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
                 continue
             }
-            guard !Self.namesAName(item, in: description) else {
+            guard !namesAName(item, in: description, names: names, language: language) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a name"))
                 continue
             }
@@ -2333,6 +2339,37 @@ extension CVDataSanitizer {
         verdict.softSkills = qualities.kept
         verdict.dropped += qualities.dropped
         return verdict
+    }
+
+    // MARK: German qualities
+
+    /// The endings of the German nouns of a quality ("Zuverlässigkeit", "Präzision", "Verständnis"), lower case.
+    private static let germanNounEndings = ["keit", "heit", "ung", "schaft", "tät", "ion", "nis", "tum", "ismus", "enz", "anz"]
+
+    /// A German quality that is a noun, written with its capital (#359, P4). The model writes the qualities in lower case in every
+    /// language ("zuverlässigkeit", "präzision"), and German writes its nouns with a capital: the skills list showed them so, the
+    /// strengths sentence of the summary took them for adjectives ("Als Bäckerin bin ich zuverlässigkeit und präzision."), and the
+    /// final check dropped that sentence for words the dictionary does not know. A lone word is a noun when it ends as a noun of a
+    /// quality does, or when the device's dictionary knows it with a capital and not as written; an adjective ("zuverlässig") and a
+    /// phrase ("verständnis für kunden") stay as they are, as does every other language. Applied twice, it is the same.
+    private func capitalisedNoun(_ quality: String, language: String?) -> String {
+        let item = quality.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+        guard language == "de", item.first?.isLowercase == true, item.allSatisfy(\.isLetter) else { return quality }
+        let noun = item.prefix(1).uppercased() + item.dropFirst()
+        let endsAsANoun = item.count >= 6 && Self.germanNounEndings.contains { item.hasSuffix($0) }
+        let isANoun = endsAsANoun || wordList.knows(item, inLanguage: "de") == false && wordList.knows(noun, inLanguage: "de") == true
+        return isANoun ? noun : quality
+    }
+
+    /// Whether a soft skill of one word is written in the description only as a name (`namesAName`). In German, whose nouns all
+    /// have a capital, a quality the description states ("mit Geduld und Sorgfalt") is written so, past the start of a sentence and
+    /// never in lower case: it is a name only when the device's dictionary does not know it as a noun, or when it is a word of one
+    /// of the `names` of the CV ("Hans").
+    private func namesAName(_ item: String, in description: String, names: [String], language: String?) -> Bool {
+        guard Self.namesAName(item, in: description) else { return false }
+        guard language == "de", wordList.knows(item, inLanguage: "de") == true else { return true }
+        let key = DescriptionText.normalized(item)
+        return names.contains { $0.split { !$0.isLetter }.contains { DescriptionText.normalized(String($0)) == key } }
     }
 
     // MARK: Names among the tools
