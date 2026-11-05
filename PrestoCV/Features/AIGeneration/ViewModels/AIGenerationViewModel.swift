@@ -89,8 +89,8 @@ final class AIGenerationViewModel: ObservableObject {
     }
 
     /// The hint of the description's editor. Its value is the text the person wrote, so the count and what happens over the limit
-    /// are said here: a CV pasted whole is still read as written, and a free description is refused as too long, as
-    /// `ai.error.too_long` says after the press.
+    /// are said here: a text the import recognises as a CV is read as written, and any other text is refused as too long,
+    /// as `ai.error.too_long` says after the press.
     var promptAccessibilityHint: String {
         if isOverCharacterLimit {
             return "ai.generation.prompt_hint_over".localizedWithArgs(characterCount, characterLimit)

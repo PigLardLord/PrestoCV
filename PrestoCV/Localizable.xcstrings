@@ -1606,37 +1606,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Über dem Limit von %lld Zeichen. Ein eingefügter Lebenslauf wird weiterhin so gelesen, wie er geschrieben ist. Eine Beschreibung über dem Limit wird als zu lang abgelehnt: Kürzen Sie sie."
+            "value" : "Über dem Limit von %lld Zeichen. Erkennt die App den Text als Lebenslauf, liest sie ihn so, wie er geschrieben ist. Sonst wird der Text als zu lang abgelehnt: Kürzen Sie ihn."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Over the limit of %lld characters. A CV you pasted is still read as written. A description over the limit is refused as too long: shorten it."
+            "value" : "Over the limit of %lld characters. If the app recognises the text as a CV, it reads it as written. Otherwise the text is refused as too long: shorten it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Por encima del límite de %lld caracteres. Un CV que pegues se sigue leyendo tal como está escrito. Una descripción por encima del límite se rechaza por demasiado larga: acórtala."
+            "value" : "Por encima del límite de %lld caracteres. Si la app reconoce el texto como un CV, lo lee tal como está escrito. Si no, el texto se rechaza por demasiado largo: acórtalo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Au-delà de la limite de %lld caractères. Un CV collé est toujours lu tel qu'il est écrit. Une description au-delà de la limite est refusée comme trop longue : raccourcissez-la."
+            "value" : "Au-delà de la limite de %lld caractères. Si l'app reconnaît le texte comme un CV, elle le lit tel qu'il est écrit. Sinon, le texte est refusé comme trop long : raccourcissez-le."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oltre il limite di %lld caratteri. Un CV incollato viene comunque letto così com'è. Una descrizione oltre il limite viene rifiutata perché troppo lunga: accorciala."
+            "value" : "Oltre il limite di %lld caratteri. Se l'app riconosce il testo come un CV, lo legge così com'è. Altrimenti il testo viene rifiutato perché troppo lungo: accorcialo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Acima do limite de %lld caracteres. Um currículo colado continua sendo lido como foi escrito. Uma descrição acima do limite é recusada por ser longa demais: encurte-a."
+            "value" : "Acima do limite de %lld caracteres. Se o app reconhecer o texto como um currículo, ele o lê como foi escrito. Caso contrário, o texto é recusado por ser longo demais: encurte-o."
           }
         }
       }
@@ -1688,37 +1688,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld von %2$lld Zeichen, über dem Limit. Ein eingefügter Lebenslauf wird weiterhin so gelesen, wie er geschrieben ist. Eine Beschreibung über dem Limit wird als zu lang abgelehnt: Kürzen Sie sie."
+            "value" : "%1$lld von %2$lld Zeichen, über dem Limit. Erkennt die App den Text als Lebenslauf, liest sie ihn so, wie er geschrieben ist. Sonst wird der Text als zu lang abgelehnt: Kürzen Sie ihn."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld of %2$lld characters, over the limit. A CV you pasted is still read as written. A description over the limit is refused as too long: shorten it."
+            "value" : "%1$lld of %2$lld characters, over the limit. If the app recognises the text as a CV, it reads it as written. Otherwise the text is refused as too long: shorten it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld de %2$lld caracteres, por encima del límite. Un CV que pegues se sigue leyendo tal como está escrito. Una descripción por encima del límite se rechaza por demasiado larga: acórtala."
+            "value" : "%1$lld de %2$lld caracteres, por encima del límite. Si la app reconoce el texto como un CV, lo lee tal como está escrito. Si no, el texto se rechaza por demasiado largo: acórtalo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld sur %2$lld caractères, au-delà de la limite. Un CV collé est toujours lu tel qu'il est écrit. Une description au-delà de la limite est refusée comme trop longue : raccourcissez-la."
+            "value" : "%1$lld sur %2$lld caractères, au-delà de la limite. Si l'app reconnaît le texte comme un CV, elle le lit tel qu'il est écrit. Sinon, le texte est refusé comme trop long : raccourcissez-le."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld di %2$lld caratteri, oltre il limite. Un CV incollato viene comunque letto così com'è. Una descrizione oltre il limite viene rifiutata perché troppo lunga: accorciala."
+            "value" : "%1$lld di %2$lld caratteri, oltre il limite. Se l'app riconosce il testo come un CV, lo legge così com'è. Altrimenti il testo viene rifiutato perché troppo lungo: accorcialo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld de %2$lld caracteres, acima do limite. Um currículo colado continua sendo lido como foi escrito. Uma descrição acima do limite é recusada por ser longa demais: encurte-a."
+            "value" : "%1$lld de %2$lld caracteres, acima do limite. Se o app reconhecer o texto como um currículo, ele o lê como foi escrito. Caso contrário, o texto é recusado por ser longo demais: encurte-o."
           }
         }
       }
