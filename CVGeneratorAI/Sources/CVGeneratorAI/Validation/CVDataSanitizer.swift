@@ -113,7 +113,7 @@ public struct CVDataSanitizer: Sendable {
         let titles = ([cvData.personalInfo.title] + jobTitles).compactMap(\.presentValue)
         let interests = unique(cvData.interests.compactMap(claimed.named).filter {
             !Self.isWork($0, titles: titles, source) && !Self.isQualityAtWork($0, in: source.explainer.language)
-        }.map { pastime(of: $0, in: source) }) { $0 }
+        }.compactMap { pastime(of: $0, in: source) }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = Self.withWholeTitle(Self.withStatedTitle(
@@ -373,7 +373,17 @@ public struct CVDataSanitizer: Sendable {
     /// English verb with no "-s" and no "-ed" ("play football", "bake bread"), a gerund ("hiking in the Alps") and a German infinitive
     /// ("wandern gehen"). An interest of one word stays whole, and so does one whose rest holds no word of 3 letters or more, or, in
     /// German, no noun.
-    private func pastime(of interest: String, in source: DescriptionText) -> String {
+    ///
+    /// No pastime is left (nil) where a piece of a clause is (#359): what the verb leaves must start, past its articles, with a noun
+    /// ("spiele das Klavier" gives "Klavier"), not with a preposition or an adverb that tells when, where or how ("koche am Wochenende
+    /// für meine Freunde", "gehe gern mit meinem Hund spazieren"), and no interest, clipped or whole, ends on an article or a
+    /// preposition ("Wandern in den"): its noun is missing. See `InterestFragment`.
+    private func pastime(of interest: String, in source: DescriptionText) -> String? {
+        guard let pastime = clipped(interest, in: source) else { return nil }
+        return InterestFragment.endsOnALinkWord(pastime, in: source.explainer.language) ? nil : pastime
+    }
+
+    private func clipped(_ interest: String, in source: DescriptionText) -> String? {
         let language = source.explainer.language
         let words = Word.words(in: interest)
         guard let language, VerbForms.readsVerbsByTags(in: language), lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue),
@@ -390,8 +400,9 @@ public struct CVDataSanitizer: Sendable {
             let saidAlone = language == .german
                 && lexicalClasses.verbs(in: "ich " + Self.lowercasingFirst(interest), language: language.rawValue).contains { $0.contains(4) }
             guard saidAlone || verbs.contains(where: { $0.contains(said[start].range.lowerBound) }) else { return interest }
-            let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.folded) }
+            let rest = InterestFragment.withoutArticles(words.dropFirst(), in: language)
             guard let next = rest.first, rest.contains(where: { $0.folded.count >= 3 }) else { return interest }
+            guard !InterestFragment.tellsHowOrWhere(next, in: interest, language: language) else { return nil }
             let kept = String(Array(interest)[next.range.lowerBound...])
             guard language != .german || kept.split(separator: " ").contains(where: { $0.first?.isUppercase == true }) else {
                 return interest

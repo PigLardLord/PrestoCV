@@ -1584,7 +1584,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a German word in lower case is an adverb of manner: by its ending, or one of the short ones.
-    private static func isGermanAdverb(_ word: String) -> Bool {
+    static func isGermanAdverb(_ word: String) -> Bool {
         guard word.first?.isLowercase == true else { return false }
         return ["ig", "lich", "los", "bar", "sam", "isch", "frei", "haft"].contains { word.count > $0.count + 2 && word.hasSuffix($0) }
             || germanShortAdverbs.contains(word)
