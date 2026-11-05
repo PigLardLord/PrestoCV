@@ -587,6 +587,9 @@ extension Grounding {
         var continuations: Set<DescriptionClauses.Place> = []
         /// The clauses attributed by rule (a).
         var naming: Set<DescriptionClauses.Place> = []
+        /// The clauses in which the person goes on from the employer that opens their sentence, split off by a comma ("À l'Hôtel du
+        /// Lac Vert, j'aidais au service des petits-déjeuners"): rule (a) reads them as the clause that names the employer (#359).
+        var fronted: Set<DescriptionClauses.Place> = []
         /// A job named in a verbless clause coordinated after another job's naming clause: that job, the head of the sentence.
         var head: [Int: Int] = [:]
     }
@@ -609,12 +612,15 @@ extension Grounding {
             var previousNaming = false
             var chainHead: Int?
             var continued: Clause?
+            // The sentence opens with the employer alone, with no verb and no year ("À l'Hôtel du Lac Vert, ...").
+            var opensWithTheEmployer = false
             for place in bySentence[sentence, default: []].sorted(by: { $0.clause < $1.clause }) {
                 let clause = clauses.clause(at: place)
                 let statement = Statement(clause: clause, quotes: reading.all, language: language)
                 let named = jobs.filter { mentioning[$0].contains(place) }
                 var allowed: [Int] = []
                 var isContinuation = false
+                var isFronted = false
                 var coordinated: [Int] = []
                 if !named.isEmpty {
                     if !clause.isAnchored && !statement.hasVerbs && previousNaming, last != nil {
@@ -628,12 +634,19 @@ extension Grounding {
                     allowed = named
                     previousNaming = true
                     continued = nil
+                    opensWithTheEmployer = place.clause == 0 && !statement.hasVerbs && !clause.words.contains(where: \.isNumber)
                 } else if let lastJobs = last,
                           Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true {
                     allowed = chain.count > 1 ? chain : lastJobs
                     isContinuation = true
                     previousNaming = false
                     continued = clause
+                    opensWithTheEmployer = false
+                } else if let lastJobs = last, opensWithTheEmployer, previousNaming, Self.isSaidByThePerson(clause, language) {
+                    allowed = lastJobs
+                    isFronted = true
+                    previousNaming = false
+                    opensWithTheEmployer = false
                 } else if previousNaming, Self.isPlace(clause) {
                     continue
                 } else {
@@ -642,10 +655,12 @@ extension Grounding {
                     previousNaming = false
                     chainHead = nil
                     continued = nil
+                    opensWithTheEmployer = false
                 }
                 guard !allowed.isEmpty, !reading.claimedWords(at: place).isEmpty else { continue }
                 result.jobsOf[place] = allowed
                 if isContinuation { result.continuations.insert(place) } else { result.naming.insert(place) }
+                if isFronted { result.fronted.insert(place) }
                 if let chainHead { for job in coordinated where job != chainHead { result.head[job] = chainHead } }
             }
         }
@@ -679,6 +694,22 @@ extension Grounding {
             return endings.contains { verb.count > $0.count + 2 && verb.hasSuffix($0) }
         }
         return isImperfect(continuation.words) && isImperfect(clause.words)
+    }
+
+    /// Whether `clause` was split off by a comma and opens with the person as its subject ("j'aidais au service", "I also helped"),
+    /// a pronoun that only the subject of a verb takes.
+    private static func isSaidByThePerson(_ clause: Clause, _ language: Vocabulary.Language?) -> Bool {
+        let pronouns: Set<String> = switch language {
+        case .english: ["i"]
+        case .french: ["je", "j"]
+        case .italian: ["io"]
+        case .spanish: ["yo"]
+        case .portuguese: ["eu"]
+        case .german: ["ich"]
+        case nil: []
+        }
+        guard !clause.isAnchored, clause.words.count > 1, let first = clause.words.first else { return false }
+        return pronouns.contains(first.folded)
     }
 
     /// The prepositions that open the place of a job ("in Leeds", "a Termoli", "en Logroño", "em Maringá", "à Annecy"), folded.
@@ -770,11 +801,15 @@ extension Grounding {
             let words = clause.words
             var start = 0
             if attribution.naming.contains(place) {
-                guard let firstNamed, place.sentence > firstNamed, place.clause == 0, attribution.jobsOf[place]?.count == 1,
+                let isFronted = attribution.fronted.contains(place)
+                guard let firstNamed, place.sentence > firstNamed, place.clause == 0 || isFronted, attribution.jobsOf[place]?.count == 1,
                       !words.contains(where: \.isNumber) else { return nil }
-                let names = Set(subjects[index].mentions.flatMap { $0 })
-                guard let end = words.lastIndex(where: { names.contains($0.folded) }) else { return nil }
-                start = end + 1
+                // A clause that goes on from the employer that opens its sentence holds no word of the employer: it is the duty, whole.
+                if !isFronted {
+                    let names = Set(subjects[index].mentions.flatMap { $0 })
+                    guard let end = words.lastIndex(where: { names.contains($0.folded) }) else { return nil }
+                    start = end + 1
+                }
             } else if !attribution.continuations.contains(place) {
                 return nil
             }

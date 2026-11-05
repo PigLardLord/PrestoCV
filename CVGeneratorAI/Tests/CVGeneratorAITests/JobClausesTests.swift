@@ -518,6 +518,65 @@ struct JobClausesTests {
         #expect(verdicts.pinned == row.pinned)
     }
 
+    // MARK: A duty said after the employer that opens its sentence (#359)
+
+    /// The receptionist's first sentence, which names the job first, with its years.
+    private static let receptionist = "De 2009 à 2013, j'ai été réceptionniste à l'Hôtel du Lac Vert."
+
+    @Test("The duty the person said after the employer that opens a later sentence, split off by a comma, is the job's (#359)",
+          arguments: [
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert, j'aidais aussi parfois au service des petits-déjeuners.",
+                  pinned: ["J'aidais aussi parfois au service des petits-déjeuners."]
+              ),
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert, à Annecy, j'aidais aussi parfois au service des petits-déjeuners.",
+                  pinned: ["J'aidais aussi parfois au service des petits-déjeuners."]
+              ),
+              PinRow(
+                  language: "en", title: "receptionist", company: "Lakeside Hotel",
+                  sentence: "From 2009 to 2013 I was a receptionist at Lakeside Hotel. At Lakeside Hotel, I also helped with the breakfast service.",
+                  pinned: ["I also helped with the breakfast service."]
+              ),
+              // The sentence that names the job first gives its title and years, no duty.
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: "À l'Hôtel du Lac Vert, j'ai été réceptionniste de 2009 à 2013.", pinned: []
+              ),
+              // Another person's work, a year, a wish: no duty of the person.
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert, ma sœur aidait au service des petits-déjeuners.", pinned: []
+              ),
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert, j'ai ouvert le restaurant en 2012.", pinned: []
+              ),
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert en 2012, j'ai ouvert le restaurant.", pinned: []
+              ),
+              PinRow(
+                  language: "fr", title: "réceptionniste", company: "Hôtel du Lac Vert",
+                  sentence: receptionist + " À l'Hôtel du Lac Vert, je voudrais aider au service des petits-déjeuners.", pinned: []
+              ),
+              PinRow(
+                  language: "en", title: "receptionist", company: "Lakeside Hotel",
+                  sentence: "From 2009 to 2013 I was a receptionist at Lakeside Hotel. At Lakeside Hotel, my sister helped with the breakfast service.",
+                  pinned: []
+              ),
+          ])
+    func dutyAfterTheFrontedEmployer(row: PinRow) throws {
+        let sanitizer = Self.makeSanitizer(in: row.language)
+        let jobs = CVData(experience: [Self.job(row.title, row.company, from: "2009", to: "2013")])
+
+        let verdicts = try sanitizer.dutyCheck(of: jobs, job: 0, duties: nil, against: row.sentence)
+
+        #expect(verdicts.pinned == row.pinned)
+    }
+
     @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
           arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
     func dutyOfAJobBeforeItsPlace(duty: String) throws {
