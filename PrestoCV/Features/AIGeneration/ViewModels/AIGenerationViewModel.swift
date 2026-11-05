@@ -8,7 +8,10 @@ final class AIGenerationViewModel: ObservableObject {
     /// The description, kept in the session as it is typed, so that it survives leaving the screen until a draft is
     /// made from it.
     @Published var prompt: String {
-        didSet { session?.text = prompt }
+        didSet {
+            session?.text = prompt
+            announceCrossingTheLimit(from: oldValue)
+        }
     }
     @Published private(set) var isGenerating: Bool = false
     /// The busy screen waits for the language data that the system downloads, up to `LanguageDataPreparation.bound`, and not for the
@@ -17,6 +20,12 @@ final class AIGenerationViewModel: ObservableObject {
     @Published private(set) var errorMessage: String = ""
     /// The generated CV, not stored yet: the editor opens it for review, with the notice it calls for, and stores it as it is.
     @Published private(set) var draft: AIDraft?
+    /// The text was already a CV, and this is what the import read in it: the editor opens it as written, in place of a
+    /// draft, and stores it as it is (ADR 0034).
+    @Published private(set) var imported: ImportedDraft?
+    /// What VoiceOver is told at once when the text goes over the limit, as in a paste of a whole CV: the hint of the editor
+    /// says it only when the person reaches the editor. Set when the text crosses the limit, not while it stays over.
+    @Published private(set) var overLimitAnnouncement: OverLimitAnnouncement?
 
     /// The running generation started by `startGenerating()`, kept so `cancel()` can stop it.
     private(set) var generationTask: Task<Void, Never>?
@@ -24,6 +33,7 @@ final class AIGenerationViewModel: ObservableObject {
     private let cvGenerationUseCase: CVGeneratorUseCase
     private let mapper: AIDraftMapper
     private let languageData: LanguageDataPreparation
+    private let pastedCV: any PastedCVReading
     private let appLanguageCode: String?
     private let platform: AIPlatform
     /// Where the description of this creation is kept, until a draft is made from it. The screen then lets go of it for
@@ -34,6 +44,9 @@ final class AIGenerationViewModel: ObservableObject {
     /// so a cancelled generation, even one that returns later, finds it changed and stays silent.
     private var activeGeneration: UUID?
 
+    /// How many times the text has crossed the limit, to tell one announcement from the next.
+    private var overLimitAnnouncements = 0
+
     /// One request to the generator: its identity, and the request as it was when the person tapped Generate.
     private struct Generation {
         let id = UUID()
@@ -42,15 +55,17 @@ final class AIGenerationViewModel: ObservableObject {
 
     /// - Parameters:
     ///   - languageData: The wait for the language data that grounding a description needs, when the device has not got it.
+    ///   - pastedCV: Reads a text that is already a CV with the import, before any model is asked.
     ///   - platform: Where the app runs, for the words of an unavailable model. The factory gives the platform of the process; the
     ///     default keeps the tests the same on every machine.
     init(
-        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataPreparation, appLanguageCode: String?,
-        session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
+        cvGenerationUseCase: CVGeneratorUseCase, mapper: AIDraftMapper, languageData: LanguageDataPreparation,
+        pastedCV: any PastedCVReading, appLanguageCode: String?, session: AIDescriptionSession, platform: AIPlatform = .iPhoneOrIPad
     ) {
         self.cvGenerationUseCase = cvGenerationUseCase
         self.mapper = mapper
         self.languageData = languageData
+        self.pastedCV = pastedCV
         self.appLanguageCode = appLanguageCode
         self.platform = platform
         self.session = session
@@ -65,9 +80,39 @@ final class AIGenerationViewModel: ObservableObject {
 
     var isOverCharacterLimit: Bool { characterCount > characterLimit }
 
+    /// The counter as VoiceOver reads it: the count in words, not "slash", and that it is over the limit.
+    var characterCountAccessibilityLabel: String {
+        if isOverCharacterLimit {
+            return "ai.generation.character_count.accessibility_over".localizedWithArgs(characterCount, characterLimit)
+        }
+        return "ai.generation.character_count.accessibility".localizedWithArgs(characterCount, characterLimit)
+    }
+
+    /// The hint of the description's editor. Its value is the text the person wrote, so the count and what happens over the limit
+    /// are said here: a text the import recognises as a CV is read as written, and any other text is refused as too long,
+    /// as `ai.error.too_long` says after the press.
+    var promptAccessibilityHint: String {
+        if isOverCharacterLimit {
+            return "ai.generation.prompt_hint_over".localizedWithArgs(characterCount, characterLimit)
+        }
+        return "ai.generation.character_count.accessibility".localizedWithArgs(characterCount, characterLimit)
+    }
+
+    /// The text crossed the limit, in one keystroke or in a paste: VoiceOver says so at once. Staying over, or going back under,
+    /// says nothing.
+    private func announceCrossingTheLimit(from previous: String) {
+        guard prompt.count > characterLimit, previous.count <= characterLimit else { return }
+        overLimitAnnouncements += 1
+        overLimitAnnouncement = OverLimitAnnouncement(
+            text: "ai.generation.over_limit_announcement".localizedWithArgs(characterLimit), sequence: overLimitAnnouncements
+        )
+    }
+
+    /// Generate stays on over the limit: a CV pasted whole is read by the import whatever its length, and the AI draft refuses
+    /// a free description over its limit with its own message.
     var canGenerate: Bool {
         let hasText = !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return hasText && !isOverCharacterLimit && !isGenerating
+        return hasText && !isGenerating
     }
 
     // MARK: - Generation
@@ -96,6 +141,14 @@ final class AIGenerationViewModel: ObservableObject {
 
     private func run(_ generation: Generation) async {
         guard mayAct(generation) else { return finish(generation) }
+
+        if let read = pastedCV.read(generation.request.userPrompt) {
+            imported = read
+            // The CV goes to the editor as written and this creation is complete, as after a draft
+            session?.text = ""
+            session = nil
+            return finish(generation)
+        }
 
         do {
             let generated = try await generateWithLanguageData(generation)

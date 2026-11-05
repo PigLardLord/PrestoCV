@@ -9,6 +9,9 @@ enum EditorNotice: Hashable {
     case aiDraftUnchecked
     /// The CV was read from the person's own text or PDF: the values to check and the text not imported come with it.
     case imported(ImportReview)
+    /// A text given to the AI screen was already a CV, so the import read it as written instead of the AI drafting it
+    /// (ADR 0034): the notice says so, then what any import says, and leads to the same review.
+    case importedDescription(ImportReview)
 
     /// The lines of the message, in the order shown.
     var messageKeys: [String] {
@@ -16,6 +19,7 @@ enum EditorNotice: Hashable {
         case .aiDraft: return ["editor.notice.ai_draft"]
         case .aiDraftUnchecked: return ["editor.notice.ai_draft", "editor.notice.ai_draft.unchecked"]
         case .imported: return ["editor.notice.imported"]
+        case .importedDescription: return ["editor.notice.imported.from_description", "editor.notice.imported"]
         }
     }
 
@@ -23,13 +27,17 @@ enum EditorNotice: Hashable {
     var iconName: String {
         switch self {
         case .aiDraft, .aiDraftUnchecked: return "sparkles"
-        case .imported: return "doc.on.clipboard"
+        case .imported, .importedDescription: return "doc.on.clipboard"
         }
     }
 
     /// What the person can review from the notice: the values to check and the text not imported, if there are any.
     var review: ImportReview? {
-        guard case .imported(let review) = self, !review.isEmpty else { return nil }
-        return review
+        switch self {
+        case .aiDraft, .aiDraftUnchecked:
+            return nil
+        case .imported(let review), .importedDescription(let review):
+            return review.isEmpty ? nil : review
+        }
     }
 }

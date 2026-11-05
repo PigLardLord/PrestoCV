@@ -30,10 +30,11 @@ struct EditorRequestTests {
             .new(template: template, notice: .aiDraft),
             .new(template: template, notice: .aiDraftUnchecked),
             .new(template: template, notice: .imported(Self.review)),
+            .new(template: template, notice: .importedDescription(Self.review)),
             .new(template: CVModel(name: "Draft"), notice: nil),
         ]
 
-        #expect(requests.count == 5, "The same template with the same notice is one request")
+        #expect(requests.count == 6, "The same template with the same notice is one request")
     }
 
     @Test("Requests of different kinds are never the same, even for the same CV")
@@ -55,6 +56,15 @@ struct EditorRequestTests {
         #expect(EditorRequest.new(template: cv, notice: .imported(Self.review)).storesAsItIs)
         #expect(EditorRequest.new(template: cv, notice: .imported(ImportReview(items: [], notImported: ""))).storesAsItIs,
                 "An import with nothing to check is stored too")
+    }
+
+    @Test("A CV pasted in the AI screen and read by the import is stored as it opens, like any import")
+    func pastedCVIsStoredAsItIs() {
+        let cv = CVModel(personalInfo: PersonalInfo(name: "Lena Hartmann"))
+
+        #expect(EditorRequest.new(template: cv, notice: .importedDescription(Self.review)).storesAsItIs)
+        #expect(EditorRequest.new(template: cv, notice: .importedDescription(ImportReview(items: [], notImported: ""))).storesAsItIs,
+                "One with nothing to check is stored too")
     }
 
     @Test("A blank CV, an example and a stored CV are not stored as they open")
