@@ -34,5 +34,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0031](0031-let-the-ai-draft-write-around-the-facts.md) | Let the AI draft write around the facts | Accepted |
 | [0032](0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md) | Record each step of the AI draft and the import in test builds | Proposed |
 | [0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md) | Change the legacy app only to fix the published version | Accepted |
+| [0035](0035-judge-the-ai-draft-by-whether-it-helps-the-person-get-hired.md) | Judge the AI draft by whether it helps the person get hired | Proposed |
 
 New ADRs copy [template.md](template.md).

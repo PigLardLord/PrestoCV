@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-27
+- **Amended by:** [ADR 0035](0035-judge-the-ai-draft-by-whether-it-helps-the-person-get-hired.md) (2026-11-05): the draft infers what the person's years and trade imply (tools, norms, scope, seniority), the word rules that block it are lifted in the new targets, and a change of the draft is judged by whether it helps the person get hired
 - **Related:** [ADR 0023](0023-ground-the-ai-draft-in-the-description.md) (amended), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md) (amended), [ADR 0022](0022-ship-legacy-app-as-v1.md), issues #202, #203, #354
 
 ## Context
