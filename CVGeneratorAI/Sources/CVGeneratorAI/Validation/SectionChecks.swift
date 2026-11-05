@@ -14,6 +14,8 @@ extension CVDataSanitizer {
             let job: Int
             /// The clauses of the description that name the job, back it or join it.
             let clauses: [String]
+            /// Whether the job goes on, as the rules keep it: the extraction says so and the description says so (#359).
+            let goesOn: Bool
         }
 
         /// One for one with the jobs that `sanitize(cvData, against: description)` keeps, in their order.
@@ -29,7 +31,7 @@ extension CVDataSanitizer {
             let entries = entries(of: cvData, source)
             let jobs = keptJobs(entries.jobs, source, entries).compactMap { kept -> DraftContext.Job? in
                 guard let index = entries.jobs.firstIndex(where: { $0.subject == kept.job.subject }) else { return nil }
-                return DraftContext.Job(job: index, clauses: entries.evidence(of: kept.job.subject).context)
+                return DraftContext.Job(job: index, clauses: entries.evidence(of: kept.job.subject).context, goesOn: kept.experience.current)
             }
             return DraftContext(jobs: jobs, field: entries.fieldClause(), own: entries.ownSentences())
         }

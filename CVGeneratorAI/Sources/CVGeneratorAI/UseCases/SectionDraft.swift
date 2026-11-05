@@ -151,7 +151,8 @@ final class SectionDraft {
 
     /// `located` with the years each job's request read filling the dates the extraction left empty, and each technology as the
     /// person wrote it, without the verb it was said with, and none that is a clause (`statedSkill`): the rules check them as any
-    /// date and skill.
+    /// date and skill. A job that goes on, as the rules keep it, gets no end year from its request; one the extraction calls current
+    /// and the description does not keeps it (#359): the rules then end the job.
     private func dated(_ located: CVData, context: CVDataSanitizer.DraftContext) -> CVData {
         var experience = located.experience
         for (number, role) in years where context.jobs.indices.contains(number) && experience.indices.contains(context.jobs[number].job) {
@@ -160,7 +161,7 @@ final class SectionDraft {
             experience[index] = Experience(
                 title: job.title, company: job.company, location: job.location,
                 startDate: job.startDate.presentValue ?? role.startDate?.presentValue,
-                endDate: job.current ? job.endDate : job.endDate.presentValue ?? role.endDate?.presentValue,
+                endDate: context.jobs[number].goesOn ? job.endDate : job.endDate.presentValue ?? role.endDate?.presentValue,
                 current: job.current, description: job.description, achievements: job.achievements
             )
         }
