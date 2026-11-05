@@ -367,6 +367,26 @@ struct EnglishTextTests {
         #expect(EnglishText.firstNotEnglish(in: "The page quotes \"\(twentyOne)\" as it is.")?.passage == twentyOne)
     }
 
+    @Test("A short quotation inside a long one does not count, with curly marks around straight ones or the other way round")
+    func aShortQuotationInsideALongOneDoesNotCount() {
+        let example = "Die App speichert jeden Lebenslauf auf dem Gerät und nicht auf einem Server."
+        let curlyOutside = "The guide says: \u{201C}It shows one example. \"\(example)\" It goes on in English.\u{201D}"
+        let straightOutside = "The guide says: \"It shows one example. \u{201C}\(example)\u{201D} It goes on in English.\""
+
+        for markdown in [curlyOutside, straightOutside] {
+            #expect(EnglishText.passages(in: markdown) == ["The guide says:", "It shows one example.", "It goes on in English."])
+            #expect(EnglishText.firstNotEnglish(in: markdown) == nil)
+        }
+    }
+
+    @Test("A long quotation inside a long one is text too, so its sentences in another language are found")
+    func aLongQuotationInsideALongOneIsText() {
+        let german = "Die App speichert jeden Lebenslauf auf dem Gerät. Wer einen Lebenslauf teilen will, exportiert ihn."
+        let markdown = "The guide says: \u{201C}It quotes the page: \"\(german)\" The text around it goes on in English.\u{201D}"
+
+        #expect(EnglishText.firstNotEnglish(in: markdown)?.passage == "Die App speichert jeden Lebenslauf auf dem Gerät.")
+    }
+
     @Test("A paragraph in another language between quotation marks, in a document that is otherwise English, is found")
     func aQuotedParagraphIsFound() {
         let german = Self.germanSentences.joined(separator: " ")

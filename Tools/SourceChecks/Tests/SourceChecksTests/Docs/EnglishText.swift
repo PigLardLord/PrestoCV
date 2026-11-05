@@ -16,8 +16,8 @@ import Foundation
 ///   each sentence of a paragraph), because a bilingual document has English enough to hide its German.
 /// - A short quotation, one sentence of at most `maximumQuotationWords` words between double quotation marks, does not count:
 ///   the decision records quote examples in the languages of the app inside English sentences. A longer quotation, or one of
-///   more sentences, is text, and its sentences are passages. German that stands outside quotation marks is a foreign
-///   passage, and so is a mark that has no partner.
+///   more sentences, is text, and its sentences are passages; a short quotation inside it, with the other marks, does not
+///   count either. German that stands outside quotation marks is a foreign passage, and so is a mark that has no partner.
 /// - A passage in another script (Cyrillic, Greek, Arabic, Chinese, ...) is not English: a tenth of its letters, and at least
 ///   `minimumOtherScriptLetters` of them, are outside the Latin script. A Greek letter in an equation is not a script.
 /// - Latin-script languages other than the six of the app are out of scope: a Dutch passage has no word of the lists and
@@ -149,12 +149,18 @@ enum EnglishText {
     }
 
     /// `text` without the text between double quotation marks, straight (`"..."`) or curly (`“...”`), and the quotations that
-    /// are judged as text: those that are not short (`isShortQuotation`). A mark that has no partner in the text quotes nothing.
+    /// are judged as text: those that are not short (`isShortQuotation`). A quotation that is judged is read as `text` is,
+    /// so a quotation inside it with the other marks is short or judged by itself; its own text comes before the quotations
+    /// in it. A mark that has no partner in the text quotes nothing.
     private static func quotations(in text: String) -> (outside: String, judged: [String]) {
         var judged: [String] = []
         let outside = text.replacing(/"([^"]*)"|\u{201C}([^\u{201D}]*)\u{201D}/) { match in
             let quoted = String(match.output.1 ?? match.output.2 ?? "")
-            if !isShortQuotation(quoted) { judged.append(collapsed(quoted)) }
+            if !isShortQuotation(quoted) {
+                let (own, inner) = quotations(in: quoted)
+                if !own.isEmpty { judged.append(own) }
+                judged += inner
+            }
             return " "
         }
         return (collapsed(outside), judged)
