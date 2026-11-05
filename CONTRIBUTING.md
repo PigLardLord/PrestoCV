@@ -7,7 +7,7 @@ Taking part means following the [Code of Conduct](CODE_OF_CONDUCT.md). A vulnera
 ## Before you start
 
 - **Open an issue first** for anything larger than a small fix, so that the approach is agreed before the work. The code is being migrated to a new architecture, and some areas are about to be replaced (see "Status" in the [README](README.md)).
-- **New code goes into the new targets.** The legacy targets are exempt from the architecture checker until they are deleted ([ADR 0012](docs/architecture/adr/0012-legacy-targets-during-migration.md)). Version 1 ships them, so a change to them fixes a bug or adds a version 1 feature ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)).
+- **New code goes into the new targets.** The legacy targets are exempt from the architecture checker until they are deleted ([ADR 0012](docs/architecture/adr/0012-legacy-targets-during-migration.md)). Version 1 ships them ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)). From its submission until the app switches to the new stack, a change to them only fixes a bug of the published version, starting from a failing test, or keeps the app building; a new feature goes into the new targets ([ADR 0033](docs/architecture/adr/0033-change-the-legacy-app-only-to-fix-the-published-version.md)).
 
 ## Requirements
 

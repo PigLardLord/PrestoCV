@@ -46,10 +46,18 @@ grants no permission to use them, and neither does this notice.
 Third-party components
 ----------------------
 
-This repository bundles no third-party code, fonts, images or data. Everything
-in it is the work of the copyright holder above and is under the License, except
-the app icon.
+Apart from the code of conduct, this repository bundles no third-party text,
+code, fonts, images or data. Everything else in it is the work of the copyright
+holder above and is under the License, except the app icon.
 
+- CODE_OF_CONDUCT.md is adapted from the Contributor Covenant, version 2.1
+  (https://www.contributor-covenant.org/version/2/1/code_of_conduct.html),
+  which its authors published under the Creative Commons Attribution 4.0
+  International licence (CC BY 4.0,
+  https://creativecommons.org/licenses/by/4.0/). The file stays under that
+  licence, not under the Apache License. The changes: the contact address is
+  filled in, and "email" is written "e-mail". Its own Attribution section
+  names the source and the licence, and stays with every copy.
 - The designs (the .mcvt packages and their preview images), the sample CVs,
   the translations of the document headings, the closed vocabularies of the AI
   draft, the golden files and the test fixtures were written for this project.

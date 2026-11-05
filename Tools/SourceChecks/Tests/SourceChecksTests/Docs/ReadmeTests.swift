@@ -78,6 +78,30 @@ struct ReadmeTests {
         }
     }
 
+    /// Whether a Markdown document has a heading "Attribution", outside fenced code: the section where a text taken from
+    /// another work names its source and licence.
+    private static func hasAttributionHeading(_ markdown: String) -> Bool {
+        let lines = MarkdownText.lines(of: markdown)
+        return zip(lines, MarkdownText.fencedLines(in: lines)).contains { line, isFenced in
+            guard !isFenced, let level = MarkdownText.headingLevel(of: line) else { return false }
+            return line.drop { $0 == " " }.dropFirst(level).trimmingCharacters(in: .whitespaces) == "Attribution"
+        }
+    }
+
+    @Test("A document with an Attribution section is named among NOTICE's third-party components")
+    func attributedDocumentsAreNamedInNotice() throws {
+        let sections = try Repository.text("NOTICE").components(separatedBy: "\nThird-party components\n")
+        let attributed = try Repository.presentFiles().filter(MarkdownText.isMarkdown).filter {
+            Self.hasAttributionHeading(try Repository.text($0))
+        }
+
+        try #require(sections.count == 2, "NOTICE has no heading \"Third-party components\"")
+        #expect(attributed.contains("CODE_OF_CONDUCT.md"), "Found \(attributed): the code of conduct has no Attribution section")
+        for file in attributed where !sections[1].contains(file) {
+            Issue.record("\(file) has an Attribution section, so it comes from another work, and NOTICE's \"Third-party components\" does not name it")
+        }
+    }
+
     @Test("The contact address is filled in where the policies name it", arguments: ["SECURITY.md", "CODE_OF_CONDUCT.md"])
     func contactAddressIsFilledIn(file: String) throws {
         let text = try Repository.text(file)

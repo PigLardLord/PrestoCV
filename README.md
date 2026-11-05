@@ -99,4 +99,4 @@ The repository side is `ci_scripts/` (it sets an archive's version from its tag 
 
 Copyright 2026 Giovanni Trovato. The source is licensed under the [Apache License, Version 2.0](LICENSE).
 
-"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. The icon's artwork, in `PrestoCV/PrestoCV.icon`, is not under the License either: all rights are reserved, and its files are in the repository only so that the official app can be built. A fork uses its own name and icon. [NOTICE](NOTICE) has the details and the components the project uses.
+"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. The icon's artwork, in `PrestoCV/PrestoCV.icon`, is not under the License either: all rights are reserved, and its files are in the repository only so that the official app can be built. A fork uses its own name and icon. The code of conduct is adapted from the Contributor Covenant and keeps its licence, CC BY 4.0. [NOTICE](NOTICE) has the details and the components the project uses.
