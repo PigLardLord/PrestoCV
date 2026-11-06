@@ -14,13 +14,13 @@ Most people write their CV on a computer, and they find it slow and boring. Pres
 
 ## How it works
 
-1. The person says who they are, for example "iOS developer, 10 years".
+1. The person says who they are, for example "iOS developer, 10 years": in a free text, by scanning a document, or by answering the coach's questions, in writing or by voice.
 2. PrestoCV proposes what such a person most likely knows and did: skills and technologies, and for each employer the likely responsibilities.
 3. The person confirms or rejects each proposal.
 4. A finished CV appears.
 5. The person adapts it to a job ad.
 
-This is the target. Version 1 offers a blank CV, an example, or, on devices with Apple Intelligence, a draft written from the person's own description. The proposals of steps 2 and 3 arrive with v1.1 (skills) and v1.2 (responsibilities per employer). Adapting the CV to a job ad, step 5, arrives with v1.2. See [Releases](#releases).
+This is the target. Version 1 offers a blank CV, an example, or, on devices with Apple Intelligence, a draft written from the person's own description. The proposals of steps 2 and 3 arrive with v1.1 (skills) and v1.2 (responsibilities per employer). Adapting the CV to a job ad, step 5, arrives with v1.2. Scanning a document and the written chat with the coach arrive with v1.1, the coach's own voice with v1.2. See [Releases](#releases).
 
 ## Principles
 
@@ -50,13 +50,13 @@ This is the target. Version 1 offers a blank CV, an example, or, on devices with
 | Release | What it brings | Server | Running cost |
 |---|---|---|---|
 | **v1** | Today's app, made right. | None | None |
-| **v1.1** | A guided start with ESCO skill suggestions that the person confirms, offline on every device. | None: the skill packs are static files, regenerated in batches and synced in the background. | Hosting is free. Generating the packs is a one-off batch, repeated only for packs whose inputs changed. |
-| **v1.2** | Experience suggestions and tailoring to a job ad, on Apple's models (on the device and Private Cloud Compute). | None | None |
+| **v1.1** | A guided start with ESCO skill suggestions that the person confirms, offline on every device, from a free text, a scanned document or a written chat with the coach. | None: the skill packs are static files, regenerated in batches and synced in the background. | Hosting is free. Generating the packs is a one-off batch, repeated only for packs whose inputs changed. |
+| **v1.2** | Experience suggestions and tailoring to a job ad, on Apple's models (on the device and Private Cloud Compute), and the coach's voice, on the device. | None | None |
 | **v2** | The cloud tier: employer lookup, job-market demand, stronger models. | A stateless, autoscaling backend with device attestation and quotas. | It grows with paid use only. |
 
 ## Sources
 
-- The owner's decisions of 2026-10-16, 2026-10-17 and 2026-10-18.
+- The owner's decisions of 2026-10-16, 2026-10-17 and 2026-10-18, and of 2026-11-06 on the ways in ([ADR 0036](../architecture/adr/0036-build-the-draft-from-prepared-lines-of-each-trade.md)).
 - The product review of 2026-10-16.
 - The market analysis of 2026-10-17.
 - The ESCO spike (#229).
