@@ -1,6 +1,6 @@
 # 0036. Build the draft from prepared lines of each trade that the person confirms
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-06
 - **Related:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md), [ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md), [ADR 0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md), ADR 0035 (proposed in #374), epic #192, issues #113, #196, #205, #206, #207, #208, #210, #212, #220, #228, #229, #230, #253, #314, #366, #368
 

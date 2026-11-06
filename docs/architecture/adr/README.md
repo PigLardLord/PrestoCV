@@ -35,6 +35,6 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0032](0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md) | Record each step of the AI draft and the import in test builds | Proposed |
 | [0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md) | Change the legacy app only to fix the published version | Accepted |
 | [0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md) | Read a text that is already a CV with the import, not the AI | Accepted |
-| [0036](0036-build-the-draft-from-prepared-lines-of-each-trade.md) | Build the draft from prepared lines of each trade that the person confirms | Proposed |
+| [0036](0036-build-the-draft-from-prepared-lines-of-each-trade.md) | Build the draft from prepared lines of each trade that the person confirms | Accepted |
 
 New ADRs copy [template.md](template.md).
