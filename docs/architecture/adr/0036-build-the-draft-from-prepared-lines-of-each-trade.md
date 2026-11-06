@@ -91,7 +91,7 @@
   - Code cuts the text into sentences: NLTokenizer, then again after ".", "!" or "?" followed by a space.
   - Where the on-device model is available, it gives the kind of each sentence (person, job, wanted job, school, skills, languages, licence, interests, details, other) in one greedy request per text, whose answer schema has exactly one of these values per sentence. Then, in one request per job sentence, it copies the workplace that the sentence names. Without the model, or after a failure, a refusal or the deadline, the sentences start unplaced, except those the import's rules place (ADR 0034).
   - Code groups the job sentences into jobs: a job starts at the first job sentence, at a year, or at a workplace that the sentence contains, and a workplace that it does not contain is ignored. In doubt it starts a new job, and so does a failure, a refusal or the deadline of that sentence's request: a wrong split shows as two jobs that the person joins, while a wrong merge would hide a job.
-  - Before the questions, the person sees the sentences under their headings (the presentation, each job, school, skills, …) and moves one with a tap. Nothing is dropped: a sentence that fits nowhere stays in a visible "not placed" list, saved with the CV and not printed. The quick add of #314 places a note the same way.
+  - Before the questions, the person sees the sentences under their headings (the presentation, each job, school, skills, …), moves one with a tap, and then confirms the split with one more tap. Only that confirmation places a sentence, whoever proposed its heading (the model or the import's rules): until then every sentence counts as not placed, and no draft is built from it. Nothing is dropped: a sentence that fits nowhere stays in a visible "not placed" list, saved with the CV and not printed. The quick add of #314 places a note the same way.
   - The questions of each job show the workplace, the years and the sentences found for it as answers to confirm.
   - A presentation with no jobs: the questions ask for the jobs, and the occupation is matched from the presentation (#207). Jobs with no presentation: the summary is inferred, below.
 - **The person's text is corrected as a proposal** (the owner, 2026-11-06).
@@ -120,7 +120,7 @@
   - The packs grow with the lines, their wordings and the templates. The first pack run measures their size against #205's estimate of about 0.6 MB gzip per language.
   - The fitting on the device helps few people: the check that keeps it safe rejected every English fit of the probe, and it does not judge sense, so the person's confirmation stays the last check.
   - The person answers a few questions after writing their text: more taps, fewer surprises.
-  - One more screen: the person checks the split of their text. In the probe about one text in three needed a move.
+  - One more screen: the person checks the split of their text and confirms it. In the probe about one text in three needed a move.
   - The check of a correction reads facts, not grammar: a slip such as "Persona solare che piace stare con la gente" passes, so the person's eye stays the last check.
 - **Cost (principle 7 of the [vision](../../product/vision.md)).**
   - The packs: about $175 for the first full run at batch prices (#205), whatever the number of users. The wordings add to the share of the lines; the first run measures the total within its budget. A later run pays only for the packs whose inputs changed, as the vision's v1.1 row says, and a run with no change costs nothing.
@@ -128,7 +128,7 @@
   - The device: free. Private Cloud Compute: free under Apple's terms for Small Business Program developers below 2 million first-time downloads, with a daily quota per person.
   - Before revenue, each paid run needs a budget that the owner approves for it. Without one, or once it is spent, the run stops before its next paid call and the last packs stay in use. No paid run starts by the schedule alone.
 - **Checks.**
-  - A test that the export prints only the person's own and confirmed values, never a placeholder, and that the list before the export includes the sentences not placed.
+  - A test that the export prints only the person's own and confirmed values, never a placeholder, and that the list before the export includes the sentences not placed. Until the person confirms the split, every sentence of every kind is in that list, none is printed, and no draft is built.
   - A test that every answer reaches the CV word for word, that the person's text stays saved as written, and that a correction enters the CV only when accepted.
   - A table-driven test of the check of a correction: a lost number word ("quindici anni"), a lost clause, an added number, name or job title, the first person, another language and a pack line each keep the person's text, and so do a failure, a refusal and the deadline.
   - Tests of the split over fixture texts: the three likely shapes and odd ones, a lowercase word or a digit after a full stop, every sentence in exactly one place, the grouping rule (a year starts a job, a workplace not in the sentence is ignored, a failed request starts a job), and without the model the sentences unplaced or placed by the import's rules.
