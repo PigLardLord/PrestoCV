@@ -10,7 +10,7 @@
 - **The owner's goal (2026-11-06).** From a few lines, a CV that reads like a credible, ready example of the person's trade, which the person then completes with their real data. It shows how a strong CV is written. Not every line has to be the person's own yet, but everything the person enters must be in it. The owner chose:
   - guided questions per job: the facts go straight into their fields, the AI proposes what is typical, and the person confirms it with a tap; legal qualifications are yes/no questions;
   - Apple's Private Cloud Compute on top, with consent that says where the text goes (#253).
-- **The plan of 2026-10-17 (epic #192, v1.1).**
+- **The plan of 2026-10-17 (epic #192).**
   - The spike #229 scored ESCO for CV suggestions, blind, on 12 occupations in three languages. A person kept 43% of the raw ESCO items (45 were wrong), and 97% of the items a strong model wrote from ESCO. The small on-device model is not good enough to write such items; it may run checks. Seniority changes the phrases (42% depend on the band) far more than the skills.
   - The packs of #205: per occupation and market, written by a strong model at batch prices, with skills and CV phrases by band and "no facts in phrases", checked before publishing and reviewed every month. They are signed static files that the app syncs in the background (#230: "No user text, occupation or identifier is sent, and nothing is logged per user").
   - Curated corrections as data (#206), offline matching of the title (#207: the pack aliases matched 38 or 39 of 39 inputs, the ESCO search put the right occupation first for 13), a suggestion engine with no model call (#208), the confirm UI (#210), experience suggestions (#220), and demand data from job ads (#228).
@@ -18,7 +18,7 @@
 - **What the on-device model does well and badly.** Probes of 2026-11-06 on the Mac mini, with invented inputs in Italian and English (electrician, cook, iOS developer, warehouse worker, shop assistant), one greedy run each:
   - **Choosing.** Given five ESCO occupations as its only allowed values, it chose the right one for 7 of 7 inputs. Given the O*NET occupations of the official crosswalk, it chose right in 6 of 6. It answered in the person's language in 7 of 7, with English source text in the prompt too. A request took 0.4 to 2.9 s.
   - **Writing the lines of a trade.** Asked for duties from ESCO skills, it copied the skill titles ("Strip wire."). Asked from O*NET tasks, it translated them word for word, in the style of a US job ad, once in the third person.
-  - **Knowing a market.** Asked for norms with none given, it left the list empty in 6 of 6 drafts. Made to give some, 7 of 24 were real names, and none of 4 for the Italian electrician and cook. Given a curated list of each market's core norms, the norms were right: CEI 64-8 and D.M. 37/2008 for an Italian electrician, HACCP for a cook, BS 7671 for a British electrician.
+  - **Knowing a market.** Asked for norms with none given, it left the list empty in 6 of 6 drafts. Made to give some, 7 of 24 were real names, and none of the 8 for the Italian electrician and cook. Given a curated list of each market's core norms, the norms were right: CEI 64-8 and D.M. 37/2008 for an Italian electrician, HACCP for a cook, BS 7671 for a British electrician.
   - **Software and tools.** Its own software list for an iOS developer (Swift, SwiftUI, Xcode) was better than ESCO's for a software developer, which lists VBScript, Perl and COBOL and has Swift and Xcode only as optional. For the trades its tools were weak.
   - **Keeping the person's words.** It dropped a dish the person named, then changed its name in the next round; in another probe it added team leadership and "Senior".
   - **Repeats.** In one list of allowed values, 4 of 6 choices were the same item.
@@ -47,7 +47,7 @@
   - **The legal qualifications and licences** of the trade in that market, from the curated data, asked as yes/no questions and never proposed (#196). A yes is the person's own answer.
   - **The checks before publishing:** those of #205, plus no fact in a line or a template, no word-for-word translation of a source task, every norm and qualification from the curated data, and no repeated line.
 - **The packs are regenerated on a schedule.**
-  - A batch runs every one or two months (the owner, 2026-11-06). It regenerates only the packs whose inputs changed: a release of a source, a change of the curated data, a new title from job ads, a new prompt.
+  - A batch runs every one or two months (the owner, 2026-11-06). It first compares the inputs of each pack with those of its last run, which calls no model, and regenerates only the packs whose inputs changed: a release of a source, a change of the curated data, a new title from job ads, a new prompt. A run with no change costs nothing. A paid run stays within the budget of Cost below.
   - The monthly diff review and the 5% sample of #205 stay. When a check fails, the last good pack stays.
   - The output is signed static files that the app syncs in the background (#230). Where the batch runs is for the hosting ADR (#205). The keys of the sources that need one stay in the pipeline's secrets.
 - **New occupations come from public data, never from the app.** The app sends nothing (#230). A new title comes from job ads (#228, once their terms allow it) or from the review, and a person approves it as a curated alias or a new pack (#206). Until then, a title with no pack goes to the closest occupation (#207), which the person sees and can change.
@@ -58,6 +58,10 @@
   - It runs only after the person's consent, which says where the text goes. The request carries what the person wrote for the draft and the occupation, never the contacts.
   - What it writes is proposed, under the same rule as a pack line: it states no fact the person did not give. ADR 0023 and ADR 0028 say what a fact is. The person's own text stays beside it.
 - **ADR 0031 and ADR 0035.** ADR 0031 stays the rule of the v1 draft in the legacy app, which takes only fixes of the published version (ADR 0033). The new targets do not extract facts from a free text with a model: the questions give them. ADR 0035 (proposed in #374) keeps its measurement for this draft. What it lets the draft infer (the core tools of the trade, its norms, the scope and seniority that the years give) is inferred in the packs and by Private Cloud Compute, never by the on-device model.
+- **The releases follow the [vision](../../product/vision.md).**
+  - v1.1, the guided start, offline on every device: the questions per job and the market's yes/no questions, the offline match of the occupation (#207), and the skills, tools and norms of the packs as proposals (#208, #210).
+  - v1.2: the lines of the experience section, the achievement and summary templates, the proposals per employer (#220) and Private Cloud Compute (#253).
+  - A pack may hold what a later release shows; the app shows it only from that release.
 - **Targets.** The pull requests that create the targets of the packs, the matching, the suggestions and the draft add them to `modules.md` (#205, #207, #208, #220).
 
 ## Consequences
@@ -71,10 +75,10 @@
   - The packs grow with the lines and the templates. The first pack run measures their size against #205's estimate of about 0.6 MB gzip per language.
   - The person answers a few questions instead of writing one text: more taps, fewer surprises.
 - **Cost (principle 7 of the [vision](../../product/vision.md)).**
-  - The packs: about $175 for a full run at batch prices (#205), less for a run of the changed packs only, whatever the number of users.
+  - The packs: about $175 for the first full run at batch prices (#205), whatever the number of users. A later run pays only for the packs whose inputs changed, as the vision's v1.1 row says, and a run with no change costs nothing.
   - Hosting: static files on a free tier. With no users, 1,000 users or 100,000 users the cost stays 0 on a host whose bandwidth is not metered: 100,000 people who each fetch one language of about 0.6 MB make about 60 GB per run.
   - The device: free. Private Cloud Compute: free under Apple's terms for Small Business Program developers below 2 million first-time downloads, with a daily quota per person.
-  - When the money runs out, the batch stops and the last packs stay in use.
+  - Before revenue, each paid run needs a budget that the owner approves for it. Without one, or once it is spent, the run stops before its next paid call and the last packs stay in use. No paid run starts by the schedule alone.
 - **Checks.**
   - A test that the export prints only the person's own and confirmed values, never a placeholder.
   - A test that every answer reaches the CV word for word.
