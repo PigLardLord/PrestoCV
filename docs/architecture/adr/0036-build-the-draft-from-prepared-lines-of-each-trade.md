@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-11-06
-- **Related:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md), [ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md), [ADR 0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md), ADR 0035 (proposed in #374), epic #192, issues #113, #196, #205, #206, #207, #208, #210, #212, #220, #228, #229, #230, #253, #314, #366, #368
+- **Related:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md), [ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md), [ADR 0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md), [ADR 0026](0026-keep-the-core-portable-to-android.md), [ADR 0027](0027-import-a-cv-from-its-text-with-rules.md), ADR 0035 (proposed in #374), epic #192, issues #113, #167, #196, #205, #206, #207, #208, #210, #212, #220, #228, #229, #230, #253, #265, #272, #273, #314, #366, #368
 
 ## Context
 
@@ -52,6 +52,14 @@
   - Not usable: Lightcast Open Skills (free for non-profit use only) and BERUFENET (the Bundesagentur für Arbeit keeps exclusive rights).
   - The O*NET and France Travail web APIs need a key. None of the sources offers GraphQL.
 - **New occupations.** The sources add occupations only with their releases: O*NET 31.0 has no "prompt engineer", and the ESCO search for it returns the theatre prompter first. The owner asked (2026-11-06) to regenerate the data every one or two months, so that new trades arrive.
+- **Two more ways in (the owner, 2026-11-06).** Besides the free text, the person can scan a document, or talk with the coach: a chat of questions, answered in writing or by voice.
+  - The scan is designed already. ADR 0027 (row F3) reads the camera, photos and scans on the device, with VisionKit's document camera and Vision's `RecognizeDocumentsRequest`; #167 and #265 plan it for the import of v1.1.
+  - #272 plans a guided interview, by voice or on screen, whose script, questions, checks and mapping to a draft live in the portable core; App Intents and Siri are adapters of it. #273 plans one command layer for the screens, Siri, an in-app chat and other channels.
+- **Speech on the device.** Probes of 2026-11-06 on the Mac mini (macOS 27), with invented answers in Italian and English read by the system's synthetic voices, so they measured the words, not accents:
+  - SpeechTranscriber and DictationTranscriber support all six languages of the app, but their models are system assets that are downloaded on demand. On the mini only English, and Italian for DictationTranscriber, were installed.
+  - The numbers and years were right in every answer (15, 2012, 20 %). SpeechTranscriber in English was almost word for word. A transcription took 0.1 to 0.7 s.
+  - DictationTranscriber garbled the words of the trades: "HACCP" became "CCCP", "UIKit" "Wiki", "CEI 64-8" "CEI 64 otto", "cook" "book". It cut "No, non ce l'ho" to "No, non ce l'".
+  - Given the trades' words as contextual strings, it got HACCP and UIKit right, and still not CEI 64-8, SwiftUI or BS 7671.
 
 ## Decision
 
@@ -94,6 +102,20 @@
   - Before the questions, the person sees the sentences under their headings (the presentation, each job, school, skills, …), moves one with a tap, and then confirms the split with one more tap. Only that confirmation places a sentence, whoever proposed its heading (the model or the import's rules): until then every sentence counts as not placed, and no draft is built from it. Nothing is dropped: a sentence that fits nowhere stays in a visible "not placed" list, saved with the CV and not printed. The quick add of #314 places a note the same way.
   - The questions of each job show the workplace, the years and the sentences found for it as answers to confirm.
   - A presentation with no jobs: the questions ask for the jobs, and the occupation is matched from the presentation (#207). Jobs with no presentation: the summary is inferred, below.
+- **The person can also scan a document or answer the coach in a chat** (the owner, 2026-11-06). Every way in ends in the same three places: the import, the split of a free text, or the answers to the questions.
+  - **A scan.** The document camera or a photo, read on the device by the extraction of ADR 0027 (row F3, #167). A page that ADR 0034's rule reads as a CV goes to the import. Any other page, such as notes, a work certificate or a diploma, is a free text: the person sees the recognized text and can fix it, and then it goes through the split above. Nothing leaves the device.
+  - **The chat.** The coach asks the questions of the guided start one at a time, and the person answers in writing or by voice. The chat and the screens are two views of one interview in the portable core (#272): the same questions, answers, storage and checks. So the same answers give the same draft, and the person can switch between the two.
+    - The questions are written in code (the string catalog) and in the packs (the yes/no qualifications). No model writes or chooses a question.
+    - An answer to a closed question (a workplace, the years, yes or no) is set by code word for word in its field, as on the screens. An answer that code cannot read as a year or as yes or no stays as text, marked for the person to fix.
+    - An open answer ("Tell me about yourself and your work") is a free text: it goes through the split, and the person confirms it as above.
+  - **Voice.**
+    - Speech is recognized on the device only, by SpeechAnalyzer with SpeechTranscriber or DictationTranscriber. The audio is never saved or sent.
+    - The recognizer gets the words of the person's trade from the pack (its tools, norms and titles) as contextual strings.
+    - The transcript appears as the text of the answer, and the person can edit it before sending it. Only the text as sent counts, and it goes through the same checks and corrections as a written answer.
+    - When the language's model is not on the device, the app offers to download it through the system. Until it is there, or for a language with no model on the device, the app offers no voice of its own. The keyboard's dictation is the system's, under the person's own settings, and works in every text field.
+    - The coach may read the questions aloud with the system's speech synthesizer, on the device.
+    - The app asks for the microphone, and for any permission the recognizer needs, only when the person first chooses voice.
+  - **Where the code lives.** The interview's script is in the portable core, which gets only text (ADR 0026). The document camera is a view in the app's `Platform/` folder; the recognition of text and of speech are adapters of their own.
 - **The person's text is corrected as a proposal** (the owner, 2026-11-06).
   - Where the on-device model is available, it corrects the sentences of each job in one greedy request, and the presentation in one more, once when the draft is built, with no retry: in the language of a CV, a repeated thing said once, not in the first person, the names of machines and tools kept. The request holds only the person's text and its language: no pack line, no title, no years.
   - Code keeps a correction only if it keeps a word of each clause of the person's text and, one by one, each number, number word and name in it; adds no number, name or job title that the text lacks; is not in the first person; is in the person's language; and copies no pack line. Otherwise, and after a failure, a refusal or the deadline, the person's text stays as written.
@@ -104,8 +126,8 @@
   - What it writes is proposed, under the same rule as a pack line: it states no fact the person did not give. ADR 0023 and ADR 0028 say what a fact is. The person's own text stays beside it.
 - **ADR 0031, ADR 0034 and ADR 0035.** ADR 0031 stays the rule of the v1 draft in the legacy app, which takes only fixes of the published version (ADR 0033). The new targets do not extract facts from a free text with a model: the model only gives the kind of a sentence, the person confirms where it goes, and the facts come from the questions and from code. ADR 0034 stays for a text that is already a CV: the import reads it, and the AI only fills its gaps. ADR 0035 (proposed in #374) keeps its measurement for this draft. What it lets the draft infer (the core tools of the trade, its norms, the scope and seniority that the years give) is inferred in the packs and by Private Cloud Compute, never by the on-device model.
 - **The releases follow the [vision](../../product/vision.md).**
-  - v1.1, the guided start, offline on every device: the free text and its split, the questions per job and the market's yes/no questions, the offline match of the occupation (#207), the skills, tools and norms of the packs as proposals (#208, #210), and the summary templates. Where the on-device model is available, it gives the kinds of the sentences and corrects the person's text. The corrections ship only if, on new invented inputs, their check keeps no correction that lost a fact.
-  - v1.2: the lines of the experience section with their wordings, their fitting on the device, the achievement templates, the proposals per employer (#220) and Private Cloud Compute (#253), with consent. The fitting on the device ships only if, on new invented inputs, its check keeps no line without sense.
+  - v1.1, the guided start, offline on every device: the free text and its split, the questions per job and the market's yes/no questions, the offline match of the occupation (#207), the skills, tools and norms of the packs as proposals (#208, #210), and the summary templates. Where the on-device model is available, it gives the kinds of the sentences and corrects the person's text. The corrections ship only if, on new invented inputs, their check keeps no correction that lost a fact. With them come the scan, with the import (#167), and the written chat as a second view of the questions; the person can speak through the keyboard's dictation.
+  - v1.2: the lines of the experience section with their wordings, their fitting on the device, the achievement templates, the proposals per employer (#220) and Private Cloud Compute (#253), with consent. The fitting on the device ships only if, on new invented inputs, its check keeps no line without sense. The coach's own voice (it reads the questions and listens, on the device) ships only if a probe with recorded voices of people reading invented answers, in the six languages, gets every number and year right; it measures the trade's words with and without the contextual strings.
   - A pack may hold what a later release shows; the app shows it only from that release.
 - **Targets.** The pull requests that create the targets of the packs, the matching, the suggestions and the draft add them to `modules.md` (#205, #207, #208, #220).
 
@@ -115,6 +137,7 @@
   - Every device gets credible lines of a trade, offline, and two people of one trade get different ones even with no model. The knowledge is checked once per pack instead of hoped for in each answer.
   - The person's words are never lost: they are saved as written, and a correction takes their place in the CV only when the person accepts it.
   - The draft is code over data: a fixture pack and the person's answers give one draft on every host, Linux included, with no model.
+  - Three ways in, one draft: a text, a scan and the chat end in the same split and the same questions, so their checks are written once.
 - **Harder.**
   - The batch and its review every one or two months. The curated norms and qualifications need a person who knows each market; a market without them gets no norms and no questions, never invented ones.
   - The packs grow with the lines, their wordings and the templates. The first pack run measures their size against #205's estimate of about 0.6 MB gzip per language.
@@ -122,10 +145,12 @@
   - The person answers a few questions after writing their text: more taps, fewer surprises.
   - One more screen: the person checks the split of their text and confirms it. In the probe about one text in three needed a move.
   - The check of a correction reads facts, not grammar: a slip such as "Persona solare che piace stare con la gente" passes, so the person's eye stays the last check.
+  - One more view in v1.1, the chat. In v1.2 the coach's voice brings the microphone permission and a model download per language.
+  - A spoken answer can hold a wrong word of the trade: in the probe the Italian dictation heard "CCCP" for HACCP. The contextual strings fixed some words and not others, so the person's eye on the transcript stays the last check.
 - **Cost (principle 7 of the [vision](../../product/vision.md)).**
   - The packs: about $175 for the first full run at batch prices (#205), whatever the number of users. The wordings add to the share of the lines; the first run measures the total within its budget. A later run pays only for the packs whose inputs changed, as the vision's v1.1 row says, and a run with no change costs nothing.
   - Hosting: static files on a free tier. With no users, 1,000 users or 100,000 users the cost stays 0 on a host whose bandwidth is not metered: 100,000 people who each fetch one language of about 0.6 MB make about 60 GB per run.
-  - The device: free. Private Cloud Compute: free under Apple's terms for Small Business Program developers below 2 million first-time downloads, with a daily quota per person.
+  - The device: free, the scan and the speech included. Private Cloud Compute: free under Apple's terms for Small Business Program developers below 2 million first-time downloads, with a daily quota per person.
   - Before revenue, each paid run needs a budget that the owner approves for it. Without one, or once it is spent, the run stops before its next paid call and the last packs stay in use. No paid run starts by the schedule alone.
 - **Checks.**
   - A test that the export prints only the person's own and confirmed values, never a placeholder, and that the list before the export includes the sentences not placed. Until the person confirms the split, every sentence of every kind is in that list, none is printed, and no draft is built.
@@ -137,7 +162,11 @@
   - A test that one CV gets the same lines and wordings each time its draft is built, that opening a saved CV shows its saved proposals, the fitted lines and the corrections included, with no model call, and that over a fixture of CVs of one trade the lines and wordings differ.
   - The pipeline's checks above, before each pack is published.
   - The measurement of ADR 0035 on drafts built from the packs.
-- **Issues.** The probe results go to the existing issues, with no new issue repeating them: #205 (lines from O*NET tasks, templates, two tool lists), #206 (norms and qualifications per market), #208 and #220 (code ranks, the model chooses, the person's line set by code, the wordings and the fitting), #113 (the checks of fitted lines and of corrections), #196 (origins, qualifications as questions), #212 (the summary templates), #314 (the same placing for the quick add), #366 (the years in the summary) and #228 (new titles).
+  - A test that the chat and the screens give the same draft for the same answers, and that switching between them loses no answer.
+  - A test over fixture recognized texts that a scanned page that ADR 0034's rule reads as a CV goes to the import, and any other page to the split.
+  - A table-driven test that a closed answer code cannot read (a year, yes or no) stays as text, marked to fix.
+  - A test that the speech port gives the core only text, and that the app offers its own voice only when the recognizer reports the language's model on the device.
+- **Issues.** The probe results go to the existing issues, with no new issue repeating them: #205 (lines from O*NET tasks, templates, two tool lists), #206 (norms and qualifications per market), #208 and #220 (code ranks, the model chooses, the person's line set by code, the wordings and the fitting), #113 (the checks of fitted lines and of corrections), #196 (origins, qualifications as questions), #212 (the summary templates), #314 (the same placing for the quick add), #366 (the years in the summary), #228 (new titles), #167 and #265 (the scan), and #272 and #273 (the interview in the core, with the chat as a view of it, and the speech results).
 
 ## Alternatives considered
 
@@ -157,3 +186,7 @@
 - **Learn the missing titles from what the app sends.** Keeping what the app sends is collected data in Apple's privacy details ("Other User Content"), and it breaks the promise of #230. Job ads give new titles with no data of any person.
 - **Write the whole draft with Private Cloud Compute.** It needs iOS 27 or later, a device with Apple Intelligence and the owner's entitlement, and it has a daily quota. The guided start must work offline on every device (v1.1).
 - **A GraphQL service over the sources.** None of them offers one, and static packs need no query service.
+- **Recognize speech on a server.** The audio would leave the device, which principle 3 of the vision rules out.
+- **Let the model write or choose the coach's questions, or hold a free conversation.** Questions written in code are the same on every device, offline, and are reviewed once.
+- **The older speech recognizer** (SFSpeechRecognizer). It had 5 languages on the device in the probe, while SpeechTranscriber supports all six of the app's.
+- **The coach's own voice in v1.1.** With synthetic voices the Italian dictation garbled words of the trades, and no human voice was measured. The keyboard's dictation covers v1.1.
