@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-06
-- **Related:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md), [ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md), ADR 0035 (proposed in #374), epic #192, issues #113, #196, #205, #206, #207, #208, #210, #220, #228, #229, #230, #253, #368
+- **Related:** [ADR 0031](0031-let-the-ai-draft-write-around-the-facts.md), [ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md), [ADR 0023](0023-ground-the-ai-draft-in-the-description.md), [ADR 0028](0028-check-each-personal-claim-of-the-ai-draft-again.md), [ADR 0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md), ADR 0035 (proposed in #374), epic #192, issues #113, #196, #205, #206, #207, #208, #210, #212, #220, #228, #229, #230, #253, #314, #366, #368
 
 ## Context
 
@@ -11,6 +11,9 @@
   - guided questions per job: the facts go straight into their fields, the AI proposes what is typical, and the person confirms it with a tap; legal qualifications are yes/no questions;
   - Apple's Private Cloud Compute on top, with consent that says where the text goes (#253).
 - **The owner's limit (2026-11-06).** The CVs of one trade must not all read the same because their lines were prepared in advance: the model should be able to rephrase the lines by what the person wrote.
+- **The person's own text (the owner, 2026-11-06).**
+  - People often write in an incomplete or wrong way. The draft should correct what they write, remove the repeats and give it the language of a CV, not keep it word for word.
+  - A free text can hold anything. Most likely it is a presentation and some jobs, a presentation only, or jobs only, and then the summary has to be inferred.
 - **The plan of 2026-10-17 (epic #192).**
   - The spike #229 scored ESCO for CV suggestions, blind, on 12 occupations in three languages. A person kept 43% of the raw ESCO items (45 were wrong), and 97% of the items a strong model wrote from ESCO. The small on-device model is not good enough to write such items; it may run checks. Seniority changes the phrases (42% depend on the band) far more than the skills.
   - The packs of #205: per occupation and market, written by a strong model at batch prices, with skills and CV phrases by band and "no facts in phrases", checked before publishing and reviewed every month. They are signed static files that the app syncs in the background (#230: "No user text, occupation or identifier is sent, and nothing is logged per user").
@@ -28,6 +31,20 @@
   - **A check of words is not a check of sense.** "Controllo della qualità e della freschezza degli impasti e del forno a legna" has only words of its line and of the person's text.
   - **One line at a time.** Asked to choose the line the person's text is about and rewrite only that one, it returned the line unchanged for 11 of 15 people and the person's text in place of the line for 4; its choices were often not the line the text was about. Asked to write one line of its own, it returned the person's text as written for 9 of 9 Italian people, and in English it added a claim ("managed stock efficiently") or lost the person's words in 4 of 5 answers. The guardrails refused one ordinary request ("led the migration from UIKit to SwiftUI"). A request took 0.6 to 1.4 s.
   - **A strict filter on the first probe.** Keeping a rewritten line only if it starts as its line does, holds a part of the person's text word for word, and has no word from neither, kept a line for 4 of 10 people in the greedy runs ("Installazione di impianti fotovoltaici sui tetti dei capannoni."), each with sense, and no line without sense. It rejected every English fit, whose verbs were synonyms ("Created" for "Built"). In the sampled runs it let one line without sense through ("…gli standard del forno a legna"). It was designed on these answers, so its numbers hold only for them.
+- **Correcting what the person wrote about a job.** Two probes on the Mac mini, with 12 invented notes of a job in three languages:
+  - **With the title and the years in the prompt,** 14 lines repeated them and 4 were in the first person.
+  - **With only the person's note,** told to write one line per thing done, a repeated thing once, not in the first person, and to keep the names of machines and tools: 6 of 12 corrections were good when read by hand and 5 partial (fragments, a repeat kept). One was bad: it lost "cassa", and a check of the lost parts catches it. No line repeated the title or the years, none was in the first person, all were in the person's language, and a request took 0.8 to 2.4 s.
+  - **With the trade's lines as examples of form,** it copied 18 of them although told never to, and added claims ("D.Lgs. 81/2008").
+  - **The spell checker of macOS** changed "swiftui" to "swift" and "evry" to "very".
+- **Splitting a free text into its parts.** Two probes with 14 invented free texts in three languages, 47 sentences: the three shapes above, mixed ones (school, languages, licence, interests), a job with no punctuation, two jobs in one sentence, the presentation last.
+  - **The cut.** NLTokenizer kept ". poi" and ". 2020-2022" inside one sentence. Cutting again after ".", "!" or "?" followed by a space fixed both.
+  - **New job or same job.** Asked whether each sentence starts a job or goes on with the one before, the model called 9 of 15 sentences that start a job "same job", and got 2 right.
+  - **The kind of each sentence.** Asked only for the kind (person, job, wanted job, school, skills, languages, licence, interests, details, other), with all the sentences of a text in one request, it was right for 39 of 47, and for every sentence in 9 of 14 texts, in 0.5 to 1.1 s a text. Half its misses put a job sentence under skills or other, and in one mixed text three kinds in a row were shifted by one. One request per sentence did no better: 40 of 47, every sentence right in 7 texts.
+  - **The jobs grouped by code.** The model copied the workplace of each job sentence. Code started a job at the first job sentence, at a year, or at a workplace that the sentence contains. The jobs came out right in 9 of 12 texts. Each miss split one job in two (the model copied "Lì" and "Dort" as workplaces), and none merged two. The guardrails refused 2 ordinary sentences.
+- **Correcting a presentation into a summary** (the same probe, 9 presentations).
+  - The summaries had no first person, kept the person's language, fixed the spelling and added nothing, in 0.4 to 0.8 s.
+  - One had a grammar slip ("Persona solare che piace stare con la gente").
+  - One lost the person's fifteen years of experience. A check of the lost parts let it through, because another word of the same part was kept.
 - **The sources.**
   - ESCO (CC BY 4.0): occupations and skills in every EU language, a free API that allows one call every 2 s, and outdated software skills.
   - O*NET 31.0 (CC BY 4.0): tasks as full sentences, in English only, and a software list. It has had no hand tools since release 30.3. The official ESCO–O*NET crosswalk found O*NET occupations for 7 of 7 inputs.
@@ -39,11 +56,11 @@
 ## Decision
 
 - **The draft holds three kinds of content.**
-  - **The person's own:** their answers to the questions (title, employer, years, place, what they did, the yes/no qualifications), set by code word for word in the field they belong to. No model changes them.
-  - **Proposed:** a line of a pack, or a text of Private Cloud Compute, marked as a proposal. It enters the CV only when the person confirms it with a tap; they can edit it after.
+  - **The person's own:** their answers to the questions (title, employer, years, place, what they did, the yes/no qualifications), set by code word for word in the field they belong to, and the sentences of their free text as written, in the part where they placed them. No model changes them: a correction is only proposed, and they stay saved with the CV.
+  - **Proposed:** a line of a pack, a correction of the person's text, or a text of Private Cloud Compute, marked as a proposal. It enters the CV only when the person confirms it with a tap; they can edit it after. A confirmed correction takes the place of the person's text in the CV, and the text as written stays saved.
   - **To complete:** a slot with a typed placeholder (an employer "Company 1", a figure "[X] %" with its unit, a period) and a coach's tip on what to write there. A placeholder is not CV content: the CV stores the empty slot with its kind, never the placeholder text, and nothing prints it. A proposed line with a slot can be confirmed only once its slot is filled.
-  - **Before the export** the app lists the proposals not confirmed and the slots left. The export does not wait for them (the owner, 2026-11-06), and what is left is not printed.
-- **Every value keeps its origin** (#196): written, answered, accepted from a pack (as it is or fitted on the device), accepted from Private Cloud Compute, or imported. An accepted pack line keeps its pack item id and its source (#208).
+  - **Before the export** the app lists the proposals not confirmed, the slots left and the sentences not placed. The export does not wait for them (the owner, 2026-11-06), and what is left is not printed.
+- **Every value keeps its origin** (#196): written, answered, accepted from a pack (as it is or fitted on the device), accepted as a correction of the person's text, accepted from Private Cloud Compute, or imported. An accepted pack line keeps its pack item id and its source (#208).
 - **The knowledge of a trade is prepared, not generated on the device.** The packs of #205 hold, per occupation and market:
   - **The lines of the experience section** (#205's phrases), written in the market's language as lines of a CV, by band of seniority (#208), with no fact: no number, no name, no employer, no licence. A pack holds more lines per band than a CV shows, and each line in two or three wordings. The pipeline's strong model writes them from ESCO, from the O*NET tasks of the occupation through the official crosswalk, from the ROME data for fr-FR, and from the curated data (#206). An O*NET task is a meaning to write from, never a text to translate.
   - **Achievement templates:** a line with typed slots ("Reduced waste by [X] % in [period]"), proposed as a line, with its slots to complete.
@@ -58,24 +75,37 @@
   - The output is signed static files that the app syncs in the background (#230). Where the batch runs is for the hosting ADR (#205). The keys of the sources that need one stay in the pipeline's secrets.
 - **New occupations come from public data, never from the app.** The app sends nothing (#230). A new title comes from job ads (#228, once their terms allow it) or from the review, and a person approves it as a curated alias or a new pack (#206). Until then, a title with no pack goes to the closest occupation (#207), which the person sees and can change.
 - **Two people of one trade get different CVs** (the owner's limit above), from four sources:
-  - their own text of each job, word for word in its entry;
+  - their own text of each job, as written or corrected, in its entry;
   - the lines their words pick: code ranks a pack's lines by the person's words and band (#208), so different texts can pick different lines;
   - the wording: code picks one of a line's wordings from the CV's identifier, so another CV of the trade may read another, and one CV keeps its own;
   - the lines fitted to what the person wrote, by the on-device model and by Private Cloud Compute, below.
 
   What code picks repeats: the same pack and the same input, the CV's identifier included, give the same lines and wordings (#208). The fitting need not repeat: the deadline, a refusal of the guardrails or another model version can leave other lines. So the draft's proposals, the fitted lines included, are saved with the CV when the draft is built; opening the CV again shows them as saved and calls no model. Only building the draft again, when the person asks for it, runs the fitting again. No sampling makes the CVs differ.
-- **On the device, code builds the draft; the model chooses, and fits lines only through a check.**
+- **On the device, code builds the draft; the model chooses, gives the kind of a sentence, and writes only through a check.**
   - Code asks the questions per job and the market's yes/no questions, matches the occupation offline (#207), sets the answers word for word, and ranks the pack's proposals (#208). This works on every device, offline and without Apple Intelligence.
   - Where the on-device model is available, it may choose among values that code gives it: the occupation among the matcher's candidates when the matcher is unsure, and the pack lines that fit what the person wrote for a job. Its answer schema allows only those values (`GenerationGuide.anyOf`), and code removes repeats. A choice only reorders the proposals.
   - It may also fit the proposed lines of a job to what the person wrote, in one greedy request per job, once when the draft is built, with no retry. Code keeps a rewritten line only if it starts with the first word of its pack line, holds a part of the person's text word for word, and has no word that is in neither its pack line nor the person's text (the provenance check of #113). Otherwise the pack line stays. A failure, a refusal of the guardrails or the deadline leaves all the pack lines of that job.
-  - A kept line is a proposal like any other, with its pack item id; the person confirms it or not. Apart from these lines, the on-device model writes no text that enters the CV.
-- **Private Cloud Compute writes only what a pack cannot hold** (v1.2, #253): a CV line from what the person wrote for a job, the pack lines of the job fitted to it, and a summary.
+  - A kept line is a proposal like any other, with its pack item id; the person confirms it or not. Apart from these lines and the corrections below, the on-device model writes no text that enters the CV.
+- **The guided start opens with a free text, which can hold anything** (the owner, 2026-11-06).
+  - A text that is already a CV goes to the import, as ADR 0034 says.
+  - Code cuts the text into sentences: NLTokenizer, then again after ".", "!" or "?" followed by a space.
+  - Where the on-device model is available, it gives the kind of each sentence (person, job, wanted job, school, skills, languages, licence, interests, details, other) in one greedy request per text, whose answer schema has exactly one of these values per sentence. Then, in one request per job sentence, it copies the workplace that the sentence names. Without the model, or after a failure, a refusal or the deadline, the sentences start unplaced, except those the import's rules place (ADR 0034).
+  - Code groups the job sentences into jobs: a job starts at the first job sentence, at a year, or at a workplace that the sentence contains, and a workplace that it does not contain is ignored. In doubt it starts a new job, and so does a failure, a refusal or the deadline of that sentence's request: a wrong split shows as two jobs that the person joins, while a wrong merge would hide a job.
+  - Before the questions, the person sees the sentences under their headings (the presentation, each job, school, skills, …) and moves one with a tap. Nothing is dropped: a sentence that fits nowhere stays in a visible "not placed" list, saved with the CV and not printed. The quick add of #314 places a note the same way.
+  - The questions of each job show the workplace, the years and the sentences found for it as answers to confirm.
+  - A presentation with no jobs: the questions ask for the jobs, and the occupation is matched from the presentation (#207). Jobs with no presentation: the summary is inferred, below.
+- **The person's text is corrected as a proposal** (the owner, 2026-11-06).
+  - Where the on-device model is available, it corrects the sentences of each job in one greedy request, and the presentation in one more, once when the draft is built, with no retry: in the language of a CV, a repeated thing said once, not in the first person, the names of machines and tools kept. The request holds only the person's text and its language: no pack line, no title, no years.
+  - Code keeps a correction only if it keeps a word of each clause of the person's text and, one by one, each number, number word and name in it; adds no number, name or job title that the text lacks; is not in the first person; is in the person's language; and copies no pack line. Otherwise, and after a failure, a refusal or the deadline, the person's text stays as written.
+  - The app shows a correction beside the person's text: the person accepts it, edits it or keeps their own. The system's spell checker only suggests, and nothing applies it by itself. The corrections are saved with the CV, like the fitted lines.
+  - With no presentation, the summary is proposed from a pack's summary template (#212), whose slots code fills: the title, the years (#366) and the skills or lines the person confirmed. From v1.2 Private Cloud Compute may write it instead, with the person's consent. Either is a proposal.
+- **Private Cloud Compute writes only what a pack cannot hold** (v1.2, #253): a correction of what the person wrote, the pack lines of a job fitted to it, and a summary. Its corrections go through the same check as those of the device.
   - It runs only after the person's consent, which says where the text goes. The request carries what the person wrote for the draft and the occupation, never the contacts.
   - What it writes is proposed, under the same rule as a pack line: it states no fact the person did not give. ADR 0023 and ADR 0028 say what a fact is. The person's own text stays beside it.
-- **ADR 0031 and ADR 0035.** ADR 0031 stays the rule of the v1 draft in the legacy app, which takes only fixes of the published version (ADR 0033). The new targets do not extract facts from a free text with a model: the questions give them. ADR 0035 (proposed in #374) keeps its measurement for this draft. What it lets the draft infer (the core tools of the trade, its norms, the scope and seniority that the years give) is inferred in the packs and by Private Cloud Compute, never by the on-device model.
+- **ADR 0031, ADR 0034 and ADR 0035.** ADR 0031 stays the rule of the v1 draft in the legacy app, which takes only fixes of the published version (ADR 0033). The new targets do not extract facts from a free text with a model: the model only gives the kind of a sentence, the person confirms where it goes, and the facts come from the questions and from code. ADR 0034 stays for a text that is already a CV: the import reads it, and the AI only fills its gaps. ADR 0035 (proposed in #374) keeps its measurement for this draft. What it lets the draft infer (the core tools of the trade, its norms, the scope and seniority that the years give) is inferred in the packs and by Private Cloud Compute, never by the on-device model.
 - **The releases follow the [vision](../../product/vision.md).**
-  - v1.1, the guided start, offline on every device: the questions per job and the market's yes/no questions, the offline match of the occupation (#207), and the skills, tools and norms of the packs as proposals (#208, #210).
-  - v1.2: the lines of the experience section with their wordings, their fitting on the device, the achievement and summary templates, the proposals per employer (#220) and Private Cloud Compute (#253). The fitting on the device ships only if, on new invented inputs, its check keeps no line without sense.
+  - v1.1, the guided start, offline on every device: the free text and its split, the questions per job and the market's yes/no questions, the offline match of the occupation (#207), the skills, tools and norms of the packs as proposals (#208, #210), and the summary templates. Where the on-device model is available, it gives the kinds of the sentences and corrects the person's text. The corrections ship only if, on new invented inputs, their check keeps no correction that lost a fact.
+  - v1.2: the lines of the experience section with their wordings, their fitting on the device, the achievement templates, the proposals per employer (#220) and Private Cloud Compute (#253), with consent. The fitting on the device ships only if, on new invented inputs, its check keeps no line without sense.
   - A pack may hold what a later release shows; the app shows it only from that release.
 - **Targets.** The pull requests that create the targets of the packs, the matching, the suggestions and the draft add them to `modules.md` (#205, #207, #208, #220).
 
@@ -83,27 +113,31 @@
 
 - **Easier.**
   - Every device gets credible lines of a trade, offline, and two people of one trade get different ones even with no model. The knowledge is checked once per pack instead of hoped for in each answer.
-  - The person's words never change, by construction, not because a rule reads the model's answer afterwards.
+  - The person's words are never lost: they are saved as written, and a correction takes their place in the CV only when the person accepts it.
   - The draft is code over data: a fixture pack and the person's answers give one draft on every host, Linux included, with no model.
 - **Harder.**
   - The batch and its review every one or two months. The curated norms and qualifications need a person who knows each market; a market without them gets no norms and no questions, never invented ones.
   - The packs grow with the lines, their wordings and the templates. The first pack run measures their size against #205's estimate of about 0.6 MB gzip per language.
   - The fitting on the device helps few people: the check that keeps it safe rejected every English fit of the probe, and it does not judge sense, so the person's confirmation stays the last check.
-  - The person answers a few questions instead of writing one text: more taps, fewer surprises.
+  - The person answers a few questions after writing their text: more taps, fewer surprises.
+  - One more screen: the person checks the split of their text. In the probe about one text in three needed a move.
+  - The check of a correction reads facts, not grammar: a slip such as "Persona solare che piace stare con la gente" passes, so the person's eye stays the last check.
 - **Cost (principle 7 of the [vision](../../product/vision.md)).**
   - The packs: about $175 for the first full run at batch prices (#205), whatever the number of users. The wordings add to the share of the lines; the first run measures the total within its budget. A later run pays only for the packs whose inputs changed, as the vision's v1.1 row says, and a run with no change costs nothing.
   - Hosting: static files on a free tier. With no users, 1,000 users or 100,000 users the cost stays 0 on a host whose bandwidth is not metered: 100,000 people who each fetch one language of about 0.6 MB make about 60 GB per run.
   - The device: free. Private Cloud Compute: free under Apple's terms for Small Business Program developers below 2 million first-time downloads, with a daily quota per person.
   - Before revenue, each paid run needs a budget that the owner approves for it. Without one, or once it is spent, the run stops before its next paid call and the last packs stay in use. No paid run starts by the schedule alone.
 - **Checks.**
-  - A test that the export prints only the person's own and confirmed values, never a placeholder.
-  - A test that every answer reaches the CV word for word.
-  - A test that the model's choices are among the values given, without repeats, and that the draft without the model differs only in the order of the proposals and in the fitted lines.
+  - A test that the export prints only the person's own and confirmed values, never a placeholder, and that the list before the export includes the sentences not placed.
+  - A test that every answer reaches the CV word for word, that the person's text stays saved as written, and that a correction enters the CV only when accepted.
+  - A table-driven test of the check of a correction: a lost number word ("quindici anni"), a lost clause, an added number, name or job title, the first person, another language and a pack line each keep the person's text, and so do a failure, a refusal and the deadline.
+  - Tests of the split over fixture texts: the three likely shapes and odd ones, a lowercase word or a digit after a full stop, every sentence in exactly one place, the grouping rule (a year starts a job, a workplace not in the sentence is ignored, a failed request starts a job), and without the model the sentences unplaced or placed by the import's rules.
+  - A test that the model's choices are among the values given, without repeats, and that the draft without the model differs only in the order of the proposals, the fitted lines, the corrections and the placing of the sentences.
   - A table-driven test of the check of fitted lines, with lines it must keep and lines it must reject, the probes' lines with a new word or another form among them, and a test that a failure, a refusal or the deadline of the fitting leaves all the pack lines of the job.
-  - A test that one CV gets the same lines and wordings each time its draft is built, that opening a saved CV shows its saved proposals, the fitted lines included, with no model call, and that over a fixture of CVs of one trade the lines and wordings differ.
+  - A test that one CV gets the same lines and wordings each time its draft is built, that opening a saved CV shows its saved proposals, the fitted lines and the corrections included, with no model call, and that over a fixture of CVs of one trade the lines and wordings differ.
   - The pipeline's checks above, before each pack is published.
   - The measurement of ADR 0035 on drafts built from the packs.
-- **Issues.** The probe results go to the existing issues, with no new issue repeating them: #205 (lines from O*NET tasks, templates, two tool lists), #206 (norms and qualifications per market), #208 and #220 (code ranks, the model chooses, the person's line set by code, the wordings and the fitting), #113 (the check of fitted lines), #196 (origins, qualifications as questions) and #228 (new titles).
+- **Issues.** The probe results go to the existing issues, with no new issue repeating them: #205 (lines from O*NET tasks, templates, two tool lists), #206 (norms and qualifications per market), #208 and #220 (code ranks, the model chooses, the person's line set by code, the wordings and the fitting), #113 (the checks of fitted lines and of corrections), #196 (origins, qualifications as questions), #212 (the summary templates), #314 (the same placing for the quick add), #366 (the years in the summary) and #228 (new titles).
 
 ## Alternatives considered
 
@@ -112,6 +146,12 @@
 - **Let the on-device model rewrite the lines freely** (the third probe). It fit the person's words into the right line for 7 of 10 people, but it also put them where they make no sense, lost and repeated lines, and replaced words with synonyms. A check of words cannot judge sense, so only the lines that pass the strict check are kept.
 - **Make the CVs differ by sampling** (a temperature). The sampled runs differed by synonyms that read worse, and one line without sense passed the strict check. The variety comes from the packs' lines and wordings, and a CV keeps the proposals saved with it.
 - **Ask the model for one line at a time** (the fourth probe). It returned the line unchanged or the person's text as written, chose lines the text was not about, and in English added claims.
+- **Keep the person's text word for word.** The owner rejected it (2026-11-06): people write in an incomplete or wrong way, and a CV needs its own language.
+- **Give the correction the trade's lines as examples of form** (the job-text probe). It copied 18 of them although told never to, and added claims.
+- **Apply the spell checker by itself.** It changed "swiftui" to "swift" and "evry" to "very".
+- **Let the model group the sentences into jobs.** It called 9 of 15 sentences that start a job "same job".
+- **Ask for the kind of each sentence in its own request.** It was no better (40 of 47 against 39), fewer texts were fully right (7 against 9), and it costs one request per sentence.
+- **Place the sentences without showing the split.** Only 9 of 14 texts were fully right, so about one text in three would put a sentence in the wrong place unseen.
 - **Propose the raw ESCO lists** (#229). A person kept 43% of them, 45 were wrong, and the software skills are outdated.
 - **Call the sources' APIs from the app,** so that the data is always current (the owner's first idea). The keys would ship in the app, ESCO allows one call every 2 s, and #207 promises that the app never calls ESCO. Packs regenerated every one or two months are as current as the sources, which release a few times a year.
 - **Learn the missing titles from what the app sends.** Keeping what the app sends is collected data in Apple's privacy details ("Other User Content"), and it breaks the promise of #230. Job ads give new titles with no data of any person.
