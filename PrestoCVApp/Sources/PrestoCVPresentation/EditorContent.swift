@@ -56,7 +56,7 @@ struct RowIDs {
     private mutating func settle<Row: EditorRow>(_ rows: [Row], taken: inout Set<RowID>) -> [Row] {
         rows.map { row in
             var row = row
-            if !(1...issued).contains(row.id.value) || !taken.insert(row.id).inserted {
+            if row.id.value < 1 || row.id.value > issued || !taken.insert(row.id).inserted {
                 row.id = make()
                 taken.insert(row.id)
             }

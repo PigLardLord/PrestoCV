@@ -381,6 +381,51 @@ struct EditorRowTests {
         #expect(!all.contains(RowID(value: 9_999)))
     }
 
+    /// The text `fill` puts in the rows of a section, in order.
+    func filledText(_ content: EditorContent, _ section: EditorSection) -> [String] {
+        switch section {
+        case .experiences: content.experiences.map(\.role)
+        case .education: content.education.map(\.degree)
+        case .skills: content.skills.map(\.name)
+        case .languages: content.languages.map(\.language)
+        case .certifications: content.certifications.map(\.name)
+        case .profiles: content.profiles.map(\.platform)
+        case .interests: content.interests.map(\.text)
+        }
+    }
+
+    /// Gives `destination` the rows of one section of `source`, through the form's public setter.
+    func takeRows(of section: EditorSection, from source: EditorContent, into destination: EditorViewModel) {
+        switch section {
+        case .experiences: destination.content.experiences = source.experiences
+        case .education: destination.content.education = source.education
+        case .skills: destination.content.skills = source.skills
+        case .languages: destination.content.languages = source.languages
+        case .certifications: destination.content.certifications = source.certifications
+        case .profiles: destination.content.profiles = source.profiles
+        case .interests: destination.content.interests = source.interests
+        }
+    }
+
+    @Test("an editor that has made no id yet takes another editor's rows: they keep their text and get ids of its own",
+          arguments: EditorSection.allCases)
+    func rowsFromAnotherEditorBeforeAnyIdIsMade(section: EditorSection) async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let source = await world.editor(on: cv)
+        source.addRow(to: section)
+        fill(source, section, at: 0)
+        let destination = await world.editor(on: cv)
+        #expect(EditorSection.allCases.allSatisfy { ids(destination.content, $0).isEmpty })
+
+        takeRows(of: section, from: source.content, into: destination)
+        destination.addRow(to: section)
+
+        #expect(filledText(destination.content, section).first == filledText(source.content, section).first)
+        #expect(ids(destination.content, section).count == 2)
+        #expect(Set(ids(destination.content, section)).count == 2)
+    }
+
     @Test("the content removes only the first row with an id, if two slipped through")
     func contentRemovesOnlyTheFirstRowWithTheId() {
         let same = RowID(value: 1)
