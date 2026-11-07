@@ -32,21 +32,30 @@ struct TimeLimit: Sendable {
     let clock: any Clock<Duration>
 }
 
-/// How long each request of a draft may take on the device (ADR 0031). A call of the on-device model that runs past its time is
-/// stopped: a model caught repeating itself would otherwise run until its window fills, minutes later (#354).
+/// How long each request of a draft and its claim check may take on the device (ADR 0031, ADR 0028). A call of the on-device model
+/// that runs past its time is stopped: a model caught repeating itself would otherwise run until its window fills, minutes later
+/// (#354). The use case is given them as one value, so that a test puts every one of them on a clock of its own (#413).
 struct DraftingLimits: Sendable {
     /// How long the request that extracts the facts may take. The longest description takes about a quarter of it on a Mac.
     let extraction: TimeLimit
     /// How long each request that writes a section, or repairs one, may take.
     let section: TimeLimit
+    /// The batches and the time of the claim check that judges the personal items the draft keeps.
+    let claimCheck: ClaimCheckLimits
 
     /// - Parameter clock: The clock both times run on.
-    init(extraction: Duration, section: Duration, on clock: any Clock<Duration>) {
+    init(extraction: Duration, section: Duration, claimCheck: ClaimCheckLimits, on clock: any Clock<Duration>) {
         self.extraction = TimeLimit(duration: extraction, clock: clock)
         self.section = TimeLimit(duration: section, clock: clock)
+        self.claimCheck = claimCheck
     }
 
-    static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30), on: ContinuousClock())
+    static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30), claimCheck: .standard, on: ContinuousClock())
+
+    /// The same times on `clock`, the claim check's too: a test keeps the app's limits and ends them when it says so (#413).
+    func on(_ clock: any Clock<Duration>) -> DraftingLimits {
+        DraftingLimits(extraction: extraction.duration, section: section.duration, claimCheck: claimCheck.on(clock), on: clock)
+    }
 }
 
 /// One call of a pass of the model, within its time, tried once more when it fails below the model.

@@ -186,7 +186,7 @@ struct ClaimWithdrawalTests {
         let grounded = CVData(personalInfo: PersonalInfo(title: title))
         let checker = FakeClaimChecker(stances: [title: .wish])
 
-        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker)
+        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker, within: .onTestClock())
 
         #expect(draft.cvData.personalInfo.title == title)
     }
@@ -205,7 +205,7 @@ struct ClaimWithdrawalTests {
         let grounded = CVData(personalInfo: PersonalInfo(title: title))
         let checker = FakeClaimChecker(stances: [title: .wish])
 
-        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker)
+        let draft = try await ClaimWithdrawal.checking(grounded, in: description, with: checker, within: .onTestClock())
 
         #expect(draft.cvData.personalInfo.title == nil)
     }
@@ -320,7 +320,7 @@ struct ClaimWithdrawalTests {
         let cvData = skills(3)
         let description = description
 
-        let checking = Task { try await ClaimWithdrawal.checking(cvData, in: description, with: checker) }
+        let checking = Task { try await ClaimWithdrawal.checking(cvData, in: description, with: checker, within: .onTestClock()) }
         for await _ in asked { break }
         checking.cancel()
 
