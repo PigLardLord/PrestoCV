@@ -20,11 +20,40 @@ public struct EditorContent: Hashable, Sendable {
     public var languages: [LanguageRow]
     public var certifications: [CertificationRow]
     public var profiles: [ProfileRow]
-    public var interests: [String]
+    public var interests: [InterestRow]
+}
+
+/// The identity of a row in the form: it stays with the row while the rows around it come and go, and the CV never holds
+/// it. Only the editor makes them (a view takes the ids of the rows it is given), so there is no public initialiser.
+public struct RowID: Hashable, Sendable {
+    let value: Int
+}
+
+/// The ids of the rows of one editor: a counter, so that no two rows of its life share one (no clock, no randomness).
+struct RowIDs {
+    private var issued = 0
+
+    mutating func make() -> RowID {
+        issued += 1
+        return RowID(value: issued)
+    }
+}
+
+/// A row of a section: it has an id, and it can have nothing in it.
+protocol EditorRow {
+    var id: RowID { get }
+    var isBlank: Bool { get }
+}
+
+/// An interest in the form.
+public struct InterestRow: Hashable, Sendable {
+    public let id: RowID
+    public var text: String
 }
 
 /// A job in the form. The period is the text of its start and its end ("2020" or "2020-05"); `isCurrent` says it goes on.
 public struct ExperienceRow: Hashable, Sendable {
+    public let id: RowID
     public var role: String
     public var company: String
     public var location: String
@@ -35,6 +64,7 @@ public struct ExperienceRow: Hashable, Sendable {
 }
 
 public struct EducationRow: Hashable, Sendable {
+    public let id: RowID
     public var degree: String
     public var school: String
     public var periodStart: String
@@ -44,28 +74,21 @@ public struct EducationRow: Hashable, Sendable {
 }
 
 public struct SkillRow: Hashable, Sendable {
+    public let id: RowID
     public var name: String
     /// The level, as the number the person picked; nil when none.
     public var level: Int?
-
-    public init(name: String, level: Int?) {
-        self.name = name
-        self.level = level
-    }
 }
 
 public struct LanguageRow: Hashable, Sendable {
+    public let id: RowID
     public var language: String
     /// The code of the level ("b2", "native"); blank until one is picked. The view words it (R13).
     public var proficiency: String
-
-    public init(language: String, proficiency: String) {
-        self.language = language
-        self.proficiency = proficiency
-    }
 }
 
 public struct CertificationRow: Hashable, Sendable {
+    public let id: RowID
     public var name: String
     public var issuer: String
     /// The text of the date it was issued ("2021" or "2021-06").
@@ -75,13 +98,9 @@ public struct CertificationRow: Hashable, Sendable {
 }
 
 public struct ProfileRow: Hashable, Sendable {
+    public let id: RowID
     public var platform: String
     public var link: String
-
-    public init(platform: String, link: String) {
-        self.platform = platform
-        self.link = link
-    }
 }
 
 /// A look of the document, by the ids of its design, palette and fonts.

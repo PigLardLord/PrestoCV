@@ -32,7 +32,8 @@ extension EditorViewModel {
                 // A write the old autosave started meanwhile ends first, so that none runs when the new writer is installed
                 await writes.untilIdle()
                 guard form == typed else { return }
-                form = EditorContent(stored)
+                form = EditorContent(stored, ids: &rowIDs)
+                pendingRemoval = nil
                 standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
             } catch {
                 failure = SaveStatus(error)

@@ -1,12 +1,10 @@
-import Foundation
-
 // A date and a period as the person writes them in a form: "2020" or "2020-05". The one reading (R6): an editor holds the
 // text and asks the domain, so that it never decides what a period may be.
 
 extension PartialDate {
     /// Reads "2020" or "2020-05", white space around it ignored. Nil for any other text, and for a date out of range.
     public init?(reading text: String) {
-        let parts = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "-", omittingEmptySubsequences: false)
+        let parts = text.trimmed.split(separator: "-", omittingEmptySubsequences: false)
         guard (1...2).contains(parts.count), parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCIIDigit) }),
               let year = Int(parts[0]) else { return nil }
         guard parts.count == 2 else { self.init(year: year); return }
@@ -26,7 +24,7 @@ extension Period {
     /// are `make(start:end:current:)`'s, and its typed reasons; a text that is no date is `invalidDate`.
     public static func reading(start: String, end: String, current: Bool) throws(PeriodError) -> Period? {
         func date(_ text: String) throws(PeriodError) -> (year: Int, month: Int?)? {
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            guard !text.trimmed.isEmpty else { return nil }
             guard let read = PartialDate(reading: text) else { throw .invalidDate }
             return (read.year, read.month)
         }
@@ -44,4 +42,12 @@ extension Period {
 
     /// Whether the period goes on.
     public var isCurrent: Bool { end == .current }
+}
+
+extension String {
+    /// Without the white space around it (standard library only, so that the domain needs no Foundation for it).
+    fileprivate var trimmed: Substring {
+        guard let first = firstIndex(where: { !$0.isWhitespace }), let last = lastIndex(where: { !$0.isWhitespace }) else { return "" }
+        return self[first...last]
+    }
 }

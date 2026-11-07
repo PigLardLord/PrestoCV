@@ -10,18 +10,27 @@ extension EditorContent {
         experiences: [], education: [], skills: [], languages: [], certifications: [], profiles: [], interests: []
     )
 
-    /// The form as the CV holds it.
+    /// The form as the CV holds it, with ids from a counter of its own.
     init(_ cv: CV) {
+        var ids = RowIDs()
+        self.init(cv, ids: &ids)
+    }
+
+    /// The form as the CV holds it: each row has the next id of `ids`.
+    init(_ cv: CV, ids: inout RowIDs) {
         let person = cv.personal
         let sections = cv.sections
         self.init(
             title: cv.title, fullName: person.fullName, professionalTitle: person.professionalTitle,
             email: person.email?.value ?? "", phone: person.phone?.value ?? "", location: person.location,
             website: person.website?.value ?? "", summary: person.summary,
-            experiences: sections.experiences.map(ExperienceRow.init), education: sections.education.map(EducationRow.init),
-            skills: sections.skills.map(SkillRow.init), languages: sections.languages.map(LanguageRow.init),
-            certifications: sections.certifications.map(CertificationRow.init), profiles: sections.profiles.map(ProfileRow.init),
-            interests: sections.interests
+            experiences: sections.experiences.map { ExperienceRow($0, id: ids.make()) },
+            education: sections.education.map { EducationRow($0, id: ids.make()) },
+            skills: sections.skills.map { SkillRow($0, id: ids.make()) },
+            languages: sections.languages.map { LanguageRow($0, id: ids.make()) },
+            certifications: sections.certifications.map { CertificationRow($0, id: ids.make()) },
+            profiles: sections.profiles.map { ProfileRow($0, id: ids.make()) },
+            interests: sections.interests.map { InterestRow(id: ids.make(), text: $0) }
         )
     }
 
@@ -37,7 +46,7 @@ extension EditorContent {
         cv.setSections(CVSections(
             experiences: experiences.map(\.entry), education: education.map(\.entry), skills: skills.map(\.entry),
             languages: languages.compactMap(\.entry), certifications: certifications.map(\.entry),
-            profiles: profiles.compactMap(\.entry), interests: interests
+            profiles: profiles.compactMap(\.entry), interests: interests.map(\.text)
         ))
         return cv
     }
@@ -55,54 +64,49 @@ extension EditorContent {
             + certifications.flatMap(\.unreadableFields) + profiles.flatMap(\.unreadableFields)
     }
 
-    /// Whether the row of `section` at `index` has nothing in it. A row that is not there has nothing either.
-    func rowIsBlank(in section: EditorSection, at index: Int) -> Bool {
+    /// Whether the row of `section` with `id` has nothing in it. A row that is not there has nothing either.
+    func rowIsBlank(in section: EditorSection, id: RowID) -> Bool {
+        row(in: section, id: id)?.isBlank ?? true
+    }
+
+    /// Whether the section has the row with `id`.
+    func hasRow(in section: EditorSection, id: RowID) -> Bool {
+        row(in: section, id: id) != nil
+    }
+
+    private func row(in section: EditorSection, id: RowID) -> (any EditorRow)? {
         switch section {
-        case .experiences: experiences.indices.contains(index) ? experiences[index].isBlank : true
-        case .education: education.indices.contains(index) ? education[index].isBlank : true
-        case .skills: skills.indices.contains(index) ? skills[index].isBlank : true
-        case .languages: languages.indices.contains(index) ? languages[index].isBlank : true
-        case .certifications: certifications.indices.contains(index) ? certifications[index].isBlank : true
-        case .profiles: profiles.indices.contains(index) ? profiles[index].isBlank : true
-        case .interests: interests.indices.contains(index) ? interests[index].isBlank : true
+        case .experiences: experiences.first { $0.id == id }
+        case .education: education.first { $0.id == id }
+        case .skills: skills.first { $0.id == id }
+        case .languages: languages.first { $0.id == id }
+        case .certifications: certifications.first { $0.id == id }
+        case .profiles: profiles.first { $0.id == id }
+        case .interests: interests.first { $0.id == id }
         }
     }
 
-    /// Whether the section has a row at `index`.
-    func hasRow(in section: EditorSection, at index: Int) -> Bool {
+    mutating func addRow(to section: EditorSection, id: RowID) {
         switch section {
-        case .experiences: experiences.indices.contains(index)
-        case .education: education.indices.contains(index)
-        case .skills: skills.indices.contains(index)
-        case .languages: languages.indices.contains(index)
-        case .certifications: certifications.indices.contains(index)
-        case .profiles: profiles.indices.contains(index)
-        case .interests: interests.indices.contains(index)
+        case .experiences: experiences.append(ExperienceRow.blank(id: id))
+        case .education: education.append(EducationRow.blank(id: id))
+        case .skills: skills.append(SkillRow.blank(id: id))
+        case .languages: languages.append(LanguageRow.blank(id: id))
+        case .certifications: certifications.append(CertificationRow.blank(id: id))
+        case .profiles: profiles.append(ProfileRow.blank(id: id))
+        case .interests: interests.append(InterestRow(id: id, text: ""))
         }
     }
 
-    mutating func addRow(to section: EditorSection) {
+    mutating func removeRow(in section: EditorSection, id: RowID) {
         switch section {
-        case .experiences: experiences.append(ExperienceRow.blank)
-        case .education: education.append(EducationRow.blank)
-        case .skills: skills.append(SkillRow.blank)
-        case .languages: languages.append(LanguageRow.blank)
-        case .certifications: certifications.append(CertificationRow.blank)
-        case .profiles: profiles.append(ProfileRow.blank)
-        case .interests: interests.append("")
-        }
-    }
-
-    mutating func removeRow(in section: EditorSection, at index: Int) {
-        guard hasRow(in: section, at: index) else { return }
-        switch section {
-        case .experiences: experiences.remove(at: index)
-        case .education: education.remove(at: index)
-        case .skills: skills.remove(at: index)
-        case .languages: languages.remove(at: index)
-        case .certifications: certifications.remove(at: index)
-        case .profiles: profiles.remove(at: index)
-        case .interests: interests.remove(at: index)
+        case .experiences: experiences.removeAll { $0.id == id }
+        case .education: education.removeAll { $0.id == id }
+        case .skills: skills.removeAll { $0.id == id }
+        case .languages: languages.removeAll { $0.id == id }
+        case .certifications: certifications.removeAll { $0.id == id }
+        case .profiles: profiles.removeAll { $0.id == id }
+        case .interests: interests.removeAll { $0.id == id }
         }
     }
 }
@@ -111,14 +115,20 @@ extension String {
     var isBlank: Bool { allSatisfy(\.isWhitespace) }
 }
 
+extension InterestRow: EditorRow {
+    var isBlank: Bool { text.isBlank }
+}
+
 // MARK: - Rows
 
-extension ExperienceRow {
-    static let blank = ExperienceRow(role: "", company: "", location: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+extension ExperienceRow: EditorRow {
+    static func blank(id: RowID) -> ExperienceRow {
+        ExperienceRow(id: id, role: "", company: "", location: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+    }
 
-    init(_ entry: Experience) {
+    init(_ entry: Experience, id: RowID) {
         self.init(
-            role: entry.role, company: entry.company, location: entry.location, periodStart: entry.period?.startText ?? "",
+            id: id, role: entry.role, company: entry.company, location: entry.location, periodStart: entry.period?.startText ?? "",
             periodEnd: entry.period?.endText ?? "", isCurrent: entry.period?.isCurrent ?? false, description: entry.description
         )
     }
@@ -135,12 +145,14 @@ extension ExperienceRow {
     var unreadableFields: [EditorField] { periodIsReadable(periodStart, periodEnd, isCurrent) ? [] : [.experiencePeriod] }
 }
 
-extension EducationRow {
-    static let blank = EducationRow(degree: "", school: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+extension EducationRow: EditorRow {
+    static func blank(id: RowID) -> EducationRow {
+        EducationRow(id: id, degree: "", school: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+    }
 
-    init(_ entry: Education) {
+    init(_ entry: Education, id: RowID) {
         self.init(
-            degree: entry.degree, school: entry.school, periodStart: entry.period?.startText ?? "",
+            id: id, degree: entry.degree, school: entry.school, periodStart: entry.period?.startText ?? "",
             periodEnd: entry.period?.endText ?? "", isCurrent: entry.period?.isCurrent ?? false, description: entry.description
         )
     }
@@ -168,10 +180,12 @@ private func periodIsReadable(_ start: String, _ end: String, _ current: Bool) -
     readPeriod(start, end, current) != nil || (start.isBlank && end.isBlank && !current)
 }
 
-extension SkillRow {
-    static let blank = SkillRow(name: "", level: nil)
+extension SkillRow: EditorRow {
+    static func blank(id: RowID) -> SkillRow {
+        SkillRow(id: id, name: "", level: nil)
+    }
 
-    init(_ entry: Skill) { self.init(name: entry.name, level: entry.level?.value) }
+    init(_ entry: Skill, id: RowID) { self.init(id: id, name: entry.name, level: entry.level?.value) }
 
     var entry: Skill { Skill(name: name, level: level.flatMap(SkillLevel.init)) }
 
@@ -180,10 +194,12 @@ extension SkillRow {
     var unreadableFields: [EditorField] { level.map { SkillLevel($0) == nil } == true ? [.skillLevel] : [] }
 }
 
-extension LanguageRow {
-    static let blank = LanguageRow(language: "", proficiency: "")
+extension LanguageRow: EditorRow {
+    static func blank(id: RowID) -> LanguageRow {
+        LanguageRow(id: id, language: "", proficiency: "")
+    }
 
-    init(_ entry: LanguageSkill) { self.init(language: entry.language, proficiency: entry.proficiency.rawValue) }
+    init(_ entry: LanguageSkill, id: RowID) { self.init(id: id, language: entry.language, proficiency: entry.proficiency.rawValue) }
 
     /// Nil while the level is not one the domain knows: the entry cannot exist without it.
     var entry: LanguageSkill? { LanguageProficiency(rawValue: proficiency).map { LanguageSkill(language: language, proficiency: $0) } }
@@ -193,12 +209,14 @@ extension LanguageRow {
     var unreadableFields: [EditorField] { entry == nil && !isBlank ? [.languageProficiency] : [] }
 }
 
-extension CertificationRow {
-    static let blank = CertificationRow(name: "", issuer: "", issued: "", link: "", description: "")
+extension CertificationRow: EditorRow {
+    static func blank(id: RowID) -> CertificationRow {
+        CertificationRow(id: id, name: "", issuer: "", issued: "", link: "", description: "")
+    }
 
-    init(_ entry: Certification) {
+    init(_ entry: Certification, id: RowID) {
         self.init(
-            name: entry.name, issuer: entry.issuer, issued: entry.issued?.text ?? "", link: entry.link?.value ?? "",
+            id: id, name: entry.name, issuer: entry.issuer, issued: entry.issued?.text ?? "", link: entry.link?.value ?? "",
             description: entry.description
         )
     }
@@ -215,10 +233,12 @@ extension CertificationRow {
     }
 }
 
-extension ProfileRow {
-    static let blank = ProfileRow(platform: "", link: "")
+extension ProfileRow: EditorRow {
+    static func blank(id: RowID) -> ProfileRow {
+        ProfileRow(id: id, platform: "", link: "")
+    }
 
-    init(_ entry: ProfileLink) { self.init(platform: entry.platform, link: entry.link.value) }
+    init(_ entry: ProfileLink, id: RowID) { self.init(id: id, platform: entry.platform, link: entry.link.value) }
 
     /// Nil while there is no link the domain accepts: a profile exists only with one.
     var entry: ProfileLink? { WebLink(link).map { ProfileLink(platform: platform, link: $0) } }

@@ -84,9 +84,12 @@ struct EditorContentMappingTests {
 
     @Test("a row without what its entry needs is left out of the CV and named, a blank one without a word")
     func incompleteRows() {
+        var ids = RowIDs()
         var content = EditorContent.empty
-        content.languages = [LanguageRow(language: "French", proficiency: ""), LanguageRow(language: "", proficiency: "")]
-        content.profiles = [ProfileRow(platform: "Portfolio", link: "not a link"), ProfileRow(platform: "", link: "")]
+        content.languages = [LanguageRow(id: ids.make(), language: "French", proficiency: ""),
+                             LanguageRow(id: ids.make(), language: "", proficiency: "")]
+        content.profiles = [ProfileRow(id: ids.make(), platform: "Portfolio", link: "not a link"),
+                            ProfileRow(id: ids.make(), platform: "", link: "")]
 
         let cv = content.applied(to: CV(id: SequentialIDGenerator().next()))
 

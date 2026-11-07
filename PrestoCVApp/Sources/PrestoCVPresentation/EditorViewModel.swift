@@ -47,6 +47,8 @@ public final class EditorViewModel {
 
     /// The form as typed.
     var form = EditorContent.empty
+    /// The ids of the form's rows: every row this editor made has one no other row has had.
+    @ObservationIgnored var rowIDs = RowIDs()
     /// The CV the form stands on: its identity, the sections, and the look and the language it was opened with.
     var base: CV?
     /// The CV the writer gave back from the last change of the look or the language, nil when none was made since the form
@@ -110,7 +112,8 @@ public final class EditorViewModel {
 
     private func open(_ cv: CV, unchangedFrom unchanged: CV?, stored: CV?) {
         guard autosave == nil else { return }
-        form = EditorContent(cv)
+        form = EditorContent(cv, ids: &rowIDs)
+        pendingRemoval = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
     }

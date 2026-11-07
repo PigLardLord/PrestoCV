@@ -20,11 +20,12 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [LanguageRow] = content.languages
     let _: [CertificationRow] = content.certifications
     let _: [ProfileRow] = content.profiles
-    let _: [String] = content.interests
+    let _: [InterestRow] = content.interests
     _ = rows
     let _: RowRemoval? = editor.pendingRemoval
     editor.addRow(to: .skills)
-    editor.removeRow(in: .skills, at: 0)
+    let added: RowID = editor.content.skills[0].id
+    editor.removeRow(in: .skills, id: added)
     editor.confirmRemoval()
     editor.cancelRemoval()
     await editor.load()
