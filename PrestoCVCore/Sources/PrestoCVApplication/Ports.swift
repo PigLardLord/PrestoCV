@@ -18,11 +18,66 @@ public protocol CVRepository: Sendable {
 
 /// Recovery and erasure, reachable from the UI (quarantine review, "delete everything about this CV").
 public protocol CVStoreMaintenance: Sendable {
+    /// The files in the quarantine, oldest first. A file stays listed across restarts until it is restored, erased or purged.
+    func quarantined() async throws(RepositoryError) -> [QuarantinedFile]
     func restore(quarantined name: String) async throws(RepositoryError) -> CV
     /// Removes every copy of a CV: the stored file whatever its schema, and quarantined copies (GDPR erasure).
     func erase(_ id: CVID) async throws(RepositoryError)
     /// Deletes quarantined files older than `date`. Returns how many were removed.
     func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int
+    /// Removes everything the store holds, in one hold of the store lock: every CV file whatever its schema or state, the
+    /// quarantine, the staged copies and the import ledger. A file that cannot be removed does not stop the others; it is
+    /// reported in `remaining`, and a second call finishes the job. Only a store that cannot be reached throws.
+    func eraseAll() async throws(RepositoryError) -> EraseAllReport
+}
+
+/// A file in the quarantine, as the review screen shows it.
+public struct QuarantinedFile: Sendable, Equatable {
+    /// Why the store set a file aside. A code, never content.
+    public enum Reason: Sendable, Equatable { case corrupt }
+
+    /// What `restore(quarantined:)` takes.
+    public let name: String
+    /// The CV the file was named after when it was set aside.
+    public let id: CVID
+    /// When the file entered the quarantine: the retention period counts from here.
+    public let enteredAt: Date
+    public let reason: Reason
+    public init(name: String, id: CVID, enteredAt: Date, reason: Reason = .corrupt) {
+        self.name = name; self.id = id; self.enteredAt = enteredAt; self.reason = reason
+    }
+
+    /// The CV a quarantine name belongs to; nil unless the name is `[<n>~]<UUID>.cv.json` and nothing else.
+    public static func id(inName name: String) -> CVID? {
+        var rest = Substring(name)
+        if let tilde = rest.firstIndex(of: "~") {
+            let digits = rest[..<tilde]
+            guard !digits.isEmpty, digits.allSatisfy({ $0 >= "0" && $0 <= "9" }) else { return nil }
+            rest = rest[rest.index(after: tilde)...]
+        }
+        guard rest.hasSuffix(".cv.json") else { return nil }
+        let text = rest.dropLast(".cv.json".count)
+        // UUID(uuidString:) also takes lower case; the store writes upper case only, and so does a name it accepts.
+        guard text.count == 36, text == text.uppercased(), let uuid = UUID(uuidString: String(text)) else { return nil }
+        return CVID(uuid)
+    }
+}
+
+/// What a file in the store is, for the person's list of what remains: never a path (R7).
+public enum StoredFileKind: Sendable, Hashable {
+    case cv, quarantined, staged, ledger, legacySource, other
+}
+
+/// A file that an erase could not remove: its kind and its name.
+public struct RemainingItem: Sendable, Hashable {
+    public let kind: StoredFileKind, name: String
+    public init(kind: StoredFileKind, name: String) { self.kind = kind; self.name = name }
+}
+
+/// What `eraseAll` did: the files it removed and the ones that remain.
+public struct EraseAllReport: Sendable, Equatable {
+    public var erased: Int, remaining: [RemainingItem]
+    public init(erased: Int, remaining: [RemainingItem] = []) { self.erased = erased; self.remaining = remaining }
 }
 
 public struct CVListing: Sendable, Equatable {

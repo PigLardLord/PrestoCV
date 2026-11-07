@@ -3,8 +3,15 @@ import Synchronization
 import PrestoCVDomain
 import PrestoCVApplication
 
-public actor InMemoryCVRepository: CVRepository {
+/// The in-memory CV store, with the maintenance port (`InMemoryCVRepository+Maintenance.swift`): the double the contract suite
+/// runs on beside the file store.
+public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance {
     var store: [CVID: CV] = [:]
+    /// The quarantine: a file that is a CV (`cv`) or does not decode (nil), and when it entered.
+    struct Held: Sendable { var id: CVID; var cv: CV?; var enteredAt: Date }
+    var held: [String: Held] = [:]
+    /// Stored files that do not decode: the next listing sets them aside.
+    var corruptLive: Set<CVID> = []
     let clock: any TimeSource
     public init(clock: any TimeSource = SteppingClock()) { self.clock = clock }
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
@@ -18,7 +25,7 @@ public actor InMemoryCVRepository: CVRepository {
     }
     public func load(_ id: CVID) async throws(RepositoryError) -> CV { guard let cv = store[id] else { throw .notFound(id) }; return cv }
     public func list() async throws(RepositoryError) -> CVListing {
-        CVListing(cvs: store.values.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }, issues: [])
+        CVListing(cvs: store.values.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }, issues: quarantineCorruptLive())
     }
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
         guard let existing = store[id] else { throw .notFound(id) }

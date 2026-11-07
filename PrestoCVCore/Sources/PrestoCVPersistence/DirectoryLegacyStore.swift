@@ -179,5 +179,6 @@ extension FileCVRepository: LegacyImportTarget {
 extension FileCVRepository {
     static let legacyLedgerName = ".legacy-imported.json"
     /// The staged copy of a CV being adopted: a name that listing, quarantine and every sweep ignore (it does not end in `.cv.json`).
-    static func stagedName(for id: CVID) -> String { "." + id.raw.uuidString + ".legacy-staged" }
+    static func stagedName(for id: CVID) -> String { "." + id.raw.uuidString + stagedSuffix }
+    static let stagedSuffix = ".legacy-staged"
 }
