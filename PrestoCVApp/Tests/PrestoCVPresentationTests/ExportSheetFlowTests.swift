@@ -53,6 +53,7 @@ struct ExportSheetFlowTests {
         await world.exporter.gate.close()
         sheet.start()
         await world.passThePause(thenExports: 1)
+        await world.held(1)
 
         sheet.select(language: SheetWorld.language("de"))
 

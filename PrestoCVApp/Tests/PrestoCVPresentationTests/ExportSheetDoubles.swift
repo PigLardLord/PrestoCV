@@ -22,12 +22,14 @@ final class ExportingFake: CVExporting {
 
     func returns(_ outcome: Result<ExportOutcome, any Error>) { result.withLock { $0 = outcome } }
 
+    /// How many calls reached the port. A call is counted once its cancellation handler is in place, so a test that
+    /// waits for the count and then cancels sees the cancellation recorded.
     var calls: Int { snapshots.withLock { $0.count } }
 
     func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
-        snapshots.withLock { $0.append(snapshot) }
-        languages.withLock { $0.append(language) }
         await withTaskCancellationHandler {
+            snapshots.withLock { $0.append(snapshot) }
+            languages.withLock { $0.append(language) }
             await gate.pass()
         } onCancel: {
             cancellations.withLock { $0 += 1 }
