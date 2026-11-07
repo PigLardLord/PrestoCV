@@ -13,7 +13,7 @@ public struct CVRow: Hashable, Sendable, Identifiable {
     public let title: RowTitle
     /// Which of the rows that read alike this is, from 2; nil for the first. The view words it.
     public let number: Int?
-    /// The professional title of the person, or empty when the row is called by it.
+    /// The line under the title, by the domain's rule (`CVSubtitle`); empty when it has none.
     public let subtitle: String
     /// When the store saved the CV last. The view words the time since, from the list's `now`.
     public let lastSaved: Date?

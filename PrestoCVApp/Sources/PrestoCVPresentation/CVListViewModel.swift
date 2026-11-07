@@ -99,10 +99,9 @@ public final class CVListViewModel {
             let number = labels[entry.id].flatMap { label -> Int? in
                 label == own ? nil : Int(label.dropFirst(own.count).filter(\.isNumber))
             }
-            let role = cv.personal.professionalTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             return CVRow(
                 reference: CVReference(id: cv.id), title: RowTitle(entry.title), number: number,
-                subtitle: { if case .role = entry.title { "" } else { role } }(),
+                subtitle: CVSubtitle.text(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle) ?? "",
                 lastSaved: cv.updatedAt ?? cv.createdAt, language: cv.language?.tag
             )
         }
