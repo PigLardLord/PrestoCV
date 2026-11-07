@@ -8,8 +8,8 @@ extension EditorViewModel {
     /// store alone.
     /// - Returns: The PDF, or nil when `exportStatus` says why there is none.
     public func export() async -> ExportedDocument? {
-        guard let base else { return nil }
-        let snapshot = form.applied(to: base)
+        guard let held else { return nil }
+        let snapshot = form.applied(to: held)
         guard let language = snapshot.language else {
             exportStatus = .languageNeeded
             return nil

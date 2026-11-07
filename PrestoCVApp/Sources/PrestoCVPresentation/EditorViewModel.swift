@@ -28,10 +28,10 @@ public final class EditorViewModel {
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
 
     /// The tag of the language the document is written in, or nil when the CV says none.
-    public var documentLanguage: String? { base?.language?.tag }
+    public var documentLanguage: String? { held?.language?.tag }
 
     /// The look the CV keeps, or nil when it keeps none yet.
-    public var look: EditorLook? { base?.design.map(EditorLook.init) }
+    public var look: EditorLook? { held?.design.map(EditorLook.init) }
 
     // MARK: - State
 
@@ -44,8 +44,13 @@ public final class EditorViewModel {
 
     /// The form as typed.
     var form = EditorContent.empty
-    /// The CV the form stands on: its identity, the sections, the look and the language.
+    /// The CV the form stands on: its identity, the sections, and the look and the language it was opened with.
     var base: CV?
+    /// The CV the writer gave back from the last change of the look or the language, nil when none was made since the form
+    /// stood on `base`. Writes never carry its look and language: the writer keeps them.
+    var restyled: CV?
+    /// The CV the form stands on, with the look and the language chosen last: the one shown, exported and copied.
+    var held: CV? { restyled ?? base }
     @ObservationIgnored var autosave: Autosave<CV>?
     /// The writer of the CV the form stands on, which keeps its revision.
     @ObservationIgnored var writer: (any CVAutosaveWriting)?
@@ -135,6 +140,7 @@ public final class EditorViewModel {
         self.autosave = autosave
         self.writer = writer
         base = cv
+        restyled = nil
         given = cv
         failure = nil
         refreshSaveStatus()

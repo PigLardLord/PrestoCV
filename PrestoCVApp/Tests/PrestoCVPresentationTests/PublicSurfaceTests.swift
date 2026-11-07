@@ -18,6 +18,10 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     await editor.saveNow()
     await editor.reload()
     await editor.saveAsCopy()
+    let tag: String? = nil
+    await editor.setDocumentLanguage(tag)
+    let parts: Set<LookPart> = [.design]
+    await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
     let document: ExportedDocument? = await editor.export()
     _ = document.map { ($0.pdf, $0.pages) }
 }

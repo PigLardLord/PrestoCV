@@ -34,8 +34,8 @@ extension EditorViewModel {
     /// After a conflict or a deletion elsewhere: the form's text is stored as a new CV, and the editor goes on with it.
     public func saveAsCopy() async {
         await replace { [self] in
-            guard let base else { return }
-            let current = form.applied(to: base)
+            guard let held else { return }
+            let current = form.applied(to: held)
             do throws(EditFailure) {
                 let copy = try await editing.duplicate(current, title: copyTitle(current.title))
                 form.title = EditorContent(copy).title
@@ -46,8 +46,8 @@ extension EditorViewModel {
         }
     }
 
-    /// Runs `body`, which replaces the CV the form stands on, after any replacement that runs. Edits made meanwhile stay in
-    /// the form, and go to the autosave once it ends; `saveNow()` waits for it.
+    /// Runs `body`, which replaces the CV the form stands on or the look and the language it holds, after any replacement
+    /// that runs. Edits made meanwhile stay in the form, and go to the autosave once it ends; `saveNow()` waits for it.
     func replace(_ body: @escaping @MainActor () async -> Void) async {
         while let replacing { await replacing.value }
         let replacement = Task {
