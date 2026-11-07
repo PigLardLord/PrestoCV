@@ -4,8 +4,9 @@ import CVDocumentModel
 
 /// Maps a CV to the document the exporter renders (ADR 0007). Exhaustive and deterministic: no clock, no identifiers,
 /// no `default:` over a domain enum, so a new case or a new CV field cannot be left out without the build or the
-/// mirror-completeness test failing. Text is trimmed and blank values are not printed; the order of the entries is the
-/// order the person chose. Two things are deliberately not printed: the title of the CV (a private list name) and the
+/// mirror-completeness test failing. Text is trimmed and a blank value is not printed. An item with nothing to print
+/// is not printed either: a skill, language or certification with a blank name, an experience or education entry whose
+/// fields are all blank. An entry with some value prints what it has. The order of the entries is the order the person chose. Two things are deliberately not printed: the title of the CV (a private list name) and the
 /// design choice (the export workflow resolves it).
 public struct CVToDocumentMapper: Sendable {
     public init() {}
@@ -28,15 +29,19 @@ public struct CVToDocumentMapper: Sendable {
         let content = cv.sections
         var result: [CVDocumentModel.Section] = []
         if let summary = text(cv.personal.summary) { result.append(.summary(summary)) }
-        let experiences = content.experiences.map(experience)
+        let experiences = content.experiences.compactMap(experience)
         if !experiences.isEmpty { result.append(.experience(experiences)) }
-        let education = content.education.map(education)
+        let education = content.education.compactMap(education)
         if !education.isEmpty { result.append(.education(education)) }
-        let skills = content.skills.map { SkillItem(name: $0.name.trimmed, rating: $0.level?.value) }
+        let skills = content.skills.compactMap { item in
+            text(item.name).map { SkillItem(name: $0, rating: item.level?.value) }
+        }
         if !skills.isEmpty { result.append(.skills(skills)) }
-        let languages = content.languages.map { LanguageItem(language: $0.language.trimmed, level: level($0.proficiency)) }
+        let languages = content.languages.compactMap { item in
+            text(item.language).map { LanguageItem(language: $0, level: level(item.proficiency)) }
+        }
         if !languages.isEmpty { result.append(.languages(languages)) }
-        let certifications = content.certifications.map(certification)
+        let certifications = content.certifications.compactMap(certification)
         if !certifications.isEmpty { result.append(.certifications(certifications)) }
         let profiles = content.profiles.map { CVDocumentModel.ProfileLink(platform: $0.platform.trimmed, url: $0.link.value) }
         if !profiles.isEmpty { result.append(.profiles(profiles)) }
@@ -45,20 +50,28 @@ public struct CVToDocumentMapper: Sendable {
         return result
     }
 
-    private func experience(_ item: Experience) -> ExperienceItem {
-        ExperienceItem(role: item.role.trimmed, company: item.company.trimmed, location: text(item.location),
-                       period: item.period.map(period), description: text(item.description))
+    /// Nil when no field has a value; otherwise what the entry has.
+    private func experience(_ item: Experience) -> ExperienceItem? {
+        let result = ExperienceItem(role: item.role.trimmed, company: item.company.trimmed, location: text(item.location),
+                                    period: item.period.map(period), description: text(item.description))
+        let hasValue = !result.role.isEmpty || !result.company.isEmpty || result.location != nil || result.period != nil
+            || result.description != nil
+        return hasValue ? result : nil
     }
 
-    private func education(_ item: Education) -> EducationItem {
-        EducationItem(degree: item.degree.trimmed, school: item.school.trimmed, period: item.period.map(period),
-                      description: text(item.description))
+    /// Nil when no field has a value; otherwise what the entry has.
+    private func education(_ item: Education) -> EducationItem? {
+        let result = EducationItem(degree: item.degree.trimmed, school: item.school.trimmed, period: item.period.map(period),
+                                   description: text(item.description))
+        let hasValue = !result.degree.isEmpty || !result.school.isEmpty || result.period != nil || result.description != nil
+        return hasValue ? result : nil
     }
 
-    /// The document carries the year only: a certification date is printed as a year.
-    private func certification(_ item: Certification) -> CertificationItem {
-        CertificationItem(name: item.name.trimmed, issuer: item.issuer.trimmed, year: item.issued?.year,
-                          url: item.link?.value, description: text(item.description))
+    /// The document carries the year only: a certification date is printed as a year. Nil when the name is blank.
+    private func certification(_ item: Certification) -> CertificationItem? {
+        guard let name = text(item.name) else { return nil }
+        return CertificationItem(name: name, issuer: item.issuer.trimmed, year: item.issued?.year, url: item.link?.value,
+                                 description: text(item.description))
     }
 
     // MARK: Values
