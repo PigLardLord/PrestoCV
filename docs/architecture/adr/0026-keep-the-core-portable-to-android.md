@@ -24,6 +24,7 @@
    - **It follows the setup documented on swift.org**, the same commands a developer runs, rather than a third-party action.
    - **The Linux job runs the same Swift 6.4.0.** Linux, Android and Xcode Cloud build with one compiler, and a toolchain update changes all three in one pull request.
    - **Amended by [ADR 0030](0030-log-through-one-interface-that-carries-no-cv-content.md):** the job builds `DiagnosticLogging` as well, the package whose interface the packages above log through. The list above stays as it was decided.
+   - **Toolchain update, 2026-11-07:** Linux and Android pin Swift 6.4.2, the toolchain of Xcode 27.2, which is now Xcode Cloud's latest release. Swift Build 6.4.0 crashed now and then on Linux while it planned a build (2 of 53 CI runs), a fault of libdispatch fixed in 6.4.2 ([swiftlang/swift-build#1786](https://github.com/swiftlang/swift-build/issues/1786)). The versions above are the ones decided first.
 2. **R18: pure targets stay portable to Android.** It applies to the targets that R2 calls pure: domain, application, published language, integration, presentation and workflow ports. The checker:
    - **refuses** an import of a module that only Apple platforms have (SwiftUI, UIKit, AppKit, Combine, CryptoKit, `os`, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision and others), in any form;
    - **refuses** `Bundle` in any form, `Bundle.module` and `#bundle` included;
