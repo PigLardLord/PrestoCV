@@ -35,6 +35,10 @@ public final class CVListViewModel {
     /// The CVs as the store listed them. A change reads its CV here, when the intent comes.
     @ObservationIgnored private var listed: [CV] = []
     @ObservationIgnored private var generation = 0
+    /// The reads that passed the wait for the editors and have not ended.
+    @ObservationIgnored private var running = 0
+    /// What the last published read or failure set; `.loading` before any read ends.
+    @ObservationIgnored private var settled: ListStatus = .loading
     @ObservationIgnored private var changedSinceLoad = false
     /// The latest change taken on each row. A change publishes its status and its result only while it is the latest.
     @ObservationIgnored private var intents: [CVReference: Int] = [:]
@@ -62,16 +66,25 @@ public final class CVListViewModel {
 
     /// Reads the store. The view calls it from its `.task`, and after anything that may have changed the store.
     public func load() async {
-        await editorsStored()
+        // Taken before the wait: a change of the list made while the editors store invalidates this read, and so does a newer read
         generation += 1
         let mine = generation
+        await editorsStored()
+        guard mine == generation else { return }
+        running += 1
         if rows.isEmpty { status = .loading }
+        // `.loading` holds only while a read runs: when the last one ends without a status of its own, the settled one shows
+        defer {
+            running -= 1
+            if running == 0, status == .loading { status = settled }
+        }
         do {
             let listing = try await browsing.list()
             guard mine == generation else { return }
             show(listing)
         } catch {
             guard mine == generation, !Task.isCancelled else { return }
+            settled = .failed
             status = .failed
             isStale = changedSinceLoad
         }
@@ -87,6 +100,7 @@ public final class CVListViewModel {
         showRows()
         let present = Set(rows.map(\.reference))
         rowStatuses = rowStatuses.filter { present.contains($0.key) }
+        settled = .loaded
         status = .loaded
         isStale = false
         changedSinceLoad = false
@@ -134,7 +148,7 @@ public final class CVListViewModel {
             // The copy is a row of its own: a newer change of this row does not supersede it
             let copy = try await editing.duplicate(cv, title: title)
             listed.insert(copy, at: 0)
-            showRows()
+            listChanged()
             await changed(reference, intent)
         } catch {
             await failed(error, on: reference, intent)
@@ -149,7 +163,7 @@ public final class CVListViewModel {
             // The CV is gone from the store whatever came after: the row goes
             try await editing.delete(cv)
             listed.removeAll { $0.id == cv.id }
-            showRows()
+            listChanged()
             await changed(reference, intent)
         } catch {
             await failed(error, on: reference, intent)
@@ -186,6 +200,12 @@ public final class CVListViewModel {
     private func replace(_ cv: CV) {
         guard let index = listed.firstIndex(where: { $0.id == cv.id }) else { return }
         listed[index] = cv
+        listChanged()
+    }
+
+    /// `listed` changed here: a read that started before holds an older list, and must not publish over this one.
+    private func listChanged() {
+        generation += 1
         showRows()
     }
 

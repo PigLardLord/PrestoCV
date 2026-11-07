@@ -17,15 +17,19 @@ final class BrowsingFake: CVBrowsing {
     let listCalls = Mutex(0)
     /// Holds the answer of `onboarding()` after the store was read, so that a test decides when each answer arrives.
     let onboardingGate = Gate()
+    /// Holds the answer of `list()` after the store was read: the listing returned is the one read when the call started,
+    /// and a failure set meanwhile is thrown when the call is let go.
+    let listGate = Gate()
     let sampleCalls = Mutex(0)
 
     init(editing: EditingFake) { self.editing = editing }
 
     func list() async throws(EditFailure) -> CVListing {
         listCalls.withLock { $0 += 1 }
-        if let error = listError.withLock({ $0 }) { throw error }
         let stored: CVListing
         do { stored = try await editing.store.list() } catch { throw .unavailable }
+        await listGate.pass()
+        if let error = listError.withLock({ $0 }) { throw error }
         return CVListing(cvs: stored.cvs, issues: issues.withLock { $0 })
     }
 
