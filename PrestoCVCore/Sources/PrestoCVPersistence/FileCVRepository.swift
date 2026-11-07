@@ -28,11 +28,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
+    func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Locking
 
-    private func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
+    func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
         do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
         catch { throw .storeUnavailable(.cannotLock) }
         // Never through a link, and never on anything but a regular file: opening does not block.
@@ -49,7 +49,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     /// Whether anything is at `url`, a link included, without following it. Only ENOENT means nothing is there.
-    private static func exists(_ url: URL) throws(RepositoryError) -> Bool {
+    static func exists(_ url: URL) throws(RepositoryError) -> Bool {
         var status = stat()
         if lstat(url.path, &status) == 0 { return true }
         guard errno == ENOENT else { throw .unreadable(file: url.lastPathComponent) }
@@ -107,7 +107,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return file
     }
 
-    private func current(_ id: CVID) throws(RepositoryError) -> CV? {
+    func current(_ id: CVID) throws(RepositoryError) -> CV? {
         let u = url(id)
         switch read(u) {
         case .absent:
@@ -127,8 +127,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
     ///
     /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
-    private func write(_ cv: CV) throws(RepositoryError) {
-        let name = url(cv.id).lastPathComponent
+    func write(_ cv: CV) throws(RepositoryError) { try write(cv, to: url(cv.id)) }
+
+    /// The same checks, for a file other than the CV's own (the staged copy of an adoption).
+    func write(_ cv: CV, to target: URL) throws(RepositoryError) {
+        let name = target.lastPathComponent
         // `stored(revision:at:)` sets both dates, and a read always returns them, so a CV without them would not read back.
         guard let createdAt = cv.createdAt, let updatedAt = cv.updatedAt else { throw .wouldNotReadBack(file: name) }
         let data: Data
@@ -137,7 +140,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         do {
             guard try CVFileV1.decode(data).toDomain() == cv else { throw RepositoryError.wouldNotReadBack(file: name) }
         } catch { throw .wouldNotReadBack(file: name) }
-        do { try data.write(to: url(cv.id), options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
+        do { try data.write(to: target, options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
     }
 
     /// Timestamps are stored with whole-second precision (ISO 8601), so they are normalised before use;
@@ -264,7 +267,8 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     public func erase(_ id: CVID) async throws(RepositoryError) {
         try withStoreLock { () throws(RepositoryError) in
             let name = id.raw.uuidString + Self.suffix
-            var victims = [directory.appendingPathComponent(name)]
+            // A staged copy of an adoption goes with the CV; the ledger stays, so the source is not imported again.
+            var victims = [directory.appendingPathComponent(name), directory.appendingPathComponent(Self.stagedName(for: id))]
             let quarantined = try quarantineNames()
             victims += quarantined.filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) }
             for v in victims {
