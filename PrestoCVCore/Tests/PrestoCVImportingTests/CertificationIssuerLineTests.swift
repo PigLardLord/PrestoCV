@@ -94,6 +94,37 @@ struct CertificationIssuerLineTests {
         #expect(found.unplaced.isEmpty)
     }
 
+    /// The separators that end the name before a later part: every one the reader cuts at, except the comma.
+    private static let separatorsAfterTheName = CertificationReader.lineSeparators.filter { $0 != ", " }
+
+    @Test("Only the name holds a list: a later part is cut at its commas, at every separator", arguments: separatorsAfterTheName)
+    func laterPartCutAtCommas(separator: String) throws {
+        let found = read(["First Aid\(separator)Acme Ltd, practical assessment, distinction"])
+        let certification = try #require(found.cv.certifications.first)
+        #expect(found.cv.certifications.count == 1)
+        #expect(certification.name.value == "First Aid")
+        #expect(certification.issuer?.value == "Acme Ltd")
+        #expect(found.unplaced.map(\.text) == ["practical assessment", "distinction"])
+    }
+
+    @Test("Only the name holds a list: a later cell of a table row is cut at its commas")
+    func laterCellCutAtCommas() throws {
+        let found = read(["| Name | Issuer |", "|---|---|", "| First Aid | Acme Ltd, practical assessment, distinction |"])
+        let certification = try #require(found.cv.certifications.first)
+        #expect(found.cv.certifications.count == 1)
+        #expect(certification.name.value == "First Aid")
+        #expect(certification.issuer?.value == "Acme Ltd")
+        #expect(found.unplaced.map(\.text) == ["practical assessment", "distinction"])
+    }
+
+    @Test("The name keeps its list when an issuer follows it")
+    func nameListBeforeIssuer() throws {
+        let found = read(["Managing Anxiety, Stress, Sleep Problems - Acme Ltd"])
+        #expect(found.cv.certifications.map(\.name.value) == ["Managing Anxiety, Stress, Sleep Problems"])
+        #expect(found.cv.certifications.first?.issuer?.value == "Acme Ltd")
+        #expect(found.unplaced.isEmpty)
+    }
+
     @Test("A comma that is followed by an organisation or a year still splits")
     func commaStillSplits() {
         let found = read(["Rescue Basics, Red Cross Society", "Rope Work, Safety, 2019"])

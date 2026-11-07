@@ -36,7 +36,9 @@ enum CertificationReader {
             if let last = dates.last { year = Sourced(value: Line.year(of: last), spans: [cell.sub(last.range).span], reading: .year) }
             let brackets = Brackets(of: cell, ifDatesIn: dates)
             let cut = dates.map(\.range).filter { !brackets.holdWords(around: $0) }
-            parts += cell.removing(cut).flatMap { CertificationReader.cut($0, dated: !dates.isEmpty) }
+            for piece in cell.removing(cut) {
+                parts += CertificationReader.cut(piece, dated: !dates.isEmpty, holdsTheName: parts.isEmpty)
+            }
         }
 
         private static func year(of date: DateMatch) -> Int {
@@ -45,17 +47,20 @@ enum CertificationReader {
         }
     }
 
-    /// The parts of a piece between the separators. A piece with no date and three or more parts at its commas, none of them
-    /// after the first an organisation or a school, is a name that holds a list, "Managing Anxiety, Stress, Sleep": it is
-    /// cut at its other separators only (#304). A piece that starts with an issuer lead is never such a name: it is cut at
-    /// every comma, so that the first part is the issuer and the rest is text not imported.
-    private static func cut(_ piece: Piece, dated: Bool) -> [Piece] {
+    /// The parts of a piece between the separators. Only the line's first part, its name, can hold a list (#304): when the
+    /// piece is the line's first, has no date, and its first part has three or more parts at its commas, none of them after
+    /// the first an organisation or a school, that part is a name that holds a list, "Managing Anxiety, Stress, Sleep", and is
+    /// cut at the other separators only. A first part that starts with an issuer lead is never such a name. Every later part,
+    /// of this piece or of a later cell, is cut at every comma as well, so that an issuer is read alone and the rest of its part
+    /// is text not imported.
+    private static func cut(_ piece: Piece, dated: Bool, holdsTheName: Bool) -> [Piece] {
         let wholeAtCommas = piece.split(by: lineSeparators.filter { $0 != ", " })
-        return wholeAtCommas.flatMap { part -> [Piece] in
+        return wholeAtCommas.enumerated().flatMap { offset, part -> [Piece] in
             let commas = part.split(by: [", "])
+            guard holdsTheName, offset == 0, !dated, commas.count >= 3 else { return commas }
             let name = commas.dropFirst().allSatisfy { !EntryVocabulary.isOrganisation($0.text) && !EntryVocabulary.isSchool($0.text) }
             let led = CertificationIssuerLead.startsWithLead(part)
-            return commas.count >= 3 && !dated && name && !led ? [part] : commas
+            return name && !led ? [part] : commas
         }
     }
 
