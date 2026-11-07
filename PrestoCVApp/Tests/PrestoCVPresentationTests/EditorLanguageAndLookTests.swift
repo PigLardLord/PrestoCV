@@ -1,6 +1,7 @@
 import Testing
 import PrestoCVDomain
 @testable import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 
 /// The document language and the look of the open CV: changed by the writer of the open CV, which keeps them; the editor
 /// shows, exports and copies what it gives back, and the person's edits stay.
@@ -125,5 +126,24 @@ struct EditorLanguageAndLookTests {
         #expect(editor.look == nil)
         #expect(editor.content.fullName == "Mara Ellison-Renn")
         #expect(try await world.editing.inStore(cv.id).design == nil)
+    }
+
+    @Test("a failed change that is retried and stored no longer shows its failure, though no text was edited")
+    func retriedChangeClearsItsFailure() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        world.editing.restyleErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        await editor.setDocumentLanguage("de")
+        #expect(editor.saveStatus == .failed)
+        #expect(editor.documentLanguage == "it")
+
+        await editor.setDocumentLanguage("de")
+        #expect(editor.documentLanguage == "de")
+        #expect(editor.saveStatus == .saved)
+        #expect(editor.isSavedOnThisDevice)
+        await editor.saveNow()
+        #expect(editor.saveStatus == .saved)
     }
 }
