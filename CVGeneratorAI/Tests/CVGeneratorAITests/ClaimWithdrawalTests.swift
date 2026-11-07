@@ -235,7 +235,7 @@ struct ClaimWithdrawalTests {
     @Test("The candidates go to the checker in batches of the size given, in order, one call each")
     func batches() async throws {
         let checker = FakeClaimChecker()
-        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: TestCallClock())
 
         let draft = try await ClaimWithdrawal.checking(skills(20), in: description, with: checker, within: limits)
 
@@ -249,7 +249,7 @@ struct ClaimWithdrawalTests {
     func oneBatch() async throws {
         for count in [1, 8] {
             let checker = FakeClaimChecker()
-            let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+            let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: TestCallClock())
 
             _ = try await ClaimWithdrawal.checking(skills(count), in: description, with: checker, within: limits)
 
@@ -261,7 +261,7 @@ struct ClaimWithdrawalTests {
     func smallestBatch() async throws {
         let checker = FakeClaimChecker()
 
-        _ = try await ClaimWithdrawal.checking(skills(3), in: description, with: checker, within: ClaimCheckLimits(batchSize: 0, time: .seconds(60)))
+        _ = try await ClaimWithdrawal.checking(skills(3), in: description, with: checker, within: ClaimCheckLimits(batchSize: 0, time: .seconds(60), on: TestCallClock()))
 
         #expect(await checker.calls.map(\.candidates.count) == [1, 1, 1])
     }
@@ -269,7 +269,7 @@ struct ClaimWithdrawalTests {
     @Test("Each batch is judged for itself: a non-fact withdraws only its own item, in any batch")
     func judgementsFollowTheirBatch() async throws {
         let checker = FakeClaimChecker(stances: ["Skill3": .wish, "Skill9": .denied, "Skill20": .otherPerson])
-        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: TestCallClock())
 
         let draft = try await ClaimWithdrawal.checking(skills(20), in: description, with: checker, within: limits)
 
@@ -281,7 +281,7 @@ struct ClaimWithdrawalTests {
           arguments: [CVGenerationError.generationFailed, .busy])
     func failedBatch(failure: CVGenerationError) async throws {
         let checker = FakeClaimChecker(failure: failure, afterCalls: 1)
-        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: TestCallClock())
 
         let draft = try await ClaimWithdrawal.checking(skills(20), in: description, with: checker, within: limits)
 
@@ -293,7 +293,7 @@ struct ClaimWithdrawalTests {
           arguments: [(0, 0), (0, 3), (1, 0), (1, 7), (2, 3)])
     func shortAnswer(afterCalls: Int, judged: Int) async throws {
         let checker = FakeClaimChecker(verdictLimit: judged, afterCalls: afterCalls)
-        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: TestCallClock())
 
         let draft = try await ClaimWithdrawal.checking(skills(20), in: description, with: checker, within: limits)
 
@@ -303,8 +303,9 @@ struct ClaimWithdrawalTests {
     @Test("A check that does not finish in its time gives no answer, and the kept items of the batches before are not kept",
           .timeLimit(.minutes(1)), arguments: [0, 1])
     func timedOut(answeredBefore: Int) async throws {
-        let checker = FakeClaimChecker(hangs: true, afterCalls: answeredBefore)
-        let limits = ClaimCheckLimits(batchSize: 8, time: .milliseconds(100))
+        let clock = TestCallClock()
+        let checker = FakeClaimChecker(hangs: true, afterCalls: answeredBefore, whenHanging: { clock.runOut() })
+        let limits = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: clock)
 
         let draft = try await ClaimWithdrawal.checking(skills(20), in: description, with: checker, within: limits)
 
