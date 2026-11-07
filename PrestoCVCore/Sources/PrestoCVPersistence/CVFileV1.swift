@@ -147,8 +147,9 @@ struct CVFileV1: Codable, Equatable {
             guard let link = try Self.canonical(p.link, WebLink.init, \.value, "profile link") else { throw Invalid(reason: "profile link") }
             sections.profiles.append(ProfileLink(platform: p.platform, link: link))
         }
+        // A stored list must already follow the list rule; the text rule then cleans, merges or drops entries without a word.
+        guard CVSections.canonicalInterests(interests, cleaningText: false) == interests else { throw Invalid(reason: "interests") }
         sections.setInterests(interests)
-        guard sections.interests == interests else { throw Invalid(reason: "interests") }   // trimmed, non-empty, unique
         var choice: DesignChoice?
         if let d = design {
             guard let valid = DesignChoice(design: d.design, palette: d.palette, fonts: d.fonts) else { throw Invalid(reason: "design") }

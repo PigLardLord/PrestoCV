@@ -1,8 +1,8 @@
 // swift-tools-version: 6.1
 import PackageDescription
 
-// App integration and presentation (docs/architecture/modules.md). The targets are empty until step 5 fills them;
-// the Xcode app starts depending on this package then (#88, #89).
+// App integration and presentation (docs/architecture/modules.md). Step 5 fills the targets one by one (#62); the
+// Xcode app starts depending on this package at the switch (#88, #89).
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
@@ -28,6 +28,16 @@ var targets: [Target] = [
         .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     ]),
 ]
+
+targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
+    "PrestoCVIntegration", "PrestoCVWorkflowPorts",
+    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    .product(name: "CVDocumentModel", package: "CVPDFExporter"),
+    .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
+    .product(name: "CVRendering", package: "CVPDFExporter"),
+    .product(name: "CVRenderingTestSupport", package: "CVPDFExporter"),
+    .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
+]))
 
 // The composition root is Apple-only (docs/architecture/modules.md): it wires the platform adapters.
 #if !os(Linux)
