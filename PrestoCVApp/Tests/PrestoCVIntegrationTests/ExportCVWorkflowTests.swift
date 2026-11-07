@@ -32,6 +32,12 @@ private struct CancellingRenderer: PDFRendering {
     func render(html: String, page: PageSetup) async throws -> RenderedPDF { throw CancellationError() }
 }
 
+private struct RendererFailure: Error {}
+
+private struct FailingRenderer: PDFRendering {
+    func render(html: String, page: PageSetup) async throws -> RenderedPDF { throw RendererFailure() }
+}
+
 private struct UnreadableInspector: PDFInspecting {
     func pageCount(of data: Data) -> Int? { nil }
     func text(of data: Data) -> String? { nil }
@@ -151,6 +157,26 @@ struct ExportCVWorkflowTests {
         _ = try await workflow(renderer: renderer, policy: policy).export(Fixtures.fullCV(), language: language("it"))
         let pages = await renderer.pages
         #expect(pages == [PageSetup(widthPoints: 500, heightPoints: 700, maxPages: 7, verticalMarginPoints: 30)])
+    }
+
+    @Test("an error of the renderer is renderingFailed, whatever its type")
+    func rendererError() async throws {
+        await #expect(throws: ExportFailure.renderingFailed) {
+            try await workflow(renderer: FailingRenderer()).export(Fixtures.fullCV(), language: language("it"))
+        }
+    }
+
+    @Test("a CV that misses a field the export requires is notReady", arguments: Array(ExportReadiness.requiredFields))
+    func missingRequiredField(field: ExportReadiness.Field) async throws {
+        var cv = Fixtures.fullCV()
+        var personal = cv.personal
+        switch field {
+        case .name: personal.fullName = " \n"
+        case .email: personal.email = nil
+        case .phone: personal.phone = nil
+        }
+        cv.setPersonalDetails(personal)
+        await #expect(throws: ExportFailure.notReady) { try await workflow().export(cv, language: language("it")) }
     }
 
     @Test("cancellation passes through unchanged")

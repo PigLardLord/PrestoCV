@@ -16,7 +16,7 @@ public struct DocumentStyle: Sendable {
 
 /// Exports a snapshot of a CV as a PDF (ADR 0007, ADR 0011). Every export is checked against its own document: the text
 /// of the PDF must hold every text the document has (R8). The outcome says when the PDF is shorter than the CV needs.
-/// Failures are `ExportFailure`; a cancelled task stays a `CancellationError` (R3, R7).
+/// Failures are `ExportFailure`, including any error of the renderer; a cancelled task stays a `CancellationError` (R3, R7).
 public struct ExportCVWorkflow: CVExporting {
     private let renderer: any PDFRendering
     private let inspector: any PDFInspecting
@@ -32,13 +32,17 @@ public struct ExportCVWorkflow: CVExporting {
 
     public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
         let personal = snapshot.personal
-        guard ExportReadiness(name: personal.fullName, email: "", phone: "").canExport else { throw ExportFailure.notReady }
+        let readiness = ExportReadiness(name: personal.fullName, email: personal.email?.value ?? "", phone: personal.phone?.value ?? "")
+        guard readiness.canExport else { throw ExportFailure.notReady }
         let words = try headingsFor(language)
         let document = mapper.map(snapshot, language: language)
         do { try CVDocumentValidator.validate(document) } catch { throw ExportFailure.invalidDocument }
         let rendered = DocumentHTMLBuilder().render(document, stylesheet: style.stylesheet, palette: style.palette,
                                                     fonts: style.fonts, headings: words)
-        let pdf = try await renderer.render(html: rendered.html, page: page)
+        let pdf: RenderedPDF
+        do { pdf = try await renderer.render(html: rendered.html, page: page) } catch is CancellationError {
+            throw CancellationError()                                  // ADR 0010: cancellation is not a failure
+        } catch { throw ExportFailure.renderingFailed }
         if !pdf.truncated {
             guard let text = inspector.text(of: pdf.data) else { throw ExportFailure.renderingFailed }
             let missing = DocumentCompleteness.missing(in: text, expected: rendered.textNodes)
