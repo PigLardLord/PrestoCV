@@ -1140,7 +1140,8 @@ extension CVDataSanitizer {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
             let entries = entries(of: cvData, source)
-            let written = WrittenText(source: source, claimed: entries.claimed(in: source), wordList: wordList, tagger: lexicalClasses)
+            let claimed = entries.claimed(in: source)
+            let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
             let titles = [facts.personalInfo.title] + facts.experience.map(\.title)
             let ownWords = Self.words(of: titles + facts.education.map(\.degree))
             let cleanField = field.flatMap { field in
@@ -1197,10 +1198,11 @@ extension CVDataSanitizer {
             var endings = Set<[String]>()
             var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
-            // The qualities of the soft skills the draft keeps, and those the description states, are the only ones the summary names as
-            // a manner (#359, N1): with no soft skill known, the summary is not read for them.
+            // The qualities of the soft skills the draft keeps, and those the description states of the person, are the only ones the
+            // summary names as a manner (#359, N1): with no soft skill known, the summary is not read for them. A quality the
+            // description gives someone else ("My colleague works with precision.") is not the person's (review round 1).
             let heldQualities: Set<String>? = qualities.isEmpty
-                ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: source.foldedWords)
+                ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: claimed.foldedWords)
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {

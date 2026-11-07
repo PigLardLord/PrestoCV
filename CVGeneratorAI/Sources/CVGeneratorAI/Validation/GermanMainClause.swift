@@ -44,17 +44,21 @@ enum GermanMainClause {
         return Vocabulary.isAuxiliary(lowered, in: .german) || Vocabulary.isBeForm(lowered, in: .german) || modals.contains(lowered)
     }
 
-    /// An infinitive ends with "en"; a participle ends with "t" and has "ge" ("gepflegt", "umgetopft"), "-iert" or a prefix that
-    /// takes no "ge" ("betreut", "verwaltet"). The verb of "ich" is neither: "plane", "leitete", or a strong past such as "schnitt".
+    /// An infinitive ends with "n" ("pflegen", "sammeln"), and so does a strong participle ("getan", "gegossen"); a weak participle
+    /// ends with "t", with or without "ge" ("gepflegt", "recycelt", "vorbereitet"). The verb of "ich" ends with neither, but for a
+    /// strong past of `ownPasts` ("schnitt", "hielt", "begann"): a present or a weak past ends with "e" ("plane", "leitete"), and
+    /// any other strong past with neither ("fuhr", "nahm").
     private static func isParticipleOrInfinitive(_ word: String) -> Bool {
         let lowered = word.lowercased()
-        guard !isSharedVerb(lowered) else { return false }
-        if lowered.hasSuffix("en") { return true }
-        return lowered.hasSuffix("t")
-            && (lowered.contains("ge") || lowered.hasSuffix("iert") || inseparablePrefixes.contains(where: lowered.hasPrefix))
+        guard !isSharedVerb(lowered), !ownPasts.contains(where: lowered.hasSuffix) else { return false }
+        return lowered.hasSuffix("n") || lowered.hasSuffix("t")
     }
 
-    private static let inseparablePrefixes = ["be", "ver", "er", "ent", "emp", "zer", "miss", "über", "unter", "hinter", "wider"]
+    /// The strong pasts of "ich" that end with "t" or "n", a closed class; a prefix keeps them ("erhielt", "vertrat", "gewann").
+    private static let ownPasts = [
+        "schnitt", "ritt", "stritt", "litt", "glitt", "schritt", "trat", "bat", "bot", "briet", "riet", "hielt", "galt", "schalt",
+        "tat", "focht", "flocht", "sott", "barst", "schien", "begann", "gewann", "spann", "rann", "sann",
+    ]
 
     private static let modals: Set<String> = [
         "kann", "konnte", "muss", "musste", "darf", "durfte", "soll", "sollte", "will", "wollte", "werde",

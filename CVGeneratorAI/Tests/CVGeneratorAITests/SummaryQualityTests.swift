@@ -124,6 +124,32 @@ struct SummaryQualityTests {
         )
     }
 
+    // MARK: A quality the description gives someone else does not hold (review round 1)
+
+    private static let baker = CVData(
+        personalInfo: PersonalInfo(name: "Daniel Hart", title: "baker"),
+        experience: [Experience(title: "baker", company: "Acme", startDate: "2019", current: true)]
+    )
+
+    private static let bakerDescription = "I work as a baker at Acme, where I bake bread. I am patient. My colleague works with precision."
+
+    @Test("A quality only a colleague has is cut out of the person's sentence, in the check and in the final pass")
+    func qualityOfAColleagueCut() throws {
+        let english = Self.sanitizer("en")
+        let sentence = "I bake bread every morning with precision."
+
+        let verdict = try english.summaryCheck(
+            of: Self.baker, summary: sentence, field: nil, work: [], duties: [], qualities: ["patience"], against: Self.bakerDescription
+        )
+        let writing = DraftWriting(
+            summary: "I work as a baker. " + sentence, roleDescriptions: [nil], technologies: [], softSkills: ["Patience"]
+        )
+        let draft = try english.sanitize(Self.baker, writing: writing, against: Self.bakerDescription)
+
+        #expect(verdict.kept == ["I bake bread every morning."], "\(verdict.kept) \(verdict.rejected)")
+        #expect(draft.summary == "I work as a baker. I bake bread every morning.", "\(draft.summary ?? "nil")")
+    }
+
     // MARK: A quality the soft skills hold, or the description states, stays
 
     @Test("A manner phrase of qualities that are all soft skills stays, in every language",

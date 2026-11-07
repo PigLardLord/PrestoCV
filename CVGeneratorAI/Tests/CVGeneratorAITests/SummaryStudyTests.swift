@@ -106,6 +106,37 @@ struct SummaryStudyTests {
         #expect(summary == Self.inputs[id]?.opening, "\(summary ?? "nil")")
     }
 
+    // MARK: Two schools and two languages: a sentence the description says of one school stays (review round 1)
+
+    private static let twoSchools = CVData(
+        personalInfo: PersonalInfo(name: "Daniel Hart", title: "nurse"),
+        experience: [],
+        education: [
+            Education(degree: "French", institution: "Lyon College"),
+            Education(degree: "nursing", institution: "Harlow City College"),
+        ],
+        languages: [Language(name: "French"), Language(name: "German")]
+    )
+
+    private static let twoSchoolsDescription = "I studied French at Lyon College. I studied nursing at Harlow City College. I speak German."
+
+    @Test("A sentence that ties one school to the language of another sentence goes, though another school's sentence names a language",
+          arguments: [
+            ("I studied nursing in German at Harlow City College.", false),
+            ("I studied French at Lyon College.", true),
+          ])
+    func twoSchoolsTwoLanguages(sentence: String, kept: Bool) throws {
+        let verdict = try Self.sanitizer("en").summaryCheck(
+            of: Self.twoSchools, summary: sentence, field: nil, work: [], duties: [], qualities: [], against: Self.twoSchoolsDescription
+        )
+        let writing = DraftWriting(summary: "I studied nursing. " + sentence, roleDescriptions: [], technologies: [], softSkills: [])
+        let draft = try Self.sanitizer("en").sanitize(Self.twoSchools, writing: writing, against: Self.twoSchoolsDescription)
+
+        #expect(verdict.kept == (kept ? [sentence] : []), "\(verdict.kept) \(verdict.rejected)")
+        #expect(verdict.rejected.map(\.reason) == (kept ? [] : [CVDataSanitizer.tiesAStudyToALanguage]), "\(verdict.rejected)")
+        #expect(draft.summary == "I studied nursing." + (kept ? " " + sentence : ""), "\(draft.summary ?? "nil")")
+    }
+
     // MARK: The studies and the languages, each on its own, stay
 
     private static let separate: [(String, String)] = [

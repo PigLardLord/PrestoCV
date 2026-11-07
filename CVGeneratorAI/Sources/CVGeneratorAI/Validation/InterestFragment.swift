@@ -35,6 +35,59 @@ enum InterestFragment {
         }
     }
 
+    /// The pastime of a German interest that a conjugated verb opens and that goes on with when, where or how (#359, de-norole): the
+    /// verb as its noun ("koche am Wochenende für meine Freunde" gives "Kochen", "sammle im Herbst" gives "Sammeln"), or the infinitive
+    /// that "gehe" takes ("gehe gern mit meinem Hund spazieren" gives "Spazieren"). The pastime is the verb the person said, so it
+    /// states nothing they did not. Nil, and the interest goes, when:
+    /// - the verb is no pastime of its own: an auxiliary, a form of "sein", a modal, or one of `notPastimes` ("mache", "habe");
+    /// - it is no present of "ich" (no final "e");
+    /// - the rest joins a second clause ("und", "oder");
+    /// - a noun of the rest has no article, possessive or preposition before it: it is the verb's object, and the pastime would lose
+    ///   it ("fahre am Wochenende gern Rad" is no "Fahren").
+    static func germanActivity(of interest: String) -> String? {
+        let text = Array(Digits.ascii(interest))
+        let words = Word.words(in: interest)
+        guard words.count > 1 else { return nil }
+        let written = words.map { String(text[$0.range]) }
+        let lowered = written.map { $0.lowercased() }
+        let german = voice(in: .german)
+        let opensANoun = german.articles.union(german.possessives).union(german.prepositions)
+        guard !lowered.dropFirst().contains(where: conjunctions.contains),
+              written.indices.dropFirst().allSatisfy({ written[$0].first?.isUppercase != true || opensANoun.contains(lowered[$0 - 1]) })
+        else { return nil }
+
+        let verb = lowered[0]
+        if infinitiveTakers.contains(verb) {
+            guard let last = written.last, written.count > 2, last.first?.isLowercase == true, last.count >= 5,
+                  ["en", "ern", "eln"].contains(where: last.hasSuffix) else { return nil }
+            return capitalized(last)
+        }
+        guard verb.count >= 4, verb.hasSuffix("e"), !notPastimes.contains(verb), !Vocabulary.isAuxiliary(verb, in: .german),
+              !Vocabulary.isBeForm(verb, in: .german) else { return nil }
+        let stem = String(verb.dropLast())
+        if verb.hasSuffix("iere") { return capitalized(verb + "n") }
+        if verb.hasSuffix("ere") { return capitalized(stem + "n") }
+        if verb.hasSuffix("le"), let before = stem.dropLast().last, !"aeiouäöü".contains(before) {
+            return capitalized(String(stem.dropLast()) + "eln")
+        }
+        return capitalized(verb + "n")
+    }
+
+    /// The verbs of "ich" that take the infinitive of the pastime last: "gehe … spazieren", "fahre … einkaufen".
+    private static let infinitiveTakers: Set<String> = ["gehe", "fahre", "lerne"]
+
+    /// The verbs of "ich" whose noun says nothing of a pastime: "Machen", "Haben", "Mögen".
+    private static let notPastimes: Set<String> = [
+        "mache", "habe", "mag", "liebe", "tue", "finde", "bleibe", "werde", "möchte", "verbringe", "nutze", "treffe", "helfe",
+        "kann", "muss", "will", "darf", "soll",
+    ]
+
+    private static let conjunctions: Set<String> = ["und", "oder", "sowie"]
+
+    private static func capitalized(_ word: String) -> String {
+        word.prefix(1).uppercased() + word.dropFirst()
+    }
+
     private static func voice(in language: Vocabulary.Language?) -> Voice.Words {
         language.flatMap { Voice.words[$0] } ?? Voice.everyWord
     }

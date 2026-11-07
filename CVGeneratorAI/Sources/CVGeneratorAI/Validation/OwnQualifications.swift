@@ -34,9 +34,15 @@ enum OwnQualifications {
         let languageWords = CVDataSanitizer.words(of: languages.map(\.name))
         let studyWords = studyWords(of: education).subtracting(languageWords).subtracting(apart)
         guard !languageWords.isEmpty, !studyWords.isEmpty else { return false }
-        let holdsBoth = { (words: [String]) in !studyWords.isDisjoint(with: words) && !languageWords.isDisjoint(with: words) }
-
-        return holdsBoth(Word.words(in: sentence).map(\.folded))
-            && !source.sentences.contains { holdsBoth(Word.words(in: $0.raw).map(\.folded)) }
+        let words = Set(Word.words(in: sentence).map(\.folded))
+        let study = studyWords.intersection(words)
+        let spoken = languageWords.intersection(words)
+        guard !study.isEmpty, !spoken.isEmpty else { return false }
+        // Only a sentence of the description that ties these very study words to these very languages backs it: a sentence of
+        // another school and another language does not (review round 1).
+        return !source.sentences.contains { sourceSentence in
+            let sourceWords = Set(Word.words(in: sourceSentence.raw).map(\.folded))
+            return study.isSubset(of: sourceWords) && spoken.isSubset(of: sourceWords)
+        }
     }
 }

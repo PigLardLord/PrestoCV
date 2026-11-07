@@ -113,7 +113,8 @@ struct InterestQualityTests {
         "de": """
             Seit 2019 arbeite ich als Feinmechaniker bei der Werkstatt Ohlsen in Suhl. In meiner Freizeit gehe ich klettern und spiele \
             Schach. Ich spiele das Klavier und koche am Wochenende für meine Freunde. Ich gehe gern mit meinem Hund spazieren und \
-            wandere in den Bergen. Ich mag Fußball, Lesen und Wandern in den Bergen.
+            wandere in den Bergen. Ich mag Fußball, Lesen und Wandern in den Bergen. Ich fahre am Wochenende gern Rad und sammle \
+            im Herbst.
             """,
         "en": """
             I have been a waiter at the Lantern Bistro in Exeter since 2019. In my free time I walked in the park every Sunday, \
@@ -125,11 +126,13 @@ struct InterestQualityTests {
         "pt": "Sou padeiro em Braga desde 2018. No meu tempo livre gosto de pesca e de caminhadas com o meu cão.",
     ]
 
-    @Test("An interest cut to a clause fragment goes, and a noun hobby stays: a conjugated verb is cut away only when a noun phrase is left (#359)",
+    @Test("An interest cut to a clause fragment goes, and a noun hobby stays: a conjugated verb is cut away only when a noun phrase is left, and a German verb that only tells when, where or how gives its noun (#359)",
           arguments: [
-              ("de", "koche am Wochenende für meine Freunde", []),
-              ("de", "gehe gern mit meinem Hund spazieren", []),
-              ("de", "wandere in den Bergen", []),
+              ("de", "koche am Wochenende für meine Freunde", ["Kochen"]),
+              ("de", "gehe gern mit meinem Hund spazieren", ["Spazieren"]),
+              ("de", "wandere in den Bergen", ["Wandern"]),
+              ("de", "sammle im Herbst", ["Sammeln"]),
+              ("de", "fahre am Wochenende gern Rad", []),
               ("de", "Wandern in den", []),
               ("de", "spiele Schach", ["Schach"]),
               ("de", "spiele das Klavier", ["Klavier"]),
@@ -153,7 +156,7 @@ struct InterestQualityTests {
         let sanitizer = CVDataSanitizer(
             languageOfText: { _ in language },
             lexicalClasses: ForcedLexicalTagger([
-                .german: .words(["arbeite", "spiele", "koche", "gehe", "wandere", "mag"]),
+                .german: .words(["arbeite", "spiele", "koche", "gehe", "wandere", "mag", "fahre", "sammle"]),
                 .english: .words(["have", "been", "walked", "like"]),
             ]),
             wordList: TableWordList()

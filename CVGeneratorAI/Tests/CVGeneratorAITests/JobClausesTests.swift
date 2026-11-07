@@ -583,6 +583,7 @@ struct JobClausesTests {
     private static let gardenerVerbs = ForcedLexicalTagger([.german: .words([
         "war", "bin", "umgetopft", "gepflegt", "habe", "einteile", "plane", "leite", "fallen", "mochte", "fallte", "gegossen",
         "kontrolliere", "gefallt", "teile", "analysiere", "antworte", "sicherstelle", "stelle",
+        "analysierte", "herunterlade", "lade", "recycelt", "sortiert", "getan", "vorbereitet", "leitete", "schnitt",
     ])])
 
     /// The gardener's ended job, whose sentence goes on after "wo ich".
@@ -664,6 +665,31 @@ struct JobClausesTests {
               GermanOrderRow(
                   sentence: parks + "die Bodenproben analysiere und die Beete plane.",
                   pinned: "Ich analysiere die Bodenproben und plane die Beete."
+              ),
+              // A past of "-ieren" is no separable verb, and "herunter" is one particle, not "her" (review round 1).
+              GermanOrderRow(sentence: nursery + "die Bodenproben analysierte.", pinned: "Ich analysierte die Bodenproben."),
+              GermanOrderRow(sentence: parks + "Dateien herunterlade.", pinned: "Ich lade Dateien herunter."),
+              // A participle with no "ge", or of a strong verb, shares the auxiliary too (review round 1).
+              GermanOrderRow(
+                  sentence: nursery + "Material recycelt und Abfälle sortiert habe.",
+                  pinned: "Ich habe Material recycelt und Abfälle sortiert."
+              ),
+              GermanOrderRow(
+                  sentence: nursery + "alles Nötige getan und die Beete gepflegt habe.",
+                  pinned: "Ich habe alles Nötige getan und die Beete gepflegt."
+              ),
+              GermanOrderRow(
+                  sentence: nursery + "die Arbeit vorbereitet und die Beete gepflegt habe.",
+                  pinned: "Ich habe die Arbeit vorbereitet und die Beete gepflegt."
+              ),
+              // A past of the person's own, weak or strong, keeps its verb, and the auxiliary stays with its clause.
+              GermanOrderRow(
+                  sentence: nursery + "die Kolonne leitete und die Beete gepflegt habe.",
+                  pinned: "Ich leitete die Kolonne und habe die Beete gepflegt."
+              ),
+              GermanOrderRow(
+                  sentence: nursery + "die Hecken schnitt und die Beete gepflegt habe.",
+                  pinned: "Ich schnitt die Hecken und habe die Beete gepflegt."
               ),
           ])
     func germanOrder(row: GermanOrderRow) throws {

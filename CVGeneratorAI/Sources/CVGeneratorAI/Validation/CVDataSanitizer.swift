@@ -156,10 +156,11 @@ public struct CVDataSanitizer: Sendable {
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let workWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + experience.map(\.company))
         let language = source.explainer.language
-        // The qualities the summary names as a manner are the kept soft skills' or the description's (#359, N1), as in the summary check.
+        // The qualities the summary names as a manner are the kept soft skills' or those the description states of the person (#359,
+        // N1), as in the summary check.
         let softSkills = skills.filter { $0.kind == .softSkill }.map(\.name)
         let heldQualities: Set<String>? = softSkills.isEmpty
-            ? nil : UnheldQualities.heldWords(softSkills: softSkills, stated: source.foldedWords)
+            ? nil : UnheldQualities.heldWords(softSkills: softSkills, stated: claimed.foldedWords)
         let summary = { (text: String?, words: Set<String>) in
             source.written(UnheldQualities.applied(to: text, language: language, held: heldQualities), quoting: entries.summaryQuotes, allowsNumbers: false) {
                 written.isPlain($0, ownWords: words, ownQualifications: ownQualifications)
@@ -383,9 +384,10 @@ public struct CVDataSanitizer: Sendable {
     /// German, no noun.
     ///
     /// No pastime is left (nil) where a piece of a clause is (#359): what the verb leaves must start, past its articles, with a noun
-    /// ("spiele das Klavier" gives "Klavier"), not with a preposition or an adverb that tells when, where or how ("koche am Wochenende
-    /// für meine Freunde", "gehe gern mit meinem Hund spazieren"), and no interest, clipped or whole, ends on an article or a
-    /// preposition ("Wandern in den"): its noun is missing. See `InterestFragment`.
+    /// ("spiele das Klavier" gives "Klavier"), not with a preposition or an adverb that tells when, where or how ("walked in the
+    /// park"), and no interest, clipped or whole, ends on an article or a preposition ("Wandern in den"): its noun is missing. In
+    /// German such an interest gives the verb's noun ("koche am Wochenende für meine Freunde" gives "Kochen"), or nothing when the
+    /// noun would lose an object. See `InterestFragment`.
     private func pastime(of interest: String, in source: DescriptionText) -> String? {
         guard let pastime = clipped(interest, in: source) else { return nil }
         return InterestFragment.endsOnALinkWord(pastime, in: source.explainer.language) ? nil : pastime
@@ -410,7 +412,9 @@ public struct CVDataSanitizer: Sendable {
             guard saidAlone || verbs.contains(where: { $0.contains(said[start].range.lowerBound) }) else { return interest }
             let rest = InterestFragment.withoutArticles(words.dropFirst(), in: language)
             guard let next = rest.first, rest.contains(where: { $0.folded.count >= 3 }) else { return interest }
-            guard !InterestFragment.tellsHowOrWhere(next, in: interest, language: language) else { return nil }
+            guard !InterestFragment.tellsHowOrWhere(next, in: interest, language: language) else {
+                return language == .german ? InterestFragment.germanActivity(of: interest) : nil
+            }
             let kept = String(Array(interest)[next.range.lowerBound...])
             guard language != .german || kept.split(separator: " ").contains(where: { $0.first?.isUppercase == true }) else {
                 return interest
