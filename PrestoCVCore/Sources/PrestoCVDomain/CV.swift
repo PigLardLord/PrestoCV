@@ -22,7 +22,7 @@ public struct CV: Hashable, Sendable {
     package init(id: CVID, revision: Int, createdAt: Date?, updatedAt: Date?, title: String, personal: PersonalDetails,
                  sections: CVSections, design: DesignChoice?, language: DocumentLanguage?) {
         self.id = id; self.revision = revision; self.createdAt = createdAt; self.updatedAt = updatedAt
-        self.title = title; self.personal = personal; self.sections = sections; self.design = design; self.language = language
+        self.title = TextRules.singleLine(title); self.personal = personal; self.sections = sections; self.design = design; self.language = language
     }
 
     /// The same content as stored by a repository at `revision`, at time `now`.
@@ -31,8 +31,8 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// "Has enough content to be saved", as `SaveRule` defines it.
-    public var canBeSaved: Bool {
+    /// "Has enough content to be saved", as `SaveRule` defines it. The size limits are not part of it: `saveCheck()` has both.
+    var hasEnoughContent: Bool {
         let p = personal, s = sections
         return SaveRule.allowsSaving(
             personalDetails: [p.fullName, p.professionalTitle, p.email?.value ?? "", p.phone?.value ?? "", p.location,
@@ -42,7 +42,10 @@ public struct CV: Hashable, Sendable {
         )
     }
 
-    public mutating func rename(_ newTitle: String) { title = newTitle }
+    /// Whether the CV can be saved: enough content, and within `CVLimits`. `saveCheck()` says why not.
+    public var canBeSaved: Bool { saveCheck() == .ok }
+
+    public mutating func rename(_ newTitle: String) { title = TextRules.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
     /// Every edit of the entries goes through here; the order is the one the user chose.
     public mutating func setSections(_ newSections: CVSections) { sections = newSections }
