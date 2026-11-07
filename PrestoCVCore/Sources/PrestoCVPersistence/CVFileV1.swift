@@ -148,7 +148,8 @@ struct CVFileV1: Codable, Equatable {
             sections.profiles.append(ProfileLink(platform: p.platform, link: link))
         }
         sections.setInterests(interests)
-        guard sections.interests == interests else { throw Invalid(reason: "interests") }   // trimmed, non-empty, unique
+        // Hidden characters in an interest are cleaned like any text; what must hold is that it was otherwise already canonical.
+        guard sections.interests == interests.map({ TextRules.singleLine($0) }) else { throw Invalid(reason: "interests") }   // trimmed, non-empty, unique
         var choice: DesignChoice?
         if let d = design {
             guard let valid = DesignChoice(design: d.design, palette: d.palette, fonts: d.fonts) else { throw Invalid(reason: "design") }

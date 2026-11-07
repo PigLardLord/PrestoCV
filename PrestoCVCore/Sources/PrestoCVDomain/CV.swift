@@ -22,7 +22,7 @@ public struct CV: Hashable, Sendable {
     package init(id: CVID, revision: Int, createdAt: Date?, updatedAt: Date?, title: String, personal: PersonalDetails,
                  sections: CVSections, design: DesignChoice?, language: DocumentLanguage?) {
         self.id = id; self.revision = revision; self.createdAt = createdAt; self.updatedAt = updatedAt
-        self.title = title; self.personal = personal; self.sections = sections; self.design = design; self.language = language
+        self.title = TextRules.singleLine(title); self.personal = personal; self.sections = sections; self.design = design; self.language = language
     }
 
     /// The same content as stored by a repository at `revision`, at time `now`.
@@ -42,7 +42,7 @@ public struct CV: Hashable, Sendable {
         )
     }
 
-    public mutating func rename(_ newTitle: String) { title = newTitle }
+    public mutating func rename(_ newTitle: String) { title = TextRules.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
     /// Every edit of the entries goes through here; the order is the one the user chose.
     public mutating func setSections(_ newSections: CVSections) { sections = newSections }
