@@ -27,8 +27,10 @@ extension FileCVRepository {
     }
 
     /// Removes everything in the store but its lock file, in one hold of the lock. One file that cannot be removed does not
-    /// keep the others: it is named in the report, and the next call finishes. A store that was never created has nothing.
-    public func eraseAll() async throws(RepositoryError) -> EraseAllReport {
+    /// keep the others: it is named in the report, and the next call finishes. With `keepingLedger` the import ledger stays
+    /// and is named in the report (if it exists), so the erase is partial until a call without it. A store that was never
+    /// created has nothing.
+    public func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport {
         switch storeState() {
         case .absent: return EraseAllReport(erased: 0)
         case .unavailable(let failure): throw .storeUnavailable(failure)
@@ -39,7 +41,9 @@ extension FileCVRepository {
             let names: [String]
             do { names = try FileManager.default.contentsOfDirectory(atPath: directory.path) } catch { throw .storeUnavailable(.cannotList) }
             for name in names.sorted() where name != ".lock" {
-                if name == "Quarantine", Self.isRealDirectory(quarantine) == true { eraseQuarantine(into: &report) }
+                if keepingLedger, name == Self.legacyLedgerName {
+                    report.remaining.append(RemainingItem(kind: .ledger, name: name))
+                } else if name == "Quarantine", Self.isRealDirectory(quarantine) == true { eraseQuarantine(into: &report) }
                 else { remove(directory.appendingPathComponent(name), kind: Self.kind(ofStoreEntry: name), into: &report) }
             }
             return report

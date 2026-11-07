@@ -98,20 +98,23 @@ public enum EraseEverythingOutcome: Sendable, Equatable {
 }
 
 /// Erases everything the app stores about the person today: every CV file whatever its schema or state, the quarantine, the
-/// staged copies and the import ledger (under one hold of the store lock), and the legacy source files that the importer has
-/// not removed. A file that cannot be removed does not stop the others; the outcome names what remains.
+/// staged copies (under one hold of the store lock), and the legacy source files that the importer has not removed. The
+/// import ledger goes only once every legacy source is gone; until then it stays, and the outcome names it among what
+/// remains. A file that cannot be removed does not stop the others; the outcome names what remains.
 /// Applications and letter defaults have no store in the new stack. When one is built, it adds its own erase-all and joins here.
 public struct EraseEverything: Sendable {
     let maintenance: any CVStoreMaintenance, legacy: any LegacyStore
     public init(maintenance: any CVStoreMaintenance, legacy: any LegacyStore) { self.maintenance = maintenance; self.legacy = legacy }
 
     public func callAsFunction() async throws(MaintenanceError) -> EraseEverythingOutcome {
-        // The sources go first: with the ledger gone, a source left behind would be imported again.
+        // The sources go first, and the ledger outlives any source that stays (or that could not be listed): with the ledger
+        // gone, that source would be imported again.
         var erased = 0, remaining: [RemainingItem] = []
         var unlisted: RepositoryError?
         do throws(RepositoryError) { try await eraseSources(erased: &erased, remaining: &remaining) } catch { unlisted = error }
+        let keepingLedger = unlisted != nil || !remaining.isEmpty
         do {
-            let report = try await maintenance.eraseAll()
+            let report = try await maintenance.eraseAll(keepingLedger: keepingLedger)
             erased += report.erased; remaining += report.remaining
         } catch { throw MaintenanceError(error) }
         if let unlisted { throw MaintenanceError(unlisted) }

@@ -5,13 +5,15 @@ import PrestoCVApplication
 
 /// The in-memory CV store, with the maintenance port (`InMemoryCVRepository+Maintenance.swift`): the double the contract suite
 /// runs on beside the file store.
-public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance {
+public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance, LegacyImportTarget {
     var store: [CVID: CV] = [:]
     /// The quarantine: a file that is a CV (`cv`) or does not decode (nil), and when it entered.
     struct Held: Sendable { var id: CVID; var cv: CV?; var enteredAt: Date }
     var held: [String: Held] = [:]
     /// Stored files that do not decode: the next listing sets them aside.
     var corruptLive: Set<CVID> = []
+    /// The ids the importer adopted: the ledger, which outlives a deletion so that a source is not imported again.
+    var adopted: Set<CVID> = []
     let clock: any TimeSource
     public init(clock: any TimeSource = SteppingClock()) { self.clock = clock }
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
@@ -31,6 +33,18 @@ public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance {
         guard let existing = store[id] else { throw .notFound(id) }
         guard existing.revision == revision else { throw .conflict(id, storedRevision: existing.revision) }
         store[id] = nil
+    }
+}
+
+extension InMemoryCVRepository {
+    /// Stores a legacy CV once: a CV the ledger knows is `.existing`, also after it was deleted.
+    public func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption {
+        if adopted.contains(cv.id) { return .existing }
+        adopted.insert(cv.id)
+        if store[cv.id] != nil { return .existing }
+        let copy = cv.adoptedAsRevisionOne
+        store[cv.id] = copy
+        return .stored(copy)
     }
 }
 

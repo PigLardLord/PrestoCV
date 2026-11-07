@@ -9,7 +9,8 @@ private func harness(_ store: InMemoryCVRepository) -> MaintenanceHarness {
     MaintenanceHarness(
         open: { store },
         plantCorrupt: { id in await store.plantCorrupt(id) },
-        plantQuarantined: { id, cv, enteredAt in await store.plantQuarantined(id, cv: cv, enteredAt: enteredAt) })
+        plantQuarantined: { id, cv, enteredAt in await store.plantQuarantined(id, cv: cv, enteredAt: enteredAt) },
+        adopt: { cv in try await store.adopt(cv) })
 }
 
 @Suite("The in-memory store's maintenance, under the contract")
@@ -39,4 +40,7 @@ struct InMemoryMaintenanceContractTests {
 
     @Test("eraseAll removes valid, corrupt and quarantined files, and a second call nothing")
     func erasesAll() async throws { try await CVStoreMaintenanceContract.eraseAllRemovesEveryKind(harness(InMemoryCVRepository())) }
+
+    @Test("eraseAll keeping the ledger leaves it and names it; a second adoption stores nothing")
+    func keepsTheLedger() async throws { try await CVStoreMaintenanceContract.eraseAllKeepsTheLedgerOnRequest(harness(InMemoryCVRepository())) }
 }

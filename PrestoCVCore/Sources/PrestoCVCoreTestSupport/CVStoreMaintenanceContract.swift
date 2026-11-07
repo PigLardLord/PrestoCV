@@ -36,10 +36,13 @@ public struct MaintenanceHarness: Sendable {
     public let plantCorrupt: @Sendable (CVID) async throws -> Void
     /// A file in the quarantine entered at `enteredAt`: the CV (restorable) or, with nil, bytes that do not decode. Returns its name.
     public let plantQuarantined: @Sendable (CVID, CV?, Date) async throws -> String
+    /// The importer's adoption of a legacy CV into the store, which records the CV in the import ledger.
+    public let adopt: @Sendable (CV) async throws -> Adoption
     public init(open: @escaping @Sendable () -> any Store,
                 plantCorrupt: @escaping @Sendable (CVID) async throws -> Void,
-                plantQuarantined: @escaping @Sendable (CVID, CV?, Date) async throws -> String) {
-        self.open = open; self.plantCorrupt = plantCorrupt; self.plantQuarantined = plantQuarantined
+                plantQuarantined: @escaping @Sendable (CVID, CV?, Date) async throws -> String,
+                adopt: @escaping @Sendable (CV) async throws -> Adoption) {
+        self.open = open; self.plantCorrupt = plantCorrupt; self.plantQuarantined = plantQuarantined; self.adopt = adopt
     }
 }
 
@@ -168,7 +171,7 @@ public enum CVStoreMaintenanceContract {
         let outcomes = await withTaskGroup(of: (erased: Int, created: CVID?).self) { group in
             group.addTask {
                 await gate.wait()
-                return (erased: (try? await a.eraseAll())?.erased ?? 0, created: nil)
+                return (erased: (try? await a.eraseAll(keepingLedger: false))?.erased ?? 0, created: nil)
             }
             for n in 0..<10 {
                 group.addTask {
@@ -194,8 +197,8 @@ public enum CVStoreMaintenanceContract {
         try check(erasedCount + live.count == 1 + made.count, "every file is erased once or still there: erased \(erasedCount), left \(live.count), made \(made.count)")
         var late = stored; late.rename("Late")
         try await expect(.notFound(seeded), "an update after the erase") { _ = try await b.update(late) }
-        try check(try await b.eraseAll().erased == live.count, "a second erase removes what the race left")
-        try check(try await b.eraseAll() == EraseAllReport(erased: 0), "and a third nothing")
+        try check(try await b.eraseAll(keepingLedger: false).erased == live.count, "a second erase removes what the race left")
+        try check(try await b.eraseAll(keepingLedger: false) == EraseAllReport(erased: 0), "and a third nothing")
     }
 
     // MARK: Erase all
@@ -203,16 +206,33 @@ public enum CVStoreMaintenanceContract {
     /// Valid, corrupt and quarantined files all go; a second call finds nothing.
     public static func eraseAllRemovesEveryKind(_ h: MaintenanceHarness) async throws {
         let store = h.open()
-        try check(try await store.eraseAll() == EraseAllReport(erased: 0), "an empty store has nothing to erase")
+        try check(try await store.eraseAll(keepingLedger: false) == EraseAllReport(erased: 0), "an empty store has nothing to erase")
         _ = try await store.create(CV(id: id(400), personal: PersonalDetails(fullName: "Valid")))
         try await h.plantCorrupt(id(401))
         _ = try await h.plantQuarantined(id(402), cv(id(402)), epoch)
         _ = try await h.plantQuarantined(id(403), nil, epoch)
-        let report = try await store.eraseAll()
+        let report = try await store.eraseAll(keepingLedger: false)
         try check(report == EraseAllReport(erased: 4), "erase all: \(report)")
         let listing = try await store.list(), held = try await store.quarantined()
         try check(listing.cvs.isEmpty && listing.issues.isEmpty && held.isEmpty, "nothing is left")
-        try check(try await store.eraseAll() == EraseAllReport(erased: 0), "a second erase removes nothing")
+        try check(try await store.eraseAll(keepingLedger: false) == EraseAllReport(erased: 0), "a second erase removes nothing")
+    }
+
+    /// The import ledger outlives an erase that keeps it: the CV is gone, and a second adoption of it stores nothing. An
+    /// erase that does not keep it removes the ledger, and the CV can be adopted again.
+    public static func eraseAllKeepsTheLedgerOnRequest(_ h: MaintenanceHarness) async throws {
+        let store = h.open(), legacy = cv(id(410))
+        guard case .stored = try await h.adopt(legacy) else { throw Failure(description: "the first adoption stores the CV") }
+        let kept = try await store.eraseAll(keepingLedger: true)
+        try check(kept.remaining.map(\.kind) == [.ledger], "the kept ledger is named: \(kept)")
+        try check(try await store.list().cvs.isEmpty, "the CV is erased")
+        try check(try await h.adopt(legacy) == .existing, "a second adoption of the erased CV is existing")
+        try check(try await store.list().cvs.isEmpty, "and stores nothing")
+        let again = try await store.eraseAll(keepingLedger: true)
+        try check(again.erased == 0 && again.remaining.map(\.kind) == [.ledger], "a repeat keeps it and removes nothing: \(again)")
+        let gone = try await store.eraseAll(keepingLedger: false)
+        try check(gone.remaining.isEmpty && gone.erased == 1, "without keeping it, the ledger goes: \(gone)")
+        guard case .stored = try await h.adopt(legacy) else { throw Failure(description: "with the ledger gone the CV is adopted again") }
     }
 }
 

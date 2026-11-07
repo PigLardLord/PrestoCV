@@ -29,7 +29,8 @@ private func harness(_ dir: URL) -> MaintenanceHarness {
             try data.write(to: q.appendingPathComponent(name))
             try FileManager.default.setAttributes([.modificationDate: enteredAt], ofItemAtPath: q.appendingPathComponent(name).path)
             return name
-        })
+        },
+        adopt: { cv in try await repo(dir).adopt(cv) })
 }
 
 @Suite("The file store's maintenance, under the contract")
@@ -62,6 +63,12 @@ struct FileCVRepositoryMaintenanceContractTests {
     func purges() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         try await CVStoreMaintenanceContract.purgeCountsFromTheClock(harness(dir))
+    }
+
+    @Test("eraseAll keeping the ledger leaves it and names it; a second adoption stores nothing")
+    func keepsTheLedger() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try await CVStoreMaintenanceContract.eraseAllKeepsTheLedgerOnRequest(harness(dir))
     }
 
     @Test("restore, purge, list and erase race on two instances without a lost or duplicated CV")
@@ -102,17 +109,17 @@ struct FileCVRepositoryEraseAllTests {
         try Data("{".utf8).write(to: dir.appendingPathComponent(FileCVRepository.stagedName(for: id2)))
         try Data(#"["\#(id1.raw.uuidString)"]"#.utf8).write(to: dir.appendingPathComponent(FileCVRepository.legacyLedgerName))
 
-        let report = try await r.eraseAll()
+        let report = try await r.eraseAll(keepingLedger: false)
         #expect(report == EraseAllReport(erased: 8))
         #expect(try entries(dir) == [".lock"])
-        #expect(try await r.eraseAll() == EraseAllReport(erased: 0))
+        #expect(try await r.eraseAll(keepingLedger: false) == EraseAllReport(erased: 0))
         #expect(try entries(dir) == [".lock"])
     }
 
     @Test("eraseAll on a store that was never created removes nothing and creates nothing")
     func neverCreated() async throws {
         let dir = tempDir()
-        #expect(try await repo(dir).eraseAll() == EraseAllReport(erased: 0))
+        #expect(try await repo(dir).eraseAll(keepingLedger: false) == EraseAllReport(erased: 0))
         #expect(!FileManager.default.fileExists(atPath: dir.path))
     }
 
@@ -128,13 +135,13 @@ struct FileCVRepositoryEraseAllTests {
         try Data("{".utf8).write(to: q.appendingPathComponent("1~" + fileName(id2)))
         chmod(q.path, 0o555)
 
-        let report = try await r.eraseAll()
+        let report = try await r.eraseAll(keepingLedger: false)
         #expect(report.erased == 1)
         #expect(Set(report.remaining) == [RemainingItem(kind: .quarantined, name: fileName(id2)), RemainingItem(kind: .quarantined, name: "1~" + fileName(id2))])
         #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent(fileName(id1)).path))
 
         chmod(q.path, 0o755)
-        #expect(try await r.eraseAll() == EraseAllReport(erased: 2))
+        #expect(try await r.eraseAll(keepingLedger: false) == EraseAllReport(erased: 2))
         #expect(try entries(dir) == [".lock"])
     }
 
@@ -142,7 +149,7 @@ struct FileCVRepositoryEraseAllTests {
     func notADirectory() async throws {
         let file = tempDir(); defer { try? FileManager.default.removeItem(at: file) }
         try Data("x".utf8).write(to: file)
-        await #expect(throws: RepositoryError.storeUnavailable(.notADirectory)) { _ = try await repo(file).eraseAll() }
+        await #expect(throws: RepositoryError.storeUnavailable(.notADirectory)) { _ = try await repo(file).eraseAll(keepingLedger: false) }
         #expect(try Data(contentsOf: file) == Data("x".utf8))
     }
 
@@ -154,7 +161,7 @@ struct FileCVRepositoryEraseAllTests {
         try Data("keep".utf8).write(to: elsewhere.appendingPathComponent(fileName(id1)))
         _ = try await repo(dir).create(named("Valid", id: id2))
         try FileManager.default.createSymbolicLink(at: dir.appendingPathComponent("Quarantine"), withDestinationURL: elsewhere)
-        #expect(try await repo(dir).eraseAll() == EraseAllReport(erased: 2))
+        #expect(try await repo(dir).eraseAll(keepingLedger: false) == EraseAllReport(erased: 2))
         #expect(try entries(dir) == [".lock"])
         #expect(try entries(elsewhere) == [fileName(id1)])
     }

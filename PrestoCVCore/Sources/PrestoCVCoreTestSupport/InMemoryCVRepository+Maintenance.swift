@@ -61,9 +61,16 @@ extension InMemoryCVRepository {
         return old.count
     }
 
-    public func eraseAll() async throws(RepositoryError) -> EraseAllReport {
-        let count = store.count + corruptLive.count + held.count
+    public func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport {
+        let ledgerFiles = keepingLedger || adopted.isEmpty ? 0 : 1
+        let count = store.count + corruptLive.count + held.count + ledgerFiles
         store = [:]; corruptLive = []; held = [:]
-        return EraseAllReport(erased: count)
+        guard keepingLedger else { adopted = []; return EraseAllReport(erased: count) }
+        let kept = adopted.isEmpty ? [] : [RemainingItem(kind: .ledger, name: Self.ledgerName)]
+        return EraseAllReport(erased: count, remaining: kept)
     }
+
+    // MARK: Import ledger
+
+    static let ledgerName = ".legacy-imported.json"
 }

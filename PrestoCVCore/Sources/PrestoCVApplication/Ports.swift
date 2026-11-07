@@ -26,9 +26,12 @@ public protocol CVStoreMaintenance: Sendable {
     /// Deletes quarantined files older than `date`. Returns how many were removed.
     func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int
     /// Removes everything the store holds, in one hold of the store lock: every CV file whatever its schema or state, the
-    /// quarantine, the staged copies and the import ledger. A file that cannot be removed does not stop the others; it is
-    /// reported in `remaining`, and a second call finishes the job. Only a store that cannot be reached throws.
-    func eraseAll() async throws(RepositoryError) -> EraseAllReport
+    /// quarantine, the staged copies and, unless `keepingLedger`, the import ledger. The ledger holds only the ids of the
+    /// CVs the importer adopted, never content; while a legacy source is left, it must stay, or that source would be
+    /// imported again. A ledger that is kept is named in `remaining`, so the outcome is partial and a second call, with
+    /// `keepingLedger` false, finishes the job. A file that cannot be removed does not stop the others; it is reported in
+    /// `remaining`, and a second call finishes the job. Only a store that cannot be reached throws.
+    func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport
 }
 
 /// A file in the quarantine, as the review screen shows it.

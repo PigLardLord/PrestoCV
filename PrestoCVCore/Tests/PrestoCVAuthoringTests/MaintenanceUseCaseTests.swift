@@ -16,7 +16,7 @@ private struct Failing: CVRepository, CVStoreMaintenance {
     func restore(quarantined name: String) async throws(RepositoryError) -> CV { throw error }
     func erase(_ id: CVID) async throws(RepositoryError) { throw error }
     func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int { throw error }
-    func eraseAll() async throws(RepositoryError) -> EraseAllReport { throw error }
+    func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport { throw error }
 }
 
 private let someID = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
