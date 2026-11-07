@@ -12,7 +12,7 @@ extension FileCVRepository {
         case .unavailable(let failure): throw .storeUnavailable(failure)
         case .present: break
         }
-        return try withStoreLock { () throws(RepositoryError) -> [QuarantinedFile] in
+        return try await withStoreLock { () throws(RepositoryError) -> [QuarantinedFile] in
             var files: [QuarantinedFile] = []
             for name in try quarantineNames() {
                 guard let id = QuarantinedFile.id(inName: name) else { continue }
@@ -34,7 +34,7 @@ extension FileCVRepository {
     /// it existed) and reports nothing erased.
     public func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport {
         if case .unavailable(let failure) = storeState() { throw .storeUnavailable(failure) }
-        return try withStoreLock { () throws(RepositoryError) -> EraseAllReport in
+        return try await withStoreLock { () throws(RepositoryError) -> EraseAllReport in
             try bumpEraseGeneration()
             var report = EraseAllReport(erased: 0)
             let names: [String]

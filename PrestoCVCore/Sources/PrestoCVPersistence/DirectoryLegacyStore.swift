@@ -84,7 +84,7 @@ extension FileCVRepository: LegacyImportTarget {
         case .unavailable(let failure): throw .storeUnavailable(failure)
         case .present: break
         }
-        return try withStoreLock { () throws(RepositoryError) -> ImportTicket in ImportTicket(generation: try readEraseGeneration()) }
+        return try await withStoreLock { () throws(RepositoryError) -> ImportTicket in ImportTicket(generation: try readEraseGeneration()) }
     }
 
     /// Stores a legacy CV as revision 1 with the times it carried, once, under the store lock, unless the store was erased
@@ -94,7 +94,7 @@ extension FileCVRepository: LegacyImportTarget {
     /// next one. A CV the ledger knows is `.existing` after the files that hold it are made durable again, so a person's
     /// deletion stands and a failed barrier is retried. Every step that fails throws, and the importer keeps the source.
     public func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption {
-        try withStoreLock { () throws(RepositoryError) -> Adoption in
+        try await withStoreLock { () throws(RepositoryError) -> Adoption in
             guard try readEraseGeneration() == ticket.generation else { return .storeErased }
             var ledger = try readLedger()
             let staged = directory.appendingPathComponent(Self.stagedName(for: cv.id))
