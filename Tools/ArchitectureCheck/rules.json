@@ -112,7 +112,6 @@
   }
  ],
  "notYetImplemented": [
-  "App/",
   "Features/",
   "DesignSystem/",
   "Platform/",
@@ -1033,6 +1032,36 @@
     "DiagnosticTraceTestSupport"
    ],
    "rules": []
+  },
+  {
+   "name": "PrestoCVNextApp",
+   "path": "PrestoCVNext/App",
+   "docName": "App/",
+   "allowedImports": [
+    "SwiftUI",
+    "PrestoCVComposition",
+    "PrestoCVPresentation"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R5",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextUITests",
+   "path": "PrestoCVNextUITests",
+   "kind": "test",
+   "allowedImports": [
+    "XCTest"
+   ],
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "PrestoCV",
