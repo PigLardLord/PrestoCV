@@ -196,7 +196,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
 
-**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
+**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`. `professional`, `modern` and `minimal` are written against markup contract 1 and pinned by hash to their `id@version`, since the catalog's sync never replaces a design of the same version: a changed package needs a new version.
 
 **`CVRendering`**
 - **`DocumentHTMLBuilder`:**
@@ -241,7 +241,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
-- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
+- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design. `BundledDesignsPrintedTests` prints each bundled design in the six languages and reads the PDF with `pdftotext` (poppler, `brew install poppler`) in reading and content-stream order, the way a naive parser does (#121); it also stores the designs' previews when `UPDATE_PREVIEWS=1`. It imports `CVDocumentModel`, `CVDesignCatalog`, `CVBundledDesigns` and `CVBundledHeadings`.
 
 **Separate package `CVPDFExporterExamples`** holds the demos. The library package contains no executables (R14).
 

@@ -20,13 +20,6 @@ struct CatalogTests {
         #expect(try await BundleDesignSource().bundledPackages().map(\.name) == ["minimal", "modern", "professional"])
     }
 
-    @Test("today's bundled designs are rejected until rewritten (HTML key, no contract version, legacy CSS)")
-    func bundledNeedRewrite() async throws {
-        for (_, data) in try await BundleDesignSource().bundledPackages() {
-            #expect(throws: DesignPackageRejected.self) { _ = try DesignPackageValidator().validate(data) }
-        }
-    }
-
     @Test("a <style> breakout is rejected wherever it hides: bare, in a comment, in a string (security C1)", arguments: [
         "</style><script>alert(1)</script>", "/* </style><img src=x> */ .cv{color:var(--color-text)}",
         ".cv{font-family:\"</style>\"}", "<!-- .cv{} -->",

@@ -546,7 +546,11 @@
     "CVRenderingMacOS",
     "CVRenderingWebKitSupport",
     "CVRenderingPDFKitInspector",
-    "CVRenderingTestSupport"
+    "CVRenderingTestSupport",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVBundledDesigns",
+    "CVBundledHeadings"
    ],
    "rules": [],
    "kind": "test"
