@@ -144,6 +144,38 @@ struct StoreLockWaitTests {
         #expect(await pauses.calls == 4)
     }
 
+    @Test("an interval of zero or less cannot make the wait endless: it ends in lockTimeout after a bounded number of pauses",
+          arguments: [Duration.zero, .milliseconds(-25)])
+    func nonpositiveIntervalStaysBounded(interval: Duration) async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = try ForeignLock(dir)
+        // A regression retries forever: the cap releases the lock at the 1000th pause, so the call ends and the test fails.
+        let pauses = PauseLog(on: 1000) { foreign.release() }
+        let wait = pauses.wait(deadline: .milliseconds(10), interval: interval)
+        let result = await releasing(foreign) { await outcome { try await repo(dir, wait: wait).create(named("Ada")) } }
+        #expect(result.failure as? RepositoryError == .storeUnavailable(.lockTimeout))
+        #expect(await pauses.calls == 10)   // a deadline of 10 ms in steps of the smallest interval, 1 ms
+        #expect(storedFiles(dir).isEmpty)
+    }
+
+    @Test("the app's own pause, on a cancelled call: it waits to the deadline and ends in lockTimeout, not in a cancellation")
+    func standardPauseIgnoresCancellation() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = try ForeignLock(dir)
+        let wait = StoreOptions.LockWait(deadline: .milliseconds(100), interval: .milliseconds(25), pause: StoreOptions.LockWait.standardPause)
+        let r = repo(dir, wait: wait)
+        let clock = ContinuousClock()
+        let started = clock.now
+        let result = await releasing(foreign) {
+            let call = Task { await outcome { try await r.create(named("Ada")) } }
+            call.cancel()
+            return await call.value
+        }
+        #expect(result.failure as? RepositoryError == .storeUnavailable(.lockTimeout))
+        #expect(clock.now - started >= .milliseconds(50))   // generous: four real pauses of 25 ms
+        #expect(storedFiles(dir).isEmpty)
+    }
+
     @Test("a waiting save does not block the executor")
     func waitingSaveFreesTheExecutor() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

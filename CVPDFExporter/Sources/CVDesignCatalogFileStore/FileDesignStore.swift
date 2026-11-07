@@ -50,15 +50,22 @@ public actor FileDesignStore: DesignStore {
         public let deadline: Duration, interval: Duration
         let pause: @Sendable (Duration) async -> Void
 
-        /// `pause` waits for about the duration it is given. Tests pass one that does not wait.
+        /// `pause` waits for about the duration it is given. Tests pass one that does not wait. An `interval` of zero or
+        /// less counts as the smallest step, one millisecond, so that every pause brings the wait closer to the deadline
+        /// and it stays bounded. A `deadline` of zero or less allows one attempt and no pause.
         public init(deadline: Duration, interval: Duration, pause: @escaping @Sendable (Duration) async -> Void) {
-            self.deadline = deadline; self.interval = interval; self.pause = pause
+            self.deadline = deadline; self.interval = max(interval, Self.smallestInterval); self.pause = pause
         }
+
+        static let smallestInterval = Duration.milliseconds(1)
 
         /// What the app uses: ten seconds, in pauses of 25 milliseconds on the real clock. The pause sleeps in a task of
         /// its own, which does not inherit the caller's cancellation: a cancelled call keeps waiting until the deadline,
         /// and its only failure, a cancellation, cannot happen.
-        public static let standard = LockWait(deadline: .seconds(10), interval: .milliseconds(25)) { interval in
+        public static let standard = LockWait(deadline: .seconds(10), interval: .milliseconds(25), pause: standardPause)
+
+        /// The pause of `standard`, apart so that a test can run it with a shorter deadline.
+        static let standardPause: @Sendable (Duration) async -> Void = { interval in
             let sleeping = Task { try await Task.sleep(for: interval) }
             _ = await sleeping.result
         }

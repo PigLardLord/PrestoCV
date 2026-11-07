@@ -8,7 +8,7 @@ import Android
 import Darwin
 #endif
 import CVDesignCatalog
-import CVDesignCatalogFileStore
+@testable import CVDesignCatalogFileStore
 import CVRenderingTestSupport
 
 // MARK: Test doubles
@@ -42,8 +42,10 @@ actor PauseLog {
     }
 
     /// A wait whose pauses are this log's: a deadline of 100 ms in pauses of 25 ms, so four pauses.
-    nonisolated var wait: FileDesignStore.LockWait {
-        FileDesignStore.LockWait(deadline: .milliseconds(100), interval: .milliseconds(25)) { _ in await self.pause() }
+    nonisolated var wait: FileDesignStore.LockWait { wait() }
+
+    nonisolated func wait(deadline: Duration = .milliseconds(100), interval: Duration = .milliseconds(25)) -> FileDesignStore.LockWait {
+        FileDesignStore.LockWait(deadline: deadline, interval: interval) { _ in await self.pause() }
     }
 }
 
@@ -178,6 +180,42 @@ struct FileDesignStoreLockWaitTests {
             }
             #expect(result.failure as? FileDesignStoreError == .lockTimeout)
             #expect(await pauses.calls == 4)
+        }
+    }
+
+    @Test("an interval of zero or less cannot make the wait endless: it ends in lockTimeout after a bounded number of pauses",
+          arguments: [Duration.zero, .milliseconds(-25)])
+    func nonpositiveIntervalStaysBounded(interval: Duration) async throws {
+        try await inTemporaryStore { dir in
+            let foreign = try ForeignLock(dir)
+            // A regression retries forever: the cap releases the lock at the 1000th pause, so the call ends and the test fails.
+            let pauses = PauseLog(on: 1000) { foreign.release() }
+            let store = FileDesignStore(directory: dir, lockWait: pauses.wait(deadline: .milliseconds(10), interval: interval))
+            let design = try DesignStoreContract.design(id: "clean")
+            let result = await releasing(foreign) { await outcome { try await store.save(design) } }
+            #expect(result.failure as? FileDesignStoreError == .lockTimeout)
+            #expect(await pauses.calls == 10)   // a deadline of 10 ms in steps of the smallest interval, 1 ms
+            #expect(dir.designFiles.isEmpty)
+        }
+    }
+
+    @Test("the app's own pause, on a cancelled save: it waits to the deadline and ends in lockTimeout, not in a cancellation")
+    func standardPauseIgnoresCancellation() async throws {
+        try await inTemporaryStore { dir in
+            let foreign = try ForeignLock(dir)
+            let wait = FileDesignStore.LockWait(deadline: .milliseconds(100), interval: .milliseconds(25), pause: FileDesignStore.LockWait.standardPause)
+            let store = FileDesignStore(directory: dir, lockWait: wait)
+            let design = try DesignStoreContract.design(id: "clean")
+            let clock = ContinuousClock()
+            let started = clock.now
+            let result = await releasing(foreign) {
+                let call = Task { await outcome { try await store.save(design) } }
+                call.cancel()
+                return await call.value
+            }
+            #expect(result.failure as? FileDesignStoreError == .lockTimeout)
+            #expect(clock.now - started >= .milliseconds(50))   // generous: four real pauses of 25 ms
+            #expect(dir.designFiles.isEmpty)
         }
     }
 
