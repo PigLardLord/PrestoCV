@@ -111,7 +111,7 @@ struct ExportCVWorkflowTests {
     func invalidDocument() async throws {
         var cv = Fixtures.fullCV()
         var personal = cv.personal
-        personal.summary = "bad\u{0007}text"
+        personal.summary = String(repeating: "x", count: 20_000)   // over the exporter's bound for one text
         cv.setPersonalDetails(personal)
         await #expect(throws: ExportFailure.invalidDocument) { try await workflow().export(cv, language: language("it")) }
     }

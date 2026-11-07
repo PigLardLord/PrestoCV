@@ -132,6 +132,76 @@ struct CVToDocumentMapperTests {
         #expect(document(cv { $0.education = [Education(degree: "", school: " ")] }).sections.isEmpty)
     }
 
+    @Test("a line break of any kind in a multi-line field becomes one line feed",
+          arguments: [("one\r\ntwo", "one\ntwo"), ("one\rtwo", "one\ntwo"), ("one\ntwo", "one\ntwo"), ("one\r\rtwo", "one\n\ntwo"),
+                      ("one\u{0B}two", "one\ntwo"), ("one\u{0C}two", "one\ntwo"), ("one\u{85}two", "one\ntwo")])
+    func multiLineBreaks(raw: String, expected: String) {
+        var personal = PersonalDetails(fullName: "Ada")
+        personal.summary = raw
+        var cv = cv { $0.experiences = [Experience(role: "Clerk", company: "Old Firm", description: raw)] }
+        cv.setPersonalDetails(personal)
+        #expect(document(cv).sections == [.summary(expected), .experience([ExperienceItem(role: "Clerk", company: "Old Firm", description: expected)])])
+    }
+
+    @Test("a tab becomes a space, in a multi-line and in a single-line field")
+    func tab() {
+        var personal = PersonalDetails(fullName: "Ada\tLovelace")
+        personal.summary = "a\tb"
+        var cv = cv { $0.skills = [Skill(name: "Swift\t5")] }
+        cv.setPersonalDetails(personal)
+        #expect(document(cv).person.name == "Ada Lovelace")
+        #expect(document(cv).sections == [.summary("a b"), .skills([SkillItem(name: "Swift 5")])])
+    }
+
+    @Test("a line break in a single-line field becomes a space", arguments: ["\n", "\r\n", "\r", "\u{85}"])
+    func singleLineBreaks(lineBreak: String) {
+        var personal = PersonalDetails(fullName: "Ada\(lineBreak)Lovelace", professionalTitle: "Lead\(lineBreak)Engineer", location: "Bath\(lineBreak)UK")
+        personal.summary = "kept"
+        var cv = cv {
+            $0.experiences = [Experience(role: "Lead\(lineBreak)Dev", company: "Old\(lineBreak)Firm", location: "A\(lineBreak)B")]
+            $0.education = [Education(degree: "BSc\(lineBreak)Maths", school: "Uni\(lineBreak)Home")]
+            $0.skills = [Skill(name: "Swift\(lineBreak)UI")]
+            $0.languages = [LanguageSkill(language: "Swiss\(lineBreak)German", proficiency: .b2)]
+            $0.certifications = [Certification(name: "Cert\(lineBreak)One", issuer: "Issuer\(lineBreak)Inc")]
+            $0.profiles = [ProfileLink(platform: "Git\(lineBreak)Hub", link: Fixtures.link("https://github.com/ada"))]
+            $0.setInterests(["Board\(lineBreak)games"])
+        }
+        cv.setPersonalDetails(personal)
+        let doc = document(cv)
+        #expect(doc.person == Person(name: "Ada Lovelace", professionalTitle: "Lead Engineer", location: "Bath UK"))
+        #expect(doc.sections == [
+            .summary("kept"),
+            .experience([ExperienceItem(role: "Lead Dev", company: "Old Firm", location: "A B")]),
+            .education([EducationItem(degree: "BSc Maths", school: "Uni Home")]),
+            .skills([SkillItem(name: "Swift UI")]),
+            .languages([LanguageItem(language: "Swiss German", level: .b2)]),
+            .certifications([CertificationItem(name: "Cert One", issuer: "Issuer Inc")]),
+            .profiles([ProfileLink(platform: "Git Hub", url: "https://github.com/ada")]),
+            .interests(["Board games"]),
+        ])
+    }
+
+    @Test("every character the exporter refuses is left out of every text field", arguments: ["\u{07}", "\u{00}", "\u{1B}", "\u{7F}", "\u{9F}", "\u{202E}", "\u{2066}"])
+    func refusedCharacters(character: String) throws {
+        let dirty = "x\(character)y"
+        var personal = PersonalDetails(fullName: dirty, professionalTitle: dirty, location: dirty)
+        personal.summary = dirty
+        var cv = cv {
+            $0.experiences = [Experience(role: dirty, company: dirty, location: dirty, description: dirty)]
+            $0.education = [Education(degree: dirty, school: dirty, description: dirty)]
+            $0.skills = [Skill(name: dirty)]
+            $0.languages = [LanguageSkill(language: dirty, proficiency: .c2)]
+            $0.certifications = [Certification(name: dirty, issuer: dirty, description: dirty)]
+            $0.profiles = [ProfileLink(platform: dirty, link: Fixtures.link("https://github.com/ada"))]
+            $0.setInterests([dirty])
+        }
+        cv.setPersonalDetails(personal)
+        let doc = document(cv)
+        try CVDocumentValidator.validate(doc)
+        #expect(doc.person.name == "xy")
+        #expect(doc.sections.first == .summary("xy"))
+    }
+
     @Test("a skill without a level has no rating, and a certification without a date has no year")
     func missingOptionalValues() {
         var cv = CV(id: Fixtures.id)
