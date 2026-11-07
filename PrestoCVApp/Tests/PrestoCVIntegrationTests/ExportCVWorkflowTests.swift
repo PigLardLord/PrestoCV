@@ -93,6 +93,20 @@ struct ExportCVWorkflowTests {
         }
     }
 
+    @Test("a certification without a name exports complete, with its issuer, year, address and description in the PDF")
+    func unnamedCertification() async throws {
+        var cv = Fixtures.fullCV()
+        var sections = cv.sections
+        sections.certifications = [Certification(name: " ", issuer: "Royal Society", issued: Fixtures.date(2017),
+                                                 link: Fixtures.link("https://notes.example/g"), description: "Notes on the Engine")]
+        cv.setSections(sections)
+        let outcome = try await workflow().export(cv, language: language("it"))
+        let pdf = text(of: outcome)
+        for expected in ["Royal Society", "2017", "notes.example/g", "Notes on the Engine"] {
+            #expect(pdf.contains(expected), "\(expected) is missing from the PDF")
+        }
+    }
+
     @Test("the headings follow the language of the export, not the CV's own", arguments: ["it", "en", "de", "fr", "es", "pt"])
     func headingsFollowTheLanguage(tag: String) async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: tag)

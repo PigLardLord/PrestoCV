@@ -4,10 +4,11 @@ import CVDocumentModel
 
 /// Maps a CV to the document the exporter renders (ADR 0007). Exhaustive and deterministic: no clock, no identifiers,
 /// no `default:` over a domain enum, so a new case or a new CV field cannot be left out without the build or the
-/// mirror-completeness test failing. Text is trimmed and a blank value is not printed. An item with nothing to print
-/// is not printed either: a skill, language or certification with a blank name, an experience or education entry whose
-/// fields are all blank. An entry with some value prints what it has. The order of the entries is the order the person chose. Two things are deliberately not printed: the title of the CV (a private list name) and the
-/// design choice (the export workflow resolves it).
+/// mirror-completeness test failing. Text is trimmed and a blank value is not printed. An experience, education entry or
+/// certification with some value prints what it has, even without a title; one whose fields are all blank is not printed.
+/// A skill or language with a blank name is not printed, whatever its level: a level alone does not say what it rates.
+/// The order of the entries is the order the person chose. Two things are deliberately not printed: the title of the CV
+/// (a private list name) and the design choice (the export workflow resolves it).
 public struct CVToDocumentMapper: Sendable {
     public init() {}
 
@@ -67,11 +68,14 @@ public struct CVToDocumentMapper: Sendable {
         return hasValue ? result : nil
     }
 
-    /// The document carries the year only: a certification date is printed as a year. Nil when the name is blank.
+    /// The document carries the year only: a certification date is printed as a year. Nil when no field has a value;
+    /// otherwise what the certification has, a blank name included.
     private func certification(_ item: Certification) -> CertificationItem? {
-        guard let name = text(item.name) else { return nil }
-        return CertificationItem(name: name, issuer: line(item.issuer), year: item.issued?.year, url: item.link?.value,
-                                 description: block(item.description))
+        let result = CertificationItem(name: line(item.name), issuer: line(item.issuer), year: item.issued?.year,
+                                       url: item.link?.value, description: block(item.description))
+        let hasValue = !result.name.isEmpty || !result.issuer.isEmpty || result.year != nil || result.url != nil
+            || result.description != nil
+        return hasValue ? result : nil
     }
 
     // MARK: Values

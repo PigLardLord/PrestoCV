@@ -141,6 +141,66 @@ private let notPrinted: [String: String] = [
     "sections.certifications[].issued.month": "the document prints a certification date as a year",
 ]
 
+// MARK: Blank fields
+
+/// A free-text field of every entry of a section made blank (white space only).
+private func blank<Item>(_ section: WritableKeyPath<CVSections, [Item]>, _ field: WritableKeyPath<Item, String>) -> (inout CV) -> Void {
+    { cv in
+        var sections = cv.sections
+        sections[keyPath: section] = sections[keyPath: section].map { item in
+            var item = item
+            item[keyPath: field] = " \n"
+            return item
+        }
+        cv.setSections(sections)
+    }
+}
+
+/// A free-text field of the personal details made blank (white space only).
+private func blank(_ field: WritableKeyPath<PersonalDetails, String>) -> (inout CV) -> Void {
+    { cv in
+        var personal = cv.personal
+        personal[keyPath: field] = " \n"
+        cv.setPersonalDetails(personal)
+    }
+}
+
+/// Every free-text field of the CV (the `.trimmed` rows of `printed`) and how to make it blank.
+private var blankings: [String: (inout CV) -> Void] {
+    [
+        "personal.fullName": blank(\.fullName),
+        "personal.professionalTitle": blank(\.professionalTitle),
+        "personal.location": blank(\.location),
+        "personal.summary": blank(\.summary),
+        "sections.experiences[].role": blank(\.experiences, \.role),
+        "sections.experiences[].company": blank(\.experiences, \.company),
+        "sections.experiences[].location": blank(\.experiences, \.location),
+        "sections.experiences[].description": blank(\.experiences, \.description),
+        "sections.education[].degree": blank(\.education, \.degree),
+        "sections.education[].school": blank(\.education, \.school),
+        "sections.education[].description": blank(\.education, \.description),
+        "sections.skills[].name": blank(\.skills, \.name),
+        "sections.languages[].language": blank(\.languages, \.language),
+        "sections.certifications[].name": blank(\.certifications, \.name),
+        "sections.certifications[].issuer": blank(\.certifications, \.issuer),
+        "sections.certifications[].description": blank(\.certifications, \.description),
+        "sections.profiles[].platform": blank(\.profiles, \.platform),
+        "sections.interests[]": { cv in   // the domain keeps no blank interest: the setter drops it
+            var sections = cv.sections
+            sections.setInterests(sections.interests.map { _ in " \n" })
+            cv.setSections(sections)
+        },
+    ]
+}
+
+/// The free-text fields whose blank value leaves the whole entry out, each with the reason. A blank field that is not
+/// here leaves every other value of its entry in the document.
+private let leftOutWholeWhenBlank: [String: String] = [
+    "sections.skills[].name": "a level alone does not say which skill it rates",
+    "sections.languages[].language": "a level alone does not say which language it rates, and every language has one",
+    "sections.interests[]": "the interest is the whole entry, and the CV keeps no blank one",
+]
+
 /// The leaves of the document that no field of the CV holds: the document's own.
 private func ownLeaves(of document: CVDocument) -> [String: String] {
     ["schemaVersion": String(document.schemaVersion), "language": document.language]
@@ -259,6 +319,32 @@ struct MirrorCompletenessTests {
         let populated = Set(all.filter { ![absent, empty].contains($0.value) }.map { normalised($0.path) })
         let unset = Set(all.map { normalised($0.path) }).subtracting(populated).filter { notPrinted[$0] == nil }
         #expect(unset.isEmpty, "the fixture leaves these empty: \(unset.sorted())")
+    }
+
+    @Test("a blank free-text field leaves every other value of its entry in the document, or the entry is listed as left out whole")
+    func aBlankFieldKeepsTheRestOfItsEntry() {
+        for (field, makeBlank) in blankings.sorted(by: { $0.key < $1.key }) {
+            var cv = Fixtures.fullCV()
+            makeBlank(&cv)
+            let document = mapped(cv)
+            let problems = completenessProblems(cv, document, printed: printed, notPrinted: notPrinted)
+                .filter { normalised($0.components(separatedBy: " = ")[0]) != field }   // the blank field itself prints nothing
+            #expect(inventedLeaves(cv, document).isEmpty, "\(field): \(inventedLeaves(cv, document))")
+            guard leftOutWholeWhenBlank[field] != nil else {
+                #expect(problems.isEmpty, "a blank \(field) loses other values: \(problems)")
+                continue
+            }
+            let section = String(field.prefix { $0 != "[" }) + "[", printedSection = String((printed[field]?.document ?? "?").prefix { $0 != "[" }) + "["
+            #expect(problems.allSatisfy { $0.hasPrefix(section) }, "a blank \(field) loses values of other entries: \(problems)")
+            #expect(!positions(document).keys.contains { $0.hasPrefix(printedSection) }, "a blank \(field) still prints its entries")
+        }
+    }
+
+    @Test("every free-text field of the CV is made blank by the check above")
+    func everyFreeTextFieldIsBlanked() {
+        let freeText = Set(printed.filter { if case .trimmed = $0.value.written { true } else { false } }.keys)
+        #expect(Set(blankings.keys) == freeText, "missing: \(freeText.subtracting(blankings.keys).sorted()), unknown: \(Set(blankings.keys).subtracting(freeText).sorted())")
+        #expect(Set(leftOutWholeWhenBlank.keys).isSubset(of: blankings.keys))
     }
 
     @Test("the tables have no entry for a field that no longer exists, and no field is in both")

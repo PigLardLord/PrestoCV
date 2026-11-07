@@ -84,15 +84,21 @@ struct CVToDocumentMapperTests {
         #expect(document(cv { $0.languages = [LanguageSkill(language: "", proficiency: .a1)] }).sections.isEmpty)
     }
 
-    @Test("a certification with a blank name is not printed, whatever else it has")
+    @Test("a certification with no value in any field is not printed; one with some prints what it has, a blank name too")
     func blankCertification() {
         let link = Fixtures.link("https://cert.example/one")
         let doc = document(cv {
             $0.certifications = [Certification(name: " ", issuer: "Apple", issued: Fixtures.date(2021), link: link, description: "x"),
-                                 Certification(name: "Swift Certified", issuer: " ")]
+                                 Certification(name: "Swift Certified", issuer: " "),
+                                 Certification(name: "", issuer: "", issued: Fixtures.date(2019)),
+                                 Certification(name: "\n", issuer: " ", description: "Passed the exam")]
         })
-        #expect(doc.sections == [.certifications([CertificationItem(name: "Swift Certified", issuer: "")])])
-        #expect(document(cv { $0.certifications = [Certification(name: "", issuer: "Apple")] }).sections.isEmpty)
+        #expect(doc.sections == [.certifications([
+            CertificationItem(name: "", issuer: "Apple", year: 2021, url: "https://cert.example/one", description: "x"),
+            CertificationItem(name: "Swift Certified", issuer: ""), CertificationItem(name: "", issuer: "", year: 2019),
+            CertificationItem(name: "", issuer: "", description: "Passed the exam"),
+        ])])
+        #expect(document(cv { $0.certifications = [Certification(name: " ", issuer: "\n", description: " ")] }).sections.isEmpty)
     }
 
     @Test("a profile always has its address, so it prints even without a platform name")
