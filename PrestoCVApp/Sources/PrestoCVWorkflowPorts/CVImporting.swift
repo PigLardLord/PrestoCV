@@ -1,0 +1,82 @@
+import Foundation
+import PrestoCVDomain
+
+// The import port and its value types (#393). Contents, layer and allowed imports: docs/architecture/modules.md.
+
+/// What an import of a CV gives the person: a CV that is not saved yet, the values to check, and the text that fits
+/// nowhere. The CV is the import's own words and nothing else (ADR 0027).
+public struct ImportOutcome: Sendable, Equatable {
+    /// A new CV: it has an id, revision 0 and nothing stored. Saving it is the caller's decision.
+    public let cv: CV
+    public let review: [ImportReviewItem]
+    /// Text of the person's CV that is in no field, whole and ready to copy: the text the rules could not place, and the
+    /// values the CV cannot hold.
+    public let notImported: String
+    public init(cv: CV, review: [ImportReviewItem], notImported: String) {
+        self.cv = cv; self.review = review; self.notImported = notImported
+    }
+}
+
+/// A value of the new CV the person should check, with the text as the person wrote it. A code and a text of the
+/// person's: the words of the screen belong to presentation (R13).
+public struct ImportReviewItem: Sendable, Equatable {
+    public let field: ImportReviewField
+    public let reason: ImportReviewReason
+    public let text: String
+    public init(field: ImportReviewField, reason: ImportReviewReason, text: String) {
+        self.field = field; self.reason = reason; self.text = text
+    }
+}
+
+/// Where in the CV a value to check is. Entries are counted from one, as the person counts them on the screen.
+public enum ImportReviewField: Sendable, Hashable {
+    case name, title, location, summary
+    case experience(Int)
+    case experiencePeriod(Int)
+    case education(Int)
+    case educationPeriod(Int)
+    case educationLocation(Int)
+    case language(Int)
+    case certificationYear(Int)
+}
+
+/// Why a value should be checked.
+public enum ImportReviewReason: String, Sendable, Hashable, CaseIterable {
+    case nameByPosition, titleByPosition, locationByPosition, summaryWithoutHeading
+    case roleOrEmployerByOrder, entryBoundsUnsure
+    /// The dates could not be made a period, such as an end before the start.
+    case periodUnreadable
+    /// The period has no end; the CV does not call it current.
+    case periodOpenEnd
+    /// A single date is no period; the CV keeps none.
+    case periodNotARange
+    /// The language has a level in words that are no CEFR level, so the CV does not hold it.
+    case levelNotCEFR
+    /// The text gives the language different levels, so the CV does not hold it.
+    case levelsDiffer
+    /// The text states no level for the language, so the CV does not hold it.
+    case levelMissing
+    /// The CV's education has no place; the text's place is kept in the text not imported.
+    case locationNotKept
+    /// The certification's year is no year the CV can hold.
+    case yearUnreadable
+}
+
+/// Why an import gave no CV.
+public enum ImportFailure: Error, Equatable, Sendable {
+    /// No text at all.
+    case empty
+    case tooLarge
+    case tooManyPages
+    case encrypted
+    /// The text or document cannot be read.
+    case unreadable
+    /// A document without a text layer.
+    case noText
+}
+
+/// Reads the CV a person already has into a new CV. The failure is an `ImportFailure`; a cancelled task stays a
+/// `CancellationError` (R3, R7).
+public protocol CVImporting: Sendable {
+    func importCV(fromText text: String) async throws -> ImportOutcome
+}
