@@ -187,9 +187,37 @@ struct LegacyImportTests {
         #expect(report.drops[idA] == [.look])
         // The source is the record of the loss: it stays until the person has seen it.
         #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
-        #expect(report.awaitingAcknowledgement == [idA: key(LegacyFixtures.fileName(LegacyFixtures.idA))] && report.removedSources.isEmpty)
+        #expect(report.awaitingAcknowledgement.keys.contains(idA) && report.awaitingAcknowledgement[idA]?.key == key(LegacyFixtures.fileName(LegacyFixtures.idA)) && report.removedSources.isEmpty)
         let done = await w.importer().acknowledgeLosses(of: report)
         #expect(done.removedSources == [key(LegacyFixtures.fileName(LegacyFixtures.idA))] && done.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("an old report does not remove a source that changed since: only the report of the run that read it does")
+    func staleReportKeepsChangedSource() async throws {
+        let name = LegacyFixtures.fileName(LegacyFixtures.idA)
+        let w = try world([name: LegacyFixtures.minimal(#""look":{"palette":"ocean"}"#)])
+        let first = try await w.importer().run()
+        #expect(first.drops[idA] == [.look])
+        try LegacyFixtures.minimal(#""look":{"palette":"ocean"},"personalInfo":{"email":"not an address"}"#).write(to: w.legacyFile(LegacyFixtures.idA), atomically: true, encoding: .utf8)
+        let second = try await w.importer().run()
+        #expect(second.drops[idA]?.contains(.email) == true)
+        let stale = await w.importer().acknowledgeLosses(of: first)
+        #expect(stale.removedSources.isEmpty && stale.failures == [LegacyImportFailure(key: key(name), reason: .sourceChanged)])
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        let current = await w.importer().acknowledgeLosses(of: second)
+        #expect(current.removedSources == [key(name)] && current.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("a source without any date is acknowledged and removed: its version is its bytes, not what the clock filled in")
+    func undatedSourceIsRemoved() async throws {
+        let undated = #"{"id":"\#(LegacyFixtures.idA)","look":{"palette":"ocean"}}"#
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): undated])
+        let report = try await w.importer().run()
+        #expect(report.drops[idA] == [.look])
+        let done = await w.importer().acknowledgeLosses(of: report)
+        #expect(done.removedSources.count == 1 && done.failures.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
     }
 
@@ -384,9 +412,15 @@ struct LegacyImportTests {
 
 private struct FakeSource: LegacyStore {
     let recordsToServe: [LegacyRecord]
+    /// The bytes the source holds at removal time; the version it listed unless a test says it changed.
+    var bytesNow: Data = fakeBytes
     let removed = Recorder()
     func records() async throws(RepositoryError) -> [LegacyRecord] { recordsToServe }
-    func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) { removed.add(key.name) }
+    func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval {
+        guard version.bytes == bytesNow else { return .changed }
+        removed.add(key.name)
+        return .removed
+    }
 }
 
 private final class Recorder: @unchecked Sendable {
@@ -401,12 +435,14 @@ private struct FakeTarget: LegacyImportTarget {
     func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption { try answer(cv) }
 }
 
+private let fakeBytes = Data("original".utf8)
+
 private func oneRecord() -> LegacyRecord { oneRecord(drops: []) }
 
 private func oneRecord(drops: [LegacyDrop]) -> LegacyRecord {
     let cv = CV(id: idA, revision: 0, createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 200), title: "T",
                 personal: PersonalDetails(fullName: "N"), sections: CVSections(), design: nil, language: nil)
-    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops)))
+    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops)), version: .init(bytes: fakeBytes))
 }
 
 @Suite("The source is kept until the new copy is verified")
@@ -452,7 +488,7 @@ struct LegacySourceKeptTests {
         let target = FakeTarget { _ throws(RepositoryError) in .existing }
         let report = try await ImportLegacyStore(source: source, target: target).run()
         #expect(report.alreadyStored == [idA] && report.drops[idA] == [.look, .email] && source.removed.all.isEmpty)
-        #expect(report.awaitingAcknowledgement == [idA: key("cv_x.json")])
+        #expect(report.awaitingAcknowledgement == [idA: LegacyRecord.Source(key: key("cv_x.json"), version: .init(bytes: fakeBytes))])
     }
 
     @Test("a CV with drops keeps its source in the run; the acknowledgement removes it and says so")
@@ -461,9 +497,19 @@ struct LegacySourceKeptTests {
         let importer = ImportLegacyStore(source: source, target: FakeTarget { cv throws(RepositoryError) in .stored(cv.adoptedAsRevisionOne) })
         let report = try await importer.run()
         #expect(report.imported == [idA] && report.drops[idA] == [.phone] && report.removedSources.isEmpty && source.removed.all.isEmpty)
-        #expect(report.awaitingAcknowledgement == [idA: key("cv_x.json")])
+        #expect(report.awaitingAcknowledgement == [idA: LegacyRecord.Source(key: key("cv_x.json"), version: .init(bytes: fakeBytes))])
         let done = await importer.acknowledgeLosses(of: report)
         #expect(done.removedSources == [key("cv_x.json")] && done.failures.isEmpty && source.removed.all == ["cv_x.json"])
+    }
+
+    @Test("a source without drops whose bytes changed between listing and removal stays and is reported changed")
+    func noDropsChangedBeforeRemoval() async throws {
+        var source = FakeSource(recordsToServe: [oneRecord()])
+        source.bytesNow = Data("rewritten".utf8)
+        let importer = ImportLegacyStore(source: source, target: FakeTarget { cv throws(RepositoryError) in .stored(cv.adoptedAsRevisionOne) })
+        let report = try await importer.run()
+        #expect(report.imported == [idA] && report.removedSources.isEmpty && source.removed.all.isEmpty)
+        #expect(report.failures == [LegacyImportFailure(key: key("cv_x.json"), reason: .sourceChanged)])
     }
 
     @Test("a CV without drops has its source removed in the run, and nothing waits")
@@ -488,7 +534,7 @@ struct LegacySourceKeptTests {
     func acknowledgementRemovalFails() async throws {
         struct Stubborn: LegacyStore {
             func records() async throws(RepositoryError) -> [LegacyRecord] { [oneRecord(drops: [.phone])] }
-            func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) { throw .unreadable(file: key.name) }
+            func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval { throw .unreadable(file: key.name) }
         }
         let importer = ImportLegacyStore(source: Stubborn(), target: FakeTarget { cv throws(RepositoryError) in .stored(cv.adoptedAsRevisionOne) })
         let report = try await importer.run()
@@ -501,7 +547,7 @@ struct LegacySourceKeptTests {
     func removalFails() async throws {
         struct Stubborn: LegacyStore {
             func records() async throws(RepositoryError) -> [LegacyRecord] { [oneRecord(), oneRecord()] }
-            func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) { throw .unreadable(file: key.name) }
+            func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval { throw .unreadable(file: key.name) }
         }
         let target = FakeTarget { cv throws(RepositoryError) in .stored(cv.adoptedAsRevisionOne) }
         let report = try await ImportLegacyStore(source: Stubborn(), target: target).run()
@@ -512,7 +558,7 @@ struct LegacySourceKeptTests {
     func listingFails() async {
         struct Broken: LegacyStore {
             func records() async throws(RepositoryError) -> [LegacyRecord] { throw .storeUnavailable(.cannotList) }
-            func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) {}
+            func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval { .removed }
         }
         let target = FakeTarget { _ throws(RepositoryError) in .existing }
         await #expect(throws: RepositoryError.storeUnavailable(.cannotList)) { try await ImportLegacyStore(source: Broken(), target: target).run() }

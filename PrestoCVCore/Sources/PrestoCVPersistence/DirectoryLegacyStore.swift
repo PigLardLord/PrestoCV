@@ -16,16 +16,22 @@ public struct DirectoryLegacyStore: LegacyStore {
     public func records() async throws(RepositoryError) -> [LegacyRecord] {
         let names = try candidateNames()
         let fallback = Date(timeIntervalSince1970: clock.now().timeIntervalSince1970.rounded(.down))
-        return names.map { LegacyRecord(key: .init(name: $0), content: content(of: $0, fallback: fallback)) }
+        return names.map { record(named: $0, fallback: fallback) }
     }
 
-    public func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) {
+    /// Removes the file only while it holds exactly the bytes of `version`, read the way `records()` reads (no link, a regular
+    /// file, within the cap). A file that is not there is already gone; any other file at that name is left as `.changed`.
+    public func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval {
         let fileName = key.name
         guard Self.isCandidate(fileName) else { throw .invalidName(fileName) }
         let url = directory.appendingPathComponent(fileName)
+        var status = stat()
+        if lstat(url.path, &status) != 0, errno == ENOENT { return .alreadyGone }
+        guard let current = readBounded(url), current == version.bytes else { return .changed }
         do { try FileManager.default.removeItem(at: url) }
-        catch let error as CocoaError where error.code == .fileNoSuchFile { return }   // already gone: nothing to remove
+        catch let error as CocoaError where error.code == .fileNoSuchFile { return .alreadyGone }
         catch { throw .writeFailed(file: fileName, cause: FailureCause(error)) }
+        return .removed
     }
 
     // MARK: Listing
@@ -45,9 +51,10 @@ public struct DirectoryLegacyStore: LegacyStore {
 
     // MARK: Reading
 
-    private func content(of name: String, fallback: Date) -> LegacyContent {
-        guard let data = readBounded(directory.appendingPathComponent(name)) else { return .unreadable }
-        return LegacyCVFile.read(data, fileName: name, fallback: fallback)
+    private func record(named name: String, fallback: Date) -> LegacyRecord {
+        let key = LegacyRecord.Key(name: name)
+        guard let data = readBounded(directory.appendingPathComponent(name)) else { return LegacyRecord(key: key, content: .unreadable) }
+        return LegacyRecord(key: key, content: LegacyCVFile.read(data, fileName: name, fallback: fallback), version: .init(bytes: data))
     }
 
     /// The bytes of a regular file within the cap, opened without following a link; nil for anything else.

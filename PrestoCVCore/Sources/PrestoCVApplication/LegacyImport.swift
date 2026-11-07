@@ -34,15 +34,43 @@ public struct LegacyRecord: Sendable, Equatable {
         package init(name: String) { self.name = name }
     }
 
+    /// The exact bytes the store read for this record. Opaque: only the store that listed it can compare it with what is
+    /// kept now. It is the bytes, never the decoded content, which can differ between two reads of the same file (a missing
+    /// date is filled from the clock).
+    public struct Version: Sendable, Hashable {
+        package let bytes: Data
+        package init(bytes: Data) { self.bytes = bytes }
+    }
+
+    /// A record as one run read it: the name and the bytes a later removal must still find.
+    public struct Source: Sendable, Equatable {
+        public let key: Key, version: Version
+        public init(key: Key, version: Version) { self.key = key; self.version = version }
+    }
+
     public let key: Key
     public let content: LegacyContent
-    public init(key: Key, content: LegacyContent) { self.key = key; self.content = content }
+    /// Nil for a record whose bytes could not be read: such a record is never removed.
+    public let version: Version?
+    public init(key: Key, content: LegacyContent, version: Version? = nil) { self.key = key; self.content = content; self.version = version }
+}
+
+/// What a conditional removal found.
+public enum LegacyRemoval: Sendable, Equatable {
+    /// The record held the bytes of the version, and is gone.
+    case removed
+    /// The record was not there any more: counts as removed.
+    case alreadyGone
+    /// The record holds other bytes (or is no longer a regular file within the cap): left where it is.
+    case changed
 }
 
 public protocol LegacyStore: Sendable {
     /// Every candidate file of the legacy store. A store that is not there is empty.
     func records() async throws(RepositoryError) -> [LegacyRecord]
-    func remove(_ key: LegacyRecord.Key) async throws(RepositoryError)
+    /// Removes the record only while it still holds the bytes of `version`. A record that is gone is `.alreadyGone`, one that
+    /// holds other bytes is left and `.changed`. Throws only for an I/O failure.
+    func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval
 }
 
 public enum Adoption: Sendable, Equatable {
@@ -59,6 +87,8 @@ public protocol LegacyImportTarget: Sendable {
 public struct LegacyImportFailure: Sendable, Equatable {
     public enum Reason: Sendable, Equatable {
         case invalid(LegacyInvalid), unreadable, notStored(RepositoryError), didNotReadBack, sourceNotRemoved(RepositoryError)
+        /// The source holds other bytes than the run read: it stays, and a later run reads it as it is.
+        case sourceChanged
     }
     public let key: LegacyRecord.Key, reason: Reason
     public init(key: LegacyRecord.Key, reason: Reason) { self.key = key; self.reason = reason }
@@ -71,13 +101,15 @@ public struct LegacyImportReport: Sendable, Equatable {
     public var drops: [CVID: [LegacyDrop]] = [:]
     /// The source of each CV with drops. `run()` keeps it: the source is the durable record of the loss, so it goes only
     /// when the caller calls `acknowledgeLosses(of:)` after the person has seen what was lost. A run that stops before that
-    /// leaves the source, and the next run reports the same drops again.
-    public var awaitingAcknowledgement: [CVID: LegacyRecord.Key] = [:]
+    /// leaves the source, and the next run reports the same drops again. Each entry holds the bytes the run read: the
+    /// acknowledgement removes the source only while it still holds them.
+    public var awaitingAcknowledgement: [CVID: LegacyRecord.Source] = [:]
     public var failures: [LegacyImportFailure] = []
     public init() {}
 }
 
-/// What `acknowledgeLosses(of:)` did: the sources it removed (one already gone counts as removed) and the ones it could not.
+/// What `acknowledgeLosses(of:)` did: the sources it removed (one already gone counts as removed) and the ones it could not
+/// (a source that changed since the report stays, as `sourceChanged`).
 public struct LegacyAcknowledgement: Sendable, Equatable {
     public var removedSources: [LegacyRecord.Key] = []
     public var failures: [LegacyImportFailure] = []
@@ -91,7 +123,7 @@ public struct ImportLegacyStore: Sendable {
     }
 
     /// Adopts every legacy CV the store holds. A source goes only once its copy is stored and reads back as what was mapped,
-    /// and only if its CV lost nothing: the source of a CV with drops stays (`awaitingAcknowledgement`) until
+    /// only while it still holds the exact bytes the run read, and only if its CV lost nothing: the source of a CV with drops stays (`awaitingAcknowledgement`) until
     /// `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed
     /// fails the run.
     public func run() async throws(RepositoryError) -> LegacyImportReport {
@@ -101,13 +133,20 @@ public struct ImportLegacyStore: Sendable {
     }
 
     /// Removes the sources `run()` kept for their losses, once the caller says the person has seen them. Removes nothing
-    /// when `removingVerifiedSources` is false. A source it cannot remove stays and is reported as `sourceNotRemoved`.
+    /// when `removingVerifiedSources` is false. A source it cannot remove stays and is reported as `sourceNotRemoved`; one that
+    /// no longer holds the bytes its report read stays and is reported as `sourceChanged`: the person saw the losses of the
+    /// earlier file, not of this one, and the next run reports it again.
     public func acknowledgeLosses(of report: LegacyImportReport) async -> LegacyAcknowledgement {
         var done = LegacyAcknowledgement()
         guard removingVerifiedSources else { return done }
-        for key in report.awaitingAcknowledgement.values {
-            do throws(RepositoryError) { try await source.remove(key); done.removedSources.append(key) } catch {
-                done.failures.append(.init(key: key, reason: .sourceNotRemoved(error)))
+        for entry in report.awaitingAcknowledgement.values {
+            do throws(RepositoryError) {
+                switch try await source.remove(entry.key, ifUnchanged: entry.version) {
+                case .removed, .alreadyGone: done.removedSources.append(entry.key)
+                case .changed: done.failures.append(.init(key: entry.key, reason: .sourceChanged))
+                }
+            } catch {
+                done.failures.append(.init(key: entry.key, reason: .sourceNotRemoved(error)))
             }
         }
         return done
@@ -117,11 +156,14 @@ public struct ImportLegacyStore: Sendable {
         switch record.content {
         case .invalid(let reason): report.failures.append(.init(key: record.key, reason: .invalid(reason)))
         case .unreadable: report.failures.append(.init(key: record.key, reason: .unreadable))
-        case .cv(let legacy): await adopt(legacy, from: record.key, into: &report)
+        case .cv(let legacy):
+            guard let version = record.version else { report.failures.append(.init(key: record.key, reason: .unreadable)); return }
+            await adopt(legacy, from: .init(key: record.key, version: version), into: &report)
         }
     }
 
-    private func adopt(_ legacy: LegacyCV, from key: LegacyRecord.Key, into report: inout LegacyImportReport) async {
+    private func adopt(_ legacy: LegacyCV, from source: LegacyRecord.Source, into report: inout LegacyImportReport) async {
+        let key = source.key
         let adoption: Adoption
         do throws(RepositoryError) { adoption = try await target.adopt(legacy.cv) } catch {
             report.failures.append(.init(key: key, reason: .notStored(error))); return
@@ -134,15 +176,20 @@ public struct ImportLegacyStore: Sendable {
         // Reported for every CV found stored, also one an earlier run stored: that run may have stopped before its report.
         // The source of a CV with drops is the durable record of the loss, so it stays until `acknowledgeLosses(of:)`; a run
         // that stops before then reports the same drops again. A loss reported twice is the safe way to fail; never is not.
-        if legacy.drops.isEmpty { await removeSource(key, into: &report); return }
+        if legacy.drops.isEmpty { await removeSource(source, into: &report); return }
         report.drops[legacy.cv.id] = legacy.drops
-        report.awaitingAcknowledgement[legacy.cv.id] = key
+        report.awaitingAcknowledgement[legacy.cv.id] = source
     }
 
-    private func removeSource(_ key: LegacyRecord.Key, into report: inout LegacyImportReport) async {
+    private func removeSource(_ entry: LegacyRecord.Source, into report: inout LegacyImportReport) async {
         guard removingVerifiedSources else { return }
-        do throws(RepositoryError) { try await source.remove(key); report.removedSources.append(key) } catch {
-            report.failures.append(.init(key: key, reason: .sourceNotRemoved(error)))
+        do throws(RepositoryError) {
+            switch try await source.remove(entry.key, ifUnchanged: entry.version) {
+            case .removed, .alreadyGone: report.removedSources.append(entry.key)
+            case .changed: report.failures.append(.init(key: entry.key, reason: .sourceChanged))
+            }
+        } catch {
+            report.failures.append(.init(key: entry.key, reason: .sourceNotRemoved(error)))
         }
     }
 }
