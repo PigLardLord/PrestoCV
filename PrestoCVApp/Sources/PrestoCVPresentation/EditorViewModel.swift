@@ -61,8 +61,11 @@ public final class EditorViewModel {
     @ObservationIgnored var writer: (any CVAutosaveWriting)?
     /// The content last given to the autosave.
     @ObservationIgnored var given: CV?
-    /// The failure of the last write or replacement, shown until a write succeeds.
+    /// The failure of the last write or of a reload or a copy, shown until a write succeeds.
     @ObservationIgnored var failure: SaveStatus?
+    /// The failure of the last change of the look or the language, shown until a change succeeds. A write that succeeds
+    /// does not clear it, and it never hides `failure`: a change that succeeds clears only this one.
+    @ObservationIgnored var changeFailure: SaveStatus?
     /// A reload or a copy, which replaces the CV the form stands on. Edits made meanwhile wait for it, and are written
     /// after it.
     @ObservationIgnored var replacing: Task<Void, Never>?
@@ -70,6 +73,11 @@ public final class EditorViewModel {
     @ObservationIgnored var generation = 0
     /// The writes of the autosave the form stands on.
     @ObservationIgnored var writes = WritesInFlight()
+    /// Counts the edits that changed the form, so that a replacement can tell whether the person typed meanwhile, even
+    /// if the text is back to what it was.
+    @ObservationIgnored var formEdits = 0
+    /// Counts the edits that changed the title, for the same purpose.
+    @ObservationIgnored var titleEdits = 0
     /// Counts the exports, so that one superseded cannot change the export status any more.
     @ObservationIgnored var exportGeneration = 0
 
@@ -121,7 +129,10 @@ public final class EditorViewModel {
     // MARK: - Editing
 
     func edit(_ content: EditorContent) {
-        form = admit(content)
+        let admitted = admit(content)
+        if admitted != form { formEdits += 1 }
+        if admitted.title != form.title { titleEdits += 1 }
+        form = admitted
         passOnTheForm()
         refreshSaveStatus()
     }
@@ -164,6 +175,7 @@ public final class EditorViewModel {
         restyled = nil
         given = cv
         failure = nil
+        changeFailure = nil
         refreshSaveStatus()
     }
 
@@ -188,6 +200,7 @@ public final class EditorViewModel {
 
     private func currentSaveStatus() -> SaveStatus {
         if let failure { return failure }
+        if let changeFailure { return changeFailure }
         guard replacing == nil, let base, let autosave else { return .saving }
         if let field = form.unreadableFields.first { return .unreadable(field) }
         switch autosave.status {

@@ -25,13 +25,13 @@ extension EditorViewModel {
     public func reload() async {
         await replace { [self] in
             guard saveStatus == .conflict, let base, autosave?.isStored == true else { return }
-            let typed = form
+            let edits = formEdits
             do throws(EditFailure) {
                 await writes.untilIdle()
                 let stored = try await editing.load(base.id)
                 // A write the old autosave started meanwhile ends first, so that none runs when the new writer is installed
                 await writes.untilIdle()
-                guard form == typed else { return }
+                guard formEdits == edits else { return }
                 form = admit(EditorContent(stored, ids: &rowIDs))
                 pendingRemoval = nil
                 standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
@@ -46,9 +46,11 @@ extension EditorViewModel {
         await replace { [self] in
             guard let held else { return }
             let current = form.applied(to: held)
+            let titleEdited = titleEdits
             do throws(EditFailure) {
                 let copy = try await editing.duplicate(current, title: copyTitle(current.title))
-                form.title = EditorContent(copy).title
+                // A title typed while the copy was stored stays, and goes to the autosave once this ends
+                if titleEdits == titleEdited { form.title = EditorContent(copy).title }
                 standOn(copy, unchangedFrom: copy, writer: editing.autosaveWriter(startingFrom: copy), isStored: true)
             } catch {
                 failure = SaveStatus(error)
