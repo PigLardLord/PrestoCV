@@ -121,6 +121,33 @@ struct TraceChainTests {
         #expect(await later.access.reader.runs().isEmpty)
     }
 
+    @Test("A run begun before the distribution answers is not recorded (fail closed); one begun after an open answer is")
+    func runBeforeTheAnswerIsDropped() async throws {
+        let paths = Self.paths()
+        defer { Self.remove(paths) }
+        let distribution = HeldDistribution()
+        let chain = Self.chain(paths, gate: .asking(distribution), log: RecordingLogger())
+
+        let early = chain.tracer.begin(.textImport)
+        early.record(.input, .text("text", "early-" + Self.marker))
+        early.finish(.finished)
+        await distribution.answer(with: .sandbox)
+        #expect(await chain.access.isOn())
+        let late = chain.tracer.begin(.textImport)
+        late.record(.input, .text("text", "late-" + Self.marker))
+        late.finish(.finished)
+
+        let runs = await chain.access.reader.runs()
+        #expect(runs.count == 1, "Only the run begun after the answer is stored")
+        let run = try #require(runs.first)
+        let files = try await chain.access.reader.shareCopies(of: run.id)
+        let document = try #require(files.first { $0.pathExtension == "json" })
+        let text = try String(contentsOf: document, encoding: .utf8)
+        #expect(text.contains("late-" + Self.marker))
+        #expect(!text.contains("early-" + Self.marker))
+        await chain.access.reader.discardCopies()
+    }
+
     @Test("A launch that records keeps the runs of the earlier launch")
     func openLaunchKeeps() async {
         let paths = Self.paths()
@@ -148,4 +175,22 @@ struct TraceChainTests {
         #expect(await chain.access.reader.runs().count == 1)
     }
     #endif
+}
+
+/// A distribution that answers when the test says so.
+private actor HeldDistribution: DistributionReading {
+    private var held: CheckedContinuation<DistributionAnswer, Never>?
+    private var given: DistributionAnswer?
+
+    func answer() async throws -> DistributionAnswer {
+        if let given { return given }
+        return await withCheckedContinuation { held = $0 }
+    }
+
+    /// Gives the answer: to the call that waits for it, or to the one that comes later.
+    func answer(with value: DistributionAnswer) {
+        given = value
+        held?.resume(returning: value)
+        held = nil
+    }
 }

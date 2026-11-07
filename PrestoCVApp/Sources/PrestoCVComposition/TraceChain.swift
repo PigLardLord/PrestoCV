@@ -5,7 +5,8 @@ import Foundation
 
 /// The trace of a test build (ADR 0032), as the composition builds it: the log entries go to the open run of their kind as
 /// well, and every run goes through the gate to a recorder that keeps it in the store. A launch whose gate stays closed
-/// purges what an earlier install stored. Only the composition builds it, so no other code can turn the trace on or reach
+/// purges what an earlier install stored. A run begun before the distribution has answered is not recorded: the gate fails closed
+/// until then (ADR 0032). Only the composition builds it, so no other code can turn the trace on or reach
 /// its files (`compositionOnly` in the checker's rules).
 struct TraceChain {
     /// The trace the import and the AI draft record into
