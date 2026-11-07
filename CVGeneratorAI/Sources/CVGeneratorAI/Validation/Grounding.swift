@@ -74,13 +74,54 @@ struct Grounding {
         func speaks(at place: Place) -> Bool {
             let clause = clauses.clause(at: place)
             let statement = Statement(clause: clause, quotes: all, language: language)
-            guard statement.speaksForThePerson else { return false }
+            guard statement.speaksForThePerson else { return sharesTheSubject(at: place) }
             return clause.isAnchored || !(statement.startsWithItsVerb || !statement.hasVerbs) || speaks(before: place)
         }
 
         private func speaks(before place: Place) -> Bool {
             speaks(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
+
+        /// Whether the German clause at `place` leaves out its subject and shares the person's with the clause before it (#359): a
+        /// comma, "und" or "oder" split it off from a clause that opens with a subordinating word and "ich" and speaks for the person
+        /// ("wo ich Jungpflanzen umgetopft und die Beete gepflegt habe"), or from one that shares the subject in turn, and it ends
+        /// with a verb in the first person of the present, which German puts last there ("die Pflege der Parkanlagen plane"). Its
+        /// noun before the verb is then the object, not the subject (`Voice`), and its article no relative pronoun
+        /// (`RelativeClauses`). A clause with a pronoun of its own ("und er die Bäume fällte") or a verb that may be another
+        /// person's ("fällte", a past that "er" says as "ich" does) shares nothing.
+        func sharesTheSubject(at place: Place) -> Bool {
+            guard language == .german, place.clause > 0 else { return false }
+            let clause = clauses.clause(at: place)
+            guard !clause.isAnchored, let verb = clause.words.indices.last, !clause.isCapitalised(verb),
+                  Self.isTheFirstPersonOfThePresent(clause.words[verb].folded),
+                  !clause.words.contains(where: { Self.pronouns.contains($0.folded) }),
+                  !Statement(clause: clause, quotes: all, language: language).namesAnotherPerson else { return false }
+            let previous = Place(sentence: place.sentence, clause: place.clause - 1)
+            let before = clauses.clause(at: previous)
+            let split = before.source.trimmingCharacters(in: .whitespacesAndNewlines)
+            let conjunction = split.split(whereSeparator: \.isWhitespace).last.map { ["und", "oder"].contains($0.lowercased()) } ?? false
+            guard split.hasSuffix(",") || conjunction else { return false }
+            let words = before.words
+            guard words.count > 2, Self.subordinators.contains(words[0].folded), words[1].folded == "ich" else {
+                return sharesTheSubject(at: previous)
+            }
+            return speaks(at: previous)
+        }
+
+        /// Whether the German verb `folded` is in the first person of the present: it ends with "e", and not with the "te" of a
+        /// past ("plante", "fällte"), unless its third person adds a "t" ("leite", "leitet").
+        private static func isTheFirstPersonOfThePresent(_ folded: String) -> Bool {
+            guard folded.count >= 4, folded.hasSuffix("e") else { return false }
+            return !folded.hasSuffix("te") || Vocabulary.isVerb(folded + "t", in: .german)
+        }
+
+        /// The German words that open a clause whose verb comes last, folded.
+        private static let subordinators: Set<String> = [
+            "wo", "wobei", "dass", "weil", "als", "nachdem", "indem", "wahrend", "seit", "seitdem", "bevor", "sobald",
+        ]
+
+        /// The German pronouns that can be the subject of a clause, folded.
+        private static let pronouns: Set<String> = ["ich", "wir", "du", "ihr", "er", "sie", "es", "man"]
 
         /// The positions of the words of the clause at `place` that claim a skill, an interest, a language, or the person's title or
         /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word before a relative that brings in
@@ -89,8 +130,8 @@ struct Grounding {
         func claimedWords(at place: Place) -> Set<Int> {
             guard claims(at: place) else { return [] }
             let clause = clauses.clause(at: place)
-            let end = RelativeClauses.start(in: clause, language: language) ?? clause.words.count
-            return Set(0..<end).subtracting(clauses.quotedWords(at: place))
+            let relative = sharesTheSubject(at: place) ? nil : RelativeClauses.start(in: clause, language: language)
+            return Set(0..<(relative ?? clause.words.count)).subtracting(clauses.quotedWords(at: place))
         }
 
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
@@ -636,7 +677,8 @@ extension Grounding {
                     continued = nil
                     opensWithTheEmployer = place.clause == 0 && !statement.hasVerbs && !clause.words.contains(where: \.isNumber)
                 } else if let lastJobs = last,
-                          Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true {
+                          Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true
+                            || (continued != nil && reading.sharesTheSubject(at: place)) {
                     allowed = chain.count > 1 ? chain : lastJobs
                     isContinuation = true
                     previousNaming = false

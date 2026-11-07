@@ -577,6 +577,69 @@ struct JobClausesTests {
         #expect(verdicts.pinned == row.pinned)
     }
 
+    // MARK: A German duty that leaves out the subject of the clause before it (#359)
+
+    /// The verbs of the gardener's sentences, as the device tags them, pinned so that every Mac reads them alike.
+    private static let gardenerVerbs = ForcedLexicalTagger([.german: .words([
+        "war", "bin", "umgetopft", "gepflegt", "habe", "einteile", "plane", "leite", "fallen", "mochte", "fallte", "gegossen",
+        "kontrolliere", "gefallt",
+    ])])
+
+    /// The gardener's ended job, whose sentence goes on after "wo ich".
+    private static let nursery = "Von 2009 bis 2013 war ich Gärtnerhelferin bei der Baumschule Lindenhof in Kassel, wo ich "
+    /// The forewoman's current job, whose sentence goes on after "wo ich".
+    private static let parks = "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, wo ich "
+
+    struct SharedSubjectRow: Sendable, CustomTestStringConvertible {
+        /// Whether the row is the forewoman's current job, or the gardener's ended one.
+        let isCurrent: Bool
+        let sentence: String
+        let duty: String
+        /// Whether the duty goes as something the person only wishes or plans.
+        let isWished: Bool
+        var testDescription: String { "\(sentence) → \(duty)" }
+    }
+
+    @Test("A German clause joined by und to the person's clause with the verb last, its own verb last in the first person, is the person's; a wish, another person's or a relative clause is not (#359)",
+          arguments: [
+              SharedSubjectRow(
+                  isCurrent: false, sentence: nursery + "Jungpflanzen umgetopft und die Beete gepflegt habe.",
+                  duty: "Ich habe die Beete gegossen.", isWished: false
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und die Pflege der Parkanlagen plane.",
+                  duty: "Ich kontrolliere die Parkanlagen.", isWished: false
+              ),
+              SharedSubjectRow(
+                  isCurrent: false, sentence: nursery + "Jungpflanzen umgetopft habe. Ich möchte später Bäume fällen.",
+                  duty: "Ich habe Bäume gefällt.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und später Bäume fällen möchte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und er die Bäume fällte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "eine Kolonne leite, die die Bäume fällte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+          ])
+    func sharedGermanSubject(row: SharedSubjectRow) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.gardenerVerbs, wordList: TableWordList())
+        let job = row.isCurrent
+            ? Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+            : Self.job("Gärtnerhelferin", "Baumschule Lindenhof", from: "2009", to: "2013")
+
+        let verdicts = try sanitizer.dutyCheck(of: CVData(experience: [job]), job: 0, duties: row.duty, against: row.sentence)
+
+        let wished = verdicts.rejected.contains { $0.sentence == row.duty && $0.reason.hasSuffix("only wishes or plans") }
+        #expect(wished == row.isWished, "\(verdicts.rejected)")
+        #expect(verdicts.kept.contains(row.duty) == !row.isWished, "\(verdicts.rejected)")
+    }
+
     @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
           arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
     func dutyOfAJobBeforeItsPlace(duty: String) throws {
