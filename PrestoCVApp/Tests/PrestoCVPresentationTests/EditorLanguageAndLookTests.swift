@@ -91,7 +91,7 @@ struct EditorLanguageAndLookTests {
         #expect(editor.look == classicOcean)
     }
 
-    @Test("an export and a copy take the look and the language chosen last")
+    @Test("an export snapshot and a copy take the look and the language chosen last")
     func exportAndCopyTakeTheChosenLookAndLanguage() async throws {
         let world = Editing()
         let cv = try await world.storedCV()
@@ -99,11 +99,11 @@ struct EditorLanguageAndLookTests {
         await editor.setDocumentLanguage("de")
         await editor.changeLook(to: classicOcean, parts: [.design, .palette])
 
-        _ = await editor.export()
+        let snapshot = editor.exportSnapshot()
         await editor.saveAsCopy()
 
-        #expect(world.exporting.languages.withLock { $0.map(\.tag) } == ["de"])
-        #expect(world.exporting.snapshots.withLock { $0.map { $0.design?.design } } == ["classic"])
+        #expect(snapshot?.cv.language?.tag == "de")
+        #expect(snapshot?.cv.design?.design == "classic")
         let copies = world.editing.copies.withLock { $0 }
         #expect(copies.map { $0.language?.tag } == ["de"])
         #expect(copies.map { $0.design?.design } == ["classic"])
