@@ -545,6 +545,24 @@
    "kind": "test"
   },
   {
+   "name": "CVRenderingIOSTests",
+   "path": "CVPDFExporter/Tests/CVRenderingIOSTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "UIKit",
+    "PDFKit",
+    "WebKit",
+    "CVRendering",
+    "CVRenderingIOS",
+    "CVRenderingWebKitSupport",
+    "CVRenderingPDFKitInspector",
+    "CVRenderingTestSupport"
+   ],
+   "rules": ["R16"],
+   "kind": "test"
+  },
+  {
    "name": "CVRenderingMacOSTests",
    "path": "CVPDFExporter/Tests/CVRenderingMacOSTests",
    "allowedImports": [
