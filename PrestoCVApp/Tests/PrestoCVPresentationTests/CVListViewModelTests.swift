@@ -17,7 +17,7 @@ struct CVListViewModelTests {
         let list = await world.loadedList()
 
         #expect(list.rows.map(\.reference) == [third, second, first].map(world.reference))
-        #expect(list.rows.map(\.title) == [.text("Third"), .text("Second"), .text("First")])
+        #expect(list.rows.map(\.label) == ["Third", "Second", "First"])
         #expect(list.status == .loaded)
     }
 
@@ -94,7 +94,7 @@ struct CVListViewModelTests {
 
         #expect(list.isStale)
         #expect(list.rows.count == 1)
-        #expect(list.rows.first?.title == .text("Renamed"))
+        #expect(list.rows.first?.label == "Renamed")
 
         world.browsing.listError.withLock { $0 = nil }
         await list.load()
@@ -102,7 +102,7 @@ struct CVListViewModelTests {
         #expect(list.status == .loaded)
     }
 
-    @Test("titles that read alike get a number no other row shows; an untitled CV is a code")
+    @Test("titles that read alike get different labels, and an untitled CV is called by the view's word")
     func alikeTitlesGetDifferentLabels() async throws {
         let world = Browsing()
         _ = try await world.stored(title: "Backend", fullName: "")
@@ -113,25 +113,55 @@ struct CVListViewModelTests {
 
         let list = await world.loadedList()
 
-        let named = list.rows.filter { $0.title != .untitled }
-        #expect(Set(named.map(\.number)) == [nil, 2, 3])
-        let untitled = list.rows.filter { $0.title == .untitled }
-        #expect(untitled.count == 2)
-        #expect(Set(untitled.map(\.number)) == [nil, 2])
+        let labels = list.rows.map(\.label)
+        #expect(Set(labels).count == 5)
+        #expect(labels.filter { $0.lowercased().hasPrefix("backend") }.count == 3)
+        #expect(labels.contains(Browsing.untitled))
+        #expect(labels.contains("\(Browsing.untitled) 2"))
     }
 
-    @Test("the numbers are the same after a reload")
+    @Test("an untitled CV and a CV titled with the view's word for untitled get different labels")
+    func untitledAndNamedLikeTheWordDiffer() async throws {
+        let world = Browsing()
+        _ = try await world.stored(title: "", fullName: "")
+        _ = try await world.stored(title: Browsing.untitled, fullName: "")
+
+        let list = await world.loadedList()
+
+        let labels = list.rows.map(\.label)
+        #expect(labels.count == 2)
+        #expect(Set(labels).count == 2)
+        #expect(labels.contains(Browsing.untitled))
+    }
+
+    @Test("a number never gives the label another row already shows")
+    func numberAvoidsARealTitle() async throws {
+        let world = Browsing()
+        _ = try await world.stored(title: "Backend", fullName: "")
+        _ = try await world.stored(title: "Backend", fullName: "")
+        _ = try await world.stored(title: "Backend (2)", fullName: "")
+
+        let list = await world.loadedList()
+
+        let labels = list.rows.map(\.label)
+        #expect(Set(labels).count == 3)
+        #expect(labels.contains("Backend (2)"))
+        #expect(labels.contains("Backend"))
+        #expect(labels.contains("Backend (3)"))
+    }
+
+    @Test("the labels are the same after a reload")
     func labelsAreStableAcrossReloads() async throws {
         let world = Browsing()
         for _ in 0..<4 { _ = try await world.stored(title: "Backend", fullName: "") }
         let list = await world.loadedList()
-        let before = Dictionary(uniqueKeysWithValues: list.rows.map { ($0.reference, $0.number) })
+        let before = Dictionary(uniqueKeysWithValues: list.rows.map { ($0.reference, $0.label) })
 
         await list.load()
 
-        let after = Dictionary(uniqueKeysWithValues: list.rows.map { ($0.reference, $0.number) })
+        let after = Dictionary(uniqueKeysWithValues: list.rows.map { ($0.reference, $0.label) })
         #expect(before == after)
-        #expect(Set(before.values) == [nil, 2, 3, 4])
+        #expect(Set(before.values).count == 4)
     }
 
     @Test("the last-saved line is the store's instant, and `now` moves only when the clock is read again")

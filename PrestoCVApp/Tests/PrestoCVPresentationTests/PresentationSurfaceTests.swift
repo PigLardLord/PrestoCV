@@ -17,8 +17,7 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
     list.dismissNotice()
     if let row = rows.first {
         let _: CVReference = row.reference
-        let _: RowTitle = row.title
-        let _: Int? = row.number
+        let _: String = row.label
         let _: String = row.subtitle
         let _: String? = row.language
         _ = row.lastSaved
@@ -80,7 +79,6 @@ func everyListCode() -> [Any] {
     look.forEach { all.append($0) }
     all.append(StartChoice.importCV)
     all.append(StartChoice.blank)
-    all.append(RowTitle.untitled)
     return all
 }
 

@@ -15,7 +15,7 @@ struct CVListChangeTests {
         await list.rename(world.reference(cv), to: "  Backend\nlead  ")
 
         #expect(try await world.editing.inStore(cv.id).title == "Backend lead")
-        #expect(list.rows.map(\.title) == [.text("Backend lead")])
+        #expect(list.rows.map(\.label) == ["Backend lead"])
         #expect(list.rowStatuses.isEmpty)
     }
 
@@ -46,8 +46,8 @@ struct CVListChangeTests {
         await list.duplicate(world.reference(cv), title: "Backend (copy)")
 
         #expect(list.rows.count == 2)
-        #expect(Set(list.rows.map(\.title)) == [.text("Backend"), .text("Backend (copy)")])
-        #expect(list.rows.first?.title == .text("Backend (copy)"))
+        #expect(Set(list.rows.map(\.label)) == ["Backend", "Backend (copy)"])
+        #expect(list.rows.first?.label == "Backend (copy)")
     }
 
     @Test("a delete removes the row at the revision the row holds")

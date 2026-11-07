@@ -70,9 +70,13 @@ struct Browsing {
 
     init() { browsing = BrowsingFake(editing: editing) }
 
+    /// The view's word for a CV with no title, and how it numbers a title
+    static let untitled = "Untitled CV"
+
     func list() -> CVListViewModel {
         CVListViewModel(
-            browsing: browsing, editing: editing, now: { [moment] in moment.date },
+            browsing: browsing, editing: editing, untitled: Self.untitled, numbered: { "\($0) (\($1))" },
+            now: { [moment] in moment.date },
             editorsStored: { [storedGate] in await storedGate.pass() }
         )
     }

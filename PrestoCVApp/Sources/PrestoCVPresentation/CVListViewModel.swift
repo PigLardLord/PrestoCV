@@ -28,6 +28,8 @@ public final class CVListViewModel {
 
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
+    @ObservationIgnored private let untitled: String
+    @ObservationIgnored private let numbered: @MainActor (String, Int) -> String
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private let editorsStored: @MainActor () async -> Void
     /// The CVs as the store listed them. A change reads its CV here, when the intent comes.
@@ -36,12 +38,17 @@ public final class CVListViewModel {
     @ObservationIgnored private var changedSinceLoad = false
 
     /// - Parameters:
+    ///   - untitled: The view's words for a CV with no title, as "Untitled CV" (R13).
+    ///   - numbered: How the view numbers a title that reads like another row's, as "Backend (2)" (R13).
     ///   - now: The time the view words "saved ... ago" from.
     ///   - editorsStored: Returns when the editors that were left have stored what they showed; the store is read after.
     public init(
-        browsing: any CVBrowsing, editing: any CVEditing, now: @escaping @MainActor () -> Date,
+        browsing: any CVBrowsing, editing: any CVEditing, untitled: String,
+        numbered: @escaping @MainActor (String, Int) -> String, now: @escaping @MainActor () -> Date,
         editorsStored: @escaping @MainActor () async -> Void
     ) {
+        self.untitled = untitled
+        self.numbered = numbered
         self.browsing = browsing
         self.editing = editing
         self.clock = now
@@ -86,21 +93,12 @@ public final class CVListViewModel {
 
     // MARK: - Rows
 
-    /// A character no title holds, which marks where the number of a title is: the view words the number (R13).
-    private static let untitledMark = "\u{1}"
-
     private func showRows() {
         let titles = listed.map { (id: $0.id.raw.uuidString, title: Self.title(of: $0)) }
-        let labels = CVTitle.labels(
-            for: titles, untitled: Self.untitledMark, numbered: { "\($0)\(Self.untitledMark)\($1)" }
-        )
-        rows = zip(listed, titles).map { cv, entry in
-            let own = entry.title.text(untitled: Self.untitledMark)
-            let number = labels[entry.id].flatMap { label -> Int? in
-                label == own ? nil : Int(label.dropFirst(own.count).filter(\.isNumber))
-            }
-            return CVRow(
-                reference: CVReference(id: cv.id), title: RowTitle(entry.title), number: number,
+        let labels = CVTitle.labels(for: titles, untitled: untitled, numbered: numbered)
+        rows = listed.map { cv in
+            CVRow(
+                reference: CVReference(id: cv.id), label: labels[cv.id.raw.uuidString] ?? untitled,
                 subtitle: CVSubtitle.text(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle) ?? "",
                 lastSaved: cv.updatedAt ?? cv.createdAt, language: cv.language?.tag
             )
