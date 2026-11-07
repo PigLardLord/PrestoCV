@@ -39,6 +39,11 @@ public final class LookViewModel {
     @ObservationIgnored private var submitted: LookChange?
     @ObservationIgnored private var unsent: LookChange?
     @ObservationIgnored private var loadGeneration = 0
+    /// The latest load is reading, and a write is being made. The picker runs one operation at a time (`mayStart`).
+    @ObservationIgnored private var isLoading = false
+    @ObservationIgnored private var isApplying = false
+
+    private enum Operation { case load, apply }
 
     private var pending: LookChange? { submitted.map { first in unsent.map { first.followed(by: $0) } ?? first } ?? unsent }
 
@@ -50,21 +55,36 @@ public final class LookViewModel {
         shown = EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
     }
 
-    /// Reads the CV. The view calls it from its `.task`. Only the latest read publishes; the choices made meanwhile stay on
-    /// top of the look it read.
+    /// Reads the CV. The view calls it from its `.task`. It shows `.loading` while it reads, and does nothing while a change
+    /// is being written: that change is newer than anything it could read. Only the latest read publishes; the choices made
+    /// meanwhile stay on top of the look it read.
     public func load() async {
+        guard mayStart(.load) else { return }
         loadGeneration += 1
         let mine = loadGeneration
+        let before = status
+        isLoading = true
+        status = .loading
+        defer { if mine == loadGeneration { isLoading = false } }
         do {
             let cv = try await editing.load(reference.id)
             guard mine == loadGeneration else { return }
             stored = cv
             writer = editing.autosaveWriter(startingFrom: cv)
             show(over: cv.design)
-            if status != .applying { status = .ready }
+            status = .ready
         } catch {
-            guard mine == loadGeneration, !Task.isCancelled else { return }
-            status = LookStatus(error)
+            guard mine == loadGeneration else { return }
+            status = Task.isCancelled ? before : LookStatus(error)
+        }
+    }
+
+    /// The picker runs one operation at a time: a change is not written while the CV is read, and the CV is not read while
+    /// a change is written. `stored` and `writer` are replaced only by the operation that runs, from the CV it read or wrote.
+    private func mayStart(_ operation: Operation) -> Bool {
+        switch operation {
+        case .load: !isApplying
+        case .apply: !isLoading && !isApplying
         }
     }
 
@@ -75,9 +95,12 @@ public final class LookViewModel {
     public func choose(fonts: String?) { choose(.fonts, EditorLook(design: shown.design, palette: shown.palette, fonts: fonts)) }
 
     /// Sends the choices made so far as one change. The CV's text is not written by it. The choices made while it is written
-    /// stay pending on top of the look it stored; if it fails, nothing the person chose is lost.
+    /// stay pending on top of the look it stored; if it fails, nothing the person chose is lost. While the CV is read or a
+    /// change is written it writes nothing, and the choices stay pending.
     public func apply() async {
-        guard let writer, let stored, let change = pending, status != .applying else { return }
+        guard mayStart(.apply), let writer, let stored, let change = pending else { return }
+        isApplying = true
+        defer { isApplying = false }
         submitted = change
         unsent = nil
         status = .applying

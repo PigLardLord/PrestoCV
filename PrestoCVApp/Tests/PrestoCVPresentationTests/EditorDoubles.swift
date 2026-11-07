@@ -56,6 +56,8 @@ final class EditingFake: CVEditing {
     let languages = Mutex<[DocumentLanguage?]>([])
     let looks = Mutex<[LookChange]>([])
     let loads = Mutex(0)
+    /// Thrown by the next reads (`load`), after the call passed the gate of the reads.
+    let loadErrors = Mutex<[EditFailure]>([])
     private let writesRunning = Mutex(0)
 
     var writeCount: Int { writes.withLock { $0.count } }
@@ -64,7 +66,9 @@ final class EditingFake: CVEditing {
 
     func load(_ id: CVID) async throws(EditFailure) -> CV {
         loads.withLock { $0 += 1 }
+        let error = loadErrors.withLock { $0.isEmpty ? nil : $0.removeFirst() }
         await loadGate.pass()
+        if let error { throw error }
         do { return try await LoadCV(repository: store)(id) } catch { throw EditFailure(error) }
     }
 
