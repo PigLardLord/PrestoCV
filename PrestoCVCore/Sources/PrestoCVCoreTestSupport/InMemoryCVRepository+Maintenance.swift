@@ -62,6 +62,7 @@ extension InMemoryCVRepository {
     }
 
     public func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport {
+        eraseGeneration += 1
         let ledgerFiles = keepingLedger || adopted.isEmpty ? 0 : 1
         let count = store.count + corruptLive.count + held.count + ledgerFiles
         store = [:]; corruptLive = []; held = [:]

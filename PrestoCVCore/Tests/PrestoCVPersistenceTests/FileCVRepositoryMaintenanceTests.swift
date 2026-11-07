@@ -30,7 +30,7 @@ private func harness(_ dir: URL) -> MaintenanceHarness {
             try FileManager.default.setAttributes([.modificationDate: enteredAt], ofItemAtPath: q.appendingPathComponent(name).path)
             return name
         },
-        adopt: { cv in try await repo(dir).adopt(cv) })
+        importer: { repo(dir) })
 }
 
 @Suite("The file store's maintenance, under the contract")
@@ -71,6 +71,12 @@ struct FileCVRepositoryMaintenanceContractTests {
         try await CVStoreMaintenanceContract.eraseAllKeepsTheLedgerOnRequest(harness(dir))
     }
 
+    @Test("an import that began before eraseAll stores nothing after it, from the store's absence on; one begun after it stores")
+    func stopsAnImport() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try await CVStoreMaintenanceContract.eraseAllStopsAnImportThatBeganBefore(harness(dir))
+    }
+
     @Test("restore, purge, list and erase race on two instances without a lost or duplicated CV")
     func races() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
@@ -93,8 +99,10 @@ struct FileCVRepositoryMaintenanceContractTests {
 @Suite("Erasing the whole file store")
 struct FileCVRepositoryEraseAllTests {
     private func entries(_ dir: URL) throws -> [String] { try FileManager.default.contentsOfDirectory(atPath: dir.path).sorted() }
+    /// What an erase leaves: the lock and the erase generation.
+    private var kept: [String] { [FileCVRepository.eraseGenerationName, ".lock"].sorted() }
 
-    @Test("eraseAll removes valid, corrupt, newer-schema, odd-named, quarantined, staged and ledger files; only .lock stays")
+    @Test("eraseAll removes valid, corrupt, newer-schema, odd-named, quarantined, staged and ledger files; only the lock and the erase generation stay")
     func everyKind() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         let r = repo(dir), q = dir.appendingPathComponent("Quarantine")
@@ -111,16 +119,34 @@ struct FileCVRepositoryEraseAllTests {
 
         let report = try await r.eraseAll(keepingLedger: false)
         #expect(report == EraseAllReport(erased: 8))
-        #expect(try entries(dir) == [".lock"])
+        #expect(try entries(dir) == kept)
         #expect(try await r.eraseAll(keepingLedger: false) == EraseAllReport(erased: 0))
-        #expect(try entries(dir) == [".lock"])
+        #expect(try entries(dir) == kept)
     }
 
-    @Test("eraseAll on a store that was never created removes nothing and creates nothing")
+    @Test("eraseAll on a store that was never created removes nothing and creates only the lock and the erase generation")
     func neverCreated() async throws {
-        let dir = tempDir()
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         #expect(try await repo(dir).eraseAll(keepingLedger: false) == EraseAllReport(erased: 0))
-        #expect(!FileManager.default.fileExists(atPath: dir.path))
+        #expect(try entries(dir) == kept)
+        #expect(try await repo(dir).list().cvs.isEmpty)
+    }
+
+    @Test("each erase moves the generation on, and a generation that is not a regular file stops an import and an erase")
+    func generation() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let r = repo(dir)
+        #expect(try await r.beginImport() == ImportTicket(generation: 0))
+        _ = try await r.eraseAll(keepingLedger: false)
+        _ = try await r.eraseAll(keepingLedger: true)
+        #expect(try await r.beginImport() == ImportTicket(generation: 2))
+        let generation = dir.appendingPathComponent(FileCVRepository.eraseGenerationName)
+        try FileManager.default.removeItem(at: generation)
+        try FileManager.default.createDirectory(at: generation, withIntermediateDirectories: false)
+        _ = try await r.create(named("Valid", id: id1))
+        await #expect(throws: RepositoryError.unreadable(file: FileCVRepository.eraseGenerationName)) { _ = try await r.beginImport() }
+        await #expect(throws: RepositoryError.self) { _ = try await r.eraseAll(keepingLedger: false) }
+        #expect(try await r.list().cvs.map(\.id) == [id1], "an erase that cannot move the generation removes nothing")
     }
 
     @Test("eraseAll with a quarantine that cannot be changed reports its files and removes the rest; a rerun finishes",
@@ -142,7 +168,7 @@ struct FileCVRepositoryEraseAllTests {
 
         chmod(q.path, 0o755)
         #expect(try await r.eraseAll(keepingLedger: false) == EraseAllReport(erased: 2))
-        #expect(try entries(dir) == [".lock"])
+        #expect(try entries(dir) == kept)
     }
 
     @Test("eraseAll fails when the store is not a directory, and changes nothing")
@@ -162,7 +188,7 @@ struct FileCVRepositoryEraseAllTests {
         _ = try await repo(dir).create(named("Valid", id: id2))
         try FileManager.default.createSymbolicLink(at: dir.appendingPathComponent("Quarantine"), withDestinationURL: elsewhere)
         #expect(try await repo(dir).eraseAll(keepingLedger: false) == EraseAllReport(erased: 2))
-        #expect(try entries(dir) == [".lock"])
+        #expect(try entries(dir) == kept)
         #expect(try entries(elsewhere) == [fileName(id1)])
     }
 }
@@ -193,7 +219,7 @@ struct EraseEverythingTests {
         #expect(outcome == .partial(erased: 2, remaining: [RemainingItem(kind: .legacySource, name: b)]))
         #expect(try Set(FileManager.default.contentsOfDirectory(atPath: legacy.path)) == [b, "notes.txt"])
         #expect(try Data(contentsOf: legacy.appendingPathComponent(b)) == Data("{\"changed\":true}".utf8))
-        #expect(try FileManager.default.contentsOfDirectory(atPath: store.path) == [".lock"])
+        #expect(try Set(FileManager.default.contentsOfDirectory(atPath: store.path)) == [FileCVRepository.eraseGenerationName, ".lock"])
 
         // The source that changed is a file the person's old app wrote; a rerun reads it as it is now, and it is not a CV: it stays named.
         let again = try await EraseEverything(maintenance: r, legacy: directoryStore)()

@@ -10,7 +10,7 @@ private func harness(_ store: InMemoryCVRepository) -> MaintenanceHarness {
         open: { store },
         plantCorrupt: { id in await store.plantCorrupt(id) },
         plantQuarantined: { id, cv, enteredAt in await store.plantQuarantined(id, cv: cv, enteredAt: enteredAt) },
-        adopt: { cv in try await store.adopt(cv) })
+        importer: { store })
 }
 
 @Suite("The in-memory store's maintenance, under the contract")
@@ -43,4 +43,7 @@ struct InMemoryMaintenanceContractTests {
 
     @Test("eraseAll keeping the ledger leaves it and names it; a second adoption stores nothing")
     func keepsTheLedger() async throws { try await CVStoreMaintenanceContract.eraseAllKeepsTheLedgerOnRequest(harness(InMemoryCVRepository())) }
+
+    @Test("an import that began before eraseAll stores nothing after it; one begun after it stores")
+    func stopsAnImport() async throws { try await CVStoreMaintenanceContract.eraseAllStopsAnImportThatBeganBefore(harness(InMemoryCVRepository())) }
 }

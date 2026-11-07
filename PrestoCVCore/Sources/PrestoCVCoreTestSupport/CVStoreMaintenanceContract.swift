@@ -36,13 +36,13 @@ public struct MaintenanceHarness: Sendable {
     public let plantCorrupt: @Sendable (CVID) async throws -> Void
     /// A file in the quarantine entered at `enteredAt`: the CV (restorable) or, with nil, bytes that do not decode. Returns its name.
     public let plantQuarantined: @Sendable (CVID, CV?, Date) async throws -> String
-    /// The importer's adoption of a legacy CV into the store, which records the CV in the import ledger.
-    public let adopt: @Sendable (CV) async throws -> Adoption
+    /// A new instance of the store as the legacy importer's target, which records each CV it adopts in the import ledger.
+    public let importer: @Sendable () -> any LegacyImportTarget
     public init(open: @escaping @Sendable () -> any Store,
                 plantCorrupt: @escaping @Sendable (CVID) async throws -> Void,
                 plantQuarantined: @escaping @Sendable (CVID, CV?, Date) async throws -> String,
-                adopt: @escaping @Sendable (CV) async throws -> Adoption) {
-        self.open = open; self.plantCorrupt = plantCorrupt; self.plantQuarantined = plantQuarantined; self.adopt = adopt
+                importer: @escaping @Sendable () -> any LegacyImportTarget) {
+        self.open = open; self.plantCorrupt = plantCorrupt; self.plantQuarantined = plantQuarantined; self.importer = importer
     }
 }
 
@@ -56,6 +56,12 @@ public enum CVStoreMaintenanceContract {
     static func name(_ id: CVID) -> String { id.raw.uuidString + ".cv.json" }
 
     static func check(_ ok: Bool, _ what: @autoclosure () -> String) throws { if !ok { throw Failure(description: what()) } }
+
+    /// One import of one CV, begun now.
+    static func adopt(_ h: MaintenanceHarness, _ cv: CV) async throws -> Adoption {
+        let importer = h.importer()
+        return try await importer.adopt(cv, under: try await importer.beginImport())
+    }
 
     static func expect(_ error: RepositoryError, _ what: String, _ body: () async throws -> Void) async throws {
         do { try await body() } catch let e as RepositoryError {
@@ -222,17 +228,32 @@ public enum CVStoreMaintenanceContract {
     /// erase that does not keep it removes the ledger, and the CV can be adopted again.
     public static func eraseAllKeepsTheLedgerOnRequest(_ h: MaintenanceHarness) async throws {
         let store = h.open(), legacy = cv(id(410))
-        guard case .stored = try await h.adopt(legacy) else { throw Failure(description: "the first adoption stores the CV") }
+        guard case .stored = try await adopt(h, legacy) else { throw Failure(description: "the first adoption stores the CV") }
         let kept = try await store.eraseAll(keepingLedger: true)
         try check(kept.remaining.map(\.kind) == [.ledger], "the kept ledger is named: \(kept)")
         try check(try await store.list().cvs.isEmpty, "the CV is erased")
-        try check(try await h.adopt(legacy) == .existing, "a second adoption of the erased CV is existing")
+        try check(try await adopt(h, legacy) == .existing, "a second adoption of the erased CV is existing")
         try check(try await store.list().cvs.isEmpty, "and stores nothing")
         let again = try await store.eraseAll(keepingLedger: true)
         try check(again.erased == 0 && again.remaining.map(\.kind) == [.ledger], "a repeat keeps it and removes nothing: \(again)")
         let gone = try await store.eraseAll(keepingLedger: false)
         try check(gone.remaining.isEmpty && gone.erased == 1, "without keeping it, the ledger goes: \(gone)")
-        guard case .stored = try await h.adopt(legacy) else { throw Failure(description: "with the ledger gone the CV is adopted again") }
+        guard case .stored = try await adopt(h, legacy) else { throw Failure(description: "with the ledger gone the CV is adopted again") }
+    }
+
+    /// An import that began before an erase stores nothing after it, on another instance too, whether the erase kept the
+    /// ledger or not, and whether the store existed when the import began; an import that begins after the erase stores.
+    public static func eraseAllStopsAnImportThatBeganBefore(_ h: MaintenanceHarness) async throws {
+        for (n, keepingLedger) in [(420, false), (421, true), (422, false)] {
+            let legacy = cv(id(n))
+            let ticket = try await h.importer().beginImport()
+            _ = try await h.open().eraseAll(keepingLedger: keepingLedger)
+            let late = try await h.importer().adopt(legacy, under: ticket)
+            try check(late == .storeErased, "an import that began before the erase stores nothing (\(n)): \(late)")
+            try check(try await h.open().list().cvs.isEmpty, "and the store holds nothing (\(n))")
+            guard case .stored = try await adopt(h, legacy) else { throw Failure(description: "an import begun after the erase stores the CV (\(n))") }
+            _ = try await h.open().eraseAll(keepingLedger: false)
+        }
     }
 }
 

@@ -26,21 +26,20 @@ extension FileCVRepository {
         }
     }
 
-    /// Removes everything in the store but its lock file, in one hold of the lock. One file that cannot be removed does not
-    /// keep the others: it is named in the report, and the next call finishes. With `keepingLedger` the import ledger stays
-    /// and is named in the report (if it exists), so the erase is partial until a call without it. A store that was never
-    /// created has nothing.
+    /// Removes everything in the store but its lock file and its erase generation, in one hold of the lock. The generation
+    /// moves first, so an import that began before the erase stores nothing after it; if it cannot move, nothing is removed.
+    /// One file that cannot be removed does not keep the others: it is named in the report, and the next call finishes. With
+    /// `keepingLedger` the import ledger stays and is named in the report (if it exists), so the erase is partial until a
+    /// call without it. A store that was never created is created to hold the generation (an import may have begun before
+    /// it existed) and reports nothing erased.
     public func eraseAll(keepingLedger: Bool) async throws(RepositoryError) -> EraseAllReport {
-        switch storeState() {
-        case .absent: return EraseAllReport(erased: 0)
-        case .unavailable(let failure): throw .storeUnavailable(failure)
-        case .present: break
-        }
+        if case .unavailable(let failure) = storeState() { throw .storeUnavailable(failure) }
         return try withStoreLock { () throws(RepositoryError) -> EraseAllReport in
+            try bumpEraseGeneration()
             var report = EraseAllReport(erased: 0)
             let names: [String]
             do { names = try FileManager.default.contentsOfDirectory(atPath: directory.path) } catch { throw .storeUnavailable(.cannotList) }
-            for name in names.sorted() where name != ".lock" {
+            for name in names.sorted() where name != ".lock" && name != Self.eraseGenerationName {
                 if keepingLedger, name == Self.legacyLedgerName {
                     report.remaining.append(RemainingItem(kind: .ledger, name: name))
                 } else if name == "Quarantine", Self.isRealDirectory(quarantine) == true { eraseQuarantine(into: &report) }

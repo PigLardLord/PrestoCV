@@ -14,6 +14,8 @@ public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance, LegacyImpor
     var corruptLive: Set<CVID> = []
     /// The ids the importer adopted: the ledger, which outlives a deletion so that a source is not imported again.
     var adopted: Set<CVID> = []
+    /// How many times the store was erased: an import that began at an older generation stores nothing.
+    var eraseGeneration = 0
     let clock: any TimeSource
     public init(clock: any TimeSource = SteppingClock()) { self.clock = clock }
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
@@ -37,8 +39,12 @@ public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance, LegacyImpor
 }
 
 extension InMemoryCVRepository {
-    /// Stores a legacy CV once: a CV the ledger knows is `.existing`, also after it was deleted.
-    public func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption {
+    public func beginImport() async throws(RepositoryError) -> ImportTicket { ImportTicket(generation: eraseGeneration) }
+
+    /// Stores a legacy CV once: a CV the ledger knows is `.existing`, also after it was deleted. Nothing is stored once the
+    /// store was erased after `ticket` was taken.
+    public func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption {
+        guard ticket.generation == eraseGeneration else { return .storeErased }
         if adopted.contains(cv.id) { return .existing }
         adopted.insert(cv.id)
         if store[cv.id] != nil { return .existing }
