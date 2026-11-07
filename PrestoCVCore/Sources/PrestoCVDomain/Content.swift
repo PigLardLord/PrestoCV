@@ -98,8 +98,15 @@ public struct CVSections: Hashable, Sendable {
     }
 
     public mutating func setInterests(_ values: [String]) {
+        interests = Self.canonicalInterests(values, cleaningText: true)
+    }
+
+    /// The one rule for a list of interests: each trimmed, none empty, no two equal ignoring case, first kept. With
+    /// `cleaningText` the text rule is applied first, so entries it empties or makes equal are dropped or merged;
+    /// without it, only the list rule is applied: a reader asks whether a stored list is already canonical.
+    public static func canonicalInterests(_ values: [String], cleaningText: Bool) -> [String] {
         var seen = Set<String>()
-        interests = values.map { TextRules.singleLine($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        return values.map { (cleaningText ? TextRules.singleLine($0) : $0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
     }
 }

@@ -51,4 +51,39 @@ struct StoredTextRulesTests {
         #expect(saved.personal.summary == "a b")
         #expect(try await r.load(id1) == saved)
     }
+
+    // MARK: Interests the text rule cleans, merges or drops
+
+    @Test("interests the text rule cleans, merges or drops read healthy, save, and reload stable",
+          arguments: [(#"["go", "‮go"]"#, ["go"]), (#"["‮"]"#, [String]()), (#"["‮ chess"]"#, ["chess"])])
+    func interestsTheRuleChanges(stored: String, cleaned: [String]) async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try write(fileJSON(sections: ["interests": stored]), in: dir)
+        let r = repo(dir)
+        let listing = try await r.list()
+        #expect(listing.issues.isEmpty)
+        #expect(listing.cvs.first?.sections.interests == cleaned)
+        #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("Quarantine").path))
+        let read = try await r.load(id1)
+        #expect(read.sections.interests == cleaned)
+        let saved = try await SaveCV(repository: r)(read)
+        #expect(saved.sections.interests == cleaned)
+        let reloaded = try await r.load(id1)
+        #expect(reloaded == saved)
+        let again = try await SaveCV(repository: r)(reloaded)
+        #expect(try await r.load(id1) == again)
+        #expect(again.sections.interests == cleaned)
+        #expect(try await r.list().issues.isEmpty)
+    }
+
+    @Test("interests that break the stored rule without the text rule are still corrupt",
+          arguments: [#"[" go"]"#, #"["go", "Go"]"#, #"[""]"#, #"["go", "go"]"#])
+    func interestsBreakingTheStoredRule(stored: String) async throws {
+        #expect(throws: (any Error).self) { try decode(fileJSON(sections: ["interests": stored])) }
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        try write(fileJSON(sections: ["interests": stored]), in: dir)
+        let listing = try await repo(dir).list()
+        #expect(listing.cvs.isEmpty)
+        #expect(listing.issues.count == 1)
+    }
 }
