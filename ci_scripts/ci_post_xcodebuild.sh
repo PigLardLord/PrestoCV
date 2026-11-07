@@ -7,9 +7,10 @@
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
-#                      check and of the screenshot tools, the check of the store listing, and the builds of PrestoCVApp and
-#                      CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines that
-#                      then run the test plan have only the built products.
+#                      check and of the screenshot tools, the check of the store listing, and the builds of PrestoCVApp,
+#                      of the second app target (PrestoCVNext, for iOS and macOS) and of CVPDFExporterExamples. It also runs
+#                      the source checks, which read the repository: the machines that then run the test plan have only the
+#                      built products.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -60,6 +61,13 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
     # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
     step swift build --package-path "$ROOT/PrestoCVApp"
+    # The second app target (docs/architecture/modules.md) is built for both of its platforms until the switch; no plan
+    # of the shipped scheme builds it.
+    next_build="$(mktemp -d)"
+    step xcodebuild build -project "$ROOT/PrestoCV.xcodeproj" -scheme PrestoCVNext \
+        -destination 'generic/platform=iOS Simulator' -destination 'generic/platform=macOS' \
+        -derivedDataPath "$next_build" CODE_SIGNING_ALLOWED=NO -quiet
+    rm -rf "$next_build"
     # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.
     step swift build --package-path "$ROOT/CVPDFExporterExamples"
     ;;

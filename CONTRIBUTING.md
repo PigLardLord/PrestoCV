@@ -30,11 +30,13 @@ swift test --package-path CVGeneratorAI
 swift test --package-path Tools/SourceChecks
 swift build --package-path PrestoCVApp
 swift build --package-path CVPDFExporterExamples
+xcodebuild build -project PrestoCV.xcodeproj -scheme PrestoCVNext -destination 'generic/platform=iOS Simulator' -destination 'generic/platform=macOS'
 Tools/ArchitectureCheck/check.sh
 Tools/ArchitectureCheck/selftest.sh
 ```
 
 - **The `PrestoCV` scheme** builds the app and has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`, the app's UI tests. `CI` leaves out `PrestoCVUITests`, which take most of an hour; the pull request check runs them in a step of their own.
+- **The `PrestoCVNext` scheme** builds the second app target, where the new app grows until the switch, for iOS and macOS. Its test plan, `Next`, runs `PrestoCVNextUITests`.
 - **`swift test --package-path`** tests a package in isolation. On Linux, run it for `DiagnosticLogging`, `DiagnosticTrace`, `PrestoCVCore`, `CVPDFExporter` and `Tools/SourceChecks`, and build `CVGeneratorAI` and `PrestoCVApp`: only the new targets exist there. `CVPDFExporterExamples`, the demos and the template viewer, builds on macOS only.
 - **`Tools/SourceChecks`** reads the repository, so it runs with `swift test`, not in the test plans. Besides the string catalog and the rules the views follow, it checks the documents: every tracked Markdown file is in English, the paths in the README's table exist and every top-level folder is in it, and the open-source files are there and linked.
 - **A change to navigation or to the exporter's integration** also runs the simulator tests, not only the package tests.

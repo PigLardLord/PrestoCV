@@ -1,8 +1,8 @@
 // swift-tools-version: 6.1
 import PackageDescription
 
-// App integration and presentation (docs/architecture/modules.md). The targets are empty until step 5 fills them;
-// the Xcode app starts depending on this package then (#88, #89).
+// App integration and presentation (docs/architecture/modules.md). Step 5 fills the targets (#88, #89); the second
+// app target, PrestoCVNext, links the composition and the presentation until the shipped target takes them over.
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
