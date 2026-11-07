@@ -57,3 +57,59 @@ enum Invented {
         return choice
     }
 }
+
+/// A repository whose next write can be held inside the store until the test releases it, and told to commit or to fail
+/// then. It counts the writes inside the store at the same time, so a test can see two overlap. No sleeps, no clock.
+actor GatedRepository: CVRepository {
+    private let inner = InMemoryCVRepository()
+    private var holdNext = false
+    private var gate: CheckedContinuation<Void, Never>?
+    private var entered: CheckedContinuation<Void, Never>?
+    private var failWhenReleased = false
+    private var active = 0
+    private(set) var peak = 0, entries = 0
+
+    func holdNextWrite() { holdNext = true }
+
+    /// Returns when a write is held in the store.
+    func untilHeld() async {
+        if gate != nil { return }
+        await withCheckedContinuation { entered = $0 }
+    }
+
+    /// Lets the held write go on: it commits, or it fails with the store unavailable.
+    func release(failing: Bool) {
+        failWhenReleased = failing
+        gate?.resume()
+        gate = nil
+    }
+
+    private func enter() async throws(RepositoryError) {
+        active += 1; entries += 1; peak = max(peak, active)
+        if holdNext {
+            holdNext = false
+            await withCheckedContinuation { continuation in
+                gate = continuation
+                entered?.resume()
+                entered = nil
+            }
+            if failWhenReleased { failWhenReleased = false; active -= 1; throw .storeUnavailable(.cannotLock) }
+        }
+    }
+
+    func create(_ cv: CV) async throws(RepositoryError) -> CV {
+        try await enter()
+        defer { active -= 1 }
+        return try await inner.create(cv)
+    }
+
+    func update(_ cv: CV) async throws(RepositoryError) -> CV {
+        try await enter()
+        defer { active -= 1 }
+        return try await inner.update(cv)
+    }
+
+    func load(_ id: CVID) async throws(RepositoryError) -> CV { try await inner.load(id) }
+    func list() async throws(RepositoryError) -> CVListing { try await inner.list() }
+    func delete(_ id: CVID, revision: Int) async throws(RepositoryError) { try await inner.delete(id, revision: revision) }
+}
