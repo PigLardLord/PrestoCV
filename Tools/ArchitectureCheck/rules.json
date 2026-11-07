@@ -489,6 +489,8 @@
    "allowedImports": [
     "CVRendering",
     "PDFKit",
+    "AppKit",
+    "UIKit",
     "Foundation"
    ],
    "rules": [
@@ -509,6 +511,29 @@
     "CVDesignCatalog",
     "CVBundledHeadings",
     "Foundation"
+   ],
+   "rules": [
+    "R16"
+   ],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingNativeTestSupport",
+   "path": "CVPDFExporter/Sources/CVRenderingNativeTestSupport",
+   "allowedImports": [
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVRenderingPDFKitInspector",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVBundledHeadings",
+    "CoreGraphics",
+    "CoreText",
+    "Foundation",
+    "Network",
+    "PDFKit",
+    "Synchronization",
+    "WebKit"
    ],
    "rules": [
     "R16"
@@ -546,7 +571,8 @@
     "CVRenderingIOS",
     "CVRenderingWebKitSupport",
     "CVRenderingPDFKitInspector",
-    "CVRenderingTestSupport"
+    "CVRenderingTestSupport",
+    "CVRenderingNativeTestSupport"
    ],
    "rules": ["R16"],
    "kind": "test"
@@ -564,7 +590,8 @@
     "CVRenderingMacOS",
     "CVRenderingWebKitSupport",
     "CVRenderingPDFKitInspector",
-    "CVRenderingTestSupport"
+    "CVRenderingTestSupport",
+    "CVRenderingNativeTestSupport"
    ],
    "rules": [],
    "kind": "test"
@@ -575,10 +602,26 @@
    "allowedImports": [
     "Testing",
     "Foundation",
-    "Network",
-    "Synchronization",
     "WebKit",
-    "CVRenderingWebKitSupport"
+    "CVRenderingWebKitSupport",
+    "CVRenderingNativeTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingPDFKitInspectorTests",
+   "path": "CVPDFExporter/Tests/CVRenderingPDFKitInspectorTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "AppKit",
+    "UIKit",
+    "CVRendering",
+    "CVRenderingPDFKitInspector",
+    "CVRenderingNativeTestSupport"
    ],
    "rules": [
     "R16"

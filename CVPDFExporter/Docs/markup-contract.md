@@ -47,11 +47,11 @@ html[lang]
 **Inline text never runs together.** Adjacent inline entries (skills, profiles, interests) are separated by one space in the markup. So are a profile's platform and URL. The space is not a field for completeness.
 - In normal flow, and between `inline-block` boxes, the space is rendered.
 - Flex and grid layouts drop it. So a rule that sets `display: flex`, `inline-flex` or `grid` must also set `gap` or `column-gap`, with a column gap of at least 3pt (0.25em); otherwise the stylesheet is rejected (review round 5).
-- The native renderer tests check the separation in the printed text (#78).
+- The native renderer tests check the separation in the printed text: `flex and grid keep inline entries apart`, on macOS and on the iOS simulator (#78).
 
 **Links print their destination.** Every link's destination is printed as text, exactly as its `href`.
 - Whether a PDF keeps clickable link annotations depends on the platform's PDF path. The printed text is what completeness checks ([R8](../../docs/architecture/rules.md#r8-untrusted-input-enters-through-one-validating-boundary)), so a PDF that keeps a link's label but loses its destination fails.
-- Where a platform keeps the annotations, the native renderer tests also check that they match the `href`s.
+- The macOS renderer keeps one link annotation per link, and its tests check that the destinations match the `href`s. The iOS renderer keeps none, and its test fails if that changes (`the annotations match the builder's hrefs, or the platform keeps none, as recorded`, #78).
 - The builder's own base style sets `a { overflow-wrap: anywhere }`, so a long destination wraps instead of running off the page. Designs cannot set `overflow-wrap`.
 
 ### Pages
