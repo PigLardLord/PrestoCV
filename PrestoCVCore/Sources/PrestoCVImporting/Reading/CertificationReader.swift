@@ -8,6 +8,15 @@ enum CertificationReader {
     private struct Line {
         var parts: [Piece] = []
         var year: Sourced<Int>?
+        /// How many dates the line holds, and whether one of them is a period with an end.
+        private var dateCount = 0
+        private var hasPeriod = false
+
+        /// Whether the year of the line is one issuance year: the line has no date, or one single date and no part beside
+        /// the lead. "Issued by Red Cross, 2021, expires 2024" and "Issued by Red Cross, Rome, 2021" are not.
+        var hasUnambiguousYear: Bool {
+            dateCount == 0 || (dateCount == 1 && !hasPeriod && parts.count <= 1)
+        }
 
         init(_ cells: [Piece]) {
             for cell in cells { read(cell) }
@@ -15,6 +24,8 @@ enum CertificationReader {
 
         private mutating func read(_ cell: Piece) {
             let dates = DateReader.periods(in: cell.text)
+            dateCount += dates.count
+            hasPeriod = hasPeriod || dates.contains { $0.period.end != nil }
             if let last = dates.last { year = Sourced(value: Line.year(of: last), spans: [cell.sub(last.range).span], reading: .year) }
             let brackets = Brackets(of: cell, ifDatesIn: dates)
             let cut = dates.map(\.range).filter { !brackets.holdWords(around: $0) }
@@ -62,6 +73,9 @@ enum CertificationReader {
     /// 3. a block whose first part starts with an issuer lead ("Issued by", "Rilasciato da", ...) followed by at most six
     ///    words, while the block above made a certification that has no issuer and does not state a year the line also
     ///    states, is that certification's issuer (and its year, when it has none); the rest of the line is text not imported.
+    ///    The line must also have an unambiguous year: no date, or one single date (not a period) with no part beside the
+    ///    lead, so that "Issued by Red Cross, 2021, expires 2024" or "..., 2021–2024" is an entry of its own: a date of
+    ///    trailing text never becomes the year of the certification above;
     ///    A certification whose line had a second part after a comma ("First Aid, Level 2") took that lone part as its
     ///    issuer, so it has one, and a lead line below it stays an entry of its own: the safe, visible split;
     /// 4. a block with no part is text not imported;
@@ -87,7 +101,7 @@ enum CertificationReader {
     /// Branch 3: the line is the issuer of the certification above it. False, and nothing changed, when it is not.
     private static func completeCertification(at index: Int, with line: Line, _ section: Section, _ findings: inout Findings) -> Bool {
         var certification = findings.cv.certifications[index]
-        guard certification.issuer == nil, certification.year == nil || line.year == nil,
+        guard line.hasUnambiguousYear, certification.issuer == nil, certification.year == nil || line.year == nil,
               let first = line.parts.first, let issuer = CertificationIssuerLead.issuer(in: first) else { return false }
         certification.issuer = issuer.quote()
         certification.year = certification.year ?? line.year
