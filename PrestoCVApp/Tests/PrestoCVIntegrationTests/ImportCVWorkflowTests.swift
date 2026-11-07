@@ -124,4 +124,42 @@ struct ImportCVWorkflowTests {
         #expect(outcome.cv.personal.summary == big.trimmingCharacters(in: .whitespaces))
         #expect(outcome.cv.revision == 0)
     }
+
+    // MARK: Saving verdict
+
+    @Test("a CV above the limit for all its texts is returned with the too-large verdict")
+    func aCVAboveTheTotalLimitSaysTooLarge() async throws {
+        // 30 entries of 9,000 characters: each text is within its own limit, together they are above the total.
+        let lines = (0..<30).map { "Entry \($0) " + String(repeating: "x", count: 8_990) }
+        let text = lines.joined(separator: "\n")
+        #expect(lines.count * 9_000 > CVLimits.maxTotalTextBytes)
+        let f = ImportFixture(text: text)
+        var imported = ImportedCV()
+        imported.person.name = f.quoted("Entry 0 " + String(repeating: "x", count: 8_990))
+        imported.experience = lines.dropFirst().map { f.experience(details: [f.quoted($0)]) }
+        let cv = imported
+        let outcome = try await workflow(ScriptedImporter { _ in f.result(cv) }).importCV(fromText: text)
+        #expect(outcome.saving == .cvTooLarge)
+        #expect(outcome.cv.sections.experiences.count == 29)
+    }
+
+    @Test("a text above the limit of one field gives the verdict naming that field, and the CV is returned")
+    func aTextTooLongNamesItsField() async throws {
+        let long = String(repeating: "word ", count: 2_500) + "end"
+        #expect(long.count > CVLimits.maxTextCharacters)
+        let f = ImportFixture(text: long)
+        var imported = ImportedCV()
+        imported.person.summary = f.quoted(long)
+        let cv = imported
+        let outcome = try await workflow(ScriptedImporter { _ in f.result(cv) }).importCV(fromText: long)
+        #expect(outcome.saving == .textTooLong(.summary))
+        #expect(outcome.cv.personal.summary == long)
+    }
+
+    @Test("a normal import gives the ok verdict, the one the CV itself gives")
+    func aNormalImportCanBeSaved() async throws {
+        let outcome = try await workflow(ScriptedImporter { _ in FullImport.result }).importCV(fromText: FullImport.text)
+        #expect(outcome.saving == .ok)
+        #expect(outcome.saving == outcome.cv.saveCheck())
+    }
 }

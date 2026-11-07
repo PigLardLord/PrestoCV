@@ -135,7 +135,7 @@ struct ImportMirrorCompletenessTests {
         var personal = cv.personal
         personal.email = nil
         cv.setPersonalDetails(personal)
-        let dropping = ImportOutcome(cv: cv, review: outcome.review, notImported: outcome.notImported)
+        let dropping = ImportOutcome(cv: cv, review: outcome.review, saving: outcome.saving, notImported: outcome.notImported)
         #expect(lost(FullImport.result.cv.fields, in: dropping) == ["person.email"])
     }
 }

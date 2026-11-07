@@ -12,7 +12,8 @@ extension ImportCV: CVTextImporting {}
 
 /// Imports the CV a person already has: the text is read by the import, and what it read becomes a new CV for the person
 /// to review (ADR 0027). Nothing is stored: the CV has an id from the generator and revision 0, and saving it is the
-/// caller's decision. A CV that could not be saved, for its size, is returned all the same: it is the person's text.
+/// caller's decision. A CV that cannot be saved, for its size, is returned all the same, since it is the person's text, with the reason in
+/// `ImportOutcome.saving`: the CV's own `saveCheck()` verdict, such as `.cvTooLarge` or `.textTooLong(field)`.
 /// Failures are `ImportFailure`; a cancelled task stays a `CancellationError` (R3, R7).
 public struct ImportCVWorkflow: CVImporting {
     private let importer: any CVTextImporting

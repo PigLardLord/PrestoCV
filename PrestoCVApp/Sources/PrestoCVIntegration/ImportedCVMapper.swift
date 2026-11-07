@@ -80,7 +80,7 @@ public struct ImportedCVMapper: Sendable {
             fullName: person.name?.value ?? "", professionalTitle: person.title?.value ?? "", email: person.email?.value,
             phone: person.phone?.value, location: person.location?.value ?? "", website: website, summary: person.summary?.value ?? ""))
         cv.setSections(sections)
-        return ImportOutcome(cv: cv, review: notes.items, notImported: (result.unplaced.map(\.text) + notes.listed).joined(separator: "\n"))
+        return ImportOutcome(cv: cv, review: notes.items, saving: cv.saveCheck(), notImported: (result.unplaced.map(\.text) + notes.listed).joined(separator: "\n"))
     }
 
     // MARK: Values

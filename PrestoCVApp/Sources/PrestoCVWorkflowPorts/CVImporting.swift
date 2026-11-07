@@ -9,11 +9,14 @@ public struct ImportOutcome: Sendable, Equatable {
     /// A new CV: it has an id, revision 0 and nothing stored. Saving it is the caller's decision.
     public let cv: CV
     public let review: [ImportReviewItem]
+    /// Whether the CV can be saved, and if not, why: the CV's own `saveCheck()` (R6). A CV that cannot be saved is
+    /// returned all the same, since it is the person's text; this says why the screen cannot offer to save it.
+    public let saving: SaveVerdict
     /// Text of the person's CV that is in no field, whole and ready to copy: the text the rules could not place, and the
     /// values the CV cannot hold.
     public let notImported: String
-    public init(cv: CV, review: [ImportReviewItem], notImported: String) {
-        self.cv = cv; self.review = review; self.notImported = notImported
+    public init(cv: CV, review: [ImportReviewItem], saving: SaveVerdict, notImported: String) {
+        self.cv = cv; self.review = review; self.saving = saving; self.notImported = notImported
     }
 }
 
