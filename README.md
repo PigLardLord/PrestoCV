@@ -50,7 +50,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 
 ## Building and testing
 
-You need Xcode 27, which reads the project in its JSON format (`PrestoCV.xcodeproj/project.xcproj`), and the iOS 26.5 simulator.
+You need Xcode 27.2, whose Swift is the one `.swift-version` pins, and the iOS 26.5 simulator. Xcode 27 reads the project in its JSON format (`PrestoCV.xcodeproj/project.xcproj`).
 
 ```bash
 xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug build
@@ -65,7 +65,7 @@ Tools/ArchitectureCheck/check.sh
 
 The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`, the app's UI tests. `CI` leaves out `PrestoCVUITests`, which take most of an hour: the pull request check runs them in a step of their own (see [Releasing](#releasing)).
 
-On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the source checks and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
+On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the source checks and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012). `Tools/check-linux.sh origin/main` runs there what the Linux CI job runs, with the same script and the Swift that `.swift-version` pins.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) lists the commands to run before a pull request, the other packages' tests and builds among them.
 
@@ -87,7 +87,7 @@ Nothing submits a build for App Review: the owner does it in App Store Connect, 
 
 Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
-The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
+The repository side is `ci_scripts/` (it stops a build whose Swift is not the one `.swift-version` pins, sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 
