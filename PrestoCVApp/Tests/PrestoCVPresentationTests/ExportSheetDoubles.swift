@@ -68,13 +68,17 @@ final class SheetWorld {
            design: design.flatMap { DesignChoice(design: $0) }, language: language.flatMap(DocumentLanguage.init))
     }
 
-    func sheet() -> ExportSheetViewModel {
+    /// - Parameters:
+    ///   - whenChosen: Runs inside the callback that takes a chosen language to the CV, as a caller's code can.
+    ///   - whenRead: Runs inside the snapshot closure, as a caller's code can.
+    func sheet(whenChosen: @escaping @MainActor (ExportLanguage?) -> Void = { _ in },
+               whenRead: @escaping @MainActor () -> Void = {}) -> ExportSheetViewModel {
         ExportSheetViewModel(
             exporter: exporter,
-            snapshot: { self.snapshotsTaken += 1; return ExportSnapshot(cv: self.cv) },
+            snapshot: { self.snapshotsTaken += 1; whenRead(); return ExportSnapshot(cv: self.cv) },
             offeredLanguages: Self.offered, appLanguage: Self.appLanguage,
             fileNamePattern: { Self.patterns[$0.tag] ?? "%@" },
-            onLanguageChosen: { self.chosen.append($0) },
+            onLanguageChosen: { self.chosen.append($0); whenChosen($0) },
             clock: self.clock, pause: Self.pause)
     }
 

@@ -20,7 +20,7 @@ struct ExportShareTests {
     func savedAndSentAreConfirmed(result: ShareResult, outcome: ShareOutcome) async throws {
         let world = SheetWorld()
         let sheet = await exported(in: world)
-        let pdf = try #require(sheet.document)
+        let pdf = try #require(sheet.documentID)
 
         sheet.shareEnded(result, of: pdf)
 
@@ -31,12 +31,12 @@ struct ExportShareTests {
     func cancelledShareChangesNothing() async throws {
         let world = SheetWorld()
         let sheet = await exported(in: world)
-        let pdf = try #require(sheet.document)
+        let pdf = try #require(sheet.documentID)
 
         sheet.shareEnded(.cancelled, of: pdf)
 
         #expect(sheet.shareOutcome == nil)
-        #expect(sheet.document == pdf)
+        #expect(sheet.documentID == pdf)
         #expect(sheet.status == .done(pages: 1))
     }
 
@@ -44,10 +44,29 @@ struct ExportShareTests {
     func nextExportResetsTheOutcome() async throws {
         let world = SheetWorld()
         let sheet = await exported(in: world)
-        sheet.shareEnded(.saved, of: try #require(sheet.document))
+        sheet.shareEnded(.saved, of: try #require(sheet.documentID))
 
         sheet.start()
 
         #expect(sheet.shareOutcome == nil, "an outcome is about the PDF it was shared from")
+    }
+
+    @Test("A share of an earlier export is not confirmed for a later export with the same bytes")
+    func shareOfAnEarlierExportWithTheSameBytes() async throws {
+        let world = SheetWorld()
+        let sheet = await exported(in: world)
+        let first = try #require(sheet.documentID)
+        let firstDocument = try #require(sheet.document)
+
+        sheet.refresh()
+        await world.passThePause(thenExports: 2)
+        await waitUntil("the second PDF") { sheet.document != nil }
+        sheet.shareEnded(.saved, of: first)
+
+        #expect(sheet.document == firstDocument, "the two PDFs hold the same bytes and pages")
+        #expect(sheet.documentID != first)
+        #expect(sheet.shareOutcome == nil)
+        sheet.shareEnded(.saved, of: try #require(sheet.documentID))
+        #expect(sheet.shareOutcome == .saved)
     }
 }

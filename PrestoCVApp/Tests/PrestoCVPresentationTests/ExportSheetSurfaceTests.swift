@@ -6,7 +6,7 @@ import PrestoCVPresentation
 /// Every public member of the export sheet and of the values it shows, each with its type spelled out. It compiles only
 /// while each type is the presentation's own: a domain type in the public surface breaks it.
 @MainActor
-func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: ExportedDocument) {
+func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: ExportID) {
     let _: ExportLanguage? = sheet.selectedLanguage
     let _: ExportLanguage? = sheet.automaticLanguage
     let _: ExportLanguage? = sheet.effectiveLanguage
@@ -14,6 +14,7 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: Export
     let _: [String] = offered.map(\.tag)
     let _: ExportStatus = sheet.status
     let _: ExportedDocument? = sheet.document
+    let _: ExportID? = sheet.documentID
     let _: String? = sheet.suggestedFileName
     let missing: ExportMissing = sheet.missing
     let _: [ExportMissing.Field] = missing.blockers + missing.warnings
@@ -33,11 +34,15 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: Export
 struct ExportSheetSurfaceTests {
 
     @Test("The export API holds no domain type: this file uses all of it importing only the presentation")
-    func noDomainTypeInTheExportAPI() {
+    func noDomainTypeInTheExportAPI() async throws {
         let world = SheetWorld()
         let sheet = world.sheet()
+        sheet.start()
+        await world.passThePause(thenExports: 1)
+        await waitUntil("the PDF") { sheet.documentID != nil }
+        let shared = try #require(sheet.documentID)
 
-        useEveryPublicMember(of: sheet, sharing: ExportingFake.onePageDocument)
+        useEveryPublicMember(of: sheet, sharing: shared)
 
         #expect(sheet.status == .idle)
         #expect(sheet.selectedLanguage == nil)

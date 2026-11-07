@@ -39,3 +39,10 @@ public struct ExportedDocument: Hashable, Sendable {
     public let pdf: Data
     public let pages: Int
 }
+
+/// The identity of one export of the export sheet: two exports have different ones, whatever their PDFs hold.
+public struct ExportID: Hashable, Sendable {
+    let generation: Int
+
+    init(generation: Int) { self.generation = generation }
+}

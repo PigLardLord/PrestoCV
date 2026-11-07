@@ -16,6 +16,8 @@ public final class ExportSheetViewModel {
     public private(set) var status: ExportStatus = .idle
     /// The PDF of the last export, or nil while one runs or when it failed.
     public private(set) var document: ExportedDocument?
+    /// The identity of the export that made `document`: set and cleared together with it. A share names the PDF by it.
+    public private(set) var documentID: ExportID?
     /// The name of the PDF's file, in the language of the PDF.
     public private(set) var suggestedFileName: String?
     /// What the CV lacks, as the sheet read it at the start of the last export.
@@ -81,11 +83,12 @@ public final class ExportSheetViewModel {
     /// Starts the export of the CV as it stands. The view calls it from its `.task`.
     public func start() { begin() }
 
-    /// Exports in `language`, and takes the choice to the CV; nil is automatic.
+    /// Exports in `language`, and takes the choice to the CV; nil is automatic. The export begins before the choice goes
+    /// out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is the later intent.
     public func select(language: ExportLanguage?) {
         selectedLanguage = language
-        onLanguageChosen(language)
         begin()
+        onLanguageChosen(language)
     }
 
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
@@ -97,13 +100,15 @@ public final class ExportSheetViewModel {
         generation += 1
         status = .idle
         document = nil
+        documentID = nil
         suggestedFileName = nil
     }
 
-    /// The share sheet of `shared` ended.
-    public func shareEnded(_ result: ShareResult, of shared: ExportedDocument) {
-        // A share that ends after a newer export started is about a PDF no longer on screen
-        guard shared == document else { return }
+    /// The share sheet of the PDF made by export `shared` ended.
+    public func shareEnded(_ result: ShareResult, of shared: ExportID) {
+        // A share that ends after a newer export started is about a PDF no longer on screen, even when the new PDF holds
+        // the same bytes
+        guard shared == documentID else { return }
         switch result {
         case .saved: shareOutcome = .saved
         case .sent: shareOutcome = .sent
@@ -119,6 +124,7 @@ public final class ExportSheetViewModel {
         let mine = generation
         status = .exporting
         document = nil
+        documentID = nil
         suggestedFileName = nil
         shareOutcome = nil
         let waitForThePause = pauseFromNow()
@@ -134,7 +140,7 @@ public final class ExportSheetViewModel {
     }
 
     private func export(_ mine: Int) async {
-        guard let (cv, language) = publish(mine, prepare) ?? nil else { return }
+        guard let (cv, language) = readTheCV(mine) else { return }
         let status: ExportStatus
         var document: ExportedDocument?
         do {
@@ -152,14 +158,22 @@ public final class ExportSheetViewModel {
         }
         publish(mine) {
             self.document = document
+            self.documentID = document.map { _ in ExportID(generation: mine) }
             self.status = status
         }
     }
 
     /// Reads the CV, publishes what the sheet knows of it before the export, and gives it with the language of the PDF;
-    /// nil when nothing is to be exported.
-    private func prepare() -> (CV, DocumentLanguage)? {
+    /// nil when nothing is to be exported, or when `mine` is no longer the latest intent: the snapshot closure can call
+    /// into the sheet, so the generation is checked again after it.
+    private func readTheCV(_ mine: Int) -> (CV, DocumentLanguage)? {
+        guard mine == generation else { return nil }
         let cv = snapshot().cv
+        guard mine == generation else { return nil }
+        return prepare(cv)
+    }
+
+    private func prepare(_ cv: CV) -> (CV, DocumentLanguage)? {
         automaticLanguage = cv.language.map(ExportLanguage.init(language:))
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {

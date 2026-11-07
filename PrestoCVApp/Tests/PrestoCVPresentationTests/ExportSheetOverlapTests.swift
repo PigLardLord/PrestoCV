@@ -18,6 +18,9 @@ struct ExportSheetOverlapTests {
         case pauseBegins
         /// The clock passes the pause; nothing waits for what it wakes.
         case pauseEnds
+        /// The task the pause woke is resumed but has not run: the test holds the main actor, so it has read nothing and
+        /// called nothing. It checks this without suspending.
+        case wokenTaskHeld
         /// So many exports wait at the port's gate.
         case held(Int)
         case releaseNewest, releaseAll
@@ -55,7 +58,7 @@ struct ExportSheetOverlapTests {
                 steps: [.start, .pauseBegins, .select("de"), .pauseEnds, .held(1)],
                 languages: ["de"], looks: [nil], cancelled: 0, snapshots: 1, status: .done(pages: 1), document: first),
         Overlap(name: "a selection after the pause ended, before its export began",
-                steps: [.start, .pauseBegins, .pauseEnds, .select("de"), .pauseEnds, .held(1)],
+                steps: [.start, .pauseBegins, .pauseEnds, .wokenTaskHeld, .select("de"), .pauseEnds, .held(1)],
                 languages: ["de"], looks: [nil], cancelled: 0, snapshots: 1, status: .done(pages: 1), document: first),
         Overlap(name: "a selection during the export",
                 steps: [.start, .pauseEnds, .held(1), .select("de"), .pauseEnds, .held(2), .releaseNewest, .exportEnds,
@@ -90,8 +93,10 @@ struct ExportSheetOverlapTests {
         let sheet = world.sheet()
         await world.exporter.gate.close()
 
+        var firstPDF: ExportID?
         for step in row.steps {
-            await take(step, on: sheet, in: world)
+            await take(step, on: sheet, in: world, firstPDF: firstPDF)
+            firstPDF = firstPDF ?? sheet.documentID
         }
         await world.exporter.gate.open()
         await waitUntil("every export to end") { sheet.status != .exporting }
@@ -106,7 +111,7 @@ struct ExportSheetOverlapTests {
         #expect(sheet.shareOutcome == nil, "no share in the table ends while its PDF is on screen")
     }
 
-    private func take(_ step: Step, on sheet: ExportSheetViewModel, in world: SheetWorld) async {
+    private func take(_ step: Step, on sheet: ExportSheetViewModel, in world: SheetWorld, firstPDF: ExportID?) async {
         switch step {
         case .start: sheet.start()
         case .refresh: sheet.refresh()
@@ -114,13 +119,22 @@ struct ExportSheetOverlapTests {
         case .select(let tag): sheet.select(language: SheetWorld.language(tag))
         case .pauseBegins: await waitUntil("the pause to begin") { world.clock.sleeping == 1 }
         case .pauseEnds: world.passThePause()
+        case .wokenTaskHeld:
+            #expect(world.clock.sleeping == 0, "the pause ended: its sleeper was resumed")
+            #expect(world.exporter.calls == 0, "the woken task has not reached the port")
+            #expect(world.snapshotsTaken == 0, "the woken task has not read the CV")
         case .held(let count): await world.held(count)
         case .releaseNewest: await world.exporter.gate.releaseNewest()
         case .releaseAll: await world.exporter.gate.releaseAll()
         case .exportEnds: await waitUntil("the export to end") { sheet.status != .exporting }
         case .portGives(let result): world.exporter.returns(result.mapError { $0 as any Error })
         case .lookChanges(let design): world.cv = SheetWorld.cv(design: design)
-        case .shareOfTheFirstPDFEnds(let result): sheet.shareEnded(result, of: Self.first)
+        case .shareOfTheFirstPDFEnds(let result):
+            guard let firstPDF else {
+                Issue.record("no PDF has been on screen yet")
+                return
+            }
+            sheet.shareEnded(result, of: firstPDF)
         }
     }
 }
