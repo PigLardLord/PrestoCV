@@ -57,6 +57,8 @@ The app is not released, so no user data needs migrating.
     - moves it back only if that read succeeds and no active CV has the same id. Otherwise it throws the read's outcome, and both folders stay unchanged (review round 3).
   - `erase(_:)` deletes every copy of a CV, whatever its schema or state, including quarantined ones (GDPR erasure).
   - `purgeQuarantine(olderThan:)` enforces retention (30 days).
+  - `quarantined()` lists the quarantine, oldest first, with the date each file entered it.
+  - `eraseAll(keepingLedger:)` first moves the store's erase generation (one byte appended to `.erase-generation`; if that fails, nothing is removed), so a legacy import that began before the erase stores nothing after it (`Adoption.storeErased`). Then it removes, under the same hold of the lock, every CV file, the quarantine, the staged copies and, unless the caller keeps it, the ledger. The ledger holds only ids; `EraseEverything` keeps it while a legacy source remains, so that source is not imported again, and names it in the report. A file it cannot remove is named in the report (kind and name) and the rest still go; a second call finishes the work.
 - **Nothing is written that could not be read back.** Before replacing a file, the repository encodes the CV and checks the size cap. It then decodes the bytes through the same strict path as a read, and requires the same CV back. Otherwise it throws `wouldNotReadBack`, which becomes `AuthoringError.tooLarge`, and the previous version stays. Without this, a save that exceeded a limit would be acknowledged, then quarantined or reported as `tooLarge` on the next listing (review round 2).
 - **Timestamps** are stored with whole-second precision. The repository truncates the clock's value before using it, so the read-back comparison holds for any clock.
 - **Writes** are one file per CV, atomic, with `complete` data protection on Apple platforms. The composition root gives the location and the protection class (`StoreOptions`); the default is `complete`, and the app does not change it. Tests of the store's logic (listing, quarantine, restore, purge, dates, sample source, failure causes) give none: a class-A write needs the user's key, and a CI host whose keybag is locked refuses it with `EPERM`, so those tests would pass or fail with the host. The protection itself is pinned by the tests that are about it: a repository built with the defaults writes atomically and asks for complete protection, and, on a device, a stored file has that class.
@@ -115,6 +117,7 @@ The validation prototype in `Prototypes/ADRValidation/`. Swift 6.3.3, Linux. 27 
   - `../` names, `1~../../` names, a name with a trailing newline and a symbolic link are all refused.
 - **Erase:** removes the stored newer-schema file and both quarantined copies.
 - **Purge:** removes only old entries.
+- **Erase everything:** reaches every kind of file, leaves only the lock and the erase generation (a store that was never created gets just these two, since an import may have begun before it existed), stops an import that began before it, also on another instance, and unlinks a linked quarantine without touching its target.
 
 **Writes**
 - A CV whose encoded file exceeds the cap is refused on create and on update:

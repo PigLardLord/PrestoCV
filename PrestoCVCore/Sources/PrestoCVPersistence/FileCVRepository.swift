@@ -68,11 +68,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return false
     }
 
-    private enum StoreState { case present, absent, unavailable(StoreFailure) }
+    enum StoreState { case present, absent, unavailable(StoreFailure) }
 
     /// The store itself: absent before the first save; unavailable when it cannot be reached, sits behind a link whose
     /// target is gone, or is not a directory. The store may be reached through a link.
-    private func storeState() -> StoreState {
+    func storeState() -> StoreState {
         var status = stat()
         guard stat(directory.path, &status) == 0 else {
             return errno == ENOENT && !Self.passesThroughDanglingLink(directory.path) ? .absent : .unavailable(.cannotList)
@@ -81,14 +81,14 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     /// Whether `url` is a real directory, not a link to one; nil when nothing is there.
-    private static func isRealDirectory(_ url: URL) -> Bool? {
+    static func isRealDirectory(_ url: URL) -> Bool? {
         var status = stat()
         guard lstat(url.path, &status) == 0 else { return errno == ENOENT ? nil : false }
         return (status.st_mode & S_IFMT) == S_IFDIR
     }
 
     /// The quarantine's entries. An absent quarantine is empty; one that is not a real directory is never used.
-    private func quarantineNames() throws(RepositoryError) -> [String] {
+    func quarantineNames() throws(RepositoryError) -> [String] {
         switch Self.isRealDirectory(quarantine) {
         case nil: return []
         case false?: throw .storeUnavailable(.notADirectory)

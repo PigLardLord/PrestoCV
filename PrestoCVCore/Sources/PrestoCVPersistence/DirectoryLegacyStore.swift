@@ -76,13 +76,26 @@ public struct DirectoryLegacyStore: LegacyStore {
 }
 
 extension FileCVRepository: LegacyImportTarget {
-    /// Stores a legacy CV as revision 1 with the times it carried, once, under the store lock. A CV becomes visible only
+    /// The store's erase generation, read under the lock. A store that does not exist yet is at generation 0: its first
+    /// erase creates it and moves it to 1.
+    public func beginImport() async throws(RepositoryError) -> ImportTicket {
+        switch storeState() {
+        case .absent: return ImportTicket(generation: 0)
+        case .unavailable(let failure): throw .storeUnavailable(failure)
+        case .present: break
+        }
+        return try await withStoreLock { () throws(RepositoryError) -> ImportTicket in ImportTicket(generation: try readEraseGeneration()) }
+    }
+
+    /// Stores a legacy CV as revision 1 with the times it carried, once, under the store lock, unless the store was erased
+    /// since `ticket` was taken: then nothing is written and the answer is `.storeErased`. A CV becomes visible only
     /// after the ledger holds its id: the copy is staged (made durable, ignored by listing and every sweep), the id is
     /// recorded (durable), the copy is renamed into place (durable) and read back. A run a kill stopped is finished by the
     /// next one. A CV the ledger knows is `.existing` after the files that hold it are made durable again, so a person's
     /// deletion stands and a failed barrier is retried. Every step that fails throws, and the importer keeps the source.
-    public func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption {
+    public func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption {
         try await withStoreLock { () throws(RepositoryError) -> Adoption in
+            guard try readEraseGeneration() == ticket.generation else { return .storeErased }
             var ledger = try readLedger()
             let staged = directory.appendingPathComponent(Self.stagedName(for: cv.id))
             let stored = try current(cv.id) != nil
@@ -154,6 +167,35 @@ extension FileCVRepository: LegacyImportTarget {
         try makeDurable(ledgerURL)
     }
 
+    // MARK: Erase generation
+
+    /// How many times the store was erased: the size of its generation file, one byte per erase. A file that is not there is
+    /// generation 0; one that cannot be read, or is not a regular file, throws, so no import goes on blind.
+    func readEraseGeneration() throws(RepositoryError) -> Int {
+        let name = Self.eraseGenerationName
+        let fd = open(directory.appendingPathComponent(name).path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard fd >= 0 else {
+            if errno == ENOENT { return 0 }
+            throw .unreadable(file: name)
+        }
+        defer { close(fd) }
+        var status = stat()
+        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .unreadable(file: name) }
+        return Int(status.st_size)
+    }
+
+    /// Moves the store to the next erase generation (one byte appended), under the lock the caller holds. An import that
+    /// began before it stores nothing after it.
+    func bumpEraseGeneration() throws(RepositoryError) {
+        let name = Self.eraseGenerationName
+        let fd = open(directory.appendingPathComponent(name).path, O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw .writeFailed(file: name, cause: FailureCause(domain: .posix, code: Int(errno))) }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        var status = stat()
+        guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .unreadable(file: name) }
+        do { try handle.write(contentsOf: Data([0x2E])) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
+    }
+
     // MARK: Durability
 
     /// Flushes a file and then the store directory to the disk, so a stored copy survives a power loss before its source goes.
@@ -178,6 +220,9 @@ extension FileCVRepository: LegacyImportTarget {
 
 extension FileCVRepository {
     static let legacyLedgerName = ".legacy-imported.json"
+    /// One byte per erase of the store: an import compares it before each write, so nothing it read before an erase is stored after.
+    static let eraseGenerationName = ".erase-generation"
     /// The staged copy of a CV being adopted: a name that listing, quarantine and every sweep ignore (it does not end in `.cv.json`).
-    static func stagedName(for id: CVID) -> String { "." + id.raw.uuidString + ".legacy-staged" }
+    static func stagedName(for id: CVID) -> String { "." + id.raw.uuidString + stagedSuffix }
+    static let stagedSuffix = ".legacy-staged"
 }
