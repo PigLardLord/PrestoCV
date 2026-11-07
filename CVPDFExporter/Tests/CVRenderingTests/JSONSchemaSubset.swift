@@ -25,39 +25,80 @@ enum JSONValue: Decodable, Equatable {
     var integerValue: Int? { if case .integer(let i) = self { return i } else { return nil } }
 }
 
-/// The part of JSON Schema 2020-12 that `cv-document.schema.json` uses, and nothing more: a keyword it does not know is
-/// reported, never skipped, so the schema cannot start to say something the tests do not check.
+/// The part of JSON Schema 2020-12 that `cv-document.schema.json` uses, and nothing more. A keyword it does not know is
+/// reported, and so is a known keyword in a form the matcher does not enforce for every kind of value (see `rejection`),
+/// never skipped, so the schema cannot start to say something the tests do not check.
 struct JSONSchemaSubset {
     let root: JSONValue
+    private let patterns: [String: NSRegularExpression]
     private static let annotations: Set<String> = ["$schema", "$id", "title", "description", "$defs", "$comment"]
-    private static let implemented: Set<String> = [
+    static let implementedKeywords: Set<String> = [
         "$ref", "type", "const", "enum", "minimum", "maximum", "minLength", "pattern", "maxItems", "minItems", "items",
         "properties", "required", "additionalProperties", "oneOf",
     ]
+    private static let jsonTypes: Set<String> = ["object", "array", "string", "number", "integer", "boolean", "null"]
 
     struct Unsupported: Error, CustomStringConvertible { let description: String }
 
+    /// The one place that says which argument forms the matcher enforces: nil when `argument` is accepted for
+    /// `keyword`, else why it is not. Add a form here only together with its enforcement in the matcher below.
+    private static func rejection(_ keyword: String, _ argument: JSONValue, root: JSONValue) -> String? {
+        func isSchema(_ v: JSONValue) -> Bool { if case .object = v { return true } else { return v == .bool(true) || v == .bool(false) } }
+        switch (keyword, argument) {
+        case ("additionalProperties", .bool(false)): return nil
+        case ("additionalProperties", _): return "only false is enforced"
+        case ("type", .string(let name)): return jsonTypes.contains(name) ? nil : "\(name) is not a JSON type"
+        case ("type", _): return "only a single type name is enforced"
+        case ("const", _): return nil
+        case ("enum", .array): return nil
+        case ("enum", _): return "must be an array"
+        case ("minimum", .integer), ("maximum", .integer): return nil
+        case ("minimum", _), ("maximum", _): return "must be an integer"
+        case ("minLength", .integer(let n)), ("maxItems", .integer(let n)), ("minItems", .integer(let n)): return n >= 0 ? nil : "must not be negative"
+        case ("minLength", _), ("maxItems", _), ("minItems", _): return "must be a non-negative integer"
+        case ("pattern", .string(let source)): return (try? NSRegularExpression(pattern: source)) != nil ? nil : "does not compile"
+        case ("pattern", _): return "must be a string"
+        case ("items", _): return isSchema(argument) ? nil : "must be a schema"
+        case ("properties", .object(let props)): return props.values.allSatisfy(isSchema) ? nil : "every property must be a schema"
+        case ("properties", _): return "must be an object"
+        case ("required", .array(let names)): return names.count == argument.strings.count ? nil : "must be an array of strings"
+        case ("required", _): return "must be an array of strings"
+        case ("oneOf", .array(let branches)): return !branches.isEmpty && branches.allSatisfy(isSchema) ? nil : "must be a non-empty array of schemas"
+        case ("oneOf", _): return "must be a non-empty array of schemas"
+        case ("$ref", .string(let ref)):
+            guard ref.hasPrefix("#/$defs/") else { return "only #/$defs/<name> is enforced" }
+            return root["$defs"]?[String(ref.dropFirst("#/$defs/".count))] != nil ? nil : "does not resolve"
+        case ("$ref", _): return "must be a string"
+        default: return "no accepted form"
+        }
+    }
+
     /// Walks the whole schema (every definition, property, item and oneOf branch) before any document is matched, and
-    /// fails on a keyword the checker does not implement: a branch that matching never reaches cannot hide one.
+    /// fails on a keyword the checker does not implement or an argument form it does not enforce: a branch that
+    /// matching never reaches cannot hide one. Patterns are compiled here.
     init(root: JSONValue) throws {
         self.root = root
         var found: [String] = []
-        Self.collectUnsupported(root, path: "#", into: &found)
-        if !found.isEmpty { throw Unsupported(description: "the schema uses keywords the checker does not implement: " + found.joined(separator: ", ")) }
+        var compiled: [String: NSRegularExpression] = [:]
+        Self.collectUnsupported(root, root: root, path: "#", into: &found, patterns: &compiled)
+        if !found.isEmpty { throw Unsupported(description: "the schema uses what the checker does not enforce: " + found.joined(separator: ", ")) }
+        patterns = compiled
     }
 
-    private static func collectUnsupported(_ schema: JSONValue, path: String, into found: inout [String]) {
+    private static func collectUnsupported(_ schema: JSONValue, root: JSONValue, path: String, into found: inout [String], patterns: inout [String: NSRegularExpression]) {
         guard case .object(let keywords) = schema else { return }
         for (keyword, argument) in keywords.sorted(by: { $0.key < $1.key }) {
             if annotations.contains(keyword) {
-                if keyword == "$defs", case .object(let defs) = argument { for (name, sub) in defs.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, path: "\(path)/$defs/\(name)", into: &found) } }
+                if keyword == "$defs", case .object(let defs) = argument { for (name, sub) in defs.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, root: root, path: "\(path)/$defs/\(name)", into: &found, patterns: &patterns) } }
                 continue
             }
-            guard implemented.contains(keyword) else { found.append("\(path): \(keyword)"); continue }
+            guard implementedKeywords.contains(keyword) else { found.append("\(path): \(keyword)"); continue }
+            if let why = rejection(keyword, argument, root: root) { found.append("\(path)/\(keyword): \(why)"); continue }
             switch (keyword, argument) {
-            case ("properties", .object(let props)): for (name, sub) in props.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, path: "\(path)/properties/\(name)", into: &found) }
-            case ("items", _), ("additionalProperties", _): collectUnsupported(argument, path: "\(path)/\(keyword)", into: &found)
-            case ("oneOf", .array(let branches)): for (i, sub) in branches.enumerated() { collectUnsupported(sub, path: "\(path)/oneOf/\(i)", into: &found) }
+            case ("pattern", .string(let source)): patterns[source] = try? NSRegularExpression(pattern: source)
+            case ("properties", .object(let props)): for (name, sub) in props.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, root: root, path: "\(path)/properties/\(name)", into: &found, patterns: &patterns) }
+            case ("items", _): collectUnsupported(argument, root: root, path: "\(path)/items", into: &found, patterns: &patterns)
+            case ("oneOf", .array(let branches)): for (i, sub) in branches.enumerated() { collectUnsupported(sub, root: root, path: "\(path)/oneOf/\(i)", into: &found, patterns: &patterns) }
             default: break
             }
         }
@@ -84,7 +125,7 @@ struct JSONSchemaSubset {
         case "const": return value == argument ? [] : ["\(path): not the constant \(argument)"]
         case "enum": if case .array(let options) = argument { return options.contains(value) ? [] : ["\(path): not one of the allowed values"] } else { return ["\(path): bad enum"] }
         case "minimum", "maximum": return bound(keyword, argument, value, path: path)
-        case "minLength": if case .string(let s) = value, let n = argument.integerValue { return s.count >= n ? [] : ["\(path): shorter than \(n)"] } else { return [] }
+        case "minLength": if case .string(let s) = value, let n = argument.integerValue { return s.unicodeScalars.count >= n ? [] : ["\(path): shorter than \(n)"] } else { return [] }
         case "pattern": return pattern(argument, value, path: path)
         case "maxItems", "minItems": return itemCount(keyword, argument, value, path: path)
         case "items": if case .array(let a) = value { return a.enumerated().flatMap { check($1, argument, path: "\(path)[\($0)]") } } else { return [] }
@@ -111,8 +152,14 @@ struct JSONSchemaSubset {
     }
 
     private func bound(_ keyword: String, _ argument: JSONValue, _ value: JSONValue, path: String) -> [String] {
-        guard case .integer(let v) = value, let limit = argument.integerValue else { return [] }
-        let ok = keyword == "minimum" ? v >= limit : v <= limit
+        let v: Double
+        switch value {
+        case .integer(let i): v = Double(i)
+        case .number(let d): v = d
+        default: return []
+        }
+        guard let limit = argument.integerValue else { return [] }
+        let ok = keyword == "minimum" ? v >= Double(limit) : v <= Double(limit)
         return ok ? [] : ["\(path): \(v) breaks \(keyword) \(limit)"]
     }
 
@@ -125,7 +172,7 @@ struct JSONSchemaSubset {
     /// `pattern` is a search, not a full match (ECMA-262 `RegExp.test`).
     private func pattern(_ argument: JSONValue, _ value: JSONValue, path: String) -> [String] {
         guard case .string(let s) = value else { return [] }
-        guard case .string(let source) = argument, let regex = try? NSRegularExpression(pattern: source) else { return ["\(path): bad pattern"] }
+        guard case .string(let source) = argument, let regex = patterns[source] else { return ["\(path): bad pattern"] }
         return regex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil ? [] : ["\(path): does not match pattern \(source)"]
     }
 
