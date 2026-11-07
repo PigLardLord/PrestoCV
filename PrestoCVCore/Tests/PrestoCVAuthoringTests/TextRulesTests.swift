@@ -17,13 +17,13 @@ private let removedClasses: [(name: String, text: String)] = [
 struct TextRulesTests {
     // MARK: Single-line
 
-    @Test("single-line removes controls, NUL and DEL", arguments: [0x0000, 0x0007, 0x000B, 0x000C, 0x001B, 0x007F, 0x0094].map(UInt32.init))
+    @Test("single-line removes controls, NUL and DEL", arguments: [0x0000, 0x0007, 0x001B, 0x007F, 0x0094].map(UInt32.init))
     func singleLineRemovesControls(code: UInt32) {
         #expect(TextRules.singleLine("a\(scalar(code))b") == "ab")
     }
 
-    @Test("single-line turns CR, LF, CRLF, NEL, tab, U+2028 and U+2029 into one space each",
-          arguments: ["\r", "\n", "\r\n", "\u{85}", "\t", "\u{2028}", "\u{2029}"])
+    @Test("single-line turns CR, LF, CRLF, NEL, VT, FF, tab, U+2028 and U+2029 into one space each",
+          arguments: ["\r", "\n", "\r\n", "\u{85}", "\u{0B}", "\u{0C}", "\t", "\u{2028}", "\u{2029}"])
     func singleLineBreaks(separator: String) {
         #expect(TextRules.singleLine("a\(separator)b") == "a b")
         #expect(TextRules.singleLine("a\(separator)\(separator)b") == "a  b")
@@ -31,17 +31,18 @@ struct TextRulesTests {
 
     // MARK: Multi-line
 
-    @Test("multi-line keeps LF, turns CRLF and CR into LF, turns a tab into a space")
+    @Test("multi-line keeps LF, turns CRLF, CR, NEL, VT, FF, U+2028 and U+2029 into LF, turns a tab into a space")
     func multiLine() {
         #expect(TextRules.multiLine("a\nb") == "a\nb")
         #expect(TextRules.multiLine("a\r\nb") == "a\nb")
         #expect(TextRules.multiLine("a\rb") == "a\nb")
         #expect(TextRules.multiLine("a\r\n\r\nb\r") == "a\n\nb\n")
         #expect(TextRules.multiLine("a\u{85}b\u{2028}c\u{2029}d") == "a\nb\nc\nd")
+        #expect(TextRules.multiLine("a\u{0B}b\u{0C}c") == "a\nb\nc")   // a page break of extracted PDF text keeps the words apart
         #expect(TextRules.multiLine("a\tb") == "a b")
     }
 
-    @Test("multi-line removes the other controls, NUL and DEL too", arguments: [0x0000, 0x0007, 0x000B, 0x000C, 0x007F].map(UInt32.init))
+    @Test("multi-line removes the other controls, NUL and DEL too", arguments: [0x0000, 0x0007, 0x007F].map(UInt32.init))
     func multiLineRemovesControls(code: UInt32) {
         #expect(TextRules.multiLine("a\(scalar(code))b") == "ab")
     }
@@ -93,7 +94,7 @@ struct TextRulesTests {
     @Test("normalising twice equals normalising once, over generated strings that mix every class")
     func idempotent() {
         let alphabet: [String] = ["a", "Z", " ", "é", "\u{1F468}", "\u{200D}", "\u{200C}", "\u{FE0F}", "\n", "\r", "\r\n", "\t", "\u{0}", "\u{7F}",
-                                  "\u{85}", "\u{2028}", "\u{2029}", "\u{0B}"] + removedClasses.map(\.text)
+                                  "\u{85}", "\u{2028}", "\u{2029}", "\u{0B}", "\u{0C}"] + removedClasses.map(\.text)
         var seed: UInt64 = 0x9E37_79B9_7F4A_7C15
         func next() -> Int {
             seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -104,8 +105,8 @@ struct TextRulesTests {
             let single = TextRules.singleLine(text), multi = TextRules.multiLine(text)
             #expect(TextRules.singleLine(single) == single)
             #expect(TextRules.multiLine(multi) == multi)
-            #expect(!single.unicodeScalars.contains { $0 == "\n" || $0 == "\r" || $0 == "\t" })
-            #expect(!multi.unicodeScalars.contains { $0 == "\r" || $0 == "\t" })
+            #expect(!single.unicodeScalars.contains { $0 == "\n" || $0 == "\r" || $0 == "\t" || $0 == "\u{0B}" || $0 == "\u{0C}" })
+            #expect(!multi.unicodeScalars.contains { $0 == "\r" || $0 == "\t" || $0 == "\u{0B}" || $0 == "\u{0C}" })
         }
     }
 }

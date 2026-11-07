@@ -3,8 +3,19 @@ import Synchronization
 import PrestoCVDomain
 import PrestoCVApplication
 
-public actor InMemoryCVRepository: CVRepository {
+/// The in-memory CV store, with the maintenance port (`InMemoryCVRepository+Maintenance.swift`): the double the contract suite
+/// runs on beside the file store.
+public actor InMemoryCVRepository: CVRepository, CVStoreMaintenance, LegacyImportTarget {
     var store: [CVID: CV] = [:]
+    /// The quarantine: a file that is a CV (`cv`) or does not decode (nil), and when it entered.
+    struct Held: Sendable { var id: CVID; var cv: CV?; var enteredAt: Date }
+    var held: [String: Held] = [:]
+    /// Stored files that do not decode: the next listing sets them aside.
+    var corruptLive: Set<CVID> = []
+    /// The ids the importer adopted: the ledger, which outlives a deletion so that a source is not imported again.
+    var adopted: Set<CVID> = []
+    /// How many times the store was erased: an import that began at an older generation stores nothing.
+    var eraseGeneration = 0
     let clock: any TimeSource
     public init(clock: any TimeSource = SteppingClock()) { self.clock = clock }
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
@@ -18,12 +29,28 @@ public actor InMemoryCVRepository: CVRepository {
     }
     public func load(_ id: CVID) async throws(RepositoryError) -> CV { guard let cv = store[id] else { throw .notFound(id) }; return cv }
     public func list() async throws(RepositoryError) -> CVListing {
-        CVListing(cvs: store.values.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }, issues: [])
+        CVListing(cvs: store.values.sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }, issues: quarantineCorruptLive())
     }
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
         guard let existing = store[id] else { throw .notFound(id) }
         guard existing.revision == revision else { throw .conflict(id, storedRevision: existing.revision) }
         store[id] = nil
+    }
+}
+
+extension InMemoryCVRepository {
+    public func beginImport() async throws(RepositoryError) -> ImportTicket { ImportTicket(generation: eraseGeneration) }
+
+    /// Stores a legacy CV once: a CV the ledger knows is `.existing`, also after it was deleted. Nothing is stored once the
+    /// store was erased after `ticket` was taken.
+    public func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption {
+        guard ticket.generation == eraseGeneration else { return .storeErased }
+        if adopted.contains(cv.id) { return .existing }
+        adopted.insert(cv.id)
+        if store[cv.id] != nil { return .existing }
+        let copy = cv.adoptedAsRevisionOne
+        store[cv.id] = copy
+        return .stored(copy)
     }
 }
 

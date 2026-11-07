@@ -4,8 +4,8 @@
 ///
 /// | Character | Single-line field | Multi-line field |
 /// |---|---|---|
-/// | Control characters (category Cc), NUL and DEL included | removed | removed |
-/// | LF, CR, CRLF, NEL (U+0085), U+2028, U+2029 | one space each | LF (CRLF and CR count once) |
+/// | Control characters (category Cc), NUL and DEL included, but the line breaks below | removed | removed |
+/// | LF, CR, CRLF, NEL (U+0085), VT (U+000B), FF (U+000C), U+2028, U+2029 | one space each | LF (CRLF and CR count once) |
 /// | Tab | one space | one space |
 /// | Embeddings and overrides U+202A to U+202E, isolates U+2066 to U+2069 | removed | removed |
 /// | The marks U+200E, U+200F and U+061C, which reverse figures on display | removed | removed |
@@ -14,6 +14,8 @@
 /// | U+200B, U+2060, U+FEFF and U+00AD, invisible but not named by the decision | kept | kept |
 ///
 /// A tag-sequence flag emoji (England, Scotland, Wales) loses its tags and reads as a black flag: the accepted loss.
+/// VT and FF are line breaks, as in Unicode's line breaking (UAX #14, class BK): text taken from a PDF has a form feed
+/// between pages, and removing it would join the last word of a page to the first of the next.
 /// There is no trimming and no collapsing of spaces, and the rule is idempotent. The multi-line fields are the summary
 /// and the description of an experience, an education and a certification; every other text is single-line.
 ///
@@ -30,7 +32,7 @@ public enum TextRules {
             defer { previousWasCarriageReturn = scalar == "\r" }
             switch scalar {
             case "\n" where previousWasCarriageReturn: continue          // the LF of a CRLF: the CR already gave the break
-            case "\r", "\n", "\u{85}", "\u{2028}", "\u{2029}": result.append(lineBreak)
+            case "\r", "\n", "\u{85}", "\u{0B}", "\u{0C}", "\u{2028}", "\u{2029}": result.append(lineBreak)
             case "\t": result.append(" ")
             default: if !isRemoved(scalar) { result.append(scalar) }
             }
