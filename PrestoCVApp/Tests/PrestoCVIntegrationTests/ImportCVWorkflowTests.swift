@@ -20,8 +20,25 @@ private final class ScriptedImporter: CVTextImporting, @unchecked Sendable {
     }
 }
 
+/// An id generator that gives a fixed id and counts how many times it was asked.
+private final class CountingID: IDGenerator, @unchecked Sendable {
+    private let lock = NSLock()
+    private var asked = 0
+    private let fixed: FixedID
+    init(_ last: Int) { fixed = FixedID(last) }
+    var calls: Int { lock.withLock { asked } }
+    func next() -> CVID {
+        lock.withLock { asked += 1 }
+        return fixed.next()
+    }
+}
+
+private func workflow(_ importer: ScriptedImporter, ids: CountingID) -> ImportCVWorkflow {
+    ImportCVWorkflow(importer: importer, ids: ids)
+}
+
 private func workflow(_ importer: ScriptedImporter, id: Int = 5) -> ImportCVWorkflow {
-    ImportCVWorkflow(importer: importer, ids: FixedID(id))
+    workflow(importer, ids: CountingID(id))
 }
 
 @Suite("Import CV workflow")
@@ -36,6 +53,13 @@ struct ImportCVWorkflowTests {
         #expect(outcome.review.isEmpty == false)
     }
 
+    @Test("a successful import takes exactly one id")
+    func successTakesOneID() async throws {
+        let ids = CountingID(5)
+        _ = try await workflow(ScriptedImporter { _ in FullImport.result }, ids: ids).importCV(fromText: FullImport.text)
+        #expect(ids.calls == 1)
+    }
+
     @Test("the text not imported is returned whole, each piece as the person wrote it")
     func notImportedTextIsReturnedWhole() async throws {
         let f = ImportFixture(text: "Ada\nA long paragraph, with punctuation; and a second sentence.\nAnother piece")
@@ -48,9 +72,11 @@ struct ImportCVWorkflowTests {
 
     @Test("a text with nothing in it is a failure, not an empty CV, and takes no id")
     func emptyTextIsAFailureNotACV() async {
+        let ids = CountingID(5)
         await #expect(throws: ImportFailure.empty) {
-            try await workflow(ScriptedImporter { _ in throw ImportError.empty }).importCV(fromText: "")
+            try await workflow(ScriptedImporter { _ in throw ImportError.empty }, ids: ids).importCV(fromText: "")
         }
+        #expect(ids.calls == 0)
     }
 
     @Test("every reason the import cannot read a text is a failure of its own")
@@ -59,18 +85,24 @@ struct ImportCVWorkflowTests {
             (.empty, .empty), (.tooLarge, .tooLarge), (.tooManyPages, .tooManyPages), (.encrypted, .encrypted),
             (.unreadable, .unreadable), (.noText, .noText),
         ]
+        let ids = CountingID(5)
         for (error, failure) in pairs {
-            await #expect(throws: failure) { try await workflow(ScriptedImporter { _ in throw error }).importCV(fromText: "x") }
+            await #expect(throws: failure) { try await workflow(ScriptedImporter { _ in throw error }, ids: ids).importCV(fromText: "x") }
         }
         struct Unexpected: Error {}
-        await #expect(throws: ImportFailure.unreadable) { try await workflow(ScriptedImporter { _ in throw Unexpected() }).importCV(fromText: "x") }
+        await #expect(throws: ImportFailure.unreadable) {
+            try await workflow(ScriptedImporter { _ in throw Unexpected() }, ids: ids).importCV(fromText: "x")
+        }
+        #expect(ids.calls == 0)
     }
 
     @Test("a cancelled task stays a cancellation")
     func cancellationPassesThrough() async {
+        let ids = CountingID(5)
         await #expect(throws: CancellationError.self) {
-            try await workflow(ScriptedImporter { _ in throw CancellationError() }).importCV(fromText: "x")
+            try await workflow(ScriptedImporter { _ in throw CancellationError() }, ids: ids).importCV(fromText: "x")
         }
+        #expect(ids.calls == 0)
     }
 
     @Test("a pasted CV is read by the same import, with its text as pasted")
