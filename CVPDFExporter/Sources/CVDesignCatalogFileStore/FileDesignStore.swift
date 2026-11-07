@@ -13,6 +13,8 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
     /// The store directory cannot be created or listed, its lock cannot be taken, or its `Designs` folder is not a
     /// real directory.
     case storeUnavailable
+    /// The store's lock was held elsewhere, by another instance or another process, until the wait's deadline.
+    case lockTimeout
     /// The index cannot be read (an I/O failure, or not a regular file), is corrupt, or was written by a newer
     /// version. It is left untouched, and nothing is saved over it.
     case indexUnreadable, indexCorrupt(String), indexFromNewerVersion(Int)
@@ -30,15 +32,49 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 ///   lists each design with its current generation. Both writes are atomic. A save that fails before the index is
 ///   written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
 /// - A save holds an exclusive `flock` on the store and a read a shared one, so a second instance or another
-///   process loses no index update.
+///   process loses no index update. While the lock is held elsewhere the call suspends between attempts and holds no
+///   thread, and it gives up with `lockTimeout` at the deadline of `lockWait`.
 /// - Files on disk are untrusted input (R8): every read goes through the validator again and must match the index,
 ///   and a path that is not a regular file (a symbolic link, a named pipe) or a `Designs` folder that is not a real
 ///   directory is never used. Only validated designs leave the store.
 public actor FileDesignStore: DesignStore {
-    let directory: URL, validator: DesignPackageValidator
+    let directory: URL, validator: DesignPackageValidator, lockWait: LockWait
 
-    public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator()) {
-        self.directory = directory; self.validator = validator
+    public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), lockWait: LockWait = .standard) {
+        self.directory = directory; self.validator = validator; self.lockWait = lockWait
+    }
+
+    /// How the store waits while its lock is held elsewhere: it tries again after each pause, and gives up with
+    /// `lockTimeout` once the pauses add up to the deadline (a pause never asks for more than what is left of it, so the wait never passes it and the sum cannot overflow). The pause suspends the caller; it never holds a thread.
+    public struct LockWait: Sendable {
+        public let deadline: Duration, interval: Duration
+        let pause: @Sendable (Duration) async -> Void
+
+        /// `pause` waits for about the duration it is given. Tests pass one that does not wait. An `interval` of zero or
+        /// less counts as the smallest step, one millisecond, so that every pause brings the wait closer to the deadline
+        /// and it stays bounded. A `deadline` of zero or less allows one attempt and no pause.
+        public init(deadline: Duration, interval: Duration, pause: @escaping @Sendable (Duration) async -> Void) {
+            self.deadline = deadline; self.interval = max(interval, Self.smallestInterval); self.pause = pause
+        }
+
+        static let smallestInterval = Duration.milliseconds(1)
+
+        /// The pause after the pauses have added up to `waited`: the interval, or only what is left of the deadline, so
+        /// the wait never passes the deadline and the sum never overflows; nil once the deadline is reached.
+        func step(after waited: Duration) -> Duration? {
+            waited < deadline ? min(interval, deadline - waited) : nil
+        }
+
+        /// What the app uses: ten seconds, in pauses of 25 milliseconds on the real clock. The pause sleeps in a task of
+        /// its own, which does not inherit the caller's cancellation: a cancelled call keeps waiting until the deadline,
+        /// and its only failure, a cancellation, cannot happen.
+        public static let standard = LockWait(deadline: .seconds(10), interval: .milliseconds(25), pause: standardPause)
+
+        /// The pause of `standard`, apart so that a test can run it with a shorter deadline.
+        static let standardPause: @Sendable (Duration) async -> Void = { interval in
+            let sleeping = Task { try await Task.sleep(for: interval) }
+            _ = await sleeping.result
+        }
     }
 
     static let indexVersion = 1, maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
@@ -58,7 +94,7 @@ public actor FileDesignStore: DesignStore {
     public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
-        _ = try withLock(exclusive: true) { () throws(FileDesignStoreError) in
+        _ = try await withLock(exclusive: true) { () throws(FileDesignStoreError) in
             let entries = try readIndex()
             try removeUnlistedFiles(keeping: entries, for: id)
             let generation = (entries.first { $0.manifest.id == id }?.generation ?? 0) + 1
@@ -74,7 +110,7 @@ public actor FileDesignStore: DesignStore {
 
     public func design(id: String) async throws(FileDesignStoreError) -> ValidatedDesign? {
         guard DesignManifest.isValidID(id) else { return nil }   // never a path, such as "../x", or "Clean" on a case-insensitive volume
-        return try withLock(exclusive: false) { () throws(FileDesignStoreError) -> ValidatedDesign? in
+        return try await withLock(exclusive: false) { () throws(FileDesignStoreError) -> ValidatedDesign? in
             guard let entry = try readIndex().first(where: { $0.manifest.id == id }) else { return nil }
             let data: Data
             switch readRegularFile(file(entry), cap: validator.maxBytes) {
@@ -90,14 +126,17 @@ public actor FileDesignStore: DesignStore {
     }
 
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
-        try withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
+        try await withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
     }
 
     // MARK: Locking
 
     /// Runs `body` holding the store lock. A shared lock on a store that does not exist yet returns nil and creates
     /// nothing: nothing has been saved. A store that exists but cannot be reached is unavailable, never empty (R7).
-    private func withLock<T>(exclusive: Bool, _ body: () throws(FileDesignStoreError) -> T) throws(FileDesignStoreError) -> T? {
+    /// While the lock is held elsewhere the call pauses between attempts, suspended, and after the pauses of
+    /// `lockWait` ends in `lockTimeout`. `body` never suspends, so no other call of this actor runs while it holds the
+    /// lock.
+    private func withLock<T>(exclusive: Bool, _ body: () throws(FileDesignStoreError) -> T) async throws(FileDesignStoreError) -> T? {
         if exclusive {
             do { try FileManager.default.createDirectory(at: designsDirectory, withIntermediateDirectories: true) } catch { throw .storeUnavailable }
         } else {
@@ -113,8 +152,16 @@ public actor FileDesignStore: DesignStore {
         defer { close(fd) }
         var status = stat()
         guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .storeUnavailable }
-        while flock(fd, exclusive ? LOCK_EX : LOCK_SH) != 0 {
-            guard errno == EINTR else { throw .storeUnavailable }
+        var waited = Duration.zero
+        while flock(fd, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) != 0 {
+            switch errno {
+            case EINTR: continue
+            case EWOULDBLOCK:
+                guard let step = lockWait.step(after: waited) else { throw .lockTimeout }
+                await lockWait.pause(step)
+                waited += step
+            default: throw .storeUnavailable
+            }
         }
         defer { flock(fd, LOCK_UN) }
         try checkDesignsDirectory()

@@ -203,9 +203,9 @@ A platform-only target wraps **every file** entirely in its platform condition. 
   - Writes are atomic, with `complete` file protection on Apple platforms.
   - **Nothing is written that could not be read back.** Before replacing a file, the repository encodes it, checks the size cap, and decodes it through the same strict path as a read. A failure is a typed `wouldNotReadBack` error, and the previous version stays.
   - Timestamps are stored with whole-second precision.
-  - Create, update and delete are conditional on the revision, under an exclusive lock on the store (`flock`), so no update is lost across repository instances or processes.
+  - Create, update and delete are conditional on the revision, under an exclusive lock on the store (`flock`), so no update is lost across repository instances or processes. The wait for the lock suspends and is bounded: a lock held elsewhere until the deadline is `storeUnavailable(.lockTimeout)` (ADR 0009).
   - Timestamps are assigned by the repository through the injected `TimeSource`. Listing is ordered by last change.
-- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Quarantine is purged after a retention period.
+- **Erasure.** Erasing a CV removes every copy: the stored file whatever its schema, and the quarantined copies. Quarantine is purged after a retention period. Erasing everything also reaches the quarantine, the staged copies, the import ledger and the legacy sources not yet removed, and an import that began before it stores nothing after it; it covers the CV data the app stores today, and a new kind of stored data extends it in the change that adds the data.
 - **Migrations.** Schema changes after release ship with a migration and a test for it. Before the first release there is no legacy format to support.
 
 **Enforced by:** test (the repository contract suite, and the file-store tests for every outcome above) and review.
