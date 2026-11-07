@@ -7,7 +7,7 @@ import PrestoCVDomain
 enum LegacyPeriod {
     enum Reading: Equatable { case none, period(Period), unreadable }
 
-    private static let separators = #"\s*[-–—]\s*|\s+(?:to|bis|a|al|à|au|até)\s+"#
+    private static let separators = #"(?i)\s*[-–—]\s*|\s+(?:to|bis|a|al|à|au|até)\s+"#
     private static let now: Set<String> = [
         "present", "current", "now", "today", "oggi", "ad oggi", "attuale", "presente", "heute", "aktuell", "jetzt",
         "actual", "actualidad", "hoy", "présent", "aujourd'hui", "actuel", "atual", "atualmente", "hoje",
@@ -15,7 +15,7 @@ enum LegacyPeriod {
     private static let months: [String: Int] = [
         "jan": 1, "gen": 1, "ene": 1, "feb": 2, "fev": 2, "mar": 3, "apr": 4, "avr": 4, "abr": 4, "may": 5, "mai": 5, "mag": 5,
         "jun": 6, "giu": 6, "juin": 6, "jul": 7, "lug": 7, "juil": 7, "aug": 8, "ago": 8, "aou": 8, "sep": 9, "set": 9,
-        "oct": 10, "ott": 10, "out": 10, "nov": 11, "dec": 12, "dic": 12, "dez": 12,
+        "oct": 10, "okt": 10, "ott": 10, "out": 10, "nov": 11, "dec": 12, "dic": 12, "dez": 12,
     ]
 
     static func read(_ text: String) -> Reading {

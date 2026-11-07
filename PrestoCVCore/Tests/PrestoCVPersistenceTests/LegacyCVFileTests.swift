@@ -13,7 +13,7 @@ private func mapped(_ json: String, name: String? = nil) -> LegacyCV? {
     return legacy
 }
 
-private func invalidReason(_ json: String, name: String = LegacyFixtures.fileName(LegacyFixtures.idA)) -> String? {
+private func invalidReason(_ json: String, name: String = LegacyFixtures.fileName(LegacyFixtures.idA)) -> LegacyInvalid? {
     guard case .invalid(let reason) = LegacyCVFile.read(Data(json.utf8), fileName: name, fallback: fallback) else { return nil }
     return reason
 }
@@ -23,25 +23,26 @@ struct LegacyCVFileTests {
     @Test("a file of version 1.0 maps every field to the domain")
     func version10() throws {
         let legacy = try #require(mapped(LegacyFixtures.v10()))
-        let cv = legacy.cv
-        #expect(cv.id == CVID(UUID(uuidString: LegacyFixtures.idA)!))
-        #expect(cv.revision == 0)
-        #expect(cv.title == "Lab roles")
-        #expect(cv.personal.fullName == "Ada Example" && cv.personal.professionalTitle == "Lab technician")
-        #expect(cv.personal.email?.value == "ada@example.org" && cv.personal.phone?.value == "+39 011 555 0100")
-        #expect(cv.personal.website?.value == "https://example.org/ada" && cv.personal.summary == "Careful and curious.")
-        #expect(cv.sections.experiences.first?.period == period(start: (2018, 3), end: nil, current: true))
-        #expect(cv.sections.experiences.first?.role == "Technician")
-        #expect(cv.sections.education.first?.period == period(start: (2012, nil), end: (2015, nil), current: false))
-        #expect(cv.sections.skills.map(\.level?.value) == [4, nil])
-        #expect(cv.sections.languages.map(\.proficiency) == [.b2, .native])
-        #expect(cv.sections.certifications.first?.issued == PartialDate(year: 2019))
-        #expect(cv.sections.certifications.first?.link?.value == "https://example.org/aid")
-        #expect(cv.sections.profiles.map(\.platform) == ["GitHub"])
-        #expect(cv.sections.interests == ["Chess", "Hiking"])
-        #expect(cv.design == nil && cv.language == nil)
-        #expect(cv.createdAt == ISO8601DateFormatter().date(from: "2026-09-01T08:00:00Z"))
-        #expect(cv.updatedAt == ISO8601DateFormatter().date(from: "2026-09-20T10:00:00Z"))
+        let expected = CV(
+            id: CVID(UUID(uuidString: LegacyFixtures.idA)!), revision: 0,
+            createdAt: ISO8601DateFormatter().date(from: "2026-09-01T08:00:00Z"), updatedAt: ISO8601DateFormatter().date(from: "2026-09-20T10:00:00Z"),
+            title: "Lab roles",
+            personal: PersonalDetails(fullName: "Ada Example", professionalTitle: "Lab technician", email: EmailAddress("ada@example.org"),
+                                      phone: PhoneNumber("+39 011 555 0100"), location: "Turin", website: WebLink("https://example.org/ada"),
+                                      summary: "Careful and curious."),
+            sections: CVSections(
+                experiences: [Experience(role: "Technician", company: "Example Labs", location: "Turin",
+                                         period: period(start: (2018, 3), end: nil, current: true), description: "Ran assays.")],
+                education: [Education(degree: "BSc Biology", school: "Example University",
+                                      period: period(start: (2012, nil), end: (2015, nil), current: false), description: "")],
+                skills: [Skill(name: "Pipetting", level: SkillLevel(4)), Skill(name: "Cooking")],
+                languages: [LanguageSkill(language: "English", proficiency: .b2), LanguageSkill(language: "Italian", proficiency: .native)],
+                certifications: [Certification(name: "First Aid", issuer: "Example Institute", issued: PartialDate(year: 2019),
+                                               link: WebLink("https://example.org/aid"), description: "Basic course")],
+                profiles: [ProfileLink(platform: "GitHub", link: WebLink("https://example.org/ada-code")!)],
+                interests: ["Chess", "Hiking"]),
+            design: nil, language: nil)
+        #expect(legacy.cv == expected)
         #expect(legacy.drops.isEmpty)
     }
 
@@ -58,11 +59,26 @@ struct LegacyCVFileTests {
         #expect(cv.design == DesignChoice(design: "modern"))
     }
 
-    @Test("a look without a design is dropped, and says so", arguments: [#"{"palette":"ocean"}"#, #"{"design":"modern!"}"#,
-        #"{"design":"Modern","palette":"ocean"}"#, #"{"design":"modern","palette":"has space"}"#, #"{"design":"modern","fonts":"\#(String(repeating: "a", count: 65))"}"#])
+    @Test("a look without a valid design is dropped, and says so", arguments: [#"{"palette":"ocean"}"#, #"{"design":"modern!"}"#,
+        #"{"design":"Modern","palette":"ocean"}"#])
     func droppedLook(look: String) throws {
         let legacy = try #require(mapped(LegacyFixtures.minimal(#""look":\#(look)"#)))
         #expect(legacy.cv.design == nil)
+        #expect(legacy.drops == [.look])
+    }
+
+    @Test("a palette the domain refuses is dropped alone: the design and the fonts stay, and the look is noted")
+    func badPaletteAlone() throws {
+        let legacy = try #require(mapped(LegacyFixtures.minimal(#""look":{"design":"modern","palette":"has space","fonts":"classic"}"#)))
+        #expect(legacy.cv.design == DesignChoice(design: "modern", fonts: "classic"))
+        #expect(legacy.drops == [.look])
+    }
+
+    @Test("fonts the domain refuses are dropped alone: the design and the palette stay, and the look is noted")
+    func badFontsAlone() throws {
+        let fonts = String(repeating: "a", count: 65)
+        let legacy = try #require(mapped(LegacyFixtures.minimal(#""look":{"design":"modern","palette":"ocean","fonts":"\#(fonts)"}"#)))
+        #expect(legacy.cv.design == DesignChoice(design: "modern", palette: "ocean"))
         #expect(legacy.drops == [.look])
     }
 
@@ -117,18 +133,18 @@ struct LegacyCVFileTests {
 
     @Test("a file without an id, with an id that is not a UUID, or named after another id, is not a legacy CV")
     func idsOutsideThePattern() {
-        #expect(invalidReason(#"{"name":"x"}"#) == "id")
-        #expect(invalidReason(#"{"id":"not-a-uuid"}"#) == "id")
-        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idB)"}"#) == "name")
-        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA.lowercased())"}"#, name: "cv_\(LegacyFixtures.idA.lowercased()).json") == "name")
-        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA)"}"#, name: "cv_x.json") == "name")
+        #expect(invalidReason(#"{"name":"x"}"#) == .id)
+        #expect(invalidReason(#"{"id":"not-a-uuid"}"#) == .id)
+        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idB)"}"#) == .name)
+        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA.lowercased())"}"#, name: "cv_\(LegacyFixtures.idA.lowercased()).json") == .name)
+        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA)"}"#, name: "cv_x.json") == .name)
     }
 
     @Test("content that is not a JSON object is invalid, and a number of the wrong type does not crash")
     func notJSON() {
-        #expect(invalidReason("[]") == "json")
-        #expect(invalidReason("not json") == "json")
-        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA)","skills":"x"}"#) == "json")
+        #expect(invalidReason("[]") == .json)
+        #expect(invalidReason("not json") == .json)
+        #expect(invalidReason(#"{"id":"\#(LegacyFixtures.idA)","skills":"x"}"#) == .json)
     }
 
     @Test("a schemaVersion key in a legacy file is ignored: the file is still a legacy file")
@@ -142,6 +158,15 @@ struct LegacyCVFileTests {
         let fields = #""languages":[{"name":"A","level":"c1"},{"name":"B","level":"mother tongue"},{"name":"C","level":"???"}]"#
         let cv = try #require(mapped(LegacyFixtures.minimal(fields))).cv
         #expect(cv.sections.languages.map(\.proficiency) == [.c1, .native, .b1])
+    }
+
+    @Test("a level is read in the order of the 1.0 app", arguments: [
+        ("Native", LanguageProficiency.native), ("mother tongue", .native), ("Beginner", .a1), ("a1", .a1), ("Elementary", .a2),
+        ("intermediate", .b1), ("Intermediate (B2)", .b1), ("Upper Intermediate", .b2), ("upper", .b2), ("B2 level", .b2),
+        ("Advanced", .c1), ("C1", .c1), ("Proficient", .c2), ("c2 certificate", .c2), ("???", .b1), ("", .b1),
+    ])
+    func levelOrder(text: String, expected: LanguageProficiency) {
+        #expect(LegacyMapper.proficiency(text) == expected)
     }
 }
 
@@ -163,6 +188,21 @@ struct LegacyPeriodTests {
     func ranges(text: String, start: (Int, Int?), end: (Int, Int?), current: Bool) {
         let expected = try? Period.make(start: start, end: current ? nil : end, current: current)
         #expect(LegacyPeriod.read(text) == .period(expected!))
+    }
+
+    @Test("October and March in the six languages, short and full", arguments: [
+        ("Oct", "Mar"), ("October", "March"), ("Ott", "Mar"), ("Ottobre", "Marzo"), ("Okt", "Mär"), ("Oktober", "März"),
+        ("Oct", "Mar"), ("Octubre", "Marzo"), ("Oct", "Mars"), ("Octobre", "Mars"), ("Out", "Mar"), ("Outubro", "Março"),
+    ])
+    func octoberAndMarch(october: String, march: String) throws {
+        let expected = try #require(try? Period.make(start: (2019, 10), end: (2021, 3), current: false))
+        #expect(LegacyPeriod.read("\(october) 2019 – \(march) 2021") == .period(expected))
+    }
+
+    @Test("the separator word is read in any case", arguments: ["2015 TO 2018", "2015 To 2018", "2015 Bis 2018", "2015 BIS 2018"])
+    func separatorCase(text: String) throws {
+        let expected = try #require(try? Period.make(start: (2015, nil), end: (2018, nil), current: false))
+        #expect(LegacyPeriod.read(text) == .period(expected))
     }
 
     @Test("empty is none; anything else that is not a range is unreadable", arguments: ["", "   ", "2020", "Present", "2020 – 2021 – 2022", "March – June", "2020 – ???"])

@@ -11,10 +11,10 @@ enum LegacyCVFile {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let raw: Raw
-        do { raw = try decoder.decode(Raw.self, from: data) } catch { return .invalid("json") }
-        guard let text = raw.id, let uuid = UUID(uuidString: text) else { return .invalid("id") }
+        do { raw = try decoder.decode(Raw.self, from: data) } catch { return .invalid(.json) }
+        guard let text = raw.id, let uuid = UUID(uuidString: text) else { return .invalid(.id) }
         // The legacy repository names a file after the id's `uuidString`, so only that exact spelling is a legacy file.
-        guard text == uuid.uuidString, fileName == "cv_\(text).json" else { return .invalid("name") }
+        guard text == uuid.uuidString, fileName == "cv_\(text).json" else { return .invalid(.name) }
         var mapper = LegacyMapper()
         let cv = mapper.map(raw, id: CVID(uuid), fallback: fallback)
         return .cv(LegacyCV(cv: cv, drops: mapper.drops))

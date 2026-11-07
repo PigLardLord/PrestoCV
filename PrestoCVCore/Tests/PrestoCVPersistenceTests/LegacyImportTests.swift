@@ -8,6 +8,8 @@ import PrestoCVCoreTestSupport
 private let idA = CVID(UUID(uuidString: LegacyFixtures.idA)!)
 private let idB = CVID(UUID(uuidString: LegacyFixtures.idB)!)
 
+private func key(_ name: String) -> LegacyRecord.Key { .init(name: name) }
+
 private struct World {
     let legacy: URL, store: URL
     let repository: FileCVRepository
@@ -56,7 +58,7 @@ struct LegacyImportTests {
     func removesVerifiedSources() async throws {
         let w = try standard()
         let report = try await w.importer().run()
-        #expect(Set(report.removedSources) == [LegacyFixtures.fileName(LegacyFixtures.idA), LegacyFixtures.fileName(LegacyFixtures.idB)])
+        #expect(Set(report.removedSources) == [key(LegacyFixtures.fileName(LegacyFixtures.idA)), key(LegacyFixtures.fileName(LegacyFixtures.idB))])
         #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
         let cvs = try await w.repository.list().cvs
         #expect(cvs.count == 2)
@@ -83,6 +85,75 @@ struct LegacyImportTests {
         #expect(kept.title == "Edited since" && kept.revision == 2)
     }
 
+    @Test("a CV the person deleted does not come back, even when its source was kept")
+    func deletedStaysDeleted() async throws {
+        let w = try standard()
+        _ = try await w.importer(removing: false).run()
+        let adopted = try await w.repository.load(idA)
+        try await w.repository.delete(idA, revision: adopted.revision)
+        let again = try await w.importer().run()
+        #expect(again.imported.isEmpty && Set(again.alreadyStored) == [idA, idB] && again.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        #expect(try await w.repository.list().cvs.map(\.id) == [idB])
+    }
+
+    @Test("a CV stored without a ledger entry (a stop between the two writes) is existing, and gets its entry")
+    func storedWithoutEntry() async throws {
+        let w = try standard()
+        _ = try await w.repository.create(named("Stored first", id: idA))
+        let report = try await w.importer().run()
+        #expect(report.alreadyStored == [idA] && report.imported == [idB] && report.failures.isEmpty)
+        #expect(try await w.repository.load(idA).personal.fullName == "Stored first")
+        let ledger = try JSONDecoder().decode([String].self, from: Data(contentsOf: w.store.appendingPathComponent(FileCVRepository.legacyLedgerName)))
+        #expect(ledger == [LegacyFixtures.idA, LegacyFixtures.idB])
+    }
+
+    @Test("a ledger that cannot be read keeps the source and stores nothing")
+    func corruptLedger() async throws {
+        let w = try standard()
+        try FileManager.default.createDirectory(at: w.store, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: w.store.appendingPathComponent(FileCVRepository.legacyLedgerName))
+        let report = try await w.importer().run()
+        #expect(report.imported.isEmpty && report.failures.count == 2)
+        #expect(report.failures.allSatisfy { $0.reason == .notStored(.corrupt(file: FileCVRepository.legacyLedgerName)) })
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        #expect(try await w.repository.list().cvs.isEmpty)
+    }
+
+    @Test("the ledger is left alone by listing, erasing, purging the quarantine and restoring")
+    func ledgerIsLeftAlone() async throws {
+        let w = try standard()
+        _ = try await w.importer().run()
+        let url = w.store.appendingPathComponent(FileCVRepository.legacyLedgerName)
+        let before = try Data(contentsOf: url)
+        let listing = try await w.repository.list()
+        #expect(listing.issues.isEmpty)
+        try await w.repository.erase(idA)
+        _ = try await w.repository.purgeQuarantine(olderThan: .distantFuture)
+        #expect(try Data(contentsOf: url) == before)
+        #expect(!FileManager.default.fileExists(atPath: w.store.appendingPathComponent("Quarantine").path))
+    }
+
+    @Test("a store that cannot be made durable keeps the source", .enabled(if: !isRoot))
+    func syncFailureKeepsSource() async throws {
+        let w = try standard()
+        try FileManager.default.createDirectory(at: w.store, withIntermediateDirectories: true)
+        // Writable and searchable but not readable: the directory cannot be opened to be synced.
+        try FileManager.default.setAttributes([.posixPermissions: 0o300], ofItemAtPath: w.store.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: w.store.path) }
+        let report = try await w.importer().run()
+        #expect(report.imported.isEmpty && report.removedSources.isEmpty && report.failures.count == 2)
+        #expect(report.failures.allSatisfy { if case .notStored(.writeFailed) = $0.reason { true } else { false } })
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("a stored file that is not there after the write fails, instead of passing as read back")
+    func missingReadBack() {
+        #expect(throws: RepositoryError.wouldNotReadBack(file: "x.cv.json")) { try FileCVRepository.verified(nil, file: "x.cv.json") }
+        let cv = CV(id: idA, personal: PersonalDetails(fullName: "N"))
+        #expect(throws: Never.self) { try FileCVRepository.verified(cv, file: "x.cv.json") }
+    }
+
     @Test("a run after a complete run finds nothing to do")
     func rerunAfterRemoval() async throws {
         let w = try standard()
@@ -97,7 +168,7 @@ struct LegacyImportTests {
         let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.v10(), LegacyFixtures.fileName(LegacyFixtures.idB): bad])
         let report = try await w.importer().run()
         #expect(report.imported == [idA])
-        #expect(report.failures == [LegacyImportFailure(fileName: LegacyFixtures.fileName(LegacyFixtures.idB), reason: .invalid("json"))])
+        #expect(report.failures == [LegacyImportFailure(key: key(LegacyFixtures.fileName(LegacyFixtures.idB)), reason: .invalid(.json))])
         let kept = try String(contentsOf: w.legacyFile(LegacyFixtures.idB), encoding: .utf8)
         #expect(kept == bad)
         #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
@@ -165,7 +236,7 @@ private struct FakeSource: LegacyStore {
     let recordsToServe: [LegacyRecord]
     let removed = Recorder()
     func records() async throws(RepositoryError) -> [LegacyRecord] { recordsToServe }
-    func remove(_ fileName: String) async throws(RepositoryError) { removed.add(fileName) }
+    func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) { removed.add(key.name) }
 }
 
 private final class Recorder: @unchecked Sendable {
@@ -183,7 +254,7 @@ private struct FakeTarget: LegacyImportTarget {
 private func oneRecord() -> LegacyRecord {
     let cv = CV(id: idA, revision: 0, createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 200), title: "T",
                 personal: PersonalDetails(fullName: "N"), sections: CVSections(), design: nil, language: nil)
-    return LegacyRecord(fileName: "cv_x.json", content: .cv(LegacyCV(cv: cv, drops: [])))
+    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: [])))
 }
 
 @Suite("The source is kept until the new copy is verified")
@@ -227,7 +298,7 @@ struct LegacySourceKeptTests {
     func removalFails() async throws {
         struct Stubborn: LegacyStore {
             func records() async throws(RepositoryError) -> [LegacyRecord] { [oneRecord(), oneRecord()] }
-            func remove(_ fileName: String) async throws(RepositoryError) { throw .unreadable(file: fileName) }
+            func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) { throw .unreadable(file: key.name) }
         }
         let target = FakeTarget { cv throws(RepositoryError) in .stored(cv.adoptedAsRevisionOne) }
         let report = try await ImportLegacyStore(source: Stubborn(), target: target).run()
@@ -238,7 +309,7 @@ struct LegacySourceKeptTests {
     func listingFails() async {
         struct Broken: LegacyStore {
             func records() async throws(RepositoryError) -> [LegacyRecord] { throw .storeUnavailable(.cannotList) }
-            func remove(_ fileName: String) async throws(RepositoryError) {}
+            func remove(_ key: LegacyRecord.Key) async throws(RepositoryError) {}
         }
         let target = FakeTarget { _ throws(RepositoryError) in .existing }
         await #expect(throws: RepositoryError.storeUnavailable(.cannotList)) { try await ImportLegacyStore(source: Broken(), target: target).run() }

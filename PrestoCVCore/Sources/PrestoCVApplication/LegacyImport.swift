@@ -15,23 +15,34 @@ public struct LegacyCV: Sendable, Equatable {
     public init(cv: CV, drops: [LegacyDrop]) { self.cv = cv; self.drops = drops }
 }
 
+/// Why a candidate file is not a legacy CV: it is not the JSON of one, it has no usable id, or its name is not its id's.
+public enum LegacyInvalid: Sendable, Equatable, Hashable {
+    case json, id, name
+}
+
 public enum LegacyContent: Sendable, Equatable {
     case cv(LegacyCV)
     /// Not a legacy CV file the importer can trust: the reason is a code, never content.
-    case invalid(String)
+    case invalid(LegacyInvalid)
     case unreadable
 }
 
 public struct LegacyRecord: Sendable, Equatable {
-    public let fileName: String
+    /// Names a record in its store. Opaque: only the store that listed it knows how it is kept.
+    public struct Key: Sendable, Hashable {
+        package let name: String
+        package init(name: String) { self.name = name }
+    }
+
+    public let key: Key
     public let content: LegacyContent
-    public init(fileName: String, content: LegacyContent) { self.fileName = fileName; self.content = content }
+    public init(key: Key, content: LegacyContent) { self.key = key; self.content = content }
 }
 
 public protocol LegacyStore: Sendable {
     /// Every candidate file of the legacy store. A store that is not there is empty.
     func records() async throws(RepositoryError) -> [LegacyRecord]
-    func remove(_ fileName: String) async throws(RepositoryError)
+    func remove(_ key: LegacyRecord.Key) async throws(RepositoryError)
 }
 
 public enum Adoption: Sendable, Equatable {
@@ -47,14 +58,14 @@ public protocol LegacyImportTarget: Sendable {
 
 public struct LegacyImportFailure: Sendable, Equatable {
     public enum Reason: Sendable, Equatable {
-        case invalid(String), unreadable, notStored(RepositoryError), didNotReadBack, sourceNotRemoved(RepositoryError)
+        case invalid(LegacyInvalid), unreadable, notStored(RepositoryError), didNotReadBack, sourceNotRemoved(RepositoryError)
     }
-    public let fileName: String, reason: Reason
-    public init(fileName: String, reason: Reason) { self.fileName = fileName; self.reason = reason }
+    public let key: LegacyRecord.Key, reason: Reason
+    public init(key: LegacyRecord.Key, reason: Reason) { self.key = key; self.reason = reason }
 }
 
 public struct LegacyImportReport: Sendable, Equatable {
-    public var imported: [CVID] = [], alreadyStored: [CVID] = [], removedSources: [String] = []
+    public var imported: [CVID] = [], alreadyStored: [CVID] = [], removedSources: [LegacyRecord.Key] = []
     public var drops: [CVID: [LegacyDrop]] = [:]
     public var failures: [LegacyImportFailure] = []
     public init() {}
@@ -76,31 +87,31 @@ public struct ImportLegacyStore: Sendable {
 
     private func handle(_ record: LegacyRecord, into report: inout LegacyImportReport) async {
         switch record.content {
-        case .invalid(let reason): report.failures.append(.init(fileName: record.fileName, reason: .invalid(reason)))
-        case .unreadable: report.failures.append(.init(fileName: record.fileName, reason: .unreadable))
-        case .cv(let legacy): await adopt(legacy, from: record.fileName, into: &report)
+        case .invalid(let reason): report.failures.append(.init(key: record.key, reason: .invalid(reason)))
+        case .unreadable: report.failures.append(.init(key: record.key, reason: .unreadable))
+        case .cv(let legacy): await adopt(legacy, from: record.key, into: &report)
         }
     }
 
-    private func adopt(_ legacy: LegacyCV, from fileName: String, into report: inout LegacyImportReport) async {
+    private func adopt(_ legacy: LegacyCV, from key: LegacyRecord.Key, into report: inout LegacyImportReport) async {
         let adoption: Adoption
         do throws(RepositoryError) { adoption = try await target.adopt(legacy.cv) } catch {
-            report.failures.append(.init(fileName: fileName, reason: .notStored(error))); return
+            report.failures.append(.init(key: key, reason: .notStored(error))); return
         }
         switch adoption {
         case .existing: report.alreadyStored.append(legacy.cv.id)
         case .stored(let copy) where copy == legacy.cv.adoptedAsRevisionOne:
             report.imported.append(legacy.cv.id)
             if !legacy.drops.isEmpty { report.drops[legacy.cv.id] = legacy.drops }
-        case .stored: report.failures.append(.init(fileName: fileName, reason: .didNotReadBack)); return
+        case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return
         }
-        await removeSource(fileName, into: &report)
+        await removeSource(key, into: &report)
     }
 
-    private func removeSource(_ fileName: String, into report: inout LegacyImportReport) async {
+    private func removeSource(_ key: LegacyRecord.Key, into report: inout LegacyImportReport) async {
         guard removingVerifiedSources else { return }
-        do throws(RepositoryError) { try await source.remove(fileName); report.removedSources.append(fileName) } catch {
-            report.failures.append(.init(fileName: fileName, reason: .sourceNotRemoved(error)))
+        do throws(RepositoryError) { try await source.remove(key); report.removedSources.append(key) } catch {
+            report.failures.append(.init(key: key, reason: .sourceNotRemoved(error)))
         }
     }
 }

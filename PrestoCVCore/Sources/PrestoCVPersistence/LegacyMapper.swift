@@ -43,13 +43,15 @@ struct LegacyMapper {
                         summary: info?.profile ?? "")
     }
 
-    /// A look needs a design the domain accepts; palette and fonts that it refuses are left out with it kept.
+    /// A look needs a design the domain accepts, or it is dropped. A palette or fonts that it refuses are left out alone:
+    /// the design is kept, and the look is noted.
     private mutating func design(_ look: LegacyCVFile.Look?) -> DesignChoice? {
         guard let look else { return nil }
-        guard let design = look.design, let choice = DesignChoice(design: design, palette: look.palette, fonts: look.fonts) else {
-            note(.look); return nil
-        }
-        return choice
+        guard let design = look.design, let bare = DesignChoice(design: design) else { note(.look); return nil }
+        let palette = look.palette.flatMap { DesignChoice(design: design, palette: $0) }?.palette
+        let fonts = look.fonts.flatMap { DesignChoice(design: design, fonts: $0) }?.fonts
+        if (look.palette != nil && palette == nil) || (look.fonts != nil && fonts == nil) { note(.look) }
+        return DesignChoice(design: bare.design, palette: palette, fonts: fonts)
     }
 
     // MARK: Sections
@@ -107,10 +109,13 @@ struct LegacyMapper {
     static func proficiency(_ text: String) -> LanguageProficiency {
         let lowered = text.lowercased()
         if let exact = LanguageProficiency(rawValue: lowered) { return exact }
-        let words: [(LanguageProficiency, [String])] = [
-            (.native, ["native", "mother"]), (.a1, ["beginner", "a1"]), (.a2, ["elementary", "a2"]),
-            (.b2, ["upper", "b2"]), (.b1, ["intermediate"]), (.c1, ["advanced", "c1"]), (.c2, ["proficient", "c2"]),
+        // The order of the 1.0 app: "intermediate" without "upper" is B1 before any "b2" is looked for.
+        let words: [(LanguageProficiency, (String) -> Bool)] = [
+            (.native, { $0.contains("native") || $0.contains("mother") }), (.a1, { $0.contains("beginner") || $0.contains("a1") }),
+            (.a2, { $0.contains("elementary") || $0.contains("a2") }), (.b1, { $0.contains("intermediate") && !$0.contains("upper") }),
+            (.b2, { $0.contains("upper") || $0.contains("b2") }), (.c1, { $0.contains("advanced") || $0.contains("c1") }),
+            (.c2, { $0.contains("proficient") || $0.contains("c2") }),
         ]
-        return words.first { _, keys in keys.contains { lowered.contains($0) } }?.0 ?? .b1
+        return words.first { $0.1(lowered) }?.0 ?? .b1
     }
 }
