@@ -53,7 +53,9 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             default: throw .storeUnavailable(.cannotLock)
             }
             await lockWait.pause(lockWait.interval)
-            waited += lockWait.interval
+            // The guard left some budget: add the interval only if it fits, else the deadline, so the sum never overflows.
+            let remaining = lockWait.deadline - waited
+            waited = lockWait.interval < remaining ? waited + lockWait.interval : lockWait.deadline
         }
         defer { flock(fd, LOCK_UN) }
         return try body()

@@ -199,6 +199,23 @@ struct FileDesignStoreLockWaitTests {
         }
     }
 
+    @Test("a deadline and an interval near the largest duration: the wait ends in lockTimeout after two pauses, without overflowing")
+    func hugeDurationsDoNotOverflow() async throws {
+        try await inTemporaryStore { dir in
+            let foreign = try ForeignLock(dir)
+            let pauses = PauseLog(on: 1000) { foreign.release() }
+            // Int64.max seconds is 1/18.45 of the largest duration: the first pause stays under the deadline, a second full interval would pass the largest.
+            let deadline = Duration.seconds(Int64.max) * 18 + .seconds(Int64.max / 5 * 2)
+            let interval = Duration.seconds(Int64.max) * 9 + .seconds(Int64.max / 10 * 3)
+            let store = FileDesignStore(directory: dir, lockWait: pauses.wait(deadline: deadline, interval: interval))
+            let design = try DesignStoreContract.design(id: "clean")
+            let result = await releasing(foreign) { await outcome { try await store.save(design) } }
+            #expect(result.failure as? FileDesignStoreError == .lockTimeout)
+            #expect(await pauses.calls == 2)
+            #expect(dir.designFiles.isEmpty)
+        }
+    }
+
     @Test("the app's own pause, on a cancelled save: it waits to the deadline and ends in lockTimeout, not in a cancellation")
     func standardPauseIgnoresCancellation() async throws {
         try await inTemporaryStore { dir in

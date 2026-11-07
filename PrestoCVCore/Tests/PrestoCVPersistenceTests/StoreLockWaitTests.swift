@@ -158,6 +158,20 @@ struct StoreLockWaitTests {
         #expect(storedFiles(dir).isEmpty)
     }
 
+    @Test("a deadline and an interval near the largest duration: the wait ends in lockTimeout after two pauses, without overflowing")
+    func hugeDurationsDoNotOverflow() async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = try ForeignLock(dir)
+        let pauses = PauseLog(on: 1000) { foreign.release() }
+        // Int64.max seconds is 1/18.45 of the largest duration: the first pause stays under the deadline, a second full interval would pass the largest.
+        let deadline = Duration.seconds(Int64.max) * 18 + .seconds(Int64.max / 5 * 2)
+        let interval = Duration.seconds(Int64.max) * 9 + .seconds(Int64.max / 10 * 3)
+        let result = await releasing(foreign) { await outcome { try await repo(dir, wait: pauses.wait(deadline: deadline, interval: interval)).create(named("Ada")) } }
+        #expect(result.failure as? RepositoryError == .storeUnavailable(.lockTimeout))
+        #expect(await pauses.calls == 2)
+        #expect(storedFiles(dir).isEmpty)
+    }
+
     @Test("the app's own pause, on a cancelled call: it waits to the deadline and ends in lockTimeout, not in a cancellation")
     func standardPauseIgnoresCancellation() async throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

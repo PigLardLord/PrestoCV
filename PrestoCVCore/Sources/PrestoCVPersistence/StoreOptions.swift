@@ -30,7 +30,7 @@ public struct StoreOptions: Sendable {
     }
 
     /// How the store waits while its lock is held elsewhere (ADR 0009): it tries again after each pause, and gives up
-    /// with `storeUnavailable(.lockTimeout)` once the pauses add up to the deadline. The pause suspends the caller; it
+    /// with `storeUnavailable(.lockTimeout)` once the pauses add up to the deadline (the last one counts only for what is left of it, so the sum cannot overflow). The pause suspends the caller; it
     /// never holds a thread.
     public struct LockWait: Sendable {
         public let deadline: Duration, interval: Duration
