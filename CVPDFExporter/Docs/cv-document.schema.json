@@ -1,0 +1,432 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prestocv.app/schemas/cv-document-1.json",
+  "title": "CVDocument, schema version 1",
+  "description": "The JSON that CVPDFExporter accepts and a backend accepts (ADR 0002). CVDocumentValidator also holds what JSON Schema cannot say: text bounded in UTF-8 bytes per field (16384) and per document (262144), no control characters or bidirectional overrides, and an end date not before the start. The size of the whole JSON is bounded at 1048576 bytes. DocumentSchemaTests in CVRenderingTests hold this schema to the type.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "language": {
+      "description": "A BCP 47 tag, such as it or en-GB.",
+      "type": "string"
+    },
+    "person": {
+      "$ref": "#/$defs/person"
+    },
+    "sections": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "language",
+    "person",
+    "sections"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "person": {
+      "description": "The person the CV is about. The name must hold a character other than white space.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "professionalTitle": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "website": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "date": {
+      "description": "A date with year or month precision. Formatting is the renderer's job, in the document language.",
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2200
+        },
+        "month": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      },
+      "required": [
+        "year"
+      ],
+      "additionalProperties": false
+    },
+    "period": {
+      "description": "A period. The end is explicit: present, unspecified (ended on an unknown date) or date, which needs endDate; present and unspecified take none.",
+      "type": "object",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/date"
+        },
+        "end": {
+          "enum": [
+            "present",
+            "unspecified",
+            "date"
+          ]
+        },
+        "endDate": {
+          "$ref": "#/$defs/date"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "end": {
+              "const": "date"
+            }
+          },
+          "required": [
+            "endDate"
+          ]
+        },
+        {
+          "properties": {
+            "end": {
+              "enum": [
+                "present",
+                "unspecified"
+              ]
+            },
+            "endDate": false
+          }
+        }
+      ]
+    },
+    "experienceItem": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/period"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "company"
+      ],
+      "additionalProperties": false
+    },
+    "educationItem": {
+      "type": "object",
+      "properties": {
+        "degree": {
+          "type": "string"
+        },
+        "school": {
+          "type": "string"
+        },
+        "period": {
+          "$ref": "#/$defs/period"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "degree",
+        "school"
+      ],
+      "additionalProperties": false
+    },
+    "skillItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "rating": {
+          "description": "1 to 5; absent when the skill is not rated.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "languageItem": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "a1",
+            "a2",
+            "b1",
+            "b2",
+            "c1",
+            "c2",
+            "native"
+          ]
+        }
+      },
+      "required": [
+        "language",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "certificationItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2200
+        },
+        "url": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "issuer"
+      ],
+      "additionalProperties": false
+    },
+    "profileLink": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "platform",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "section": {
+      "description": "A section, identified by its kind, never by a title.",
+      "oneOf": [
+        {
+          "description": "The summary text.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "summary"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Work experience.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "experience"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/experienceItem"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Education.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "education"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/educationItem"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Skills.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "skills"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/skillItem"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Languages.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "languages"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/languageItem"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Certifications.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "certifications"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/certificationItem"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Profile links.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "profiles"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "$ref": "#/$defs/profileLink"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "Interests.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "interests"
+            },
+            "items": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
