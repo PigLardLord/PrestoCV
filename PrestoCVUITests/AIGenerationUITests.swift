@@ -1,6 +1,8 @@
+import UIKit
 import XCTest
 
 /// The AI screen can be used with VoiceOver, and with the keyboard up, and it waits for the language data a description needs.
+/// A CV pasted whole is read as written, not drafted.
 final class AIGenerationUITests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -146,6 +148,116 @@ final class AIGenerationUITests: XCTestCase {
         app.buttons["Experience"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'San Camillo'")).firstMatch
             .waitForExistence(timeout: 10), "The draft should hold the job of the description")
+    }
+
+    // MARK: - A CV pasted whole (#371)
+
+    /// An invented CV, pasted whole as a person pastes the one they already have.
+    private let pastedCV = """
+        Marcus Hale
+        Line Cook
+        marcus.hale@example.com | +44 7700 900123
+        Leeds, UK
+
+        Summary
+        Reliable cook with eight years in busy kitchens.
+
+        Experience
+        Line Cook, The Copper Pot, Leeds
+        03/2019 – Present
+        • Prepared mise en place for 120 covers a night
+        • Trained two new commis chefs
+
+        Commis Chef, Harbour Inn, Hull
+        2016 – 2019
+        • Made sauces and soups
+        • Kept the cold room stocked
+
+        Education
+        Level 2 Diploma in Professional Cookery, Leeds College, 2016
+
+        Skills
+        Knife skills, Food safety, Stock control
+
+        Languages
+        English – Native
+        Polish – B2
+        """
+    private let readAsWritten = "Your text was already a CV, so it was read as written."
+
+    /// A CV pasted whole is read by the import and not drafted: the editor opens with the notice that says so, the duties as
+    /// the person wrote them, and what to check. The launch scripts no draft, so a model asked for one fails the test: the
+    /// simulator cannot run it.
+    func testAPastedCVOpensAsWrittenWithWhatToCheck() throws {
+        launch()
+        openTheAIScreenOnFirstRun()
+        pasteAsTheDescription(pastedCV).tap()
+
+        let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", readAsWritten)).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 30), "The pasted CV should open in the editor, read as written")
+        XCTAssertFalse(app.alerts.firstMatch.exists, "A pasted CV asks no model, so no message comes")
+        XCTAssertEqual(app.textFields["Full Name"].value as? String, "Marcus Hale")
+        add(app.keptScreenshot(named: "Pasted CV - editor"))
+
+        let review = app.buttons["editor.notice.review"]
+        XCTAssertTrue(review.exists, "The notice should lead to what to check")
+        review.tap()
+        XCTAssertTrue(app.navigationBars["Check the import"].waitForExistence(timeout: 10), "The review should open")
+        add(app.keptScreenshot(named: "Pasted CV - what to check"))
+        app.buttons["Done"].tap()
+
+        // The tab, wherever the device puts the tabs: a tab bar on an iPhone, the bar at the top of an iPad
+        app.buttons["Experience"].firstMatch.tap()
+        let duties = app.textViews.matching(NSPredicate(format: "label == %@", "Description")).firstMatch
+        XCTAssertTrue(duties.waitForExistence(timeout: 10), "The first job should have its duties")
+        app.scrollTo(duties)
+        XCTAssertEqual(duties.value as? String, "• Prepared mise en place for 120 covers a night\n• Trained two new commis chefs",
+                       "The first job's duties should be the pasted ones, word for word")
+        add(app.keptScreenshot(named: "Pasted CV - experience"))
+    }
+
+    /// A free description over the limit is not a CV: Generate is on, and the AI draft refuses it with its own message, before
+    /// the model is asked.
+    func testAFreeDescriptionOverTheLimitIsRefusedWithItsMessage() throws {
+        launch(["-PrestoCVUITestsScriptedDraft", "nurse"])
+        openTheAIScreenOnFirstRun()
+        let description = String(repeating: "I cook in a busy kitchen in Leeds and I train the new staff every week. ", count: 30)
+        let generate = pasteAsTheDescription(description)
+
+        XCTAssertTrue(app.staticTexts["\(description.count) of 2000 characters, over the limit"].exists,
+                      "The counter should be read as words, with the text over the limit")
+        XCTAssertTrue(generate.isEnabled, "Generate should be on over the limit")
+        generate.tap()
+        let alert = app.alerts["Error"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "A free description over the limit should end with a message")
+        XCTAssertTrue(alert.staticTexts["That description is too long. Please shorten it and try again."].exists,
+                      "The message should say the description is too long")
+        alert.buttons["OK"].tap()
+        XCTAssertTrue(waitUntil(alert, exists: false), "OK should close the message")
+        XCTAssertTrue(generate.exists, "The screen should stay, with the description to shorten")
+    }
+
+    /// Pastes `text` as the description with the text view's own menu, as a person pastes a CV, closes the keyboard and returns
+    /// Generate, in reach.
+    private func pasteAsTheDescription(_ text: String) -> XCUIElement {
+        UIPasteboard.general.string = text
+        let description = app.textViews.matching(NSPredicate(format: "label == %@", "Your Professional Background")).firstMatch
+        XCTAssertTrue(description.waitForExistence(timeout: 10), "The AI screen should have a description to paste into")
+        description.tap()
+        XCTAssertTrue(description.waitForKeyboardFocus(true), "A tap should give the description the keyboard focus")
+        // A tap on the caret of a focused text view opens its menu
+        description.tap()
+        let paste = app.menuItems["Paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 10), "The description's menu should offer to paste")
+        paste.tap()
+        XCTAssertEqual(description.value as? String, text, "The description should be the pasted text")
+        let done = app.toolbars.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10), XCUIApplication.noSoftwareKeyboard)
+        done.tap()
+
+        let generate = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Generate CV with AI")).firstMatch
+        app.scrollTo(generate)
+        return generate
     }
 
     /// Opens the AI screen from the first-run screen, which offers the AI draft when the model can run.

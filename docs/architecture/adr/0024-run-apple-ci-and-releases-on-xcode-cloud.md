@@ -39,7 +39,7 @@ The post script runs every step and fails at the end. The app is iOS only in ver
 ## Consequences
 
 - **The configuration is outside the repository.** The workflows live in App Store Connect, set up by the owner with an Apple ID. `docs/release/xcode-cloud.md` is their only description, and nothing tests that the two agree. The scripts and the test plans are in the repository, so a change to them is reviewed in a pull request.
-- **The compute budget is 25 hours a month.** Every pull request and every merge to `main` spends some of it. `PrestoCVUITests`, which are Xcode's template launch tests and take most of an hour, are left out of the `CI` plan for that reason. The checker is built from source on every build, because Xcode Cloud keeps no build cache between builds.
+- **The compute budget is 25 hours a month.** Every pull request and every merge to `main` spends some of it. `PrestoCVUITests`, the app's UI tests, which take most of an hour, are left out of the `CI` plan for that reason. The checker is built from source on every build, because Xcode Cloud keeps no build cache between builds.
 - **No signing secrets on GitHub.** Xcode Cloud signs the build itself, so no key and no certificate is in the repository or in GitHub's settings.
 - **Required checks.** A pull request can merge without the Apple checks unless the owner makes the Xcode Cloud checks required in a GitHub ruleset. `docs/release/xcode-cloud.md` says how.
 - **A new simulator test target** of `CVPDFExporter` goes into both test plans, as well as into the `ExporterTests` scheme, or it does not run in CI.

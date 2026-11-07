@@ -77,6 +77,12 @@ final class AppRouter: ObservableObject {
         openEditor(.new(template: draft.cv, notice: .imported(draft.review)))
     }
 
+    /// Opens a CV pasted in the AI screen and read by the import, in place of the AI screen, with the notice that says it
+    /// was read as written and the review of any import (ADR 0034)
+    func navigateToEditorWithImportedDescription(_ draft: ImportedDraft) {
+        openEditor(.new(template: draft.cv, notice: .importedDescription(draft.review)))
+    }
+
     /// Opens the import screen on a PDF the system opened in the app, from the share sheet or Files. A screen already on
     /// the import reads it there. An editor on screen is saved first, at once, as leaving it does, and the import takes
     /// its place; when its edits cannot be stored, the editor stays, with its failure, and the PDF is let go.

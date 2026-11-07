@@ -1,0 +1,83 @@
+PrestoCV
+Copyright 2026 Giovanni Trovato
+
+This product is licensed under the Apache License, Version 2.0 (the "License").
+The full text is in the LICENSE file.
+
+
+Attribution
+-----------
+
+Section 4(d) of the License asks whoever distributes a work derived from
+PrestoCV to keep the attribution notices of this file: in a NOTICE file of the
+derived work, in its documentation, or on the screen where it lists third-party
+notices (for an app, its acknowledgements or licenses screen). This line is the
+notice to keep:
+
+    This product includes PrestoCV, Copyright 2026 Giovanni Trovato, licensed
+    under the Apache License, Version 2.0.
+
+The notices under "Trademarks" and "Third-party components" below are not
+attribution notices in this sense: a derived work does not have to repeat them.
+
+
+Trademarks
+----------
+
+"PrestoCV" and the PrestoCV app icon are trademarks of Giovanni Trovato. They
+are not licensed under the Apache License, Version 2.0: section 6 of the License
+grants no permission to use them, and neither does this notice.
+
+- The app icon is the artwork in PrestoCV/PrestoCV.icon, and every image built
+  from it. The licensor does not license it: it is not part of the Work that
+  the License covers, and all rights in it are reserved. Its files are in this
+  repository only so that the official app can be built.
+- A fork, or any other app built from this source, must use a name and an icon
+  of its own, and must not suggest that it is PrestoCV or that the author
+  endorses it. It also needs its own bundle identifier and signing team.
+- The names inside the code (modules, targets, types and folders such as
+  PrestoCVCore) may stay as they are. What a fork must change is what its users,
+  its store listing and its documents see: the display name, the icon, the
+  localized texts that name the app, and the PDF metadata.
+- Saying truthfully that a work is based on PrestoCV is allowed, as section 6
+  of the License describes.
+
+
+Third-party components
+----------------------
+
+Apart from the code of conduct, this repository bundles no third-party text,
+code, fonts, images or data. Everything else in it is the work of the copyright
+holder above and is under the License, except the app icon.
+
+- CODE_OF_CONDUCT.md is adapted from the Contributor Covenant, version 2.1
+  (https://www.contributor-covenant.org/version/2/1/code_of_conduct.html),
+  which its authors published under the Creative Commons Attribution 4.0
+  International licence (CC BY 4.0,
+  https://creativecommons.org/licenses/by/4.0/). The file stays under that
+  licence, not under the Apache License. The changes: the contact address is
+  filled in, and "email" is written "e-mail". Its own Attribution section
+  names the source and the licence, and stays with every copy.
+- The designs (the .mcvt packages and their preview images), the sample CVs,
+  the translations of the document headings, the closed vocabularies of the AI
+  draft, the golden files and the test fixtures were written for this project.
+- No font file is distributed. The designs name font families only: system
+  families such as -apple-system, Helvetica and Arial, and, in one legacy font
+  scheme, Inter. A family the device does not have falls back to the next one.
+
+Used by the project, not included in this repository:
+
+- swift-syntax (https://github.com/swiftlang/swift-syntax), under the Apache
+  License 2.0 with the Runtime Library Exception. Swift Package Manager fetches
+  it to build the architecture checker (Tools/ArchitectureCheck) and the
+  prototype's checker (Prototypes/ADRValidation/checker). The app does not
+  contain it.
+- Apple's SDK frameworks (among them SwiftUI, UIKit, WebKit, PDFKit and
+  Foundation Models) and SF Symbols, which the operating system provides. They
+  are used under Apple's terms. SF Symbols may be used only in apps for Apple
+  platforms.
+- The GitHub Actions actions/checkout and actions/cache (MIT License) and the
+  swift container image, which the CI workflow in .github/workflows uses.
+- The Swift toolchain and the Swift SDK for Android from swift.org, and the
+  Android NDK of the runner image, which the CI workflow's Android job uses to
+  build the portable targets. Nothing it builds is distributed.

@@ -50,3 +50,25 @@ struct ImportEditorNoticeTests {
         #expect(EditorNotice.imported(ImportReview(items: [], notImported: "")).review == nil)
     }
 }
+
+@Suite("EditorNotice of a CV pasted in the AI screen")
+struct ImportedDescriptionEditorNoticeTests {
+
+    @Test("A CV pasted in the AI screen says it was read as written, then what an import says, and leads to its review")
+    func importedDescriptionNotice() {
+        let review = ImportReview(items: [], notImported: "Driving licence: B")
+        let notice = EditorNotice.importedDescription(review)
+
+        #expect(notice.messageKeys == ["editor.notice.imported.from_description", "editor.notice.imported"])
+        for key in notice.messageKeys {
+            #expect(key.localized != key, "\(key) is missing from the string catalog")
+        }
+        #expect(notice.iconName == "doc.on.clipboard", "The import's symbol: the CV was read, not drafted")
+        #expect(notice.review == review)
+    }
+
+    @Test("A pasted CV with nothing to check and nothing left over offers no review")
+    func emptyReview() {
+        #expect(EditorNotice.importedDescription(ImportReview(items: [], notImported: "")).review == nil)
+    }
+}

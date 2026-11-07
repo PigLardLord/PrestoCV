@@ -9,13 +9,14 @@ enum EditorRequest: Hashable, Sendable {
     /// the person's text or PDF, with the notice the editor shows above it.
     case new(template: CVModel, notice: EditorNotice?)
 
-    /// Whether the editor stores the CV as it opens, without waiting for a change. An AI draft and an imported CV were
-    /// made from what the person gave, and nothing else holds them: the system's copy of an opened PDF is deleted. A
-    /// blank CV or an example is stored only once it is changed, so one left untouched leaves nothing behind.
+    /// Whether the editor stores the CV as it opens, without waiting for a change. An AI draft and an imported CV (from
+    /// the import screen, or a CV pasted in the AI screen) were made from what the person gave, and nothing else holds
+    /// them: the system's copy of an opened PDF is deleted. A blank CV or an example is stored only once it is changed,
+    /// so one left untouched leaves nothing behind.
     var storesAsItIs: Bool {
         guard case .new(_, let notice?) = self else { return false }
         switch notice {
-        case .aiDraft, .aiDraftUnchecked, .imported:
+        case .aiDraft, .aiDraftUnchecked, .imported, .importedDescription:
             return true
         }
     }

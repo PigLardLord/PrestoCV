@@ -577,6 +577,148 @@ struct JobClausesTests {
         #expect(verdicts.pinned == row.pinned)
     }
 
+    // MARK: A German duty that leaves out the subject of the clause before it (#359)
+
+    /// The verbs of the gardener's sentences, as the device tags them, pinned so that every Mac reads them alike.
+    private static let gardenerVerbs = ForcedLexicalTagger([.german: .words([
+        "war", "bin", "umgetopft", "gepflegt", "habe", "einteile", "plane", "leite", "fallen", "mochte", "fallte", "gegossen",
+        "kontrolliere", "gefallt", "teile", "analysiere", "antworte", "sicherstelle", "stelle",
+    ])])
+
+    /// The gardener's ended job, whose sentence goes on after "wo ich".
+    private static let nursery = "Von 2009 bis 2013 war ich Gärtnerhelferin bei der Baumschule Lindenhof in Kassel, wo ich "
+    /// The forewoman's current job, whose sentence goes on after "wo ich".
+    private static let parks = "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, wo ich "
+
+    struct SharedSubjectRow: Sendable, CustomTestStringConvertible {
+        /// Whether the row is the forewoman's current job, or the gardener's ended one.
+        let isCurrent: Bool
+        let sentence: String
+        let duty: String
+        /// Whether the duty goes as something the person only wishes or plans.
+        let isWished: Bool
+        var testDescription: String { "\(sentence) → \(duty)" }
+    }
+
+    @Test("A German clause joined by und to the person's clause with the verb last, its own verb last in the first person, is the person's; a wish, another person's or a relative clause is not (#359)",
+          arguments: [
+              SharedSubjectRow(
+                  isCurrent: false, sentence: nursery + "Jungpflanzen umgetopft und die Beete gepflegt habe.",
+                  duty: "Ich habe die Beete gegossen.", isWished: false
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und die Pflege der Parkanlagen plane.",
+                  duty: "Ich kontrolliere die Parkanlagen.", isWished: false
+              ),
+              SharedSubjectRow(
+                  isCurrent: false, sentence: nursery + "Jungpflanzen umgetopft habe. Ich möchte später Bäume fällen.",
+                  duty: "Ich habe Bäume gefällt.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und später Bäume fällen möchte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "die Kolonne einteile und er die Bäume fällte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+              SharedSubjectRow(
+                  isCurrent: true, sentence: parks + "eine Kolonne leite, die die Bäume fällte.",
+                  duty: "Ich kontrolliere die Bäume.", isWished: true
+              ),
+          ])
+    func sharedGermanSubject(row: SharedSubjectRow) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.gardenerVerbs, wordList: TableWordList())
+        let job = row.isCurrent
+            ? Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+            : Self.job("Gärtnerhelferin", "Baumschule Lindenhof", from: "2009", to: "2013")
+
+        let verdicts = try sanitizer.dutyCheck(of: CVData(experience: [job]), job: 0, duties: row.duty, against: row.sentence)
+
+        let wished = verdicts.rejected.contains { $0.sentence == row.duty && $0.reason.hasSuffix("only wishes or plans") }
+        #expect(wished == row.isWished, "\(verdicts.rejected)")
+        #expect(verdicts.kept.contains(row.duty) == !row.isWished, "\(verdicts.rejected)")
+    }
+
+    struct GermanOrderRow: Sendable, CustomTestStringConvertible {
+        let sentence: String
+        /// The duty as the person said it, in the order of a German main clause.
+        let pinned: String
+        var testDescription: String { "\(sentence) → \(pinned)" }
+    }
+
+    @Test("A German duty said after wo ich with the verb last is written as a main clause: each verb second, a separable particle at the end of its clause, a shared auxiliary first (#359)",
+          arguments: [
+              GermanOrderRow(
+                  sentence: parks + "die Kolonne einteile und die Pflege der Parkanlagen plane.",
+                  pinned: "Ich teile die Kolonne ein und plane die Pflege der Parkanlagen."
+              ),
+              GermanOrderRow(
+                  sentence: nursery + "Jungpflanzen umgetopft und die Beete gepflegt habe.",
+                  pinned: "Ich habe Jungpflanzen umgetopft und die Beete gepflegt."
+              ),
+              GermanOrderRow(sentence: parks + "die Kolonne leite.", pinned: "Ich leite die Kolonne."),
+              GermanOrderRow(sentence: parks + "die Bewässerung sicherstelle.", pinned: "Ich stelle die Bewässerung sicher."),
+        GermanOrderRow(sentence: parks + "auf die Anfragen antworte.", pinned: "Ich antworte auf die Anfragen."),
+              // "an" opens these verbs, but no particle: they stay whole.
+              GermanOrderRow(
+                  sentence: parks + "die Bodenproben analysiere und die Beete plane.",
+                  pinned: "Ich analysiere die Bodenproben und plane die Beete."
+              ),
+          ])
+    func germanOrder(row: GermanOrderRow) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.gardenerVerbs, wordList: TableWordList())
+        let job = row.sentence.hasPrefix(Self.parks)
+            ? Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+            : Self.job("Gärtnerhelferin", "Baumschule Lindenhof", from: "2009", to: "2013")
+
+        let verdicts = try sanitizer.dutyCheck(
+            of: CVData(experience: [job]), job: 0, duties: "Ich kontrolliere die Parkanlagen.", against: row.sentence
+        )
+
+        #expect(verdicts.pinned == [row.pinned])
+    }
+
+    // MARK: A German list of duties in nouns after the employers (#359)
+
+    /// The verbs of the landscaper's sentences, as the device tags them, pinned so that every Mac reads them alike.
+    private static let landscaperVerbs = ForcedLexicalTagger([.german: .words(["war", "bin", "habe", "verlegt", "pflegt", "pflegten", "pflege"])])
+
+    /// Two jobs of one sentence, and the duties they share, said in nouns after "mit", as English says them with a gerund.
+    private static let paving = "Danach war ich Landschaftsgärtnerin bei Gartenbau Mertens von 2013 bis 2017, dann bei Grünwerk Sauer von 2017 "
+        + "bis 2020, mit dem Verlegen von Pflasterflächen und dem Einbau von Bewässerungsanlagen."
+
+    @Test("A German list of duties in nouns after mit, joined by und, goes on from both employers before it and is the person's (#359)",
+          arguments: [0, 1])
+    func dutiesInNounsAfterTheEmployers(job: Int) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.landscaperVerbs, wordList: TableWordList())
+        let jobs = CVData(experience: [
+            Self.job("Landschaftsgärtnerin", "Gartenbau Mertens", from: "2013", to: "2017"),
+            Self.job("Landschaftsgärtnerin", "Grünwerk Sauer", from: "2017", to: "2020"),
+        ])
+
+        let verdicts = try sanitizer.dutyCheck(of: jobs, job: job, duties: "Ich habe Pflasterflächen verlegt.", against: Self.paving)
+
+        let pinned = verdicts.pinned.joined(separator: " ")
+        #expect(pinned.contains("Pflasterflächen") && pinned.contains("Bewässerungsanlagen"), "\(verdicts.pinned)")
+        #expect(!verdicts.rejected.contains { $0.reason.hasSuffix("only wishes or plans") }, "\(verdicts.rejected)")
+    }
+
+    @Test("A German clause after the employer that has a subject of its own, a relative after mit or one after und, stays another's (#359)",
+          arguments: [
+              "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach, mit der die Stadt die Parkanlagen pflegt.",
+              "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, und die Kollegen pflegten die Parkanlagen.",
+          ])
+    func anotherSubjectAfterTheEmployer(sentence: String) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.landscaperVerbs, wordList: TableWordList())
+        let job = Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+
+        let verdicts = try sanitizer.dutyCheck(of: CVData(experience: [job]), job: 0, duties: "Ich pflege die Parkanlagen.", against: sentence)
+
+        #expect(verdicts.pinned.isEmpty, "\(verdicts.pinned)")
+        #expect(verdicts.rejected.contains { $0.reason.hasSuffix("only wishes or plans") }, "\(verdicts.rejected)")
+    }
+
     @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
           arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
     func dutyOfAJobBeforeItsPlace(duty: String) throws {

@@ -1,6 +1,17 @@
 # PrestoCV
 
-A SwiftUI app for iOS and macOS. You write your CV once and export it as a PDF in any of several designs. AI drafting on the device is optional.
+PrestoCV is a CV and résumé app for iPhone and iPad, written in SwiftUI. You write your CV once and export it as a PDF in any of several designs. Where the device supports Apple's Foundation Models, the app can also write a first draft on the device from a description in your own words. The app is in English, German, Spanish, French, Italian and Portuguese, and so are the headings of the documents it exports. A macOS version is part of the target architecture ([ADR 0004](docs/architecture/adr/0004-native-multiplatform-app.md)).
+
+The source is licensed under the [Apache License 2.0](LICENSE). The name and the icon are not (see [License](#license)).
+
+## Privacy
+
+PrestoCV collects no data. It has no account, no analytics, no advertising and no server of its own:
+- the CVs and the unsaved edits stay on the device, in the app's `Application Support/PrestoCV` folder, and go into the device's backups like the data of any app;
+- the AI draft is written on the device by Apple's Foundation Models, so the description is not sent anywhere;
+- in a release build, a CV leaves the device only as a PDF that the person shares or saves. A TestFlight or Debug build also keeps a trace of each step of the AI draft and the import on the device, and it leaves the device only when the person shares it ([ADR 0032](docs/architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)).
+
+The privacy manifest, `PrestoCV/PrivacyInfo.xcprivacy`, declares no tracking and no collected data. A feature that sends data off the device would need its own ADR, and would change this section and the manifest in the same pull request. A privacy or security problem is reported as [SECURITY.md](SECURITY.md) says.
 
 ## Name
 
@@ -8,11 +19,11 @@ The app is called PrestoCV on the App Store ("PrestoCV: CV & Resume Maker"), und
 
 ## Status
 
-Pre-production. The code is being rebuilt on a target architecture that is enforced mechanically, before the backlog bugs are fixed (ADR 0001):
+Version 1.0 is for iPhone and iPad. It is the legacy app with its bugs fixed ([ADR 0022](docs/architecture/adr/0022-ship-legacy-app-as-v1.md)). A macOS version comes later.
+
+The code is being rebuilt on a target architecture that is enforced mechanically (ADR 0001), one context at a time. The current app and packages are the legacy code that the migration replaces, and it goes on after version 1:
 - the architecture is in `docs/architecture/`;
 - the order of work is issue #98.
-
-The current app and packages are the legacy code the migration replaces, one context at a time.
 
 ## Where things are
 
@@ -20,16 +31,21 @@ The current app and packages are the legacy code the migration replaces, one con
 |---|---|
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R18, modules and allowed imports, glossary, ADRs. |
-| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). |
-| `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The current packages (legacy, being replaced). |
+| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). The app icon is `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)). |
+| `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
+| `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
+| `CVPDFExporterExamples/` | The exporter's demos and template viewer, kept apart from the library. |
 | `DiagnosticLogging/`, `docs/logging.md` | The diagnostic log (ADR 0030): one interface that carries no CV content, its decorators and its unified log adapter; the guide says how to read the log, what each event holds and how to add one. |
 | `DiagnosticTrace/` | The trace of a test build (ADR 0032): each step of the AI draft and the import, with its text, kept on the device in TestFlight and Debug builds only, and shared by the person; `docs/logging.md` says where it is and how to read it. |
 | `CVPDFExporter/Docs/` | The document markup contract that designs follow, which the exporter's tests hold the code to. |
-| `Tools/ArchitectureCheck/` | The checker that enforces the rules, and its pre-commit hook. |
-| `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene, the deployment targets. They read the repository, so they run with `swift test`, not in the test plans. |
+| `Tools/ArchitectureCheck/`, `.githooks/` | The checker that enforces the rules, and the pre-commit hook that runs it. |
+| `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene, the deployment targets, and the documents (they are in English, this table matches the repository, and the open-source files are there and linked). They read the repository, so they run with `swift test`, not in the test plans. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
 | `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases and the Apple checks: the build scripts that Xcode Cloud and the pull request check run, the test plans, the settings of the workflows and of the check, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
+| `PrestoCV.xcodeproj/` | The Xcode project, in its JSON format (`project.xcproj`), and the shared schemes. |
+| `.agents/` | The branch policy that the git hooks follow: the protected branches, and the paths that are not code. |
+| `.github/` | The GitHub Actions workflow that runs the Linux checks, and the code owners of the architecture rules. |
 
 ## Building and testing
 
@@ -46,9 +62,11 @@ swift test --package-path Tools/SourceChecks
 Tools/ArchitectureCheck/check.sh
 ```
 
-The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`. `CI` leaves out `PrestoCVUITests`, Xcode's template launch tests, which take most of an hour and check nothing.
+The scheme has two test plans. `PrestoCV`, the default, runs every test: the app's, the exporter package's simulator tests, and `PrestoCVUITests`, the app's UI tests. `CI` leaves out `PrestoCVUITests`, which take most of an hour: the pull request check runs them in a step of their own (see [Releasing](#releasing)).
 
 On Linux, the packages contain only the new targets. They build today and stay empty until the migration fills them; the architecture checker, the source checks and the prototype also build and test there. The legacy targets are declared only on Apple hosts (ADR 0012).
+
+[CONTRIBUTING.md](CONTRIBUTING.md) lists the commands to run before a pull request, the other packages' tests and builds among them.
 
 ## Development data
 
@@ -66,15 +84,19 @@ Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
-Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, and the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
+Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
 The repository side is `ci_scripts/` (it sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 
 ## Contributing
 
-- **Conventions, reviews, commits and pull requests:** `AGENTS.md`.
-- **A change that adds a target or a dependency between targets** updates `docs/architecture/modules.md` and `Tools/ArchitectureCheck/rules.json` in the same pull request.
+- **How to contribute:** [CONTRIBUTING.md](CONTRIBUTING.md): building and testing, the architecture rules and the checker, commits, and what a pull request needs.
+- **Conventions and reviews:** [AGENTS.md](AGENTS.md).
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Vulnerabilities:** report them privately, as [SECURITY.md](SECURITY.md) says, never in a public issue.
 
 ## License
 
-Copyright © 2024 PrestoCV. All rights reserved.
+Copyright 2026 Giovanni Trovato. The source is licensed under the [Apache License, Version 2.0](LICENSE).
+
+"PrestoCV" and the app icon are trademarks of Giovanni Trovato and are not licensed under it. The icon's artwork, in `PrestoCV/PrestoCV.icon`, is not under the License either: all rights are reserved, and its files are in the repository only so that the official app can be built. A fork uses its own name and icon. The code of conduct is adapted from the Contributor Covenant and keeps its licence, CC BY 4.0. [NOTICE](NOTICE) has the details and the components the project uses.

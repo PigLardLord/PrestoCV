@@ -17,7 +17,7 @@ struct FieldCheckTests {
         "marie-claire.dupont@exemple.fr",  // fr-FR
         "joão.silva@exemplo.com.br",       // pt-BR
         "ana.sousa@exemplo.pt",            // pt-PT
-        "lucia+cv@gmail.com",
+        "ada.lovelace+cv@example.com",
         " ada@example.com\n",
     ])
     func plausibleEmail(text: String) {
