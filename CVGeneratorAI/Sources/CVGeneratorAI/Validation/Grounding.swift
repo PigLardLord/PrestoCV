@@ -130,8 +130,21 @@ struct Grounding {
         func claimedWords(at place: Place) -> Set<Int> {
             guard claims(at: place) else { return [] }
             let clause = clauses.clause(at: place)
-            let relative = sharesTheSubject(at: place) ? nil : RelativeClauses.start(in: clause, language: language)
+            let relative = sharesTheSubject(at: place)
+                ? nil : RelativeClauses.start(in: clause, goingOnWith: clausesGoingOn(after: place), language: language)
             return Set(0..<(relative ?? clause.words.count)).subtracting(clauses.quotedWords(at: place))
+        }
+
+        /// The later clauses of the sentence at `place` that go on with its clause (`RelativeClauses`): each one a comma or a
+        /// conjunction split off, up to one that opens a clause of its own with a subordinating word, a pronoun or a relative.
+        private func clausesGoingOn(after place: Place) -> [Clause] {
+            var result: [Clause] = []
+            for clause in clauses.sentences[place.sentence].dropFirst(place.clause + 1) {
+                guard !clause.isAnchored, let first = clause.words.first?.folded, !Self.subordinators.contains(first),
+                      !Self.pronouns.contains(first), !Vocabulary.isRelative(first, in: language) else { break }
+                result.append(clause)
+            }
+            return result
         }
 
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
@@ -678,7 +691,8 @@ extension Grounding {
                     opensWithTheEmployer = place.clause == 0 && !statement.hasVerbs && !clause.words.contains(where: \.isNumber)
                 } else if let lastJobs = last,
                           Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true
-                            || (continued != nil && reading.sharesTheSubject(at: place)) {
+                            || (continued != nil && reading.sharesTheSubject(at: place))
+                            || Self.goesOnInNouns(clause, after: continued, language) {
                     allowed = chain.count > 1 ? chain : lastJobs
                     isContinuation = true
                     previousNaming = false
@@ -736,6 +750,25 @@ extension Grounding {
             return endings.contains { verb.count > $0.count + 2 && verb.hasSuffix($0) }
         }
         return isImperfect(continuation.words) && isImperfect(clause.words)
+    }
+
+    /// Whether the German `clause` goes on from the employers before it with the person's work in nouns, with no verb (#359): "mit", an
+    /// article and a noun ("..., dann bei Grünwerk Sauer von 2017 bis 2020, mit dem Verlegen von Pflasterflächen"), as English goes
+    /// on with a gerund ("..., then at Copperfield Arena from 2019 to 2021, setting up the PA systems"); or an article and a noun that
+    /// "und" or "oder" adds to such a clause, `continuation` ("und dem Einbau von Bewässerungsanlagen").
+    private static func goesOnInNouns(_ clause: Clause, after continuation: Clause?, _ language: Vocabulary.Language?) -> Bool {
+        guard language == .german, !clause.isAnchored else { return false }
+        let articles = Voice.words[.german]?.articles ?? []
+        let isInNouns = { (clause: Clause) -> Bool in
+            let start = clause.words.first?.folded == "mit" ? 1 : 0
+            return clause.words.count > start + 1 && articles.contains(clause.words[start].accented) && clause.isCapitalised(start + 1)
+                && !RelativeClauses.hasAVerb(clause, after: -1, language: language)
+        }
+        if clause.words.first?.folded == "mit" { return isInNouns(clause) }
+        guard let continuation, isInNouns(continuation),
+              let split = continuation.source.split(whereSeparator: \.isWhitespace).last,
+              ["und", "oder"].contains(split.lowercased()) else { return false }
+        return isInNouns(clause)
     }
 
     /// Whether `clause` was split off by a comma and opens with the person as its subject ("j'aidais au service", "I also helped"),

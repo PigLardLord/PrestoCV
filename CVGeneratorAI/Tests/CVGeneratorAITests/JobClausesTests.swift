@@ -640,6 +640,46 @@ struct JobClausesTests {
         #expect(verdicts.kept.contains(row.duty) == !row.isWished, "\(verdicts.rejected)")
     }
 
+    // MARK: A German list of duties in nouns after the employers (#359)
+
+    /// The verbs of the landscaper's sentences, as the device tags them, pinned so that every Mac reads them alike.
+    private static let landscaperVerbs = ForcedLexicalTagger([.german: .words(["war", "bin", "habe", "verlegt", "pflegt", "pflegten", "pflege"])])
+
+    /// Two jobs of one sentence, and the duties they share, said in nouns after "mit", as English says them with a gerund.
+    private static let paving = "Danach war ich Landschaftsgärtnerin bei Gartenbau Mertens von 2013 bis 2017, dann bei Grünwerk Sauer von 2017 "
+        + "bis 2020, mit dem Verlegen von Pflasterflächen und dem Einbau von Bewässerungsanlagen."
+
+    @Test("A German list of duties in nouns after mit, joined by und, goes on from both employers before it and is the person's (#359)",
+          arguments: [0, 1])
+    func dutiesInNounsAfterTheEmployers(job: Int) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.landscaperVerbs, wordList: TableWordList())
+        let jobs = CVData(experience: [
+            Self.job("Landschaftsgärtnerin", "Gartenbau Mertens", from: "2013", to: "2017"),
+            Self.job("Landschaftsgärtnerin", "Grünwerk Sauer", from: "2017", to: "2020"),
+        ])
+
+        let verdicts = try sanitizer.dutyCheck(of: jobs, job: job, duties: "Ich habe Pflasterflächen verlegt.", against: Self.paving)
+
+        let pinned = verdicts.pinned.joined(separator: " ")
+        #expect(pinned.contains("Pflasterflächen") && pinned.contains("Bewässerungsanlagen"), "\(verdicts.pinned)")
+        #expect(!verdicts.rejected.contains { $0.reason.hasSuffix("only wishes or plans") }, "\(verdicts.rejected)")
+    }
+
+    @Test("A German clause after the employer that has a subject of its own, a relative after mit or one after und, stays another's (#359)",
+          arguments: [
+              "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach, mit der die Stadt die Parkanlagen pflegt.",
+              "Seit 2020 bin ich Vorarbeiterin bei der Stadtgärtnerei Hollerbach in Fulda, und die Kollegen pflegten die Parkanlagen.",
+          ])
+    func anotherSubjectAfterTheEmployer(sentence: String) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.landscaperVerbs, wordList: TableWordList())
+        let job = Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+
+        let verdicts = try sanitizer.dutyCheck(of: CVData(experience: [job]), job: 0, duties: "Ich pflege die Parkanlagen.", against: sentence)
+
+        #expect(verdicts.pinned.isEmpty, "\(verdicts.pinned)")
+        #expect(verdicts.rejected.contains { $0.reason.hasSuffix("only wishes or plans") }, "\(verdicts.rejected)")
+    }
+
     @Test("A written duty that says the duty of a job named before its place goes from another job (#362)",
           arguments: ["Reparto el trabajo del equipo y monto los neumáticos.", "Monto los neumáticos.", "Monta los neumáticos."])
     func dutyOfAJobBeforeItsPlace(duty: String) throws {
