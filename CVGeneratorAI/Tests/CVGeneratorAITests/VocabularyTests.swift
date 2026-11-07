@@ -150,6 +150,7 @@ struct VocabularyTests {
             ("J'ai écrit des plans de soins", .french, "plans"), ("Ho gestito casi complessi", .italian, "casi"),
             ("Lavoro la sera presso Acme", .italian, "sera"), ("Se me asignó la formación", .spanish, "se"),
             ("Une équipe qui se forme", .french, "se"), ("Mi si è affidato un reparto", .italian, "si"), ("Trabalho para si", .portuguese, "si"),
+            ("Bei Acme habe ich auch mal bei der Baumpflege ausgeholfen", .german, "mal"),
           ])
     func modalityOfAnotherLanguage(text: String, language: Vocabulary.Language, word: String) {
         #expect(!Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
@@ -160,7 +161,7 @@ struct VocabularyTests {
         ("Ich habe fast 3 Jahre gearbeitet", Vocabulary.Language.german, "fast"), ("Falls Acme mich einstellt", .german, "falls"),
         ("I plan to work at Acme", .english, "plan"), ("Casi tres años", .spanish, "casi"), ("Je sera", .french, "sera"),
         ("Si Acme me contrata", .spanish, "si"), ("Si Acme m'embauche", .french, "si"), ("Se Acme mi assume", .italian, "se"),
-        ("Se a Acme me contratar", .portuguese, "se"),
+        ("Se a Acme me contratar", .portuguese, "se"), ("Falo mal inglês", .portuguese, "mal"),
     ])
     func modalityOfItsLanguage(text: String, language: Vocabulary.Language, word: String) {
         #expect(Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
