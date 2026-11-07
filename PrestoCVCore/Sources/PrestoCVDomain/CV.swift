@@ -31,8 +31,8 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// "Has enough content to be saved", as `SaveRule` defines it.
-    public var canBeSaved: Bool {
+    /// "Has enough content to be saved", as `SaveRule` defines it. The size limits are not part of it: `saveCheck()` has both.
+    var hasEnoughContent: Bool {
         let p = personal, s = sections
         return SaveRule.allowsSaving(
             personalDetails: [p.fullName, p.professionalTitle, p.email?.value ?? "", p.phone?.value ?? "", p.location,
@@ -41,6 +41,9 @@ public struct CV: Hashable, Sendable {
                            s.profiles.count, s.interests.count]
         )
     }
+
+    /// Whether the CV can be saved: enough content, and within `CVLimits`. `saveCheck()` says why not.
+    public var canBeSaved: Bool { saveCheck() == .ok }
 
     public mutating func rename(_ newTitle: String) { title = TextRules.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
