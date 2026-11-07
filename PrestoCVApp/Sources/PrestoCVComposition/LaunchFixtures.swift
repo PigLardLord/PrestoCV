@@ -22,6 +22,8 @@ struct LaunchFixtures: Equatable, Sendable {
         case unreadableDistribution
         case seedWithoutFolder
         case seedUnwritable
+        /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
+        case unsafeFolder
     }
 
     static let storageArgument = "-PrestoCVNextStorage"
@@ -90,6 +92,15 @@ struct LaunchFixtures: Equatable, Sendable {
         return AppPaths(root: root, temporary: device.temporary)
     }
 
+    /// Makes the fixture ready before the app reads it: for a fixture folder, checks that it is a plain folder of the
+    /// temporary folder and then writes the seed. Nothing is made or written before the check passes, so a link planted in
+    /// the temporary folder never leads a launch into another folder, such as the real store.
+    func prepare(_ paths: AppPaths) throws(Failure) {
+        guard storage != .device else { return }
+        try Self.requirePlainFolders(of: paths)
+        try writeSeed(into: paths.store)
+    }
+
     /// Puts the seed in the store folder, which it makes.
     func writeSeed(into directory: URL) throws(Failure) {
         do {
@@ -99,6 +110,34 @@ struct LaunchFixtures: Equatable, Sendable {
             }
         } catch {
             throw .seedUnwritable
+        }
+    }
+
+    // MARK: Checking
+
+    /// Refuses a root, a store or a trace folder, or any folder between them and the temporary folder, that is a link, and
+    /// a root that resolves to somewhere outside the temporary folder.
+    private static func requirePlainFolders(of paths: AppPaths) throws(Failure) {
+        let temporary = paths.temporary.standardizedFileURL.path
+        for folder in [paths.store, paths.trace] {
+            var url = folder.standardizedFileURL
+            while url.path.hasPrefix(temporary + "/") {
+                if isLink(url) { throw .unsafeFolder }
+                url.deleteLastPathComponent()
+            }
+        }
+        let resolvedTemporary = paths.temporary.resolvingSymlinksInPath().path
+        guard paths.root.resolvingSymlinksInPath().path.hasPrefix(resolvedTemporary + "/") else { throw .unsafeFolder }
+    }
+
+    /// Whether the entry is a link. An entry that is not there is none; one that cannot be read counts as one (fail closed).
+    private static func isLink(_ url: URL) -> Bool {
+        do {
+            return try FileManager.default.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType == .typeSymbolicLink
+        } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+            return false
+        } catch {
+            return true
         }
     }
 

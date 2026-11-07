@@ -138,7 +138,7 @@ public final class Composition {
         prepare = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
             do throws(LaunchFixtures.Failure) {
-                try fixtures.writeSeed(into: paths.store)
+                try fixtures.prepare(paths)
             } catch {
                 throw CompositionFailure(error)
             }

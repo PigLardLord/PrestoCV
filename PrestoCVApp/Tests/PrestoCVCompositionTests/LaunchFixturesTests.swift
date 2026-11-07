@@ -161,5 +161,82 @@ struct LaunchFixturesTests {
             try fixtures.writeSeed(into: file.appendingPathComponent("Store", isDirectory: true))
         }
     }
+
+    // MARK: A fixture folder that is a link
+
+    private static func unique() -> String { "Linked-\(UUID().uuidString)" }
+
+    private static func target() throws -> URL {
+        let target = FileManager.default.temporaryDirectory.appendingPathComponent("LinkTarget-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        return target
+    }
+
+    private static func entries(_ folder: URL) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    }
+
+    private static func arguments(storage name: String) throws -> [String] {
+        [program, "-PrestoCVNextStorage", name, "-PrestoCVNextSeed", try seed(["planted.cv.json": "{}"])]
+    }
+
+    @MainActor
+    @Test("A fixture folder that is a link to another folder fails the launch, and nothing is written there")
+    func linkedRoot() async throws {
+        let target = try Self.target()
+        let name = Self.unique()
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer {
+            try? FileManager.default.removeItem(at: link)
+            try? FileManager.default.removeItem(at: target)
+        }
+
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(try Self.entries(target).isEmpty, "Nothing was made or written through the link")
+    }
+
+    @MainActor
+    @Test("A store folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    func linkedStore() async throws {
+        let target = try Self.target()
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("Store"), withDestinationURL: target)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: target)
+        }
+
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(try Self.entries(target).isEmpty, "Nothing was written through the link")
+    }
+
+    @MainActor
+    @Test("A fixture folder that is a plain folder still launches with its seed")
+    func plainFolderLaunches() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+
+        guard case .ready = state else {
+            Issue.record("expected ready, got \(state)")
+            return
+        }
+        #expect(try Self.entries(root.appendingPathComponent("Store")) == ["planted.cv.json"])
+    }
 }
 #endif
