@@ -58,6 +58,11 @@ struct GuardedBackSwipeTests {
         (delegate ?? gesture.delegate)?.gestureRecognizer?(gesture, shouldReceive: touch) ?? true
     }
 
+    /// Whether the delegate of `gesture` lets it begin: yes when the delegate does not answer, as in UIKit.
+    private func begins(_ gesture: UIGestureRecognizer) -> Bool {
+        gesture.delegate?.gestureRecognizerShouldBegin?(gesture) ?? true
+    }
+
     // MARK: - The gestures while the screen goes
 
     @Test("The guard keeps both gestures while the screen disappears, and gives them back to the system once it is gone")
@@ -78,6 +83,8 @@ struct GuardedBackSwipeTests {
         #expect(stack.content.delegate as AnyObject? === stack.systemContentDelegate, "The content swipe should go back to the system")
     }
 
+    /// Keeps the system's delegates: the screen shown again after a pop taken back must not make the guard take itself for
+    /// one of them.
     @Test("A pop taken back leaves the gestures with the guard, which gives the system's back when the screen goes")
     func aPopTakenBackKeepsTheGuard() throws {
         let stack = try shownGuard(canLeaveAtOnce: { true })
@@ -106,10 +113,22 @@ struct GuardedBackSwipeTests {
         let stack = try shownGuard(canLeaveAtOnce: { storeHoldsTheForm }, leave: { leaves += 1; storeHoldsTheForm = true })
         touchDown(on: stack)
 
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.edge), "Edits the store does not hold should not go back at once")
+        #expect(!begins(stack.edge), "Edits the store does not hold should not go back at once")
         #expect(leaves == 1, "The swipe should leave the way Back does")
 
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.content), "The rest of the swipe should not start a pop of its own")
+        #expect(!begins(stack.content), "The rest of the swipe should not start a pop of its own")
+        #expect(leaves == 1, "One swipe should leave once")
+    }
+
+    @Test("A swipe the content pan sees first gets one answer too")
+    func theContentPanFirstGetsOneAnswerToo() throws {
+        var storeHoldsTheForm = false
+        var leaves = 0
+        let stack = try shownGuard(canLeaveAtOnce: { storeHoldsTheForm }, leave: { leaves += 1; storeHoldsTheForm = true })
+        touchDown(on: stack)
+
+        #expect(!begins(stack.content), "Edits the store does not hold should not go back at once")
+        #expect(!begins(stack.edge), "The rest of the swipe should not start a pop of its own")
         #expect(leaves == 1, "One swipe should leave once")
     }
 
@@ -120,40 +139,42 @@ struct GuardedBackSwipeTests {
         let stack = try shownGuard(canLeaveAtOnce: { false }, leave: { leaves += 1 })
         touchDown(on: stack)
 
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.edge))
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.content))
+        #expect(!begins(stack.edge))
+        #expect(!begins(stack.content))
 
         #expect(leaves == 1, "One swipe should try to leave once")
     }
 
+    /// Keeps the answer to one swipe: the next one is asked again.
     @Test("The next swipe asks again: it goes back at once when the store holds the form, and leaves again when it does not")
     func theNextSwipeAsksAgain() throws {
         var storeHoldsTheForm = false
         var leaves = 0
         let stack = try shownGuard(canLeaveAtOnce: { storeHoldsTheForm }, leave: { leaves += 1 })
         touchDown(on: stack)
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.edge))
+        #expect(!begins(stack.edge))
 
         touchDown(on: stack)
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.edge), "The edits are still not stored")
+        #expect(!begins(stack.edge), "The edits are still not stored")
         #expect(leaves == 2, "A new swipe should leave again")
 
         storeHoldsTheForm = true
         touchDown(on: stack)
-        #expect(stack.guardian.gestureRecognizerShouldBegin(stack.edge), "A swipe with nothing to store should go back at once")
+        #expect(begins(stack.edge), "A swipe with nothing to store should go back at once")
     }
 
+    /// Fails as well when every touch starts a new swipe.
     @Test("A finger that joins a swipe is part of it")
     func aFingerThatJoinsIsPartOfTheSwipe() throws {
         var storeHoldsTheForm = false
         let stack = try shownGuard(canLeaveAtOnce: { storeHoldsTheForm }, leave: { storeHoldsTheForm = true })
         touchDown(on: stack)
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.edge))
+        #expect(!begins(stack.edge))
 
         // The content pan already follows the first finger when the second one lands
         #expect(receives(UITouch(), PanFollowingAFinger(), delegate: stack.guardian))
 
-        #expect(!stack.guardian.gestureRecognizerShouldBegin(stack.content), "The swipe should keep the answer it got")
+        #expect(!begins(stack.content), "The swipe should keep the answer it got")
     }
 }
 
