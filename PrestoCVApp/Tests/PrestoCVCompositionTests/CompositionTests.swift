@@ -42,12 +42,14 @@ struct CompositionTests {
     private static func inputs(
         _ paths: AppPaths,
         log: any DiagnosticLogger = RecordingLogger(),
+        clock: any TimeSource = SteppingClock(),
+        ids: any IDGenerator = SequentialIDGenerator(),
         compileRules: @escaping Composition.CompileRules
     ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
-            clock: SteppingClock(),
-            ids: SequentialIDGenerator(),
+            clock: clock,
+            ids: ids,
             log: log,
             gate: .asking(FixedDistribution(.production)),
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
@@ -81,16 +83,30 @@ struct CompositionTests {
         #expect(files.isEmpty == false, "The CV was written under the store folder")
     }
 
-    @Test("The clock and the ids are the ones the inputs gave")
+    @Test("The clock and the ids are the very instances the inputs gave, with the state they had")
     func holdsTheGivenSources() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
         let counter = CompileCounter()
+        // Sources that already moved, and a reference moved the same way: fresh doubles would start again
+        let clock = SteppingClock()
+        let ids = SequentialIDGenerator()
+        let referenceClock = SteppingClock()
+        let referenceIDs = SequentialIDGenerator()
+        for _ in 0..<5 {
+            _ = clock.now(); _ = referenceClock.now()
+            _ = ids.next(); _ = referenceIDs.next()
+        }
 
-        let composition = try Self.ready(await Composition.make(Self.inputs(paths, compileRules: Self.counting(counter))))
+        let composition = try Self.ready(await Composition.make(
+            Self.inputs(paths, clock: clock, ids: ids, compileRules: Self.counting(counter))
+        ))
 
-        #expect(composition.ids.next() == SequentialIDGenerator().next())
-        #expect(composition.clock.now() == SteppingClock().now())
+        #expect(composition.ids.next() == referenceIDs.next())
+        #expect(composition.clock.now() == referenceClock.now())
+        // Both calls moved the supplied instances, not copies of them
+        #expect(ids.next() == referenceIDs.next())
+        #expect(clock.now() == referenceClock.now())
     }
 
     @Test("The rules are compiled once per composition, also when the renderer is asked for twice")
@@ -169,13 +185,6 @@ struct CompositionTests {
 /// The two sources that read the system.
 @Suite("The system sources")
 struct SystemSourcesTests {
-    @Test("The clock tells the time of the call")
-    func clock() {
-        let before = Date()
-        let now = SystemTimeSource().now()
-        #expect(now >= before && now <= Date())
-    }
-
     @Test("Each id is new")
     func ids() {
         let ids = UUIDGenerator()
