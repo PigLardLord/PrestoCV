@@ -106,11 +106,21 @@ struct LaunchFixtures: Equatable, Sendable {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for (name, content) in seed {
-                try Data(content.utf8).write(to: directory.appendingPathComponent(name), options: .atomic)
+                try Data(content.utf8).write(to: directory.appendingPathComponent(name), options: Self.writingOptions)
             }
         } catch {
             throw .seedUnwritable
         }
+    }
+
+    /// Atomic, and complete file protection where the platform applies it, as the trace store does: a host Mac does not
+    /// apply it, and a locked keybag would refuse the write there.
+    private static var writingOptions: Data.WritingOptions {
+        #if os(iOS)
+        [.atomic, .completeFileProtection]
+        #else
+        [.atomic]
+        #endif
     }
 
     // MARK: Checking
