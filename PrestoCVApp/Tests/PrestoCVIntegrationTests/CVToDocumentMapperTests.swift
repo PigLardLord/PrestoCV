@@ -138,9 +138,9 @@ struct CVToDocumentMapperTests {
         #expect(document(cv { $0.education = [Education(degree: "", school: " ")] }).sections.isEmpty)
     }
 
-    @Test("a line break of any kind in a multi-line field becomes one line feed",
+    @Test("a line break of any kind in a multi-line field becomes one line feed; the CV removes a vertical tab and a form feed before it (text rule, #389)",
           arguments: [("one\r\ntwo", "one\ntwo"), ("one\rtwo", "one\ntwo"), ("one\ntwo", "one\ntwo"), ("one\r\rtwo", "one\n\ntwo"),
-                      ("one\u{0B}two", "one\ntwo"), ("one\u{0C}two", "one\ntwo"), ("one\u{85}two", "one\ntwo")])
+                      ("one\u{0B}two", "onetwo"), ("one\u{0C}two", "onetwo"), ("one\u{85}two", "one\ntwo")])
     func multiLineBreaks(raw: String, expected: String) {
         var personal = PersonalDetails(fullName: "Ada")
         personal.summary = raw
