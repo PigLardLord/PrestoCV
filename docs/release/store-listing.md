@@ -78,7 +78,7 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 | es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 310 |
 | fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 302 |
 | pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 309 |
-| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 313 |
+| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 317 |
 
 Notes for App Review: 3997 characters (4000).
 <!-- counts:end -->
@@ -820,5 +820,5 @@ Pronto para enviar. | Um PDF caprichado, com os títulos no idioma do seu currí
 ### What's New
 
 ```text
-O rascunho com IA agora mantém suas palavras quando você cola um currículo, porque ele lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para «atualidade». Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente.
+O rascunho com IA agora mantém suas palavras quando você cola um currículo, porque o app o lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para “atualidade”. Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente.
 ```
