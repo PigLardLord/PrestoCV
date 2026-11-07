@@ -60,7 +60,9 @@ public final class LookViewModel {
 
     /// Reads the CV. The view calls it from its `.task`. It shows `.loading` while it reads, and does nothing while a change
     /// is being written: that change is newer than anything it could read. Only the latest read publishes; the choices made
-    /// meanwhile stay on top of the look it read.
+    /// meanwhile stay on top of the look it read. A read that returns the CV publishes it even if its task was cancelled, as
+    /// the list and the editor do: the CV it read is the store's, and keeping the older one would make the next change a
+    /// conflict. Only a cancelled read that failed gives back the status it found.
     public func load() async {
         guard mayStart(.load) else { return }
         loadGeneration += 1

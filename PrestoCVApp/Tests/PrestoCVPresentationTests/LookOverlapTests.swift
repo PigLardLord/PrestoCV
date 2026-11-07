@@ -149,6 +149,30 @@ struct LookOverlapTests {
         #expect(look.status == .ready)
     }
 
+    @Test("a read that returns the CV after its task was cancelled publishes it, so the next change is no conflict")
+    func cancelledReadThatReturnsPublishes() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend", design: classicForest)
+        let look = world.look(of: cv)
+        await look.load()
+        try await world.editing.otherWindowSaves(cv, fullName: "Someone Else")
+        await world.editing.loadGate.close()
+
+        let reading = Task { await look.load() }
+        await waitUntil("the read to wait") { await world.editing.loadGate.waiting == 1 }
+        reading.cancel()
+        await world.editing.loadGate.open()
+        await reading.value
+
+        #expect(look.status == .ready)
+
+        look.choose(palette: "ocean")
+        await look.apply()
+
+        #expect(look.status == .applied)
+        #expect(try await world.editing.inStore(cv.id).design == DesignChoice(design: "classic", palette: "ocean", fonts: "serif"))
+    }
+
     @Test("a change applied while the CV is read writes nothing and keeps the choices")
     func applyDuringLoadWritesNothing() async throws {
         let world = Browsing()
