@@ -35,7 +35,12 @@ public final class LookViewModel {
     @ObservationIgnored private let editing: any CVEditing
     @ObservationIgnored private var stored: CV?
     @ObservationIgnored private var writer: (any CVAutosaveWriting)?
-    @ObservationIgnored private var pending: LookChange?
+    /// The change being written, and the choices made while it is written. `pending` is both, in order.
+    @ObservationIgnored private var submitted: LookChange?
+    @ObservationIgnored private var unsent: LookChange?
+    @ObservationIgnored private var loadGeneration = 0
+
+    private var pending: LookChange? { submitted.map { first in unsent.map { first.followed(by: $0) } ?? first } ?? unsent }
 
     public init(reference: CVReference, editing: any CVEditing, options: any LookOptionsProviding) {
         let options = options.options()
@@ -45,16 +50,21 @@ public final class LookViewModel {
         shown = EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
     }
 
-    /// Reads the CV. The view calls it from its `.task`.
+    /// Reads the CV. The view calls it from its `.task`. Only the latest read publishes; the choices made meanwhile stay on
+    /// top of the look it read.
     public func load() async {
+        loadGeneration += 1
+        let mine = loadGeneration
         do {
             let cv = try await editing.load(reference.id)
+            guard mine == loadGeneration else { return }
             stored = cv
             writer = editing.autosaveWriter(startingFrom: cv)
-            if let design = cv.design { shown = EditorLook(design) }
-            status = .ready
+            show(over: cv.design)
+            if status != .applying { status = .ready }
         } catch {
-            if !Task.isCancelled { status = LookStatus(error) }
+            guard mine == loadGeneration, !Task.isCancelled else { return }
+            status = LookStatus(error)
         }
     }
 
@@ -64,26 +74,38 @@ public final class LookViewModel {
 
     public func choose(fonts: String?) { choose(.fonts, EditorLook(design: shown.design, palette: shown.palette, fonts: fonts)) }
 
-    /// Sends the choices made so far as one change. The CV's text is not written by it.
+    /// Sends the choices made so far as one change. The CV's text is not written by it. The choices made while it is written
+    /// stay pending on top of the look it stored; if it fails, nothing the person chose is lost.
     public func apply() async {
-        guard let writer, let stored, let pending, status != .applying else { return }
+        guard let writer, let stored, let change = pending, status != .applying else { return }
+        submitted = change
+        unsent = nil
         status = .applying
         do {
-            let changed = try await writer.changeLook(pending, of: stored)
+            let changed = try await writer.changeLook(change, of: stored)
             self.stored = changed
-            self.pending = nil
-            chosen = []
-            if let design = changed.design { shown = EditorLook(design) }
-            status = .applied
+            submitted = nil
+            show(over: changed.design)
+            chosen = Set(unsent?.parts.map(LookPart.init) ?? [])
+            status = unsent == nil ? .applied : .ready
         } catch {
             status = Task.isCancelled || error is CancellationError ? .ready : (error as? EditFailure).map(LookStatus.init) ?? .failed
         }
     }
 
+    /// The look of the CV with the pending choices on top, or the defaults for a CV that keeps none.
+    private func show(over design: DesignChoice?) {
+        if let pending {
+            shown = EditorLook(pending.applying(to: design))
+        } else if let design {
+            shown = EditorLook(design)
+        }
+    }
+
     private func choose(_ part: LookPart, _ look: EditorLook) {
         guard let step = LookChange(shown: look, parts: [part]) else { return }
-        let change = pending.map { $0.followed(by: step) } ?? step
-        pending = change
+        unsent = unsent.map { $0.followed(by: step) } ?? step
+        guard let change = pending else { return }
         shown = EditorLook(change.shown)
         chosen = Set(change.parts.map(LookPart.init))
         if status == .applied { status = .ready }
