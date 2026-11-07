@@ -28,11 +28,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
+    func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Locking
 
-    private func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
+    func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
         do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
         catch { throw .storeUnavailable(.cannotLock) }
         // Never through a link, and never on anything but a regular file: opening does not block.
@@ -107,7 +107,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return file
     }
 
-    private func current(_ id: CVID) throws(RepositoryError) -> CV? {
+    func current(_ id: CVID) throws(RepositoryError) -> CV? {
         let u = url(id)
         switch read(u) {
         case .absent:
@@ -127,7 +127,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
     ///
     /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
-    private func write(_ cv: CV) throws(RepositoryError) {
+    func write(_ cv: CV) throws(RepositoryError) {
         let name = url(cv.id).lastPathComponent
         // `stored(revision:at:)` sets both dates, and a read always returns them, so a CV without them would not read back.
         guard let createdAt = cv.createdAt, let updatedAt = cv.updatedAt else { throw .wouldNotReadBack(file: name) }
