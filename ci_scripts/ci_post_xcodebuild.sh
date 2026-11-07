@@ -7,7 +7,7 @@
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
 #   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
-#                      check and of the screenshot tools, the check of the store listing, and the builds of PrestoCVApp and
+#                      check and of the screenshot tools, the check of the store listing, the tests of PrestoCVApp and the build of
 #                      CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines that
 #                      then run the test plan have only the built products.
 set -euo pipefail
@@ -58,8 +58,7 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/check-store-listing.py"
     step "$ROOT/Tools/Release/check-store-listing-selftest.py"
     step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
-    # PrestoCVApp has no tests until step 5 (#88); building it checks its targets and cross-package dependencies.
-    step swift build --package-path "$ROOT/PrestoCVApp"
+    step swift test --package-path "$ROOT/PrestoCVApp"
     # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.
     step swift build --package-path "$ROOT/CVPDFExporterExamples"
     ;;
