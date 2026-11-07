@@ -175,6 +175,29 @@ struct LegacyImportTests {
         #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
     }
 
+    @Test("a run that finishes an interrupted adoption makes the ledger durable before the CV becomes visible", .enabled(if: !isRoot))
+    func recoveryWaitsForTheLedger() async throws {
+        let w = try standard()
+        try await stageCopy(idA, in: w)
+        try writeLedger([LegacyFixtures.idA], in: w)
+        let stored = w.store.appendingPathComponent(LegacyFixtures.idA + ".cv.json")
+        let staged = w.store.appendingPathComponent(FileCVRepository.stagedName(for: idA))
+        // Writable and searchable but not readable: the ledger can be read, but its barrier (the file, then the
+        // directory) cannot hold, because the directory cannot be opened to be synced.
+        try FileManager.default.setAttributes([.posixPermissions: 0o300], ofItemAtPath: w.store.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: w.store.path) }
+        let failed = try await w.importer().run()
+        #expect(failed.imported.isEmpty && failed.removedSources.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: stored.path))
+        #expect(FileManager.default.fileExists(atPath: staged.path))
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: w.store.path)
+        let retried = try await w.importer().run()
+        #expect(Set(retried.imported) == [idA, idB] && retried.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
     @Test("a CV erased before the rename was finished stays erased: its staged copy goes with it")
     func erasedStagedCopy() async throws {
         let w = try standard()

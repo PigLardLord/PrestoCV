@@ -73,7 +73,10 @@ extension FileCVRepository: LegacyImportTarget {
             let staged = directory.appendingPathComponent(Self.stagedName(for: cv.id))
             let stored = try current(cv.id) != nil
             if ledger.contains(cv.id.raw) {
-                if !stored, try Self.exists(staged) { return .stored(try publish(staged, as: cv.id)) }   // a kill stopped the rename
+                if !stored, try Self.exists(staged) {   // a kill stopped the rename, or the ledger's barrier failed
+                    try makeDurable(ledgerURL)
+                    return .stored(try publish(staged, as: cv.id))
+                }
                 if stored { try makeDurable(url(cv.id)) }
                 try makeDurable(ledgerURL)
                 return .existing
