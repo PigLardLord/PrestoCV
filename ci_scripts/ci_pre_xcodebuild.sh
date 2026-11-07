@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Xcode Cloud runs this before every xcodebuild action. For an archive it sets the marketing version from the ref: the
+# Xcode Cloud runs this before every xcodebuild action. It first checks that the Swift of the workflow's Xcode is the one
+# .swift-version pins (ADR 0026), so a workflow on another Xcode fails at once. For an archive it then sets the marketing version from the ref: the
 # tag v<version> or the branch release/<version>, where <version> is 1.2 or 1.2.3. Any other ref keeps the project's
 # version. The build number is not set here: Xcode Cloud sets it. It edits only this checkout of the project file.
 set -euo pipefail
+
+"$(cd "$(dirname "$0")/.." && pwd)/Tools/check-toolchain.sh"
 
 if [ "${CI_XCODEBUILD_ACTION:-}" != archive ]; then
   echo "ci_pre_xcodebuild: action '${CI_XCODEBUILD_ACTION:-}' is not an archive, the version stays as it is"
