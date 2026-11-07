@@ -58,6 +58,22 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "CVRenderingPDFKitInspector", package: "CVPDFExporter"),
     .product(name: "CVDrafting", package: "CVGeneratorAI"),
     .product(name: "CVDraftingFoundationModels", package: "CVGeneratorAI"),
+    .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingOSLog", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceFiles", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceDistribution", package: "DiagnosticTrace"),
+]))
+targets.append(.testTarget(name: "PrestoCVCompositionTests", dependencies: [
+    "PrestoCVComposition",
+    .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+    .product(name: "CVRenderingWebKitSupport", package: "CVPDFExporter"),
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceTestSupport", package: "DiagnosticTrace"),
 ]))
 #endif
 
@@ -69,6 +85,8 @@ let package = Package(
         .package(path: "../PrestoCVCore"),
         .package(path: "../CVPDFExporter"),
         .package(path: "../CVGeneratorAI"),
+        .package(path: "../DiagnosticLogging"),
+        .package(path: "../DiagnosticTrace"),
     ],
     targets: targets
 )

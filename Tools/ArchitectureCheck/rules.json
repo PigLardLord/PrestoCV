@@ -122,7 +122,9 @@
   "adr": "0032",
   "files": [
    "PrestoCV/PrestoCVApp.swift",
-   "PrestoCV/App/AppEnvironment.swift"
+   "PrestoCV/App/AppEnvironment.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/Composition.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/TraceChain.swift"
   ],
   "modules": [
    "DiagnosticTraceFiles",
@@ -768,6 +770,12 @@
     "CVRenderingPDFKitInspector",
     "CVDrafting",
     "CVDraftingFoundationModels",
+    "DiagnosticLogging",
+    "DiagnosticLoggingOSLog",
+    "DiagnosticTrace",
+    "DiagnosticTraceFiles",
+    "DiagnosticTraceDistribution",
+    "WebKit",
     "Foundation"
    ],
    "rules": [
@@ -778,6 +786,25 @@
     "R14",
     "R17"
    ]
+  },
+  {
+   "name": "PrestoCVCompositionTests",
+   "path": "PrestoCVApp/Tests/PrestoCVCompositionTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "WebKit",
+    "PrestoCVComposition",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "CVRenderingWebKitSupport",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
+   ],
+   "rules": [],
+   "kind": "test"
   },
   {
    "name": "DiagnosticLogging",
