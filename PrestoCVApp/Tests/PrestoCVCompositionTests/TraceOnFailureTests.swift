@@ -1,0 +1,90 @@
+import CVRenderingWebKitSupport
+import DiagnosticLogging
+import DiagnosticLoggingTestSupport
+import DiagnosticTrace
+import DiagnosticTraceTestSupport
+import Foundation
+import PrestoCVCoreTestSupport
+import Testing
+import WebKit
+@testable import PrestoCVComposition
+
+/// A launch that may not record removes what an earlier install stored (ADR 0032), also when the composition fails: the
+/// error screen must not leave a person's CV text on the device.
+@MainActor
+@Suite("The trace purge when the composition fails")
+struct TraceOnFailureTests {
+    private static let marker = "Zwiebelmarker"
+
+    private static func base() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("TraceOnFailureTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    private static func inputs(_ paths: AppPaths, compileRules: @escaping Composition.CompileRules) -> Composition.Inputs {
+        Composition.Inputs(
+            paths: paths,
+            clock: SteppingClock(),
+            ids: SequentialIDGenerator(),
+            log: RecordingLogger(),
+            gate: .asking(FixedDistribution(.production)),
+            device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
+            samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
+            compileRules: compileRules,
+            prepare: {}
+        )
+    }
+
+    private static let failingRules: Composition.CompileRules = {
+        @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in throw .contentRulesUnavailable
+    }
+
+    /// Stores one run, as an earlier TestFlight install did.
+    private static func storeARun(in paths: AppPaths) async {
+        let earlier = TraceChain(
+            directory: paths.trace, shareDirectory: paths.traceShare, gate: .asking(FixedDistribution(.sandbox)),
+            device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
+            log: RecordingLogger()
+        )
+        #expect(await earlier.access.isOn())
+        let run = earlier.tracer.begin(.textImport)
+        run.record(.input, .text("text", marker))
+        run.finish(.finished)
+        #expect(await earlier.access.reader.runs().count == 1)
+    }
+
+    @Test("Rules that cannot be compiled still purge the traces of an earlier install before make returns")
+    func purgesWhenTheRulesFail() async {
+        let base = Self.base()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let paths = AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
+        await Self.storeARun(in: paths)
+        #expect(FileManager.default.fileExists(atPath: paths.trace.path))
+
+        let state = await Composition.make(Self.inputs(paths, compileRules: Self.failingRules))
+
+        guard case .failed(.contentRulesUnavailable) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(!FileManager.default.fileExists(atPath: paths.trace.path), "The traces are purged when make returns")
+    }
+
+    @Test("A store folder that cannot be made still purges the traces of an earlier install before make returns")
+    func purgesWhenTheStoreFails() async throws {
+        let base = Self.base()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let paths = AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
+        await Self.storeARun(in: paths)
+        #expect(FileManager.default.fileExists(atPath: paths.trace.path))
+        // A regular file where the store folder belongs, so that making the store fails while the trace folder stays
+        try Data("x".utf8).write(to: paths.store)
+
+        let state = await Composition.make(Self.inputs(paths, compileRules: Self.failingRules))
+
+        guard case .failed(.storeUnavailable) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(!FileManager.default.fileExists(atPath: paths.trace.path), "The traces are purged when make returns")
+    }
+}

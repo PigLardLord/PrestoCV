@@ -14,6 +14,7 @@ struct TraceChain {
     let logger: any DiagnosticLogger
     /// Whether the trace records on this launch, and the runs it stored
     let access: TraceAccess
+    private let startup: Task<Void, Never>
 
     /// - Parameters:
     ///   - directory: The folder of the stored runs, made on the first run the gate lets through.
@@ -35,10 +36,11 @@ struct TraceChain {
         )
         // A build that may not record keeps nothing: a TestFlight install replaced by the App Store build keeps its data
         // container, and with it the runs the earlier install stored. The store does it on its own task, after the answer.
-        let startup = Task {
+        startup = Task {
             await launch.answered()
             if !launch.gate.isOpen { await store.purge() }
         }
+        let startup = startup
         let tracer = GatedTracer(gate: launch.gate, next: recorder)
         self.tracer = tracer
         logger = TracingLogger(tracer: tracer, next: log, kinds: ["draft": .aiDraft, "import": .textImport])
@@ -50,6 +52,12 @@ struct TraceChain {
             },
             reader: store
         )
+    }
+
+    /// Returns once the gate has answered and a closed launch has purged. The composition awaits it when it fails, so that
+    /// the error screen never leaves the traces of an earlier install behind.
+    func settle() async {
+        await startup.value
     }
 }
 
