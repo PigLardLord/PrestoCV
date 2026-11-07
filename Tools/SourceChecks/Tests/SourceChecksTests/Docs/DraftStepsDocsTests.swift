@@ -68,7 +68,7 @@ struct DraftStepsDocsTests {
     func adrGivesTheDeadlines() throws {
         let code = try Self.text(Self.source)
         let limits = try #require(
-            code.firstMatch(of: /static let standard = DraftingLimits\(extraction: \.seconds\((\d+)\), section: \.seconds\((\d+)\), on:/),
+            code.firstMatch(of: /static let standard = DraftingLimits\(extraction: \.seconds\((\d+)\), section: \.seconds\((\d+)\), claimCheck:/),
             "\(Self.source) no longer gives the limits as `.seconds(n)`"
         )
         let section = try Self.sectionLines().joined(separator: "\n")
