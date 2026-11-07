@@ -15,8 +15,12 @@ public struct IOSPDFRenderer: PDFRendering {
     /// `rules` is the list the composition root compiled once (R4).
     @MainActor
     public init(rules: WKContentRuleList, loadTimeout: Duration = .seconds(30), readinessTimeout: Duration = .seconds(10)) {
-        engine = IOSPrintEngine(rules: rules, loadTimeout: loadTimeout, readinessTimeout: readinessTimeout)
+        engine = IOSPrintEngine(rules: rules, loadTimeout: loadTimeout, readinessTimeout: readinessTimeout,
+                                isCancelled: { _ in Task.isCancelled })
     }
+
+    /// A renderer over a given engine: the tests choose where it sees a cancellation.
+    init(engine: IOSPrintEngine) { self.engine = engine }
 
     /// Cancellation, before or during the work, ends in `CancellationError`.
     public func render(html: String, page: PageSetup) async throws -> RenderedPDF {
@@ -28,14 +32,22 @@ public struct IOSPDFRenderer: PDFRendering {
 /// Does the work on the main actor, where WebKit and the print system live.
 @MainActor
 final class IOSPrintEngine {
+    /// Where the synchronous part of a render looks for a cancellation: after the load, before each page, and once the
+    /// PDF is drawn and read back, so a cancellation during the last page still ends in `CancellationError`.
+    enum CancellationPoint: Equatable, Sendable { case afterLoad, beforePage(Int), beforeReturn }
+
     /// Renders between the start of their load and their end. The tests read it to cancel a render that is working.
     private(set) static var rendersInFlight = 0
 
     let rules: WKContentRuleList
     let loadTimeout: Duration, readinessTimeout: Duration
+    /// Whether the render was cancelled, asked at each point; the renderer asks the task.
+    let isCancelled: @MainActor (CancellationPoint) -> Bool
 
-    init(rules: WKContentRuleList, loadTimeout: Duration, readinessTimeout: Duration) {
+    init(rules: WKContentRuleList, loadTimeout: Duration, readinessTimeout: Duration,
+         isCancelled: @escaping @MainActor (CancellationPoint) -> Bool) {
         self.rules = rules; self.loadTimeout = loadTimeout; self.readinessTimeout = readinessTimeout
+        self.isCancelled = isCancelled
     }
 
     func render(_ html: String, _ page: PageSetup) async throws -> RenderedPDF {
@@ -56,7 +68,7 @@ final class IOSPrintEngine {
         catch .cancelled { throw CancellationError() }
         do { try await DocumentReadiness.wait(in: view, timeout: readinessTimeout) }
         catch .cancelled { throw CancellationError() }
-        try Task.checkCancellation()
+        try stopIfCancelled(at: .afterLoad)
 
         let renderer = PagePrintRenderer(paper: paper, verticalMargin: page.verticalMarginPoints)
         let formatter = view.viewPrintFormatter()
@@ -65,19 +77,23 @@ final class IOSPrintEngine {
         let required = renderer.numberOfPages
         guard required > 0 else { throw IOSPDFRenderer.Failure.nothingToPrint }
         let kept = min(required, page.maxPages)
-        try Task.checkCancellation()
-        let data = try Self.draw(renderer, pages: kept)
+        let data = try draw(renderer, pages: kept)
         try Self.check(data, holds: kept)
+        try stopIfCancelled(at: .beforeReturn)
         return RenderedPDF(data: data, pageCount: kept, requiredPages: required)
     }
 
+    private func stopIfCancelled(at point: CancellationPoint) throws {
+        if isCancelled(point) { throw CancellationError() }
+    }
+
     /// Draws the first `pages` pages, checking for cancellation before each one.
-    private static func draw(_ renderer: PagePrintRenderer, pages: Int) throws -> Data {
+    private func draw(_ renderer: PagePrintRenderer, pages: Int) throws -> Data {
         renderer.prepare(forDrawingPages: NSRange(location: 0, length: pages))
         var cancelled = false
         let data = UIGraphicsPDFRenderer(bounds: renderer.paperRect).pdfData { context in
             for index in 0..<pages {
-                if Task.isCancelled { cancelled = true; return }
+                if isCancelled(.beforePage(index)) { cancelled = true; return }
                 context.beginPage()
                 renderer.drawPage(at: index, in: renderer.paperRect)
             }

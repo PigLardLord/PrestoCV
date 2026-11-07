@@ -89,11 +89,61 @@ struct IOSPDFRendererTests {
         return false
     }
 
+    /// The steps of a render that run on the main actor without a break: laying the pages out, then drawing each page.
+    /// A cancellation from another task lands during one of them and is seen at the next point the engine asks at.
+    nonisolated static let synchronousSteps: [IOSPrintEngine.CancellationPoint] = [.afterLoad, .beforePage(0), .beforePage(1)]
+
+    @Test("a cancellation that arrives while the pages are laid out or drawn, the last page included, ends in a cancellation, never in a PDF",
+          arguments: synchronousSteps)
+    func cancelledDuringASynchronousStep(arrivesAfter point: IOSPrintEngine.CancellationPoint) async throws {
+        let probe = CancellationArriving(after: point)
+        let renderer = IOSPDFRenderer(engine: try await Self.engine(asking: probe))
+        await #expect(throws: CancellationError.self) { _ = try await renderer.render(html: try Self.twoPages(), page: Self.twoPageLimit) }
+        #expect(probe.asked.contains(point), "the render never reached \(point), so the cancellation did not land in its step")
+    }
+
+    @Test("a render whose task is never cancelled draws its pages through the same engine")
+    func notCancelled() async throws {
+        let probe = CancellationArriving(after: nil)
+        let pdf = try await IOSPDFRenderer(engine: try await Self.engine(asking: probe)).render(html: try Self.twoPages(), page: Self.twoPageLimit)
+        #expect(pdf.pageCount == 2 && PDFDocument(data: pdf.data)?.pageCount == 2)
+        #expect(Self.synchronousSteps.allSatisfy { probe.asked.contains($0) }, "asked at \(probe.asked)")
+    }
+
+    static let twoPageLimit = PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 2)
+
+    static func twoPages() throws -> String {
+        try ContractFixture.rendered().html.replacingOccurrences(
+            of: "</main>", with: String(repeating: "<p>Line of a long document.</p>", count: 300) + "</main>")
+    }
+
+    static func engine(asking probe: CancellationArriving) async throws -> IOSPrintEngine {
+        IOSPrintEngine(rules: try await SecureWebViewConfiguration.compileRules(), loadTimeout: .seconds(30),
+                       readinessTimeout: .seconds(10), isCancelled: probe.isCancelled)
+    }
+
     @Test("a page setup with no page or no printable height is refused", arguments: [
         PageSetup(widthPoints: 595, heightPoints: 842, maxPages: 0), PageSetup(widthPoints: 595, heightPoints: 60, maxPages: 1),
     ])
     func invalidPageSetup(page: PageSetup) async throws {
         await #expect(throws: IOSPDFRenderer.Failure.invalidPageSetup) { _ = try await renderer().render(html: "<p>x</p>", page: page) }
+    }
+}
+
+/// A task cancelled while the step after `after` runs: the engine sees "not cancelled" at `after` and at every point
+/// before it, and "cancelled" at every point after it, as `Task.isCancelled` does once a task is cancelled.
+@MainActor
+final class CancellationArriving {
+    let after: IOSPrintEngine.CancellationPoint?
+    private(set) var asked: [IOSPrintEngine.CancellationPoint] = []
+    private var cancelled = false
+
+    init(after: IOSPrintEngine.CancellationPoint?) { self.after = after }
+
+    func isCancelled(_ point: IOSPrintEngine.CancellationPoint) -> Bool {
+        asked.append(point)
+        defer { if point == after { cancelled = true } }
+        return cancelled
     }
 }
 #endif
