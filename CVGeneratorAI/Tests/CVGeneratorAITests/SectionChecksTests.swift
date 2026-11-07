@@ -1800,7 +1800,7 @@ struct SectionChecksTests {
         let description = "I live in Leeds. Since 2015 I have worked as a fitter at Harlow Mills, where I service each gearbox."
         let check = { (summary: String) in
             try english.summaryCheck(
-                of: facts, summary: summary, field: nil, work: ["I service each gearbox."], duties: [], qualities: ["patience"],
+                of: facts, summary: summary, field: nil, work: ["I service each gearbox."], duties: [], qualities: ["patience", "care"],
                 tools: [], against: description
             )
         }

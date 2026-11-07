@@ -1188,6 +1188,8 @@ extension CVDataSanitizer {
             // I coordinate patient care" of a nursing assistant. The person's own words, quoted, stay.
             let keptTitles = titles.compactMap { $0?.presentValue }
             let personName = facts.personalInfo.name
+            // The words of the person's work, which a school may share (#359, P3): a sentence of them and a language is no study tied to it.
+            let ownWorkWords = Self.words(of: titles + facts.experience.map(\.company))
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -1195,6 +1197,10 @@ extension CVDataSanitizer {
             var endings = Set<[String]>()
             var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            // The qualities of the soft skills the draft keeps, and those the description states, are the only ones the summary names as
+            // a manner (#359, N1): with no soft skill known, the summary is not read for them.
+            let heldQualities: Set<String>? = qualities.isEmpty
+                ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: source.foldedWords)
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
@@ -1223,6 +1229,16 @@ extension CVDataSanitizer {
                        written.rejection(of: $0, ownWords: summaryOwnWords, ownQualifications: ownQualifications) == nil
                    }) {
                     sentence = head
+                }
+                // A manner phrase of qualities that are not all soft skills loses the ones that are not (#359, N1): "with focus and
+                // precision" of a draft that holds only "precision" says "with precision"; the sentence goes when it cannot be cut clean.
+                var unheldQualities: [String]?
+                if let heldQualities {
+                    switch UnheldQualities.check(sentence, language: language, held: heldQualities) {
+                    case .unchanged: break
+                    case .without(let cut): sentence = cut
+                    case .unheld(let names): unheldQualities = names
+                    }
                 }
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
@@ -1262,6 +1278,10 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
                 } else if Self.copiesADuty(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
+                } else if DraftDepth.isRich, OwnQualifications.tiesAStudyToALanguage(
+                    sentence, education: facts.education, languages: facts.languages, apart: ownWorkWords, source: source
+                ) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.tiesAStudyToALanguage))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
@@ -1271,6 +1291,10 @@ extension CVDataSanitizer {
                           RoleAssertion.unkeptRole(in: sentence, titles: keptTitles, name: personName, language: language) != nil {
                     // Last, so that a word the written check names ("certified") is the reason the model reads.
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesAnUnstatedRole))
+                } else if let unheldQualities {
+                    verdict.rejected.append(Rejection(
+                        sentence: sentence, reason: Self.namesAnUnheldQuality + ": " + unheldQualities.joined(separator: ", ")
+                    ))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
@@ -1480,6 +1504,10 @@ extension CVDataSanitizer {
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
+    /// A manner phrase of a quality that is none of the kept soft skills, which cannot be cut clean (#359, N1).
+    static let namesAnUnheldQuality = "it names a quality that is none of the person's soft skills: leave it out, or name a soft skill"
+    /// A sentence of a rich summary that says a school or a course taught the person's languages (#359, P3).
+    static let tiesAStudyToALanguage = "it says a school or a course taught the languages: say the studies and the languages in separate sentences"
     static let namesAnUnstatedRole = "it names a role the person did not state: say the person's own title, or none"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
@@ -2081,10 +2109,16 @@ extension CVDataSanitizer {
 
     /// The first five letters of each word of five letters or more of `texts` that says nothing of a work: how a summary sentence
     /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354, round 6).
+    /// A stem is read without its accents, as a title and a verb of one stock write them differently ("Bäckerin", "backe"; #359,
+    /// P4): the sentence "Ich backe Brot mit Präzision" of a baker said nothing of the work.
     private static func workStems(of texts: [String]) -> Set<String> {
-        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(5)) } })
-            .subtracting(idleStems)
+        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map(stem(of:)) })
+            .subtracting(foldedIdleStems)
     }
+
+    private static func stem(of word: String) -> String { String(DescriptionText.normalized(word).prefix(5)) }
+
+    private static let foldedIdleStems = Set(idleStems.map(stem(of:)))
 
     /// The words of five letters or more that say nothing of a work, in the six languages: quantifiers, connectives, auxiliaries.
     private static let idleWords: Set<String> = [
@@ -2288,7 +2322,7 @@ extension CVDataSanitizer {
             }
         }
         for raw in softSkills {
-            guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
+            guard let item = check(capitalisedNoun(raw, language: language), false), keys.insert(Self.skillKey(item)).inserted else { continue }
             guard !Self.emptyQualities.contains(DescriptionText.normalized(item)) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "an empty word, not a quality"))
                 continue
@@ -2297,7 +2331,7 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
                 continue
             }
-            guard !Self.namesAName(item, in: description) else {
+            guard !namesAName(item, in: description, names: names, language: language) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a name"))
                 continue
             }
@@ -2307,6 +2341,37 @@ extension CVDataSanitizer {
         verdict.softSkills = qualities.kept
         verdict.dropped += qualities.dropped
         return verdict
+    }
+
+    // MARK: German qualities
+
+    /// The endings of the German nouns of a quality ("Zuverlässigkeit", "Präzision", "Verständnis"), lower case.
+    private static let germanNounEndings = ["keit", "heit", "ung", "schaft", "tät", "ion", "nis", "tum", "ismus", "enz", "anz"]
+
+    /// A German quality that is a noun, written with its capital (#359, P4). The model writes the qualities in lower case in every
+    /// language ("zuverlässigkeit", "präzision"), and German writes its nouns with a capital: the skills list showed them so, the
+    /// strengths sentence of the summary took them for adjectives ("Als Bäckerin bin ich zuverlässigkeit und präzision."), and the
+    /// final check dropped that sentence for words the dictionary does not know. A lone word is a noun when it ends as a noun of a
+    /// quality does, or when the device's dictionary knows it with a capital and not as written; an adjective ("zuverlässig") and a
+    /// phrase ("verständnis für kunden") stay as they are, as does every other language. Applied twice, it is the same.
+    private func capitalisedNoun(_ quality: String, language: String?) -> String {
+        let item = quality.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+        guard language == "de", item.first?.isLowercase == true, item.allSatisfy(\.isLetter) else { return quality }
+        let noun = item.prefix(1).uppercased() + item.dropFirst()
+        let endsAsANoun = item.count >= 6 && Self.germanNounEndings.contains { item.hasSuffix($0) }
+        let isANoun = endsAsANoun || wordList.knows(item, inLanguage: "de") == false && wordList.knows(noun, inLanguage: "de") == true
+        return isANoun ? noun : quality
+    }
+
+    /// Whether a soft skill of one word is written in the description only as a name (`namesAName`). In German, whose nouns all
+    /// have a capital, a quality the description states ("mit Geduld und Sorgfalt") is written so, past the start of a sentence and
+    /// never in lower case: it is a name only when the device's dictionary does not know it as a noun, or when it is a word of one
+    /// of the `names` of the CV ("Hans").
+    private func namesAName(_ item: String, in description: String, names: [String], language: String?) -> Bool {
+        guard Self.namesAName(item, in: description) else { return false }
+        guard language == "de", wordList.knows(item, inLanguage: "de") == true else { return true }
+        let key = DescriptionText.normalized(item)
+        return names.contains { $0.split { !$0.isLetter }.contains { DescriptionText.normalized(String($0)) == key } }
     }
 
     // MARK: Names among the tools

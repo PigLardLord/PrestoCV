@@ -22,4 +22,21 @@ enum OwnQualifications {
         }
         return CVDataSanitizer.words(of: education.map(\.degree)).union(ofStudies)
     }
+
+    /// Whether `sentence` says a school or a course taught the person's languages (#359, P3): it holds a word of a kept degree or school
+    /// and a word of a kept language, which the description never puts in one sentence. The model joined "I studied at the school" and
+    /// "I speak French and English" into "I studied the CAP at the school in French and English". A word of the studies that is a
+    /// language's name ("English literature") or a word of the person's work (`apart`: the titles and the employers) is none of the
+    /// studies.
+    static func tiesAStudyToALanguage(
+        _ sentence: String, education: [Education], languages: [Language], apart: Set<String>, source: DescriptionText
+    ) -> Bool {
+        let languageWords = CVDataSanitizer.words(of: languages.map(\.name))
+        let studyWords = studyWords(of: education).subtracting(languageWords).subtracting(apart)
+        guard !languageWords.isEmpty, !studyWords.isEmpty else { return false }
+        let holdsBoth = { (words: [String]) in !studyWords.isDisjoint(with: words) && !languageWords.isDisjoint(with: words) }
+
+        return holdsBoth(Word.words(in: sentence).map(\.folded))
+            && !source.sentences.contains { holdsBoth(Word.words(in: $0.raw).map(\.folded)) }
+    }
 }
