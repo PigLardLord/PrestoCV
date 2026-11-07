@@ -57,12 +57,13 @@ final class PrestoCVUITestsLaunchTests: XCTestCase {
         keepScreenshot(of: app)
     }
 
-    /// The outer screen of the iPhone Duo stays upright for every app: there the test is skipped.
+    /// Skipped only where no app turns, as on the outer screen of the iPhone Duo.
     func testLaunchesInLandscape() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = launch(language: "en", locale: "en_US")
-        guard app.turn(to: .landscapeLeft) else {
-            throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo")
+        guard try app.turnsToLandscape() else {
+            XCTFail("The first run should turn to landscape")
+            return
         }
         XCTAssertTrue(app.buttons["firstrun.import"].exists, "The first run should still offer the import in landscape")
         keepScreenshot(of: app)
