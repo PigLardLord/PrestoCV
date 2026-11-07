@@ -8,8 +8,11 @@ final class PrestoCVUITestsLaunchTests: XCTestCase {
 
     private var appearanceBefore: XCUIDevice.Appearance = .unspecified
 
+    /// Every test starts upright, as the other UI tests do: a class that stopped before its tear-down may have left the
+    /// device turned.
     override func setUpWithError() throws {
         continueAfterFailure = false
+        XCUIDevice.shared.orientation = .portrait
         appearanceBefore = XCUIDevice.shared.appearance
     }
 
@@ -22,66 +25,75 @@ final class PrestoCVUITestsLaunchTests: XCTestCase {
     // MARK: - Languages
 
     func testLaunchesInEnglish() throws {
-        launch(language: "en", locale: "en_US")
+        keepScreenshot(of: launch(language: "en", locale: "en_US"))
     }
 
     func testLaunchesInSpanish() throws {
-        launch(language: "es", locale: "es_ES")
+        keepScreenshot(of: launch(language: "es", locale: "es_ES"))
     }
 
     func testLaunchesInFrench() throws {
-        launch(language: "fr", locale: "fr_FR")
+        keepScreenshot(of: launch(language: "fr", locale: "fr_FR"))
     }
 
     func testLaunchesInGerman() throws {
-        launch(language: "de", locale: "de_DE")
+        keepScreenshot(of: launch(language: "de", locale: "de_DE"))
     }
 
     func testLaunchesInItalian() throws {
-        launch(language: "it", locale: "it_IT")
+        keepScreenshot(of: launch(language: "it", locale: "it_IT"))
     }
 
     func testLaunchesInPortuguese() throws {
-        launch(language: "pt", locale: "pt_PT")
+        keepScreenshot(of: launch(language: "pt", locale: "pt_PT"))
     }
 
     // MARK: - Appearance and orientation
 
     func testLaunchesInDarkMode() throws {
         XCUIDevice.shared.appearance = .dark
-        launch(language: "en", locale: "en_US")
+        let app = launch(language: "en", locale: "en_US")
+        XCTAssertEqual(XCUIDevice.shared.appearance, .dark, "The device should still be in dark mode on the first screen")
+        keepScreenshot(of: app)
     }
 
+    /// The outer screen of the iPhone Duo stays upright for every app: there the test is skipped.
     func testLaunchesInLandscape() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
-        launch(language: "en", locale: "en_US")
+        let app = launch(language: "en", locale: "en_US")
+        guard app.turn(to: .landscapeLeft) else {
+            throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo")
+        }
+        XCTAssertTrue(app.buttons["firstrun.import"].exists, "The first run should still offer the import in landscape")
+        keepScreenshot(of: app)
     }
 
     // MARK: - Helpers
 
-    /// The first run's import in English, and its localization key: in another language, a label that is either of
-    /// them means the app did not load that language.
-    private let englishImportLabel = "Paste or import a CV"
-    private let importLabelKey = "onboarding.import.button"
+    /// The first run's import as the string catalog writes it in each language: the label tells which language the
+    /// app loaded, so a launch that falls back to another language, or shows the key, fails.
+    private let importLabels = [
+        "en": "Paste or import a CV",
+        "es": "Pega o importa un CV",
+        "fr": "Coller ou importer un CV",
+        "de": "Lebenslauf einfügen oder importieren",
+        "it": "Incolla o importa un CV",
+        "pt": "Colar ou importar um currículo",
+    ]
 
-    /// Launches on an empty store, waits for the first run's import, and keeps a screenshot of the first screen.
-    private func launch(language: String, locale: String) {
+    /// Launches on an empty store and waits for the first run's import, in the language asked for.
+    private func launch(language: String, locale: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVUITestsEmptyStorage"]
         app.launch()
 
         let importButton = app.buttons["firstrun.import"]
         XCTAssertTrue(importButton.waitForExistence(timeout: 20), "The first run should offer the import in \"\(language)\"")
-        if language == "en" {
-            XCTAssertEqual(importButton.label, englishImportLabel)
-        } else {
-            XCTAssertNotEqual(importButton.label, englishImportLabel, "The first run should be in \"\(language)\", not English")
-            XCTAssertNotEqual(importButton.label, importLabelKey, "The first run should show the \"\(language)\" text, not its key")
-        }
+        XCTAssertEqual(importButton.label, importLabels[language], "The first run should be in \"\(language)\"")
+        return app
+    }
 
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen, \(name)"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+    private func keepScreenshot(of app: XCUIApplication) {
+        add(app.keptScreenshot(named: "Launch Screen, \(name)"))
     }
 }
