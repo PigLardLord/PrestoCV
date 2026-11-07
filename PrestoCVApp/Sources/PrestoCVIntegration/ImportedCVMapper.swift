@@ -40,18 +40,21 @@ public struct ImportedCVMapper: Sendable {
                          withdrawing: [.educationPeriod(place), .educationLocation(place)], kept: kept)
         }
         sections.skills = imported.skills.map { Skill(name: $0.value) }
+        // A language the CV cannot hold has no row: its items name its position in the text, never a row of the CV.
         for (index, language) in imported.languages.enumerated() {
             if let level = language.level {
                 sections.languages.append(LanguageSkill(language: language.name.value, proficiency: level.value))
+                notes.settle(from: [.language(index + 1)], to: [.language(sections.languages.count)], withdrawing: [], kept: true)
             } else {
                 // The CV needs a level, and the text states none: the language stays visible, never invented
+                notes.settle(from: [.language(index + 1)], to: [.languageNotKept(index + 1)], withdrawing: [], kept: true)
                 let text = [language.name.value, language.levelWords?.value].compactMap { $0 }.joined(separator: " — ")
                 let reason: ImportReviewReason = switch language.levelWords?.check {
                 case .levelsDiffer: .levelsDiffer
                 case .levelNotCEFR: .levelNotCEFR
                 case .none, .some: .levelMissing
                 }
-                notes.drop(.language(index + 1), reason, text)
+                notes.drop(.languageNotKept(index + 1), reason, text)
             }
         }
         sections.certifications = imported.certifications.enumerated().map { index, certification in

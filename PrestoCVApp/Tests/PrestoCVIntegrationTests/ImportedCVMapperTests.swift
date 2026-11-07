@@ -128,11 +128,64 @@ struct ImportedCVMapperTests {
             ]
         }
         #expect(outcome.cv.sections.languages == [LanguageSkill(language: "English", proficiency: .b2)])
-        #expect(outcome.review.filter { if case .language = $0.field { true } else { false } } == [
-            ImportReviewItem(field: .language(2), reason: .levelNotCEFR, text: "Spanish — fluent"),
-            ImportReviewItem(field: .language(3), reason: .levelMissing, text: "French"),
+        #expect(outcome.review.filter { switch $0.field { case .language, .languageNotKept: true; default: false } } == [
+            ImportReviewItem(field: .languageNotKept(2), reason: .levelNotCEFR, text: "Spanish — fluent"),
+            ImportReviewItem(field: .languageNotKept(3), reason: .levelMissing, text: "French"),
         ])
         #expect(outcome.notImported.contains("Spanish — fluent") && outcome.notImported.contains("French"))
+    }
+
+    /// A language the text lists: its name and whether the CV can hold it (it has a CEFR level).
+    private struct Listed: Sendable, CustomTestStringConvertible {
+        let name: String
+        let kept: Bool
+        let flagged: Bool
+        var testDescription: String { "\(name)\(kept ? "" : " (rejected)")\(flagged ? " (flagged)" : "")" }
+    }
+
+    @Test("a review item names the CV row of a kept language, or the text's position of a rejected one", arguments: [
+        [Listed(name: "Spanish", kept: false, flagged: false), Listed(name: "English", kept: true, flagged: false)],
+        [Listed(name: "English", kept: true, flagged: false), Listed(name: "Spanish", kept: false, flagged: false)],
+        [Listed(name: "English", kept: true, flagged: false), Listed(name: "Spanish", kept: false, flagged: false),
+         Listed(name: "German", kept: true, flagged: false), Listed(name: "French", kept: false, flagged: false),
+         Listed(name: "Italian", kept: true, flagged: false)],
+        [Listed(name: "Spanish", kept: false, flagged: false), Listed(name: "French", kept: false, flagged: false),
+         Listed(name: "English", kept: true, flagged: false)],
+        [Listed(name: "Spanish", kept: false, flagged: false), Listed(name: "English", kept: true, flagged: true),
+         Listed(name: "French", kept: false, flagged: false), Listed(name: "German", kept: true, flagged: true)],
+    ])
+    private func reviewFieldsOfLanguages(_ listed: [Listed]) {
+        let words = listed.map(\.name).joined(separator: " ")
+        let f = ImportFixture(text: words + " B2 fluent")
+        let outcome = map(f) {
+            $0.languages = listed.map { language in
+                let level = language.kept ? f.sourced(LanguageProficiency.b2, quoting: "B2", reading: .languageLevel) : nil
+                let levelWords = language.kept ? (language.flagged ? f.quoted("fluent", check: .levelsDiffer) : nil) : f.quoted("fluent", check: .levelNotCEFR)
+                return f.language(f.quoted(language.name), level: level, levelWords: levelWords)
+            }
+        }
+        let keptNames = listed.filter(\.kept).map(\.name)
+        #expect(outcome.cv.sections.languages.map(\.language) == keptNames)
+        var seen = 0
+        for (position, language) in listed.enumerated() {
+            let field: ImportReviewField
+            if language.kept {
+                seen += 1
+                field = .language(seen)
+                #expect(outcome.cv.sections.languages[seen - 1].language == language.name)
+            } else {
+                field = .languageNotKept(position + 1)
+            }
+            let items = outcome.review.filter { $0.field == field }
+            if language.kept && !language.flagged {
+                #expect(items.isEmpty)
+            } else {
+                #expect(items.count == 1 && items.first?.text.hasPrefix(language.name) == true)
+            }
+        }
+        let rows = outcome.review.compactMap { item -> Int? in if case .language(let row) = item.field { row } else { nil } }
+        #expect(rows.allSatisfy { (1...keptNames.count).contains($0) })
+        #expect(outcome.review.count == listed.filter { !$0.kept || $0.flagged }.count)
     }
 
     @Test("a period keeps the precision the text gave: a month only where the text states one")

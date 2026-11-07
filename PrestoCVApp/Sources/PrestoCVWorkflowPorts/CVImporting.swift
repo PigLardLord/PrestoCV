@@ -39,7 +39,10 @@ public enum ImportReviewField: Sendable, Hashable {
     case education(Int)
     case educationPeriod(Int)
     case educationLocation(Int)
+    /// The position in the returned CV's languages.
     case language(Int)
+    /// The n-th language the text lists (from one, in the text's order), which the CV does not hold; its words are in the text not imported.
+    case languageNotKept(Int)
     case certificationYear(Int)
 }
 
