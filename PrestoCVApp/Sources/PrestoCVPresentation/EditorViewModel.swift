@@ -112,7 +112,7 @@ public final class EditorViewModel {
 
     private func open(_ cv: CV, unchangedFrom unchanged: CV?, stored: CV?) {
         guard autosave == nil else { return }
-        form = EditorContent(cv, ids: &rowIDs)
+        form = rowIDs.unique(EditorContent(cv, ids: &rowIDs))
         pendingRemoval = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
@@ -121,7 +121,7 @@ public final class EditorViewModel {
     // MARK: - Editing
 
     func edit(_ content: EditorContent) {
-        form = content
+        form = rowIDs.unique(content)
         passOnTheForm()
         refreshSaveStatus()
     }

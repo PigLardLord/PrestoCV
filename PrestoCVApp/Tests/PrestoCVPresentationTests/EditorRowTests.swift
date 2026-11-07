@@ -143,6 +143,96 @@ struct EditorRowTests {
         #expect(stored.map(\.period) == [nil])
     }
 
+    // MARK: - Every section
+
+    /// The ids of the rows of a section, in order.
+    func ids(_ content: EditorContent, _ section: EditorSection) -> [RowID] {
+        switch section {
+        case .experiences: content.experiences.map(\.id)
+        case .education: content.education.map(\.id)
+        case .skills: content.skills.map(\.id)
+        case .languages: content.languages.map(\.id)
+        case .certifications: content.certifications.map(\.id)
+        case .profiles: content.profiles.map(\.id)
+        case .interests: content.interests.map(\.id)
+        }
+    }
+
+    /// Puts text in the row at `index` of a section.
+    func fill(_ editor: EditorViewModel, _ section: EditorSection, at index: Int) {
+        switch section {
+        case .experiences: editor.content.experiences[index].role = "Designer"
+        case .education: editor.content.education[index].degree = "Design"
+        case .skills: editor.content.skills[index].name = "Prototyping"
+        case .languages: editor.content.languages[index].language = "Italian"
+        case .certifications: editor.content.certifications[index].name = "Certified"
+        case .profiles: editor.content.profiles[index].platform = "Portfolio"
+        case .interests: editor.content.interests[index].text = "Cycling"
+        }
+    }
+
+    /// An editor whose every section has three rows, those of `filled` with text in them.
+    func editorWithRows(filled: Set<Int>, in world: Editing) async throws -> EditorViewModel {
+        let editor = await world.editor(on: try await world.storedCV())
+        for section in EditorSection.allCases {
+            for index in 0..<3 {
+                editor.addRow(to: section)
+                #expect(ids(editor.content, section).count == index + 1)
+                guard ids(editor.content, section).count == index + 1 else { continue }
+                if filled.contains(index) { fill(editor, section, at: index) }
+            }
+        }
+        return editor
+    }
+
+    /// The ids of every section but `section`.
+    func idsOutside(_ section: EditorSection, _ content: EditorContent) -> [EditorSection: [RowID]] {
+        Dictionary(uniqueKeysWithValues: EditorSection.allCases.filter { $0 != section }.map { ($0, ids(content, $0)) })
+    }
+
+    @Test("adding a row changes only the section asked for", arguments: EditorSection.allCases)
+    func addRowChangesOnlyItsSection(section: EditorSection) async throws {
+        let editor = try await editorWithRows(filled: [0, 1, 2], in: Editing())
+        let before = editor.content
+
+        editor.addRow(to: section)
+
+        let after = ids(editor.content, section)
+        #expect(after.count == 4)
+        guard after.count == 4 else { return }
+        #expect(Array(after.prefix(3)) == ids(before, section))
+        #expect(!ids(before, section).contains(after[3]))
+        #expect(idsOutside(section, editor.content) == idsOutside(section, before))
+    }
+
+    @Test("a row with nothing in it goes at once, and its neighbours stay", arguments: EditorSection.allCases)
+    func blankRemovalTakesOnlyTheBlankRow(section: EditorSection) async throws {
+        let editor = try await editorWithRows(filled: [0, 2], in: Editing())
+        let before = editor.content
+
+        editor.removeRow(in: section, id: ids(before, section)[1])
+
+        #expect(ids(editor.content, section) == [ids(before, section)[0], ids(before, section)[2]])
+        #expect(idsOutside(section, editor.content) == idsOutside(section, before))
+        #expect(editor.pendingRemoval == nil)
+    }
+
+    @Test("a confirmed removal takes the one row, and its neighbours stay", arguments: EditorSection.allCases)
+    func confirmedRemovalTakesOnlyTheChosenRow(section: EditorSection) async throws {
+        let editor = try await editorWithRows(filled: [0, 1, 2], in: Editing())
+        let before = editor.content
+        let chosen = ids(before, section)[1]
+
+        editor.removeRow(in: section, id: chosen)
+        #expect(ids(editor.content, section) == ids(before, section))
+        #expect(editor.pendingRemoval == RowRemoval(section: section, row: chosen))
+        editor.confirmRemoval()
+
+        #expect(ids(editor.content, section) == [ids(before, section)[0], ids(before, section)[2]])
+        #expect(idsOutside(section, editor.content) == idsOutside(section, before))
+        #expect(editor.pendingRemoval == nil)
+    }
+
     // MARK: - Identity
 
     /// The skills the editor shows, by name, with the id of each.
@@ -254,5 +344,69 @@ struct EditorRowTests {
         #expect(editor.saveStatus == .saved)
         #expect(editor.content.skills.map(\.name) == ["Prototyping"])
         #expect(world.editing.writeCount == writes)
+    }
+
+    // MARK: - Unique ids
+
+    @Test("a row the view copied gets an id of its own, and removing the original leaves the copy")
+    func copiedRowDoesNotShareItsId() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        let ids = addSkills(["A", "B"], to: editor)
+
+        editor.content.skills.append(editor.content.skills[0])
+
+        #expect(editor.content.skills.map(\.name) == ["A", "B", "A"])
+        #expect(editor.content.skills[0].id == ids[0])
+        #expect(Set(editor.content.skills.map(\.id)).count == 3)
+        editor.removeRow(in: .skills, id: ids[0])
+        editor.confirmRemoval()
+        #expect(editor.content.skills.map(\.name) == ["B", "A"])
+    }
+
+    @Test("a row whose id the editor never issued gets one, and an id taken in another section is not shared")
+    func foreignAndCrossSectionIdsAreReplaced() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        let ids = addSkills(["A"], to: editor)
+        var content = editor.content
+        content.interests = [InterestRow(id: ids[0], text: "Cycling"), InterestRow(id: RowID(value: 9_999), text: "Chess")]
+
+        editor.content = content
+
+        let all = editor.content.skills.map(\.id) + editor.content.interests.map(\.id)
+        #expect(Set(all).count == 3)
+        #expect(editor.content.skills[0].id == ids[0])
+        #expect(editor.content.interests.map(\.text) == ["Cycling", "Chess"])
+        #expect(!all.contains(RowID(value: 9_999)))
+    }
+
+    @Test("the content removes only the first row with an id, if two slipped through")
+    func contentRemovesOnlyTheFirstRowWithTheId() {
+        let same = RowID(value: 1)
+        var content = EditorContent.empty
+        content.skills = [SkillRow(id: same, name: "A", level: nil), SkillRow(id: same, name: "B", level: nil)]
+
+        content.removeRow(in: .skills, id: same)
+
+        #expect(content.skills.map(\.name) == ["B"])
+    }
+
+    @Test("ids are made unique in every section, and the first row with an id keeps it")
+    func uniqueIDsKeepTheFirst() {
+        var issued = RowIDs()
+        let first = issued.make()
+        var content = EditorContent.empty
+        content.experiences = [ExperienceRow.blank(id: first), ExperienceRow.blank(id: first)]
+        content.education = [EducationRow.blank(id: first)]
+        content.languages = [LanguageRow.blank(id: first)]
+        content.profiles = [ProfileRow.blank(id: first), ProfileRow.blank(id: RowID(value: 0))]
+
+        let unique = issued.unique(content)
+
+        let all = [unique.experiences.map(\.id), unique.education.map(\.id), unique.languages.map(\.id), unique.profiles.map(\.id)]
+            .flatMap { $0 }
+        #expect(Set(all).count == 6)
+        #expect(unique.experiences[0].id == first)
     }
 }

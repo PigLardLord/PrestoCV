@@ -98,15 +98,20 @@ extension EditorContent {
         }
     }
 
+    /// Removes the first row with `id` only, so that a duplicate that slipped through never takes another row with it.
+    private func remove<Row: EditorRow>(from rows: inout [Row], id: RowID) {
+        if let index = rows.firstIndex(where: { $0.id == id }) { rows.remove(at: index) }
+    }
+
     mutating func removeRow(in section: EditorSection, id: RowID) {
         switch section {
-        case .experiences: experiences.removeAll { $0.id == id }
-        case .education: education.removeAll { $0.id == id }
-        case .skills: skills.removeAll { $0.id == id }
-        case .languages: languages.removeAll { $0.id == id }
-        case .certifications: certifications.removeAll { $0.id == id }
-        case .profiles: profiles.removeAll { $0.id == id }
-        case .interests: interests.removeAll { $0.id == id }
+        case .experiences: remove(from: &experiences, id: id)
+        case .education: remove(from: &education, id: id)
+        case .skills: remove(from: &skills, id: id)
+        case .languages: remove(from: &languages, id: id)
+        case .certifications: remove(from: &certifications, id: id)
+        case .profiles: remove(from: &profiles, id: id)
+        case .interests: remove(from: &interests, id: id)
         }
     }
 }
