@@ -28,7 +28,7 @@ var targets: [Target] = [
     .testTarget(
         name: "CVRenderingTests",
         dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVBundledHeadings", "CVDesignCatalog"],
-        resources: [.copy("Golden")]
+        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json")]
     ),
 ]
 

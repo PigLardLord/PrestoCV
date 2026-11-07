@@ -2,7 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-28
-- **Related:** R6, R7, R12, [ADR 0010](0010-ui-free-presentation-package.md), issues #10, #11, #12, #30, #45, #56
+- **Related:** R6, R7, R12, [ADR 0010](0010-ui-free-presentation-package.md), issues #10, #11, #12, #30, #45, #56, #99
+- **Amended:** 2026-11-07: the wait for the store lock suspends and is bounded, and ends in `storeUnavailable(.lockTimeout)` (#99) (Decision, "Revisions, timestamps and the lock" and "Which outcomes")
 
 ## Context
 
@@ -40,6 +41,14 @@ The app is not released, so no user data needs migrating.
 - **Revisions, timestamps and the lock.**
   - `create`, `update` and `delete` are conditional on the revision. `update` of a changed CV fails with `conflict(storedRevision:)`; update or delete of a missing CV fails with `notFound`. Nothing is overwritten and nothing is resurrected.
   - Every mutation holds an exclusive `flock` on the store's lock file, so the check and the write are atomic across repository instances and processes. An actor alone only protects one instance.
+  - **The wait for the lock is bounded and holds no thread** (amended 2026-11-07, #99).
+    - The repository asks for the lock with `LOCK_NB`. While another instance or process holds it, the call suspends for a pause and tries again. Once the pauses add up to the deadline, it fails with `storeUnavailable(.lockTimeout)`, and nothing is written. `EINTR` tries again at once; any other failure than "busy" (`EWOULDBLOCK`) is `cannotLock`, as before.
+    - The wait is a value of `StoreOptions` (`lockWait`): a deadline of ten seconds, in pauses of 25 milliseconds, built in the options type. Tests pass a pause that does not wait. An interval of zero or less counts as the smallest step (one millisecond), so the wait stays bounded. A pause never asks for more than what is left of the deadline, so a long interval cannot stretch the wait past it.
+    - The body under the lock never suspends. While a call pauses, other calls of the same actor can run, but each takes the lock itself, so the lock, not the actor, keeps the writers apart.
+    - A cancelled call keeps waiting until the deadline and ends as it would have: ports are not cancellable (R3).
+    - The polling is not fair: under long contention, one caller can wait until its deadline while others take the lock. Accepted: the deadline makes it visible.
+    - Rejected: a blocking `flock` on a dedicated executor. It frees the cooperative threads, but `flock` has no timeout, so the wait would still have no bound.
+    - The design store (`FileDesignStore`) waits the same way, with its own copy of the loop, because the packages never import each other: an exclusive lock for a save, a shared one for a read, and its own `lockTimeout`. Its wait comes through its initialiser.
   - The repository assigns the revision and the timestamps: through the injected `TimeSource`, and via `package`-level API, so callers cannot forge them. The listing is ordered by last change.
 - **Maintenance port: `CVStoreMaintenance`.**
   - `restore(quarantined:)`:
@@ -48,12 +57,14 @@ The app is not released, so no user data needs migrating.
     - moves it back only if that read succeeds and no active CV has the same id. Otherwise it throws the read's outcome, and both folders stay unchanged (review round 3).
   - `erase(_:)` deletes every copy of a CV, whatever its schema or state, including quarantined ones (GDPR erasure).
   - `purgeQuarantine(olderThan:)` enforces retention (30 days).
+  - `quarantined()` lists the quarantine, oldest first, with the date each file entered it.
+  - `eraseAll(keepingLedger:)` first moves the store's erase generation (one byte appended to `.erase-generation`; if that fails, nothing is removed), so a legacy import that began before the erase stores nothing after it (`Adoption.storeErased`). Then it removes, under the same hold of the lock, every CV file, the quarantine, the staged copies and, unless the caller keeps it, the ledger. The ledger holds only ids; `EraseEverything` keeps it while a legacy source remains, so that source is not imported again, and names it in the report. A file it cannot remove is named in the report (kind and name) and the rest still go; a second call finishes the work.
 - **Nothing is written that could not be read back.** Before replacing a file, the repository encodes the CV and checks the size cap. It then decodes the bytes through the same strict path as a read, and requires the same CV back. Otherwise it throws `wouldNotReadBack`, which becomes `AuthoringError.tooLarge`, and the previous version stays. Without this, a save that exceeded a limit would be acknowledged, then quarantined or reported as `tooLarge` on the next listing (review round 2).
 - **Timestamps** are stored with whole-second precision. The repository truncates the clock's value before using it, so the read-back comparison holds for any clock.
 - **Writes** are one file per CV, atomic, with `complete` data protection on Apple platforms. The composition root gives the location and the protection class (`StoreOptions`); the default is `complete`, and the app does not change it. Tests of the store's logic (listing, quarantine, restore, purge, dates, sample source, failure causes) give none: a class-A write needs the user's key, and a CI host whose keybag is locked refuses it with `EPERM`, so those tests would pass or fail with the host. The protection itself is pinned by the tests that are about it: a repository built with the defaults writes atomically and asks for complete protection, and, on a device, a stored file has that class.
 - **A failed write keeps its cause as far as the repository's callers.**
   - **What is kept.** `writeFailed(file:cause:)` carries the underlying error as a `FailureCause`: a domain (Cocoa, POSIX or other) and a code, and nothing else: no path and no message (R7). A test or a direct caller of the repository can name it (`cocoa 513 (posix 13)`, `posix 28`).
-  - **Which outcomes.** Only the failures that map to `writeFailed` keep a cause: the write of a file, and the removal and the move that save, delete, restore, erase and purge make. The other classified outcomes are codes and keep none: `unreadable`, `corrupt`, `tooLarge`, `storeUnavailable(.cannotList)` and `(.cannotLock)`, and a failed move into the quarantine during a listing (`quarantineFailed`).
+  - **Which outcomes.** Only the failures that map to `writeFailed` keep a cause: the write of a file, and the removal and the move that save, delete, restore, erase and purge make. The other classified outcomes are codes and keep none: `unreadable`, `corrupt`, `tooLarge`, `storeUnavailable(.cannotList)`, `(.cannotLock)` and `(.lockTimeout)`, and a failed move into the quarantine during a listing (`quarantineFailed`).
   - **The errno.** Under a Cocoa error it also keeps the `errno` that Foundation reports there, because Cocoa 513 (no permission) covers both a folder that cannot be written to (`EACCES`, 13) and, expected but not observed, a file the device has locked (`EPERM`, 1). Foundation on macOS 26.6 and 27.0 reports it for a write, a removal and a move into a read-only folder, and a test asserts it for the write on Apple platforms. swift-corelibs-foundation on Linux reports none, so there the errno is empty.
   - **Where it stops.** The use cases translate a repository failure that is not a conflict, a missing CV or a read-back failure to `AuthoringError.unavailable` (R7), and the cause does not cross that line. The text the user sees does not depend on it. No log records the cause yet: a diagnostic boundary that records the coded `FailureCause` before the use case translates it is not built, and belongs to the change that wires the composition root (ADR 0012).
 - **Data protection is `complete`, and a locked device is a read error, never an empty store.** Decided in #323.
@@ -106,6 +117,7 @@ The validation prototype in `Prototypes/ADRValidation/`. Swift 6.3.3, Linux. 27 
   - `../` names, `1~../../` names, a name with a trailing newline and a symbolic link are all refused.
 - **Erase:** removes the stored newer-schema file and both quarantined copies.
 - **Purge:** removes only old entries.
+- **Erase everything:** reaches every kind of file, leaves only the lock and the erase generation (a store that was never created gets just these two, since an import may have begun before it existed), stops an import that began before it, also on another instance, and unlinks a linked quarantine without touching its target.
 
 **Writes**
 - A CV whose encoded file exceeds the cap is refused on create and on update:
