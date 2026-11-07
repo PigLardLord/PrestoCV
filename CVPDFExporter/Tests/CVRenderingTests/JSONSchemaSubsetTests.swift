@@ -32,41 +32,56 @@ struct JSONSchemaSubsetTests {
         #expect(!s.problems(.string("   ")).isEmpty)
     }
 
-    /// One row per implemented keyword: a schema that uses it and an instance that breaks it. A keyword the walker
-    /// accepts and the matcher ignores makes its row go red.
-    static let violations: [(keyword: String, schema: String, instance: String)] = [
-        ("$ref", ##"{"$defs":{"s":{"type":"string"}},"$ref":"#/$defs/s"}"##, "1"),
-        ("type", #"{"type":"string"}"#, "1"),
-        ("const", #"{"const":"a"}"#, #""b""#),
-        ("enum", #"{"enum":["a","b"]}"#, #""c""#),
-        ("minimum", #"{"minimum":2}"#, "1"),
-        ("maximum", #"{"maximum":2}"#, "3"),
-        ("minLength", #"{"minLength":2}"#, #""a""#),
-        ("pattern", #"{"pattern":"^a$"}"#, #""b""#),
-        ("maxItems", #"{"maxItems":1}"#, "[1,2]"),
-        ("minItems", #"{"minItems":2}"#, "[1]"),
-        ("items", #"{"items":{"type":"string"}}"#, "[1]"),
-        ("properties", #"{"properties":{"a":{"type":"string"}}}"#, #"{"a":1}"#),
-        ("required", #"{"required":["a"]}"#, "{}"),
-        ("additionalProperties", #"{"properties":{"a":{}},"additionalProperties":false}"#, #"{"b":1}"#),
-        ("oneOf", #"{"oneOf":[{"type":"string"},{"type":"integer"}]}"#, "true"),
-    ]
-
-    @Test("every implemented keyword reports a violation", arguments: violations)
-    func keywordIsEnforced(row: (keyword: String, schema: String, instance: String)) throws {
-        let s = try schema(row.schema)
-        let problems = s.problems(try JSONValue.parse(Data(row.instance.utf8)))
-        #expect(!problems.isEmpty, "\(row.keyword) is accepted but not enforced")
+    /// A minimal schema using the form, an instance that satisfies it, one that violates it, and the path of the violation.
+    /// No `default`: a new `AcceptedForm` case does not compile until it has its row.
+    static func row(_ form: JSONSchemaSubset.AcceptedForm) -> (schema: String, valid: String, invalid: String, path: String) {
+        switch form {
+        case .typeObject: return (#"{"type":"object"}"#, "{}", "1", "$")
+        case .typeArray: return (#"{"type":"array"}"#, "[]", "1", "$")
+        case .typeString: return (#"{"type":"string"}"#, #""a""#, "1", "$")
+        case .typeNumber: return (#"{"type":"number"}"#, "1.5", #""a""#, "$")
+        case .typeInteger: return (#"{"type":"integer"}"#, "1", "1.5", "$")
+        case .typeBoolean: return (#"{"type":"boolean"}"#, "true", "1", "$")
+        case .typeNull: return (#"{"type":"null"}"#, "null", "1", "$")
+        case .const: return (#"{"const":"a"}"#, #""a""#, #""b""#, "$")
+        case .enumeration: return (#"{"enum":["a","b"]}"#, #""a""#, #""c""#, "$")
+        case .minimum: return (#"{"minimum":2}"#, "2", "1", "$")
+        case .maximum: return (#"{"maximum":2}"#, "2", "3", "$")
+        case .minLength: return (#"{"minLength":2}"#, #""ab""#, #""a""#, "$")
+        case .pattern: return (#"{"pattern":"^a$"}"#, #""a""#, #""b""#, "$")
+        case .maxItems: return (#"{"maxItems":1}"#, "[1]", "[1,2]", "$")
+        case .minItems: return (#"{"minItems":2}"#, "[1,2]", "[1]", "$")
+        case .items: return (#"{"items":{"type":"string"}}"#, #"["a"]"#, #"["a",1]"#, "$[1]")
+        case .properties: return (#"{"properties":{"a":{"type":"string"}}}"#, #"{"a":"x"}"#, #"{"a":1}"#, "$.a")
+        case .propertyForbidden: return (#"{"properties":{"a":false}}"#, "{}", #"{"a":1}"#, "$.a")
+        case .required: return (#"{"required":["a"]}"#, #"{"a":1}"#, "{}", "$")
+        case .noAdditionalProperties: return (#"{"properties":{"a":{}},"additionalProperties":false}"#, #"{"a":1}"#, #"{"b":1}"#, "$")
+        case .oneOf: return (#"{"oneOf":[{"type":"string"},{"type":"integer"}]}"#, "1", "true", "$")
+        case .localReference: return (##"{"$defs":{"s":{"type":"string"}},"$ref":"#/$defs/s"}"##, #""a""#, "1", "$")
+        }
     }
 
-    @Test("the table covers every implemented keyword")
-    func tableCoversEveryKeyword() {
-        #expect(Set(Self.violations.map(\.keyword)) == JSONSchemaSubset.implementedKeywords)
+    @Test("every accepted form is classified as itself and enforced against a violating instance", arguments: JSONSchemaSubset.AcceptedForm.allCases)
+    func formIsEnforced(form: JSONSchemaSubset.AcceptedForm) throws {
+        let row = Self.row(form)
+        let root = try JSONValue.parse(Data(row.schema.utf8))
+        let argument = try #require(root[form.keyword])
+        #expect(JSONSchemaSubset.form(of: form.keyword, argument: argument, root: root) == .success(form))
+        let s = try JSONSchemaSubset(root: root)
+        #expect(s.problems(try JSONValue.parse(Data(row.valid.utf8))).isEmpty, "\(form) rejects its valid instance")
+        let problems = s.problems(try JSONValue.parse(Data(row.invalid.utf8)))
+        #expect(problems.contains { $0.hasPrefix(row.path) }, "\(form) is accepted but not enforced at \(row.path): \(problems)")
     }
 
     @Test("a keyword whose argument form the matcher does not enforce is refused at init", arguments: [
         #"{"additionalProperties":{"type":"string"}}"#,
         #"{"additionalProperties":true}"#,
+        #"{"additionalProperties":{}}"#,
+        #"{"items":true}"#,
+        #"{"items":false}"#,
+        #"{"properties":{"a":true}}"#,
+        #"{"oneOf":[true]}"#,
+        #"{"oneOf":[{"type":"string"},false]}"#,
         #"{"type":["string","null"]}"#,
         #"{"type":"text"}"#,
         #"{"minimum":1.5}"#,

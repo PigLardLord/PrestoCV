@@ -26,50 +26,92 @@ enum JSONValue: Decodable, Equatable {
 }
 
 /// The part of JSON Schema 2020-12 that `cv-document.schema.json` uses, and nothing more. A keyword it does not know is
-/// reported, and so is a known keyword in a form the matcher does not enforce for every kind of value (see `rejection`),
+/// reported, and so is a known keyword in a form the matcher does not enforce for every kind of value (see `form(of:argument:root:)`),
 /// never skipped, so the schema cannot start to say something the tests do not check.
 struct JSONSchemaSubset {
     let root: JSONValue
     private let patterns: [String: NSRegularExpression]
     private static let annotations: Set<String> = ["$schema", "$id", "title", "description", "$defs", "$comment"]
-    static let implementedKeywords: Set<String> = [
-        "$ref", "type", "const", "enum", "minimum", "maximum", "minLength", "pattern", "maxItems", "minItems", "items",
-        "properties", "required", "additionalProperties", "oneOf",
-    ]
-    private static let jsonTypes: Set<String> = ["object", "array", "string", "number", "integer", "boolean", "null"]
+    /// Every (keyword, argument form) the matcher enforces, one case each. `JSONSchemaSubsetTests` has an exhaustive switch
+    /// over these with no default, so a new case does not compile until it has a schema, an instance that satisfies it and
+    /// one that violates it. Add a case only together with its enforcement in the matcher below.
+    enum AcceptedForm: CaseIterable, Hashable {
+        case typeObject, typeArray, typeString, typeNumber, typeInteger, typeBoolean, typeNull
+        case const, enumeration, minimum, maximum, minLength, pattern, maxItems, minItems
+        case items, properties, propertyForbidden, required, noAdditionalProperties, oneOf, localReference
+
+        var keyword: String {
+            switch self {
+            case .typeObject, .typeArray, .typeString, .typeNumber, .typeInteger, .typeBoolean, .typeNull: return "type"
+            case .const: return "const"
+            case .enumeration: return "enum"
+            case .minimum: return "minimum"
+            case .maximum: return "maximum"
+            case .minLength: return "minLength"
+            case .pattern: return "pattern"
+            case .maxItems: return "maxItems"
+            case .minItems: return "minItems"
+            case .items: return "items"
+            case .properties, .propertyForbidden: return "properties"
+            case .required: return "required"
+            case .noAdditionalProperties: return "additionalProperties"
+            case .oneOf: return "oneOf"
+            case .localReference: return "$ref"
+            }
+        }
+    }
+
+    static let implementedKeywords: Set<String> = Set(AcceptedForm.allCases.map(\.keyword))
 
     struct Unsupported: Error, CustomStringConvertible { let description: String }
+    struct Rejection: Error, Equatable { let reason: String }
 
-    /// The one place that says which argument forms the matcher enforces: nil when `argument` is accepted for
-    /// `keyword`, else why it is not. Add a form here only together with its enforcement in the matcher below.
-    private static func rejection(_ keyword: String, _ argument: JSONValue, root: JSONValue) -> String? {
-        func isSchema(_ v: JSONValue) -> Bool { if case .object = v { return true } else { return v == .bool(true) || v == .bool(false) } }
+    /// The one place that says which argument forms the matcher enforces: the form `argument` has for `keyword`, or why
+    /// it has none. A subschema is an object; a boolean subschema is enforced only as `false` under `properties`.
+    static func form(of keyword: String, argument: JSONValue, root: JSONValue) -> Result<AcceptedForm, Rejection> {
+        func reject(_ reason: String) -> Result<AcceptedForm, Rejection> { .failure(Rejection(reason: reason)) }
+        func isObject(_ v: JSONValue) -> Bool { if case .object = v { return true } else { return false } }
         switch (keyword, argument) {
-        case ("additionalProperties", .bool(false)): return nil
-        case ("additionalProperties", _): return "only false is enforced"
-        case ("type", .string(let name)): return jsonTypes.contains(name) ? nil : "\(name) is not a JSON type"
-        case ("type", _): return "only a single type name is enforced"
-        case ("const", _): return nil
-        case ("enum", .array): return nil
-        case ("enum", _): return "must be an array"
-        case ("minimum", .integer), ("maximum", .integer): return nil
-        case ("minimum", _), ("maximum", _): return "must be an integer"
-        case ("minLength", .integer(let n)), ("maxItems", .integer(let n)), ("minItems", .integer(let n)): return n >= 0 ? nil : "must not be negative"
-        case ("minLength", _), ("maxItems", _), ("minItems", _): return "must be a non-negative integer"
-        case ("pattern", .string(let source)): return (try? NSRegularExpression(pattern: source)) != nil ? nil : "does not compile"
-        case ("pattern", _): return "must be a string"
-        case ("items", _): return isSchema(argument) ? nil : "must be a schema"
-        case ("properties", .object(let props)): return props.values.allSatisfy(isSchema) ? nil : "every property must be a schema"
-        case ("properties", _): return "must be an object"
-        case ("required", .array(let names)): return names.count == argument.strings.count ? nil : "must be an array of strings"
-        case ("required", _): return "must be an array of strings"
-        case ("oneOf", .array(let branches)): return !branches.isEmpty && branches.allSatisfy(isSchema) ? nil : "must be a non-empty array of schemas"
-        case ("oneOf", _): return "must be a non-empty array of schemas"
+        case ("additionalProperties", .bool(false)): return .success(.noAdditionalProperties)
+        case ("additionalProperties", _): return reject("only false is enforced")
+        case ("type", .string(let name)):
+            switch name {
+            case "object": return .success(.typeObject)
+            case "array": return .success(.typeArray)
+            case "string": return .success(.typeString)
+            case "number": return .success(.typeNumber)
+            case "integer": return .success(.typeInteger)
+            case "boolean": return .success(.typeBoolean)
+            case "null": return .success(.typeNull)
+            default: return reject("\(name) is not a JSON type")
+            }
+        case ("type", _): return reject("only a single type name is enforced")
+        case ("const", _): return .success(.const)
+        case ("enum", .array): return .success(.enumeration)
+        case ("enum", _): return reject("must be an array")
+        case ("minimum", .integer): return .success(.minimum)
+        case ("maximum", .integer): return .success(.maximum)
+        case ("minimum", _), ("maximum", _): return reject("must be an integer")
+        case ("minLength", .integer(let n)): return n >= 0 ? .success(.minLength) : reject("must not be negative")
+        case ("maxItems", .integer(let n)): return n >= 0 ? .success(.maxItems) : reject("must not be negative")
+        case ("minItems", .integer(let n)): return n >= 0 ? .success(.minItems) : reject("must not be negative")
+        case ("minLength", _), ("maxItems", _), ("minItems", _): return reject("must be a non-negative integer")
+        case ("pattern", .string(let source)): return (try? NSRegularExpression(pattern: source)) != nil ? .success(.pattern) : reject("does not compile")
+        case ("pattern", _): return reject("must be a string")
+        case ("items", _): return isObject(argument) ? .success(.items) : reject("must be an object schema")
+        case ("properties", .object(let props)):
+            if props.values.allSatisfy(isObject) { return .success(.properties) }
+            return props.values.allSatisfy({ isObject($0) || $0 == .bool(false) }) ? .success(.propertyForbidden) : reject("every property must be an object schema or false")
+        case ("properties", _): return reject("must be an object")
+        case ("required", .array(let names)): return names.count == argument.strings.count ? .success(.required) : reject("must be an array of strings")
+        case ("required", _): return reject("must be an array of strings")
+        case ("oneOf", .array(let branches)): return !branches.isEmpty && branches.allSatisfy(isObject) ? .success(.oneOf) : reject("must be a non-empty array of object schemas")
+        case ("oneOf", _): return reject("must be a non-empty array of object schemas")
         case ("$ref", .string(let ref)):
-            guard ref.hasPrefix("#/$defs/") else { return "only #/$defs/<name> is enforced" }
-            return root["$defs"]?[String(ref.dropFirst("#/$defs/".count))] != nil ? nil : "does not resolve"
-        case ("$ref", _): return "must be a string"
-        default: return "no accepted form"
+            guard ref.hasPrefix("#/$defs/") else { return reject("only #/$defs/<name> is enforced") }
+            return root["$defs"]?[String(ref.dropFirst("#/$defs/".count))] != nil ? .success(.localReference) : reject("does not resolve")
+        case ("$ref", _): return reject("must be a string")
+        default: return reject("no accepted form")
         }
     }
 
@@ -93,7 +135,7 @@ struct JSONSchemaSubset {
                 continue
             }
             guard implementedKeywords.contains(keyword) else { found.append("\(path): \(keyword)"); continue }
-            if let why = rejection(keyword, argument, root: root) { found.append("\(path)/\(keyword): \(why)"); continue }
+            if case .failure(let why) = form(of: keyword, argument: argument, root: root) { found.append("\(path)/\(keyword): \(why.reason)"); continue }
             switch (keyword, argument) {
             case ("pattern", .string(let source)): patterns[source] = try? NSRegularExpression(pattern: source)
             case ("properties", .object(let props)): for (name, sub) in props.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, root: root, path: "\(path)/properties/\(name)", into: &found, patterns: &patterns) }
@@ -108,7 +150,6 @@ struct JSONSchemaSubset {
     func problems(_ value: JSONValue) -> [String] { check(value, root, path: "$") }
 
     private func check(_ value: JSONValue, _ schema: JSONValue, path: String) -> [String] {
-        if schema == .bool(true) { return [] }
         if schema == .bool(false) { return ["\(path): not allowed"] }
         guard case .object(let keywords) = schema else { return ["\(path): the schema is not an object"] }
         var found: [String] = []
