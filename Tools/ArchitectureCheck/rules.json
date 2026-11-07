@@ -683,6 +683,24 @@
    ]
   },
   {
+   "name": "PrestoCVIntegrationTests",
+   "path": "PrestoCVApp/Tests/PrestoCVIntegrationTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PrestoCVIntegration",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVDomain",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVBundledHeadings"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "PrestoCVPresentation",
    "path": "PrestoCVApp/Sources/PrestoCVPresentation",
    "allowedImports": [

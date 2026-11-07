@@ -288,11 +288,13 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 **`PrestoCVIntegration`**
 - **Workflows**, implementing the ports:
   - `EditCVWorkflow`;
-  - `ExportCVWorkflow`: from the editor snapshot, with the document language, through the renderer, then the completeness check on the actual PDF;
+  - `ExportCVWorkflow`: from the editor snapshot, with the document language, through the renderer, then the completeness check on the actual PDF. In order: the CV is ready (`notReady`), the headings of the language (`unsupportedLanguage`, never a fallback; a table that cannot be read is `renderingFailed`), the mapped document is valid (`invalidDocument`), the render on the page of the `ExportPolicy`, the completeness check (`incomplete`, with the number of texts missing). A PDF shorter than the CV needs is an outcome, not a failure: `ExportOutcome.truncated`, with both page counts; its text is cut, so the completeness check does not apply to it. The look (stylesheet, palette, fonts) is a `DocumentStyle` the composition root passes in; resolving the CV's design choice into one is the design catalog's job (step 3-4);
   - `BrowseDesigns`;
   - `DraftCVWithAI`: availability, then draft, then an unsaved CV plus its gaps;
   - `ImportCVWorkflow` (planned, [ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)): the import, then an unsaved CV plus its review list and the text not imported.
-- **Mappers:** `CV → CVDocument`, `CVDraft → CV` and, when the import is wired in, `ImportedCV → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+- **Mappers:** `CVToDocumentMapper` (`CV → CVDocument`), `CVDraft → CV` and, when the import is wired in, `ImportedCV → CV`. They are exhaustive and deterministic, with typed dates. The draft mapper uses `Period.make` and reports every gap.
+  - `CVToDocumentMapper` trims text and prints no blank value; sections come in print order (summary, experience, education, skills, languages, certifications, profiles, interests) and an empty one is left out. Left out on purpose: the CV's list title, the identity and bookkeeping fields, the design choice (the export resolves it), and the month of a certification (the document prints a year). `MirrorCompletenessTests` walks a fully populated CV with `Mirror`: a field added to the CV that neither reaches the document nor appears in the test's list of left-out fields fails it, and so does a value in the document that no field of the CV holds.
+- **`PrestoCVIntegrationTests`** may import `PrestoCVIntegration`, `PrestoCVWorkflowPorts`, `PrestoCVDomain`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVRenderingTestSupport` (the fake renderer and the PDF inspector for Linux), `CVBundledHeadings`, Testing, Foundation. They run on Linux with `swift test --package-path PrestoCVApp`.
 
 **`PrestoCVPresentation`**
 - `@Observable @MainActor` view models whose public API holds presentation types only: status enums, and no domain types.
