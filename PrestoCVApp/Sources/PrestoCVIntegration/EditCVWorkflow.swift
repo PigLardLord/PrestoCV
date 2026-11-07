@@ -36,16 +36,22 @@ public struct EditCVWorkflow: CVEditing {
     }
 }
 
-/// The one owner of the revision of an open CV. It keeps the latest CV the store returned, so the text the editor holds is
-/// written onto the revision the store has (the editor cannot set a revision), and it serves its calls one at a time, in
-/// order: a call that waits keeps its place even if its task is cancelled meanwhile.
+/// The one owner of the open CV's revision, look and language. It keeps the latest CV the store returned, so the text the
+/// editor holds is written onto the revision the store has (the editor cannot set a revision). While nothing is stored it
+/// keeps the unsaved CV instead, so a look or a language chosen before the first write is not lost to a text snapshot
+/// taken earlier. It serves its calls one at a time, in order: a call that waits keeps its place even if its task is
+/// cancelled meanwhile.
 ///
 /// A write that reached the store is done, whatever happened to the task meanwhile; a cancelled task whose write did not
-/// reach the store throws `CancellationError`.
+/// reach the store throws `CancellationError`. A write that fails or is cancelled before it reached the store leaves the
+/// unsaved look and language for the retry.
 actor AutosaveWriter: CVAutosaveWriting {
     private let save: SaveCV
     private let change: ChangeCV
+    /// The CV as the store holds it, once it holds it.
     private var latest: CV?
+    /// The CV as far as the writer knows it while nothing is stored: only its look and language count.
+    private var unsaved: CV?
     private var busy = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
@@ -55,19 +61,24 @@ actor AutosaveWriter: CVAutosaveWriting {
         latest = stored
     }
 
-    func write(_ content: CV, isStored: Bool) async throws {
+    func write(_ content: CV) async throws {
         await turn()
         defer { next() }
         try Task.checkCancellation()
-        let target = isStored ? (latest.map { $0.holding(contentOf: content) } ?? content) : content
+        let target = (latest ?? unsaved).map { $0.holding(contentOf: content) } ?? content
         latest = try await settled { () async throws(AuthoringError) -> CV in try await save(target) }
+        unsaved = nil
     }
 
     func changeLook(_ look: LookChange, of content: CV) async throws -> CV {
         await turn()
         defer { next() }
         try Task.checkCancellation()
-        guard let current = latest else { return ChangeCV.applying(look, to: content) }
+        guard let current = latest else {
+            let changed = ChangeCV.applying(look, to: withText(of: content))
+            unsaved = changed
+            return changed
+        }
         let stored = try await settled { () async throws(AuthoringError) -> CV in try await change.look(of: current, look) }
         latest = stored
         return stored
@@ -77,11 +88,18 @@ actor AutosaveWriter: CVAutosaveWriting {
         await turn()
         defer { next() }
         try Task.checkCancellation()
-        guard let current = latest else { return ChangeCV.applying(language: language, to: content) }
+        guard let current = latest else {
+            let changed = ChangeCV.applying(language: language, to: withText(of: content))
+            unsaved = changed
+            return changed
+        }
         let stored = try await settled { () async throws(AuthoringError) -> CV in try await change.documentLanguage(of: current, to: language) }
         latest = stored
         return stored
     }
+
+    /// The unsaved CV the writer holds with the text of `content`, or `content` when it holds none.
+    private func withText(of content: CV) -> CV { unsaved.map { $0.holding(contentOf: content) } ?? content }
 
     /// Runs a store operation: its failure is an `EditFailure`, or `CancellationError` when the task was cancelled meanwhile.
     private func settled(_ operation: () async throws(AuthoringError) -> CV) async throws -> CV {

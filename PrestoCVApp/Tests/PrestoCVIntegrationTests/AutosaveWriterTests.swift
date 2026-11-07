@@ -27,7 +27,7 @@ struct AutosaveWriterTests {
         _ = try await writer.setDocumentLanguage(german, of: start)
         var edited = start
         edited.rename("Edited")
-        try await writer.write(edited, isStored: true)
+        try await writer.write(edited)
 
         let result = try await workflow.load(start.id)
         #expect(result.title == "Edited" && result.language == german && result.design?.design == "minimal")
@@ -42,13 +42,13 @@ struct AutosaveWriterTests {
         let looked = try await writer.changeLook(LookChange(shown: shown, parts: [.design]), of: draft)
         #expect(looked.design == shown && looked.revision == 0)
         #expect(await repository.writes == 0)
-        try await writer.write(looked, isStored: false)
+        try await writer.write(looked)
 
         let spoken = try await writer.setDocumentLanguage(german, of: looked)
         #expect(spoken.language == german && spoken.revision == 2)
         var edited = looked
         edited.rename("Edited")
-        try await writer.write(edited, isStored: true)
+        try await writer.write(edited)
 
         let result = try await workflow.load(draft.id)
         #expect(result.title == "Edited" && result.language == german && result.design == shown)
@@ -64,7 +64,7 @@ struct AutosaveWriterTests {
 
         var snapshot = start
         snapshot.rename("Typed before the change")
-        try await writer.write(snapshot, isStored: true)
+        try await writer.write(snapshot)
 
         let result = try await workflow.load(start.id)
         #expect(result.design?.design == "minimal" && result.language == german && result.title == "Typed before the change")
@@ -93,7 +93,7 @@ struct AutosaveWriterTests {
         edited.rename("Edited")
         await gated.holdNextWrite()
 
-        let first = Task { try await writer.write(edited, isStored: true) }
+        let first = Task { try await writer.write(edited) }
         await gated.untilHeld()
         let second = Task { try await writer.changeLook(LookChange(shown: shown, parts: [.design]), of: start) }
         for _ in 0..<200 { await Task.yield() }
@@ -117,14 +117,14 @@ struct AutosaveWriterTests {
         let first = typed
         await gated.holdNextWrite()
 
-        let task = Task { try await writer.write(first, isStored: true) }
+        let task = Task { try await writer.write(first) }
         await gated.untilHeld()
         task.cancel()
         await gated.release(failing: false)
         try await task.value
 
         typed.rename("Second")
-        try await writer.write(typed, isStored: true)
+        try await writer.write(typed)
         let result = try await flow.load(start.id)
         #expect(result.title == "Second" && result.revision == start.revision + 2)
     }
@@ -140,7 +140,7 @@ struct AutosaveWriterTests {
         let edited = typed
         await gated.holdNextWrite()
 
-        let task = Task { try await writer.write(edited, isStored: true) }
+        let task = Task { try await writer.write(edited) }
         await gated.untilHeld()
         task.cancel()
         await gated.release(failing: true)
@@ -163,5 +163,102 @@ struct AutosaveWriterTests {
         await gated.release(failing: true)
 
         await #expect(throws: CancellationError.self) { _ = try await task.value }
+    }
+
+    // MARK: The table: every state of the writer against every call
+
+    /// What the writer holds when the call is made. Every look and language change is passed the ORIGINAL draft, as an
+    /// editor does that has not seen the result of the one before.
+    enum State: CaseIterable {
+        case stored, unsavedPlain, unsavedLooked, unsavedSpoken, unsavedBoth
+        var isStored: Bool { self == .stored }
+        var looked: Bool { self == .unsavedLooked || self == .unsavedBoth }
+        var spoken: Bool { self == .unsavedSpoken || self == .unsavedBoth }
+    }
+
+    enum Call: CaseIterable {
+        case write, changeLook, setLanguage, failedWrite, cancelledWriteThatStored, cancelledWriteThatDidNotStore
+    }
+
+    @Test("every state of the writer against every call keeps the look and the language the writer holds", arguments: State.allCases, Call.allCases)
+    func table(state: State, call: Call) async throws {
+        let gated = GatedRepository()
+        let flow = EditCVWorkflow(repository: gated, ids: SequentialIDGenerator())
+        let classic = Invented.design("classic")
+        let french = DocumentLanguage("fr")
+        var draft = Invented.cv("Ada", id: flow.new().id)
+        if state.isStored { draft = try await flow.save(draft) }
+        let writer = flow.autosaveWriter(startingFrom: state.isStored ? draft : nil)
+        var look: DesignChoice?, language: DocumentLanguage?
+        if state.looked { _ = try await writer.changeLook(LookChange(shown: shown, parts: [.design]), of: draft); look = shown }
+        if state.spoken { _ = try await writer.setDocumentLanguage(german, of: draft); language = german }
+        let entriesBefore = await gated.entries
+        var typed = draft
+        typed.rename("Typed")
+        let attempt = typed
+
+        switch call {
+        case .write:
+            try await writer.write(attempt)
+        case .changeLook:
+            let classicLook = LookChange(shown: classic, parts: [.design])
+            let changed = try await writer.changeLook(classicLook, of: draft)
+            look = classicLook.applying(to: look)
+            #expect(changed.design == look && changed.language == language && changed.title == draft.title)
+            #expect(await gated.entries == entriesBefore + (state.isStored ? 1 : 0))
+        case .setLanguage:
+            let changed = try await writer.setDocumentLanguage(french, of: draft)
+            language = french
+            #expect(changed.language == french && changed.design == look && changed.title == draft.title)
+            #expect(await gated.entries == entriesBefore + (state.isStored ? 1 : 0))
+        case .failedWrite:
+            await gated.holdNextWrite()
+            let task = Task { try await writer.write(attempt) }
+            await gated.untilHeld()
+            await gated.release(failing: true)
+            await #expect(throws: EditFailure.self) { try await task.value }
+        case .cancelledWriteThatStored:
+            await gated.holdNextWrite()
+            let task = Task { try await writer.write(attempt) }
+            await gated.untilHeld()
+            task.cancel()
+            await gated.release(failing: false)
+            try await task.value
+        case .cancelledWriteThatDidNotStore:
+            await gated.holdNextWrite()
+            let task = Task { try await writer.write(attempt) }
+            await gated.untilHeld()
+            task.cancel()
+            await gated.release(failing: true)
+            await #expect(throws: CancellationError.self) { try await task.value }
+        }
+
+        // The next write, of a text snapshot older than every change above: it stores its text and the writer's look and language.
+        var snapshot = draft
+        snapshot.rename("Snapshot")
+        try await writer.write(snapshot)
+        let result = try await flow.load(draft.id)
+        #expect(result.title == "Snapshot")
+        #expect(result.design == look)
+        #expect(result.language == language)
+    }
+
+    @Test("two changes before the first save, each given the original draft, then a write of an older snapshot: both are stored with the old text")
+    func twoChangesBeforeTheFirstSave() async throws {
+        let draft = Invented.cv("Ada", id: workflow.new().id)
+        var snapshot = draft
+        snapshot.rename("Older")
+        let writer = workflow.autosaveWriter(startingFrom: nil)
+
+        let looked = try await writer.changeLook(LookChange(shown: shown, parts: [.design]), of: draft)
+        let spoken = try await writer.setDocumentLanguage(german, of: draft)
+        #expect(looked.design == shown)
+        #expect(spoken.design == shown && spoken.language == german)
+        #expect(await repository.writes == 0)
+        try await writer.write(snapshot)
+
+        let result = try await workflow.load(draft.id)
+        #expect(result.title == "Older" && result.design == shown && result.language == german)
+        #expect(await repository.creates == 1)
     }
 }

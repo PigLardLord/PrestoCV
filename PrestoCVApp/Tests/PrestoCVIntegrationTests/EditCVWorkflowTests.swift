@@ -154,7 +154,7 @@ struct EditCVWorkflowTests {
 
         let attempt = Task { () -> (any Error)? in
             withUnsafeCurrentTask { $0?.cancel() }
-            do { try await writer.write(cv, isStored: false); return nil } catch { return error }
+            do { try await writer.write(cv); return nil } catch { return error }
         }
 
         #expect(await attempt.value is CancellationError)

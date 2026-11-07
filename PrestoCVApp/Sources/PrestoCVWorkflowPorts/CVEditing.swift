@@ -22,15 +22,17 @@ public protocol CVEditing: Sendable {
 /// failure is an `EditFailure`.
 public protocol CVAutosaveWriting: Sendable {
     /// Stores the text of `content` (title, details, sections) onto the CV the writer holds, keeping the look and the
-    /// language it holds. A CV not stored yet is created from `content` as it is.
+    /// language the writer holds, stored or not: a text snapshot never undoes a look or a language chosen since. The
+    /// first write of an unsaved CV creates it, with the look and the language chosen so far; one that fails or is
+    /// cancelled before it reached the store keeps them for the retry.
     ///
     /// A cancelled write may still have been stored; then it returns normally. A cancelled write that was not stored
     /// throws `CancellationError`, never an `EditFailure`.
-    func write(_ content: CV, isStored: Bool) async throws
+    func write(_ content: CV) async throws
 
-    /// Changes the look of the stored CV and stores it; the text the person has typed is not written by this call.
-    /// Returns the CV as stored. While nothing is stored, writes nothing and returns `content` with the change applied:
-    /// the first `write` stores it.
+    /// Changes the look of the open CV; the text the person has typed is not written by this call. Returns the CV with
+    /// the change. When the CV is stored, stores it and returns it as stored. While nothing is stored, writes nothing and
+    /// keeps the change in the writer, on top of the changes made before: the first `write` stores them all.
     func changeLook(_ change: LookChange, of content: CV) async throws -> CV
 
     /// Like `changeLook`, for the language of the document (nil: automatic).

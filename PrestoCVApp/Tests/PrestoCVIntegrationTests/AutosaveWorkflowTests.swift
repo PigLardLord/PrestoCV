@@ -25,9 +25,9 @@ struct AutosaveWorkflowTests {
         var cancelNext = cancelFirstWrite
         return Autosave(content: cv, unchangedFrom: stored.map { $0 }, isStored: stored != nil, isWorthStoring: { $0.canBeSaved },
                         clock: clock, onWriteFailure: { box.errors.append($0) },
-                        write: { content, isStored in
+                        write: { content, _ in
                             if cancelNext { cancelNext = false; withUnsafeCurrentTask { $0?.cancel() } }
-                            try await writer.write(content, isStored: isStored)
+                            try await writer.write(content)
                         })
     }
 
