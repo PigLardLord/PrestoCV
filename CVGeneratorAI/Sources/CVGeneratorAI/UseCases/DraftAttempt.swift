@@ -51,6 +51,11 @@ struct DraftingLimits: Sendable {
     }
 
     static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30), claimCheck: .standard, on: ContinuousClock())
+
+    /// The same times on `clock`, the claim check's too: a test keeps the app's limits and ends them when it says so (#413).
+    func on(_ clock: any Clock<Duration>) -> DraftingLimits {
+        DraftingLimits(extraction: extraction.duration, section: section.duration, claimCheck: claimCheck.on(clock), on: clock)
+    }
 }
 
 /// One call of a pass of the model, within its time, tried once more when it fails below the model.

@@ -53,13 +53,10 @@ final class LogSpy: DiagnosticLogger {
 extension DraftingLimits {
     /// The app's times on a clock that ends them only when a test says so: a draft of a test never runs out of time on a busy
     /// machine (#413). The package's tests have the same in `TestCallClock`; a test target cannot import another's files.
+    /// The limits are internal to the package, so this needs the `@testable` import above, which a Debug build gives: the test
+    /// plans build Debug.
     static func onTestClock() -> DraftingLimits {
-        let clock = IdleClock()
-        return DraftingLimits(
-            extraction: .seconds(90), section: .seconds(30),
-            claimCheck: ClaimCheckLimits(batchSize: ClaimCheckLimits.standard.batchSize, time: ClaimCheckLimits.standard.time, on: clock),
-            on: clock
-        )
+        DraftingLimits.standard.on(IdleClock())
     }
 }
 

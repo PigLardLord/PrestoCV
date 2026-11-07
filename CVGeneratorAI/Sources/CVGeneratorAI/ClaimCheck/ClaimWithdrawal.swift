@@ -19,6 +19,11 @@ struct ClaimCheckLimits: Sendable {
         self.time = time
         self.clock = clock
     }
+
+    /// The same batch and time on `clock`: a test keeps the app's limits and ends the time when it says so (#413).
+    func on(_ clock: any Clock<Duration>) -> ClaimCheckLimits {
+        ClaimCheckLimits(batchSize: batchSize, time: time, on: clock)
+    }
 }
 
 /// What the claim check did with a grounded draft: the draft it gave, the candidates it was asked about, the judgement of each when
@@ -66,6 +71,7 @@ enum ClaimWithdrawal {
 
     /// What `checking` gives, with what the check said for the trace of a test build (ADR 0032): the candidates, the judgement of
     /// each, and why the check gave no answer when it did not.
+    /// - Parameter limits: No default (#413), as for `checking`.
     static func report(on grounded: CVData, in description: String, with checker: any ClaimChecking,
                        within limits: ClaimCheckLimits) async throws -> ClaimCheckReport {
         let candidates = ClaimCandidates.of(grounded, in: description)
