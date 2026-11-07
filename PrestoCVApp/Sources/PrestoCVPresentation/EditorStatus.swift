@@ -49,11 +49,11 @@ public enum ExportStatus: Hashable, Sendable {
 /// A field of the editor's form, named by a status so that the view can mark it.
 public enum EditorField: Hashable, Sendable, CaseIterable {
     case title, fullName, professionalTitle, email, phone, location, website, summary
-    case experienceRole, experienceCompany, experienceLocation, experienceDescription
-    case educationDegree, educationSchool, educationDescription
-    case skillName, language
-    case certificationName, certificationIssuer, certificationDescription
-    case profilePlatform, interest
+    case experienceRole, experienceCompany, experienceLocation, experienceDescription, experiencePeriod
+    case educationDegree, educationSchool, educationDescription, educationPeriod
+    case skillName, skillLevel, language, languageProficiency
+    case certificationName, certificationIssuer, certificationDescription, certificationIssued, certificationLink
+    case profilePlatform, profileLink, interest
 }
 
 /// A section of the editor's form.

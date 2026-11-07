@@ -19,6 +19,9 @@ public final class EditorViewModel {
         set { edit(newValue) }
     }
 
+    /// The row the person asked to remove, which waits for `confirmRemoval()` or `cancelRemoval()`.
+    public internal(set) var pendingRemoval: RowRemoval?
+
     public private(set) var opening: OpeningStatus = .opening
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving

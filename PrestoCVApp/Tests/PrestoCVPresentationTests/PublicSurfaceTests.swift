@@ -14,6 +14,19 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: Bool = editor.isSavedOnThisDevice
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
+    let rows: [ExperienceRow] = content.experiences
+    let _: [EducationRow] = content.education
+    let _: [SkillRow] = content.skills
+    let _: [LanguageRow] = content.languages
+    let _: [CertificationRow] = content.certifications
+    let _: [ProfileRow] = content.profiles
+    let _: [String] = content.interests
+    _ = rows
+    let _: RowRemoval? = editor.pendingRemoval
+    editor.addRow(to: .skills)
+    editor.removeRow(in: .skills, at: 0)
+    editor.confirmRemoval()
+    editor.cancelRemoval()
     await editor.load()
     await editor.saveNow()
     await editor.reload()
