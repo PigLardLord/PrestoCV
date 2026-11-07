@@ -14,8 +14,9 @@ private typealias PlatformFont = UIFont
 /// of text lies and how big it is printed. The export workflow checks every export with it, and the renderer contract
 /// suite and the native renderer tests check the renderers (R8, ADR 0011).
 ///
-/// A line's box is in page space (points, origin at the lower left of the media box), as PDFKit gives it whatever the
-/// page's rotation. Text drawn wholly outside the page is not in the page's text at all, so completeness reports it.
+/// A page's box is its crop box, the part a viewer shows (PDFKit gives the media box when the page has no crop box, and
+/// clips a crop box to the media box). A line's box is in page space (points, the PDF's own coordinates, so a crop box
+/// need not start at the origin), as PDFKit gives it whatever the page's rotation. Text drawn wholly outside the page is not in the page's text at all, so completeness reports it.
 /// A line's glyph height is the smallest font size PDFKit gives for its characters, the page's transform included; a
 /// line with a character that has no font has none, so the geometry check rejects it.
 public struct PDFKitInspector: PDFLayoutInspecting {
@@ -34,7 +35,7 @@ public struct PDFKitInspector: PDFLayoutInspecting {
         var lines: [PDFTextLine] = []
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { return nil }
-            pages.append(Self.box(page.bounds(for: .mediaBox)))
+            pages.append(Self.box(page.bounds(for: .cropBox)))
             let characters = page.numberOfCharacters
             guard characters > 0, let selection = page.selection(for: NSRange(location: 0, length: characters)) else { continue }
             for line in selection.selectionsByLine() {

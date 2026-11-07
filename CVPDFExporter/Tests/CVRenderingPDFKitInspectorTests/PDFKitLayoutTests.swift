@@ -66,6 +66,21 @@ struct PDFKitLayoutTests {
         }
     }
 
+    @Test("a page's box is its crop box: a line past the crop box but inside the media box is outside, one inside is not")
+    func cropBox() throws {
+        let cropBox = CGRect(x: 50, y: 100, width: 300, height: 400)
+        let data = DrawnPDF.pages([[
+            Self.line("Inside the crop box", size: 12, x: 100, y: 300),
+            Self.line("Straddling the crop box edge", size: 12, x: 100, y: 497),
+        ]], cropBox: cropBox)
+        let layout = try #require(PDFKitInspector().layout(of: data))
+        #expect(layout.pages == [PDFBox(x: 50, y: 100, width: 300, height: 400)], "\(layout.pages)")
+        let inside = try #require(layout.lines.first { $0.text == "Inside the crop box" })
+        #expect(abs(inside.box.x - 100) <= 0.5 && abs(inside.box.y - 298.62) <= 1.5, "the line's box is \(inside.box)")
+        let violations = GeometricCompleteness.violations(in: layout, minimumGlyphHeight: GeometricCompleteness.minimumGlyphHeight)
+        #expect(violations == [.outsidePage(page: 0, text: "Straddling the crop box edge")], "\(violations)")
+    }
+
     @Test("text drawn below the bottom edge is reported outside the page")
     func belowTheBottomEdge() throws {
         let layout = try Self.layout(Self.outside)

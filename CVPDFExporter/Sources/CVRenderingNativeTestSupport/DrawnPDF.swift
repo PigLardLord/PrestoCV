@@ -25,14 +25,15 @@ public enum DrawnPDF {
         }
     }
 
-    /// An A4 PDF (595 x 842 pt) with one page per element of `pages`.
-    public static func pages(_ pages: [[Line]]) -> Data {
+    /// An A4 PDF (595 x 842 pt) with one page per element of `pages`. With `cropBox`, every page has that crop box, in
+    /// page space, as a viewer shows only what lies inside it.
+    public static func pages(_ pages: [[Line]], cropBox: CGRect? = nil) -> Data {
         let data = NSMutableData()
         var media = CGRect(x: 0, y: 0, width: 595, height: 842)
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
               let context = CGContext(consumer: consumer, mediaBox: &media, nil) else { return Data() }
         for page in pages {
-            context.beginPDFPage(nil)
+            context.beginPDFPage(pageInfo(cropBox: cropBox))
             for item in page {
                 context.saveGState()
                 context.scaleBy(x: item.scale, y: item.scale)
@@ -48,6 +49,12 @@ public enum DrawnPDF {
         }
         context.closePDF()
         return data as Data
+    }
+
+    private static func pageInfo(cropBox: CGRect?) -> CFDictionary? {
+        guard var box = cropBox else { return nil }
+        let value = Data(bytes: &box, count: MemoryLayout<CGRect>.size)
+        return [kCGPDFContextCropBox as String: value] as CFDictionary
     }
 
     /// `data` with its first page rotated by `degrees` (a multiple of 90), as a reader would show it turned.
