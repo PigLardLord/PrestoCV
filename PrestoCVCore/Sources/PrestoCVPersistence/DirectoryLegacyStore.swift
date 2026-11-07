@@ -82,7 +82,7 @@ extension FileCVRepository: LegacyImportTarget {
     /// next one. A CV the ledger knows is `.existing` after the files that hold it are made durable again, so a person's
     /// deletion stands and a failed barrier is retried. Every step that fails throws, and the importer keeps the source.
     public func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption {
-        try withStoreLock { () throws(RepositoryError) -> Adoption in
+        try await withStoreLock { () throws(RepositoryError) -> Adoption in
             var ledger = try readLedger()
             let staged = directory.appendingPathComponent(Self.stagedName(for: cv.id))
             let stored = try current(cv.id) != nil

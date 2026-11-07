@@ -9,14 +9,16 @@ public enum FileProtection: Sendable, Equatable {
     case unprotected
 }
 
-/// What the composition root gives the CV store beside its location and its clock: the size cap of a file and the
-/// protection class of what it writes. Grouped, so that the store's initializer keeps to three parameters.
-public struct StoreOptions: Sendable, Equatable {
+/// What the composition root gives the CV store beside its location and its clock: the size cap of a file, the
+/// protection class of what it writes and how long it waits for the store's lock. Grouped, so that the store's
+/// initializer keeps to three parameters.
+public struct StoreOptions: Sendable {
     public var maxFileBytes: Int
     public var protection: FileProtection
+    public var lockWait: LockWait
 
-    public init(maxFileBytes: Int = 5 * 1024 * 1024, protection: FileProtection = .complete) {
-        self.maxFileBytes = maxFileBytes; self.protection = protection
+    public init(maxFileBytes: Int = 5 * 1024 * 1024, protection: FileProtection = .complete, lockWait: LockWait = .standard) {
+        self.maxFileBytes = maxFileBytes; self.protection = protection; self.lockWait = lockWait
     }
 
     /// The options of every write: always atomic, so a failed write never leaves half a file; the protection class as given.
@@ -24,6 +26,40 @@ public struct StoreOptions: Sendable, Equatable {
         switch protection {
         case .complete: [.atomic, .completeFileProtection]
         case .unprotected: [.atomic]
+        }
+    }
+
+    /// How the store waits while its lock is held elsewhere (ADR 0009): it tries again after each pause, and gives up
+    /// with `storeUnavailable(.lockTimeout)` once the pauses add up to the deadline (a pause never asks for more than what is left of it, so the wait never passes it and the sum cannot overflow). The pause suspends the caller; it
+    /// never holds a thread.
+    public struct LockWait: Sendable {
+        public let deadline: Duration, interval: Duration
+        let pause: @Sendable (Duration) async -> Void
+
+        /// `pause` waits for about the duration it is given. Tests pass one that does not wait. An `interval` of zero or
+        /// less counts as the smallest step, one millisecond, so that every pause brings the wait closer to the deadline
+        /// and it stays bounded. A `deadline` of zero or less allows one attempt and no pause.
+        public init(deadline: Duration, interval: Duration, pause: @escaping @Sendable (Duration) async -> Void) {
+            self.deadline = deadline; self.interval = max(interval, Self.smallestInterval); self.pause = pause
+        }
+
+        static let smallestInterval = Duration.milliseconds(1)
+
+        /// The pause after the pauses have added up to `waited`: the interval, or only what is left of the deadline, so
+        /// the wait never passes the deadline and the sum never overflows; nil once the deadline is reached.
+        func step(after waited: Duration) -> Duration? {
+            waited < deadline ? min(interval, deadline - waited) : nil
+        }
+
+        /// What the app uses: ten seconds, in pauses of 25 milliseconds on the real clock. The pause sleeps in a task of
+        /// its own, which does not inherit the caller's cancellation: a cancelled call keeps waiting until the deadline
+        /// (R3), and its only failure, a cancellation, cannot happen.
+        public static let standard = LockWait(deadline: .seconds(10), interval: .milliseconds(25), pause: standardPause)
+
+        /// The pause of `standard`, apart so that a test can run it with a shorter deadline.
+        static let standardPause: @Sendable (Duration) async -> Void = { interval in
+            let sleeping = Task { try await Task.sleep(for: interval) }
+            _ = await sleeping.result
         }
     }
 }

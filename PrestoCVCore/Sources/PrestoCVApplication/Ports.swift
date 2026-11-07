@@ -38,7 +38,11 @@ public enum StoreIssue: Sendable, Equatable {
     case quarantineFailed(file: String)              // corrupt, but could not be moved aside
 }
 
-public enum StoreFailure: Sendable, Equatable { case notADirectory, cannotList, cannotLock }
+public enum StoreFailure: Sendable, Equatable {
+    case notADirectory, cannotList, cannotLock
+    /// The store's lock was held elsewhere, by another instance or another process, until the wait's deadline.
+    case lockTimeout
+}
 
 /// The error under a failed call, as codes only: its domain and its code, never a path or a message (R7).
 public struct FailureCause: Sendable, Equatable, CustomStringConvertible {
