@@ -776,6 +776,7 @@
     "DiagnosticTraceFiles",
     "DiagnosticTraceDistribution",
     "WebKit",
+    "Synchronization",
     "Foundation"
    ],
    "rules": [

@@ -20,18 +20,29 @@ struct TraceOnFailureTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("TraceOnFailureTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    private static func inputs(_ paths: AppPaths, compileRules: @escaping Composition.CompileRules) -> Composition.Inputs {
+    private static func inputs(
+        _ paths: AppPaths,
+        gate: TraceLaunchGate = .asking(FixedDistribution(.production)),
+        settleDeadline: @escaping @Sendable () async -> Void = TraceOnFailureTests.neverFires,
+        compileRules: @escaping Composition.CompileRules
+    ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
             clock: SteppingClock(),
             ids: SequentialIDGenerator(),
             log: RecordingLogger(),
-            gate: .asking(FixedDistribution(.production)),
+            gate: gate,
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             compileRules: compileRules,
+            settleDeadline: settleDeadline,
             prepare: {}
         )
+    }
+
+    /// A deadline that never fires: nothing waits for it to end.
+    private static let neverFires: @Sendable () async -> Void = {
+        for await _ in AsyncStream<Void> { _ in } {}
     }
 
     private static let failingRules: Composition.CompileRules = {
@@ -86,5 +97,26 @@ struct TraceOnFailureTests {
             return
         }
         #expect(!FileManager.default.fileExists(atPath: paths.trace.path), "The traces are purged when make returns")
+    }
+
+    @Test("A distribution that never answers does not hold back the error state, and the purge waits for the answer",
+          .timeLimit(.minutes(1)))
+    func failedStateDoesNotWaitForTheAnswer() async {
+        let base = Self.base()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let paths = AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
+        await Self.storeARun(in: paths)
+        let distribution = HeldDistribution()
+
+        let state = await Composition.make(Self.inputs(
+            paths, gate: .asking(distribution), settleDeadline: {}, compileRules: Self.failingRules
+        ))
+
+        guard case .failed(.contentRulesUnavailable) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: paths.trace.path), "No purge without an answer")
+        await distribution.answer(with: .production)
     }
 }

@@ -34,6 +34,11 @@ struct CompositionTests {
         @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in throw .contentRulesUnavailable
     }
 
+    /// A deadline that never fires: nothing waits for it to end.
+    private static let neverFires: @Sendable () async -> Void = {
+        for await _ in AsyncStream<Void> { _ in } {}
+    }
+
     private static func paths() -> AppPaths {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("CompositionTests-\(UUID().uuidString)", isDirectory: true)
         return AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
@@ -55,6 +60,7 @@ struct CompositionTests {
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             compileRules: compileRules,
+            settleDeadline: Self.neverFires,
             prepare: {}
         )
     }

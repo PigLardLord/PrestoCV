@@ -284,7 +284,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVImporting`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, save, load) and `CVExporting` (untyped `throws`, so cancellation passes through).
@@ -317,6 +317,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the AI adapter, the PDFKit reader of the import, `TimeSource`, `IDGenerator` and logger;
   - the trace chain of ADR 0032 (`TraceChain`, which builds the recorder, the gate and the store), built here and nowhere else;
   - the `ScreenFactory`;
+  - the deadline of a failed launch (`Inputs.settleDeadline`): `make` returns the failed state even while the distribution has not answered, and the purge of a closed launch follows the answer;
   - `CompositionState`, ready or failed with a code (`CompositionFailure`) the app shows as one error screen.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. Launch arguments select it (`-PrestoCVNextStorage <name>`, `-PrestoCVNextEmptyStorage`, `-PrestoCVNextSeed <base 64>`, `-PrestoCVNextDistribution <answer>`); they are parsed into `LaunchFixtures`, which exists in Debug builds only. No production target depends on a test-support target.
 

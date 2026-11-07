@@ -178,7 +178,7 @@ struct TraceChainTests {
 }
 
 /// A distribution that answers when the test says so.
-private actor HeldDistribution: DistributionReading {
+actor HeldDistribution: DistributionReading {
     private var held: CheckedContinuation<DistributionAnswer, Never>?
     private var given: DistributionAnswer?
 

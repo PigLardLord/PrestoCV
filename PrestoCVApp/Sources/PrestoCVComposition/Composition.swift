@@ -9,6 +9,7 @@ import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
 import PrestoCVPersistence
+import Synchronization
 import WebKit
 #if os(iOS)
 import CVRenderingIOS
@@ -42,6 +43,10 @@ public final class Composition {
         /// The folder of the sample CVs that ship with the app
         let samples: URL
         let compileRules: CompileRules
+        /// Returns when a failed launch should stop waiting for the distribution's answer. A failed launch shows its error
+        /// screen even while the distribution has not answered (the store may fetch over the network); the purge of a
+        /// closed launch then still follows the answer (ADR 0032). The launch chooses it, so a test fires it at once.
+        let settleDeadline: @Sendable () async -> Void
         /// What a launch does before the folders are made, such as writing the seed of a UI test. It fails with a code.
         let prepare: @MainActor () throws(CompositionFailure) -> Void
     }
@@ -83,15 +88,27 @@ public final class Composition {
     }
 
     /// Assembles the app, or fails with one code. The trace chain starts first, so that its answer and the purge of a
-    /// closed launch (ADR 0032) do not depend on the rest: when the assembly fails, `make` returns after the purge.
+    /// closed launch (ADR 0032) do not depend on the rest. When the assembly fails, `make` waits for the purge only until
+    /// `settleDeadline`: the error screen must not wait for a distribution that has not answered. The purge is not brought
+    /// forward, it follows the answer on the trace chain's own task, as it does on a launch that succeeds.
     static func make(_ inputs: Inputs) async -> CompositionState {
         let trace = TraceChain(
             directory: inputs.paths.trace, shareDirectory: inputs.paths.traceShare, gate: inputs.gate,
             device: inputs.device, log: inputs.log
         )
         let state = await assemble(inputs, trace: trace)
-        if case .failed = state { await trace.settle() }
+        if case .failed = state { await first(of: { await trace.settle() }, or: inputs.settleDeadline) }
         return state
+    }
+
+    /// Returns when either operation has finished. The one that finishes later is left to end on its own: waiting for a
+    /// task's value cannot be cancelled, so a task group would still wait for it.
+    private static func first(of work: @escaping @Sendable () async -> Void, or deadline: @escaping @Sendable () async -> Void) async {
+        await withCheckedContinuation { (waiting: CheckedContinuation<Void, Never>) in
+            let once = Once(waiting)
+            Task { await work(); once.resume() }
+            Task { await deadline(); once.resume() }
+        }
     }
 
     private static func assemble(_ inputs: Inputs, trace: TraceChain) async -> CompositionState {
@@ -159,7 +176,31 @@ public final class Composition {
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
             },
+            settleDeadline: {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    // Cancelled: the wait ends at once, as when the time is up
+                    return
+                }
+            },
             prepare: prepare
         ))
+    }
+}
+
+/// Resumes a continuation the first time it is asked to, and never again.
+private final class Once: Sendable {
+    private let waiting: Mutex<CheckedContinuation<Void, Never>?>
+
+    init(_ continuation: CheckedContinuation<Void, Never>) {
+        waiting = Mutex(continuation)
+    }
+
+    func resume() {
+        waiting.withLock { continuation in
+            continuation?.resume()
+            continuation = nil
+        }
     }
 }
