@@ -123,7 +123,7 @@ Each step of the AI draft and of the import, with the text it read and wrote, ke
   - one `CVFileV1` file per CV, named from its id;
   - atomic writes, with `complete` protection unless the composition root gives another class through `StoreOptions` (tests of the store's logic give none; [ADR 0009](adr/0009-persisted-schema-v1.md): what that means for a locked device and for CI hosts), and a read-back check before every write;
   - a failed write, delete, restore, erase or purge (the failures mapped to `writeFailed`) keeps the error it came from, as a `FailureCause` (domain, code, and the `errno` under a Cocoa error); the classified read, lock, listing and quarantine outcomes keep no cause, and the use cases drop it when they translate to `AuthoringError`;
-  - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md));
+  - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)); while the lock is held elsewhere the call suspends between attempts, and it ends in `storeUnavailable(.lockTimeout)` at the deadline of `StoreOptions.lockWait` ([ADR 0009](adr/0009-persisted-schema-v1.md));
   - reads classified as described in R12;
   - `Quarantine/` with validated restore, erase and purge.
 - `DirectoryLegacyStore` and `FileCVRepository.adopt`: the adapters of the legacy import. The directory store lists `cv_*.json`, reads only regular files within a size cap and never through a link (R8), and maps each through `LegacyCVFile` (the legacy shape, read as the released app reads it, with the look mapped as ADR 0022 says) to a domain CV; `LegacyPeriod` converts the period text only when it is an unambiguous range of two dates, and drops the rest. `adopt` runs under the store lock and keeps the legacy times, which `create` would reset; a legacy file is never read as schema 1, because the store lists only `*.cv.json`.
@@ -196,7 +196,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - **`InstallDesign`**: validate the raw bytes, then `DesignRenderingGate.verify`, then `DesignStore.save`. Nothing is stored unless both checks pass.
 - **Ports:** `DesignStore`, `BundledDesignSource` (raw bytes), and **`DesignRenderingGate`**. The catalog owns the gate; `CVRendering` implements it, along the allowed Rendering → Catalog edge.
 
-**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
+**`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), whose wait suspends and ends in `lockTimeout` at the deadline of the injected `LockWait`, and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
 
 **`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
 
