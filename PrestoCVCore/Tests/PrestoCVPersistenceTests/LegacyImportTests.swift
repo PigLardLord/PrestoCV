@@ -175,6 +175,19 @@ struct LegacyImportTests {
         #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
     }
 
+    @Test("a CV an earlier run stored but did not finish (the rename held, a barrier after it failed) still has what it lost reported before its source goes")
+    func dropsReportedWhenFoundStored() async throws {
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.minimal(#""look":{"palette":"ocean"}"#)])
+        try await stageCopy(idA, in: w)
+        try writeLedger([LegacyFixtures.idA], in: w)
+        try FileManager.default.moveItem(at: w.store.appendingPathComponent(FileCVRepository.stagedName(for: idA)),
+                                         to: w.store.appendingPathComponent(LegacyFixtures.idA + ".cv.json"))
+        let report = try await w.importer().run()
+        #expect(report.alreadyStored == [idA] && report.imported.isEmpty && report.failures.isEmpty)
+        #expect(report.drops[idA] == [.look])
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
     @Test("a run that finishes an interrupted adoption makes the ledger durable before the CV becomes visible", .enabled(if: !isRoot))
     func recoveryWaitsForTheLedger() async throws {
         let w = try standard()
@@ -372,10 +385,12 @@ private struct FakeTarget: LegacyImportTarget {
     func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption { try answer(cv) }
 }
 
-private func oneRecord() -> LegacyRecord {
+private func oneRecord() -> LegacyRecord { oneRecord(drops: []) }
+
+private func oneRecord(drops: [LegacyDrop]) -> LegacyRecord {
     let cv = CV(id: idA, revision: 0, createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 200), title: "T",
                 personal: PersonalDetails(fullName: "N"), sections: CVSections(), design: nil, language: nil)
-    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: [])))
+    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops)))
 }
 
 @Suite("The source is kept until the new copy is verified")
@@ -413,6 +428,14 @@ struct LegacySourceKeptTests {
     func existingCopy() async throws {
         let (report, removed) = try await run { _ throws(RepositoryError) in .existing }
         #expect(report.alreadyStored == [idA] && removed == ["cv_x.json"])
+    }
+
+    @Test("a CV that is already stored has what it lost reported before its source goes: an earlier run may have stopped before reporting it")
+    func existingCopyReportsDrops() async throws {
+        let source = FakeSource(recordsToServe: [oneRecord(drops: [.look, .email])])
+        let target = FakeTarget { _ throws(RepositoryError) in .existing }
+        let report = try await ImportLegacyStore(source: source, target: target).run()
+        #expect(report.alreadyStored == [idA] && report.drops[idA] == [.look, .email] && source.removed.all == ["cv_x.json"])
     }
 
     @Test("a source that cannot be removed is reported, and the run goes on")

@@ -66,6 +66,8 @@ public struct LegacyImportFailure: Sendable, Equatable {
 
 public struct LegacyImportReport: Sendable, Equatable {
     public var imported: [CVID] = [], alreadyStored: [CVID] = [], removedSources: [LegacyRecord.Key] = []
+    /// What each CV lost in the mapping, for every CV this run finds stored (`imported` or `alreadyStored`): an earlier run
+    /// may have stored it and stopped before its report.
     public var drops: [CVID: [LegacyDrop]] = [:]
     public var failures: [LegacyImportFailure] = []
     public init() {}
@@ -100,11 +102,12 @@ public struct ImportLegacyStore: Sendable {
         }
         switch adoption {
         case .existing: report.alreadyStored.append(legacy.cv.id)
-        case .stored(let copy) where copy == legacy.cv.adoptedAsRevisionOne:
-            report.imported.append(legacy.cv.id)
-            if !legacy.drops.isEmpty { report.drops[legacy.cv.id] = legacy.drops }
+        case .stored(let copy) where copy == legacy.cv.adoptedAsRevisionOne: report.imported.append(legacy.cv.id)
         case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return
         }
+        // Reported for every CV whose source goes, also one an earlier run stored: that run may have stopped (a kill, a
+        // failed barrier after the rename) before its report. A loss reported twice is the safe way to fail; never is not.
+        if !legacy.drops.isEmpty { report.drops[legacy.cv.id] = legacy.drops }
         await removeSource(key, into: &report)
     }
 
