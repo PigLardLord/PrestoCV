@@ -278,6 +278,17 @@
    "rules": []
   },
   {
+   "name": "PrestoCVImportingTestSupport",
+   "path": "PrestoCVCore/Sources/PrestoCVImportingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "PrestoCVImporting",
+    "PrestoCVDomain",
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVImportingPDFKit",
    "path": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
    "allowedImports": [
@@ -663,6 +674,7 @@
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVRendering",
@@ -690,7 +702,10 @@
     "Foundation",
     "PrestoCVIntegration",
     "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
+    "PrestoCVImportingTestSupport",
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVRendering",

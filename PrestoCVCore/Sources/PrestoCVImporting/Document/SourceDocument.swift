@@ -35,7 +35,7 @@ public struct SourceDocument: Hashable, Sendable {
     public let blocks: [SourceBlock]
     private let scalars: [Unicode.Scalar]
 
-    init(format: SourceFormat, text: String, blocks: [SourceBlock]) {
+    package init(format: SourceFormat, text: String, blocks: [SourceBlock]) {
         self.format = format
         self.text = text
         self.blocks = blocks
