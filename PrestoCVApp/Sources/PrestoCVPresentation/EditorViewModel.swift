@@ -129,7 +129,7 @@ public final class EditorViewModel {
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
             onWriteFailure: { [weak self] error in self?.writeFailed(error, generation: mine) },
             // Only the writer: a write that ends after the editor is gone still stores what it was given
-            write: { content, isStored in try await writer.write(content, isStored: isStored) }
+            write: { content, _ in try await writer.write(content) }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
         self.autosave = autosave

@@ -14,6 +14,8 @@ struct LookChangeWorkflowTests {
 
     init() { workflow = EditCVWorkflow(repository: repository, ids: SequentialIDGenerator()) }
 
+    private func writer(for stored: CV) -> any CVAutosaveWriting { workflow.autosaveWriter(startingFrom: stored) }
+
     private func stored(design: DesignChoice?) async throws -> CV {
         var cv = FixtureCV.full(id: workflow.new().id)
         cv.choose(design: design)
@@ -24,7 +26,7 @@ struct LookChangeWorkflowTests {
     func onlyChosenPartsChange() async throws {
         let saved = try await stored(design: Invented.design("modern", palette: "ocean", fonts: "classic"))
 
-        let changed = try await workflow.changeLook(of: saved, LookChange(shown: shown, parts: [.palette]))
+        let changed = try await writer(for: saved).changeLook(LookChange(shown: shown, parts: [.palette]), of: saved)
 
         #expect(changed.design == Invented.design("modern", palette: "mono", fonts: "classic"))
         #expect(try await workflow.load(saved.id) == changed)
@@ -34,7 +36,7 @@ struct LookChangeWorkflowTests {
     func unknownIdsOfOtherPartsStay() async throws {
         let saved = try await stored(design: Invented.design("from-a-newer-app", palette: "newer-palette", fonts: "newer-fonts"))
 
-        let changed = try await workflow.changeLook(of: saved, LookChange(shown: shown, parts: [.fonts]))
+        let changed = try await writer(for: saved).changeLook(LookChange(shown: shown, parts: [.fonts]), of: saved)
 
         #expect(changed.design == Invented.design("from-a-newer-app", palette: "newer-palette", fonts: "serif"))
     }
@@ -43,7 +45,7 @@ struct LookChangeWorkflowTests {
     func noLookTakesAllShown() async throws {
         let saved = try await stored(design: nil)
 
-        let changed = try await workflow.changeLook(of: saved, LookChange(shown: shown, parts: [.design]))
+        let changed = try await writer(for: saved).changeLook(LookChange(shown: shown, parts: [.design]), of: saved)
 
         #expect(changed.design == shown)
     }
@@ -54,7 +56,7 @@ struct LookChangeWorkflowTests {
         let first = LookChange(shown: Invented.design("minimal", palette: "ocean", fonts: "classic"), parts: [.design])
         let second = LookChange(shown: Invented.design("minimal", palette: "mono", fonts: "classic"), parts: [.palette])
 
-        let changed = try await workflow.changeLook(of: saved, first.followed(by: second))
+        let changed = try await writer(for: saved).changeLook(first.followed(by: second), of: saved)
 
         #expect(changed.design == Invented.design("minimal", palette: "mono", fonts: "classic"))
         #expect(changed.revision == saved.revision + 1)
@@ -67,7 +69,7 @@ struct LookChangeWorkflowTests {
         let other = try await workflow.rename(saved, to: "Other window")
 
         await #expect(throws: EditFailure.conflict(storedRevision: other.revision)) {
-            _ = try await workflow.changeLook(of: saved, LookChange(shown: shown, parts: [.design]))
+            _ = try await writer(for: saved).changeLook(LookChange(shown: shown, parts: [.design]), of: saved)
         }
     }
 
@@ -76,10 +78,10 @@ struct LookChangeWorkflowTests {
         let saved = try await stored(design: nil)
         let german = DocumentLanguage("de")
 
-        let set = try await workflow.setDocumentLanguage(of: saved, to: german)
+        let set = try await writer(for: saved).setDocumentLanguage(german, of: saved)
         #expect(set.language?.tag == "de" && set.revision == saved.revision + 1)
 
-        let cleared = try await workflow.setDocumentLanguage(of: set, to: nil)
+        let cleared = try await writer(for: set).setDocumentLanguage(nil, of: set)
         #expect(cleared.language == nil)
         #expect(try await workflow.load(saved.id) == cleared)
     }

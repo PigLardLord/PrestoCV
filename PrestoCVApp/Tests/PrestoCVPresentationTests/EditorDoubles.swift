@@ -33,8 +33,8 @@ actor Gate {
     }
 }
 
-/// The editing port on the use cases of the application layer and an in-memory store, with a gate before each write
-/// of the autosave and a record of what reached it.
+/// The editing port on the use cases of the application layer and an in-memory store, with a gate in each call of the
+/// writer of the open CV and a record of what reached it.
 final class EditingFake: CVEditing {
     let store = InMemoryCVRepository()
     let ids = SequentialIDGenerator()
@@ -77,34 +77,84 @@ final class EditingFake: CVEditing {
         do { try await DeleteCV(repository: store)(cv) } catch { throw EditFailure(error) }
     }
 
-    func changeLook(of cv: CV, _ change: LookChange) async throws(EditFailure) -> CV {
-        looks.withLock { $0.append(change) }
-        do { return try await ChangeCV(repository: store).look(of: cv, change) } catch { throw EditFailure(error) }
-    }
-
-    func setDocumentLanguage(of cv: CV, to language: DocumentLanguage?) async throws(EditFailure) -> CV {
-        languages.withLock { $0.append(language) }
-        do { return try await ChangeCV(repository: store).documentLanguage(of: cv, to: language) } catch { throw EditFailure(error) }
-    }
-
     func autosaveWriter(startingFrom stored: CV?) -> any CVAutosaveWriting { GatedWriter(editing: self, latest: stored) }
 
-    /// What one autosave writer does: it keeps the CV the store returned and writes the form's content onto it.
+    /// What the workflow's writer of the open CV does: it owns the revision, the look and the language, and serves its
+    /// calls one at a time, in order. It writes the form's text onto the CV the store returned last, or, while nothing is
+    /// stored, onto the look and the language chosen so far; it stores a look or a language onto the stored CV, or keeps it
+    /// for the first write. Every call passes the gate, so that a test can hold it at any point.
     actor GatedWriter: CVAutosaveWriting {
         let editing: EditingFake
-        var latest: CV?
+        private var latest: CV?
+        private var unsaved: CV?
+        private var busy = false
+        private var waiting: [CheckedContinuation<Void, Never>] = []
 
         init(editing: EditingFake, latest: CV?) { self.editing = editing; self.latest = latest }
 
-        func write(_ content: CV, isStored: Bool) async throws {
-            let target = isStored ? (latest.map { $0.holding(contentOf: content) } ?? content) : content
-            editing.writes.withLock { $0.append(target) }
+        func write(_ content: CV) async throws {
+            // Counted from the call, not from its turn, so that two writes the editor overlaps are seen
             let running = editing.writesRunning.withLock { $0 += 1; return $0 }
             editing.mostWritesAtOnce.withLock { $0 = max($0, running) }
+            defer { editing.writesRunning.withLock { $0 -= 1 } }
+            await turn()
+            defer { next() }
+            try Task.checkCancellation()
+            let target = (latest ?? unsaved).map { $0.holding(contentOf: content) } ?? content
+            editing.writes.withLock { $0.append(target) }
             await editing.gate.pass()
-            editing.writesRunning.withLock { $0 -= 1 }
             if let error = editing.writeErrors.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) { throw error }
             latest = try await editing.save(target)
+            unsaved = nil
+        }
+
+        func changeLook(_ change: LookChange, of content: CV) async throws -> CV {
+            editing.looks.withLock { $0.append(change) }
+            await turn()
+            defer { next() }
+            try Task.checkCancellation()
+            await editing.gate.pass()
+            guard let current = latest else {
+                let changed = ChangeCV.applying(change, to: withText(of: content))
+                unsaved = changed
+                return changed
+            }
+            let stored: CV
+            do { stored = try await ChangeCV(repository: editing.store).look(of: current, change) } catch { throw EditFailure(error) }
+            latest = stored
+            return stored
+        }
+
+        func setDocumentLanguage(_ language: DocumentLanguage?, of content: CV) async throws -> CV {
+            editing.languages.withLock { $0.append(language) }
+            await turn()
+            defer { next() }
+            try Task.checkCancellation()
+            await editing.gate.pass()
+            guard let current = latest else {
+                let changed = ChangeCV.applying(language: language, to: withText(of: content))
+                unsaved = changed
+                return changed
+            }
+            let stored: CV
+            do {
+                stored = try await ChangeCV(repository: editing.store).documentLanguage(of: current, to: language)
+            } catch {
+                throw EditFailure(error)
+            }
+            latest = stored
+            return stored
+        }
+
+        private func withText(of content: CV) -> CV { unsaved.map { $0.holding(contentOf: content) } ?? content }
+
+        private func turn() async {
+            guard busy else { busy = true; return }
+            await withCheckedContinuation { waiting.append($0) }
+        }
+
+        private func next() {
+            if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
         }
     }
 
