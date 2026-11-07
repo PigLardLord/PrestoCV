@@ -70,15 +70,15 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 287 |
-| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 287 |
-| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 350 |
-| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 296 |
-| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 310 |
-| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 310 |
-| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 302 |
-| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 309 |
-| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 317 |
+| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 398 |
+| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 398 |
+| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 481 |
+| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 416 |
+| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 429 |
+| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 429 |
+| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 435 |
+| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 438 |
+| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 445 |
 
 Notes for App Review: 3997 characters (4000).
 <!-- counts:end -->
@@ -188,7 +188,7 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two.
 ```
 
 ## English (U.K.), en-GB
@@ -267,7 +267,7 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two.
 ```
 
 ## German, de-DE
@@ -346,7 +346,7 @@ Bereit zum Versenden. | Ein sauberes PDF, mit Überschriften in der Sprache des 
 ### What's New
 
 ```text
-Der KI-Entwurf übernimmt Ihre eigenen Worte, wenn Sie einen Lebenslauf einfügen, und liest ihn wie einen Import. Eine Stelle, die Sie noch innehaben, endet jetzt mit dem Wort, das Ihr Lebenslauf für „heute“ verwendet. Eine Aufgabe steht nicht mehr doppelt da oder unter der falschen Stelle, und eine beendete Stelle steht nicht mehr in der Gegenwart.
+Der KI-Entwurf übernimmt Ihre eigenen Worte, wenn Sie einen Lebenslauf einfügen, und liest ihn wie einen Import. Eine Stelle, die Sie noch innehaben, endet jetzt mit dem Wort, das Ihr Lebenslauf für „heute“ verwendet. Eine Aufgabe steht nicht mehr doppelt da oder unter der falschen Stelle, und eine beendete Stelle steht nicht mehr in der Gegenwart. Ein importiertes Zertifikat mit einer Zeile „Ausgestellt von“ darunter ist jetzt ein Zertifikat mit seinem Aussteller, nicht zwei.
 ```
 
 ## Italian, it
@@ -425,7 +425,7 @@ Pronto da inviare. | Un PDF curato, con i titoli nella lingua del tuo CV.
 ### What's New
 
 ```text
-La bozza con l'IA ora mantiene le tue parole quando incolli un CV: lo legge come un'importazione. Un lavoro in corso finisce con la parola che usa il tuo CV per dire «oggi». Un compito non viene più scritto due volte né messo sotto il lavoro sbagliato, e un lavoro concluso non è più al presente.
+La bozza con l'IA ora mantiene le tue parole quando incolli un CV: lo legge come un'importazione. Un lavoro in corso finisce con la parola che usa il tuo CV per dire «oggi». Un compito non viene più scritto due volte né messo sotto il lavoro sbagliato, e un lavoro concluso non è più al presente. Una certificazione importata con sotto una riga «Rilasciato da» ora è una sola certificazione con il suo ente, non due.
 ```
 
 ## Spanish (Spain), es-ES
@@ -504,7 +504,7 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
+El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente. Una certificación importada con una línea «Expedido por» debajo ahora es una sola certificación con su emisor, no dos.
 ```
 
 ## Spanish (Mexico), es-MX
@@ -583,7 +583,7 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
+El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente. Una certificación importada con una línea «Expedido por» debajo ahora es una sola certificación con su emisor, no dos.
 ```
 
 ## French, fr-FR
@@ -662,7 +662,7 @@ Prêt à envoyer. | Un PDF soigné, avec des titres dans la langue du CV.
 ### What's New
 
 ```text
-Le brouillon par IA garde désormais vos propres mots quand vous collez un CV : il le lit comme un import. Un poste en cours se termine par le mot que votre CV emploie pour « aujourd’hui ». Une tâche n’est plus écrite deux fois ni placée sous le mauvais poste, et un poste terminé n’est plus au présent.
+Le brouillon par IA garde désormais vos propres mots quand vous collez un CV : il le lit comme un import. Un poste en cours se termine par le mot que votre CV emploie pour « aujourd’hui ». Une tâche n’est plus écrite deux fois ni placée sous le mauvais poste, et un poste terminé n’est plus au présent. Une certification importée suivie d’une ligne « Délivré par » est désormais une seule certification avec son organisme, et non deux.
 ```
 
 ## Portuguese (Portugal), pt-PT
@@ -741,7 +741,7 @@ Pronto a enviar. | Um PDF cuidado, com os títulos na língua do seu currículo.
 ### What's New
 
 ```text
-O rascunho com IA passa a manter as suas palavras quando cola um currículo, porque o lê como uma importação. Um emprego atual termina com a palavra que o seu currículo usa para «atualidade». Uma tarefa já não é escrita duas vezes nem colocada no emprego errado, e um emprego terminado já não está no presente.
+O rascunho com IA passa a manter as suas palavras quando cola um currículo, porque o lê como uma importação. Um emprego atual termina com a palavra que o seu currículo usa para «atualidade». Uma tarefa já não é escrita duas vezes nem colocada no emprego errado, e um emprego terminado já não está no presente. Uma certificação importada com uma linha «Emitido por» por baixo passa a ser uma só certificação com a sua entidade, e não duas.
 ```
 
 ## Portuguese (Brazil), pt-BR
@@ -820,5 +820,5 @@ Pronto para enviar. | Um PDF caprichado, com os títulos no idioma do seu currí
 ### What's New
 
 ```text
-O rascunho com IA agora mantém suas palavras quando você cola um currículo, porque o app o lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para “atualidade”. Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente.
+O rascunho com IA agora mantém suas palavras quando você cola um currículo, porque o app o lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para “atualidade”. Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente. Uma certificação importada com uma linha “Emitido por” embaixo agora é uma só certificação com a entidade emissora, e não duas.
 ```
