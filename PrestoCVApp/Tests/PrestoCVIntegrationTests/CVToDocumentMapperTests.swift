@@ -31,7 +31,7 @@ struct CVToDocumentMapperTests {
             .education([EducationItem(degree: "Mathematics", school: "University",
                                       period: DocumentPeriod(start: DocumentDate(year: 2008, month: 9), end: .date(DocumentDate(year: 2011, month: 6))),
                                       description: "Honours")]),
-            .skills([SkillItem(name: "Swift", rating: 4), SkillItem(name: "Git", rating: 3)]),
+            .skills([SkillItem(name: "Swift", rating: 4), SkillItem(name: "Git", rating: 2)]),
             .languages([LanguageItem(language: "English", level: .native), LanguageItem(language: "Italiano", level: .b2)]),
             .certifications([CertificationItem(name: "Swift Certified", issuer: "Apple", year: 2021, url: "https://cert.example/one",
                                                description: "Concurrency")]),
