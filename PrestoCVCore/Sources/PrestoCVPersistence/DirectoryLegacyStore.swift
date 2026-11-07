@@ -62,21 +62,36 @@ public struct DirectoryLegacyStore: LegacyStore {
 }
 
 extension FileCVRepository: LegacyImportTarget {
-    /// Stores a legacy CV as revision 1 with the times it carried, once: under the store lock, a CV the ledger knows, or
-    /// that the store already holds, is left as it is (`.existing`), so a CV the person deleted never comes back. The
-    /// copy is made durable and read back before the ledger takes its id; a failure throws, and the importer keeps the source.
+    /// Stores a legacy CV as revision 1 with the times it carried, once, under the store lock. A CV becomes visible only
+    /// after the ledger holds its id: the copy is staged (made durable, ignored by listing and every sweep), the id is
+    /// recorded (durable), the copy is renamed into place (durable) and read back. A run a kill stopped is finished by the
+    /// next one. A CV the ledger knows is `.existing` after the files that hold it are made durable again, so a person's
+    /// deletion stands and a failed barrier is retried. Every step that fails throws, and the importer keeps the source.
     public func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption {
         try withStoreLock { () throws(RepositoryError) -> Adoption in
             var ledger = try readLedger()
-            if ledger.contains(cv.id.raw) { return .existing }
-            if try current(cv.id) != nil { try record(cv.id, in: &ledger); return .existing }
-            let adopted = cv.adoptedAsRevisionOne
-            try write(adopted)
-            try makeDurable(url(cv.id))
-            let readBack = try Self.verified(try current(cv.id), file: url(cv.id).lastPathComponent)
+            let staged = directory.appendingPathComponent(Self.stagedName(for: cv.id))
+            let stored = try current(cv.id) != nil
+            if ledger.contains(cv.id.raw) {
+                if !stored, try Self.exists(staged) { return .stored(try publish(staged, as: cv.id)) }   // a kill stopped the rename
+                if stored { try makeDurable(url(cv.id)) }
+                try makeDurable(ledgerURL)
+                return .existing
+            }
+            if stored { try makeDurable(url(cv.id)); try record(cv.id, in: &ledger); return .existing }   // no released code makes this state
+            try write(cv.adoptedAsRevisionOne, to: staged)
+            try makeDurable(staged)
             try record(cv.id, in: &ledger)
-            return .stored(readBack)
+            return .stored(try publish(staged, as: cv.id))
         }
+    }
+
+    /// Moves the staged copy into place, makes it durable and reads it back.
+    private func publish(_ staged: URL, as id: CVID) throws(RepositoryError) -> CV {
+        let name = url(id).lastPathComponent
+        guard rename(staged.path, url(id).path) == 0 else { throw .writeFailed(file: name, cause: FailureCause(domain: .posix, code: Int(errno))) }
+        try makeDurable(url(id))
+        return try Self.verified(try current(id), file: name)
     }
 
     /// The copy that reads back; a file that is not there after the write is a write that did not hold.
@@ -146,4 +161,6 @@ extension FileCVRepository: LegacyImportTarget {
 
 extension FileCVRepository {
     static let legacyLedgerName = ".legacy-imported.json"
+    /// The staged copy of a CV being adopted: a name that listing, quarantine and every sweep ignore (it does not end in `.cv.json`).
+    static func stagedName(for id: CVID) -> String { "." + id.raw.uuidString + ".legacy-staged" }
 }

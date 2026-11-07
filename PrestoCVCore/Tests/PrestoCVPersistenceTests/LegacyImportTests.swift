@@ -134,6 +134,104 @@ struct LegacyImportTests {
         #expect(!FileManager.default.fileExists(atPath: w.store.appendingPathComponent("Quarantine").path))
     }
 
+    // MARK: A CV becomes visible only after the ledger holds its id
+
+    /// A staged copy of `id`, as a run killed after the staged write leaves it.
+    private func stageCopy(_ id: CVID, in w: World) async throws {
+        let scratch = tempDir()
+        _ = try await ImportLegacyStore(source: w.source, target: repo(scratch), removingVerifiedSources: false).run()
+        try FileManager.default.createDirectory(at: w.store, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: scratch.appendingPathComponent(id.raw.uuidString + ".cv.json"),
+                                         to: w.store.appendingPathComponent(FileCVRepository.stagedName(for: id)))
+    }
+
+    private func writeLedger(_ ids: [String], in w: World) throws {
+        try FileManager.default.createDirectory(at: w.store, withIntermediateDirectories: true)
+        try JSONEncoder().encode(ids).write(to: w.store.appendingPathComponent(FileCVRepository.legacyLedgerName))
+    }
+
+    @Test("a stop after the staged write and before the ledger: the CV is not listed, and the next run stores it")
+    func killedBeforeLedger() async throws {
+        let w = try standard()
+        try await stageCopy(idA, in: w)
+        #expect(try await w.repository.list().cvs.isEmpty)
+        let report = try await w.importer().run()
+        #expect(Set(report.imported) == [idA, idB] && report.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.store.appendingPathComponent(FileCVRepository.stagedName(for: idA)).path))
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("a stop after the ledger and before the rename: the CV is not listed, the next run finishes the rename, and the source goes only then")
+    func killedBeforeRename() async throws {
+        let w = try standard()
+        try await stageCopy(idA, in: w)
+        try writeLedger([LegacyFixtures.idA], in: w)
+        #expect(try await w.repository.list().cvs.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        let report = try await w.importer().run()
+        #expect(Set(report.imported) == [idA, idB] && report.failures.isEmpty)
+        #expect(try await w.repository.load(idA).revision == 1)
+        #expect(!FileManager.default.fileExists(atPath: w.store.appendingPathComponent(FileCVRepository.stagedName(for: idA)).path))
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("a CV erased before the rename was finished stays erased: its staged copy goes with it")
+    func erasedStagedCopy() async throws {
+        let w = try standard()
+        try await stageCopy(idA, in: w)
+        try writeLedger([LegacyFixtures.idA], in: w)
+        try await w.repository.erase(idA)
+        let report = try await w.importer().run()
+        #expect(report.alreadyStored == [idA] && report.imported == [idB])
+        #expect(try await w.repository.list().cvs.map(\.id) == [idB])
+    }
+
+    @Test("listing, quarantine, purging and restoring leave a staged copy and the ledger alone")
+    func stagedCopyIsLeftAlone() async throws {
+        let w = try standard()
+        try await stageCopy(idA, in: w)
+        try writeLedger([LegacyFixtures.idA], in: w)
+        let staged = w.store.appendingPathComponent(FileCVRepository.stagedName(for: idA))
+        let before = try Data(contentsOf: staged)
+        #expect(try await w.repository.list().issues.isEmpty)
+        try await w.repository.erase(idB)
+        _ = try await w.repository.purgeQuarantine(olderThan: .distantFuture)
+        #expect(try Data(contentsOf: staged) == before)
+        #expect(!FileManager.default.fileExists(atPath: w.store.appendingPathComponent("Quarantine").path))
+    }
+
+    @Test("the CV file's sync failed on a run: the retry syncs it before saying existing, and the source goes only then", .enabled(if: !isRoot))
+    func retrySyncsTheCVFile() async throws {
+        let w = try standard()
+        _ = try await w.importer(removing: false).run()
+        let file = w.store.appendingPathComponent(LegacyFixtures.idA + ".cv.json")
+        try FileManager.default.setAttributes([.posixPermissions: 0o200], ofItemAtPath: file.path)   // cannot be opened to be synced
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path) }
+        let failed = try await w.importer().run()
+        #expect(!failed.failures.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        let retried = try await w.importer().run()
+        #expect(retried.alreadyStored == [idA] && retried.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("the ledger's sync failed on a run: the retry syncs it again before saying existing", .enabled(if: !isRoot))
+    func retrySyncsTheLedger() async throws {
+        let w = try standard()
+        _ = try await w.importer(removing: false).run()
+        let ledger = w.store.appendingPathComponent(FileCVRepository.legacyLedgerName)
+        try FileManager.default.setAttributes([.posixPermissions: 0o200], ofItemAtPath: ledger.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledger.path) }
+        let failed = try await w.importer().run()
+        #expect(failed.removedSources.isEmpty && failed.failures.count == 2)
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ledger.path)
+        let retried = try await w.importer().run()
+        #expect(Set(retried.alreadyStored) == [idA, idB] && retried.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
     @Test("a store that cannot be made durable keeps the source", .enabled(if: !isRoot))
     func syncFailureKeepsSource() async throws {
         let w = try standard()
