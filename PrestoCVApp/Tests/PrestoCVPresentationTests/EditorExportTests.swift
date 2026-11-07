@@ -84,6 +84,31 @@ struct EditorExportTests {
         #expect(editor.exportStatus == .done(pages: 2))
     }
 
+    @Test("an older export that ends last returns its result and leaves the status of the newer one")
+    func olderExportLeavesTheNewerStatus() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        await world.exporting.gate.close()
+
+        let older = Task { await editor.export() }
+        await waitUntil("the older export to start") { await world.exporting.gate.waiting == 1 }
+        let newer = Task { await editor.export() }
+        await waitUntil("the newer export to start") { await world.exporting.gate.waiting == 2 }
+        world.exporting.result.withLock { $0 = .success(ExportOutcome(pdf: Data([4]), pageCount: 2, requiredPages: 2)) }
+        await world.exporting.gate.releaseNewest()
+        let newerDocument = await newer.value
+        #expect(newerDocument?.pages == 2)
+        #expect(editor.exportStatus == .done(pages: 2))
+
+        world.exporting.result.withLock { $0 = .failure(ExportFailure.notReady) }
+        await world.exporting.gate.open()
+        let olderDocument = await older.value
+
+        #expect(olderDocument == nil)
+        #expect(editor.exportStatus == .done(pages: 2))
+    }
+
     @Test("a cancelled export goes back to idle and gives no document")
     func cancelledExportIsIdle() async throws {
         let world = Editing()
