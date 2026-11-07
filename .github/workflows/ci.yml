@@ -13,7 +13,8 @@ jobs:
   linux:
     name: Linux · architecture check
     runs-on: ubuntu-latest
-    # Swift 6.4.2, the Swift of Xcode 27.2 that Xcode Cloud builds with (ADR 0026).
+    # The Swift that .swift-version pins: 6.4.2, the Swift of Xcode 27.2 that Xcode Cloud builds with (ADR 0026).
+    # Tools/check-linux.sh fails when they differ, and the source checks hold this file to .swift-version.
     container: swift:6.4.2
     steps:
       - name: Install the self-test's dependencies
@@ -27,34 +28,16 @@ jobs:
           path: Tools/ArchitectureCheck/.build
           key: checker-linux-swift-6.4.2-${{ hashFiles('Tools/ArchitectureCheck/Package.resolved', 'Tools/ArchitectureCheck/Sources/**') }}
           restore-keys: checker-linux-swift-6.4.2-
-      - name: Architecture check
+      - name: Linux checks
+        # The script a computer runs too (ADR 0026): the toolchain against .swift-version, the architecture check against
+        # the base branch's baseline, which may only shrink (ADR 0006), the checker's self-test, the source checks, and the
+        # build and tests of the new targets, the only ones that exist on Linux (ADR 0012). The source checks also run in
+        # ci_scripts/ci_post_xcodebuild.sh (the Mac mini check, the Release build), not in the test plans.
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          if [ -n "$BASE_REF" ]; then
-            # The baseline may only shrink: compare it with the base branch's (ADR 0006).
-            git show "origin/$BASE_REF:Tools/ArchitectureCheck/baseline.json" > "$RUNNER_TEMP/base-baseline.json" 2>/dev/null \
-              || echo "[]" > "$RUNNER_TEMP/base-baseline.json"
-            Tools/ArchitectureCheck/check.sh --against "$RUNNER_TEMP/base-baseline.json"
-          else
-            Tools/ArchitectureCheck/check.sh
-          fi
-      - name: Checker self-test
-        run: Tools/ArchitectureCheck/selftest.sh
-      - name: Source checks
-        # The string catalog, the rules the app's views follow and release hygiene: they read the repository, so they
-        # run here and in ci_scripts/ci_post_xcodebuild.sh (the Mac mini check, the Release build), not in the test plans.
-        run: swift test --package-path Tools/SourceChecks
-      - name: Build and test the new targets
-        # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
-        run: |
-          swift build --package-path CVGeneratorAI
-          swift test --package-path DiagnosticLogging
-          swift test --package-path DiagnosticTrace
-          swift test --package-path PrestoCVCore
-          swift test --package-path CVPDFExporter
-          swift test --package-path PrestoCVApp
+          Tools/check-linux.sh ${BASE_REF:+"origin/$BASE_REF"}
 
   android:
     name: Android · build of the portable targets
@@ -62,7 +45,7 @@ jobs:
     timeout-minutes: 30
     env:
       # The Swift SDK for Android must match the host toolchain exactly. 6.4.2 is the Swift of Xcode 27.2, which Xcode
-      # Cloud builds with, and of the Linux job (ADR 0026). Both downloads are checked against these checksums.
+      # Cloud builds with, and of the Linux job, as .swift-version pins (ADR 0026). Both downloads are checked against these checksums.
       SWIFT_VERSION: 6.4.2
       SWIFT_TOOLCHAIN_SHA256: 2e9ebec040ad459dd89a6d093a02d8314939135104850fae4d5c0f174fb3ba8c
       SWIFT_ANDROID_SDK_SHA256: 4d6ad63ea74becd58e123ff58b1b48c3be5ec0db0dff0ea5abe37ac007dd3233

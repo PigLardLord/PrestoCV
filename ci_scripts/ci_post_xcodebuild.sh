@@ -5,7 +5,8 @@
 # Each failed step is named in a line "ci_post_xcodebuild: FAILED: <step>", and the last line says how many steps ran:
 # a check that reads this output needs both, because a script that ran no step fails nothing.
 #   archive            checks the archive, so one that is wrong never reaches TestFlight;
-#   build-for-testing  runs what ADR 0006 needs on a Mac beyond the app tests: the package tests, the architecture check
+#   build-for-testing  checks the Swift against .swift-version (ADR 0026), then runs what ADR 0006 needs on a Mac beyond
+#                      the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
 #                      check and of the screenshot tools, the check of the store listing, the tests of PrestoCVApp and the build of
 #                      CVPDFExporterExamples. It also runs the source checks, which read the repository: the machines that
@@ -33,6 +34,7 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/check-archive.sh" "${CI_ARCHIVE_PATH:?ci_post_xcodebuild: CI_ARCHIVE_PATH is not set}"
     ;;
   build-for-testing)
+    step "$ROOT/Tools/check-toolchain.sh"
     for package in DiagnosticLogging DiagnosticTrace PrestoCVCore CVPDFExporter CVGeneratorAI; do
       step swift test --package-path "$ROOT/$package"
     done
