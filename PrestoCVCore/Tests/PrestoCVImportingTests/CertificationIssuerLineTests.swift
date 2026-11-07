@@ -149,4 +149,105 @@ struct CertificationIssuerLineTests {
         let found = read(["First Aid Certificate", "Issued by"])
         #expect(found.cv.certifications.count == 2)
     }
+
+    // MARK: An issuer line is cut at every comma
+
+    @Test("A line that starts with a lead never keeps its commas whole: the first part is the issuer, the rest is not imported")
+    func leadLineCutAtCommas() {
+        let three = read(["Python Basics", "Offered by Example Online, focused on Python, Data"])
+        #expect(three.cv.certifications.count == 1)
+        #expect(three.cv.certifications.first?.issuer?.value == "Example Online")
+        #expect(three.unplaced.map(\.text) == ["focused on Python", "Data"])
+        let four = read(["Python Basics", "Offered by Example Online, focused on Python, Data, Notebooks"])
+        #expect(four.cv.certifications.count == 1)
+        #expect(four.cv.certifications.first?.issuer?.value == "Example Online")
+        #expect(four.unplaced.map(\.text) == ["focused on Python", "Data", "Notebooks"])
+    }
+
+    // MARK: Contracted leads
+
+    private static let contracted: [String] = [
+        "Rilasciato dal", "Rilasciata dalla", "Rilasciato dallo", "Rilasciato dall'", "Rilasciata dall\u{2019}",
+        "Emesso dal", "Emessa dalla", "Emesso dallo", "Emesso dall'",
+        "Offerto dal", "Offerta dalla", "Offerto dallo", "Offerto dall'",
+        "Ausgestellt vom", "Angeboten vom", "Verliehen vom",
+    ]
+
+    @Test("A contracted lead sets the issuer", arguments: contracted)
+    func contractedLeads(lead: String) throws {
+        let separator = lead.hasSuffix("'") || lead.hasSuffix("\u{2019}") ? "" : " "
+        let found = read(["Pool Safety", "\(lead)\(separator)Example Council, 2020"])
+        #expect(found.cv.certifications.count == 1, "\(lead)")
+        #expect(found.cv.certifications.first?.issuer?.value == "Example Council")
+        #expect(found.cv.certifications.first?.year?.value == 2020)
+    }
+
+    @Test("A name that merely starts like a contracted lead stays an entry of its own")
+    func contractedNames() {
+        let found = read(["Pool Safety", "Dallas Rescue Basics", "Vom Kurs zur Praxis"])
+        #expect(found.cv.certifications.count == 3)
+        #expect(found.cv.certifications.allSatisfy { $0.issuer == nil })
+    }
+
+    // MARK: The safe split of "A, B"
+
+    @Test("A name with one part after a comma takes it as issuer, so a lead line below stays its own entry")
+    func twoPartName() {
+        let found = read(["First Aid, Level 2", "Issued by Example Council, 2021"])
+        #expect(found.cv.certifications.map(\.name.value) == ["First Aid", "Issued by Example Council"])
+        #expect(found.cv.certifications.first?.issuer?.value == "Level 2")
+    }
+
+    // MARK: Conditions of the issuer line
+
+    @Test("A lead line after a certification whose own line named an issuer is an entry of its own")
+    func issuerFromOwnLine() {
+        let found = read(["Pool Safety - Example Cross", "Issued by Example Council"])
+        #expect(found.cv.certifications.count == 2)
+        #expect(found.cv.certifications.first?.issuer?.value == "Example Cross")
+    }
+
+    @Test("A lead line without a year completes a certification that has one, and keeps its year")
+    func yearAbove() {
+        let found = read(["Pool Safety 2020", "Issued by Example Cross"])
+        #expect(found.cv.certifications.count == 1)
+        #expect(found.cv.certifications.first?.issuer?.value == "Example Cross")
+        #expect(found.cv.certifications.first?.year?.value == 2020)
+    }
+
+    // MARK: The link to the line above is cut
+
+    @Test("A table header between a certification and a lead line cuts the link")
+    func linkCutAtTableHeader() {
+        let (document, sections) = pasted("Certifications\nPool Safety\n| Name | Issuer |\n|---|---|\nIssued by Example Cross")
+        var findings = Findings(document: document)
+        for section in sections where section.kind == .certifications { CertificationReader.read(section, into: &findings) }
+        #expect(findings.cv.certifications.first?.issuer == nil)
+        #expect(findings.cv.certifications.map(\.name.value).contains("Issued by Example Cross"))
+    }
+
+    @Test("A block with no cell between a certification and a lead line cuts the link")
+    func linkCutAtEmptyBlock() {
+        let (document, sections) = pasted("Certifications\nPool Safety\nIssued by Example Cross")
+        var findings = Findings(document: document)
+        for var section in sections where section.kind == .certifications {
+            let first = section.blocks[0]
+            let empty = SourceBlock(index: 99, span: first.span, cells: [], kind: .line, isEmphasized: false, followsGap: false,
+                                    page: nil, frame: nil, column: nil, fontSize: nil)
+            section.blocks.insert(empty, at: 1)
+            CertificationReader.read(section, into: &findings)
+        }
+        #expect(findings.cv.certifications.first?.issuer == nil)
+    }
+
+    @Test("A consumed block between a certification and a lead line cuts the link")
+    func linkCutAtConsumedBlock() {
+        let (document, sections) = pasted("Certifications\nPool Safety\nSomething Else\nIssued by Example Cross")
+        var findings = Findings(document: document)
+        for section in sections where section.kind == .certifications {
+            findings.consumedBlocks.insert(section.blocks[1].index)
+            CertificationReader.read(section, into: &findings)
+        }
+        #expect(findings.cv.certifications.first?.issuer == nil)
+    }
 }

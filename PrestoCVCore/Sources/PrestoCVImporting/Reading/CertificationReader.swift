@@ -29,13 +29,15 @@ enum CertificationReader {
 
     /// The parts of a piece between the separators. A piece with no date and three or more parts at its commas, none of them
     /// after the first an organisation or a school, is a name that holds a list, "Managing Anxiety, Stress, Sleep": it is
-    /// cut at its other separators only (#304).
+    /// cut at its other separators only (#304). A piece that starts with an issuer lead is never such a name: it is cut at
+    /// every comma, so that the first part is the issuer and the rest is text not imported.
     private static func cut(_ piece: Piece, dated: Bool) -> [Piece] {
         let wholeAtCommas = piece.split(by: lineSeparators.filter { $0 != ", " })
         return wholeAtCommas.flatMap { part -> [Piece] in
             let commas = part.split(by: [", "])
             let name = commas.dropFirst().allSatisfy { !EntryVocabulary.isOrganisation($0.text) && !EntryVocabulary.isSchool($0.text) }
-            return commas.count >= 3 && !dated && name ? [part] : commas
+            let led = CertificationIssuerLead.startsWithLead(part)
+            return commas.count >= 3 && !dated && name && !led ? [part] : commas
         }
     }
 
@@ -52,12 +54,16 @@ enum CertificationReader {
     }
 
     /// Decides what a block is, by the first branch that holds. The result is the index of the certification it made, which
-    /// the next block may complete, or nil when the next block cannot complete anything:
+    /// the next block may complete, or nil when the next block cannot complete anything. The link to the block above is also
+    /// cut by a table header, by a block with no cell, by a line that completed the one above, and, in the caller, by a block
+    /// another reader consumed:
     /// 1. a table header is left out as markup;
     /// 2. a block with no cell has nothing to read;
     /// 3. a block whose first part starts with an issuer lead ("Issued by", "Rilasciato da", ...) followed by at most six
     ///    words, while the block above made a certification that has no issuer and does not state a year the line also
-    ///    states, is that certification's issuer (and its year, when it has none); the rest of the line is text not imported;
+    ///    states, is that certification's issuer (and its year, when it has none); the rest of the line is text not imported.
+    ///    A certification whose line had a second part after a comma ("First Aid, Level 2") took that lone part as its
+    ///    issuer, so it has one, and a lead line below it stays an entry of its own: the safe, visible split;
     /// 4. a block with no part is text not imported;
     /// 5. anything else is a certification of its own: the first part is the name, the issuer is the part that reads as an
     ///    organisation, or the only part left, and the rest is text not imported.
@@ -69,7 +75,7 @@ enum CertificationReader {
         let cells = section.cells(of: block, in: findings.document)
         guard !cells.isEmpty else { return nil }
         let line = Line(cells)
-        if let above, complete(above, with: line, section, &findings) { return nil }
+        if let above, completeCertification(at: above, with: line, section, &findings) { return nil }
         guard let name = line.parts.first else {
             findings.unplace(block, in: section)
             return nil
@@ -79,7 +85,7 @@ enum CertificationReader {
     }
 
     /// Branch 3: the line is the issuer of the certification above it. False, and nothing changed, when it is not.
-    private static func complete(_ index: Int, with line: Line, _ section: Section, _ findings: inout Findings) -> Bool {
+    private static func completeCertification(at index: Int, with line: Line, _ section: Section, _ findings: inout Findings) -> Bool {
         var certification = findings.cv.certifications[index]
         guard certification.issuer == nil, certification.year == nil || line.year == nil,
               let first = line.parts.first, let issuer = CertificationIssuerLead.issuer(in: first) else { return false }
