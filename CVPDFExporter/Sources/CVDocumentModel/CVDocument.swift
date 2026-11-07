@@ -104,7 +104,7 @@ public struct SkillItem: Codable, Sendable, Equatable {
 }
 
 public struct LanguageItem: Codable, Sendable, Equatable {
-    public enum Level: String, Codable, Sendable { case a1, a2, b1, b2, c1, c2, native }
+    public enum Level: String, Codable, Sendable, CaseIterable { case a1, a2, b1, b2, c1, c2, native }
     public var language: String, level: Level
     public init(language: String, level: Level) { self.language = language; self.level = level }
 }

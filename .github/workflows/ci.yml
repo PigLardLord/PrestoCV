@@ -49,13 +49,12 @@ jobs:
       - name: Build and test the new targets
         # On Linux only the new targets exist; the legacy ones are declared for Apple hosts only (ADR 0012).
         run: |
-          for package in CVGeneratorAI PrestoCVApp; do
-            swift build --package-path "$package"
-          done
+          swift build --package-path CVGeneratorAI
           swift test --package-path DiagnosticLogging
           swift test --package-path DiagnosticTrace
           swift test --package-path PrestoCVCore
           swift test --package-path CVPDFExporter
+          swift test --package-path PrestoCVApp
 
   android:
     name: Android · build of the portable targets
