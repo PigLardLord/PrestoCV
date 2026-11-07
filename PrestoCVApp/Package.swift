@@ -40,6 +40,12 @@ targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
     .product(name: "CVRenderingTestSupport", package: "CVPDFExporter"),
     .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
 ]))
+targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
+    "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+]))
 
 // The composition root is Apple-only (docs/architecture/modules.md): it wires the platform adapters.
 #if !os(Linux)

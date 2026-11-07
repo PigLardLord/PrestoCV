@@ -703,6 +703,22 @@
    "kind": "test"
   },
   {
+   "name": "PrestoCVPresentationTests",
+   "path": "PrestoCVApp/Tests/PrestoCVPresentationTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "PrestoCVPresentation",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "PrestoCVDomain"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
    "name": "PrestoCVPresentation",
    "path": "PrestoCVApp/Sources/PrestoCVPresentation",
    "allowedImports": [
