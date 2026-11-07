@@ -145,7 +145,7 @@ struct Piece: Equatable {
     /// White space, separators, the symbols and emoji used as icons, and an unmatched bracket at either end.
     static func isTrimmable(_ character: Character) -> Bool {
         if character.isWhitespace { return true }
-        if " ,;:|·•–—-/*_~>".contains(character) { return true }
+        if " ,;:|·‧•–—-/*_~>".contains(character) { return true }
         return isIcon(character)
     }
 
