@@ -60,6 +60,15 @@ public enum SeparationDesign: String, Sendable, CaseIterable {
     }
 }
 
+/// How the annotations of a PDF are compared with the links of the document it was made from.
+public enum AnnotationDestinations {
+    /// Whether the annotations' destinations are exactly the links' `href`s, one annotation per link: as multisets, so a
+    /// link with two annotations, or a link with none, does not match.
+    public static func match(found: [String], expected: [String]) -> Bool {
+        found.sorted() == expected.sorted()
+    }
+}
+
 /// The checks of a native renderer on the PDFs it really prints, read back with PDFKit (#78, #80). The iOS and macOS
 /// tests call them one line each, so a check cannot differ between the platforms.
 @MainActor
@@ -150,7 +159,7 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         }
         let expected = Self.hrefs(in: fixture.html)
         guard !expected.isEmpty else { throw NativeCheckFailure.noHrefs }
-        guard Set(found) == Set(expected) else {
+        guard AnnotationDestinations.match(found: found, expected: expected) else {
             throw NativeCheckFailure.annotationsDiffer(found: found.sorted(), expected: expected.sorted())
         }
     }
