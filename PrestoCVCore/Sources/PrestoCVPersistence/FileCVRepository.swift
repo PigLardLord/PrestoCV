@@ -11,28 +11,32 @@ import PrestoCVApplication
 
 /// The CV store on disk (ADR 0009, R12). One file per CV, named from its identifier, in schema 1. Every mutating
 /// operation holds an exclusive `flock` on the store, so revision checks hold across repository instances and
-/// processes; the composition root still keeps one instance per process (ADR 0008). Waiting for the lock blocks a
-/// thread of the cooperative pool: #111.
+/// processes; the composition root still keeps one instance per process (ADR 0008). While the lock is held elsewhere
+/// the call suspends between attempts and holds no thread, and it gives up at the deadline of `StoreOptions.lockWait`.
 public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     let directory: URL
     let clock: any TimeSource
     let maxFileBytes: Int
+    let lockWait: StoreOptions.LockWait
     /// The options of every write, from the protection class the composition root gave: complete unless it said otherwise.
     nonisolated let writeOptions: Data.WritingOptions
     var quarantine: URL { directory.appendingPathComponent("Quarantine", isDirectory: true) }
 
     public init(directory: URL, clock: any TimeSource, options: StoreOptions = StoreOptions()) {
         self.directory = directory; self.clock = clock
-        self.maxFileBytes = options.maxFileBytes; self.writeOptions = options.writing
+        self.maxFileBytes = options.maxFileBytes; self.lockWait = options.lockWait; self.writeOptions = options.writing
     }
 
     static let suffix = ".cv.json"
     static let uuidPattern = "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
-    private func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
+    func url(_ id: CVID) -> URL { directory.appendingPathComponent(id.raw.uuidString + Self.suffix) }
 
     // MARK: Locking
 
-    private func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) throws(RepositoryError) -> T {
+    /// Runs `body` holding the store's exclusive lock. The lock is only ever tried (`LOCK_NB`): while another instance
+    /// or process holds it, the call suspends for a pause and tries again, until the pauses reach the deadline. The
+    /// body never awaits, so other calls of this actor that run during a pause never see half an operation.
+    func withStoreLock<T>(_ body: () throws(RepositoryError) -> T) async throws(RepositoryError) -> T {
         do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
         catch { throw .storeUnavailable(.cannotLock) }
         // Never through a link, and never on anything but a regular file: opening does not block.
@@ -41,26 +45,34 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         defer { close(fd) }
         var status = stat()
         guard fstat(fd, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { throw .storeUnavailable(.cannotLock) }
-        while flock(fd, LOCK_EX) != 0 {
-            guard errno == EINTR else { throw .storeUnavailable(.cannotLock) }
+        var waited = Duration.zero
+        while flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            switch errno {
+            case EINTR: continue
+            case EWOULDBLOCK:
+                guard let step = lockWait.step(after: waited) else { throw .storeUnavailable(.lockTimeout) }
+                await lockWait.pause(step)
+                waited += step
+            default: throw .storeUnavailable(.cannotLock)
+            }
         }
         defer { flock(fd, LOCK_UN) }
         return try body()
     }
 
     /// Whether anything is at `url`, a link included, without following it. Only ENOENT means nothing is there.
-    private static func exists(_ url: URL) throws(RepositoryError) -> Bool {
+    static func exists(_ url: URL) throws(RepositoryError) -> Bool {
         var status = stat()
         if lstat(url.path, &status) == 0 { return true }
         guard errno == ENOENT else { throw .unreadable(file: url.lastPathComponent) }
         return false
     }
 
-    private enum StoreState { case present, absent, unavailable(StoreFailure) }
+    enum StoreState { case present, absent, unavailable(StoreFailure) }
 
     /// The store itself: absent before the first save; unavailable when it cannot be reached, sits behind a link whose
     /// target is gone, or is not a directory. The store may be reached through a link.
-    private func storeState() -> StoreState {
+    func storeState() -> StoreState {
         var status = stat()
         guard stat(directory.path, &status) == 0 else {
             return errno == ENOENT && !Self.passesThroughDanglingLink(directory.path) ? .absent : .unavailable(.cannotList)
@@ -69,14 +81,14 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     /// Whether `url` is a real directory, not a link to one; nil when nothing is there.
-    private static func isRealDirectory(_ url: URL) -> Bool? {
+    static func isRealDirectory(_ url: URL) -> Bool? {
         var status = stat()
         guard lstat(url.path, &status) == 0 else { return errno == ENOENT ? nil : false }
         return (status.st_mode & S_IFMT) == S_IFDIR
     }
 
     /// The quarantine's entries. An absent quarantine is empty; one that is not a real directory is never used.
-    private func quarantineNames() throws(RepositoryError) -> [String] {
+    func quarantineNames() throws(RepositoryError) -> [String] {
         switch Self.isRealDirectory(quarantine) {
         case nil: return []
         case false?: throw .storeUnavailable(.notADirectory)
@@ -107,7 +119,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         return file
     }
 
-    private func current(_ id: CVID) throws(RepositoryError) -> CV? {
+    func current(_ id: CVID) throws(RepositoryError) -> CV? {
         let u = url(id)
         switch read(u) {
         case .absent:
@@ -127,8 +139,11 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
     ///
     /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
-    private func write(_ cv: CV) throws(RepositoryError) {
-        let name = url(cv.id).lastPathComponent
+    func write(_ cv: CV) throws(RepositoryError) { try write(cv, to: url(cv.id)) }
+
+    /// The same checks, for a file other than the CV's own (the staged copy of an adoption).
+    func write(_ cv: CV, to target: URL) throws(RepositoryError) {
+        let name = target.lastPathComponent
         // `stored(revision:at:)` sets both dates, and a read always returns them, so a CV without them would not read back.
         guard let createdAt = cv.createdAt, let updatedAt = cv.updatedAt else { throw .wouldNotReadBack(file: name) }
         let data: Data
@@ -137,7 +152,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         do {
             guard try CVFileV1.decode(data).toDomain() == cv else { throw RepositoryError.wouldNotReadBack(file: name) }
         } catch { throw .wouldNotReadBack(file: name) }
-        do { try data.write(to: url(cv.id), options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
+        do { try data.write(to: target, options: writeOptions) } catch { throw .writeFailed(file: name, cause: FailureCause(error)) }
     }
 
     /// Timestamps are stored with whole-second precision (ISO 8601), so they are normalised before use;
@@ -147,14 +162,14 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     // MARK: CVRepository
 
     public func create(_ cv: CV) async throws(RepositoryError) -> CV {
-        try withStoreLock { () throws(RepositoryError) -> CV in
+        try await withStoreLock { () throws(RepositoryError) -> CV in
             guard try current(cv.id) == nil else { throw .alreadyExists(cv.id) }
             let stored = cv.stored(revision: 1, at: now()); try write(stored); return stored
         }
     }
 
     public func update(_ cv: CV) async throws(RepositoryError) -> CV {
-        try withStoreLock { () throws(RepositoryError) -> CV in
+        try await withStoreLock { () throws(RepositoryError) -> CV in
             guard let existing = try current(cv.id) else { throw .notFound(cv.id) }
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
             let stored = cv.stored(revision: cv.revision + 1, at: now())
@@ -179,7 +194,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     public func delete(_ id: CVID, revision: Int) async throws(RepositoryError) {
-        try withStoreLock { () throws(RepositoryError) in
+        try await withStoreLock { () throws(RepositoryError) in
             guard let existing = try current(id) else { throw .notFound(id) }
             guard existing.revision == revision else { throw .conflict(id, storedRevision: existing.revision) }
             do { try FileManager.default.removeItem(at: url(id)) } catch { throw .writeFailed(file: url(id).lastPathComponent, cause: FailureCause(error)) }
@@ -194,7 +209,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         case .unavailable(let failure): throw .storeUnavailable(failure)
         case .present: break
         }
-        return try withStoreLock { () throws(RepositoryError) -> CVListing in
+        return try await withStoreLock { () throws(RepositoryError) -> CVListing in
             let files: [URL]
             do { files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) }
             catch { throw .storeUnavailable(.cannotList) }
@@ -239,7 +254,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         guard name.range(of: "^(\\d+~)?" + Self.uuidPattern + "\\.cv\\.json\\z", options: .regularExpression) != nil else {
             throw .invalidName(name)
         }
-        return try withStoreLock { () throws(RepositoryError) -> CV in
+        return try await withStoreLock { () throws(RepositoryError) -> CV in
             if Self.isRealDirectory(quarantine) == false { throw .storeUnavailable(.notADirectory) }
             let source = quarantine.appendingPathComponent(name)
             let original = name.replacingOccurrences(of: #"^\d+~"#, with: "", options: .regularExpression)
@@ -262,9 +277,10 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
     }
 
     public func erase(_ id: CVID) async throws(RepositoryError) {
-        try withStoreLock { () throws(RepositoryError) in
+        try await withStoreLock { () throws(RepositoryError) in
             let name = id.raw.uuidString + Self.suffix
-            var victims = [directory.appendingPathComponent(name)]
+            // A staged copy of an adoption goes with the CV; the ledger stays, so the source is not imported again.
+            var victims = [directory.appendingPathComponent(name), directory.appendingPathComponent(Self.stagedName(for: id))]
             let quarantined = try quarantineNames()
             victims += quarantined.filter { $0 == name || $0.hasSuffix("~" + name) }.map { quarantine.appendingPathComponent($0) }
             for v in victims {
@@ -276,7 +292,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     /// A file's age in the quarantine counts from when it entered it: quarantining stamps it with the clock.
     public func purgeQuarantine(olderThan date: Date) async throws(RepositoryError) -> Int {
-        try withStoreLock { () throws(RepositoryError) -> Int in
+        try await withStoreLock { () throws(RepositoryError) -> Int in
             var removed = 0
             for n in try quarantineNames() {
                 let u = quarantine.appendingPathComponent(n)
