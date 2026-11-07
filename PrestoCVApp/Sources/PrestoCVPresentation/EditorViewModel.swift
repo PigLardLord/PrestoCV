@@ -68,6 +68,11 @@ public final class EditorViewModel {
     @ObservationIgnored var generation = 0
     /// The writes of the autosave the form stands on.
     @ObservationIgnored var writes = WritesInFlight()
+    /// Counts the edits that changed the form, so that a replacement can tell whether the person typed meanwhile, even
+    /// if the text is back to what it was.
+    @ObservationIgnored var formEdits = 0
+    /// Counts the edits that changed the title, for the same purpose.
+    @ObservationIgnored var titleEdits = 0
     /// Counts the exports, so that one superseded cannot change the export status any more.
     @ObservationIgnored var exportGeneration = 0
 
@@ -118,6 +123,8 @@ public final class EditorViewModel {
     // MARK: - Editing
 
     func edit(_ content: EditorContent) {
+        if content != form { formEdits += 1 }
+        if content.title != form.title { titleEdits += 1 }
         form = content
         passOnTheForm()
         refreshSaveStatus()
