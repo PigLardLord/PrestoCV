@@ -195,6 +195,10 @@ public final class FoundationModelsService: CVGenerationService {
     /// Translates the framework's generation errors into the ones the app explains to the person
     nonisolated static func map(_ error: LanguageModelSession.GenerationError) -> CVGenerationError {
         switch error {
+        case .exceededContextWindowSize:
+            // The app's own instructions and schema fill the window, not a long description (that is the validator's
+            // `descriptionTooLong`); the same text would fill it again, so it is not tried again
+            return .generationFailed
         case .guardrailViolation, .refusal:
             return .contentNotAllowed
         case .unsupportedLanguageOrLocale:
@@ -206,9 +210,8 @@ public final class FoundationModelsService: CVGenerationService {
         case .decodingFailure:
             return .generationFailed
         default:
-            // A full context window is the app's own instructions and schema filling it, not a long description (that is
-            // the validator's `descriptionTooLong`); an unsupported guide is a fault of the app's schema, and a later OS may
-            // add errors: none is the description's
+            // An unsupported guide is a fault of the app's schema, and a later OS may add errors: neither is the
+            // description's
             return .serviceFailed
         }
     }
