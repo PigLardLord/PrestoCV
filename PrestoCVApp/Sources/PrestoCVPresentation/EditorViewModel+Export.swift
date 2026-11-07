@@ -9,25 +9,31 @@ extension EditorViewModel {
     /// - Returns: The PDF, or nil when `exportStatus` says why there is none.
     public func export() async -> ExportedDocument? {
         guard let held else { return nil }
+        exportGeneration += 1
+        let mine = exportGeneration
         let snapshot = form.applied(to: held)
         guard let language = snapshot.language else {
             exportStatus = .languageNeeded
             return nil
         }
         exportStatus = .exporting
+        let status: ExportStatus
+        var document: ExportedDocument?
         do {
             let outcome = try await exporting.export(snapshot, language: language)
-            exportStatus = outcome.truncated
+            status = outcome.truncated
                 ? .truncated(pages: outcome.pageCount, required: outcome.requiredPages)
                 : .done(pages: outcome.pageCount)
-            return ExportedDocument(pdf: outcome.pdf, pages: outcome.pageCount)
+            document = ExportedDocument(pdf: outcome.pdf, pages: outcome.pageCount)
         } catch let failure as ExportFailure {
-            exportStatus = ExportStatus(failure)
+            status = ExportStatus(failure)
         } catch is CancellationError {
-            exportStatus = .idle
+            status = .idle
         } catch {
-            exportStatus = .failed
+            status = .failed
         }
-        return nil
+        // A request superseded meanwhile returns its result and leaves the status to the newer one
+        if mine == exportGeneration { exportStatus = status }
+        return document
     }
 }

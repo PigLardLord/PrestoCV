@@ -63,6 +63,10 @@ public final class EditorViewModel {
     @ObservationIgnored var replacing: Task<Void, Never>?
     /// Counts the autosaves, so that one replaced cannot change the status any more.
     @ObservationIgnored var generation = 0
+    /// The writes of the autosave the form stands on.
+    @ObservationIgnored var writes = WritesInFlight()
+    /// Counts the exports, so that one superseded cannot change the export status any more.
+    @ObservationIgnored var exportGeneration = 0
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
@@ -129,16 +133,19 @@ public final class EditorViewModel {
     func standOn(_ cv: CV, unchangedFrom unchanged: CV?, writer: any CVAutosaveWriting, isStored: Bool) {
         generation += 1
         let mine = generation
+        writes.replace()
+        let mineWrites = WritesInFlight()
         let autosave = Autosave<CV>(
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
             onWriteFailure: { [weak self] error in self?.writeFailed(error, generation: mine) },
             // Only the writer: a write that ends after the editor is gone still stores what it was given
-            write: { content, _ in try await writer.write(content) }
+            write: { content, _ in try await mineWrites.run { try await writer.write(content) } }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
         self.autosave = autosave
         self.writer = writer
+        self.writes = mineWrites
         base = cv
         restyled = nil
         given = cv

@@ -27,6 +27,12 @@ actor Gate {
         released.forEach { $0.resume() }
     }
 
+    /// Lets the call that arrived last go on, and holds the others.
+    func releaseNewest() {
+        guard !waiters.isEmpty else { return }
+        waiters.removeLast().resume()
+    }
+
     func pass() async {
         guard isClosed else { return }
         await withCheckedContinuation { waiters.append($0) }
@@ -39,6 +45,8 @@ final class EditingFake: CVEditing {
     let store = InMemoryCVRepository()
     let ids = SequentialIDGenerator()
     let gate = Gate()
+    /// Holds the reads of the store (`load`), so that a test decides when one ends.
+    let loadGate = Gate()
     /// Each CV an autosave writer took to the store, before the store checked it.
     let writes = Mutex<[CV]>([])
     let mostWritesAtOnce = Mutex(0)
@@ -56,6 +64,7 @@ final class EditingFake: CVEditing {
 
     func load(_ id: CVID) async throws(EditFailure) -> CV {
         loads.withLock { $0 += 1 }
+        await loadGate.pass()
         do { return try await LoadCV(repository: store)(id) } catch { throw EditFailure(error) }
     }
 
