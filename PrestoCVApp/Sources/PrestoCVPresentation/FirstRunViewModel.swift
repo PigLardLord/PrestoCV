@@ -19,6 +19,7 @@ public final class FirstRunViewModel {
     private var examples: [ExampleChoice] = []
     @ObservationIgnored private var samples: [CVID: CV] = [:]
     @ObservationIgnored private var examplesRead = false
+    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
 
@@ -27,24 +28,31 @@ public final class FirstRunViewModel {
         self.editing = editing
     }
 
-    /// Reads the store and, once, the examples. The view calls it from its `.task`.
+    /// Reads the store and, once, the examples. The view calls it from its `.task`. Only the latest read publishes.
     public func load() async {
+        generation += 1
+        let mine = generation
         do {
-            switch try await browsing.onboarding() {
+            let onboarding = try await browsing.onboarding()
+            guard mine == generation else { return }
+            switch onboarding {
             case .firstRun: state = .firstRun
             case .returning: state = .returning
             }
         } catch {
+            guard mine == generation else { return }
             if !Task.isCancelled { state = .failed }
         }
         guard !examplesRead else { return }
         do {
             let read = try await browsing.samples()
+            guard mine == generation else { return }
             samples = Dictionary(read.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             examples = read.map { ExampleChoice(title: CVTitle(name: $0.title, person: "", role: $0.personal.professionalTitle).text(untitled: ""), id: $0.id) }
             examplesIssue = nil
             examplesRead = true
         } catch {
+            guard mine == generation else { return }
             if !Task.isCancelled { examplesIssue = ExamplesIssue(error) }
         }
     }

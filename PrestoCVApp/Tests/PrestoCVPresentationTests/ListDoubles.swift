@@ -15,6 +15,8 @@ final class BrowsingFake: CVBrowsing {
     let sampleList = Mutex<[CV]>([])
     let samplesError = Mutex<EditFailure?>(nil)
     let listCalls = Mutex(0)
+    /// Holds the answer of `onboarding()` after the store was read, so that a test decides when each answer arrives.
+    let onboardingGate = Gate()
     let sampleCalls = Mutex(0)
 
     init(editing: EditingFake) { self.editing = editing }
@@ -30,7 +32,9 @@ final class BrowsingFake: CVBrowsing {
     func onboarding() async throws(EditFailure) -> OnboardingState {
         if let error = onboardingError.withLock({ $0 }) { throw error }
         let listing = try await list()
-        return listing.cvs.isEmpty && listing.issues.isEmpty ? .firstRun : .returning
+        let state: OnboardingState = listing.cvs.isEmpty && listing.issues.isEmpty ? .firstRun : .returning
+        await onboardingGate.pass()
+        return state
     }
 
     func samples() async throws(EditFailure) -> [CV] {
