@@ -1193,7 +1193,7 @@ struct SectionChecksTests {
         #expect(noun.dropped.map(\.reason) == ["another language"])
     }
 
-    @Test("A field of the trade, its billing and its audit are technical skills (#354, probe round 12)")
+    @Test("A field of the trade and its audit are technical skills; its billing, an activity the description does not write, is none (#354, probe round 12; #359)")
     func fieldOfTheTradeIsATechnology() {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
 
@@ -1202,8 +1202,8 @@ struct SectionChecksTests {
             against: "Trabajo como contable en una gestoría de Murcia desde 2017."
         )
 
-        #expect(verdict.technologies == ["Contabilidad", "Facturación", "Auditoría"])
-        #expect(verdict.dropped.isEmpty)
+        #expect(verdict.technologies == ["Contabilidad", "Auditoría"])
+        #expect(verdict.dropped.map(\.sentence) == ["Facturación"])
     }
 
     @Test("A lone word of a Romance language that the tagger reads as a verb is one only in the infinitive (#354, iOS 26)")
@@ -1232,6 +1232,15 @@ struct SectionChecksTests {
         #expect(verdict.technologies == row.kept)
         #expect(verdict.softSkills == row.keptSoftSkills)
         #expect(verdict.dropped.allSatisfy { $0.reason == "verb" })
+    }
+
+    @Test("A concept, an activity or a place of one word the description does not write is no tool; a tool, and a word it writes, stay (#359, P1)",
+          arguments: SkillRow.concepts)
+    func conceptIsNoTool(_ row: SkillRow) {
+        let verdict = row.sanitizer.skillCheck(technologies: row.technologies, softSkills: row.softSkills, against: row.description)
+
+        #expect(verdict.technologies == row.kept)
+        #expect(verdict.dropped.allSatisfy { $0.reason == "a concept, an activity or a place, not a tool" })
     }
 
     @Test("Of two technologies of one kind, by their head noun, the second goes; tools of other kinds, and a short last word, stay (#354)")
@@ -2611,5 +2620,44 @@ struct SkillRow: Sendable, CustomTestStringConvertible {
             description: "Ich arbeite seit 2015 mit dem Minibagger in Kassel.", kept: ["Säge", "Minibagger"]
         ),
         SkillRow(language: "en", technologies: ["teaches", "Photoshop", "saw"], description: "I design posters in Photoshop in Leeds.", kept: ["Photoshop", "saw"]),
+    ]
+
+    static let concepts: [SkillRow] = [
+        SkillRow(
+            language: "es", technologies: ["Excel", "Facturación", "Balance", "Cuentas", "Impuestos", "Contabilidad", "SAP"],
+            description: "Soy contable en Zaragoza. Desde 2018 llevo la contabilidad de una empresa en Excel.",
+            kept: ["Excel", "Contabilidad", "SAP"]
+        ),
+        // A word the description writes stays.
+        SkillRow(language: "es", technologies: ["Facturación", "Excel"], description: "Llevo la facturación de un taller en Murcia.", kept: ["Facturación", "Excel"]),
+        SkillRow(
+            language: "it", technologies: ["fatturazione", "bilancio", "aula", "trapano", "KNX"],
+            description: "Sono elettricista a Modena dal 2015 e programmo impianti KNX.", kept: ["trapano", "KNX"]
+        ),
+        SkillRow(
+            language: "it", technologies: ["bilancio", "Excel"], description: "Tengo la contabilità e il bilancio di un'officina di Modena.",
+            kept: ["bilancio", "Excel"]
+        ),
+        SkillRow(language: "pt", technologies: ["faturação", "Contas", "sala de aula", "martelo"], description: "Sou carpinteiro em Braga desde 2015.", kept: ["martelo"]),
+        SkillRow(
+            language: "fr", technologies: ["classe", "salle de classe", "Facturation", "marteau"],
+            description: "Je suis menuisier à Rouen depuis 2015.", kept: ["marteau"]
+        ),
+        SkillRow(
+            language: "de",
+            technologies: [
+                "Lehrplan", "Lehrbuch", "Klassenzimmer", "Lehrerausbildung", "Unterrichtsmaterial", "Lehrplananalyse", "Lehrplanentwicklung",
+                "Lehrplanüberprüfung", "Lehrplananpassung", "Dokumentenverwaltung",
+            ],
+            description: "Ich bin Grundschullehrerin in Kassel.", kept: ["Lehrbuch", "Unterrichtsmaterial"]
+        ),
+        SkillRow(
+            language: "de", technologies: ["Minibagger", "Analysegerät", "Planfräser", "Serverraum"],
+            description: "Ich arbeite seit 2015 mit dem Minibagger in Kassel.", kept: ["Minibagger", "Analysegerät", "Planfräser"]
+        ),
+        SkillRow(
+            language: "en", technologies: ["classroom", "curriculum", "accounts", "projector", "Photoshop", "Excel"],
+            description: "I teach art at a school in Leeds and make the posters in Photoshop.", kept: ["projector", "Photoshop", "Excel"]
+        ),
     ]
 }
