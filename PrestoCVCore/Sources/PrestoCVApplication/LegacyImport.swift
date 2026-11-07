@@ -78,10 +78,24 @@ public enum Adoption: Sendable, Equatable {
     case stored(CV)
     /// A CV with this id is already stored: left as it is.
     case existing
+    /// The store was erased after the import began: nothing was written.
+    case storeErased
+}
+
+/// Which erase of the store an import began after. An import holds the records it read; an erase that comes after it began
+/// removes the CVs and the ledger, and nothing the import still holds may be stored after it.
+public struct ImportTicket: Sendable, Equatable {
+    public let generation: Int
+    public init(generation: Int) { self.generation = generation }
 }
 
 public protocol LegacyImportTarget: Sendable {
-    func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption
+    /// Taken before the import reads its records, so that no erase falls between the two unseen.
+    func beginImport() async throws(RepositoryError) -> ImportTicket
+    /// Stores a legacy CV once, unless the store was erased since `ticket` was taken: then nothing is written and the answer
+    /// is `.storeErased`. The check and the write are one step under the store's lock, so an erase is either before both or
+    /// after both.
+    func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption
 }
 
 public struct LegacyImportFailure: Sendable, Equatable {
@@ -105,6 +119,9 @@ public struct LegacyImportReport: Sendable, Equatable {
     /// acknowledgement removes the source only while it still holds them.
     public var awaitingAcknowledgement: [CVID: LegacyRecord.Source] = [:]
     public var failures: [LegacyImportFailure] = []
+    /// The store was erased while the run went on, and the run stopped: what it had stored went with the store, so the report
+    /// holds nothing else. The next run reads whatever the erase left.
+    public var storeErased = false
     public init() {}
 }
 
@@ -124,11 +141,19 @@ public struct ImportLegacyStore: Sendable {
 
     /// Adopts every legacy CV the store holds. A source goes only once its copy is stored and reads back as what was mapped,
     /// only while it still holds the exact bytes the run read, and only if its CV lost nothing: the source of a CV with drops stays (`awaitingAcknowledgement`) until
-    /// `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed
-    /// fails the run.
+    /// `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed, or a
+    /// store that cannot say which erase it is at, fails the run. An erase of the store after the run began stops it: nothing
+    /// more is stored and no source goes, and the report says only `storeErased`.
     public func run() async throws(RepositoryError) -> LegacyImportReport {
         var report = LegacyImportReport()
-        for record in try await source.records() { await handle(record, into: &report) }
+        let ticket = try await target.beginImport()   // before the records are read: an erase after this point is seen
+        for record in try await source.records() {
+            guard await handle(record, under: ticket, into: &report) else {
+                var erased = LegacyImportReport()
+                erased.storeErased = true
+                return erased
+            }
+        }
         return report
     }
 
@@ -152,33 +177,38 @@ public struct ImportLegacyStore: Sendable {
         return done
     }
 
-    private func handle(_ record: LegacyRecord, into report: inout LegacyImportReport) async {
+    /// Handles one record; false once the store was erased after the run began, and the run stops.
+    private func handle(_ record: LegacyRecord, under ticket: ImportTicket, into report: inout LegacyImportReport) async -> Bool {
         switch record.content {
         case .invalid(let reason): report.failures.append(.init(key: record.key, reason: .invalid(reason)))
         case .unreadable: report.failures.append(.init(key: record.key, reason: .unreadable))
         case .cv(let legacy):
-            guard let version = record.version else { report.failures.append(.init(key: record.key, reason: .unreadable)); return }
-            await adopt(legacy, from: .init(key: record.key, version: version), into: &report)
+            guard let version = record.version else { report.failures.append(.init(key: record.key, reason: .unreadable)); return true }
+            return await adopt(legacy, from: .init(key: record.key, version: version), under: ticket, into: &report)
         }
+        return true
     }
 
-    private func adopt(_ legacy: LegacyCV, from source: LegacyRecord.Source, into report: inout LegacyImportReport) async {
+    private func adopt(_ legacy: LegacyCV, from source: LegacyRecord.Source, under ticket: ImportTicket,
+                       into report: inout LegacyImportReport) async -> Bool {
         let key = source.key
         let adoption: Adoption
-        do throws(RepositoryError) { adoption = try await target.adopt(legacy.cv) } catch {
-            report.failures.append(.init(key: key, reason: .notStored(error))); return
+        do throws(RepositoryError) { adoption = try await target.adopt(legacy.cv, under: ticket) } catch {
+            report.failures.append(.init(key: key, reason: .notStored(error))); return true
         }
         switch adoption {
+        case .storeErased: return false
         case .existing: report.alreadyStored.append(legacy.cv.id)
         case .stored(let copy) where copy == legacy.cv.adoptedAsRevisionOne: report.imported.append(legacy.cv.id)
-        case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return
+        case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return true
         }
         // Reported for every CV found stored, also one an earlier run stored: that run may have stopped before its report.
         // The source of a CV with drops is the durable record of the loss, so it stays until `acknowledgeLosses(of:)`; a run
         // that stops before then reports the same drops again. A loss reported twice is the safe way to fail; never is not.
-        if legacy.drops.isEmpty { await removeSource(source, into: &report); return }
+        if legacy.drops.isEmpty { await removeSource(source, into: &report); return true }
         report.drops[legacy.cv.id] = legacy.drops
         report.awaitingAcknowledgement[legacy.cv.id] = source
+        return true
     }
 
     private func removeSource(_ entry: LegacyRecord.Source, into report: inout LegacyImportReport) async {

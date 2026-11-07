@@ -432,7 +432,8 @@ private final class Recorder: @unchecked Sendable {
 
 private struct FakeTarget: LegacyImportTarget {
     let answer: @Sendable (CV) throws(RepositoryError) -> Adoption
-    func adopt(_ cv: CV) async throws(RepositoryError) -> Adoption { try answer(cv) }
+    func beginImport() async throws(RepositoryError) -> ImportTicket { ImportTicket(generation: 0) }
+    func adopt(_ cv: CV, under ticket: ImportTicket) async throws(RepositoryError) -> Adoption { try answer(cv) }
 }
 
 private let fakeBytes = Data("original".utf8)
