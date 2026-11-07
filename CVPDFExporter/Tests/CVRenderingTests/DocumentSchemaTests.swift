@@ -14,7 +14,7 @@ struct DocumentSchemaTests {
         guard let url = Bundle.module.url(forResource: "cv-document.schema", withExtension: "json") else {
             throw SchemaError(description: "the test bundle has no cv-document.schema.json")
         }
-        return JSONSchemaSubset(root: try JSONValue.parse(Data(contentsOf: url)))
+        return try JSONSchemaSubset(root: JSONValue.parse(Data(contentsOf: url)))
     }
 
     static func definition(_ name: String) throws -> JSONValue {
@@ -74,6 +74,27 @@ struct DocumentSchemaTests {
     ])
     func refusals(json: String) throws {
         #expect(try !Self.schema().problems(JSONValue.parse(Data(json.utf8))).isEmpty)
+    }
+
+    // MARK: A name needs a character the validator does not trim
+
+    func nameDocument(_ name: String) -> CVDocument { CVDocument(language: "en", person: Person(name: name), sections: []) }
+
+    @Test("a name of white space only is refused by the validator and by the schema", arguments: [
+        "   ", "\t", "\n", "\r\n", " \t\n ", "\u{0B}", "\u{0C}", "\u{85}", "\u{A0}", "\u{1680}", "\u{2003}", "\u{200B}",
+        "\u{2028}", "\u{2029}", "\u{202F}", "\u{205F}", "\u{3000}",
+    ])
+    func whitespaceNamesAreRefused(name: String) throws {
+        #expect(!validatorAccepts(nameDocument(name)))
+        #expect(try !problems(nameDocument(name)).isEmpty)
+    }
+
+    @Test("the schema and the validator agree on names that hold a character other than white space", arguments: [
+        "Ada", " Ada ", "\u{FEFF}", "\u{200C}", "\u{2060}", "\u{3000}A", "\u{A0}\u{FEFF}",
+    ])
+    func visibleNamesAgree(name: String) throws {
+        #expect(try problems(nameDocument(name)).isEmpty == validatorAccepts(nameDocument(name)))
+        #expect(validatorAccepts(nameDocument(name)))
     }
 
     // MARK: The schema names what the type has

@@ -30,6 +30,38 @@ enum JSONValue: Decodable, Equatable {
 struct JSONSchemaSubset {
     let root: JSONValue
     private static let annotations: Set<String> = ["$schema", "$id", "title", "description", "$defs", "$comment"]
+    private static let implemented: Set<String> = [
+        "$ref", "type", "const", "enum", "minimum", "maximum", "minLength", "pattern", "maxItems", "minItems", "items",
+        "properties", "required", "additionalProperties", "oneOf",
+    ]
+
+    struct Unsupported: Error, CustomStringConvertible { let description: String }
+
+    /// Walks the whole schema (every definition, property, item and oneOf branch) before any document is matched, and
+    /// fails on a keyword the checker does not implement: a branch that matching never reaches cannot hide one.
+    init(root: JSONValue) throws {
+        self.root = root
+        var found: [String] = []
+        Self.collectUnsupported(root, path: "#", into: &found)
+        if !found.isEmpty { throw Unsupported(description: "the schema uses keywords the checker does not implement: " + found.joined(separator: ", ")) }
+    }
+
+    private static func collectUnsupported(_ schema: JSONValue, path: String, into found: inout [String]) {
+        guard case .object(let keywords) = schema else { return }
+        for (keyword, argument) in keywords.sorted(by: { $0.key < $1.key }) {
+            if annotations.contains(keyword) {
+                if keyword == "$defs", case .object(let defs) = argument { for (name, sub) in defs.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, path: "\(path)/$defs/\(name)", into: &found) } }
+                continue
+            }
+            guard implemented.contains(keyword) else { found.append("\(path): \(keyword)"); continue }
+            switch (keyword, argument) {
+            case ("properties", .object(let props)): for (name, sub) in props.sorted(by: { $0.key < $1.key }) { collectUnsupported(sub, path: "\(path)/properties/\(name)", into: &found) }
+            case ("items", _), ("additionalProperties", _): collectUnsupported(argument, path: "\(path)/\(keyword)", into: &found)
+            case ("oneOf", .array(let branches)): for (i, sub) in branches.enumerated() { collectUnsupported(sub, path: "\(path)/oneOf/\(i)", into: &found) }
+            default: break
+            }
+        }
+    }
 
     /// The problems of `value` against the schema, each with the path where it was found; empty when it is valid.
     func problems(_ value: JSONValue) -> [String] { check(value, root, path: "$") }
@@ -53,6 +85,7 @@ struct JSONSchemaSubset {
         case "enum": if case .array(let options) = argument { return options.contains(value) ? [] : ["\(path): not one of the allowed values"] } else { return ["\(path): bad enum"] }
         case "minimum", "maximum": return bound(keyword, argument, value, path: path)
         case "minLength": if case .string(let s) = value, let n = argument.integerValue { return s.count >= n ? [] : ["\(path): shorter than \(n)"] } else { return [] }
+        case "pattern": return pattern(argument, value, path: path)
         case "maxItems", "minItems": return itemCount(keyword, argument, value, path: path)
         case "items": if case .array(let a) = value { return a.enumerated().flatMap { check($1, argument, path: "\(path)[\($0)]") } } else { return [] }
         case "properties": return properties(argument, of: value, path: path)
@@ -87,6 +120,13 @@ struct JSONSchemaSubset {
         guard case .array(let a) = value, let limit = argument.integerValue else { return [] }
         let ok = keyword == "maxItems" ? a.count <= limit : a.count >= limit
         return ok ? [] : ["\(path): \(a.count) items break \(keyword) \(limit)"]
+    }
+
+    /// `pattern` is a search, not a full match (ECMA-262 `RegExp.test`).
+    private func pattern(_ argument: JSONValue, _ value: JSONValue, path: String) -> [String] {
+        guard case .string(let s) = value else { return [] }
+        guard case .string(let source) = argument, let regex = try? NSRegularExpression(pattern: source) else { return ["\(path): bad pattern"] }
+        return regex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) != nil ? [] : ["\(path): does not match pattern \(source)"]
     }
 
     private func properties(_ argument: JSONValue, of value: JSONValue, path: String) -> [String] {
