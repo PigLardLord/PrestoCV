@@ -128,6 +128,27 @@ struct LookOverlapTests {
         #expect(try await world.editing.inStore(cv.id).design == DesignChoice(design: "classic", palette: "ocean", fonts: "sans"))
     }
 
+    @Test("a cancelled read that replaced another read goes back to the status before both")
+    func cancelledReadAfterAnotherReadIsNotLeftLoading() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend", design: classicForest)
+        let look = world.look(of: cv)
+        await look.load()
+        world.editing.loadErrors.withLock { $0 = [.unavailable, .unavailable] }
+        await world.editing.loadGate.close()
+
+        let first = Task { await look.load() }
+        await waitUntil("the first read to wait") { await world.editing.loadGate.waiting == 1 }
+        let second = Task { await look.load() }
+        await waitUntil("the second read to wait") { await world.editing.loadGate.waiting == 2 }
+        second.cancel()
+        await world.editing.loadGate.open()
+        await first.value
+        await second.value
+
+        #expect(look.status == .ready)
+    }
+
     @Test("a change applied while the CV is read writes nothing and keeps the choices")
     func applyDuringLoadWritesNothing() async throws {
         let world = Browsing()

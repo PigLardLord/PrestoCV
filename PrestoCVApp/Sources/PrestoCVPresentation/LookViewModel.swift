@@ -42,6 +42,9 @@ public final class LookViewModel {
     /// The latest load is reading, and a write is being made. The picker runs one operation at a time (`mayStart`).
     @ObservationIgnored private var isLoading = false
     @ObservationIgnored private var isApplying = false
+    /// The status before the reads that are running began: a cancelled latest read goes back to it, not to the `.loading`
+    /// of a read it replaced.
+    @ObservationIgnored private var statusBeforeLoading: LookStatus = .loading
 
     private enum Operation { case load, apply }
 
@@ -62,7 +65,7 @@ public final class LookViewModel {
         guard mayStart(.load) else { return }
         loadGeneration += 1
         let mine = loadGeneration
-        let before = status
+        if !isLoading { statusBeforeLoading = status }
         isLoading = true
         status = .loading
         defer { if mine == loadGeneration { isLoading = false } }
@@ -75,7 +78,7 @@ public final class LookViewModel {
             status = .ready
         } catch {
             guard mine == loadGeneration else { return }
-            status = Task.isCancelled ? before : LookStatus(error)
+            status = Task.isCancelled ? statusBeforeLoading : LookStatus(error)
         }
     }
 
