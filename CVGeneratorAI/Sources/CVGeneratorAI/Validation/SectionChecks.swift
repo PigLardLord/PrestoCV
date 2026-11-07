@@ -2198,8 +2198,8 @@ extension CVDataSanitizer {
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a German infinitive (`isGermanActivity`),
     /// while a method or a field of the trade stays ("manutenzione preventiva", "Facturación"; probe round 12); the singular and the
     /// plural of one skill count once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the
-    /// second goes, unless that noun is a generic kind ("software di diagnostica", "software di controllo"); a fragment, a verb, a
-    /// skill in another language (a product name is none: "Docker") and a soft skill that names a tool go, and so does stationery,
+    /// second goes, unless that noun is a generic kind ("software di diagnostica", "software di controllo"); a fragment, a verb (a
+    /// lone form the description does not write, too: "pensa", "organiza"; `verbReading`, #359), a skill in another language (a product name is none: "Docker") and a soft skill that names a tool go, and so does stationery,
     /// furniture or protective wear
     /// (`namesAnEverydayObject`); so does a technology that is a bare kind of tool
     /// ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo") stays (#354, round 4). A technology the verb it starts with leads ("usare i PLC") is
@@ -2228,6 +2228,11 @@ extension CVDataSanitizer {
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
         var verdict = SkillVerdict()
         var keys = Set<String>()
+        let said = DescriptionText.normalized(description)
+        let trimmed = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        let amongVerbs = (technologies + softSkills).filter {
+            verbReading(of: $0.trimmingCharacters(in: trimmed), language: language, said: said) == .verb
+        }.count >= 2
         let check = { (raw: String, cutsVerb: Bool) -> String? in
             let item = raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
             let words = item.split(separator: " ").map(String.init)
@@ -2248,8 +2253,9 @@ extension CVDataSanitizer {
             let saidVerb = second != nil && Self.saysAfterSubject(first, in: description, language: language)
             let infinitive = words.count > 2 && Self.skillArticles.contains(second ?? "")
                 && (Self.infinitiveEndings[language ?? ""] ?? []).contains(where: first.hasSuffix)
+            let loneVerb = second == nil && verbReading(of: item, language: language, said: said).map { $0 == .verb || amongVerbs } == true
             var kept = item
-            if !Self.toolWords.contains(first), taggedVerb || saidVerb || infinitive {
+            if !Self.toolWords.contains(first), taggedVerb || saidVerb || infinitive || loneVerb {
                 let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.lowercased()) }
                 guard cutsVerb, rest.contains(where: { $0.count >= 3 }) else {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "verb"))
@@ -2341,6 +2347,42 @@ extension CVDataSanitizer {
         verdict.softSkills = qualities.kept
         verdict.dropped += qualities.dropped
         return verdict
+    }
+
+    // MARK: Lone verbs
+
+    /// How a lone word reads as a verb: surely, or only among other verbs.
+    private enum VerbReading { case verb, alsoANoun }
+
+    /// The forms of a lone verb by language: the ending of the form a draft lists ("pensa", "organiza", "planifie"), that of its
+    /// infinitive, and the endings that make verbs and no noun, each with the letters it needs before it ("organizza", not "pizza";
+    /// "organiza", not "baliza").
+    private static let loneVerbForms: [String: (form: String, infinitive: String, verbEndings: [String: Int])] = [
+        "it": ("a", "are", ["ifica": 3, "izza": 4]),
+        "es": ("a", "ar", ["ifica": 3, "iza": 4, "iona": 4]),
+        "pt": ("a", "ar", ["ifica": 3, "iza": 4, "iona": 4]),
+        "fr": ("e", "er", ["ifie": 3]),
+    ]
+
+    /// How a skill of one word in lower case reads as a form of a verb of the description's language that the description does
+    /// not write (#359, P1: "pensa", "spiega", "organizza" listed as tools or qualities): surely, when an ending makes only verbs
+    /// ("verifica", "organiza", "planifie") or, in Italian, when no noun's plural makes it ("pense" for "pensa"); only among other
+    /// verbs, when the word is also a noun ("sega", "insegna", "lima", "scie"). A word with a capital is a name ("Trova"), a
+    /// tool's word or kind is a tool, and an Italian word in -ma is a noun of Greek origin ("schema"); German and English lone
+    /// verbs are the tagger's.
+    private func verbReading(of item: String, language: String?, said description: String) -> VerbReading? {
+        guard let language, let forms = Self.loneVerbForms[language], item.count >= 4, item.hasSuffix(forms.form),
+              item.allSatisfy({ $0.isLetter && $0.isLowercase }), !Self.toolWords.contains(item),
+              !Self.toolKinds.contains(DescriptionText.normalized(item)),
+              DescriptionText.spans(of: DescriptionText.normalized(item), in: description).isEmpty else { return nil }
+        let stem = String(item.dropLast(forms.form.count))
+        guard wordList.knows(stem + forms.infinitive, inLanguage: language) == true else { return nil }
+        if forms.verbEndings.contains(where: { item.hasSuffix($0.key) && item.count - $0.key.count >= $0.value }) { return .verb }
+        guard language == "it", !stem.hasSuffix("m") else { return .alsoANoun }
+        // A noun in -ca or -ga makes its plural in -che or -ghe ("seghe"), one in -cia or -gia in -ce or -ge too ("bilance").
+        var plurals = [stem.hasSuffix("c") || stem.hasSuffix("g") ? stem + "he" : stem + "e"]
+        if stem.hasSuffix("ci") || stem.hasSuffix("gi") { plurals.append(String(stem.dropLast()) + "e") }
+        return plurals.contains { wordList.knows($0, inLanguage: language) == true } ? .alsoANoun : .verb
     }
 
     // MARK: German qualities

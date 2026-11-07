@@ -1222,6 +1222,18 @@ struct SectionChecksTests {
         #expect(verdict.dropped.map(\.reason) == ["verb"])
     }
 
+    // MARK: Skills that are no tools (#359, P1)
+
+    @Test("A lone verb the description does not write is no skill; a noun that is also a verb stays among tools, and so does a name (#359, P1)",
+          arguments: SkillRow.loneVerbs)
+    func loneVerbIsNoSkill(_ row: SkillRow) {
+        let verdict = row.sanitizer.skillCheck(technologies: row.technologies, softSkills: row.softSkills, against: row.description)
+
+        #expect(verdict.technologies == row.kept)
+        #expect(verdict.softSkills == row.keptSoftSkills)
+        #expect(verdict.dropped.allSatisfy { $0.reason == "verb" })
+    }
+
     @Test("Of two technologies of one kind, by their head noun, the second goes; tools of other kinds, and a short last word, stay (#354)")
     func toolsOfOneKind() {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -2542,4 +2554,62 @@ private struct CaseSensitiveWords: WordList {
         ]
         return words[language]?.contains(word) ?? false
     }
+}
+
+/// A skill list of a draft in one language, against a description, with the technologies and soft skills that stay (#359, P1).
+/// Its dictionary knows every word but the invented names and the forms the Mac's does not know (probed on macOS 27: no noun
+/// makes them); its tagger reads no lone word of a Romance language, as the Mac's, and in German and English only the verbs given.
+struct SkillRow: Sendable, CustomTestStringConvertible {
+    let language: String
+    let technologies: [String]
+    var softSkills: [String] = []
+    let description: String
+    let kept: [String]
+    var keptSoftSkills: [String] = []
+
+    var testDescription: String { "\(language): \((technologies + softSkills).joined(separator: ", "))" }
+
+    var sanitizer: CVDataSanitizer {
+        let language = language
+        return CVDataSanitizer(
+            languageOfText: { _ in language },
+            lexicalClasses: ForcedLexicalTagger([
+                .italian: .noAssets, .spanish: .noAssets, .portuguese: .noAssets, .french: .noAssets,
+                .german: .words(["organisiert"]), .english: .words(["teaches"]),
+            ]),
+            wordList: TableWordList(names: TableWordList.inventedNames.union(Self.unknownForms))
+        )
+    }
+
+    /// The forms the Mac's dictionary does not know: no noun's plural makes them ("pense" for "pensa").
+    static let unknownForms: Set<String> = ["pense", "spieghe", "incoraggie", "incoragge", "organizze", "pianifiche"]
+
+    static let italianExample = "Sono Maria Rossi, insegnante di scuola primaria a Bologna. Dal 2016 insegno alla scuola Don Milani, "
+        + "dove ho formato 3 nuovi insegnanti. Prima, dal 2012 al 2016, ho lavorato come assistente in un asilo nido."
+
+    static let loneVerbs: [SkillRow] = [
+        SkillRow(language: "it", technologies: ["pensa", "spiega", "trapano"], description: "Sono falegname a Modena dal 2015.", kept: ["trapano"]),
+        // A noun that is also a verb form ("sega", "seghe") stays beside one verb, and a tool the description names stays.
+        SkillRow(language: "it", technologies: ["sega", "pensa", "forno"], description: "Cuocio il pane nel forno a legna dal 2015.", kept: ["sega", "forno"]),
+        // The app's example: among verbs, a verb form that is also a noun ("insegna", "valuta") is a verb.
+        SkillRow(
+            language: "it",
+            technologies: ["pensa", "insegna", "valuta", "spiega", "verifica", "incoraggia", "adatta", "monitora", "Google Classroom"],
+            softSkills: ["organizza", "pianifica", "precisione"], description: italianExample, kept: ["Google Classroom"],
+            keptSoftSkills: ["precisione"]
+        ),
+        // A verb form with a capital is a name ("Trova").
+        SkillRow(language: "it", technologies: ["Trova", "pensa", "spiega"], description: "Sono falegname a Modena dal 2015.", kept: ["Trova"]),
+        SkillRow(language: "es", technologies: ["organiza", "planifica", "taladro"], description: "Soy carpintero en Murcia desde 2015.", kept: ["taladro"]),
+        SkillRow(language: "es", technologies: ["lima", "Excel"], description: "Llevo las cuentas de un taller en Excel desde 2017.", kept: ["lima", "Excel"]),
+        SkillRow(language: "pt", technologies: ["organiza", "seleciona", "martelo"], description: "Sou carpinteiro em Braga desde 2015.", kept: ["martelo"]),
+        SkillRow(language: "pt", technologies: ["cola", "serra"], description: "Sou carpinteiro em Braga desde 2015.", kept: ["cola", "serra"]),
+        SkillRow(language: "fr", technologies: ["planifie", "vérifie", "marteau"], description: "Je suis menuisier à Rouen depuis 2015.", kept: ["marteau"]),
+        SkillRow(language: "fr", technologies: ["scie", "pince"], description: "Je suis menuisier à Rouen depuis 2015.", kept: ["scie", "pince"]),
+        SkillRow(
+            language: "de", technologies: ["organisiert", "Säge", "Minibagger"],
+            description: "Ich arbeite seit 2015 mit dem Minibagger in Kassel.", kept: ["Säge", "Minibagger"]
+        ),
+        SkillRow(language: "en", technologies: ["teaches", "Photoshop", "saw"], description: "I design posters in Photoshop in Leeds.", kept: ["Photoshop", "saw"]),
+    ]
 }
