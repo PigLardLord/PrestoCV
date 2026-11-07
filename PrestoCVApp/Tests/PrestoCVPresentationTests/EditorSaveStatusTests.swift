@@ -46,6 +46,89 @@ struct EditorSaveStatusTests {
         #expect(await world.storedName(of: cv) == "Tobias Renn-Ellison")
     }
 
+    @Test("reload waits for the write the old writer still runs, and the CV it loads is the other window's")
+    func reloadWaitsForARunningWrite() async throws {
+        let world = Editing()
+        let (editor, cv) = try await inConflict(world)
+        await world.editing.gate.close()
+        editor.type(\.fullName, "Mara Ellison-Renn 2")
+        await world.passThePause(thenWrites: 2)
+        #expect(editor.saveStatus == .conflict)
+        let loadsBefore = world.editing.loads.withLock { $0 }
+
+        let reloading = Task { await editor.reload() }
+        await settle()
+        #expect(world.editing.loads.withLock { $0 } == loadsBefore)
+
+        await world.editing.gate.open()
+        await reloading.value
+
+        #expect(editor.content.fullName == "Tobias Renn")
+        #expect(editor.saveStatus == .saved)
+        #expect(await world.storedName(of: cv) == "Tobias Renn")
+        editor.type(\.fullName, "Tobias Renn-Ellison")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .saved)
+        #expect(await world.storedName(of: cv) == "Tobias Renn-Ellison")
+    }
+
+    @Test("an autosave that was replaced by a reload writes nothing more")
+    func replacedAutosaveWritesNothingMore() async throws {
+        let world = Editing()
+        let (editor, cv) = try await inConflict(world)
+        editor.type(\.fullName, "Mara Ellison-Renn 2")
+
+        await editor.reload()
+        let writesBefore = world.editing.writeCount
+        world.clock.advance(by: .seconds(5))
+        await settle()
+
+        #expect(world.editing.writeCount == writesBefore)
+        #expect(editor.content.fullName == "Tobias Renn")
+        #expect(editor.saveStatus == .saved)
+        #expect(await world.storedName(of: cv) == "Tobias Renn")
+    }
+
+    @Test("reload outside a conflict does nothing: the text and the status stay")
+    func reloadOutsideAConflictDoesNothing() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        try await world.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+
+        await editor.reload()
+        #expect(world.editing.loads.withLock { $0 } == 1)
+        #expect(editor.content.fullName == "Mara Ellison")
+        #expect(editor.saveStatus == .saved)
+
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.reload()
+        #expect(world.editing.loads.withLock { $0 } == 1)
+        #expect(editor.content.fullName == "Mara Ellison-Renn")
+        #expect(editor.saveStatus == .pending)
+    }
+
+    @Test("text typed while reload reads the store stays: the editor keeps its writer and the conflict")
+    func reloadKeepsTextTypedDuringTheRead() async throws {
+        let world = Editing()
+        let (editor, cv) = try await inConflict(world)
+        await world.editing.loadGate.close()
+
+        let reloading = Task { await editor.reload() }
+        await waitUntil("the read to start") { await world.editing.loadGate.waiting == 1 }
+        editor.type(\.fullName, "Mara Ellison-Renn 2")
+        await world.editing.loadGate.open()
+        await reloading.value
+
+        #expect(editor.content.fullName == "Mara Ellison-Renn 2")
+        #expect(editor.saveStatus == .conflict)
+        #expect(await world.storedName(of: cv) == "Tobias Renn")
+
+        await editor.reload()
+        #expect(editor.content.fullName == "Tobias Renn")
+        #expect(editor.saveStatus == .saved)
+    }
+
     @Test("save as copy after a conflict stores the text as a new CV, and the original stays as the other window left it")
     func saveAsCopyAfterConflictStoresNewCV() async throws {
         let world = Editing()
