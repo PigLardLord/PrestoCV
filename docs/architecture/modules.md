@@ -108,7 +108,7 @@ Each step of the AI draft and of the import, with the text it read and wrote, ke
 **`PrestoCVApplication`**
 - **Ports:**
   - `CVRepository`: create, conditional update, load, list, conditional delete. Typed `RepositoryError`, not cancellable.
-  - `CVStoreMaintenance`: restore from quarantine, erase every copy, purge quarantine.
+  - `CVStoreMaintenance`: list the quarantine, restore from it, erase every copy of a CV, purge the quarantine, erase everything. Its use cases are `ReviewStoreIssues`, `RestoreQuarantinedCV`, `EraseCV`, `PurgeExpiredQuarantine` (30 days, from the injected `TimeSource`) and `EraseEverything`, with a typed `MaintenanceError` and an `EraseEverythingOutcome` that names a file by kind and name, never by path.
   - `SampleCVSource`, `IDGenerator`, `TimeSource`. `TimeSource` is so named to avoid shadowing `Swift.Clock`.
 - **Use cases:**
   - `NewCV`, `SaveCV` (create or conditional update, errors translated to `AuthoringError`, including `tooLarge`), `LoadCV`;
@@ -125,7 +125,7 @@ Each step of the AI draft and of the import, with the text it read and wrote, ke
   - a failed write, delete, restore, erase or purge (the failures mapped to `writeFailed`) keeps the error it came from, as a `FailureCause` (domain, code, and the `errno` under a Cocoa error); the classified read, lock, listing and quarantine outcomes keep no cause, and the use cases drop it when they translate to `AuthoringError`;
   - every mutation under an exclusive `flock` on the store, from the C library of the platform: `Glibc`, `Darwin` or `Android` ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md));
   - reads classified as described in R12;
-  - `Quarantine/` with validated restore, erase and purge.
+  - `Quarantine/` with validated restore, erase and purge, and `eraseAll` (in `FileCVRepository+Maintenance.swift`), which under one hold of the lock removes every CV file, the quarantine, the staged copies and the ledger, and names in its report any file it could not remove.
 - `DirectoryLegacyStore` and `FileCVRepository.adopt`: the adapters of the legacy import. The directory store lists `cv_*.json`, reads only regular files within a size cap and never through a link (R8), and maps each through `LegacyCVFile` (the legacy shape, read as the released app reads it, with the look mapped as ADR 0022 says) to a domain CV; `LegacyPeriod` converts the period text only when it is an unambiguous range of two dates, and drops the rest. `adopt` runs under the store lock and keeps the legacy times, which `create` would reset; a legacy file is never read as schema 1, because the store lists only `*.cv.json`.
 - `DirectorySampleCVSource`: sample CVs from an injected directory, in the same v1 format and through the store's own reader. They are kept in `PrestoCV/Resources/Samples/`, and the app ships them from the switch to the new stack on (version 1 ships the legacy samples).
 
