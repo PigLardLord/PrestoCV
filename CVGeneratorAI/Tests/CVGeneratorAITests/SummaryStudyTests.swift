@@ -201,13 +201,16 @@ struct SummaryStudyTests {
         languages: [Language(name: "German")]
     )
 
-    /// Two clauses of one sentence of the description ("…at Harlow City College and I speak German") do not say the course was
-    /// taught in German; a sentence that says it in other words or another order goes too, since losing it is the safe way to fail.
+    /// Two clauses of one sentence of the description ("…at Harlow City College and I speak German", "I studied nursing; in German,
+    /// …") do not say the course was taught in German; a sentence that says it in other words, another order or with other stops goes
+    /// too, since losing it is the safe way to fail.
     @Test("A sentence that ties a study to a language stays only as the person's own words, in their order",
           arguments: [
             ("I studied nursing at Harlow City College and I speak German.", "I studied nursing in German at Harlow City College.", false),
             ("I studied nursing in German at Harlow City College.", "I studied nursing in German at Harlow City College.", true),
             ("I studied nursing in German at Harlow City College.", "At Harlow City College I studied nursing in German.", false),
+            ("I studied nursing; in German, I speak with patients.", "I studied nursing in German.", false),
+            ("I studied nursing, in German I speak with patients.", "I studied nursing in German.", false),
           ])
     func ownWordsTieAStudyToALanguage(description: String, sentence: String, kept: Bool) throws {
         let verdict = try Self.sanitizer("en").summaryCheck(

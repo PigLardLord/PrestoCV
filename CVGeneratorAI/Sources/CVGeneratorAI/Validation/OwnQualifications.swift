@@ -24,7 +24,7 @@ enum OwnQualifications {
     }
 
     /// Whether `sentence` says a school or a course taught the person's languages (#359, P3): it holds a word of a kept degree or school
-    /// and a word of a kept language, and it is not the person's own words. The model joined "I studied at the school" and "I speak
+    /// and a word of a kept language, and it is not one of the person's sentences. The model joined "I studied at the school" and "I speak
     /// French and English" into "I studied the CAP at the school in French and English". A word of the studies that is a language's
     /// name ("English literature") or a word of the person's work (`apart`: the titles and the employers) is none of the studies.
     static func tiesAStudyToALanguage(
@@ -33,22 +33,21 @@ enum OwnQualifications {
         let languageWords = CVDataSanitizer.words(of: languages.map(\.name))
         let studyWords = studyWords(of: education).subtracting(languageWords).subtracting(apart)
         guard !languageWords.isEmpty, !studyWords.isEmpty else { return false }
-        let said = Word.words(in: sentence).map(\.folded)
-        let words = Set(said)
+        let words = Set(Word.words(in: sentence).map(\.folded))
         let study = studyWords.intersection(words)
         let spoken = languageWords.intersection(words)
         guard !study.isEmpty, !spoken.isEmpty else { return false }
-        // Only the person's own words back it, in their order: a run of one sentence of the description. Sharing its words is not
-        // enough, since "I studied nursing at Harlow City College and I speak German" holds every word of "I studied nursing in
-        // German at Harlow City College" (review round 1, final gate). A true sentence said otherwise goes: losing it is safe.
-        return !source.sentences.contains { sourceSentence in
-            holdsRun(said, in: Word.words(in: sourceSentence.raw).map(\.folded))
-        }
+        // Only a whole sentence of the description, word for word and stop for stop, backs it. Sharing its words is not enough,
+        // since "I studied nursing at Harlow City College and I speak German" holds every word of "I studied nursing in German at
+        // Harlow City College", and nor is a run of its words: "I studied nursing; in German, I speak with patients" holds "I studied
+        // nursing in German" (review round 1, the final gate and its fix check). A true sentence said otherwise goes: losing it is safe.
+        let written = verbatim(sentence)
+        return !source.sentences.contains { verbatim($0.raw) == written }
     }
 
-    /// Whether `words` follow one another, in this order, somewhere in `text`.
-    private static func holdsRun(_ words: [String], in text: [String]) -> Bool {
-        guard !words.isEmpty, words.count <= text.count else { return false }
-        return (0...(text.count - words.count)).contains { start in text[start..<(start + words.count)].elementsEqual(words) }
+    /// `text` as written, without its case, the spacing between its words, or its final stop.
+    private static func verbatim(_ text: String) -> String {
+        text.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".!?… "))
     }
 }
