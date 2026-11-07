@@ -42,7 +42,7 @@ public final class CVGeneratorUseCase {
         )
     }
 
-    /// - Parameter limits: How long each request of the model may take.
+    /// - Parameter limits: How long each request of the model and the claim check may take.
     init(
         service: CVGenerationService,
         claimChecker: ClaimChecking,
@@ -148,7 +148,7 @@ public final class CVGeneratorUseCase {
             if section != nil { trace.stage(.grounding, gave: grounded, from: facts) }
             timing.lap(.grounding)
             stage = .claimCheck
-            let report = try await ClaimWithdrawal.report(on: grounded, in: request.userPrompt, with: claimChecker)
+            let report = try await ClaimWithdrawal.report(on: grounded, in: request.userPrompt, with: claimChecker, within: limits.claimCheck)
             let checked = report.draft
             log.claims(of: grounded, checked: checked, in: request.userPrompt)
             trace.claims(report)
