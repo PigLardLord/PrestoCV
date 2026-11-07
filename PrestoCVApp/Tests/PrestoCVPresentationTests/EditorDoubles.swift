@@ -56,6 +56,10 @@ final class EditingFake: CVEditing {
     let languages = Mutex<[DocumentLanguage?]>([])
     let looks = Mutex<[LookChange]>([])
     let loads = Mutex(0)
+    /// Holds the copies (`duplicate`) before they reach the store, so that a test decides when one ends.
+    let duplicateGate = Gate()
+    /// Thrown by the next changes of the look or the language, once they are at the store's door.
+    let restyleErrors = Mutex<[any Error]>([])
     private let writesRunning = Mutex(0)
 
     var writeCount: Int { writes.withLock { $0.count } }
@@ -79,6 +83,7 @@ final class EditingFake: CVEditing {
     func duplicate(_ cv: CV, title: String) async throws(EditFailure) -> CV {
         let copy = cv.duplicated(as: ids.next(), title: title)
         copies.withLock { $0.append(copy) }
+        await duplicateGate.pass()
         return try await save(copy)
     }
 
@@ -123,6 +128,7 @@ final class EditingFake: CVEditing {
             defer { next() }
             try Task.checkCancellation()
             await editing.gate.pass()
+            if let error = editing.restyleErrors.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) { throw error }
             guard let current = latest else {
                 let changed = ChangeCV.applying(change, to: withText(of: content))
                 unsaved = changed
@@ -140,6 +146,7 @@ final class EditingFake: CVEditing {
             defer { next() }
             try Task.checkCancellation()
             await editing.gate.pass()
+            if let error = editing.restyleErrors.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) { throw error }
             guard let current = latest else {
                 let changed = ChangeCV.applying(language: language, to: withText(of: content))
                 unsaved = changed

@@ -153,6 +153,27 @@ struct EditorSaveStatusTests {
         #expect(try await world.editing.inStore(cv.id).personal.summary == "")
     }
 
+    @Test("a title typed while the copy is being stored is kept, stored, and not reported saved before it is")
+    func titleTypedWhileTheCopyIsStoredIsKept() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.duplicateGate.close()
+
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.duplicateGate.waiting == 1 }
+        editor.type(\.title, "Product roles")
+        await world.editing.duplicateGate.open()
+        await copying.value
+
+        #expect(editor.content.title == "Product roles")
+        #expect(editor.saveStatus != .saved)
+        await editor.saveNow()
+        let copy = try #require(world.editing.copies.withLock { $0.first })
+        #expect(world.editing.writes.withLock { $0.last?.title } == "Product roles")
+        #expect(try await world.editing.inStore(copy.id).title == "Product roles")
+        #expect(editor.saveStatus == .saved)
+    }
+
     @Test("a CV deleted elsewhere says so, and save as copy keeps the text as a new CV")
     func deletedElsewhereOffersSaveAsCopy() async throws {
         let world = Editing()

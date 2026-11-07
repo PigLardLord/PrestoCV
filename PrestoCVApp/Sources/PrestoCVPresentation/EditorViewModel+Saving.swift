@@ -45,9 +45,11 @@ extension EditorViewModel {
         await replace { [self] in
             guard let held else { return }
             let current = form.applied(to: held)
+            let typedTitle = form.title
             do throws(EditFailure) {
                 let copy = try await editing.duplicate(current, title: copyTitle(current.title))
-                form.title = EditorContent(copy).title
+                // A title typed while the copy was stored stays, and goes to the autosave once this ends
+                if form.title == typedTitle { form.title = EditorContent(copy).title }
                 standOn(copy, unchangedFrom: copy, writer: editing.autosaveWriter(startingFrom: copy), isStored: true)
             } catch {
                 failure = SaveStatus(error)
