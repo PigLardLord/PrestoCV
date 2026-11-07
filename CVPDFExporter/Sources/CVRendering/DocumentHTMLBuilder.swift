@@ -92,12 +92,12 @@ public struct DocumentHTMLBuilder: Sendable {
             return wrap("summary", h.summary, text.isEmpty ? [] : [el(.p, "cv-summary", [], [.text(text)])])
         case .experience(let items):
             return wrap("experience", h.experience, items.map { i in
-                el(.article, "cv-entry", [], [el(.h3, "cv-entry-title", [], [.text(i.role)]), el(.p, "cv-entry-subtitle", [], [.text(i.company)])]
+                el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.role) + optional(.p, "cv-entry-subtitle", i.company)
                    + optional(.p, "cv-entry-location", i.location) + period(i.period) + optional(.p, "cv-entry-description", i.description))
             })
         case .education(let items):
             return wrap("education", h.education, items.map { i in
-                el(.article, "cv-entry", [], [el(.h3, "cv-entry-title", [], [.text(i.degree)]), el(.p, "cv-entry-subtitle", [], [.text(i.school)])]
+                el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.degree) + optional(.p, "cv-entry-subtitle", i.school)
                    + period(i.period) + optional(.p, "cv-entry-description", i.description))
             })
         case .skills(let items):
@@ -110,7 +110,7 @@ public struct DocumentHTMLBuilder: Sendable {
             })
         case .certifications(let items):
             return wrap("certifications", h.certifications, items.map { i in
-                var children = [el(.h3, "cv-entry-title", [], [.text(i.name)]), el(.p, "cv-entry-subtitle", [], [.text(i.issuer)])]
+                var children = optional(.h3, "cv-entry-title", i.name) + optional(.p, "cv-entry-subtitle", i.issuer)
                 if let y = i.year { children.append(el(.p, "cv-entry-period", [], [.text("\(y)")])) }
                 children += optional(.p, "cv-entry-description", i.description)
                 if let u = i.url, let link = WebLink(u) { children.append(el(.a, "cv-entry-link", [(.href, link.url)], [.text(link.url)])) }

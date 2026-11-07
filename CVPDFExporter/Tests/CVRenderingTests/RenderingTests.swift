@@ -49,6 +49,20 @@ struct BuilderTests {
         #expect(html.contains(#"<span class="cv-skill">Git</span>"#))         // no bare "0" rating (#21)
     }
 
+    @Test("an entry prints what it has: a blank title, subtitle or issuer leaves no empty element")
+    func blankEntryPartsAreOmitted() throws {
+        let doc = CVDocument(language: "en", person: Person(name: "A"), sections: [
+            .experience([ExperienceItem(role: "", company: "Co"), ExperienceItem(role: "Dev", company: "")]),
+            .education([EducationItem(degree: "", school: "School"), EducationItem(degree: "Degree", school: "")]),
+            .certifications([CertificationItem(name: "Cert", issuer: "")]),
+        ])
+        let html = DocumentHTMLBuilder().build(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
+        #expect(!html.contains("></h3>"))
+        #expect(!html.contains("></p>"))
+        #expect(html.contains(#"<h3 class="cv-entry-title">Dev</h3>"#))
+        #expect(html.contains(#"<p class="cv-entry-subtitle">School</p>"#))
+    }
+
     @Test("user text is escaped and never re-parsed as template syntax (#21, R8)")
     func escaping() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
