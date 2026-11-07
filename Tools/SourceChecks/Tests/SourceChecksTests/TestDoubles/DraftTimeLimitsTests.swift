@@ -12,7 +12,9 @@ import Testing
 ///    (`limits: .standard`, `= .standard`, `{ .standard }`, `?? .standard`), that `.on(` does not move to another clock. Any
 ///    implied `.standard` counts, since the text does not say its type: an `ImportCV` in such a file writes `ImportLimits.standard`;
 /// 2. a real clock (`ContinuousClock()`, `SuspendingClock()`, `.continuous`, `.suspending`) anywhere but as the `clock:` argument
-///    of a call that makes no limit: the use case's `clock:` times the steps for the log and ends nothing;
+///    of a call that builds one of `logClockTypes` and names it (`T(`, `T.init(`, `let u: T = .init(`, or `self.init(`, `Self(`
+///    and `Self.init(` inside `extension T`): those types time their steps for the log with it and end nothing, while any other
+///    call that takes a clock, a helper of the test included, can hand it on to a limit;
 /// 3. a call that builds a use case with the public initialiser, which sets the real limits: it has `logger:` and no `limits:`,
 ///    and it has `claimChecker:` or it names the use case (`CVGeneratorUseCase(`, `CVGeneratorUseCase.init(`,
 ///    `let u: CVGeneratorUseCase = .init(`, or `self.init(`, `Self(` and `.init(` inside `extension CVGeneratorUseCase`);
@@ -34,8 +36,9 @@ struct DraftTimeLimitsTests {
     /// The types whose `.standard` holds the real limits.
     static let limitTypes: Set<String> = ["DraftingLimits", "ClaimCheckLimits"]
 
-    /// The calls that make a limit: a real clock is wrong in any of their arguments.
-    static let limitCalls: Set<String> = ["DraftingLimits", "ClaimCheckLimits", "TimeLimit"]
+    /// The types whose `clock:` only times their steps for the log and the trace, as their initialisers say: the use case, the
+    /// import, and the wait for the language data, whose bound is its `sleep:`. A real clock given to any other call is reported.
+    static let logClockTypes: Set<String> = ["CVGeneratorUseCase", "ImportCV", "LanguageDataPreparation"]
 
     /// Whether the check reads a file: its code names the draft or one of its limits.
     static func reads(_ source: String) throws -> Bool {
@@ -48,6 +51,7 @@ struct DraftTimeLimitsTests {
         guard try reads(source) else { return [] }
         let code = DraftCode(source)
         let calls = code.calls()
+        let extensions = try code.extensions()
         var found: [String] = []
         func report(_ offset: Int, _ text: String) { found.append("\(path):\(code.line(of: offset)): \(text)") }
 
@@ -73,13 +77,12 @@ struct DraftTimeLimitsTests {
                 default: continue
                 }
             }
-            if code.isTheLogClock(at: start, calls: calls) { continue }
+            if code.isTheLogClock(at: start, calls: calls, extensions: extensions) { continue }
             report(start, "a real clock, and a limit on it ends on a busy machine; use `TestCallClock()`")
         }
 
-        let bodies = try code.useCaseExtensionBodies()
         for call in calls where call.labels.contains("logger") && !call.labels.contains("limits")
-            && (call.labels.contains("claimChecker") || code.buildsAUseCase(call, extensionBodies: bodies)) {
+            && (call.labels.contains("claimChecker") || code.buildsAUseCase(call, extensions: extensions)) {
             report(call.open, "`\(call.name)(…)` builds a use case on the real limits; pass `limits: .onTestClock()`")
         }
 
@@ -190,6 +193,41 @@ struct DraftTimeLimitsTests {
         Scenario(name: "the use case's log clock",
                  source: "CVGeneratorUseCase(service: s, claimChecker: c, logger: l, clock: ContinuousClock(), tracer: t, limits: .onTestClock())",
                  violations: 0),
+        Scenario(name: "the use case's log clock by the variable's type",
+                 source: "let u: CVGeneratorUseCase = .init(service: s, claimChecker: c, logger: l, clock: ContinuousClock(), tracer: t, limits: .onTestClock())",
+                 violations: 0),
+        Scenario(name: "the use case's log clock in a helper of the use case", source: """
+            extension CVGeneratorUseCase {
+                convenience init(s: S) { self.init(service: s, claimChecker: c, logger: l, clock: ContinuousClock(), tracer: t, limits: .onTestClock()) }
+            }
+            """, violations: 0),
+        Scenario(name: "the import's log clock",
+                 source: "ImportCV(pdfReader: r, limits: ImportLimits.standard, logger: l, clock: ContinuousClock(), tracer: t); CVGeneratorUseCase(service: s, claimChecker: c)",
+                 violations: 0),
+        Scenario(name: "the import's log clock in a helper of the import", source: """
+            extension ImportCV {
+                init(r: R) { self.init(pdfReader: r, limits: ImportLimits.standard, logger: l, clock: ContinuousClock(), tracer: t) }
+            }
+            let u = CVGeneratorUseCase(service: s, claimChecker: c)
+            """, violations: 0),
+        Scenario(name: "the language data wait's log clock",
+                 source: "LanguageDataPreparation(requester: r, sleep: w, logger: l, clock: ContinuousClock()); CVGeneratorUseCase(service: s, claimChecker: c)",
+                 violations: 0),
+        Scenario(name: "a helper that makes limits given the real clock", source: """
+            func makeLimits(clock: some Clock<Duration>) -> DraftingLimits { DraftingLimits.standard.on(clock) }
+            let limits = makeLimits(clock: ContinuousClock())
+            """, violations: 1),
+        Scenario(name: "a helper given the real clock, implied",
+                 source: "let limits = makeLimits(clock: .continuous); let u = CVGeneratorUseCase(service: s, claimChecker: c)", violations: 1),
+        Scenario(name: "a method given the real clock", source: "let u = CVGeneratorUseCase(service: s, claimChecker: c).on(clock: SuspendingClock())",
+                 violations: 1),
+        Scenario(name: "a logger given the real clock (a false alarm the author sees)",
+                 source: "let log = DraftLog(clock: ContinuousClock()); let u = CVGeneratorUseCase(service: s, claimChecker: c)", violations: 1),
+        Scenario(name: "an implied initialiser in a helper of the use case given the real clock",
+                 source: "extension CVGeneratorUseCase { static func limit() -> TimeLimit { .init(duration: .seconds(1), clock: ContinuousClock()) } }",
+                 violations: 1),
+        Scenario(name: "an implied initialiser of a variable's type given the real clock",
+                 source: "let k: DraftLog = .init(clock: ContinuousClock()); let u = CVGeneratorUseCase(service: s, claimChecker: c)", violations: 1),
         Scenario(name: "the time now", source: "let start = ContinuousClock.now; let limit = TimeLimit(duration: .seconds(1), clock: k)", violations: 0),
         Scenario(name: "a member of a value", source: "let k = timer.suspending; let u = CVGeneratorUseCase(service: s, claimChecker: c)", violations: 0),
     ]
@@ -276,37 +314,56 @@ private struct DraftCode {
         return postfix.contains(unit) && before == dot - 1 ? .expression : .implied
     }
 
-    /// Whether the real clock at `start` is the `clock:` argument of a call that makes no limit: the use case's, which times the
-    /// steps for the log.
-    func isTheLogClock(at start: Int, calls: [Call]) -> Bool {
+    /// Whether the real clock at `start` is the `clock:` argument of a call that builds one of `logClockTypes` and names it.
+    func isTheLogClock(at start: Int, calls: [Call], extensions: [Extension]) -> Bool {
         guard let colon = previousNonSpace(before: start), units[colon] == Self.colon,
               let labelEnd = previousNonSpace(before: colon), word(endingAt: labelEnd) == "clock",
               let opening = previousNonSpace(before: wordStart(endingAt: labelEnd)),
               units[opening] == Self.comma || units[opening] == UInt16(UInt8(ascii: "(")),
-              let call = calls.filter({ $0.open < start && start < $0.close }).max(by: { $0.open < $1.open })
+              let call = calls.filter({ $0.open < start && start < $0.close }).max(by: { $0.open < $1.open }),
+              let type = namedType(of: call, extensions: extensions)
         else { return false }
-        return !DraftTimeLimitsTests.limitCalls.contains(call.type) && !call.labels.contains("duration")
+        return DraftTimeLimitsTests.logClockTypes.contains(type)
     }
 
-    /// Whether `call` names the use case: by its type, by the type of the variable it sets, or as `self.init` and the like in an
-    /// extension of it.
-    func buildsAUseCase(_ call: Call, extensionBodies: [Range<Int>]) -> Bool {
-        if call.type == "CVGeneratorUseCase" { return true }
-        if ["self.init", "Self", "Self.init", ".init"].contains(call.name), extensionBodies.contains(where: { $0.contains(call.open) }) {
-            return true
+    /// The type `call` builds when its code names it: `T(` and `T.init(` by the name, `let u: T = .init(` by the variable's type,
+    /// and `self.init(`, `Self(`, `Self.init(` by the extension they are in. Nil for any other call: a function, a method, and a
+    /// bare `.init(` in an extension, which can build the type of an argument (`limit: .init(duration:clock:)`).
+    func namedType(of call: Call, extensions: [Extension]) -> String? {
+        if ["self.init", "Self", "Self.init"].contains(call.name) {
+            return extensions.last { $0.body.contains(call.open) }?.type
         }
-        guard call.name == ".init", let equals = previousNonSpace(before: call.nameStart), units[equals] == Self.equals,
-              let typeEnd = previousNonSpace(before: equals) else { return false }
-        return word(endingAt: typeEnd) == "CVGeneratorUseCase"
+        if call.name == ".init" {
+            guard let equals = previousNonSpace(before: call.nameStart), units[equals] == Self.equals,
+                  let typeEnd = previousNonSpace(before: equals), Self.isWord(units[typeEnd]) else { return nil }
+            return word(endingAt: typeEnd)
+        }
+        guard let first = call.name.unicodeScalars.first, CharacterSet.uppercaseLetters.contains(first) else { return nil }
+        return call.type
     }
 
-    /// The bodies of `extension CVGeneratorUseCase`, braces included.
-    func useCaseExtensionBodies() throws -> [Range<Int>] {
-        try matches(#"\bextension\s+(?:\w+\s*\.\s*)*CVGeneratorUseCase\b"#).compactMap { match in
-            guard let open = units[(match.location + match.length)...].firstIndex(of: UInt16(UInt8(ascii: "{"))),
-                  let close = closing(open) else { return nil }
-            return open..<(close + 1)
-        }
+    /// Whether `call` builds the use case: named as `namedType(of:extensions:)` reads it, or a bare `.init(` inside an extension of
+    /// the use case. That last one can build an argument's type too, and is counted, since a call taken for the use case is checked
+    /// for its limits and the author sees a false alarm, while a missed one is silent.
+    func buildsAUseCase(_ call: Call, extensions: [Extension]) -> Bool {
+        if namedType(of: call, extensions: extensions) == "CVGeneratorUseCase" { return true }
+        return call.name == ".init" && extensions.last { $0.body.contains(call.open) }?.type == "CVGeneratorUseCase"
+    }
+
+    /// An `extension` of the code: the type it extends, the last part of its name, and its body, braces included.
+    struct Extension {
+        let type: String
+        let body: Range<Int>
+    }
+
+    func extensions() throws -> [Extension] {
+        try NSRegularExpression(pattern: #"\bextension\s+(?:\w+\s*\.\s*)*(\w+)\b"#)
+            .matches(in: text, range: NSRange(location: 0, length: units.count)).compactMap { match in
+                let name = match.range(at: 1)
+                guard let open = units[(name.location + name.length)...].firstIndex(of: UInt16(UInt8(ascii: "{"))),
+                      let close = closing(open) else { return nil }
+                return Extension(type: string(name.location..<(name.location + name.length)), body: open..<(close + 1))
+            }
     }
 
     // MARK: Calls
