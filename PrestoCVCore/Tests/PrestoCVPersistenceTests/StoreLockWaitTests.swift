@@ -30,22 +30,36 @@ final class ForeignLock: Sendable {
     deinit { close(fd) }
 }
 
-/// A pause that does not wait: it counts its calls, and on the call given runs an action, such as releasing a lock.
+/// A pause that does not wait: it records the duration each call asks for, and on the call given runs an action, such as
+/// releasing a lock.
 actor PauseLog {
-    private(set) var calls = 0
+    private(set) var asked: [Duration] = []
+    var calls: Int { asked.count }
     private let trigger: Int, action: @Sendable () -> Void
 
     init(on trigger: Int = 0, _ action: @escaping @Sendable () -> Void = {}) { self.trigger = trigger; self.action = action }
 
-    func pause() {
-        calls += 1
+    func pause(_ duration: Duration) {
+        asked.append(duration)
         if calls == trigger { action() }
     }
 
     /// A wait whose pauses are this log's.
     nonisolated func wait(deadline: Duration = .milliseconds(100), interval: Duration = .milliseconds(25)) -> StoreOptions.LockWait {
-        StoreOptions.LockWait(deadline: deadline, interval: interval) { _ in await self.pause() }
+        StoreOptions.LockWait(deadline: deadline, interval: interval) { await self.pause($0) }
     }
+}
+
+/// A deadline, an interval, and the pauses a wait under contention asks for with them.
+struct LockWaitSteps: Sendable, CustomTestStringConvertible {
+    let deadline: Duration, interval: Duration, pauses: [Duration]
+    var testDescription: String { "deadline \(deadline), interval \(interval)" }
+
+    static let cases = [
+        LockWaitSteps(deadline: .milliseconds(100), interval: .seconds(60), pauses: [.milliseconds(100)]),
+        LockWaitSteps(deadline: .milliseconds(100), interval: .milliseconds(75), pauses: [.milliseconds(75), .milliseconds(25)]),
+        LockWaitSteps(deadline: .milliseconds(100), interval: .milliseconds(25), pauses: Array(repeating: .milliseconds(25), count: 4)),
+    ]
 }
 
 /// A wait that only yields, with a budget no contention in a test reaches: the tests of many writers use it.
@@ -168,7 +182,20 @@ struct StoreLockWaitTests {
         let interval = Duration.seconds(Int64.max) * 9 + .seconds(Int64.max / 10 * 3)
         let result = await releasing(foreign) { await outcome { try await repo(dir, wait: pauses.wait(deadline: deadline, interval: interval)).create(named("Ada")) } }
         #expect(result.failure as? RepositoryError == .storeUnavailable(.lockTimeout))
-        #expect(await pauses.calls == 2)
+        #expect(await pauses.asked == [interval, deadline - interval])   // the second pause asks only for what is left
+        #expect(storedFiles(dir).isEmpty)
+    }
+
+    @Test("each pause asks for the interval, or only for what is left of the deadline: the wait never passes the deadline",
+          arguments: LockWaitSteps.cases)
+    func pausesStayWithinTheDeadline(steps: LockWaitSteps) async throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = try ForeignLock(dir)
+        let pauses = PauseLog(on: 1000) { foreign.release() }
+        let wait = pauses.wait(deadline: steps.deadline, interval: steps.interval)
+        let result = await releasing(foreign) { await outcome { try await repo(dir, wait: wait).create(named("Ada")) } }
+        #expect(result.failure as? RepositoryError == .storeUnavailable(.lockTimeout))
+        #expect(await pauses.asked == steps.pauses)
         #expect(storedFiles(dir).isEmpty)
     }
 

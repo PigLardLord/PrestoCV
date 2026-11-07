@@ -45,7 +45,7 @@ public actor FileDesignStore: DesignStore {
     }
 
     /// How the store waits while its lock is held elsewhere: it tries again after each pause, and gives up with
-    /// `lockTimeout` once the pauses add up to the deadline (the last one counts only for what is left of it, so the sum cannot overflow). The pause suspends the caller; it never holds a thread.
+    /// `lockTimeout` once the pauses add up to the deadline (a pause never asks for more than what is left of it, so the wait never passes it and the sum cannot overflow). The pause suspends the caller; it never holds a thread.
     public struct LockWait: Sendable {
         public let deadline: Duration, interval: Duration
         let pause: @Sendable (Duration) async -> Void
@@ -58,6 +58,12 @@ public actor FileDesignStore: DesignStore {
         }
 
         static let smallestInterval = Duration.milliseconds(1)
+
+        /// The pause after the pauses have added up to `waited`: the interval, or only what is left of the deadline, so
+        /// the wait never passes the deadline and the sum never overflows; nil once the deadline is reached.
+        func step(after waited: Duration) -> Duration? {
+            waited < deadline ? min(interval, deadline - waited) : nil
+        }
 
         /// What the app uses: ten seconds, in pauses of 25 milliseconds on the real clock. The pause sleeps in a task of
         /// its own, which does not inherit the caller's cancellation: a cancelled call keeps waiting until the deadline,
@@ -150,13 +156,12 @@ public actor FileDesignStore: DesignStore {
         while flock(fd, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) != 0 {
             switch errno {
             case EINTR: continue
-            case EWOULDBLOCK: guard waited < lockWait.deadline else { throw .lockTimeout }
+            case EWOULDBLOCK:
+                guard let step = lockWait.step(after: waited) else { throw .lockTimeout }
+                await lockWait.pause(step)
+                waited += step
             default: throw .storeUnavailable
             }
-            await lockWait.pause(lockWait.interval)
-            // The guard left some budget: add the interval only if it fits, else the deadline, so the sum never overflows.
-            let remaining = lockWait.deadline - waited
-            waited = lockWait.interval < remaining ? waited + lockWait.interval : lockWait.deadline
         }
         defer { flock(fd, LOCK_UN) }
         try checkDesignsDirectory()

@@ -49,13 +49,12 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
         while flock(fd, LOCK_EX | LOCK_NB) != 0 {
             switch errno {
             case EINTR: continue
-            case EWOULDBLOCK: guard waited < lockWait.deadline else { throw .storeUnavailable(.lockTimeout) }
+            case EWOULDBLOCK:
+                guard let step = lockWait.step(after: waited) else { throw .storeUnavailable(.lockTimeout) }
+                await lockWait.pause(step)
+                waited += step
             default: throw .storeUnavailable(.cannotLock)
             }
-            await lockWait.pause(lockWait.interval)
-            // The guard left some budget: add the interval only if it fits, else the deadline, so the sum never overflows.
-            let remaining = lockWait.deadline - waited
-            waited = lockWait.interval < remaining ? waited + lockWait.interval : lockWait.deadline
         }
         defer { flock(fd, LOCK_UN) }
         return try body()
