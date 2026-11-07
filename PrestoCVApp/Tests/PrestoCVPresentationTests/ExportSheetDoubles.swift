@@ -11,8 +11,9 @@ import PrestoCVWorkflowPorts
 /// late result does.
 final class ExportingFake: CVExporting {
     let gate = Gate()
-    let snapshots = Mutex<[CV]>([])
-    let languages = Mutex<[DocumentLanguage]>([])
+    /// Each call that reached the port, its CV and its language recorded together under one lock: a test that sees a
+    /// call sees all of it.
+    private let received = Mutex<[(snapshot: CV, language: DocumentLanguage)]>([])
     /// How many calls were cancelled while they ran.
     let cancellations = Mutex(0)
     let result = Mutex<Result<ExportOutcome, any Error>>(.success(ExportingFake.onePage))
@@ -24,12 +25,13 @@ final class ExportingFake: CVExporting {
 
     /// How many calls reached the port. A call is counted once its cancellation handler is in place, so a test that
     /// waits for the count and then cancels sees the cancellation recorded.
-    var calls: Int { snapshots.withLock { $0.count } }
+    var calls: Int { received.withLock { $0.count } }
+    var snapshots: [CV] { received.withLock { $0.map(\.snapshot) } }
+    var languages: [DocumentLanguage] { received.withLock { $0.map(\.language) } }
 
     func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
         await withTaskCancellationHandler {
-            snapshots.withLock { $0.append(snapshot) }
-            languages.withLock { $0.append(language) }
+            received.withLock { $0.append((snapshot, language)) }
             await gate.pass()
         } onCancel: {
             cancellations.withLock { $0 += 1 }

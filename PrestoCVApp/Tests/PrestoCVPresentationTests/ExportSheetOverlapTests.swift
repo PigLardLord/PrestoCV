@@ -102,8 +102,8 @@ struct ExportSheetOverlapTests {
         await waitUntil("every export to end") { sheet.status != .exporting }
         await settle()
 
-        #expect(world.exporter.languages.withLock { $0 }.map(\.tag) == row.languages)
-        #expect(world.exporter.snapshots.withLock { $0 }.map(\.design?.design) == row.looks)
+        #expect(world.exporter.languages.map(\.tag) == row.languages)
+        #expect(world.exporter.snapshots.map(\.design?.design) == row.looks)
         #expect(world.exporter.cancellations.withLock { $0 } == row.cancelled)
         #expect(world.snapshotsTaken == row.snapshots, "a superseded task reads nothing")
         #expect(sheet.status == row.status)

@@ -65,7 +65,7 @@ struct ExportSheetStatusTests {
 
         #expect(sheet.status == .unsupportedLanguage)
         #expect(sheet.document == nil)
-        #expect(world.exporter.languages.withLock { $0 }.map(\.tag) == ["tlh"], "one export, in the CV's own language")
+        #expect(world.exporter.languages.map(\.tag) == ["tlh"], "one export, in the CV's own language")
     }
 
     struct NotAnExportFailure: Error {}
@@ -97,7 +97,7 @@ struct ExportSheetStatusTests {
         await world.exporter.gate.open()
         await waitUntil("the export to end") { sheet.status != .exporting }
 
-        #expect(world.exporter.snapshots.withLock { $0 }.map(\.personal.fullName) == ["Ada Brook"])
+        #expect(world.exporter.snapshots.map(\.personal.fullName) == ["Ada Brook"])
         #expect(world.snapshotsTaken == 1, "the snapshot is read once per export")
     }
 
@@ -116,7 +116,7 @@ struct ExportSheetStatusTests {
         #expect(sheet.document == nil, "the PDF on screen has the look left behind")
         await world.passThePause(thenExports: 2)
         await waitUntil("the second export to end") { sheet.status != .exporting }
-        #expect(world.exporter.snapshots.withLock { $0 }.map(\.design?.design) == [nil, "classic"])
+        #expect(world.exporter.snapshots.map(\.design?.design) == [nil, "classic"])
         #expect(sheet.status == .done(pages: 1))
     }
 
@@ -136,7 +136,7 @@ struct ExportSheetStatusTests {
         await waitUntil("the export to end") { sheet.status != .exporting }
         await settle()
 
-        #expect(world.exporter.snapshots.withLock { $0 }.map(\.personal.fullName) == ["Mara Ellison-Renn"])
+        #expect(world.exporter.snapshots.map(\.personal.fullName) == ["Mara Ellison-Renn"])
         #expect(sheet.status == .done(pages: 1))
         #expect(store.editing.loads.withLock { $0 } == 1, "only the editor's opening read the store")
         #expect(store.editing.writeCount == 0)

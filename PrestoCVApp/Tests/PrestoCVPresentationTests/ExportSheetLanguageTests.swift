@@ -34,7 +34,7 @@ struct ExportSheetLanguageTests {
         sheet.select(language: SheetWorld.language("de"))
         await world.passThePause(thenExports: 1)
 
-        #expect(world.exporter.languages.withLock { $0.map(\.tag) } == ["de"], "the CV is in Italian, the choice German")
+        #expect(world.exporter.languages.map(\.tag) == ["de"], "the CV is in Italian, the choice German")
         #expect(sheet.effectiveLanguage == SheetWorld.language("de"))
     }
 
@@ -73,7 +73,7 @@ struct ExportSheetLanguageTests {
         #expect(sheet.selectedLanguage == nil)
         #expect(sheet.automaticLanguage == SheetWorld.language("it"), "the CV is in Italian")
         #expect(sheet.effectiveLanguage == SheetWorld.language("it"))
-        #expect(world.exporter.languages.withLock { $0.map(\.tag) } == ["it"])
+        #expect(world.exporter.languages.map(\.tag) == ["it"])
     }
 
     @Test("The file is named in the language of the PDF, not the app's, and only once the PDF's language is known")

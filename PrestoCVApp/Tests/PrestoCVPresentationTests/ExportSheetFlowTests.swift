@@ -43,7 +43,7 @@ struct ExportSheetFlowTests {
         await settle()
 
         #expect(world.exporter.calls == 1, "the pause starts again at each choice, so only the last one exports")
-        #expect(world.exporter.languages.withLock { $0 }.map(\.tag) == ["en"])
+        #expect(world.exporter.languages.map(\.tag) == ["en"])
     }
 
     @Test("A choice made while an export runs cancels that export")

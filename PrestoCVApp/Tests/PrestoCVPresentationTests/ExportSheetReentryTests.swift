@@ -45,7 +45,7 @@ struct ExportSheetReentryTests {
         await waitUntil("the PDF") { sheet.document != nil }
         await settle()
 
-        #expect(world.exporter.languages.withLock { $0 }.map(\.tag) == ["en"])
+        #expect(world.exporter.languages.map(\.tag) == ["en"])
         #expect(sheet.selectedLanguage == SheetWorld.language("en"))
         #expect(sheet.status == .done(pages: 1))
     }
