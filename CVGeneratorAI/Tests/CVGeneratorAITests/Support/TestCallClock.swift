@@ -63,8 +63,15 @@ extension DraftingLimits {
     static func onTestClock(_ clock: TestCallClock = TestCallClock()) -> DraftingLimits {
         DraftingLimits(
             extraction: .seconds(90), section: .seconds(30),
-            claimCheck: ClaimCheckLimits(batchSize: ClaimCheckLimits.standard.batchSize, time: ClaimCheckLimits.standard.time, on: clock),
+            claimCheck: .onTestClock(clock),
             on: clock
         )
+    }
+}
+
+extension ClaimCheckLimits {
+    /// The app's batch and time, on `clock`: the claim check runs out of time only when the test says so.
+    static func onTestClock(_ clock: TestCallClock = TestCallClock()) -> ClaimCheckLimits {
+        ClaimCheckLimits(batchSize: ClaimCheckLimits.standard.batchSize, time: ClaimCheckLimits.standard.time, on: clock)
     }
 }

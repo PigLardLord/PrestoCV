@@ -17,7 +17,8 @@ struct DraftTimeLimitsTests {
     ]
 
     /// What a test file does wrong, one line each: a use case built with the public initialiser (it takes `logger:`, and sets the
-    /// real limits), a use case given the real limits, and a helper that builds one without test-clock limits.
+    /// real limits), a use case given the real limits, a claim check given the real limits, and a helper that builds a use case
+    /// without test-clock limits.
     static func violations(in path: String, source: String) -> [String] {
         let code = SwiftCode(source).code.joined(separator: "\n")
         var found: [String] = []
@@ -28,6 +29,9 @@ struct DraftTimeLimitsTests {
             if call.contains("limits: .standard") {
                 found.append("\(path): CVGeneratorUseCase(…) is given `limits: .standard`; pass `limits: .onTestClock()`")
             }
+        }
+        if code.contains("within: .standard") {
+            found.append("\(path): the claim check is given `within: .standard`; pass `within: .onTestClock()`")
         }
         if code.contains("extension CVGeneratorUseCase"), !code.contains(".onTestClock(") {
             found.append("\(path): the helper builds a use case without limits on `.onTestClock()`")
@@ -87,6 +91,10 @@ struct DraftTimeLimitsTests {
         Scenario(name: "a helper on a test clock",
                  source: "extension CVGeneratorUseCase { init() { self.init(logger: l, limits: .onTestClock()) } }", violations: 0),
         Scenario(name: "a comment", source: "// CVGeneratorUseCase(service: s, logger: l)", violations: 0),
+        Scenario(name: "a claim check on the real limits",
+                 source: "ClaimWithdrawal.checking(d, in: t, with: c, within: .standard)", violations: 1),
+        Scenario(name: "a claim check on a test clock",
+                 source: "ClaimWithdrawal.checking(d, in: t, with: c, within: .onTestClock())", violations: 0),
     ]
 
     @Test("The check reads a source", arguments: scenarios)
