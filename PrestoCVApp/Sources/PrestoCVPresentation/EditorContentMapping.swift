@@ -69,6 +69,14 @@ extension EditorContent {
         row(in: section, id: id)?.isBlank ?? true
     }
 
+    /// How many rows of all sections have `id`.
+    func rowCount(withID id: RowID) -> Int {
+        experiences.filter { $0.id == id }.count + education.filter { $0.id == id }.count
+            + skills.filter { $0.id == id }.count + languages.filter { $0.id == id }.count
+            + certifications.filter { $0.id == id }.count + profiles.filter { $0.id == id }.count
+            + interests.filter { $0.id == id }.count
+    }
+
     /// Whether the section has the row with `id`.
     func hasRow(in section: EditorSection, id: RowID) -> Bool {
         row(in: section, id: id) != nil

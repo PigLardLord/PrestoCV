@@ -409,4 +409,55 @@ struct EditorRowTests {
         #expect(Set(all).count == 6)
         #expect(unique.experiences[0].id == first)
     }
+
+    // MARK: - A pending removal whose row can no longer be told apart
+
+    /// Where the view puts a copy of the row waiting for its removal.
+    enum CopyPlace: CaseIterable, Sendable {
+        case before
+        case after
+        case anotherSection
+    }
+
+    @Test("a copy of the row waiting for removal withdraws the request, and both rows stay", arguments: CopyPlace.allCases)
+    func copyOfThePendingRowWithdrawsTheRequest(place: CopyPlace) async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        let ids = addSkills(["A"], to: editor)
+        editor.removeRow(in: .skills, id: ids[0])
+        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: ids[0]))
+        var content = editor.content
+        let copy = content.skills[0]
+        switch place {
+        case .before: content.skills.insert(copy, at: 0)
+        case .after: content.skills.append(copy)
+        case .anotherSection: content.interests = [InterestRow(id: ids[0], text: "Cycling")]
+        }
+
+        editor.content = content
+
+        #expect(editor.pendingRemoval == nil)
+        editor.confirmRemoval()
+        let expectedSkills = place == .anotherSection ? 1 : 2
+        #expect(editor.content.skills.map(\.name) == Array(repeating: "A", count: expectedSkills))
+        #expect(editor.content.interests.count == (place == .anotherSection ? 1 : 0))
+        #expect(editor.pendingRemoval == nil)
+    }
+
+    @Test("the row waiting for removal taken out by the view: confirming removes nothing else")
+    func pendingRowRemovedByTheViewRemovesNothingElse() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        let ids = addSkills(["A", "B"], to: editor)
+        editor.removeRow(in: .skills, id: ids[0])
+        var content = editor.content
+        content.skills.removeAll { $0.id == ids[0] }
+
+        editor.content = content
+
+        #expect(editor.pendingRemoval == nil)
+        editor.confirmRemoval()
+        #expect(editor.content.skills.map(\.name) == ["B"])
+        #expect(editor.pendingRemoval == nil)
+    }
 }

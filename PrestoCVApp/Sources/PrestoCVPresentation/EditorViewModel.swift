@@ -112,7 +112,7 @@ public final class EditorViewModel {
 
     private func open(_ cv: CV, unchangedFrom unchanged: CV?, stored: CV?) {
         guard autosave == nil else { return }
-        form = rowIDs.unique(EditorContent(cv, ids: &rowIDs))
+        form = admit(EditorContent(cv, ids: &rowIDs))
         pendingRemoval = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
@@ -121,9 +121,17 @@ public final class EditorViewModel {
     // MARK: - Editing
 
     func edit(_ content: EditorContent) {
-        form = rowIDs.unique(content)
+        form = admit(content)
         passOnTheForm()
         refreshSaveStatus()
+    }
+
+    /// `content` with unique row ids, the one place every entry of rows into the form passes through. The row waiting for its
+    /// removal is named by its id: if that id arrives on more than one row, or on none, the rows cannot be told apart, so the
+    /// request is withdrawn and nothing is removed.
+    func admit(_ content: EditorContent) -> EditorContent {
+        if let request = pendingRemoval, content.rowCount(withID: request.row) != 1 { pendingRemoval = nil }
+        return rowIDs.unique(content)
     }
 
     /// Gives the autosave the CV the form shows, unless a replacement runs: it is given once that ends.
