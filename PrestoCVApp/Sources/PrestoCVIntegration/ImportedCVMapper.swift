@@ -19,14 +19,25 @@ public struct ImportedCVMapper: Sendable {
         let person = imported.person
 
         var sections = CVSections()
-        sections.experiences = imported.experience.enumerated().map { index, entry in
-            Experience(role: entry.role?.value ?? "", company: entry.employer?.value ?? "", location: entry.location?.value ?? "",
-                       period: period(entry.period, field: .experiencePeriod(index + 1), notes: &notes), description: description(entry.details))
+        // An entry with nothing left is not added (its text stays in the text not imported), and review fields count only
+        // the entries the CV holds: an entry takes its place in the CV, and the items of one left out are withdrawn.
+        for (index, entry) in imported.experience.enumerated() {
+            let place = sections.experiences.count + 1
+            let experience = Experience(role: entry.role?.value ?? "", company: entry.employer?.value ?? "", location: entry.location?.value ?? "",
+                                        period: period(entry.period, field: .experiencePeriod(place), notes: &notes), description: description(entry.details))
+            let kept = !experience.hasNoContent
+            if kept { sections.experiences.append(experience) }
+            notes.settle(from: [.experience(index + 1)], to: kept ? [.experience(place)] : [], withdrawing: [.experiencePeriod(place)], kept: kept)
         }
-        sections.education = imported.education.enumerated().map { index, entry in
-            if let location = entry.location { notes.drop(.educationLocation(index + 1), .locationNotKept, location.value) }
-            return Education(degree: entry.degree?.value ?? "", school: entry.school?.value ?? "",
-                             period: period(entry.period, field: .educationPeriod(index + 1), notes: &notes), description: description(entry.details))
+        for (index, entry) in imported.education.enumerated() {
+            let place = sections.education.count + 1
+            if let location = entry.location { notes.drop(.educationLocation(place), .locationNotKept, location.value) }
+            let education = Education(degree: entry.degree?.value ?? "", school: entry.school?.value ?? "",
+                                      period: period(entry.period, field: .educationPeriod(place), notes: &notes), description: description(entry.details))
+            let kept = !education.hasNoContent
+            if kept { sections.education.append(education) }
+            notes.settle(from: [.education(index + 1)], to: kept ? [.education(place)] : [],
+                         withdrawing: [.educationPeriod(place), .educationLocation(place)], kept: kept)
         }
         sections.skills = imported.skills.map { Skill(name: $0.value) }
         for (index, language) in imported.languages.enumerated() {
@@ -118,6 +129,17 @@ public struct ImportedCVMapper: Sendable {
 
         func words(of period: Sourced<ImportedPeriod>) -> String { document.text(of: period.spans, joinedBy: " ") }
 
+        /// Ends an entry: its imported review items move to the entry's place in the CV, or, when the entry is left out,
+        /// they and the items of its dropped values are withdrawn. The text of what was dropped stays in `listed`.
+        mutating func settle(from imported: [ImportReviewField], to place: [ImportReviewField], withdrawing dropped: [ImportReviewField], kept: Bool) {
+            items = items.compactMap { item in
+                if let at = imported.firstIndex(of: item.field) {
+                    return place.indices.contains(at) ? ImportReviewItem(field: place[at], reason: item.reason, text: item.text) : nil
+                }
+                return !kept && dropped.contains(item.field) ? nil : item
+            }
+        }
+
         /// A value left out of the CV: reported once for its field and reason, and kept in the text not imported.
         mutating func drop(_ field: ImportReviewField, _ reason: ImportReviewReason, _ text: String, listed isListed: Bool = true) {
             if let known = items.firstIndex(where: { $0.field == field && $0.reason == reason }) {
@@ -128,6 +150,16 @@ public struct ImportedCVMapper: Sendable {
             if isListed { listed.append(text) }
         }
     }
+}
+
+/// The entry reads nothing: no value of it is left. The domain has no such predicate; it is the adapter's own check of
+/// what it has just built from an import, kept to the fields the mapper fills.
+private extension Experience {
+    var hasNoContent: Bool { [role, company, location, description].allSatisfy(\.isEmpty) && period == nil }
+}
+
+private extension Education {
+    var hasNoContent: Bool { [degree, school, description].allSatisfy(\.isEmpty) && period == nil }
 }
 
 private extension ReviewItem {

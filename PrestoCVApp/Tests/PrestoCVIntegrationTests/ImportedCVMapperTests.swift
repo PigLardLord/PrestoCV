@@ -190,6 +190,104 @@ struct ImportedCVMapperTests {
         #expect(outcome.notImported == "2019 -")
     }
 
+    // MARK: Entries left with no content
+
+    /// One way an entry loses its only content: what it holds, and the person's words that end up in the text not imported.
+    struct Hollow: CustomTestStringConvertible, Sendable {
+        let name: String
+        let period: (start: YearMonth, end: ImportedPeriod.End?, quote: String, check: CheckReason?)?
+        let location: String?
+        let entryCheck: CheckReason?
+        var notImported: [String] { [period?.quote, location].compactMap { $0 } }
+        var testDescription: String { name }
+
+        static let all: [Hollow] = [
+            Hollow(name: "open end", period: (yearMonth(2019), .unstated, "2019 -", .periodOpenEnd), location: nil, entryCheck: nil),
+            Hollow(name: "single date", period: (yearMonth(2019), nil, "2019", nil), location: nil, entryCheck: nil),
+            Hollow(name: "unreadable period (end before start)",
+                   period: (yearMonth(2021), .date(yearMonth(2019)), "2021 - 2019", .periodUnreadable), location: nil, entryCheck: nil),
+            Hollow(name: "period out of the years the CV holds",
+                   period: (yearMonth(1850), .date(yearMonth(1860)), "1850 - 1860", nil), location: nil, entryCheck: nil),
+            Hollow(name: "failed check on the entry alone", period: nil, location: nil, entryCheck: .entryBoundsUnsure),
+            Hollow(name: "failed check and open end",
+                   period: (yearMonth(2019), .unstated, "2019 -", .periodOpenEnd), location: nil, entryCheck: .entryBoundsUnsure),
+        ]
+    }
+
+    private static let kept = "Keep"
+
+    private func keptPeriod(_ f: ImportFixture) -> Sourced<ImportedPeriod> {
+        f.sourced(ImportedPeriod(start: yearMonth(2015), end: nil), quoting: "2015", reading: .period)
+    }
+
+    private func hollowPeriod(_ f: ImportFixture, _ hollow: Hollow) -> Sourced<ImportedPeriod>? {
+        hollow.period.map { f.sourced(ImportedPeriod(start: $0.start, end: $0.end), quoting: $0.quote, reading: .period, check: $0.check) }
+    }
+
+    private func fixtureText(_ hollow: Hollow) -> String { (hollow.notImported + [Self.kept, "2015"]).joined(separator: " ") }
+
+    /// The entry after the left-out one holds its place in the CV, and so do its review items; nothing points at a missing row.
+    private func expectOnlyTheKeptEntry(_ outcome: ImportOutcome, hollow: Hollow, keptField: ImportReviewField, keptPeriodField: ImportReviewField) {
+        #expect(outcome.review == [
+            ImportReviewItem(field: keptField, reason: .roleOrEmployerByOrder, text: Self.kept),
+            ImportReviewItem(field: keptPeriodField, reason: .periodNotARange, text: "2015"),
+        ])
+        #expect(outcome.notImported.split(separator: "\n").map(String.init) == hollow.notImported + ["2015"])
+    }
+
+    @Test("an experience left with no content is not added; its text is not imported once, and the next entry keeps its CV position", arguments: Hollow.all)
+    func emptyExperienceIsLeftOut(_ hollow: Hollow) {
+        let f = ImportFixture(text: fixtureText(hollow))
+        let outcome = map(f) {
+            $0.experience = [
+                f.experience(period: hollowPeriod(f, hollow), check: hollow.entryCheck),
+                f.experience(role: f.quoted(Self.kept), period: keptPeriod(f), check: .roleOrEmployerByOrder),
+            ]
+        }
+        #expect(outcome.cv.sections.experiences.map(\.role) == [Self.kept])
+        expectOnlyTheKeptEntry(outcome, hollow: hollow, keptField: .experience(1), keptPeriodField: .experiencePeriod(1))
+    }
+
+    @Test("an education left with no content is not added; its text is not imported once, and the next entry keeps its CV position", arguments: Hollow.all)
+    func emptyEducationIsLeftOut(_ hollow: Hollow) {
+        let f = ImportFixture(text: fixtureText(hollow))
+        let outcome = map(f) {
+            $0.education = [
+                f.education(period: hollowPeriod(f, hollow), check: hollow.entryCheck),
+                f.education(degree: f.quoted(Self.kept), period: keptPeriod(f), check: .roleOrEmployerByOrder),
+            ]
+        }
+        #expect(outcome.cv.sections.education.map(\.degree) == [Self.kept])
+        expectOnlyTheKeptEntry(outcome, hollow: hollow, keptField: .education(1), keptPeriodField: .educationPeriod(1))
+    }
+
+    @Test("an education with only a location, which the CV cannot hold, is not added; the location is not imported once")
+    func educationWithOnlyALocationIsLeftOut() {
+        let f = ImportFixture(text: "Aveiro Keep 2015")
+        let outcome = map(f) {
+            $0.education = [
+                f.education(location: f.quoted("Aveiro")),
+                f.education(degree: f.quoted(Self.kept), period: keptPeriod(f), check: .roleOrEmployerByOrder),
+            ]
+        }
+        #expect(outcome.cv.sections.education.map(\.degree) == [Self.kept])
+        expectOnlyTheKeptEntry(outcome, hollow: Hollow(name: "location", period: nil, location: "Aveiro", entryCheck: nil),
+                               keptField: .education(1), keptPeriodField: .educationPeriod(1))
+    }
+
+    @Test("a later entry's location item follows its entry to its CV position")
+    func laterEducationLocationFollowsItsEntry() {
+        let f = ImportFixture(text: "2019 - Keep Aveiro")
+        let outcome = map(f) {
+            $0.education = [
+                f.education(period: f.sourced(ImportedPeriod(start: yearMonth(2019), end: .unstated), quoting: "2019 -", reading: .period, check: .periodOpenEnd)),
+                f.education(degree: f.quoted(Self.kept), location: f.quoted("Aveiro")),
+            ]
+        }
+        #expect(outcome.review == [ImportReviewItem(field: .educationLocation(1), reason: .locationNotKept, text: "Aveiro")])
+        #expect(outcome.notImported == "2019 -\nAveiro")
+    }
+
     @Test("the document language is the language the import detected, or none")
     func documentLanguageIsTheDetectedOne() {
         let f = ImportFixture(text: "Ada")
