@@ -37,7 +37,7 @@ struct ImportedCVMapperTests {
                            period: Period(start: date(2019, 3), end: .date(date(2021, 5))),
                            description: "• Led the migration to containers\n• Cut build times by half"),
                 Experience(role: "Junior Developer", company: "Tailspin Works", location: "",
-                           period: Period(start: date(2015), end: .unknown), description: "Wrote internal tools"),
+                           period: nil, description: "Wrote internal tools"),
             ],
             education: [
                 Education(degree: "MSc Computer Science", school: "Technical University of Aveiro",
@@ -174,7 +174,7 @@ struct ImportedCVMapperTests {
         for piece in ["2021 - 2019", "1850 - 1860", "2015"] { #expect(outcome.notImported.contains(piece)) }
     }
 
-    @Test("a period without an end is never present: its end stays unknown, and only a stated present is current")
+    @Test("a period without an end is no period: the entry has none, one review item, and the text is not imported once")
     func openEndIsNeverPresent() {
         let f = ImportFixture(text: "Alpha 2019 - Beta 2019 - present")
         let outcome = map(f) {
@@ -185,8 +185,9 @@ struct ImportedCVMapperTests {
                                                                       quoting: "2019 - present", reading: .period)),
             ]
         }
-        #expect(outcome.cv.sections.experiences.map { $0.period?.end } == [.unknown, .current])
+        #expect(outcome.cv.sections.experiences.map { $0.period?.end } == [nil, .current])
         #expect(outcome.review == [ImportReviewItem(field: .experiencePeriod(1), reason: .periodOpenEnd, text: "2019 -")])
+        #expect(outcome.notImported == "2019 -")
     }
 
     @Test("the document language is the language the import detected, or none")

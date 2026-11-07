@@ -75,7 +75,8 @@ public struct ImportedCVMapper: Sendable {
     // MARK: Values
 
     /// The typed period of a range the text states, or none, with the reason: a single date, an end before the start or a
-    /// date out of the years the CV holds. An open end stays `.unknown`: it is never "present".
+    /// date out of the years the CV holds, or a start with no end ("2019 -"): that is no unambiguous range, and it is never
+    /// "present". Each of these is one review item for the field, and the person's words stay in the text not imported.
     private func period(_ period: Sourced<ImportedPeriod>?, field: ImportReviewField, notes: inout Notes) -> Period? {
         guard let period else { return nil }
         if let check = period.check { notes.drop(field, ReviewItemMapping.reason(check), notes.words(of: period), listed: false) }
@@ -87,7 +88,9 @@ public struct ImportedCVMapper: Sendable {
                 return nil
             case .date(let end)?: return try Period.make(start: start, end: (year: end.year, month: end.month), current: false)
             case .current?: return try Period.make(start: start, end: nil, current: true)
-            case .unstated?: return try Period.make(start: start, end: nil, current: false)
+            case .unstated?:
+                notes.drop(field, .periodOpenEnd, notes.words(of: period))
+                return nil
             }
         } catch {
             notes.drop(field, .periodUnreadable, notes.words(of: period))
