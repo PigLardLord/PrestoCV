@@ -148,6 +148,27 @@ struct EditorSaveStatusTests {
         #expect(await world.storedName(of: cv) == "Tobias Renn")
     }
 
+    @Test("a blank row added and removed while reload reads the store is an edit: the stored CV is not taken")
+    func reloadKeepsTheFormAfterARowAddedAndRemovedDuringTheRead() async throws {
+        let world = Editing()
+        let (editor, cv) = try await inConflict(world)
+        let typed = editor.content.fullName
+        await world.editing.loadGate.close()
+
+        let reloading = Task { await editor.reload() }
+        await waitUntil("the read to start") { await world.editing.loadGate.waiting == 1 }
+        editor.addRow(to: .experiences)
+        let added = try #require(editor.content.experiences.last)
+        editor.removeRow(in: .experiences, id: added.id)
+        await world.editing.loadGate.open()
+        await reloading.value
+
+        #expect(editor.content.fullName == typed)
+        #expect(editor.content.experiences.isEmpty)
+        #expect(editor.saveStatus == .conflict)
+        #expect(await world.storedName(of: cv) == "Tobias Renn")
+    }
+
     @Test("save as copy after a conflict stores the text as a new CV, and the original stays as the other window left it")
     func saveAsCopyAfterConflictStoresNewCV() async throws {
         let world = Editing()
