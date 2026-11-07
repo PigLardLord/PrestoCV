@@ -186,7 +186,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it checks the name, counts, dates and ratings;
   - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
-- Pending: a committed JSON Schema.
+- **The JSON Schema**, version 1, is committed as [cv-document.schema.json](../../CVPDFExporter/Docs/cv-document.schema.json). `DocumentSchemaTests` hold it to the type in both directions: what the type encodes validates, its property names, section kinds and language levels are the schema's, and the bounds both state (years, months, ratings, entry counts) are the validator's. The byte bounds on text stay in the validator, which JSON Schema cannot express.
 
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
