@@ -38,4 +38,15 @@ public struct LookChange: Sendable, Equatable {
             parts: parts.union(later.parts)
         )
     }
+
+    /// The look a CV that holds `current` has once this change is made: the parts chosen are `shown`'s, every other part
+    /// stays as the CV holds it, an id the app does not know included. A CV with no look takes all of `shown`. A part
+    /// chosen that `shown` has no value for is cleared.
+    public func applying(to current: DesignChoice?) -> DesignChoice {
+        guard let current else { return shown }
+        let design = parts.contains(.design) ? shown.design : current.design
+        let palette = parts.contains(.palette) ? shown.palette : current.palette
+        let fonts = parts.contains(.fonts) ? shown.fonts : current.fonts
+        return DesignChoice(design: design, palette: palette, fonts: fonts) ?? current
+    }
 }
