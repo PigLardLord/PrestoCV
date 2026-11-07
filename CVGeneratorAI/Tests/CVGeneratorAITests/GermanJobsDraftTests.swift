@@ -80,4 +80,14 @@ struct GermanJobsDraftTests {
 
         #expect(job.description?.contains(duty) == true, "\(draft.experience.map { "\($0.company): \($0.description ?? "")" })")
     }
+
+    @Test("The forewoman's duties said after wo ich read as a German main clause in her job's final text")
+    func germanOrder() throws {
+        let description = try #require(DraftingInputs.jobs.first { $0.id == "jobs-de" }).description
+        let draft = try Self.sanitizer.sanitize(Self.answer, writing: Self.writing, against: description)
+        let job = try #require(draft.experience.first { $0.company.contains("Hollerbach") })
+
+        #expect(job.description?.contains("Ich teile die Kolonne ein und plane die Pflege der Parkanlagen.") == true, "\(job.description ?? "")")
+        #expect(job.description?.contains("Ich einteile") == false)
+    }
 }

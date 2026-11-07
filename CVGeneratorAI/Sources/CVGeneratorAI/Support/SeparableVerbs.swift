@@ -32,6 +32,22 @@ enum SeparableVerbs {
         return String(clause[..<particle.endIndex]) + String(clause[verb.startIndex...])
     }
 
+    /// A finite verb a separable particle opens, as a subordinate clause writes it, split into the verb and the particle a main
+    /// clause ends with: "einteile" is "teile … ein", "sicherstelle" is "stelle … sicher" (#359). A verb that only begins like one
+    /// stays whole: a foreign verb in "-ieren" ("analysiere") and the verbs of `wholeVerbs` ("antworte", "hinterlege").
+    static func split(_ verb: String) -> (verb: String, particle: String)? {
+        guard verb.first?.isLowercase == true, !wholeVerbs.contains(where: { verb.hasPrefix($0) }),
+              !["iere", "iert", "ierst", "ieren"].contains(where: { verb.hasSuffix($0) }) else { return nil }
+        for particle in particles.union(adjectives).sorted(by: { $0.count > $1.count }) where verb.hasPrefix(particle) {
+            let rest = String(verb.dropFirst(particle.count))
+            if rest.count >= 4, isFiniteVerb(Substring(rest)), joins(particle, rest) { return (rest, particle) }
+        }
+        return nil
+    }
+
+    /// The verbs that begin with a particle's letters and are not separable.
+    private static let wholeVerbs = ["antwort", "hinter"]
+
     /// A finite verb as a subordinate clause ends with it: lower case, unlike a noun, and with the ending of a person.
     private static func isFiniteVerb(_ word: Substring) -> Bool {
         guard word.count >= 4, word.first?.isLowercase == true else { return false }

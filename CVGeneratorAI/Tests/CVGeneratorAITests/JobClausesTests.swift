@@ -582,7 +582,7 @@ struct JobClausesTests {
     /// The verbs of the gardener's sentences, as the device tags them, pinned so that every Mac reads them alike.
     private static let gardenerVerbs = ForcedLexicalTagger([.german: .words([
         "war", "bin", "umgetopft", "gepflegt", "habe", "einteile", "plane", "leite", "fallen", "mochte", "fallte", "gegossen",
-        "kontrolliere", "gefallt",
+        "kontrolliere", "gefallt", "teile", "analysiere", "antworte", "sicherstelle", "stelle",
     ])])
 
     /// The gardener's ended job, whose sentence goes on after "wo ich".
@@ -638,6 +638,45 @@ struct JobClausesTests {
         let wished = verdicts.rejected.contains { $0.sentence == row.duty && $0.reason.hasSuffix("only wishes or plans") }
         #expect(wished == row.isWished, "\(verdicts.rejected)")
         #expect(verdicts.kept.contains(row.duty) == !row.isWished, "\(verdicts.rejected)")
+    }
+
+    struct GermanOrderRow: Sendable, CustomTestStringConvertible {
+        let sentence: String
+        /// The duty as the person said it, in the order of a German main clause.
+        let pinned: String
+        var testDescription: String { "\(sentence) → \(pinned)" }
+    }
+
+    @Test("A German duty said after wo ich with the verb last is written as a main clause: each verb second, a separable particle at the end of its clause, a shared auxiliary first (#359)",
+          arguments: [
+              GermanOrderRow(
+                  sentence: parks + "die Kolonne einteile und die Pflege der Parkanlagen plane.",
+                  pinned: "Ich teile die Kolonne ein und plane die Pflege der Parkanlagen."
+              ),
+              GermanOrderRow(
+                  sentence: nursery + "Jungpflanzen umgetopft und die Beete gepflegt habe.",
+                  pinned: "Ich habe Jungpflanzen umgetopft und die Beete gepflegt."
+              ),
+              GermanOrderRow(sentence: parks + "die Kolonne leite.", pinned: "Ich leite die Kolonne."),
+              GermanOrderRow(sentence: parks + "die Bewässerung sicherstelle.", pinned: "Ich stelle die Bewässerung sicher."),
+        GermanOrderRow(sentence: parks + "auf die Anfragen antworte.", pinned: "Ich antworte auf die Anfragen."),
+              // "an" opens these verbs, but no particle: they stay whole.
+              GermanOrderRow(
+                  sentence: parks + "die Bodenproben analysiere und die Beete plane.",
+                  pinned: "Ich analysiere die Bodenproben und plane die Beete."
+              ),
+          ])
+    func germanOrder(row: GermanOrderRow) throws {
+        let sanitizer = CVDataSanitizer(languageOfText: { _ in "de" }, lexicalClasses: Self.gardenerVerbs, wordList: TableWordList())
+        let job = row.sentence.hasPrefix(Self.parks)
+            ? Self.job("Vorarbeiterin", "Stadtgärtnerei Hollerbach", from: "2020")
+            : Self.job("Gärtnerhelferin", "Baumschule Lindenhof", from: "2009", to: "2013")
+
+        let verdicts = try sanitizer.dutyCheck(
+            of: CVData(experience: [job]), job: 0, duties: "Ich kontrolliere die Parkanlagen.", against: row.sentence
+        )
+
+        #expect(verdicts.pinned == [row.pinned])
     }
 
     // MARK: A German list of duties in nouns after the employers (#359)

@@ -871,7 +871,7 @@ extension Grounding {
     func pinnedDuties(of index: Int) -> [PinnedDuty] {
         let firstNamed = attribution.naming.filter { attribution.jobsOf[$0]?.contains(index) == true }.map(\.sentence).min()
         let places = attribution.jobsOf.keys.filter { attribution.jobsOf[$0]?.contains(index) == true }.sorted(by: Self.isBefore)
-        let pieces = places.compactMap { place -> (place: Place, text: String)? in
+        let pieces = places.compactMap { place -> (place: Place, duty: ClauseDuty)? in
             let clause = clauses.clause(at: place)
             let words = clause.words
             var start = 0
@@ -890,25 +890,35 @@ extension Grounding {
             }
             return duty(of: clause, from: start).map { (place, $0) }
         }
+        typealias Joined = (place: Place, text: String, parts: [String], verbLast: [[String]]?, conjunctions: [String])
         // Two duties of one sentence joined by a conjunction stay one duty ("I rigged the lights and loaded the
         // trucks"), so neither is a piece without its subject.
-        var joined: [(place: Place, text: String, parts: [String])] = []
-        for piece in pieces {
+        var joined: [Joined] = []
+        for (place, piece) in pieces {
             // The conjunction is not one of the clause's words: it ends the clause as the sentence has it.
-            if let last = joined.last, last.place.sentence == piece.place.sentence, last.place.clause + 1 == piece.place.clause,
+            if let last = joined.last, last.place.sentence == place.sentence, last.place.clause + 1 == place.clause,
                let conjunction = clauses.clause(at: last.place).source.split(whereSeparator: \.isWhitespace).last.map(String.init),
                Self.conjunctions.contains(conjunction.lowercased()),
                let head = piece.text.first {
-                let nextClause = clauses.clause(at: piece.place)
+                // A German clause after one with the verb last has its verb last too: the two are written as one main clause.
+                if let chain = last.verbLast {
+                    let words = piece.words.first?.lowercased() == "ich" ? Array(piece.words.dropFirst()) : piece.words
+                    if let main = GermanMainClause.written(chain + [words], joinedBy: last.conjunctions + [conjunction]) {
+                        joined[joined.count - 1] = (place, main.text, main.parts, chain + [words], last.conjunctions + [conjunction])
+                        continue
+                    }
+                }
+                let nextClause = clauses.clause(at: place)
                 let firstWord = String(piece.text.prefix { !$0.isWhitespace })
                 let lowered = String(head).lowercased() + firstWord.dropFirst()
                 let written = nextClause.written(from: 0, to: nextClause.words.count)
                 let start = written.split(separator: " ").contains { $0 == lowered } ? String(head).lowercased() : String(head)
                 joined[joined.count - 1] = (
-                    piece.place, String(last.text.dropLast()) + " " + conjunction + " " + start + piece.text.dropFirst(), last.parts + [piece.text]
+                    place, String(last.text.dropLast()) + " " + conjunction + " " + start + piece.text.dropFirst(), last.parts + [piece.text],
+                    nil, []
                 )
             } else {
-                joined.append((piece.place, piece.text, [piece.text]))
+                joined.append((place, piece.text, [piece.text], piece.isVerbLast ? [piece.words] : nil, []))
             }
         }
         return joined.map { PinnedDuty(text: $0.text, parts: $0.parts) }
@@ -926,25 +936,38 @@ extension Grounding {
         }
     }
 
-    private func duty(of clause: Clause, from first: Int) -> String? {
+    /// A duty cut from one clause: its text, its words as written, and whether they are a German clause after "wo ich" with the
+    /// verb last, which `text` writes as a main clause.
+    private struct ClauseDuty {
+        let text: String
+        let words: [String]
+        let isVerbLast: Bool
+    }
+
+    private func duty(of clause: Clause, from first: Int) -> ClauseDuty? {
         let words = clause.words
         let language = explainer.language
         var start = first
         var end = words.count
         while end > start, Self.conjunctions.contains(words[end - 1].folded) { end -= 1 }
         while end > start, explainer.isTimePhrase(words[end - 1]) { end -= 1 }
-        var moved: String?
+        var moved: (text: String, words: [String])?
         if start < end, Self.relativeWords.contains(words[start].accented) {
             start += 1
             // German puts the verb last after "wo": "wo ich Anlagen installiere" is "Ich installiere Anlagen".
             if language == .german, start < end - 2, words[start].folded == "ich" {
-                moved = "Ich " + clause.written(from: end - 1, to: end) + " " + clause.written(from: start + 1, to: end - 1)
+                let after = (start + 1..<end).map { clause.written(from: $0, to: $0 + 1) }
+                moved = GermanMainClause.written([after], joinedBy: []).map { ($0.text, after) }
             }
         }
         guard end - start >= 2 else { return nil }
-        let text = moved ?? clause.written(from: start, to: end)
+        if let moved { return ClauseDuty(text: moved.text, words: moved.words, isVerbLast: true) }
+        let text = clause.written(from: start, to: end)
         guard let head = text.first else { return nil }
-        return String(head).uppercased() + text.dropFirst() + "."
+        return ClauseDuty(
+            text: String(head).uppercased() + text.dropFirst() + ".", words: (start..<end).map { clause.written(from: $0, to: $0 + 1) },
+            isVerbLast: false
+        )
     }
 
     /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): "I mix on
