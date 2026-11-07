@@ -15,6 +15,7 @@ actor FakeClaimChecker: ClaimChecking {
     private let hangs: Bool
     private let afterCalls: Int
     private let whenAsked: (@Sendable () -> Void)?
+    private let whenHanging: (@Sendable () -> Void)?
 
     private(set) var calls: [Call] = []
 
@@ -26,14 +27,16 @@ actor FakeClaimChecker: ClaimChecking {
     ///     then throws `failure`, or the cancellation.
     ///   - afterCalls: How many calls answer in full before `failure`, `verdictLimit` and `hangs` apply.
     ///   - whenAsked: Run at each call, as soon as it is recorded.
+    ///   - whenHanging: Run when a call starts to wait instead of answering.
     init(stances: [String: ClaimStance] = [:], failure: (any Error)? = nil, verdictLimit: Int? = nil, hangs: Bool = false,
-         afterCalls: Int = 0, whenAsked: (@Sendable () -> Void)? = nil) {
+         afterCalls: Int = 0, whenAsked: (@Sendable () -> Void)? = nil, whenHanging: (@Sendable () -> Void)? = nil) {
         self.stances = stances
         self.failure = failure
         self.verdictLimit = verdictLimit
         self.hangs = hangs
         self.afterCalls = afterCalls
         self.whenAsked = whenAsked
+        self.whenHanging = whenHanging
     }
 
     func judgements(of candidates: [ClaimCandidate], in description: String) async throws -> [ClaimJudgement] {
@@ -41,6 +44,7 @@ actor FakeClaimChecker: ClaimChecking {
         whenAsked?()
         let misbehaves = calls.count > afterCalls
         if misbehaves, hangs {
+            whenHanging?()
             do { try await Task.sleep(for: .seconds(3600)) } catch { throw failure ?? error }
         }
         if misbehaves, let failure { throw failure }
