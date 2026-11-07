@@ -8,14 +8,17 @@ enum CertificationReader {
     private struct Line {
         var parts: [Piece] = []
         var year: Sourced<Int>?
-        /// How many dates the line holds, and whether one of them is a period with an end.
+        /// How many dates the line holds, whether one of them is a period with an end, and whether one of them shares its
+        /// part (between the separators) with other text.
         private var dateCount = 0
         private var hasPeriod = false
+        private var hasDateAmongWords = false
 
-        /// Whether the year of the line is one issuance year: the line has no date, or one single date and no part beside
-        /// the lead. "Issued by Red Cross, 2021, expires 2024" and "Issued by Red Cross, Rome, 2021" are not.
+        /// Whether the year of the line is one issuance year: the line has no date, or one single date that is a part of
+        /// its own and no part beside the lead. "Issued by Red Cross, 2021, expires 2024", "Issued by Red Cross, Rome, 2021"
+        /// and "Issued by Red Cross expires 2024" are not: a date among words may belong to those words, whatever they are.
         var hasUnambiguousYear: Bool {
-            dateCount == 0 || (dateCount == 1 && !hasPeriod && parts.count <= 1)
+            dateCount == 0 || (dateCount == 1 && !hasPeriod && !hasDateAmongWords && parts.count <= 1)
         }
 
         init(_ cells: [Piece]) {
@@ -26,6 +29,10 @@ enum CertificationReader {
             let dates = DateReader.periods(in: cell.text)
             dateCount += dates.count
             hasPeriod = hasPeriod || dates.contains { $0.period.end != nil }
+            if !dates.isEmpty {
+                let wholeParts = Set(cell.split(by: CertificationReader.lineSeparators).map(\.span))
+                hasDateAmongWords = hasDateAmongWords || dates.contains { !wholeParts.contains(cell.sub($0.range).span) }
+            }
             if let last = dates.last { year = Sourced(value: Line.year(of: last), spans: [cell.sub(last.range).span], reading: .year) }
             let brackets = Brackets(of: cell, ifDatesIn: dates)
             let cut = dates.map(\.range).filter { !brackets.holdWords(around: $0) }
@@ -73,9 +80,10 @@ enum CertificationReader {
     /// 3. a block whose first part starts with an issuer lead ("Issued by", "Rilasciato da", ...) followed by at most six
     ///    words, while the block above made a certification that has no issuer and does not state a year the line also
     ///    states, is that certification's issuer (and its year, when it has none); the rest of the line is text not imported.
-    ///    The line must also have an unambiguous year: no date, or one single date (not a period) with no part beside the
-    ///    lead, so that "Issued by Red Cross, 2021, expires 2024" or "..., 2021–2024" is an entry of its own: a date of
-    ///    trailing text never becomes the year of the certification above;
+    ///    The line must also have an unambiguous year: no date, or one single date (not a period) that is a part of its
+    ///    own, between the separators, with no part beside the lead, so that "Issued by Red Cross, 2021, expires 2024",
+    ///    "..., 2021–2024" or "Issued by Red Cross expires 2024" is an entry of its own: a date of other text never
+    ///    becomes the year of the certification above;
     ///    A certification whose line had a second part after a comma ("First Aid, Level 2") took that lone part as its
     ///    issuer, so it has one, and a lead line below it stays an entry of its own: the safe, visible split;
     /// 4. a block with no part is text not imported;

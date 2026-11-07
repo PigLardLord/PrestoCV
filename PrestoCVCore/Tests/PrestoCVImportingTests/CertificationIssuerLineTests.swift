@@ -54,7 +54,7 @@ struct CertificationIssuerLineTests {
 
     @Test("The lead is read in lower case and with a colon")
     func casing() throws {
-        let found = read(["First Aid Certificate", "issued by: Red Cross 2021"])
+        let found = read(["First Aid Certificate", "issued by: Red Cross, 2021"])
         #expect(found.cv.certifications.count == 1)
         #expect(found.cv.certifications.first?.issuer?.value == "Red Cross")
         #expect(found.cv.certifications.first?.year?.value == 2021)
@@ -217,13 +217,21 @@ struct CertificationIssuerLineTests {
 
     // MARK: The year of the issuer line must be unambiguous
 
-    /// Lines whose dates say more than one issuance year: the line is an entry of its own (split rather than merge, #283).
+    /// Lines whose dates are not one issuance year standing as a part of its own: the line is an entry of its own (split
+    /// rather than merge, #283). A date that shares its part with words ("expires 2024", "valid until 2024") may belong to
+    /// those words, whatever they are, and so may a date written right after the issuer with no separator.
     private static let ambiguousLines: [String] = [
         "Issued by Red Cross, 2021, expires 2024",
         "Rilasciato da Croce Rossa, 2021, scadenza 2024",
         "Issued by Red Cross, expires 2024",
         "Issued by Red Cross, 2021\u{2013}2024",
         "Issued by Red Cross, Rome, 2021",
+        "Issued by Red Cross expires 2024",
+        "Rilasciato da Croce Rossa scadenza 2024",
+        "Ausgestellt von Rotes Kreuz gültig bis 2024",
+        "Issued by Red Cross 2021",
+        "Issued by Red Cross (2021)",
+        "Issued by Red Cross (valid until 2024)",
     ]
 
     @Test("A lead line whose dates are not one issuance year is an entry of its own, and gives no year to the line above",
@@ -235,12 +243,21 @@ struct CertificationIssuerLineTests {
         #expect(found.cv.certifications.first?.year == nil, "\(line)")
     }
 
-    @Test("A lead line with one issuance year and nothing else still completes the line above")
-    func unambiguousYear() {
-        let found = read(["First Aid Certificate", "Issued by Red Cross, 2021"])
-        #expect(found.cv.certifications.count == 1)
-        #expect(found.cv.certifications.first?.issuer?.value == "Red Cross")
-        #expect(found.cv.certifications.first?.year?.value == 2021)
+    /// Lines with one issuance year as a part of its own, after the issuer.
+    private static let unambiguousLines: [String] = [
+        "Issued by Red Cross, 2021",
+        "Issued by Red Cross, March 2021",
+        "Issued by Red Cross, (2021)",
+        "Issued by Red Cross | 2021",
+    ]
+
+    @Test("A lead line with one issuance year as a part of its own, and nothing else, still completes the line above",
+          arguments: unambiguousLines)
+    func unambiguousYear(line: String) {
+        let found = read(["First Aid Certificate", line])
+        #expect(found.cv.certifications.count == 1, "\(line)")
+        #expect(found.cv.certifications.first?.issuer?.value == "Red Cross", "\(line)")
+        #expect(found.cv.certifications.first?.year?.value == 2021, "\(line)")
     }
 
     @Test("A lead line with no date still completes the line above")
