@@ -54,7 +54,8 @@ struct GuardedBackSwipe: UIViewControllerRepresentable {
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            // After a pop that was taken back, the guard still has them
+            // A pop taken back shows the screen again without `viewDidDisappear`: the guard still has the gestures, and
+            // taking them again would keep itself as the system's delegate
             guard navigation == nil, let navigation = navigationController else { return }
             self.navigation = navigation
             edgeDelegate = navigation.interactivePopGestureRecognizer?.delegate
@@ -85,8 +86,9 @@ struct GuardedBackSwipe: UIViewControllerRepresentable {
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             // Never during a transition, and never on the root, as the navigation controller itself decides
             guard let navigation, navigation.viewControllers.count > 1, navigation.transitionCoordinator == nil else { return false }
-            // Both gestures see a swipe, the edge pan and then the content pan: the second gets the answer the first got,
-            // even when `leave` has stored the form by then, or the swipe would also start a pop of its own
+            // One swipe asks both gestures, the edge pan and the content pan. Once one has called `leave`, the other refuses
+            // too, even when `leave` has stored the form by then, or the swipe would also start a pop of its own. When one
+            // begins, UIKit does not let the other begin with it
             guard !swipeCalledLeave else { return false }
             if canLeaveAtOnce() {
                 return true
