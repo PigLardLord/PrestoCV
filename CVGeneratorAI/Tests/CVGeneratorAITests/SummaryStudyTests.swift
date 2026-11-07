@@ -191,4 +191,33 @@ struct SummaryStudyTests {
         #expect(verdict.kept == [sentence], "\(verdict.kept) \(verdict.rejected)")
         #expect(draft.summary == "I work as a warehouse operative. " + sentence, "\(draft.summary ?? "nil")")
     }
+
+    // MARK: Only the person's own words, in their order, tie a study to a language (final gate)
+
+    private static let nursing = CVData(
+        personalInfo: PersonalInfo(name: "Daniel Hart", title: "nurse"),
+        experience: [],
+        education: [Education(degree: "nursing", institution: "Harlow City College")],
+        languages: [Language(name: "German")]
+    )
+
+    /// Two clauses of one sentence of the description ("…at Harlow City College and I speak German") do not say the course was
+    /// taught in German; a sentence that says it in other words or another order goes too, since losing it is the safe way to fail.
+    @Test("A sentence that ties a study to a language stays only as the person's own words, in their order",
+          arguments: [
+            ("I studied nursing at Harlow City College and I speak German.", "I studied nursing in German at Harlow City College.", false),
+            ("I studied nursing in German at Harlow City College.", "I studied nursing in German at Harlow City College.", true),
+            ("I studied nursing in German at Harlow City College.", "At Harlow City College I studied nursing in German.", false),
+          ])
+    func ownWordsTieAStudyToALanguage(description: String, sentence: String, kept: Bool) throws {
+        let verdict = try Self.sanitizer("en").summaryCheck(
+            of: Self.nursing, summary: sentence, field: nil, work: [], duties: [], qualities: [], against: description
+        )
+        let writing = DraftWriting(summary: "I studied nursing. " + sentence, roleDescriptions: [], technologies: [], softSkills: [])
+        let draft = try Self.sanitizer("en").sanitize(Self.nursing, writing: writing, against: description)
+
+        #expect(verdict.kept == (kept ? [sentence] : []), "\(verdict.kept) \(verdict.rejected)")
+        #expect(verdict.rejected.map(\.reason) == (kept ? [] : [CVDataSanitizer.tiesAStudyToALanguage]), "\(verdict.rejected)")
+        #expect(draft.summary == "I studied nursing." + (kept ? " " + sentence : ""), "\(draft.summary ?? "nil")")
+    }
 }

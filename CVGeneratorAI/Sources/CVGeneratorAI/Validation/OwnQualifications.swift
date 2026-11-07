@@ -24,25 +24,31 @@ enum OwnQualifications {
     }
 
     /// Whether `sentence` says a school or a course taught the person's languages (#359, P3): it holds a word of a kept degree or school
-    /// and a word of a kept language, which the description never puts in one sentence. The model joined "I studied at the school" and
-    /// "I speak French and English" into "I studied the CAP at the school in French and English". A word of the studies that is a
-    /// language's name ("English literature") or a word of the person's work (`apart`: the titles and the employers) is none of the
-    /// studies.
+    /// and a word of a kept language, and it is not the person's own words. The model joined "I studied at the school" and "I speak
+    /// French and English" into "I studied the CAP at the school in French and English". A word of the studies that is a language's
+    /// name ("English literature") or a word of the person's work (`apart`: the titles and the employers) is none of the studies.
     static func tiesAStudyToALanguage(
         _ sentence: String, education: [Education], languages: [Language], apart: Set<String>, source: DescriptionText
     ) -> Bool {
         let languageWords = CVDataSanitizer.words(of: languages.map(\.name))
         let studyWords = studyWords(of: education).subtracting(languageWords).subtracting(apart)
         guard !languageWords.isEmpty, !studyWords.isEmpty else { return false }
-        let words = Set(Word.words(in: sentence).map(\.folded))
+        let said = Word.words(in: sentence).map(\.folded)
+        let words = Set(said)
         let study = studyWords.intersection(words)
         let spoken = languageWords.intersection(words)
         guard !study.isEmpty, !spoken.isEmpty else { return false }
-        // Only a sentence of the description that ties these very study words to these very languages backs it: a sentence of
-        // another school and another language does not (review round 1).
+        // Only the person's own words back it, in their order: a run of one sentence of the description. Sharing its words is not
+        // enough, since "I studied nursing at Harlow City College and I speak German" holds every word of "I studied nursing in
+        // German at Harlow City College" (review round 1, final gate). A true sentence said otherwise goes: losing it is safe.
         return !source.sentences.contains { sourceSentence in
-            let sourceWords = Set(Word.words(in: sourceSentence.raw).map(\.folded))
-            return study.isSubset(of: sourceWords) && spoken.isSubset(of: sourceWords)
+            holdsRun(said, in: Word.words(in: sourceSentence.raw).map(\.folded))
         }
+    }
+
+    /// Whether `words` follow one another, in this order, somewhere in `text`.
+    private static func holdsRun(_ words: [String], in text: [String]) -> Bool {
+        guard !words.isEmpty, words.count <= text.count else { return false }
+        return (0...(text.count - words.count)).contains { start in text[start..<(start + words.count)].elementsEqual(words) }
     }
 }
