@@ -109,6 +109,14 @@ struct NoLayoutInspector: PDFLayoutInspecting {
     func layout(of data: Data) -> PDFLayout? { nil }
 }
 
+/// An inspector that reads the complete text of a fake PDF but lays it out as `layout`, whatever the PDF holds.
+struct FixedLayoutInspector: PDFLayoutInspecting {
+    let layout: PDFLayout
+    func pageCount(of data: Data) -> Int? { MinimalPDFInspector().pageCount(of: data) }
+    func text(of data: Data) -> String? { MinimalPDFInspector().text(of: data) }
+    func layout(of data: Data) -> PDFLayout? { layout }
+}
+
 @Suite("#80 · the install gate checks the geometry")
 struct GeometryGateTests {
     func gate(_ renderer: any PDFRendering, _ inspector: any PDFLayoutInspecting) throws -> FixtureRenderingGate {
@@ -148,6 +156,32 @@ struct GeometryGateTests {
         }
         #expect(error == .unreadablePDF)
         #expect(try await store.design(id: "clean") == nil)
+    }
+
+    /// The gate's rejection for a layout the geometry check cannot work with, the text being complete.
+    func rejection(of layout: PDFLayout) async throws -> FixtureRenderingGate.Rejection? {
+        let store = InMemoryDesignStore()
+        let error = await #expect(throws: FixtureRenderingGate.Rejection.self) {
+            _ = try await InstallDesign(gate: try gate(FakePDFRenderer(), FixedLayoutInspector(layout: layout)), store: store)(designData(cleanCSS, id: "clean"))
+        }
+        #expect(try await store.design(id: "clean") == nil)
+        return error
+    }
+
+    @Test("a layout with no pages is an unreadable PDF and the design is not stored")
+    func noPages() async throws {
+        #expect(try await rejection(of: PDFLayout(pages: [], lines: [])) == .unreadablePDF)
+    }
+
+    @Test("a layout with pages and no text lines is an unreadable PDF and the design is not stored")
+    func noLines() async throws {
+        #expect(try await rejection(of: PDFLayout(pages: [a4Page], lines: [])) == .unreadablePDF)
+    }
+
+    @Test("a line of unknown glyph height is too small, the text being complete, and the design is not stored")
+    func unknownGlyphHeight() async throws {
+        let line = textLine("Mathematics", page: 0, PDFBox(x: 40, y: 400, width: 100, height: 12), glyphHeight: nil)
+        #expect(try await rejection(of: PDFLayout(pages: [a4Page], lines: [line])) == .glyphTooSmall(["Mathematics"]))
     }
 
     @Test("a design that renders inside the page at a readable size is stored")
