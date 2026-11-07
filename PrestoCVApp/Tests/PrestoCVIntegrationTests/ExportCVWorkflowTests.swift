@@ -77,6 +77,22 @@ struct ExportCVWorkflowTests {
         }
     }
 
+    @Test("a multi-line summary and description export complete, each line in the PDF")
+    func multiLineText() async throws {
+        var cv = Fixtures.fullCV()
+        var personal = cv.personal
+        personal.summary = "First summary line\nSecond summary line"
+        cv.setPersonalDetails(personal)
+        var sections = cv.sections
+        sections.experiences = [Experience(role: "Analyst", company: "Babbage", description: "- led a team\r\n- shipped the Engine")]
+        cv.setSections(sections)
+        let outcome = try await workflow().export(cv, language: language("it"))
+        let pdf = text(of: outcome)
+        for line in ["First summary line", "Second summary line", "led a team", "shipped the Engine"] {
+            #expect(pdf.contains(line), "\(line) is missing from the PDF")
+        }
+    }
+
     @Test("the headings follow the language of the export, not the CV's own", arguments: ["it", "en", "de", "fr", "es", "pt"])
     func headingsFollowTheLanguage(tag: String) async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: tag)

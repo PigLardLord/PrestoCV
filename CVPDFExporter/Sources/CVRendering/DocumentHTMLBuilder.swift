@@ -87,18 +87,25 @@ public struct DocumentHTMLBuilder: Sendable {
             guard let v = value, !v.isEmpty else { return [] }
             return [el(tag, cls, [], [.text(v)])]
         }
+        /// The person's line breaks reach the page as paragraphs: one `<p>` per non-blank line (#21). A blank line adds
+        /// nothing, since the paragraphs are already apart.
+        func paragraphs(_ cls: String, _ value: String?) -> [HTML] {
+            (value ?? "").split(separator: "\n", omittingEmptySubsequences: true)
+                .filter { !$0.allSatisfy(\.isWhitespace) }
+                .map { el(.p, cls, [], [.text(String($0))]) }
+        }
         switch s {
         case .summary(let text):
-            return wrap("summary", h.summary, text.isEmpty ? [] : [el(.p, "cv-summary", [], [.text(text)])])
+            return wrap("summary", h.summary, paragraphs("cv-summary", text))
         case .experience(let items):
             return wrap("experience", h.experience, items.map { i in
                 el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.role) + optional(.p, "cv-entry-subtitle", i.company)
-                   + optional(.p, "cv-entry-location", i.location) + period(i.period) + optional(.p, "cv-entry-description", i.description))
+                   + optional(.p, "cv-entry-location", i.location) + period(i.period) + paragraphs("cv-entry-description", i.description))
             })
         case .education(let items):
             return wrap("education", h.education, items.map { i in
                 el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.degree) + optional(.p, "cv-entry-subtitle", i.school)
-                   + period(i.period) + optional(.p, "cv-entry-description", i.description))
+                   + period(i.period) + paragraphs("cv-entry-description", i.description))
             })
         case .skills(let items):
             return wrap("skills", h.skills, inline(items.map { i in
@@ -112,7 +119,7 @@ public struct DocumentHTMLBuilder: Sendable {
             return wrap("certifications", h.certifications, items.map { i in
                 var children = optional(.h3, "cv-entry-title", i.name) + optional(.p, "cv-entry-subtitle", i.issuer)
                 if let y = i.year { children.append(el(.p, "cv-entry-period", [], [.text("\(y)")])) }
-                children += optional(.p, "cv-entry-description", i.description)
+                children += paragraphs("cv-entry-description", i.description)
                 if let u = i.url, let link = WebLink(u) { children.append(el(.a, "cv-entry-link", [(.href, link.url)], [.text(link.url)])) }
                 return el(.article, "cv-entry", [], children)
             })

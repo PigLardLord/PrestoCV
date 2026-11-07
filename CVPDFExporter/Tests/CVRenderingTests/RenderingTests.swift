@@ -63,6 +63,25 @@ struct BuilderTests {
         #expect(html.contains(#"<p class="cv-entry-subtitle">School</p>"#))
     }
 
+    @Test("the person's line breaks reach the page: one paragraph per line in the summary and in every description (#21)")
+    func lineBreaksArePreserved() throws {
+        let doc = CVDocument(language: "en", person: Person(name: "A"), sections: [
+            .summary("Summary one\nSummary two"),
+            .experience([ExperienceItem(role: "Dev", company: "Co", description: "- led a team\n- shipped X\n\n  \n- fixed Y")]),
+            .education([EducationItem(degree: "D", school: "S", description: "Thesis\nHonours")]),
+            .certifications([CertificationItem(name: "C", issuer: "I", description: "Part one\nPart two")]),
+        ])
+        let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
+        let html = rendered.html
+        #expect(html.contains(#"<p class="cv-summary">Summary one</p><p class="cv-summary">Summary two</p>"#))
+        #expect(html.contains(#"<p class="cv-entry-description">- led a team</p><p class="cv-entry-description">- shipped X</p><p class="cv-entry-description">- fixed Y</p>"#))
+        #expect(html.contains(#"<p class="cv-entry-description">Thesis</p><p class="cv-entry-description">Honours</p>"#))
+        #expect(html.contains(#"<p class="cv-entry-description">Part one</p><p class="cv-entry-description">Part two</p>"#))
+        #expect(!html.contains("\n"))
+        #expect(rendered.textNodes.contains("Summary two"))
+        #expect(!rendered.textNodes.contains { $0.contains("\n") })
+    }
+
     @Test("user text is escaped and never re-parsed as template syntax (#21, R8)")
     func escaping() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
