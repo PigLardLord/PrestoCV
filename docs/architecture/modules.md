@@ -231,6 +231,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVRenderingIOS`, `CVRenderingMacOS`**
 - One `PDFRendering` implementation per platform ([ADR 0003](adr/0003-one-pdf-renderer-per-platform.md)). Every file is wrapped in its platform condition.
+- On iOS the web view is never put in a window. A `UIPrintPageRenderer` with a fixed paper and printable area paginates it, and each page is drawn in turn into a `UIGraphicsPDFRenderer` context, with a check for cancellation before each one. No step waits on a print callback, so a stalled print cannot hang the export (#101); the load and the readiness wait have time limits.
 
 **`CVRenderingPDFKitInspector`**
 - `PDFInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`.
