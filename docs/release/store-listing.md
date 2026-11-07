@@ -4,7 +4,7 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 
 - **Where they go.** In App Store Connect, the name and the subtitle are under App Information. The keywords, the promotional text, the description and the screenshots are under the version (1.0), for each localization. The notes for App Review are under App Review Information, at the bottom of the version page.
 - **Limits.** Name and subtitle: 30 characters. Keywords: 100 bytes of UTF-8, each keyword longer than two characters, separated by commas without spaces. Promotional text: 170 characters. Description, What's New and review notes: 4,000 characters. App Review Guideline 2.3.7 rules out prices and "free" claims in the name, the subtitle and the screenshots, and competitors' names in the keywords; guideline 2.3.1 asks for review notes that say specifically how to reach every feature.
-- **What's New.** App Store Connect has no What's New field for an app's first version, so the 1.0 texts are not entered there. They serve as TestFlight's What to Test, and as the start of the next version's notes.
+- **What's New.** App Store Connect has no What's New field for an app's first version, so version 1.0 has none. The texts below are those of version 1.0.1, which has the field.
 - **Counts.** `Tools/Release/check-store-listing.py` counts every text of this file, checks it against those limits, and checks that the table under [Character counts](#character-counts) is current. Run it after changing a text; `--write` rewrites the table.
 - **What each claim rests on.** Every feature named here is in the app as it ships (the legacy app of ADR 0022). In the AI draft, the facts (the name, the contacts, the employers, the schools, the dates, the figures and the languages) occur in the person's description; the summary, the role descriptions and the skills are written by the model from it and may be wrong, so no text promises a correct draft ([ADR 0031](../architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md), with [ADR 0023](../architecture/adr/0023-ground-the-ai-draft-in-the-description.md)). The device list is Apple's, from "How to get Apple Intelligence" (support.apple.com/en-us/121115), read on 2026-10-18.
 - **The copy is written for each market, not translated.** The register follows the app's own texts: "Sie" in German, "vous" in French, "tu" in Italian and Spanish, "você" in Brazilian Portuguese. The French texts put a no-break space (U+00A0) before a colon and inside « », as French typography does: keep it when copying them.
@@ -70,15 +70,15 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 184 |
-| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 184 |
-| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 230 |
-| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 209 |
-| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 213 |
-| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 210 |
-| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 220 |
-| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 215 |
-| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 205 |
+| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 287 |
+| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 287 |
+| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 350 |
+| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 296 |
+| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 310 |
+| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 310 |
+| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 302 |
+| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 309 |
+| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 313 |
 
 Notes for App Review: 3997 characters (4000).
 <!-- counts:end -->
@@ -188,7 +188,7 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The first version of PrestoCV. Write your CV on your iPhone or iPad, draft it with Apple Intelligence on supported devices, and export it as a PDF in three designs. No account, no ads.
+The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
 ```
 
 ## English (U.K.), en-GB
@@ -267,7 +267,7 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The first version of PrestoCV. Write your CV on your iPhone or iPad, draft it with Apple Intelligence on supported devices, and export it as a PDF in three designs. No account, no ads.
+The AI draft now keeps your own words when you paste in a CV, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
 ```
 
 ## German, de-DE
@@ -346,7 +346,7 @@ Bereit zum Versenden. | Ein sauberes PDF, mit Überschriften in der Sprache des 
 ### What's New
 
 ```text
-Die erste Version von PrestoCV. Schreiben Sie Ihren Lebenslauf auf dem iPhone oder iPad, entwerfen Sie ihn auf unterstützten Geräten mit Apple Intelligence und exportieren Sie ihn als PDF in drei Designs. Ohne Konto, ohne Werbung.
+Der KI-Entwurf übernimmt Ihre eigenen Worte, wenn Sie einen Lebenslauf einfügen, und liest ihn wie einen Import. Eine Stelle, die Sie noch innehaben, endet jetzt mit dem Wort, das Ihr Lebenslauf für „heute“ verwendet. Eine Aufgabe steht nicht mehr doppelt da oder unter der falschen Stelle, und eine beendete Stelle steht nicht mehr in der Gegenwart.
 ```
 
 ## Italian, it
@@ -425,7 +425,7 @@ Pronto da inviare. | Un PDF curato, con i titoli nella lingua del tuo CV.
 ### What's New
 
 ```text
-La prima versione di PrestoCV. Scrivi il tuo CV su iPhone o iPad, fatti preparare una bozza da Apple Intelligence sui dispositivi compatibili ed esportalo in PDF in tre design. Senza account, senza pubblicità.
+La bozza con l'IA ora mantiene le tue parole quando incolli un CV: lo legge come un'importazione. Un lavoro in corso finisce con la parola che usa il tuo CV per dire «oggi». Un compito non viene più scritto due volte né messo sotto il lavoro sbagliato, e un lavoro concluso non è più al presente.
 ```
 
 ## Spanish (Spain), es-ES
@@ -504,7 +504,7 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-La primera versión de PrestoCV. Escribe tu CV en el iPhone o el iPad, deja que Apple Intelligence redacte un borrador en los dispositivos compatibles y expórtalo en PDF con tres diseños. Sin cuenta y sin anuncios.
+El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
 ```
 
 ## Spanish (Mexico), es-MX
@@ -583,7 +583,7 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-La primera versión de PrestoCV. Escribe tu CV en tu iPhone o iPad, deja que Apple Intelligence redacte un borrador en los dispositivos compatibles y expórtalo en PDF con tres diseños. Sin cuenta y sin anuncios.
+El borrador con IA ahora conserva tus propias palabras cuando pegas un CV, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
 ```
 
 ## French, fr-FR
@@ -662,7 +662,7 @@ Prêt à envoyer. | Un PDF soigné, avec des titres dans la langue du CV.
 ### What's New
 
 ```text
-La première version de PrestoCV. Rédigez votre CV sur iPhone ou iPad, laissez Apple Intelligence en écrire un brouillon sur les appareils compatibles et exportez-le en PDF avec trois mises en page. Sans compte, sans pub.
+Le brouillon par IA garde désormais vos propres mots quand vous collez un CV : il le lit comme un import. Un poste en cours se termine par le mot que votre CV emploie pour « aujourd’hui ». Une tâche n’est plus écrite deux fois ni placée sous le mauvais poste, et un poste terminé n’est plus au présent.
 ```
 
 ## Portuguese (Portugal), pt-PT
@@ -741,7 +741,7 @@ Pronto a enviar. | Um PDF cuidado, com os títulos na língua do seu currículo.
 ### What's New
 
 ```text
-A primeira versão do PrestoCV. Escreva o seu currículo no iPhone ou no iPad, deixe o Apple Intelligence escrever um rascunho nos dispositivos compatíveis e exporte-o em PDF com três designs. Sem conta, sem anúncios.
+O rascunho com IA passa a manter as suas palavras quando cola um currículo, porque o lê como uma importação. Um emprego atual termina com a palavra que o seu currículo usa para «atualidade». Uma tarefa já não é escrita duas vezes nem colocada no emprego errado, e um emprego terminado já não está no presente.
 ```
 
 ## Portuguese (Brazil), pt-BR
@@ -820,5 +820,5 @@ Pronto para enviar. | Um PDF caprichado, com os títulos no idioma do seu currí
 ### What's New
 
 ```text
-A primeira versão do PrestoCV. Escreva seu currículo no iPhone ou iPad, deixe o Apple Intelligence escrever um rascunho nos aparelhos compatíveis e exporte em PDF com três designs. Sem conta, sem anúncios.
+O rascunho com IA agora mantém suas palavras quando você cola um currículo, porque ele lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para «atualidade». Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente.
 ```
