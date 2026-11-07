@@ -129,6 +129,25 @@ struct EditorSaveStatusTests {
         #expect(editor.saveStatus == .saved)
     }
 
+    @Test("text typed away and back while reload reads the store is an edit: the stored CV is not taken")
+    func reloadKeepsTextTypedBackDuringTheRead() async throws {
+        let world = Editing()
+        let (editor, cv) = try await inConflict(world)
+        let typed = editor.content.fullName
+        await world.editing.loadGate.close()
+
+        let reloading = Task { await editor.reload() }
+        await waitUntil("the read to start") { await world.editing.loadGate.waiting == 1 }
+        editor.type(\.fullName, "Mara Ellison-Renn 2")
+        editor.type(\.fullName, typed)
+        await world.editing.loadGate.open()
+        await reloading.value
+
+        #expect(editor.content.fullName == typed)
+        #expect(editor.saveStatus == .conflict)
+        #expect(await world.storedName(of: cv) == "Tobias Renn")
+    }
+
     @Test("save as copy after a conflict stores the text as a new CV, and the original stays as the other window left it")
     func saveAsCopyAfterConflictStoresNewCV() async throws {
         let world = Editing()
@@ -151,6 +170,69 @@ struct EditorSaveStatusTests {
         await editor.saveNow()
         #expect(try await world.editing.inStore(copy.id).personal.summary == "Designs forms.")
         #expect(try await world.editing.inStore(cv.id).personal.summary == "")
+    }
+
+    @Test("a title typed while the copy is being stored is kept, stored, and not reported saved before it is")
+    func titleTypedWhileTheCopyIsStoredIsKept() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.duplicateGate.close()
+
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.duplicateGate.waiting == 1 }
+        editor.type(\.title, "Product roles")
+        await world.editing.duplicateGate.open()
+        await copying.value
+
+        #expect(editor.content.title == "Product roles")
+        #expect(editor.saveStatus != .saved)
+        await editor.saveNow()
+        let copy = try #require(world.editing.copies.withLock { $0.first })
+        #expect(world.editing.writes.withLock { $0.last?.title } == "Product roles")
+        #expect(try await world.editing.inStore(copy.id).title == "Product roles")
+        #expect(editor.saveStatus == .saved)
+    }
+
+    @Test("a title typed away and back while the copy is being stored is an edit: the person's title is kept")
+    func titleTypedBackDuringTheCopyIsKept() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.duplicateGate.close()
+
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.duplicateGate.waiting == 1 }
+        editor.type(\.title, "Product roles")
+        editor.type(\.title, "Design roles")
+        await world.editing.duplicateGate.open()
+        await copying.value
+
+        #expect(editor.content.title == "Design roles")
+        #expect(editor.saveStatus != .saved)
+        await editor.saveNow()
+        let copy = try #require(world.editing.copies.withLock { $0.first })
+        #expect(try await world.editing.inStore(copy.id).title == "Design roles")
+        #expect(editor.saveStatus == .saved)
+    }
+
+    @Test("a summary typed while the copy is being stored does not keep the old title: the copy title applies")
+    func summaryTypedDuringTheCopyLetsTheCopyTitleApply() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.duplicateGate.close()
+
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.duplicateGate.waiting == 1 }
+        editor.type(\.summary, "Designs forms.")
+        await world.editing.duplicateGate.open()
+        await copying.value
+
+        #expect(editor.content.title == "Copy of Design roles")
+        await editor.saveNow()
+        let copy = try #require(world.editing.copies.withLock { $0.first })
+        let stored = try await world.editing.inStore(copy.id)
+        #expect(stored.title == "Copy of Design roles")
+        #expect(stored.personal.summary == "Designs forms.")
+        #expect(editor.saveStatus == .saved)
     }
 
     @Test("a CV deleted elsewhere says so, and save as copy keeps the text as a new CV")

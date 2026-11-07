@@ -26,6 +26,7 @@ extension EditorViewModel {
             guard let writer, let base else { return }
             do {
                 restyled = try await change(writer, form.applied(to: base))
+                changeFailure = nil
             } catch {
                 changeFailed(error)
             }
@@ -35,6 +36,6 @@ extension EditorViewModel {
     /// A change the writer refused shows its failure; one cancelled before it reached the store changed nothing.
     private func changeFailed(_ error: any Error) {
         guard !(error is CancellationError) else { return }
-        failure = (error as? EditFailure).map { SaveStatus($0) } ?? .failed
+        changeFailure = (error as? EditFailure).map { SaveStatus($0) } ?? .failed
     }
 }
