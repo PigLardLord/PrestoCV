@@ -114,7 +114,8 @@ struct InterestQualityTests {
             Seit 2019 arbeite ich als Feinmechaniker bei der Werkstatt Ohlsen in Suhl. In meiner Freizeit gehe ich klettern und spiele \
             Schach. Ich spiele das Klavier und koche am Wochenende für meine Freunde. Ich gehe gern mit meinem Hund spazieren und \
             wandere in den Bergen. Ich mag Fußball, Lesen und Wandern in den Bergen. Ich fahre am Wochenende gern Rad und sammle \
-            im Herbst.
+            im Herbst. Ich tanze nicht am Wochenende und schwimme selten im Winter. \
+            Ich male im Sommer nie und reite im Winter selten.
             """,
         "en": """
             I have been a waiter at the Lantern Bistro in Exeter since 2019. In my free time I walked in the park every Sunday, \
@@ -133,6 +134,10 @@ struct InterestQualityTests {
               ("de", "wandere in den Bergen", ["Wandern"]),
               ("de", "sammle im Herbst", ["Sammeln"]),
               ("de", "fahre am Wochenende gern Rad", []),
+              ("de", "tanze nicht am Wochenende", []),
+              ("de", "schwimme selten im Winter", []),
+              ("de", "male im Sommer nie", []),
+              ("de", "reite im Winter selten", []),
               ("de", "Wandern in den", []),
               ("de", "spiele Schach", ["Schach"]),
               ("de", "spiele das Klavier", ["Klavier"]),
@@ -156,7 +161,7 @@ struct InterestQualityTests {
         let sanitizer = CVDataSanitizer(
             languageOfText: { _ in language },
             lexicalClasses: ForcedLexicalTagger([
-                .german: .words(["arbeite", "spiele", "koche", "gehe", "wandere", "mag", "fahre", "sammle"]),
+                .german: .words(["arbeite", "spiele", "koche", "gehe", "wandere", "mag", "fahre", "sammle", "tanze", "schwimme", "male", "reite"]),
                 .english: .words(["have", "been", "walked", "like"]),
             ]),
             wordList: TableWordList()
@@ -165,6 +170,14 @@ struct InterestQualityTests {
         let result = try sanitizer.sanitize(CVData(interests: [interest]), against: try #require(Self.pastimes[language]))
 
         #expect(result.interests == kept)
+    }
+
+    @Test("A German hobby the person denies or hardly ever does gives no pastime (review round 2)", arguments: [
+        "koche nicht am Wochenende", "male im Sommer nie", "reite im Winter selten", "gehe nie mit meinem Hund spazieren",
+        "koche kaum für meine Freunde", "wandere niemals in den Bergen",
+    ])
+    func deniedHobbyGivesNoPastime(interest: String) {
+        #expect(InterestFragment.germanActivity(of: interest) == nil)
     }
 
     @Test("A hobby with the person's own things in it stays")

@@ -39,6 +39,7 @@ enum InterestFragment {
     /// verb as its noun ("koche am Wochenende für meine Freunde" gives "Kochen", "sammle im Herbst" gives "Sammeln"), or the infinitive
     /// that "gehe" takes ("gehe gern mit meinem Hund spazieren" gives "Spazieren"). The pastime is the verb the person said, so it
     /// states nothing they did not. Nil, and the interest goes, when:
+    /// - the person denies it or does it hardly ever: a word of `denials` ("koche nicht am Wochenende", "wandere selten im Winter");
     /// - the verb is no pastime of its own: an auxiliary, a form of "sein", a modal, or one of `notPastimes` ("mache", "habe");
     /// - it is no present of "ich" (no final "e");
     /// - the rest joins a second clause ("und", "oder");
@@ -47,7 +48,7 @@ enum InterestFragment {
     static func germanActivity(of interest: String) -> String? {
         let text = Array(Digits.ascii(interest))
         let words = Word.words(in: interest)
-        guard words.count > 1 else { return nil }
+        guard words.count > 1, !words.contains(where: { denials.contains($0.folded) }) else { return nil }
         let written = words.map { String(text[$0.range]) }
         let lowered = written.map { $0.lowercased() }
         let german = voice(in: .german)
@@ -83,6 +84,9 @@ enum InterestFragment {
     ]
 
     private static let conjunctions: Set<String> = ["und", "oder", "sowie"]
+
+    /// The German negations, and the words that say the person does it hardly ever, as `Word.folded` writes them (review round 2).
+    private static let denials = WrittenTextWords.of(.german).negations.union(["kaum", "selten", "nimmer", "nirgends", "nirgendwo"])
 
     private static func capitalized(_ word: String) -> String {
         word.prefix(1).uppercased() + word.dropFirst()
