@@ -16,6 +16,7 @@ public struct DocumentStyle: Sendable {
 
 /// Exports a snapshot of a CV as a PDF (ADR 0007, ADR 0011). Every export is checked against its own document: the text
 /// of the PDF must hold every text the document has (R8). The outcome says when the PDF is shorter than the CV needs.
+/// A link the exporter would not print as it is makes the export fail (`invalidDocument`) instead of vanishing from the PDF.
 /// Failures are `ExportFailure`, including any error of the renderer; a cancelled task stays a `CancellationError` (R3, R7).
 public struct ExportCVWorkflow: CVExporting {
     private let renderer: any PDFRendering
@@ -37,6 +38,7 @@ public struct ExportCVWorkflow: CVExporting {
         let words = try headingsFor(language)
         let document = mapper.map(snapshot, language: language)
         do { try CVDocumentValidator.validate(document) } catch { throw ExportFailure.invalidDocument }
+        guard DocumentLinks.unprintable(in: document).isEmpty else { throw ExportFailure.invalidDocument }   // never drop a link silently
         let rendered = DocumentHTMLBuilder().render(document, stylesheet: style.stylesheet, palette: style.palette,
                                                     fonts: style.fonts, headings: words)
         let pdf: RenderedPDF
