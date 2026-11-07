@@ -1,5 +1,8 @@
 /// The document markup contract (ADR 0011): the only elements, classes and attributes a design may
 /// select. Rendering emits exactly this structure; the catalog validates designs against it.
+///
+/// A text of several lines (the summary, a description) is one `p` per non-blank line, each with the same class
+/// (`cv-summary`, `cv-entry-description`): the person's line breaks are never lost, and no element is added.
 public enum MarkupContract {
     /// Bumped on any change a design could depend on; designs declare the version they target.
     public static let version = 1
