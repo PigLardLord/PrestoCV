@@ -69,6 +69,17 @@ public struct LegacyImportReport: Sendable, Equatable {
     /// What each CV lost in the mapping, for every CV this run finds stored (`imported` or `alreadyStored`): an earlier run
     /// may have stored it and stopped before its report.
     public var drops: [CVID: [LegacyDrop]] = [:]
+    /// The source of each CV with drops. `run()` keeps it: the source is the durable record of the loss, so it goes only
+    /// when the caller calls `acknowledgeLosses(of:)` after the person has seen what was lost. A run that stops before that
+    /// leaves the source, and the next run reports the same drops again.
+    public var awaitingAcknowledgement: [CVID: LegacyRecord.Key] = [:]
+    public var failures: [LegacyImportFailure] = []
+    public init() {}
+}
+
+/// What `acknowledgeLosses(of:)` did: the sources it removed (one already gone counts as removed) and the ones it could not.
+public struct LegacyAcknowledgement: Sendable, Equatable {
+    public var removedSources: [LegacyRecord.Key] = []
     public var failures: [LegacyImportFailure] = []
     public init() {}
 }
@@ -79,12 +90,27 @@ public struct ImportLegacyStore: Sendable {
         self.source = source; self.target = target; self.removingVerifiedSources = removingVerifiedSources
     }
 
-    /// Adopts every legacy CV the store holds. A source goes only once its copy is stored and reads back as what was mapped;
-    /// whatever fails is reported and left where it was. Only a source that cannot be listed fails the run.
+    /// Adopts every legacy CV the store holds. A source goes only once its copy is stored and reads back as what was mapped,
+    /// and only if its CV lost nothing: the source of a CV with drops stays (`awaitingAcknowledgement`) until
+    /// `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed
+    /// fails the run.
     public func run() async throws(RepositoryError) -> LegacyImportReport {
         var report = LegacyImportReport()
         for record in try await source.records() { await handle(record, into: &report) }
         return report
+    }
+
+    /// Removes the sources `run()` kept for their losses, once the caller says the person has seen them. Removes nothing
+    /// when `removingVerifiedSources` is false. A source it cannot remove stays and is reported as `sourceNotRemoved`.
+    public func acknowledgeLosses(of report: LegacyImportReport) async -> LegacyAcknowledgement {
+        var done = LegacyAcknowledgement()
+        guard removingVerifiedSources else { return done }
+        for key in report.awaitingAcknowledgement.values {
+            do throws(RepositoryError) { try await source.remove(key); done.removedSources.append(key) } catch {
+                done.failures.append(.init(key: key, reason: .sourceNotRemoved(error)))
+            }
+        }
+        return done
     }
 
     private func handle(_ record: LegacyRecord, into report: inout LegacyImportReport) async {
@@ -105,10 +131,12 @@ public struct ImportLegacyStore: Sendable {
         case .stored(let copy) where copy == legacy.cv.adoptedAsRevisionOne: report.imported.append(legacy.cv.id)
         case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return
         }
-        // Reported for every CV whose source goes, also one an earlier run stored: that run may have stopped (a kill, a
-        // failed barrier after the rename) before its report. A loss reported twice is the safe way to fail; never is not.
-        if !legacy.drops.isEmpty { report.drops[legacy.cv.id] = legacy.drops }
-        await removeSource(key, into: &report)
+        // Reported for every CV found stored, also one an earlier run stored: that run may have stopped before its report.
+        // The source of a CV with drops is the durable record of the loss, so it stays until `acknowledgeLosses(of:)`; a run
+        // that stops before then reports the same drops again. A loss reported twice is the safe way to fail; never is not.
+        if legacy.drops.isEmpty { await removeSource(key, into: &report); return }
+        report.drops[legacy.cv.id] = legacy.drops
+        report.awaitingAcknowledgement[legacy.cv.id] = key
     }
 
     private func removeSource(_ key: LegacyRecord.Key, into report: inout LegacyImportReport) async {
