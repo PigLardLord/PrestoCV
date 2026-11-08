@@ -20,10 +20,11 @@ struct ExportSheetStatusTests {
         FailureRow(failure: .unsupportedLanguage, status: .unsupportedLanguage),
         FailureRow(failure: .invalidDocument, status: .invalid),
         FailureRow(failure: .incomplete(missing: 2), status: .incomplete(missing: 2)),
+        FailureRow(failure: .textNotVisible(lines: 2), status: .textNotVisible(lines: 2)),
         FailureRow(failure: .renderingFailed, status: .failed),
     ]
 
-    @Test("Each export failure has its status, an incomplete PDF with how many texts it lacks", arguments: failures)
+    @Test("Each export failure has its status, with how many texts are missing or lines hidden", arguments: failures)
     func eachExportFailureHasItsStatus(row: FailureRow) async {
         let world = SheetWorld()
         let sheet = world.sheet()
