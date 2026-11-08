@@ -117,9 +117,9 @@ struct LocalizationCatalog {
         localization(of: key, in: language)?.texts
     }
 
-    /// Whether a literal of the code is looked up under this key, with its values read as text or as numbers.
+    /// Whether the catalog has a key under which the app finds this literal at run time (`SwiftLiteral.runtimeKeys`).
     func isLookedUp(_ literal: SwiftLiteral) -> Bool {
-        strings[literal.text] != nil || strings[literal.key] != nil || strings[literal.numberKey] != nil
+        literal.runtimeKeys.contains { strings[$0] != nil }
     }
 }
 
@@ -268,13 +268,13 @@ enum StringChecks {
         return types
     }
 
-    /// Every key of the catalog that a string literal of the sources names.
+    /// Every key of the catalog under which the app can find a string literal of the sources at run time.
     private static func usedKeys(in catalog: LocalizationCatalog, sources: [SwiftSource]) -> Set<String> {
         let keys = Set(catalog.keys)
         var used: Set<String> = []
         for file in sources {
             for literal in StringLiteralLexer.literals(in: file.code) {
-                for name in [literal.text, literal.key, literal.numberKey] where keys.contains(name) { used.insert(name) }
+                for name in literal.runtimeKeys where keys.contains(name) { used.insert(name) }
             }
         }
         return used
@@ -357,19 +357,13 @@ enum StringChecks {
 
     // MARK: Lookups
 
-    /// A lookup of a key: `"key".localized`, `String(localized: "key")`, `LocalizedStringKey("key")`,
-    /// `LocalizedStringResource("key")`. The lookup check reads it and the every-literal rule does not.
-    static func isLookup(_ literal: SwiftLiteral) -> Bool {
-        literal.after.range(of: #"^\s*\.(?:localized|asLoclizedKey|localizedWithArgs)\b"#, options: .regularExpression) != nil
-            || literal.before.range(of: #"(?:String\(\s*localized:|LocalizedStringKey\(|LocalizedStringResource\()$"#, options: .regularExpression) != nil
-    }
-
-    /// The keys that the sources look up and the catalog lacks, with the file. A lookup is checked whatever the form of
-    /// its literal (plain, raw, multiline, with values) and wherever it stands, nested in a value of another literal too.
+    /// The keys that the sources look up and the catalog lacks, with the file. A lookup (`SwiftLiteral.lookup`) is
+    /// checked whatever the form of its literal (plain, raw, multiline, with values) and wherever it stands, nested in a
+    /// value of another literal too, under the keys its kind of lookup asks for at run time.
     private static func lookedUpButMissing(from catalog: LocalizationCatalog, in sources: [SwiftSource]) -> [String] {
         sources.flatMap { file in
             StringLiteralLexer.literals(in: file.code)
-                .filter { isLookup($0) && !catalog.isLookedUp($0) }
+                .filter { $0.lookup != nil && !catalog.isLookedUp($0) }
                 .map { "\($0.text) (\(file.path))" }
         }
     }
@@ -386,7 +380,7 @@ enum StringChecks {
         if rules.everyLiteralInViews {
             return read.flatMap { file in
                 StringLiteralLexer.literals(in: file.code)
-                    .filter { !isLookup($0) && !rules.nonTextArguments.keys.contains(where: $0.before.hasSuffix) }
+                    .filter { $0.lookup == nil && !rules.nonTextArguments.keys.contains(where: $0.before.hasSuffix) }
                     .map { (literal: $0, path: file.path) }
             }
         }
@@ -397,7 +391,7 @@ enum StringChecks {
         }
         return read.flatMap { file in
             StringLiteralLexer.literals(in: file.code)
-                .filter { literal in !isLookup(literal) && handedTo.contains { literal.before.range(of: $0, options: .regularExpression) != nil } }
+                .filter { literal in literal.lookup == nil && handedTo.contains { literal.before.range(of: $0, options: .regularExpression) != nil } }
                 .map { (literal: $0, path: file.path) }
         }
     }
@@ -445,6 +439,39 @@ struct SwiftLiteral: Equatable {
 
     /// Whether the text has words to translate, once the values are taken out.
     var hasWords: Bool { key.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil }
+
+    /// Whether the literal holds a value (`\(expression)`): only then do its text and its key differ.
+    var hasValue: Bool { text != key }
+
+    /// How the code looks the literal up in the catalog, or nil when it does not: then the literal is shown as written,
+    /// or handed to SwiftUI, which reads a literal with values as a format key. The lookup check reads a lookup, and the
+    /// every-literal rule does not.
+    var lookup: LiteralLookup? {
+        if after.range(of: #"^\s*\.(?:localized|asLoclizedKey|localizedWithArgs)\b"#, options: .regularExpression) != nil { return .builtText }
+        if before.range(of: #"(?:String\(\s*localized:|LocalizedStringKey\(|LocalizedStringResource\()$"#, options: .regularExpression) != nil { return .format }
+        return nil
+    }
+
+    /// The keys under which the app can find the literal at run time. A String extension asks for the text with its
+    /// values filled in, which no catalog key can match, so a literal with a value has none. An initializer that reads
+    /// the interpolation asks for the format, `%@` or `%lld` by the value's type, which the checks cannot tell apart.
+    var runtimeKeys: [String] {
+        switch lookup {
+        case .builtText?: hasValue ? [] : [text]
+        case .format?, nil: [text, key, numberKey]
+        }
+    }
+}
+
+/// How the app finds a literal in the catalog at run time.
+enum LiteralLookup: Equatable {
+    /// `String(localized:`, `LocalizedStringKey(`, `LocalizedStringResource(`: the initializer reads the literal's
+    /// interpolation, so each value is a placeholder and the key is the format (`Hello %@`, `%lld items`).
+    case format
+    /// A String extension of the legacy app (`.localized`, `.localizedWithArgs`, `.asLoclizedKey`): it receives the
+    /// String already built, each value filled in, so its key is the text as written, and a literal with a value is
+    /// never found.
+    case builtText
 }
 
 /// The one reader of string literals of the string checks: single-line, multiline (`"""`) and raw (`#"` with any number of

@@ -16,6 +16,9 @@ struct LiteralForm: Sendable, CustomTestStringConvertible {
     /// Whether the literal as a whole can be the argument of a lookup, i.e. it holds the text itself.
     let canBeLookedUp: Bool
 
+    /// Whether the literal holds a value: its catalog key is then not its text.
+    var hasValue: Bool { keys != read }
+
     var testDescription: String { name }
 
     static let all: [LiteralForm] = [
@@ -40,6 +43,9 @@ struct LiteralContext: Sendable, CustomTestStringConvertible {
     let wrap: @Sendable (String) -> String
     /// A lookup is not read by the every-literal rule, but its key must be in the catalog.
     let isLookup: Bool
+    /// A String extension receives the String already built, with each value filled in: it asks the catalog for the
+    /// filled-in text, so a literal with a value is never found, whatever key the catalog has.
+    var fillsInValues = false
 
     var testDescription: String { name }
 
@@ -48,7 +54,9 @@ struct LiteralContext: Sendable, CustomTestStringConvertible {
         LiteralContext(name: "String(localized:", wrap: { "Text(String(localized: \($0)))" }, isLookup: true),
         LiteralContext(name: "LocalizedStringKey(", wrap: { "Text(LocalizedStringKey(\($0)))" }, isLookup: true),
         LiteralContext(name: "LocalizedStringResource(", wrap: { "Text(LocalizedStringResource(\($0)))" }, isLookup: true),
-        LiteralContext(name: ".localized", wrap: { "Text(\($0).localized)" }, isLookup: true),
+        LiteralContext(name: ".localized", wrap: { "Text(\($0).localized)" }, isLookup: true, fillsInValues: true),
+        LiteralContext(name: ".localizedWithArgs(", wrap: { "Text(\($0).localizedWithArgs(count))" }, isLookup: true, fillsInValues: true),
+        LiteralContext(name: ".asLoclizedKey", wrap: { "Text(\($0).asLoclizedKey)" }, isLookup: true, fillsInValues: true),
         LiteralContext(name: "a ternary", wrap: { "Text(isReady ? \($0) : \"plant.ok\")" }, isLookup: false),
         LiteralContext(name: "a local let", wrap: { "let heading = \($0)\nText(heading)" }, isLookup: false),
         LiteralContext(name: "an argument label", wrap: { "Banner(title: \($0))" }, isLookup: false),
@@ -74,6 +82,12 @@ struct LiteralCase: Sendable, CustomTestStringConvertible {
 struct StringLiteralFormsTests {
     /// Runs the checks on `code` and a catalog with `keys`, and returns the literals reported as not looked up.
     static func reported(code: String, catalogKeys keys: [String], rules: StringRules? = nil) throws -> [String] {
+        let found = try findings(code: code, catalogKeys: keys, rules: rules).lookedUpButMissing
+        return found.map { entry in String(entry[..<(entry.range(of: " (", options: .backwards)?.lowerBound ?? entry.endIndex)]) }.sorted()
+    }
+
+    /// Runs the checks on `code` and a catalog with `keys`.
+    static func findings(code: String, catalogKeys keys: [String], rules: StringRules? = nil) throws -> StringFindings {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("literal-forms-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -87,8 +101,7 @@ struct StringLiteralFormsTests {
         try code.write(to: source, atomically: true, encoding: .utf8)
         var rules = rules ?? StringRules()
         if rules.viewFolders == nil { rules.everyLiteralInViews = true }
-        let found = try StringChecks.run(catalog: catalog, sources: [source], rules: rules).lookedUpButMissing
-        return found.map { entry in String(entry[..<(entry.range(of: " (", options: .backwards)?.lowerBound ?? entry.endIndex)]) }.sorted()
+        return try StringChecks.run(catalog: catalog, sources: [source], rules: rules)
     }
 
     @Test("A literal missing from the catalog is reported, whatever its form and place; one in the catalog is not", arguments: LiteralCase.all)
@@ -97,8 +110,27 @@ struct StringLiteralFormsTests {
         let missing = try Self.reported(code: code, catalogKeys: ["plant.ok"])
         let present = try Self.reported(code: code, catalogKeys: ["plant.ok"] + testCase.form.keys)
 
+        let neverFound = testCase.context.fillsInValues && testCase.form.hasValue
         #expect(missing == testCase.form.read.sorted(), "missing from the catalog: \(missing)")
-        #expect(present.isEmpty, "in the catalog: \(present)")
+        #expect(present == (neverFound ? testCase.form.read.sorted() : []), "in the catalog: \(present)")
+    }
+
+    @Test("A literal with a value looked up by a String extension is reported even with its format key in the catalog", arguments: [".localized", ".localizedWithArgs(count)", ".asLoclizedKey"])
+    func extensionLookupOfAValue(_ call: String) throws {
+        let withValue = "Text(\"Hello \\(name)\"\(call))\n"
+        let withoutValue = "Text(\"Hello %@\"\(call))\n"
+
+        #expect(try Self.reported(code: withValue, catalogKeys: ["Hello %@", "Hello %lld"]) == ["Hello \\(name)"])
+        #expect(try Self.reported(code: withoutValue, catalogKeys: ["Hello %@"]).isEmpty)
+    }
+
+    @Test("A format key that only a String extension lookup of a literal with a value names is unused: the extension never asks for it")
+    func extensionLookupDoesNotUseTheFormatKey() throws {
+        let byExtension = try Self.findings(code: "Text(\"Hello \\(name)\".localized)\n", catalogKeys: ["Hello %@"])
+        let byInitializer = try Self.findings(code: "Text(String(localized: \"Hello \\(name)\"))\n", catalogKeys: ["Hello %@"])
+
+        #expect(byExtension.unused == ["Hello %@"])
+        #expect(byInitializer.unused.isEmpty)
     }
 
     @Test("Both English alternatives of a ternary inside an interpolation are reported")
