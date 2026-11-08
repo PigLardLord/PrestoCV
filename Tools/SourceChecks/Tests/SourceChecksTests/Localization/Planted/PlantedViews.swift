@@ -11,6 +11,10 @@ struct PlantedViews {
             Text("plant.placeholders")
             Text("plant.promise")
             Text("plant.title_case")
+            Text("plant.empty_translation")
+            Text("plant.empty_english")
+            Text("plant.unmarked_english")
+            Text("plant.review_english")
             Text("plant.absent".localized)
         }
     }

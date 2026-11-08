@@ -22,7 +22,29 @@ struct StringChecksSelfTests {
 
     @Test("A text in a state other than translated is found")
     func notTranslated() throws {
-        #expect(try Self.run().notTranslated == ["plant.not_translated (es)"])
+        #expect(try Self.run().notTranslated.contains("plant.not_translated (es)"))
+    }
+
+    @Test("An empty text is found, in a translated language and in English")
+    func emptyText() throws {
+        let found = try Self.run().notTranslated
+        #expect(found.contains("plant.empty_translation (de)"), "\(found)")
+        #expect(found.contains("plant.empty_english (en)"), "\(found)")
+    }
+
+    @Test("An English text with no state, or a state other than translated, is found")
+    func unmarkedEnglish() throws {
+        let found = try Self.run().notTranslated
+        #expect(found.contains("plant.unmarked_english (en)"), "\(found)")
+        #expect(found.contains("plant.review_english (en)"), "\(found)")
+    }
+
+    @Test("Nothing else is reported as empty or not translated")
+    func onlyThePlantedOnes() throws {
+        #expect(Set(try Self.run().notTranslated) == [
+            "plant.not_translated (es)", "plant.empty_translation (de)", "plant.empty_english (en)",
+            "plant.unmarked_english (en)", "plant.review_english (en)",
+        ])
     }
 
     @Test("A text copied from English is found")
