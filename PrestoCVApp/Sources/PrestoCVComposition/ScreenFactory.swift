@@ -27,6 +27,10 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - untitled: The view's words for a CV with no title (R13).
     ///   - numbered: How the view numbers a title that reads like another row's (R13).
+    ///
+    /// Before it reads the store, the list waits for every editor still alive (`editorsStored`) to store what it shows.
+    /// The factory holds editors weakly, so whoever lets an editor go waits for its `saveNow()` first (the shell's
+    /// navigation, step 5-11a).
     public func makeCVList(
         untitled: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
@@ -55,8 +59,14 @@ public final class ScreenFactory {
     }
 
     /// Returns once every editor that is still alive has stored what it shows, so that the list reads the store after them.
+    /// An editor made while an earlier one is storing is stored as well. An editor already released is not waited for:
+    /// whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
     private func storeEditors() async {
-        for editor in editors.compactMap(\.editor) { await editor.saveNow() }
+        var stored = Set<ObjectIdentifier>()
+        while let next = editors.compactMap(\.editor).first(where: { !stored.contains(ObjectIdentifier($0)) }) {
+            stored.insert(ObjectIdentifier(next))
+            await next.saveNow()
+        }
     }
 }
 

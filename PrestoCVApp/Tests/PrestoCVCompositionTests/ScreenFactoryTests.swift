@@ -228,6 +228,75 @@ struct ScreenFactoryTests {
         withExtendedLifetime(editor) {}
     }
 
+    /// Holds the first write at a gate the test opens, so that what the main actor does meanwhile is deterministic.
+    private actor WriteGate {
+        private var held = false
+        private var reached: CheckedContinuation<Void, Never>?
+        private var release: CheckedContinuation<Void, Never>?
+        private var isReached = false
+        private var isOpen = false
+
+        func hold() async {
+            guard !held else { return }
+            held = true
+            isReached = true
+            reached?.resume()
+            reached = nil
+            guard !isOpen else { return }
+            await withCheckedContinuation { release = $0 }
+        }
+
+        func waitReached() async {
+            guard !isReached else { return }
+            await withCheckedContinuation { reached = $0 }
+        }
+
+        func open() {
+            isOpen = true
+            release?.resume()
+            release = nil
+        }
+    }
+
+    /// The in-memory repository whose first `create` waits at the gate.
+    private struct GatedRepository: CVRepository {
+        let inner: InMemoryCVRepository
+        let gate: WriteGate
+
+        func create(_ cv: CV) async throws(RepositoryError) -> CV {
+            await gate.hold()
+            return try await inner.create(cv)
+        }
+        func update(_ cv: CV) async throws(RepositoryError) -> CV { try await inner.update(cv) }
+        func load(_ id: CVID) async throws(RepositoryError) -> CV { try await inner.load(id) }
+        func list() async throws(RepositoryError) -> CVListing { try await inner.list() }
+        func delete(_ id: CVID, revision: Int) async throws(RepositoryError) { try await inner.delete(id, revision: revision) }
+    }
+
+    @Test("An editor made while the list waits for an earlier editor's write is stored too before the list reads")
+    func listWaitsForEditorsMadeMeanwhile() async throws {
+        let gate = WriteGate()
+        let factory = ScreenFactory(
+            repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock()
+        )
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        await first.load()
+        Self.typed(first, title: "First")
+        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let loading = Task { @MainActor in await list.load() }
+        await gate.waitReached()
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        await second.load()
+        Self.typed(second, title: "Second")
+
+        await gate.open()
+        await loading.value
+
+        #expect(Set(list.rows.map(\.label)) == ["First", "Second"])
+        withExtendedLifetime((first, second)) {}
+    }
+
     @Test("The factory does not keep an editor alive")
     func registryIsWeak() async throws {
         let fixture = try await Self.fixture()
