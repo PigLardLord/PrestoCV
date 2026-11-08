@@ -23,7 +23,7 @@ var targets: [Target] = [
     .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings"]),
     // The markup contract page, which MarkupContractPageTests holds the code to. The test reads it from its bundle: a
     // simulator may run it where the repository is not.
-    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"], resources: [.copy("../../Docs/markup-contract.md")]),
+    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns", "CVRenderingTestSupport"], resources: [.copy("../../Docs/markup-contract.md")]),
     .testTarget(name: "CVDesignCatalogFileStoreTests", dependencies: ["CVDesignCatalogFileStore", "CVDesignCatalog", "CVRenderingTestSupport"]),
     .testTarget(
         name: "CVRenderingTests",

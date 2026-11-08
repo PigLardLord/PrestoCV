@@ -15,9 +15,9 @@ struct BundledDesignsRenderingTests {
     /// same version, so a shipped package that changes needs a new version; `Designs/README.md` gives the steps, and the
     /// new hash is pinned here last.
     static let pins: [String: String] = [
-        "minimal@1.1.0": "02fa1a03cf8c63eb44c541882ccc52a9e5878395e1640d32397151c4697f7ec5",
-        "modern@1.1.0": "d41791a6cc1b331459fec039efad319589c7d00f39878764c518596954238721",
-        "professional@1.1.0": "5d97d8a6c63e811b48521a4bd971d943ecfa7a2a2be0a0023282157ef431f8b7",
+        "minimal@1.2.0": "1a8658e4e7ae98fbf7a55b617c1677102dcb6bfc1ca5ba0778e19aa34756c9d6",
+        "modern@1.2.0": "5cf0f2a9d98cb3e0efb154fb11c0ae1bb4f7e26c432ec33d815be8135f8cdfcd",
+        "professional@1.2.0": "2ddcdf733c070666a8ef9552e1a00fb28956ac1d88229a6354840dbc9596c6cc",
     ]
 
     static func packages() async throws -> [(name: String, data: Data, design: ValidatedDesign)] {
@@ -42,7 +42,7 @@ struct BundledDesignsRenderingTests {
     func gate() async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it")
         let gate = FixtureRenderingGate(renderer: FakePDFRenderer(), inspector: MinimalPDFInspector(), fixture: ContractFixture.document,
-                                        headings: headings, palette: ContractFixture.palette)
+                                        headings: headings)
         let designs = try await Self.packages()
         #expect(designs.count == 3)
         for (name, _, design) in designs {
@@ -52,16 +52,17 @@ struct BundledDesignsRenderingTests {
 
     @Test("each bundled package is pinned to its id and version: a change needs a new version (#3)")
     func pinned() async throws {
-        let hashes = try await Self.packages().map { (key: "\($0.design.manifest.id)@\($0.design.manifest.version)", hex: SHA256.hex($0.data)) }
+        let hashes = try await Self.packages().map { (key: "\($0.design.manifest.id)@\($0.design.manifest.version.text)", hex: SHA256.hex($0.data)) }
         #expect(Set(hashes.map(\.key)).count == hashes.count, "two packages share an id and a version: \(hashes.map(\.key))")
         #expect(Dictionary(hashes.map { ($0.key, $0.hex) }, uniquingKeysWith: { first, _ in first }) == Self.pins)
     }
 
-    @Test("golden output: the fixture renders exactly to the reviewed HTML of each design")
+    @Test("golden output: the fixture renders exactly to the reviewed HTML of each design, in its default palette and fonts")
     func golden() async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it")
         for (name, _, design) in try await Self.packages() {
-            let html = DocumentHTMLBuilder().build(ContractFixture.document, stylesheet: design.stylesheet, palette: ContractFixture.palette, headings: headings)
+            let html = DocumentHTMLBuilder().build(ContractFixture.document, stylesheet: design.stylesheet,
+                                                       palette: design.manifest.defaultPalette.palette, fonts: design.manifest.defaultFonts, headings: headings)
             try GoldenFile.updateIfRequested("design-\(name).html", with: html)
             let url = try #require(Bundle.module.url(forResource: "Golden/design-\(name)", withExtension: "html"), "no golden file for \(name)")
             #expect(html == (try String(contentsOf: url, encoding: .utf8)), "\(name)")
