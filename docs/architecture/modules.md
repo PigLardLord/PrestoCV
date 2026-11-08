@@ -186,7 +186,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - it checks the name, counts, dates and ratings;
   - it bounds text in UTF-8 bytes, per field and for the whole document, and refuses control characters and bidirectional overrides;
   - JSON arrives through `decode(json:)`, which checks the size before decoding.
-- Pending: a committed JSON Schema.
+- **The JSON Schema**, version 1, is committed as [cv-document.schema.json](../../CVPDFExporter/Docs/cv-document.schema.json). `DocumentSchemaTests` hold it to the type in both directions: what the type encodes validates, its property names, section kinds and language levels are the schema's, and the bounds both state (years, months, ratings, entry counts) are the validator's. The byte bounds on text stay in the validator, which JSON Schema cannot express.
 
 **`CVDesignCatalog`**
 - **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
@@ -328,6 +328,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 ## Xcode app target `PrestoCV` (iOS 26.5, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
+
+**Until the switch to the new stack**, these folders live under `PrestoCVNext/`, in a second app target, `PrestoCVNext`, with the same platforms; the legacy target below keeps shipping and its scheme keeps archiving. The `PrestoCVNext` scheme builds the second target and runs its test plan, `TestPlans/Next.xctestplan`; its UI test target, `PrestoCVNextUITests`, is held to R16. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
 
 | Folder | Contents | May import |
 |---|---|---|

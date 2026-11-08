@@ -95,7 +95,7 @@ struct ClaimCheckEvaluation {
         let checked: GeneratedDraft
         do {
             grounded = try CVDataSanitizer().sanitize(evaluationCase.draft, against: evaluationCase.description)
-            checked = try await ClaimWithdrawal.checking(grounded, in: evaluationCase.description, with: checker)
+            checked = try await ClaimWithdrawal.checking(grounded, in: evaluationCase.description, with: checker, within: .standard)
         } catch {
             return MeasuredDraft(evaluationCase, items: [], seconds: seconds(since: start), error: error, unchecked: false)
         }

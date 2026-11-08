@@ -2,7 +2,8 @@
 import PackageDescription
 
 // App integration and presentation (docs/architecture/modules.md). Step 5 fills the targets one by one (#62); the
-// Xcode app starts depending on this package at the switch (#88, #89).
+// second app target, PrestoCVNext, links the composition and the presentation until the shipped target takes them
+// over at the switch (#88, #89).
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
