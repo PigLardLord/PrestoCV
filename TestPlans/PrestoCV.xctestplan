@@ -71,6 +71,13 @@
     {
       "target" : {
         "containerPath" : "container:CVPDFExporter",
+        "identifier" : "CVRenderingPDFKitInspectorTests",
+        "name" : "CVRenderingPDFKitInspectorTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:CVPDFExporter",
         "identifier" : "CVRenderingIOSTests",
         "name" : "CVRenderingIOSTests"
       }

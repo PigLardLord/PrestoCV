@@ -3,6 +3,8 @@
 # CI, the pre-commit hook and the ticket loop all call this script, so the invocation lives in one place.
 # Extra arguments are passed through, e.g. --against <base-baseline.json> or --write-baseline.
 set -euo pipefail
+# The C locale, as in the CI container: Swift Build 6.4 cannot read a translated `ld` banner (swiftlang/swift-build#1934).
+export LC_ALL=C
 ROOT="${ARCHITECTURE_CHECK_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 TOOL="$(cd "$(dirname "$0")" && pwd)"
 # The build directory can be shared (ARCHITECTURE_CHECK_SCRATCH), so a checker built from another copy of the

@@ -30,7 +30,7 @@ final class SectionDraft {
     private let service: any CVGenerationService
     private let sanitizer: CVDataSanitizer
     private let log: DraftLog
-    private let limit: Duration
+    private let limit: TimeLimit
     private let description: String
 
     /// What the requests wrote so far, as their checks kept it: what the draft keeps when the writing stops.
@@ -49,7 +49,7 @@ final class SectionDraft {
     /// - Parameters:
     ///   - limit: How long each request may take.
     ///   - description: The person's description, which the checks read; no request reads it.
-    init(service: any CVGenerationService, sanitizer: CVDataSanitizer, log: DraftLog, limit: Duration, description: String) {
+    init(service: any CVGenerationService, sanitizer: CVDataSanitizer, log: DraftLog, limit: TimeLimit, description: String) {
         self.service = service
         self.sanitizer = sanitizer
         self.log = log
