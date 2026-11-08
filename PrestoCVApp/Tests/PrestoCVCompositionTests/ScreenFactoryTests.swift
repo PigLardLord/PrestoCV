@@ -228,17 +228,23 @@ struct ScreenFactoryTests {
         withExtendedLifetime(editor) {}
     }
 
-    /// Holds the first write at a gate the test opens, so that what the main actor does meanwhile is deterministic.
+    /// Holds one write, the n-th `create`, at a gate the test opens, so that what the main actor does meanwhile is
+    /// deterministic. The other writes pass.
     private actor WriteGate {
-        private var held = false
+        private let holding: Int
+        private var calls = 0
         private var reached: CheckedContinuation<Void, Never>?
         private var release: CheckedContinuation<Void, Never>?
         private var isReached = false
         private var isOpen = false
 
+        init(holding call: Int) {
+            holding = call
+        }
+
         func hold() async {
-            guard !held else { return }
-            held = true
+            calls += 1
+            guard calls == holding else { return }
             isReached = true
             reached?.resume()
             reached = nil
@@ -258,7 +264,7 @@ struct ScreenFactoryTests {
         }
     }
 
-    /// The in-memory repository whose first `create` waits at the gate.
+    /// The in-memory repository whose `create` calls go through the gate.
     private struct GatedRepository: CVRepository {
         let inner: InMemoryCVRepository
         let gate: WriteGate
@@ -275,7 +281,7 @@ struct ScreenFactoryTests {
 
     @Test("An editor made while the list waits for an earlier editor's write is stored too before the list reads")
     func listWaitsForEditorsMadeMeanwhile() async throws {
-        let gate = WriteGate()
+        let gate = WriteGate(holding: 1)
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock()
@@ -294,6 +300,37 @@ struct ScreenFactoryTests {
         await loading.value
 
         #expect(Set(list.rows.map(\.label)) == ["First", "Second"])
+        withExtendedLifetime((first, second)) {}
+    }
+
+    @Test("An edit made after an editor's turn in the list's wait is not waited for, and shows on the list's next load")
+    func listShowsALaterEditOnItsNextLoad() async throws {
+        let gate = WriteGate(holding: 2)
+        let factory = ScreenFactory(
+            repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock()
+        )
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        await first.load()
+        Self.typed(first, title: "First")
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        await second.load()
+        Self.typed(second, title: "Second")
+        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let loading = Task { @MainActor in await list.load() }
+        await gate.waitReached()
+        // The first editor has stored at its turn, and the second one's write is held: the person edits the first.
+        Self.typed(first, title: "First, edited")
+
+        await gate.open()
+        await loading.value
+
+        // The edit came after the first editor's turn, so the list does not wait for it. The autosave runs on the real
+        // clock and may store it before the read or after: both are what the contract allows.
+        let labels = Set(list.rows.map(\.label))
+        #expect(labels == ["First", "Second"] || labels == ["First, edited", "Second"], "the list shows \(labels)")
+        await list.load()
+        #expect(Set(list.rows.map(\.label)) == ["First, edited", "Second"])
         withExtendedLifetime((first, second)) {}
     }
 

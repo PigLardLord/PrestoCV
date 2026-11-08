@@ -30,9 +30,10 @@ public final class ScreenFactory {
     ///   - untitled: The view's words for a CV with no title (R13).
     ///   - numbered: How the view numbers a title that reads like another row's (R13).
     ///
-    /// Before it reads the store, the list waits for every editor still alive (`editorsStored`) to store what it shows.
-    /// The factory holds editors weakly, so whoever lets an editor go waits for its `saveNow()` first (the shell's
-    /// navigation, step 5-11a).
+    /// Before it reads the store, the list has every editor still alive store what it shows at its turn (`editorsStored`).
+    /// An edit made after an editor's turn is not waited for: the autosave stores it, and the list shows it on its next
+    /// load (step 5-11a reloads the list after each store, issue #402). The factory holds editors weakly, so whoever lets
+    /// an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
     public func makeCVList(
         untitled: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
@@ -61,8 +62,10 @@ public final class ScreenFactory {
         return editor
     }
 
-    /// Returns once every editor that is still alive has stored what it shows, so that the list reads the store after them.
-    /// An editor made while an earlier one is storing is stored as well. An editor already released is not waited for:
+    /// Stores every editor that is still alive once, in turn, so that the list reads the store after them. Each editor
+    /// stores what it shows at its turn; an editor made while an earlier one is storing gets a turn as well. An editor
+    /// already stored is not visited again, so an edit made after its turn is left to its autosave and to the list's next
+    /// load: going round again while the person types would never end. An editor already released is not waited for:
     /// whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
     ///
     /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made
