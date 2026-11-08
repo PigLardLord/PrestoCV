@@ -44,14 +44,26 @@ public enum DocumentCompleteness {
         String(String.UnicodeScalarView(s.lowercased().unicodeScalars.filter { !$0.properties.isWhitespace }))
     }
 
-    /// The text nodes the PDF text does not contain. Every node, each occurrence counted, needs its own span of the
-    /// PDF text that no other node uses, so a value made of the end of one field and the start of the next ("Greg" +
-    /// "Officer" contains "go") cannot stand in for a missing field.
+    /// The steps the search may take before it gives up. Real documents use far fewer (`modules.md` records them).
+    public static let stepBudget = 100_000
+
+    /// The text nodes the PDF text does not contain: `report(in:expected:).missing`.
+    public static func missing(in pdfText: String, expected textNodes: [String]) -> [String] {
+        report(in: pdfText, expected: textNodes).missing
+    }
+
+    /// Which text nodes the PDF text does not contain, and how much work the search took. Every node, each occurrence
+    /// counted, needs its own span of the PDF text that no other node uses, so a value made of the end of one field
+    /// and the start of the next ("Greg" + "Officer" contains "go") cannot stand in for a missing field.
     ///
     /// Spans that start and end where the PDF text breaks (whitespace or a line end) are tried first, and the search
     /// backtracks when a choice leaves another node without a span ("Ann" + "Anna"). A search that exceeds its step
     /// budget counts as incomplete: the check fails closed.
-    public static func missing(in pdfText: String, expected textNodes: [String]) -> [String] {
+    public static func report(in pdfText: String, expected textNodes: [String]) -> CompletenessReport {
+        report(in: pdfText, expected: textNodes, stepBudget: stepBudget)
+    }
+
+    static func report(in pdfText: String, expected textNodes: [String], stepBudget: Int) -> CompletenessReport {
         // The PDF text without whitespace, and for each position whether a break precedes or follows it.
         var pdf: [Unicode.Scalar] = [], startsAfterBreak: [Bool] = [], endsBeforeBreak: [Bool] = []
         var sawBreak = true
@@ -114,7 +126,7 @@ public enum DocumentCompleteness {
         func place(_ k: Int) -> Bool {
             if k == nodes.count { return true }
             steps += 1
-            if steps > 100_000 { exhausted = true; return false }
+            if steps > stepBudget { exhausted = true; return false }
             let floor = k > 0 && nodes[k].needle == nodes[k - 1].needle ? chosen[k - 1] : -1
             for start in nodes[k].candidates where start > floor && free(start, nodes[k].length) {
                 mark(start, nodes[k].length, true)
@@ -125,7 +137,7 @@ public enum DocumentCompleteness {
             }
             return false
         }
-        if everyLaterNodeCanStillBePlaced(after: -1), place(0) { return [] }
+        if everyLaterNodeCanStillBePlaced(after: -1), place(0) { return CompletenessReport(missing: [], steps: steps, budgetExhausted: false) }
 
         // No complete assignment. First name the values that are short on their own: fewer disjoint occurrences in
         // the PDF text than in the document, whatever the other fields do. Only when every value has enough on its own
@@ -150,6 +162,15 @@ public enum DocumentCompleteness {
         if missingIndices.isEmpty, let last = nodes.last { missingIndices.insert(last.index) }   // budget exceeded: fail closed
         var seen = Set<String>(), missing: [String] = []
         for (index, text) in textNodes.enumerated() where missingIndices.contains(index) && seen.insert(text).inserted { missing.append(text) }
-        return missing
+        return CompletenessReport(missing: missing, steps: steps, budgetExhausted: exhausted)
+    }
+}
+
+/// What a completeness search found: the missing text nodes, the steps it took, and whether it stopped at its budget.
+/// A search stopped by its budget always names a missing node, so it never reads as complete.
+public struct CompletenessReport: Sendable, Equatable {
+    public var missing: [String], steps: Int, budgetExhausted: Bool
+    public init(missing: [String], steps: Int, budgetExhausted: Bool) {
+        self.missing = missing; self.steps = steps; self.budgetExhausted = budgetExhausted
     }
 }
