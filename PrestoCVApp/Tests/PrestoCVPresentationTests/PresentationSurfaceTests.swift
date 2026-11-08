@@ -57,6 +57,17 @@ func useEveryPublicMember(of look: LookViewModel) async {
     await look.apply()
 }
 
+@MainActor
+func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) {
+    let reference: CVReference? = shell.selection
+    let column: ShellColumn = shell.preferredColumn
+    switch column { case .sidebar, .detail: break }
+    if let row = rows.first { shell.select(row.reference) }
+    shell.reconcile(with: rows)
+    shell.deselect()
+    _ = reference
+}
+
 func everyListCode() -> [Any] {
     let status: [ListStatus] = [.loading, .loaded, .failed]
     let rows: [RowStatus] = [.conflict, .gone, .tooLarge, .failed]
@@ -95,6 +106,7 @@ struct PresentationSurfaceTests {
         await useEveryPublicMember(of: list, reference: world.reference(cv))
         await useEveryPublicMember(of: world.firstRun())
         await useEveryPublicMember(of: world.look(of: world.editing.new()))
+        useEveryPublicMember(of: ShellNavigationModel(), rows: list.rows)
 
         #expect(list.status == .loaded)
     }
