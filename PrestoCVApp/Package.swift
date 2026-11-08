@@ -18,6 +18,7 @@ var targets: [Target] = [
         "PrestoCVWorkflowPorts",
         .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
         .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+        .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
         .product(name: "CVDocumentModel", package: "CVPDFExporter"),
         .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
         .product(name: "CVRendering", package: "CVPDFExporter"),
@@ -32,9 +33,11 @@ var targets: [Target] = [
 
 targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
     "PrestoCVIntegration", "PrestoCVWorkflowPorts",
-    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImportingTestSupport", package: "PrestoCVCore"),
     .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
     .product(name: "CVRendering", package: "CVPDFExporter"),
