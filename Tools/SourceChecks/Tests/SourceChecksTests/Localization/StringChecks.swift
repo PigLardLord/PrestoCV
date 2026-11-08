@@ -9,6 +9,7 @@ import Foundation
 /// language or the file when that is what differs.
 struct StringFindings: Equatable {
     var missingLanguage: [String] = []
+    /// A text that is empty, or whose state is not `translated`, in any of the six languages.
     var notTranslated: [String] = []
     var copiedFromEnglish: [String] = []
     var otherPlaceholders: [String] = []
@@ -218,12 +219,15 @@ enum StringChecks {
         for language in LocalizationCatalog.languages where catalog.localization(of: key, in: language) == nil {
             findings.missingLanguage.append("\(key) (\(language))")
         }
+        for language in LocalizationCatalog.languages {
+            guard let found = catalog.localization(of: key, in: language) else { continue }
+            if found.state != "translated" || found.texts.contains(where: \.isEmpty) {
+                findings.notTranslated.append("\(key) (\(language))")
+            }
+        }
         if let english = catalog.texts(of: key, in: "en") {
             for language in LocalizationCatalog.translatedLanguages {
                 guard let translation = catalog.localization(of: key, in: language) else { continue }
-                if translation.state != "translated" {
-                    findings.notTranslated.append("\(key) (\(language))")
-                }
                 let mayBeSame = rules.sameInEveryLanguage.contains(key) || (rules.sameInSomeLanguages[key]?.contains(language) ?? false)
                 if translation.texts == english && !mayBeSame {
                     findings.copiedFromEnglish.append("\(key) (\(language))")

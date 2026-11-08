@@ -49,7 +49,7 @@ struct StringCatalogTests {
         let findings = try pair.findings()
 
         #expect(findings.missingLanguage.isEmpty, "Keys without a text in a language: \(findings.missingLanguage)")
-        #expect(findings.notTranslated.isEmpty, "Texts not marked translated: \(findings.notTranslated)")
+        #expect(findings.notTranslated.isEmpty, "Texts empty or not marked translated: \(findings.notTranslated)")
     }
 
     @Test("No text is copied from English, except those that read the same", arguments: CatalogUnderCheck.all)
