@@ -42,7 +42,7 @@ Today:
   - content completeness for every bundled design;
   - the security tests from R8.
 
-  A **geometric completeness** check reads the real PDF with PDFKit (`PDFKitInspector`, `GeometricCompleteness`): each text line inside its page, and its glyph height at least 6 pt. The design install gate and the native renderer tests run it (#78, #80).
+  A **geometric completeness** check reads the real PDF with PDFKit (`PDFKitInspector`, `GeometricCompleteness`): each text line inside its page, and its glyph height at least 6 pt. The design install gate, the native renderer tests and every export that is not truncated (`ExportCVWorkflow`) run it (#78, #80).
 - **Selection by the app.** The app picks its renderer through platform-conditional target dependencies in `PrestoCVComposition`. The composition root creates it on the main actor and injects it.
 - **No fallback renderer.** An unsupported platform fails at build time, not with a fake PDF.
 - **Backend.** A server renderer runs in a sandboxed process with no network egress, and with time, page and memory limits.

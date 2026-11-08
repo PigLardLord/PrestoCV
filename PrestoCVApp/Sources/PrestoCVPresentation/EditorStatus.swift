@@ -44,6 +44,8 @@ public enum ExportStatus: Hashable, Sendable {
     case invalid
     /// The PDF lacks `missing` of the document's texts.
     case incomplete(missing: Int)
+    /// `lines` text lines of the PDF are outside their page or too small to read.
+    case textNotVisible(lines: Int)
     case failed
 }
 
@@ -98,6 +100,7 @@ extension ExportStatus {
         case .unsupportedLanguage: self = .unsupportedLanguage
         case .invalidDocument: self = .invalid
         case .incomplete(let missing): self = .incomplete(missing: missing)
+        case .textNotVisible(let lines): self = .textNotVisible(lines: lines)
         case .renderingFailed: self = .failed
         }
     }
