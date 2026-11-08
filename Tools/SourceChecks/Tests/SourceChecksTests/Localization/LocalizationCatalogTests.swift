@@ -56,7 +56,9 @@ struct LocalizationCatalogTests {
     /// Only the AI texts are checked for a promise of availability in the legacy catalog.
     static let promiseKeyPrefix = "ai."
 
-    /// The exemptions of the legacy catalog, as the checks take them.
+    /// The exemptions of the legacy catalog, as the checks take them. It keeps the scan of the literals handed to a view
+    /// (`everyLiteralInViews` stays off): its app is frozen to fixes of the published version (ADR 0033), and that scan is
+    /// the one it already had on main. The new app reads every literal of its views.
     static let legacyRules = StringRules(
         sameInEveryLanguage: sameInEveryLanguage,
         sameInSomeLanguages: sameInSomeLanguages,

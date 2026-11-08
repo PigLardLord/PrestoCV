@@ -24,7 +24,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
-            extraArguments: ["title", "message", "code", "retryTitle"]))
+            extraArguments: ["title", "message", "code", "retryTitle"],
+            // Deny by default: English written anywhere in a view (a ternary, a local, a multiline literal) is not translated.
+            everyLiteralInViews: true))
 
     static let all = [legacy, next]
 

@@ -53,8 +53,18 @@ struct StringRules: Sendable {
     var viewFolders: [String]?
     /// Labels of arguments that take a key, on any view: `ErrorStateView(title: "failed.title")`.
     var extraArguments: [String] = []
-    /// Read every string literal with words in the view folders, wherever it stands, instead of the literals handed to a view.
+    /// Read every string literal with words in the view folders, wherever it stands (a ternary, a local, a multiline or raw
+    /// literal, a member call), instead of the literals handed straight to a view. A literal then passes only as a key, a
+    /// lookup, a `nonKeyLiterals` entry or the argument of one of `nonTextArguments`.
     var everyLiteralInViews = false
+    /// The arguments (the text before the literal) that take something other than text to translate, each with its reason.
+    var nonTextArguments: [String: String] = [
+        "verbatim:": "text shown as it is, by definition",
+        "accessibilityIdentifier(": "an identifier for the UI tests, never shown",
+        "systemName:": "the name of an SF Symbol",
+        "systemImage:": "the name of an SF Symbol",
+        "named:": "the name of an image or a color in the asset catalog",
+    ]
 }
 
 // MARK: - Catalog
@@ -243,18 +253,35 @@ enum StringChecks {
                 if translation.texts == english && !mayBeSame {
                     findings.copiedFromEnglish.append("\(key) (\(language))")
                 }
-                if formatSpecifiers(of: translation.texts) != formatSpecifiers(of: english) {
+                let types = placeholderTypes(of: translation.texts)
+                if types == nil || types != placeholderTypes(of: english) {
                     findings.otherPlaceholders.append("\(key) (\(language))")
                 }
             }
+            if placeholderTypes(of: english) == nil { findings.otherPlaceholders.append("\(key) (en)") }
         }
         if !used.contains(key) && !rules.dynamicKeyPrefixes.contains(where: key.hasPrefix) {
             findings.unused.append(key)
         }
     }
 
-    private static func formatSpecifiers(of texts: [String]) -> [String] {
-        texts.flatMap { $0.matches(of: #"%(?:\d+\$)?(?:@|lld|d|f)"#, group: 0) }.sorted()
+    /// The type of the value each argument position takes in a language, over all its forms: an unnumbered specifier takes
+    /// the next position of its text, and `%2$@` takes the position 2. A form may omit a value that another form uses
+    /// (a plural "one"). Nil when two specifiers want different types for one position, which no argument list can meet.
+    static func placeholderTypes(of texts: [String]) -> [Int: String]? {
+        var types: [Int: String] = [:]
+        for text in texts {
+            var next = 1
+            for specifier in text.matches(of: #"%%|%(?:\d+\$)?(?:@|lld|d|f)"#, group: 0) where specifier != "%%" {
+                let numbered = specifier.dropFirst().split(separator: "$", maxSplits: 1)
+                let position = numbered.count == 2 ? Int(numbered[0]) ?? next : next
+                let type = String(numbered.count == 2 ? numbered[1] : specifier.dropFirst())
+                if numbered.count < 2 { next += 1 }
+                if let known = types[position], known != type { return nil }
+                types[position] = type
+            }
+        }
+        return types
     }
 
     /// Every key of the catalog that a string literal of the sources names.
@@ -373,16 +400,99 @@ enum StringChecks {
     /// A literal followed by `.localized` is a lookup, which the lookup check reads.
     private static let notLookedUpAsMember = #"(?!\s*\.)"#
 
-    /// Every literal that a source hands to a view as its text, with the file. `Text(verbatim:)` is not one.
+    /// Every literal that a source hands to a view as its text, with the file. `Text(verbatim:)` is not one. With
+    /// `everyLiteralInViews`, every literal of the view folders that is not a lookup or the argument of a non-text parameter.
     private static func viewLiterals(in sources: [SwiftSource], rules: StringRules) -> [(literal: String, path: String)] {
+        let read = sources.filter { file in rules.viewFolders.map { folders in folders.contains { file.path.hasPrefix($0 + "/") } } ?? true }
+        if rules.everyLiteralInViews {
+            return read.flatMap { file in
+                literals(in: file.code).filter { !isLookup($0) && !rules.nonTextArguments.keys.contains(where: $0.before.hasSuffix) }
+                    .map { (literal: $0.text, path: file.path) }
+            }
+        }
         let views = ([swiftUIViews] + rules.extraViews.map(NSRegularExpression.escapedPattern(for:))).joined(separator: "|")
         var patterns = ["\\b(?:\(views))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)", "\\.(?:\(swiftUIModifiers))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)"]
         if !rules.extraArguments.isEmpty {
             patterns.append("\\b(?:\(rules.extraArguments.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|"))):\\s*\(stringLiteral)\(notLookedUpAsMember)")
         }
-        let read = sources.filter { file in rules.viewFolders.map { folders in folders.contains { file.path.hasPrefix($0 + "/") } } ?? true }
         return read.flatMap { file in
             patterns.flatMap { file.code.matches(of: $0) }.map { (literal: $0, path: file.path) }
+        }
+    }
+
+    /// A string literal of the code, with the code that stands before it and after it on the line or lines around.
+    struct Literal {
+        let text: String
+        /// The last characters of the code before the literal, without trailing white space.
+        let before: String
+        /// The first characters of the code after the literal.
+        let after: String
+    }
+
+    /// A lookup of a key: `"key".localized`, `String(localized: "key")`, `LocalizedStringKey("key")`. The lookup check reads it.
+    private static func isLookup(_ literal: Literal) -> Bool {
+        literal.after.range(of: #"^\s*\.(?:localized|asLoclizedKey|localizedWithArgs)\b"#, options: .regularExpression) != nil
+            || literal.before.range(of: #"(?:String\(\s*localized:|LocalizedStringKey\()$"#, options: .regularExpression) != nil
+    }
+
+    /// The string literals of Swift code, single-line, multiline (`"""`) and raw (`#"` ... `"#`), wherever they stand.
+    /// Comments are skipped, and a literal inside a value of another literal is not read on its own.
+    static func literals(in code: String) -> [Literal] {
+        let chars = Array(code)
+        var found: [(range: Range<Int>, text: String)] = []
+        var i = 0
+        func hasPrefix(_ prefix: String, at index: Int) -> Bool {
+            let p = Array(prefix)
+            return index + p.count <= chars.count && Array(chars[index..<index + p.count]) == p
+        }
+        /// The end of the literal that opens at `start` with `hashes` pound signs and `quotes` quotes, and its text.
+        func literal(from start: Int, hashes: Int, quotes: Int) -> (end: Int, text: String) {
+            let pounds = String(repeating: "#", count: hashes)
+            let closing = String(repeating: "\"", count: quotes) + pounds
+            var j = start + hashes + quotes
+            let textStart = j
+            while j < chars.count {
+                if hasPrefix(closing, at: j) { return (j + closing.count, String(chars[textStart..<j])) }
+                if chars[j] == "\\" && hasPrefix("\\" + pounds + "(", at: j) {
+                    j += 1 + hashes + 1
+                    var depth = 1
+                    while j < chars.count && depth > 0 {
+                        if chars[j] == "\"" { j = literal(from: j, hashes: 0, quotes: 1).end; continue }
+                        if chars[j] == "(" { depth += 1 } else if chars[j] == ")" { depth -= 1 }
+                        j += 1
+                    }
+                    continue
+                }
+                if chars[j] == "\\" && hashes == 0 { j += 2; continue }
+                if quotes == 1 && chars[j] == "\n" { break }
+                j += 1
+            }
+            return (min(j, chars.count), String(chars[textStart..<min(j, chars.count)]))
+        }
+        while i < chars.count {
+            if hasPrefix("//", at: i) {
+                while i < chars.count && chars[i] != "\n" { i += 1 }
+            } else if hasPrefix("/*", at: i) {
+                i += 2
+                while i < chars.count && !hasPrefix("*/", at: i) { i += 1 }
+                i += 2
+            } else if chars[i] == "#" || chars[i] == "\"" {
+                var hashes = 0
+                while i + hashes < chars.count && chars[i + hashes] == "#" { hashes += 1 }
+                guard i + hashes < chars.count, chars[i + hashes] == "\"" else { i += hashes; continue }
+                let quotes = hasPrefix("\"\"\"", at: i + hashes) ? 3 : 1
+                let read = literal(from: i, hashes: hashes, quotes: quotes)
+                found.append((i..<read.end, quotes == 3 ? read.text.trimmingCharacters(in: .whitespacesAndNewlines) : read.text))
+                i = read.end
+            } else {
+                i += 1
+            }
+        }
+        return found.map { range, text in
+            Literal(
+                text: text,
+                before: String(chars[max(0, range.lowerBound - 80)..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines),
+                after: String(chars[range.upperBound..<min(chars.count, range.upperBound + 40)]))
         }
     }
 
