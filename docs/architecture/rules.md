@@ -129,7 +129,7 @@ Untrusted input is: design packages, AI output, persisted files, imported docume
   - **design CSS is parsed and allow-listed, never sanitised.** A CSS tokenizer accepts only the selectors of the [markup contract](../../CVPDFExporter/Docs/markup-contract.md) and an allow-list of properties with bounded values. It then re-serialises the tokens, so the CSS emitted is exactly the CSS validated;
   - rejected outright: `<`, CSS escapes, comments inside tokens, at-rules other than `@media print|screen|all`, pseudo-elements, `:has()` and other functional pseudo-classes, ids, custom properties, `!important`, every resource-bearing function;
   - **not in the allow-list**, so it cannot hide, move, reorder or inject content: `position`, `transform`, `zoom`, `filter`, `mask`, `clip`, `overflow`, `visibility`, `opacity`, `content`, `list-style`, `quotes`, counters, `direction`, `order`;
-  - **colours** only through the palette variables. Text can only use `--color-text` or `--color-primary`, and a palette exists only if text contrast is at least 4.5:1 and primary contrast at least 3:1;
+  - **colours** only through the palette variables. Text can only use `--color-text` or `--color-primary`, and a palette exists only if both have a contrast of at least 4.5:1 on the background, because a design can use either for small text;
   - **fonts** only through `--font-body` and `--font-heading`, from a closed set of system families. Embedding fonts needs its own ADR, with native registration.
 - **User values** are escaped per Unicode scalar and never re-parsed.
   - Tag and attribute names are closed enums.

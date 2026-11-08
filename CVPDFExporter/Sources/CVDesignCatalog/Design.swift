@@ -143,12 +143,12 @@ public struct HexColor: Sendable, Equatable {
     }
 }
 
-/// Only readable palettes exist: text on background ≥ 4.5:1, primary on background ≥ 3:1. Designs can
-/// only colour text with these variables, so no palette can make text invisible.
+/// Only readable palettes exist: text and primary each on background ≥ 4.5:1, the WCAG level for ordinary text.
+/// Designs can colour text of any size with either variable (a 9pt date or link in primary), so both need it.
 public struct Palette: Sendable, Equatable {
     public let primary: HexColor, text: HexColor, background: HexColor
     public init?(primary: HexColor, text: HexColor, background: HexColor) {
-        guard text.contrast(with: background) >= 4.5, primary.contrast(with: background) >= 3 else { return nil }
+        guard text.contrast(with: background) >= 4.5, primary.contrast(with: background) >= 4.5 else { return nil }
         self.primary = primary; self.text = text; self.background = background
     }
     public var customProperties: String {
