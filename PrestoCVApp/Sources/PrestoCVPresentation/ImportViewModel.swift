@@ -25,8 +25,8 @@ public final class ImportViewModel {
     @ObservationIgnored private let importer: any CVImporting
     @ObservationIgnored private let files: any ImportFileReading
     @ObservationIgnored private var running: Task<Void, Never>?
-    /// The file the import running reads, nil when it reads none.
-    @ObservationIgnored private var reading: URL?
+    /// How many tasks hold each file, by its canonical spelling: a task holds its file until it ends, also after a cancel.
+    @ObservationIgnored private var holders: [URL: Int] = [:]
     /// Counts the intents that start or end an import: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
 
@@ -58,12 +58,12 @@ public final class ImportViewModel {
         start(from: .file, reading: nil) { try await importer.importCV(fromPDF: data) }
     }
 
-    /// A PDF file the person chose or opened in the app. The file is let go once its import ended, however it ended.
-    /// One handed over while an import runs is let go unread, unless it is the file being read, which its own import
-    /// lets go: nothing of a file is kept (ADR 0027).
+    /// A PDF file the person chose or opened in the app. A file is let go once, when no import uses it any more,
+    /// however its import ended. One handed over while an import runs is not read; it is let go at once, unless an
+    /// import still uses it (the same file, however spelled), which lets it go: nothing of a file is kept (ADR 0027).
     public func importFile(at url: URL) {
         guard status != .importing else {
-            if !Self.isSameFile(url, reading) { files.release(url) }
+            if holders[Self.canonical(url)] == nil { files.release(url) }
             return
         }
         let importer = importer, files = files
@@ -107,13 +107,17 @@ public final class ImportViewModel {
         generation += 1
         let mine = generation
         self.source = source
-        reading = file
+        if let file { holders[Self.canonical(file), default: 0] += 1 }
         result = nil
         status = .importing
         let files = files
         running = Task { [weak self] in
             // After the draft or the problem is published, so that the file outlives its own import only.
-            defer { if let file { files.release(file) } }
+            defer {
+                if let file {
+                    if let self { self.letGo(file) } else { files.release(file) }
+                }
+            }
             let ended: Result<ImportOutcome, any Error>
             do { ended = .success(try await work()) } catch { ended = .failure(error) }
             self?.finish(mine, ended, from: source)
@@ -123,7 +127,6 @@ public final class ImportViewModel {
     private func finish(_ mine: Int, _ ended: Result<ImportOutcome, any Error>, from source: ImportSource) {
         guard mine == generation else { return }
         running = nil
-        reading = nil
         switch ended {
         case .success(let outcome):
             result = ImportedDraft(outcome, from: source)
@@ -140,7 +143,18 @@ public final class ImportViewModel {
     private func end() {
         status = .idle
         source = nil
-        reading = nil
+    }
+
+    /// A task gives its file back: the file goes when no other task holds it.
+    private func letGo(_ file: URL) {
+        let key = Self.canonical(file)
+        let left = (holders[key] ?? 1) - 1
+        if left > 0 {
+            holders[key] = left
+        } else {
+            holders[key] = nil
+            files.release(file)
+        }
     }
 
     /// An import failure of the file port stays what it is; any other error of the file is `fileNotRead`.
@@ -150,8 +164,5 @@ public final class ImportViewModel {
     }
 
     /// The same file however it is spelled: links resolved, `.` and `..` taken out.
-    private static func isSameFile(_ url: URL, _ other: URL?) -> Bool {
-        guard let other else { return false }
-        return url.resolvingSymlinksInPath().standardizedFileURL == other.resolvingSymlinksInPath().standardizedFileURL
-    }
+    private static func canonical(_ url: URL) -> URL { url.resolvingSymlinksInPath().standardizedFileURL }
 }

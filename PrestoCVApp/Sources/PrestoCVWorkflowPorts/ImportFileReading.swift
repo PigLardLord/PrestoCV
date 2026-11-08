@@ -7,7 +7,7 @@ public protocol ImportFileReading: Sendable {
     /// does. A file above the bound throws `ImportFailure.tooLarge`, one that cannot be read `ImportFailure.fileNotRead`;
     /// a cancelled task stays a `CancellationError` (R3, R7).
     func readPDF(fromFileAt url: URL) async throws -> Data
-    /// Lets the file go, whether it was read or not: nothing of it is kept (ADR 0027). Called once for each file the
-    /// person handed over.
+    /// Lets the file go, whether it was read or not: nothing of it is kept (ADR 0027). Called once for each file, when no
+    /// import uses it any more: a file handed over again while in use is the same file.
     func release(_ url: URL)
 }
