@@ -87,4 +87,35 @@ struct ImportFileLifetimeTests {
         #expect(world.files.released(otherFile) == 1)
         #expect(world.files.released(file) == 0)
     }
+
+    @Test("a file held by two imports is let go once when the view model is gone before both end")
+    func twoHoldersModelGone() async {
+        let world = ImportWorld()
+        var model: ImportViewModel? = world.model()
+        await world.hold(model!) { $0.importFile(at: file) }
+        model?.cancel()
+        model?.importFile(at: file)
+        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
+
+        model = nil
+        await world.files.gate.open()
+        await world.importer.gate.open()
+        await settle()
+
+        #expect(world.files.released(file) == 1)
+    }
+
+    @Test("a file held by one import is let go once when the view model is gone before it ends")
+    func oneHolderModelGone() async {
+        let world = ImportWorld()
+        var model: ImportViewModel? = world.model()
+        await world.hold(model!) { $0.importFile(at: file) }
+
+        model = nil
+        await world.files.gate.open()
+        await world.importer.gate.open()
+        await settle()
+
+        #expect(world.files.released(file) == 1)
+    }
 }

@@ -25,8 +25,8 @@ public final class ImportViewModel {
     @ObservationIgnored private let importer: any CVImporting
     @ObservationIgnored private let files: any ImportFileReading
     @ObservationIgnored private var running: Task<Void, Never>?
-    /// How many tasks hold each file, by its canonical spelling: a task holds its file until it ends, also after a cancel.
-    @ObservationIgnored private var holders: [URL: Int] = [:]
+    /// Which tasks hold which files. The tasks hold it too, so it outlives the view model until the last task ends.
+    @ObservationIgnored private let holds: FileHolds
     /// Counts the intents that start or end an import: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
 
@@ -34,6 +34,7 @@ public final class ImportViewModel {
     public init(importer: any CVImporting, files: any ImportFileReading) {
         self.importer = importer
         self.files = files
+        holds = FileHolds(files)
     }
 
     // MARK: - Intents
@@ -63,7 +64,7 @@ public final class ImportViewModel {
     /// import still uses it (the same file, however spelled), which lets it go: nothing of a file is kept (ADR 0027).
     public func importFile(at url: URL) {
         guard status != .importing else {
-            if holders[Self.canonical(url)] == nil { files.release(url) }
+            holds.refuse(url)
             return
         }
         let importer = importer, files = files
@@ -107,17 +108,13 @@ public final class ImportViewModel {
         generation += 1
         let mine = generation
         self.source = source
-        if let file { holders[Self.canonical(file), default: 0] += 1 }
+        if let file { holds.hold(file) }
         result = nil
         status = .importing
-        let files = files
+        let holds = holds
         running = Task { [weak self] in
             // After the draft or the problem is published, so that the file outlives its own import only.
-            defer {
-                if let file {
-                    if let self { self.letGo(file) } else { files.release(file) }
-                }
-            }
+            defer { if let file { holds.letGo(file) } }
             let ended: Result<ImportOutcome, any Error>
             do { ended = .success(try await work()) } catch { ended = .failure(error) }
             self?.finish(mine, ended, from: source)
@@ -145,18 +142,6 @@ public final class ImportViewModel {
         source = nil
     }
 
-    /// A task gives its file back: the file goes when no other task holds it.
-    private func letGo(_ file: URL) {
-        let key = Self.canonical(file)
-        let left = (holders[key] ?? 1) - 1
-        if left > 0 {
-            holders[key] = left
-        } else {
-            holders[key] = nil
-            files.release(file)
-        }
-    }
-
     /// An import failure of the file port stays what it is; any other error of the file is `fileNotRead`.
     private static func readFailure(_ error: any Error) -> any Error {
         if error is ImportFailure || error is CancellationError { return error }
@@ -164,5 +149,34 @@ public final class ImportViewModel {
     }
 
     /// The same file however it is spelled: links resolved, `.` and `..` taken out.
-    private static func canonical(_ url: URL) -> URL { url.resolvingSymlinksInPath().standardizedFileURL }
+    fileprivate static func canonical(_ url: URL) -> URL { url.resolvingSymlinksInPath().standardizedFileURL }
+}
+
+/// How many tasks hold each file, by its canonical spelling: a task holds its file until it ends, also after a cancel.
+/// A file is released exactly once, by the last task that gives it back; the tasks hold this object, not the view model.
+@MainActor
+private final class FileHolds {
+    private let files: any ImportFileReading
+    private var counts: [URL: Int] = [:]
+
+    init(_ files: any ImportFileReading) { self.files = files }
+
+    func hold(_ file: URL) { counts[ImportViewModel.canonical(file), default: 0] += 1 }
+
+    /// A task gives its file back: the file goes when no other task holds it.
+    func letGo(_ file: URL) {
+        let key = ImportViewModel.canonical(file)
+        let left = (counts[key] ?? 1) - 1
+        if left > 0 {
+            counts[key] = left
+        } else {
+            counts[key] = nil
+            files.release(file)
+        }
+    }
+
+    /// A file handed over and not read: it goes at once, unless a task still holds it (that task lets it go).
+    func refuse(_ file: URL) {
+        if counts[ImportViewModel.canonical(file)] == nil { files.release(file) }
+    }
 }
