@@ -79,23 +79,24 @@ public struct InstallDesign: Sendable {
     }
 }
 
-/// The installed designs, in the store's order (by identifier).
+/// The installed designs, in the store's order (by identifier). A cancellation is passed through (R7); any other failure
+/// of the store is `storeUnavailable`.
 public struct ListDesigns: Sendable {
     let store: any DesignStore
     public init(store: any DesignStore) { self.store = store }
-    public func callAsFunction() async throws(DesignCatalogError) -> [DesignManifest] {
-        do { return try await store.installedDesigns() } catch { throw .storeUnavailable }
+    public func callAsFunction() async throws -> [DesignManifest] {
+        do { return try await store.installedDesigns() } catch is CancellationError { throw CancellationError() } catch { throw DesignCatalogError.storeUnavailable }
     }
 }
 
-/// One installed design.
+/// One installed design. A cancellation is passed through (R7); any other failure of the store is `storeUnavailable`.
 public struct GetDesign: Sendable {
     let store: any DesignStore
     public init(store: any DesignStore) { self.store = store }
-    public func callAsFunction(id: String) async throws(DesignCatalogError) -> ValidatedDesign {
+    public func callAsFunction(id: String) async throws -> ValidatedDesign {
         let design: ValidatedDesign?
-        do { design = try await store.design(id: id) } catch { throw .storeUnavailable }
-        guard let design else { throw .unknownDesign(id) }
+        do { design = try await store.design(id: id) } catch is CancellationError { throw CancellationError() } catch { throw DesignCatalogError.storeUnavailable }
+        guard let design else { throw DesignCatalogError.unknownDesign(id) }
         return design
     }
 }
@@ -255,7 +256,7 @@ public struct ResolveDesign: Sendable {
     let getDesign: GetDesign
     public init(store: any DesignStore) { getDesign = GetDesign(store: store) }
 
-    public func callAsFunction(design: String, palette: String?, fonts: String?) async throws(DesignCatalogError) -> ResolvedDesign {
+    public func callAsFunction(design: String, palette: String?, fonts: String?) async throws -> ResolvedDesign {
         let found = try await getDesign(id: design)
         let chosenPalette = palette.flatMap(NamedPalette.init(rawValue:)) ?? found.manifest.defaultPalette
         let chosenFonts = fonts.flatMap(FontScheme.init(rawValue:)) ?? found.manifest.defaultFonts

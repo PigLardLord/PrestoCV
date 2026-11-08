@@ -201,8 +201,8 @@ public actor FileDesignStore: DesignStore {
             origins[id] = origin
             let record = try encodeOrigins(origins, listing: listed, for: id)
             try write(package, to: file(entry), for: id)
+            try write(index, to: indexFile, for: id)   // the index first: it decides what is listed, so a failure after it only loses the origin
             try write(record, to: originsFile, for: id)
-            try write(index, to: indexFile, for: id)
             return installed == nil ? .installed : .upgraded
         }
         guard let outcome else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
@@ -358,6 +358,7 @@ public actor FileDesignStore: DesignStore {
         }
         let version: Int
         do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .indexCorrupt("no schema version") }
+        // Schema 1 has no migration: it was only ever written by tests, since no app built a FileDesignStore before this version.
         guard version <= Self.indexVersion else { throw .indexFromNewerVersion(version) }
         guard version == Self.indexVersion else { throw .indexCorrupt("schema version \(version)") }
         let index: IndexV2

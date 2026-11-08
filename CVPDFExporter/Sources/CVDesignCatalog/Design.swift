@@ -224,6 +224,10 @@ public protocol DesignRenderingGate: Sendable {
 }
 
 /// Outbound port, owned by the catalog (R3). Raw bytes: validation happens in the catalog, not the source.
+///
+/// Precondition: a source returns the same packages for the life of the process. The bundled one reads `Bundle.module`,
+/// which does not change while the app runs. The import's early refusal of a bundled identifier relies on it, and the
+/// store's lock refuses an import over an identifier it records as bundled.
 public protocol BundledDesignSource: Sendable {
     func bundledPackages() async throws -> [(name: String, data: Data)]
 }

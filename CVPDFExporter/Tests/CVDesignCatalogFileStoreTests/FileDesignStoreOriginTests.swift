@@ -41,12 +41,35 @@ private final class WriteLog: Sendable {
     init(failing: String? = nil) { self.failing = failing }
     func write(_ data: Data, to url: URL) throws {
         names.withLock { $0.append(url.lastPathComponent) }
-        if url.lastPathComponent == failing { throw CocoaError(.fileWriteNoPermission) }
+        if url.lastPathComponent == failing || (failing == "package" && url.pathExtension == "mcvt") { throw CocoaError(.fileWriteNoPermission) }
         try data.write(to: url, options: .atomic)
     }
     var written: [String] { names.withLock { $0 } }
     func store(_ dir: URL) -> FileDesignStore { FileDesignStore(directory: dir, writeFile: { try self.write($0, to: $1) }) }
 }
+
+/// Which save a failure scenario runs, over an installed "clean" design at 1.0.0 whose recorded origin is `start`.
+enum FailureScenario: CaseIterable, CustomTestStringConvertible {
+    case importOverUnrecorded, importOverImported, syncUpgradeOverBundled, syncOverUnrecorded
+    var testDescription: String { String(describing: self).replacingOccurrences(of: "Over", with: " over ") }
+    var start: DesignOrigin? {
+        switch self {
+        case .importOverUnrecorded, .syncOverUnrecorded: nil
+        case .importOverImported: .imported
+        case .syncUpgradeOverBundled: .bundled
+        }
+    }
+    /// The origin the save records when it writes.
+    var recorded: DesignOrigin {
+        switch self {
+        case .importOverUnrecorded, .importOverImported: .imported
+        case .syncUpgradeOverBundled, .syncOverUnrecorded: .bundled
+        }
+    }
+    /// Whether the save replaces the installed design (a sync over a design that is not recorded as bundled keeps it).
+    var replaces: Bool { self != .syncOverUnrecorded }
+}
+
 
 @Suite("FileDesignStore records each design's origin (#127)")
 struct FileDesignStoreOriginTests {
@@ -191,16 +214,16 @@ struct FileDesignStoreOriginTests {
         }
     }
 
-    @Test("a save writes the package file, then the record, then the index; an adoption writes the record only; a kept design writes nothing")
+    @Test("a save writes the package file, then the index, then the record; an adoption writes the record only; a kept design writes nothing")
     func writeOrder() async throws {
         try await inTemporaryStore { dir in
             let log = WriteLog(), store = log.store(dir)
             try await store.save(DesignStoreContract.design(id: "clean"))
-            #expect(log.written == ["clean.1.mcvt", "origins.json", "index.json"])
+            #expect(log.written == ["clean.1.mcvt", "index.json", "origins.json"])
             #expect(try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) == .installed)
-            #expect(log.written.suffix(3) == ["bold.1.mcvt", "origins.json", "index.json"])
+            #expect(log.written.suffix(3) == ["bold.1.mcvt", "index.json", "origins.json"])
             #expect(try await store.saveIfNewer(DesignStoreContract.design(id: "bold", version: "1.1.0")) == .upgraded)
-            #expect(log.written.suffix(3) == ["bold.2.mcvt", "origins.json", "index.json"])
+            #expect(log.written.suffix(3) == ["bold.2.mcvt", "index.json", "origins.json"])
             let count = log.written.count
             #expect(try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) == .keptInstalled)
             #expect(try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0")) == .saved)
@@ -212,17 +235,41 @@ struct FileDesignStoreOriginTests {
         }
     }
 
-    @Test("a save whose index write fails leaves the listed designs as they were; the record's extra entry is not reported and a retry records it")
+    @Test("after a failed write, whichever file it was, the store reports the old state, the new state, or the new design with no origin; never the old design under another origin",
+          arguments: FailureScenario.allCases, ["package", "origins.json", "index.json"])
+    func failedWriteNeverChangesTheOrigin(scenario: FailureScenario, failing: String) async throws {
+        try await inTemporaryStore { dir in
+            let old = try DesignStoreContract.design(id: "clean"), new = try DesignStoreContract.design(id: "clean", version: "2.0.0")
+            let seed = FileDesignStore(directory: dir)
+            if scenario.start == .bundled { _ = try await seed.saveIfNewer(old) } else { try await seed.save(old) }
+            if scenario.start == nil { try FileManager.default.removeItem(at: dir.origins) }
+            let store = WriteLog(failing: failing).store(dir)
+            do {
+                if scenario == .importOverUnrecorded || scenario == .importOverImported { try await store.save(new) } else { _ = try await store.saveIfNewer(new) }
+            } catch {}
+            let fresh = FileDesignStore(directory: dir)
+            let listed = try await fresh.installedDesigns(), origin = try await fresh.installedOrigins()["clean"]
+            if listed == [old.manifest] {
+                #expect(origin == scenario.start, "the old design is listed, and its origin is as it was")
+                #expect(try await fresh.design(id: "clean") == old)
+            } else {
+                #expect(listed == [new.manifest] && scenario.replaces)
+                #expect(origin == nil || origin == scenario.recorded, "the new design has its origin or none")
+                #expect(try await fresh.design(id: "clean") == new)
+            }
+        }
+    }
+
+    @Test("a save whose index write fails leaves the listed designs and the record as they were, and a retry installs it")
     func indexWriteFails() async throws {
         try await inTemporaryStore { dir in
             let clean = try DesignStoreContract.design(id: "clean")
             try await FileDesignStore(directory: dir).save(clean)
-            let index = try Data(contentsOf: dir.index)
+            let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins)
             let log = WriteLog(failing: "index.json"), store = log.store(dir)
             await #expect(throws: FileDesignStoreError.writeFailed(id: "bold")) { try await store.save(DesignStoreContract.design(id: "bold")) }
-            #expect(log.written == ["bold.1.mcvt", "origins.json", "index.json"])
-            #expect(try Data(contentsOf: dir.index) == index)
-            #expect(try String(decoding: Data(contentsOf: dir.origins), as: UTF8.self) == record("[\(entry("bold")),\(entry("clean"))]"))
+            #expect(log.written == ["bold.1.mcvt", "index.json"])
+            #expect(try Data(contentsOf: dir.index) == index && Data(contentsOf: dir.origins) == origins)
             #expect(try await store.installedDesigns() == [clean.manifest])
             #expect(try await store.installedOrigins() == ["clean": .imported])
             #expect(try await store.design(id: "bold") == nil)
@@ -232,17 +279,21 @@ struct FileDesignStoreOriginTests {
         }
     }
 
-    @Test("a save whose record write fails writes no index: the design is not listed, and the record is as it was")
+    @Test("a save whose record write fails has listed the design: it is installed and readable, with no recorded origin, and a retry records it")
     func recordWriteFails() async throws {
         try await inTemporaryStore { dir in
-            let clean = try DesignStoreContract.design(id: "clean")
+            let clean = try DesignStoreContract.design(id: "clean"), bold = try DesignStoreContract.design(id: "bold")
             try await FileDesignStore(directory: dir).save(clean)
-            let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins)
+            let origins = try Data(contentsOf: dir.origins)
             let log = WriteLog(failing: "origins.json"), store = log.store(dir)
-            await #expect(throws: FileDesignStoreError.writeFailed(id: "bold")) { try await store.save(DesignStoreContract.design(id: "bold")) }
-            #expect(log.written == ["bold.1.mcvt", "origins.json"])
-            #expect(try Data(contentsOf: dir.index) == index && Data(contentsOf: dir.origins) == origins)
-            #expect(try await store.installedDesigns() == [clean.manifest])
+            await #expect(throws: FileDesignStoreError.writeFailed(id: "bold")) { try await store.save(bold) }
+            #expect(log.written == ["bold.1.mcvt", "index.json", "origins.json"])
+            #expect(try Data(contentsOf: dir.origins) == origins)
+            #expect(try await store.installedDesigns() == [bold.manifest, clean.manifest])
+            #expect(try await store.design(id: "bold") == bold)
+            #expect(try await store.installedOrigins() == ["clean": .imported])
+            #expect(try await FileDesignStore(directory: dir).adoptAsBundled(bold))
+            #expect(try await FileDesignStore(directory: dir).installedOrigins() == ["clean": .imported, "bold": .bundled])
             try FileManager.default.removeItem(at: dir.origins)
             await #expect(throws: FileDesignStoreError.writeFailed(id: "clean")) { _ = try await store.adoptAsBundled(clean) }
             #expect(!FileManager.default.fileExists(atPath: dir.origins.path))

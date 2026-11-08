@@ -646,3 +646,31 @@ struct InstallDesignTests {
         await #expect(throws: DesignPackageRejected.self) { _ = try await install(designData(".cv{display:none}", id: "bad")) }
     }
 }
+
+@Suite("the catalog reads pass a cancellation through (R7)")
+struct CatalogReadCancellationTests {
+    @Test("ListDesigns throws CancellationError when the store's listing is cancelled")
+    func list() async {
+        await #expect(throws: CancellationError.self) { _ = try await ListDesigns(store: SpyDesignStore(cancelling: [.installedDesigns]))() }
+    }
+
+    @Test("GetDesign throws CancellationError when the store's read is cancelled")
+    func get() async {
+        await #expect(throws: CancellationError.self) { _ = try await GetDesign(store: SpyDesignStore(cancelling: [.design]))(id: "clean") }
+    }
+
+    @Test("ResolveDesign throws CancellationError when the store's read is cancelled")
+    func resolve() async {
+        let resolve = ResolveDesign(store: SpyDesignStore(cancelling: [.design]))
+        await #expect(throws: CancellationError.self) { _ = try await resolve(design: "clean", palette: nil, fonts: nil) }
+    }
+
+    @Test("a plain failure of the store is still storeUnavailable, and an unknown design is still unknownDesign")
+    func failures() async throws {
+        let failing = SpyDesignStore(unreadable: ["clean"], listingFails: true)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await ListDesigns(store: failing)() }
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await GetDesign(store: failing)(id: "clean") }
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await ResolveDesign(store: failing)(design: "clean", palette: nil, fonts: nil) }
+        await #expect(throws: DesignCatalogError.unknownDesign("bold")) { _ = try await ResolveDesign(store: failing)(design: "bold", palette: nil, fonts: nil) }
+    }
+}
