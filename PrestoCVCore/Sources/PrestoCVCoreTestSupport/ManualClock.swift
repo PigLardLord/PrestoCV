@@ -33,6 +33,8 @@ public final class ManualClock: Clock {
 
     public var now: Instant { state.withLock { $0.now } }
     public var minimumResolution: Duration { .zero }
+    /// How many sleeps wait for the clock to reach their deadline: a test moves it once a sleep has begun.
+    public var sleeping: Int { state.withLock { $0.sleepers.count } }
 
     public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         let id = state.withLock { state in
