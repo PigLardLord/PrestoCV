@@ -53,13 +53,13 @@ public struct ListCVs: Sendable {
     }
 }
 
-/// Renames a stored CV: a conditional update, so a rename never overwrites another window's changes.
+/// Renames a stored CV: a conditional update, so a rename never overwrites another window's changes. The title is trimmed, and it is one line.
 public struct RenameCV: Sendable {
     let save: SaveCV
     public init(repository: any CVRepository) { save = SaveCV(repository: repository) }
     public func callAsFunction(_ cv: CV, to title: String) async throws(AuthoringError) -> CV {
         var renamed = cv
-        renamed.rename(title)
+        renamed.rename(title.trimmingCharacters(in: .whitespacesAndNewlines))
         return try await save(renamed)
     }
 }

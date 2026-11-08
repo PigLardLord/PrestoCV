@@ -52,6 +52,17 @@ public struct CV: Hashable, Sendable {
     public mutating func choose(design: DesignChoice?) { self.design = design }
     public mutating func setLanguage(_ language: DocumentLanguage?) { self.language = language }
 
+    /// This CV with the text of `other`: its title, details and sections. The identity, the revision, the times, the design
+    /// and the language stay this CV's own, so that an editor's text can be written over the stored CV it started from
+    /// without undoing a look or a language chosen since.
+    public func holding(contentOf other: CV) -> CV {
+        var result = self
+        result.rename(other.title)
+        result.setPersonalDetails(other.personal)
+        result.setSections(other.sections)
+        return result
+    }
+
     /// Duplication rule: the copy keeps the content and the design, not the identity or the history.
     /// The new title is composed by presentation, which knows the language (R13).
     public func duplicated(as newID: CVID, title: String) -> CV {
