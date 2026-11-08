@@ -56,6 +56,14 @@ struct LocalizationCatalogTests {
     /// Only the AI texts are checked for a promise of availability in the legacy catalog.
     static let promiseKeyPrefix = "ai."
 
+    /// The placeholders of the values of the legacy app's formats, which the checks cannot read from the code.
+    static let valueTypes: [String: ValueTypes] = [
+        #"cv.list.unreadable_notice \(unreadableCount)"#: ValueTypes(["%lld"], "unreadableCount is an Int"),
+        #"export.preview.open \($0.pageCount)"#: ValueTypes(["%lld"], "ExportedPDF.pageCount is an Int"),
+        #"\(title). \(message)"#: ValueTypes(["%@", "%@"], "EmptyStateView and ErrorView: title and message are Strings"),
+        #"\(unavailable). \(explanation)"#: ValueTypes(["%@", "%@"], "both are Strings read from the catalog"),
+    ]
+
     /// The exemptions of the legacy catalog, as the checks take them. It keeps the scan of the literals handed to a view
     /// (`everyLiteralInViews` stays off): its app is frozen to fixes of the published version (ADR 0033), and that scan is
     /// the one it already had on main. The new app reads every literal of its views.
@@ -68,6 +76,7 @@ struct LocalizationCatalogTests {
         personNames: personNames,
         properNamesOfKey: properNamesOfKey,
         promiseKeyPrefix: promiseKeyPrefix,
+        valueTypes: valueTypes,
         viewFolders: ["PrestoCV"]
     )
 

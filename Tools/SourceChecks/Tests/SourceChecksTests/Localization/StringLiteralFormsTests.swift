@@ -15,6 +15,8 @@ struct LiteralForm: Sendable, CustomTestStringConvertible {
     let keys: [String]
     /// Whether the literal as a whole can be the argument of a lookup, i.e. it holds the text itself.
     let canBeLookedUp: Bool
+    /// The placeholders the rules declare for its literal with values, so that a lookup of it can be found.
+    var valueTypes: [String: ValueTypes] = [:]
 
     /// Whether the literal holds a value: its catalog key is then not its text.
     var hasValue: Bool { keys != read }
@@ -26,8 +28,10 @@ struct LiteralForm: Sendable, CustomTestStringConvertible {
         LiteralForm(name: "multiline", source: "\"\"\"\n    Save your CV\n    \"\"\"", read: ["Save your CV"], keys: ["Save your CV"], canBeLookedUp: true),
         LiteralForm(name: "raw #", source: ##"#"Save your CV"#"##, read: ["Save your CV"], keys: ["Save your CV"], canBeLookedUp: true),
         LiteralForm(name: "raw ##", source: ###"##"Save your CV"##"###, read: ["Save your CV"], keys: ["Save your CV"], canBeLookedUp: true),
-        LiteralForm(name: "with an interpolation", source: #""Save \(name) CV""#, read: [#"Save \(name) CV"#], keys: ["Save %@ CV"], canBeLookedUp: true),
-        LiteralForm(name: "raw with an interpolation", source: ##"#"Save \#(name) CV"#"##, read: [#"Save \(name) CV"#], keys: ["Save %@ CV"], canBeLookedUp: true),
+        LiteralForm(name: "with an interpolation", source: #""Save \(name) CV""#, read: [#"Save \(name) CV"#], keys: ["Save %@ CV"], canBeLookedUp: true,
+            valueTypes: [#"Save \(name) CV"#: ValueTypes(["%@"], "name is a String")]),
+        LiteralForm(name: "raw with an interpolation", source: ##"#"Save \#(name) CV"#"##, read: [#"Save \(name) CV"#], keys: ["Save %@ CV"], canBeLookedUp: true,
+            valueTypes: [#"Save \(name) CV"#: ValueTypes(["%@"], "name is a String")]),
         LiteralForm(
             name: "nested in an interpolation", source: #""\(isReady ? "Save your CV" : "Try again")""#,
             read: ["Save your CV", "Try again"], keys: ["Save your CV", "Try again"], canBeLookedUp: false),
@@ -88,6 +92,27 @@ struct StringLiteralFormsTests {
 
     /// Runs the checks on `code` and a catalog with `keys`.
     static func findings(code: String, catalogKeys keys: [String], rules: StringRules? = nil) throws -> StringFindings {
+        try withFiles(code: code, catalogKeys: keys) { catalog, source in
+            try StringChecks.run(catalog: catalog, sources: [source], rules: Self.viewRules(rules))
+        }
+    }
+
+    /// The exemptions of `rules` that exempt nothing in `code` and a catalog with `keys`.
+    static func stale(code: String, catalogKeys keys: [String], rules: StringRules) throws -> [String] {
+        try withFiles(code: code, catalogKeys: keys) { catalog, source in
+            try StringChecks.staleExemptions(catalog: catalog, sources: [source], rules: Self.viewRules(rules))
+        }
+    }
+
+    /// The rules with every literal of the views read, unless they name the view folders.
+    private static func viewRules(_ rules: StringRules?) -> StringRules {
+        var rules = rules ?? StringRules()
+        if rules.viewFolders == nil { rules.everyLiteralInViews = true }
+        return rules
+    }
+
+    /// Writes a catalog with `keys` and a source with `code` to a new folder, runs `body` on them and removes the folder.
+    private static func withFiles<T>(code: String, catalogKeys keys: [String], _ body: (URL, URL) throws -> T) throws -> T {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("literal-forms-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -99,16 +124,16 @@ struct StringLiteralFormsTests {
         try JSONSerialization.data(withJSONObject: ["sourceLanguage": "en", "version": "1.0", "strings": strings]).write(to: catalog)
         let source = folder.appendingPathComponent("View.swift")
         try code.write(to: source, atomically: true, encoding: .utf8)
-        var rules = rules ?? StringRules()
-        if rules.viewFolders == nil { rules.everyLiteralInViews = true }
-        return try StringChecks.run(catalog: catalog, sources: [source], rules: rules)
+        return try body(catalog, source)
     }
 
     @Test("A literal missing from the catalog is reported, whatever its form and place; one in the catalog is not", arguments: LiteralCase.all)
     func everyFormInEveryPlace(_ testCase: LiteralCase) throws {
         let code = "struct V {\n    var body: some View {\n        \(testCase.context.wrap(testCase.form.source))\n    }\n}\n"
-        let missing = try Self.reported(code: code, catalogKeys: ["plant.ok"])
-        let present = try Self.reported(code: code, catalogKeys: ["plant.ok"] + testCase.form.keys)
+        var rules = StringRules()
+        rules.valueTypes = testCase.form.valueTypes
+        let missing = try Self.reported(code: code, catalogKeys: ["plant.ok"], rules: rules)
+        let present = try Self.reported(code: code, catalogKeys: ["plant.ok"] + testCase.form.keys, rules: rules)
 
         let neverFound = testCase.context.fillsInValues && testCase.form.hasValue
         #expect(missing == testCase.form.read.sorted(), "missing from the catalog: \(missing)")
@@ -126,19 +151,82 @@ struct StringLiteralFormsTests {
 
     @Test("A format key that only a String extension lookup of a literal with a value names is unused: the extension never asks for it")
     func extensionLookupDoesNotUseTheFormatKey() throws {
-        let byExtension = try Self.findings(code: "Text(\"Hello \\(name)\".localized)\n", catalogKeys: ["Hello %@"])
-        let byInitializer = try Self.findings(code: "Text(String(localized: \"Hello \\(name)\"))\n", catalogKeys: ["Hello %@"])
+        var rules = StringRules()
+        rules.valueTypes = ["Hello \\(name)": ValueTypes(["%@"], "name is a String")]
+        let byExtension = try Self.findings(code: "Text(\"Hello \\(name)\".localized)\n", catalogKeys: ["Hello %@"], rules: rules)
+        let byInitializer = try Self.findings(code: "Text(String(localized: \"Hello \\(name)\"))\n", catalogKeys: ["Hello %@"], rules: rules)
 
         #expect(byExtension.unused == ["Hello %@"])
         #expect(byInitializer.unused.isEmpty)
     }
 
-    @Test("A format lookup with a text value and a number value is found under its mixed key, which counts as used")
+    /// Rules that declare a text value and a number value for `shell.numbered \(title) \(number)`.
+    private static let numberedRules: StringRules = {
+        var rules = StringRules()
+        rules.valueTypes = ["shell.numbered \\(title) \\(number)": ValueTypes(["%@", "%lld"], "title is a String, number an Int")]
+        return rules
+    }()
+
+    @Test("A format lookup with a text value and a number value is found under its declared mixed key, which counts as used")
     func formatWithValuesOfTwoTypes() throws {
         let code = "let s = String(localized: \"shell.numbered \\(title) \\(number)\")\n"
-        let mixed = try Self.findings(code: code, catalogKeys: ["shell.numbered %@ %lld"])
+        let mixed = try Self.findings(code: code, catalogKeys: ["shell.numbered %@ %lld"], rules: Self.numberedRules)
 
         #expect(mixed.lookedUpButMissing.isEmpty && mixed.unused.isEmpty)
+    }
+
+    @Test("A catalog key with the placeholders of a format swapped is reported missing and unused: the app never asks for it")
+    func formatWithItsPlaceholdersSwapped() throws {
+        let lookup = "let s = String(localized: \"shell.numbered \\(title) \\(number)\")\n"
+        let view = "Text(\"shell.numbered \\(title) \\(number)\")\n"
+
+        for code in [lookup, view] {
+            let swapped = try Self.findings(code: code, catalogKeys: ["shell.numbered %lld %@"], rules: Self.numberedRules)
+            #expect(try Self.reported(code: code, catalogKeys: ["shell.numbered %lld %@"], rules: Self.numberedRules) == ["shell.numbered \\(title) \\(number)"])
+            #expect(swapped.unused == ["shell.numbered %lld %@"])
+        }
+    }
+
+    @Test("A literal with values whose placeholders are not declared is reported with the hint, whatever keys the catalog has")
+    func undeclaredValues() throws {
+        let hint = ": declare the type of each value in valueTypes"
+        for code in ["Text(String(localized: \"Hello \\(name)\"))\n", "Text(\"Hello \\(name)\")\n"] {
+            let found = try Self.findings(code: code, catalogKeys: ["Hello %@", "Hello %lld"])
+            #expect(found.lookedUpButMissing.count == 1 && found.lookedUpButMissing.allSatisfy { $0.hasPrefix("Hello \\(name) (") && $0.hasSuffix(hint) }, "\(found.lookedUpButMissing)")
+            #expect(found.unused == ["Hello %@", "Hello %lld"])
+        }
+        let byExtension = try Self.findings(code: "Text(\"Hello \\(name)\".localized)\n", catalogKeys: [])
+        #expect(byExtension.lookedUpButMissing.allSatisfy { !$0.hasSuffix(hint) }, "a String extension never finds a value, declared or not")
+    }
+
+    @Test("A literal with seven values of mixed types is found under its declared key, and reported when undeclared")
+    func sevenMixedValues() throws {
+        let code = "let s = String(localized: \"seven \\(a) \\(b) \\(c) \\(d) \\(e) \\(f) \\(g)\")\n"
+        let key = "seven %@ %lld %@ %lld %@ %lld %@"
+        var rules = StringRules()
+        rules.valueTypes = ["seven \\(a) \\(b) \\(c) \\(d) \\(e) \\(f) \\(g)": ValueTypes(["%@", "%lld", "%@", "%lld", "%@", "%lld", "%@"], "a planted mix")]
+
+        let declared = try Self.findings(code: code, catalogKeys: [key], rules: rules)
+        let undeclared = try Self.findings(code: code, catalogKeys: [key])
+        #expect(declared.lookedUpButMissing.isEmpty && declared.unused.isEmpty)
+        #expect(undeclared.lookedUpButMissing.count == 1 && undeclared.unused == [key])
+    }
+
+    @Test("A declaration of placeholders that no checked literal needs, or that does not fit its literal, is stale")
+    func staleValueTypes() throws {
+        let code = "Text(String(localized: \"Hello \\(name)\"))\nlet s = \"Plain \\(x)\".localized\n"
+        func stale(_ text: String, _ placeholders: [String], keys: [String] = ["Hello %@"]) throws -> [String] {
+            var rules = StringRules()
+            rules.valueTypes = [text: ValueTypes(placeholders, "a planted declaration")]
+            return try Self.stale(code: code, catalogKeys: keys, rules: rules)
+        }
+
+        #expect(try stale("Hello \\(name)", ["%@"]).isEmpty)
+        #expect(try stale("Gone \\(x)", ["%@"]) == [#""Gone \(x)" is in no checked source as a format with values: remove it from valueTypes"#])
+        #expect(try stale("Plain \\(x)", ["%@"]) == [#""Plain \(x)" is in no checked source as a format with values: remove it from valueTypes"#])
+        #expect(try stale("Hello \\(name)", ["%@", "%lld"]) == [#""Hello \(name)" declares 2 placeholders for its 1 value: correct it in valueTypes"#])
+        #expect(try stale("Hello \\(name)", ["%s"], keys: ["Hello %s"]) == [#""Hello \(name)" declares %s, which is not a placeholder: correct it in valueTypes"#])
+        #expect(try stale("Hello \\(name)", ["%lld"]) == [#""Hello \(name)" builds the key Hello %lld, which the catalog lacks: correct it in valueTypes"#])
     }
 
     @Test("The name of an SF Symbol handed to a view as symbol: is not text to translate")
@@ -205,8 +293,10 @@ struct StringLiteralFormsTests {
 
         #expect(found.map(\.text) == ["a\tb \"q\" \\(n + 1)", "one\n  two \\(n)", "raw \\n \\(m)"])
         #expect(found.map(\.key) == ["a\tb \"q\" %@", "one\n  two %@", "raw \\n %@"])
-        #expect(found.map(\.formatKeys)[0] == ["a\tb \"q\" %@", "a\tb \"q\" %lld"])
-        #expect(StringLiteralLexer.literals(in: "\"\\(a) of \\(b)\"")[0].formatKeys == ["%@ of %@", "%lld of %@", "%@ of %lld", "%lld of %lld"])
+        #expect(found[0].formatParts == ["a\tb \"q\" ", ""] && found[0].formatKey(["%lld"]) == "a\tb \"q\" %lld")
+        let two = StringLiteralLexer.literals(in: "\"\\(a) of \\(b)\"")[0]
+        #expect(two.formatParts == ["", " of ", ""] && two.valueCount == 2)
+        #expect(two.formatKey(["%lld", "%@"]) == "%lld of %@" && two.formatKey(["%@"]) == nil)
         #expect(found[0].before == "Text(" && found[2].before.hasSuffix("title:"))
     }
 }

@@ -24,6 +24,10 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
+            valueTypes: [
+                #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
+                #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
+            ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
             extraArguments: ["title", "message", "code", "retryTitle"],

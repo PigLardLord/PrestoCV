@@ -46,6 +46,12 @@ struct StringRules: Sendable {
     /// Literals handed to a view that are deliberately not a key, each with the reason: a name, a format, a file name.
     /// A literal without a letter pair (a number, a symbol, values only) needs no entry.
     var nonKeyLiterals: [String: String] = [:]
+    /// The placeholder of each value (`%@`, `%lld`, in order) of the literals with values that are looked up or handed to
+    /// a view, keyed by the literal as written (`shell.numbered \(title) \(number)`), each with its reason. The checks
+    /// cannot see the type of a value, so the key the app asks for at run time is declared here: a literal with values
+    /// that has no entry is reported, and an entry that fits no literal of the sources is stale. Two literals with the
+    /// same text share one entry.
+    var valueTypes: [String: ValueTypes] = [:]
     /// Views of the app's own design system that take a key as their first argument, besides the views of SwiftUI.
     var extraViews: [String] = []
     /// The folders (relative to the repository root) whose views are read for literals; all the sources when nil. The legacy
@@ -66,6 +72,17 @@ struct StringRules: Sendable {
         "symbol:": "the name of an SF Symbol, handed to a view of the design system (EmptyStateView)",
         "named:": "the name of an image or a color in the asset catalog",
     ]
+}
+
+/// The placeholders of the values of one literal, in order, with the reason for their types.
+struct ValueTypes: Sendable {
+    let placeholders: [String]
+    let reason: String
+
+    init(_ placeholders: [String], _ reason: String) {
+        self.placeholders = placeholders
+        self.reason = reason
+    }
 }
 
 // MARK: - Catalog
@@ -119,8 +136,8 @@ struct LocalizationCatalog {
     }
 
     /// Whether the catalog has a key under which the app finds this literal at run time (`SwiftLiteral.runtimeKeys`).
-    func isLookedUp(_ literal: SwiftLiteral) -> Bool {
-        literal.runtimeKeys.contains { strings[$0] != nil }
+    func isLookedUp(_ literal: SwiftLiteral, valueTypes: [String: ValueTypes]) -> Bool {
+        literal.runtimeKeys(valueTypes).contains { strings[$0] != nil }
     }
 }
 
@@ -173,14 +190,14 @@ enum StringChecks {
     static func run(catalog url: URL, sources urls: [URL], rules: StringRules = StringRules()) throws -> StringFindings {
         let catalog = try LocalizationCatalog(contentsOf: url)
         let sources = try urls.map(SwiftSource.init(url:))
-        let used = usedKeys(in: catalog, sources: sources)
+        let used = usedKeys(in: catalog, sources: sources, rules: rules)
         var findings = StringFindings()
         for key in catalog.keys where !rules.pendingKeys.contains(key) {
             check(key, in: catalog, used: used, rules: rules, into: &findings)
         }
         findings.titleCase = try titleCaseTexts(in: catalog, rules: rules)
         findings.availabilityPromises = availabilityPromises(in: catalog, rules: rules)
-        findings.lookedUpButMissing = lookedUpButMissing(from: catalog, in: sources) + notKeys(handedToViews: sources, catalog: catalog, rules: rules)
+        findings.lookedUpButMissing = lookedUpButMissing(from: catalog, in: sources, rules: rules) + notKeys(handedToViews: sources, catalog: catalog, rules: rules)
         return findings
     }
 
@@ -215,6 +232,30 @@ enum StringChecks {
         let handed = Set(viewLiterals(in: try urls.map(SwiftSource.init(url:)), rules: rules).map(\.literal.text))
         for literal in rules.nonKeyLiterals.keys.sorted() where !handed.contains(literal) {
             stale.append("\"\(literal)\" is handed to no view: remove it from nonKeyLiterals")
+        }
+        stale += staleValueTypes(catalog: catalog, sources: try urls.map(SwiftSource.init(url:)), rules: rules)
+        return stale
+    }
+
+    /// The entries of `valueTypes` that fit no format with values of the sources, or build a key the catalog lacks.
+    private static func staleValueTypes(catalog: LocalizationCatalog, sources: [SwiftSource], rules: StringRules) -> [String] {
+        let formats = sources.flatMap { StringLiteralLexer.literals(in: $0.code) }.filter { $0.hasValue && $0.lookup != .builtText }
+        var stale: [String] = []
+        for (text, declared) in rules.valueTypes.sorted(by: { $0.key < $1.key }) {
+            guard let literal = formats.first(where: { $0.text == text }) else {
+                stale.append("\"\(text)\" is in no checked source as a format with values: remove it from valueTypes")
+                continue
+            }
+            guard let key = literal.formatKey(declared.placeholders) else {
+                let values = literal.valueCount
+                stale.append("\"\(text)\" declares \(declared.placeholders.count) placeholders for its \(values) value\(values == 1 ? "" : "s"): correct it in valueTypes")
+                continue
+            }
+            if let wrong = declared.placeholders.first(where: { !SwiftLiteral.placeholders.contains($0) }) {
+                stale.append("\"\(text)\" declares \(wrong), which is not a placeholder: correct it in valueTypes")
+            } else if catalog.strings[key] == nil {
+                stale.append("\"\(text)\" builds the key \(key), which the catalog lacks: correct it in valueTypes")
+            }
         }
         return stale
     }
@@ -270,12 +311,12 @@ enum StringChecks {
     }
 
     /// Every key of the catalog under which the app can find a string literal of the sources at run time.
-    private static func usedKeys(in catalog: LocalizationCatalog, sources: [SwiftSource]) -> Set<String> {
+    private static func usedKeys(in catalog: LocalizationCatalog, sources: [SwiftSource], rules: StringRules) -> Set<String> {
         let keys = Set(catalog.keys)
         var used: Set<String> = []
         for file in sources {
             for literal in StringLiteralLexer.literals(in: file.code) {
-                for name in literal.runtimeKeys where keys.contains(name) { used.insert(name) }
+                for name in literal.runtimeKeys(rules.valueTypes) where keys.contains(name) { used.insert(name) }
             }
         }
         return used
@@ -361,12 +402,19 @@ enum StringChecks {
     /// The keys that the sources look up and the catalog lacks, with the file. A lookup (`SwiftLiteral.lookup`) is
     /// checked whatever the form of its literal (plain, raw, multiline, with values) and wherever it stands, nested in a
     /// value of another literal too, under the keys its kind of lookup asks for at run time.
-    private static func lookedUpButMissing(from catalog: LocalizationCatalog, in sources: [SwiftSource]) -> [String] {
+    private static func lookedUpButMissing(from catalog: LocalizationCatalog, in sources: [SwiftSource], rules: StringRules) -> [String] {
         sources.flatMap { file in
             StringLiteralLexer.literals(in: file.code)
-                .filter { $0.lookup != nil && !catalog.isLookedUp($0) }
-                .map { "\($0.text) (\(file.path))" }
+                .filter { $0.lookup != nil && !catalog.isLookedUp($0, valueTypes: rules.valueTypes) }
+                .map { missing($0, in: file.path, rules: rules) }
         }
+    }
+
+    /// A literal the catalog lacks, as a line to read. A format with values whose types are not declared says so.
+    private static func missing(_ literal: SwiftLiteral, in path: String, rules: StringRules) -> String {
+        literal.hasValue && literal.lookup != .builtText && rules.valueTypes[literal.text] == nil
+            ? "\(literal.text) (\(path)): declare the type of each value in valueTypes"
+            : "\(literal.text) (\(path))"
     }
 
     // MARK: Literals handed to views
@@ -402,8 +450,8 @@ enum StringChecks {
     /// symbols only, such as "\(a) / \(b)", has nothing to translate.
     private static func notKeys(handedToViews sources: [SwiftSource], catalog: LocalizationCatalog, rules: StringRules) -> [String] {
         viewLiterals(in: sources, rules: rules).compactMap { literal, path in
-            guard literal.hasWords, !catalog.isLookedUp(literal), rules.nonKeyLiterals[literal.text] == nil else { return nil }
-            return "\(literal.text) (\(path))"
+            guard literal.hasWords, !catalog.isLookedUp(literal, valueTypes: rules.valueTypes), rules.nonKeyLiterals[literal.text] == nil else { return nil }
+            return missing(literal, in: path, rules: rules)
         }
     }
 
@@ -428,11 +476,10 @@ struct SwiftLiteral: Equatable {
     /// The content, with the escapes decoded and the indentation of a multiline literal removed. A value stays as
     /// `\(expression)`, for a raw literal too.
     let text: String
-    /// The key the literal would be in a catalog: each value is `%@`.
+    /// The text with each value as `%@`: what the checks read for words.
     let key: String
-    /// Every key the literal can be in a catalog when an initializer reads its interpolation: each value is `%@` or
-    /// `%lld`, by a type the checks cannot see. The first is `key`; past six values only the two uniform keys are listed.
-    let formatKeys: [String]
+    /// The literal's format cut at its values: one part more than it has values.
+    let formatParts: [String]
     /// The last characters of the code before the literal, without trailing white space: the call or the argument label
     /// it is the argument of, or the operator that joins it to other code.
     let before: String
@@ -442,8 +489,21 @@ struct SwiftLiteral: Equatable {
     /// Whether the text has words to translate, once the values are taken out.
     var hasWords: Bool { key.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil }
 
-    /// Whether the literal holds a value (`\(expression)`): only then do its text and its key differ.
-    var hasValue: Bool { text != key }
+    /// The placeholders a value can have in a catalog key.
+    static let placeholders: Set<String> = ["%@", "%lld", "%llu", "%ld", "%lu", "%d", "%u", "%lf", "%f"]
+
+    /// The number of values (`\(expression)`) the literal holds.
+    var valueCount: Int { formatParts.count - 1 }
+
+    /// Whether the literal holds a value (`\(expression)`).
+    var hasValue: Bool { valueCount > 0 }
+
+    /// The catalog key of the literal's format with these placeholders, in order; nil when their number is not the
+    /// number of values.
+    func formatKey(_ placeholders: [String]) -> String? {
+        guard placeholders.count == valueCount else { return nil }
+        return zip(formatParts, placeholders + [""]).map { $0 + $1 }.joined()
+    }
 
     /// How the code looks the literal up in the catalog, or nil when it does not: then the literal is shown as written,
     /// or handed to SwiftUI, which reads a literal with values as a format key. The lookup check reads a lookup, and the
@@ -455,13 +515,15 @@ struct SwiftLiteral: Equatable {
     }
 
     /// The keys under which the app can find the literal at run time. A String extension asks for the text with its
-    /// values filled in, which no catalog key can match, so a literal with a value has none. An initializer that reads
-    /// the interpolation asks for the format, `%@` or `%lld` for each value by its type, which the checks cannot tell
-    /// apart: any of `formatKeys`.
-    var runtimeKeys: [String] {
+    /// values filled in, which no catalog key can match, so a literal with a value has none. An initializer or a view
+    /// that reads the interpolation asks for the format with a placeholder for each value by its type, which the checks
+    /// cannot see: only the key that `valueTypes` declares for the literal, and none when it declares none.
+    func runtimeKeys(_ valueTypes: [String: ValueTypes]) -> [String] {
         switch lookup {
-        case .builtText?: hasValue ? [] : [text]
-        case .format?, nil: [text] + formatKeys
+        case .builtText?: return hasValue ? [] : [text]
+        case .format?, nil:
+            guard hasValue else { return [text] }
+            return valueTypes[text].flatMap { formatKey($0.placeholders) }.map { [$0] } ?? []
         }
     }
 }
@@ -469,7 +531,8 @@ struct SwiftLiteral: Equatable {
 /// How the app finds a literal in the catalog at run time.
 enum LiteralLookup: Equatable {
     /// `String(localized:`, `LocalizedStringKey(`, `LocalizedStringResource(`: the initializer reads the literal's
-    /// interpolation, so each value is a placeholder and the key is the format (`Hello %@`, `%lld items`).
+    /// interpolation, so each value is a placeholder by its type and the key is the format (`Hello %@`, `%lld items`),
+    /// as `StringRules.valueTypes` declares it.
     case format
     /// A String extension of the legacy app (`.localized`, `.localizedWithArgs`, `.asLoclizedKey`): it receives the
     /// String already built, each value filled in, so its key is the text as written, and a literal with a value is
@@ -490,32 +553,20 @@ struct StringLiteralLexer {
     private static let decodedNewline = Unicode.Scalar(0xE000)!
     /// A character that stands for a value in the format of a literal, until a placeholder is chosen for it.
     private static let valueMarker = Unicode.Scalar(0xE001)!
-    /// The most values whose placeholders are mixed in `SwiftLiteral.formatKeys`.
-    private static let mixedValuesLimit = 6
 
     static func literals(in code: String) -> [SwiftLiteral] {
         var lexer = StringLiteralLexer(chars: Array(code.unicodeScalars))
         lexer.scan(untilClosingParenthesis: false)
         return lexer.found.sorted { $0.range.lowerBound < $1.range.lowerBound }.map { range, text, format in
-            let keys = formatKeys(of: format)
+            let parts = format.split(separator: Character(valueMarker), omittingEmptySubsequences: false).map(String.init)
             return SwiftLiteral(
-                text: text, key: keys[0], formatKeys: keys,
+                text: text, key: parts.joined(separator: "%@"), formatParts: parts,
                 before: lexer.string(max(0, range.lowerBound - 80)..<range.lowerBound).trimmingCharacters(in: .whitespacesAndNewlines),
                 after: lexer.string(range.upperBound..<min(lexer.chars.count, range.upperBound + 40)))
         }
     }
 
     private init(chars: [Unicode.Scalar]) { self.chars = chars }
-
-    /// The keys of a format whose values are `valueMarker`: each value `%@` or `%lld`, all `%@` first.
-    private static func formatKeys(of format: String) -> [String] {
-        let parts = format.split(separator: Character(valueMarker), omittingEmptySubsequences: false).map(String.init)
-        let values = parts.count - 1
-        let placeholders: [[String]] = values <= mixedValuesLimit
-            ? (0..<(1 << values)).map { mask in (0..<values).map { ((mask >> $0) & 1) == 0 ? "%@" : "%lld" } }
-            : [Array(repeating: "%@", count: values), Array(repeating: "%lld", count: values)]
-        return placeholders.map { chosen in zip(parts, chosen + [""]).map { $0 + $1 }.joined() }
-    }
 
     private func string(_ range: Range<Int>) -> String {
         var view = String.UnicodeScalarView()
