@@ -5,10 +5,10 @@ internal import PrestoCVDomain
 import PrestoCVWorkflowPorts
 
 /// The editor of one CV: the person's text, stored by itself a pause after the last change and at once when the editor is
-/// left, and exported as it stands.
+/// left, and given as it stands to the export sheet.
 ///
 /// It presents; it decides nothing. What may be stored is the domain's verdict (`CV.saveCheck()`), when to write is the
-/// `Autosave` of the application layer, and the store and the export are the ports it is given (ADR 0010).
+/// `Autosave` of the application layer, and the store is the port it is given (ADR 0010).
 @MainActor
 @Observable
 public final class EditorViewModel {
@@ -25,7 +25,6 @@ public final class EditorViewModel {
     public private(set) var opening: OpeningStatus = .opening
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
-    public internal(set) var exportStatus: ExportStatus = .idle
 
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
@@ -40,7 +39,6 @@ public final class EditorViewModel {
 
     let start: EditorStart
     let editing: any CVEditing
-    let exporting: any CVExporting
     let clock: any Clock<Duration>
     let pause: Duration
     let copyTitle: @MainActor (String) -> String
@@ -78,8 +76,6 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
-    /// Counts the exports, so that one superseded cannot change the export status any more.
-    @ObservationIgnored var exportGeneration = 0
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
@@ -87,12 +83,11 @@ public final class EditorViewModel {
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
     public init(
-        start: EditorStart, editing: any CVEditing, exporting: any CVExporting, clock: any Clock<Duration>,
+        start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
         pause: Duration, copyTitle: @escaping @MainActor (String) -> String
     ) {
         self.start = start
         self.editing = editing
-        self.exporting = exporting
         self.clock = clock
         self.pause = pause
         self.copyTitle = copyTitle

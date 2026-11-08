@@ -10,7 +10,6 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.content = content
     let _: OpeningStatus = editor.opening
     let _: SaveStatus = editor.saveStatus
-    let _: ExportStatus = editor.exportStatus
     let _: Bool = editor.isSavedOnThisDevice
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
@@ -36,8 +35,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     await editor.setDocumentLanguage(tag)
     let parts: Set<LookPart> = [.design]
     await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
-    let document: ExportedDocument? = await editor.export()
-    _ = document.map { ($0.pdf, $0.pages) }
+    let _: ExportSnapshot? = editor.exportSnapshot()
 }
 
 /// Every value a status can take, with a field or a section where it has one. The switches break when a case is added,
@@ -58,7 +56,7 @@ func everySaveStatus() -> [SaveStatus] {
 
 func everyExportStatus() -> [ExportStatus] {
     let all: [ExportStatus] = [.idle, .exporting, .done(pages: 1), .truncated(pages: 1, required: 2), .languageNeeded,
-                               .notReady, .unsupportedLanguage, .invalid, .incomplete, .failed]
+                               .notReady, .unsupportedLanguage, .invalid, .incomplete(missing: 1), .failed]
     for status in all {
         switch status {
         case .idle, .exporting, .done, .truncated, .languageNeeded, .notReady, .unsupportedLanguage, .invalid, .incomplete,

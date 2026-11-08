@@ -210,30 +210,14 @@ extension EditFailure {
     }
 }
 
-/// The export port: it records each snapshot and gives the outcome a test set.
-final class ExportingFake: CVExporting {
-    let gate = Gate()
-    let snapshots = Mutex<[CV]>([])
-    let languages = Mutex<[DocumentLanguage]>([])
-    let result = Mutex<Result<ExportOutcome, any Error>>(.success(ExportOutcome(pdf: Data([1, 2, 3]), pageCount: 1, requiredPages: 1)))
-
-    func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
-        snapshots.withLock { $0.append(snapshot) }
-        languages.withLock { $0.append(language) }
-        await gate.pass()
-        return try result.withLock { $0 }.get()
-    }
-}
-
-/// The editor on the two fakes and a clock moved by hand. The pause is one second, as in version 1.
+/// The editor on the store's fake and a clock moved by hand. The pause is one second, as in version 1.
 @MainActor
 struct Editing {
     let editing = EditingFake()
-    let exporting = ExportingFake()
     let clock = ManualClock()
 
     func editor(_ start: EditorStart) -> EditorViewModel {
-        EditorViewModel(start: start, editing: editing, exporting: exporting, clock: self.clock, pause: .seconds(1),
+        EditorViewModel(start: start, editing: editing, clock: self.clock, pause: .seconds(1),
                         copyTitle: { "Copy of " + $0 })
     }
 

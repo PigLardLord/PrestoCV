@@ -42,7 +42,8 @@ public enum ExportStatus: Hashable, Sendable {
     /// The document language has no bundled headings; nothing is exported in another language.
     case unsupportedLanguage
     case invalid
-    case incomplete
+    /// The PDF lacks `missing` of the document's texts.
+    case incomplete(missing: Int)
     case failed
 }
 
@@ -96,7 +97,7 @@ extension ExportStatus {
         case .notReady: self = .notReady
         case .unsupportedLanguage: self = .unsupportedLanguage
         case .invalidDocument: self = .invalid
-        case .incomplete: self = .incomplete
+        case .incomplete(let missing): self = .incomplete(missing: missing)
         case .renderingFailed: self = .failed
         }
     }
