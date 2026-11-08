@@ -15,6 +15,9 @@ struct PlantedViews {
             Text("plant.empty_english")
             Text("plant.unmarked_english")
             Text("plant.review_english")
+            Text("plant.plural_review")
+            Text("plant.plural_no_value")
+            Text("plant.plural_empty")
             Text("plant.absent".localized)
         }
     }

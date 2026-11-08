@@ -39,11 +39,20 @@ struct StringChecksSelfTests {
         #expect(found.contains("plant.review_english (en)"), "\(found)")
     }
 
+    @Test("A plural form after the first that is not translated, has no text or an empty one is found")
+    func laterPluralForm() throws {
+        let found = try Self.run().notTranslated
+        #expect(found.contains("plant.plural_review (de)"), "\(found)")
+        #expect(found.contains("plant.plural_no_value (de)"), "\(found)")
+        #expect(found.contains("plant.plural_empty (de)"), "\(found)")
+    }
+
     @Test("Nothing else is reported as empty or not translated")
     func onlyThePlantedOnes() throws {
         #expect(Set(try Self.run().notTranslated) == [
             "plant.not_translated (es)", "plant.empty_translation (de)", "plant.empty_english (en)",
             "plant.unmarked_english (en)", "plant.review_english (en)",
+            "plant.plural_review (de)", "plant.plural_no_value (de)", "plant.plural_empty (de)",
         ])
     }
 
