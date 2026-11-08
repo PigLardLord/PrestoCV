@@ -1,4 +1,4 @@
-import CVGeneratorAI
+@testable import CVGeneratorAI
 import DiagnosticLogging
 import DiagnosticTrace
 import Foundation
@@ -17,11 +17,11 @@ extension ImportCV {
 }
 
 extension CVGeneratorUseCase {
-    /// A use case that logs nothing, for the tests that are not about the log.
+    /// A use case that logs nothing, for the tests that are not about the log, with every time limit on a test clock (#413).
     convenience init(service: CVGenerationService, claimChecker: ClaimChecking, sanitizer: CVDataSanitizer = CVDataSanitizer()) {
         self.init(
             service: service, claimChecker: claimChecker, logger: SilentLogger(), clock: ContinuousClock(), tracer: NoTracer(),
-            sanitizer: sanitizer
+            validator: DefaultCVValidator(), sanitizer: sanitizer, limits: .onTestClock()
         )
     }
 }
@@ -47,5 +47,27 @@ final class LogSpy: DiagnosticLogger {
     /// Every line written, in order
     var lines: [String] {
         written.withLock { $0.map(\.line) }
+    }
+}
+
+extension DraftingLimits {
+    /// The app's times on a clock that ends them only when a test says so: a draft of a test never runs out of time on a busy
+    /// machine (#413). The package's tests have the same in `TestCallClock`; a test target cannot import another's files.
+    /// The limits are internal to the package, so this needs the `@testable` import above, which a Debug build gives: the test
+    /// plans build Debug.
+    static func onTestClock() -> DraftingLimits {
+        DraftingLimits.standard.on(IdleClock())
+    }
+}
+
+/// A clock whose sleeps end only when their task is cancelled: a limit on it never runs out, however busy the machine is.
+private struct IdleClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+
+    var now: Instant { .now }
+    var minimumResolution: Duration { .zero }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        try await Task.sleep(for: .seconds(1_000_000_000))
     }
 }

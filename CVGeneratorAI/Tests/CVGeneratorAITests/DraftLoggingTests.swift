@@ -26,7 +26,7 @@ struct DraftLoggingTests {
     ) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
             service: service, claimChecker: checker, logger: logger, clock: TickingClock(step: Self.step), tracer: NoTracer(),
-            sanitizer: sanitizer
+            validator: DefaultCVValidator(), sanitizer: sanitizer, limits: .onTestClock()
         )
     }
 

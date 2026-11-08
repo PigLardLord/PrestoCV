@@ -2,7 +2,8 @@
 import PackageDescription
 
 // App integration and presentation (docs/architecture/modules.md). Step 5 fills the targets one by one (#62); the
-// Xcode app starts depending on this package at the switch (#88, #89).
+// second app target, PrestoCVNext, links the composition and the presentation until the shipped target takes them
+// over at the switch (#88, #89).
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
@@ -17,6 +18,7 @@ var targets: [Target] = [
         "PrestoCVWorkflowPorts",
         .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
         .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+        .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
         .product(name: "CVDocumentModel", package: "CVPDFExporter"),
         .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
         .product(name: "CVRendering", package: "CVPDFExporter"),
@@ -31,9 +33,11 @@ var targets: [Target] = [
 
 targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
     "PrestoCVIntegration", "PrestoCVWorkflowPorts",
-    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImportingTestSupport", package: "PrestoCVCore"),
     .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
     .product(name: "CVRendering", package: "CVPDFExporter"),
@@ -66,6 +70,22 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "CVRenderingPDFKitInspector", package: "CVPDFExporter"),
     .product(name: "CVDrafting", package: "CVGeneratorAI"),
     .product(name: "CVDraftingFoundationModels", package: "CVGeneratorAI"),
+    .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingOSLog", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceFiles", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceDistribution", package: "DiagnosticTrace"),
+]))
+targets.append(.testTarget(name: "PrestoCVCompositionTests", dependencies: [
+    "PrestoCVComposition",
+    .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
+    .product(name: "CVRenderingWebKitSupport", package: "CVPDFExporter"),
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticTrace", package: "DiagnosticTrace"),
+    .product(name: "DiagnosticTraceTestSupport", package: "DiagnosticTrace"),
 ]))
 #endif
 
@@ -77,6 +97,8 @@ let package = Package(
         .package(path: "../PrestoCVCore"),
         .package(path: "../CVPDFExporter"),
         .package(path: "../CVGeneratorAI"),
+        .package(path: "../DiagnosticLogging"),
+        .package(path: "../DiagnosticTrace"),
     ],
     targets: targets
 )
