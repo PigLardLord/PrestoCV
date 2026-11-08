@@ -600,6 +600,10 @@
     "CVRenderingWebKitSupport",
     "CVRenderingPDFKitInspector",
     "CVRenderingTestSupport",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVBundledDesigns",
+    "CVBundledHeadings",
     "CVRenderingNativeTestSupport"
    ],
    "rules": [],
