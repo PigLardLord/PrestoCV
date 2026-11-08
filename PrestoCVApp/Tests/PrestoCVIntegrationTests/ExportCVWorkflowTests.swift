@@ -245,7 +245,8 @@ struct ExportCVWorkflowTests {
 
     // MARK: Geometry (R8, #80)
 
-    private func export(layout: PDFLayout?, policy: ExportPolicy = .standard, renderer: any PDFRendering = FakePDFRenderer()) async throws -> ExportOutcome {
+    private func export(layout: PDFLayout?, policy: ExportPolicy = .standard,
+                        renderer: any PDFRendering = FakePDFRenderer()) async throws -> ExportOutcome {
         try await workflow(renderer: renderer, inspector: FixedLayoutInspector(fixed: layout), policy: policy)
             .export(Fixtures.fullCV(), language: language("it"))
     }
