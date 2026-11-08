@@ -25,4 +25,20 @@ struct EditorExportTests {
         #expect(world.editing.writeCount == 0)
         #expect(editor.saveStatus == .pending, "the snapshot leaves the save status alone")
     }
+
+    @Test("the snapshot carries the rows the person added and has not saved yet")
+    func snapshotCarriesTheUnsavedRows() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.addRow(to: .skills)
+        editor.content.skills[0].name = "Prototyping"
+        editor.addRow(to: .interests)
+        editor.content.interests[0].text = "Cycling"
+
+        let snapshot = try #require(editor.exportSnapshot(), "an open CV gives a snapshot")
+
+        #expect(snapshot.cv.sections.skills.map(\.name) == ["Prototyping"])
+        #expect(snapshot.cv.sections.interests == ["Cycling"])
+        #expect(world.editing.writeCount == 0, "the rows reach the export without a save")
+    }
 }
