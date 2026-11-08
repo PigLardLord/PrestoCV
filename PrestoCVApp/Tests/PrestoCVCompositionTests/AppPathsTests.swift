@@ -57,4 +57,33 @@ struct AppPathsTests {
 
         #expect(throws: AppPaths.Failure.storeUnavailable) { try paths.create() }
     }
+
+    // MARK: Import copies
+
+    @Test("The copy folders are the bundle's inbox in the temporary folder and the inbox in Documents")
+    func importCopies() {
+        let temporary = URL(filePath: "/tmp/x", directoryHint: .isDirectory)
+        let documents = URL(filePath: "/base/Documents", directoryHint: .isDirectory)
+
+        let folders = AppPaths.importCopies(temporary: temporary, documents: documents, bundleID: "app.example")
+
+        #expect(folders.map(\.path) == ["/tmp/x/app.example-Inbox", "/base/Documents/Inbox"])
+    }
+
+    @Test("With no bundle id only the inbox in Documents is a copy folder", arguments: [nil, ""] as [String?])
+    func importCopiesWithoutABundle(bundleID: String?) {
+        let temporary = URL(filePath: "/tmp/x", directoryHint: .isDirectory)
+        let documents = URL(filePath: "/base/Documents", directoryHint: .isDirectory)
+
+        let folders = AppPaths.importCopies(temporary: temporary, documents: documents, bundleID: bundleID)
+
+        #expect(folders.map(\.path) == ["/base/Documents/Inbox"])
+    }
+
+    #if !os(iOS)
+    @Test("Outside iOS a file is opened where it is, so the device has no copy folder")
+    func noCopyFoldersOutsideIOS() {
+        #expect(AppPaths.importCopiesOnDevice().isEmpty)
+    }
+    #endif
 }

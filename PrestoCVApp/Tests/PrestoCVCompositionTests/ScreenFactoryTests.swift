@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import PrestoCVApplication
 import PrestoCVCoreTestSupport
 import PrestoCVDomain
@@ -24,12 +25,11 @@ struct ScreenFactoryTests {
         func clean() { try? FileManager.default.removeItem(at: paths.temporary) }
     }
 
-    private static func fixture() async throws -> Fixture {
-        let paths = CompositionTests.paths()
+    private static func fixture(_ paths: AppPaths = CompositionTests.paths(), copyFolders: [URL] = []) async throws -> Fixture {
         let ids = SequentialIDGenerator()
         let counter = CompositionTests.CompileCounter()
         let state = await Composition.make(
-            CompositionTests.inputs(paths, ids: ids, compileRules: CompositionTests.counting(counter))
+            CompositionTests.inputs(paths, ids: ids, copyFolders: copyFolders, compileRules: CompositionTests.counting(counter))
         )
         return Fixture(composition: try CompositionTests.ready(state), paths: paths, ids: ids, counter: counter)
     }
@@ -291,7 +291,7 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -316,7 +316,7 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -347,7 +347,7 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await editor.load()
@@ -385,7 +385,90 @@ struct ScreenFactoryTests {
         #expect(released == nil)
     }
 
-    @Test("The rules are compiled once, also after the three factories were used")
+    // MARK: Import
+
+    /// Waits until the screen's import has ended, however it ended.
+    private static func ended(_ screen: ImportViewModel) async {
+        for await importing in Observations({ screen.status == .importing }) where !importing { break }
+    }
+
+    /// A folder of the composition's temporary folder, made empty.
+    private static func folder(_ name: String, in paths: AppPaths) throws -> URL {
+        let folder = paths.temporary.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    /// Bytes that are no PDF: the real import reads them and fails.
+    private static func junk(named name: String, in folder: URL) throws -> URL {
+        let file = folder.appendingPathComponent(name)
+        try Data("not a PDF".utf8).write(to: file)
+        return file
+    }
+
+    @Test("An import screen made by the factory reads a pasted text into a draft", .timeLimit(.minutes(1)))
+    func importOfAText() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let screen = fixture.composition.screens.makeImport()
+        screen.paste(["""
+        Ada Lovelace
+        ada@example.com
+
+        Experience
+        Analyst, Example Engines, 2019 – 2024
+        Wrote the first programs for the engine.
+
+        Education
+        BSc Mathematics, Example University, 2015 – 2018
+        """])
+
+        screen.importText()
+        await Self.ended(screen)
+
+        #expect(screen.status == .ready)
+        guard case .draft? = screen.result?.start else {
+            Issue.record("expected a draft, got \(String(describing: screen.result?.start))")
+            return
+        }
+        #expect(Self.store(fixture).isEmpty, "an import stores nothing until the person saves")
+    }
+
+    @Test("A file in a copy folder is deleted after its import", .timeLimit(.minutes(1)))
+    func importDeletesACopy() async throws {
+        let paths = CompositionTests.paths()
+        let inbox = try Self.folder("app.example-Inbox", in: paths)
+        let fixture = try await Self.fixture(paths, copyFolders: [inbox])
+        defer { fixture.clean() }
+        let copy = try Self.junk(named: "cv.pdf", in: inbox)
+        let screen = fixture.composition.screens.makeImport()
+
+        screen.importFile(at: copy)
+        await Self.ended(screen)
+
+        #expect(screen.status == .failed(.unreadable))
+        #expect(!FileManager.default.fileExists(atPath: copy.path), "the system's copy is deleted")
+        #expect(FileManager.default.fileExists(atPath: inbox.path), "the copy folder stays")
+    }
+
+    @Test("A file outside the copy folders stays after its import", .timeLimit(.minutes(1)))
+    func importKeepsAChosenFile() async throws {
+        let paths = CompositionTests.paths()
+        let inbox = try Self.folder("app.example-Inbox", in: paths)
+        let chosen = try Self.folder("Files", in: paths)
+        let fixture = try await Self.fixture(paths, copyFolders: [inbox])
+        defer { fixture.clean() }
+        let file = try Self.junk(named: "cv.pdf", in: chosen)
+        let screen = fixture.composition.screens.makeImport()
+
+        screen.importFile(at: file)
+        await Self.ended(screen)
+
+        #expect(screen.status == .failed(.unreadable))
+        #expect(FileManager.default.fileExists(atPath: file.path), "a file the person chose is theirs")
+    }
+
+    @Test("The rules are compiled once, also after the four factories were used")
     func rulesCompiledOnce() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -393,6 +476,7 @@ struct ScreenFactoryTests {
         await Self.list(fixture).load()
         await fixture.composition.screens.makeFirstRun().load()
         await Self.editor(fixture, .blank).load()
+        _ = fixture.composition.screens.makeImport()
         _ = fixture.composition.makeRenderer()
 
         #expect(fixture.counter.calls == 1)

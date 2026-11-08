@@ -34,4 +34,26 @@ struct AppPaths: Equatable, Sendable {
             temporary: FileManager.default.temporaryDirectory
         )
     }
+
+    /// The folders where the system puts the copy of a file opened in the app: `<bundle id>-Inbox` in the temporary folder
+    /// (iOS 26 and later), and `Inbox` in Documents (older systems). The import deletes a copy only when it lies directly in
+    /// one of them. With no bundle id there is no temporary inbox to name, so only the one in Documents is given.
+    static func importCopies(temporary: URL, documents: URL, bundleID: String?) -> [URL] {
+        let older = documents.appendingPathComponent("Inbox", isDirectory: true)
+        guard let bundleID, !bundleID.isEmpty else { return [older] }
+        return [temporary.appendingPathComponent("\(bundleID)-Inbox", isDirectory: true), older]
+    }
+
+    /// The copy folders of this device. On macOS a file opened in the app is opened where it is, with no copy, so there is
+    /// no copy folder: a person's own `~/Documents/Inbox` is never emptied.
+    static func importCopiesOnDevice() -> [URL] {
+        #if os(iOS)
+        importCopies(
+            temporary: FileManager.default.temporaryDirectory, documents: URL.documentsDirectory,
+            bundleID: Bundle.main.bundleIdentifier
+        )
+        #else
+        []
+        #endif
+    }
 }

@@ -49,6 +49,7 @@ struct CompositionTests {
         log: any DiagnosticLogger = RecordingLogger(),
         clock: any TimeSource = SteppingClock(),
         ids: any IDGenerator = SequentialIDGenerator(),
+        copyFolders: [URL] = [],
         compileRules: @escaping Composition.CompileRules
     ) -> Composition.Inputs {
         Composition.Inputs(
@@ -60,6 +61,7 @@ struct CompositionTests {
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
             settlement: TraceSettlement(),
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
+            copyFolders: copyFolders,
             compileRules: compileRules,
             settleDeadline: Self.neverFires,
             check: {},

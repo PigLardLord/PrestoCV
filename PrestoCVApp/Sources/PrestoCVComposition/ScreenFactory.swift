@@ -3,16 +3,21 @@ import PrestoCVApplication
 import PrestoCVDomain
 import PrestoCVIntegration
 import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 
 /// Makes the view models of the screens over the composition's one repository, clock and id source (R4, R5). A view is
 /// given its view model by this factory and never builds one. The methods do no I/O: each view model loads in its own
 /// `load()`.
 ///
-/// The two workflows are stateless, so the factory makes one of each and every view model shares them.
+/// The workflows are stateless, so the factory makes one of each and every view model shares them. The file port of the
+/// import is one too, shared by every import screen: it counts the files it received, so a file handed to two screens is
+/// let go only when both have released it.
 @MainActor
 public final class ScreenFactory {
     private let browsing: BrowseCVsWorkflow
     private let editing: EditCVWorkflow
+    private let importing: ImportCVWorkflow
+    private let importFiles: any ImportFileReading
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
@@ -25,12 +30,16 @@ public final class ScreenFactory {
     ///   - clock: The time of day, for the list's dates.
     ///   - editorClock: The clock the editors' autosave pause runs on: the composition gives the real one, a test one it
     ///     moves by hand.
+    ///   - importer: Reads a text or a PDF for the import.
+    ///   - importFiles: Reads and lets go the files handed to the import screens.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
-        editorClock: any Clock<Duration>
+        editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
+        importing = ImportCVWorkflow(importer: importer, ids: ids)
+        self.importFiles = importFiles
         self.clock = clock
         self.editorClock = editorClock
     }
@@ -58,6 +67,11 @@ public final class ScreenFactory {
     /// The first run.
     public func makeFirstRun() -> FirstRunViewModel {
         FirstRunViewModel(browsing: browsing, editing: editing)
+    }
+
+    /// The import of a CV the person already has: a text, a pasted PDF or a PDF file.
+    public func makeImport() -> ImportViewModel {
+        ImportViewModel(importer: importing, files: importFiles)
     }
 
     /// An editor, stored by the autosave a pause after the last change (one second, as in version 1).
