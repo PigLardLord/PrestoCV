@@ -60,6 +60,7 @@ targets += [
     ]),
     .testTarget(name: "CVRenderingMacOSTests", dependencies: [
         "CVRenderingMacOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
+        "CVDocumentModel", "CVDesignCatalog", "CVBundledDesigns", "CVBundledHeadings",
         "CVRenderingNativeTestSupport",
     ]),
 ]

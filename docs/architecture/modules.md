@@ -202,7 +202,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 
 **`CVDesignCatalogFileStore`** holds `FileDesignStore`: the directory is injected, the index is written atomically under a lock (`flock`, from `Glibc`, `Darwin` or `Android`), whose wait suspends and ends in `lockTimeout` at the deadline of the injected `LockWait`, and one instance serves the process. Every read validates the file again, so only validated designs leave the store.
 
-**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`.
+**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`. `professional`, `modern` and `minimal` are written against markup contract 1 and pinned by hash to their `id@version`, since the catalog's sync never replaces a design of the same version: a changed package needs a new version.
 
 **`CVRendering`**
 - **`DocumentHTMLBuilder`:**
@@ -257,7 +257,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
 - **`CVRenderingNativeTestSupport`** (iOS and macOS) holds what both native renderers' tests share: `NativeRendererChecks`, the loopback listener that counts connections, and `DrawnPDF`, which draws PDFs with CoreText. It may import `CVRendering`, `CVRenderingTestSupport`, `CVRenderingPDFKitInspector`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings`, CoreGraphics, CoreText, Foundation, Network, PDFKit, Synchronization and WebKit (the listener's control page).
-- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation. They run the checks of `NativeRendererChecks`, one line each:
+- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation. `BundledDesignsPreviewTests` prints an English sample with each bundled design and stores the first page as the design's preview when `UPDATE_PREVIEWS=1`; it imports `CVDocumentModel`, `CVDesignCatalog`, `CVBundledDesigns` and `CVBundledHeadings`. They run the checks of `NativeRendererChecks`, one line each:
   - a field the renderer drops is reported missing;
   - flex and grid at the minimum column gap keep skills, profiles and interests apart;
   - R8: a script does not run; a remote image, stylesheet and font, a link and a meta refresh make no connection; the PDF keeps the document's text;
