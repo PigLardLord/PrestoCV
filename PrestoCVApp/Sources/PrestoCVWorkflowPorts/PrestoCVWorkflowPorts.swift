@@ -24,7 +24,9 @@ public enum ExportFailure: Error, Equatable, Sendable {
     case invalidDocument
     /// The PDF lacks `missing` of the document's texts.
     case incomplete(missing: Int)
-    /// The headings could not be read, or the PDF could not be read back.
+    /// `lines` text lines of the PDF are not visible: outside their page, or with glyphs under the minimum height (a PDF with no page or no text counts as one).
+    case textNotVisible(lines: Int)
+    /// The headings could not be read, or the PDF could not be read back (text or layout).
     case renderingFailed
 }
 

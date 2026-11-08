@@ -57,7 +57,7 @@ public final class Composition {
 
     let paths: AppPaths
     let repository: FileCVRepository
-    let inspector: any PDFInspecting
+    let inspector: any PDFLayoutInspecting
     let headings: HeadingsCatalog
     let samples: any SampleCVSource
     let clock: any TimeSource
