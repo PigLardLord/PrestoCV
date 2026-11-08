@@ -143,4 +143,14 @@ struct CatalogTests {
         #expect(Palette(primary: HexColor("#1F3A5F")!, text: HexColor("#EEEEEE")!, background: white) == nil)
         #expect(Palette(primary: HexColor("#FAFAFA")!, text: HexColor("#111111")!, background: white) == nil)
     }
+
+    /// A design may colour 9pt text with primary (dates, links), so primary needs the 4.5:1 of ordinary text, not 3:1.
+    @Test("primary needs the contrast of ordinary text: 4.5:1 on the background", arguments: [
+        ("#949494", false),   // 3.03:1, readable only as a border or a large heading
+        ("#777777", false),   // 4.48:1, just below
+        ("#767676", true),    // 4.54:1, just above
+    ])
+    func primaryContrast(primary: String, exists: Bool) {
+        #expect((Palette(primary: HexColor(primary)!, text: HexColor("#111111")!, background: HexColor("#FFFFFF")!) != nil) == exists)
+    }
 }
