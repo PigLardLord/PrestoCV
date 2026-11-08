@@ -7,18 +7,46 @@ import PrestoCVImportingTestSupport
 import PrestoCVIntegration
 import PrestoCVWorkflowPorts
 
-/// An importer that answers as it was told, and remembers the texts it was given.
+/// The answer of an importer asked for what its script does not hold.
+private struct NotScripted: Error {}
+
+/// An importer that answers as it was told, and remembers the texts and the PDFs it was given. One made for texts
+/// throws for a PDF, one made for PDFs throws for a text.
 private final class ScriptedImporter: CVTextImporting, @unchecked Sendable {
     private let lock = NSLock()
     private var texts: [String] = []
+    private var documents: [Data] = []
     private let answer: @Sendable (String) throws -> ImportResult
-    init(_ answer: @escaping @Sendable (String) throws -> ImportResult) { self.answer = answer }
+    private let pdfAnswer: @Sendable (Data) throws -> ImportResult
+    init(_ answer: @escaping @Sendable (String) throws -> ImportResult) {
+        self.answer = answer; pdfAnswer = { _ in throw NotScripted() }
+    }
+    private init(pdfAnswer: @escaping @Sendable (Data) throws -> ImportResult) {
+        answer = { _ in throw NotScripted() }; self.pdfAnswer = pdfAnswer
+    }
+    static func pdf(_ answer: @escaping @Sendable (Data) throws -> ImportResult) -> ScriptedImporter {
+        ScriptedImporter(pdfAnswer: answer)
+    }
     var received: [String] { lock.withLock { texts } }
+    var receivedPDFs: [Data] { lock.withLock { documents } }
     func importText(_ text: String) throws -> ImportResult {
         lock.withLock { texts.append(text) }
         return try answer(text)
     }
+    func importPDF(_ data: Data) async throws -> ImportResult {
+        lock.withLock { documents.append(data) }
+        return try pdfAnswer(data)
+    }
 }
+
+/// Every reason the import gives for reading nothing, with the failure the workflow gives for it.
+private let everyImportError: [(ImportError, ImportFailure)] = [
+    (.empty, .empty), (.tooLarge, .tooLarge), (.tooManyPages, .tooManyPages), (.encrypted, .encrypted),
+    (.unreadable, .unreadable), (.noText, .noText),
+]
+
+/// Invented bytes: the scripted importer never reads them.
+private let somePDF = Data("%PDF-1.7 invented".utf8)
 
 /// An id generator that gives a fixed id and counts how many times it was asked.
 private final class CountingID: IDGenerator, @unchecked Sendable {
@@ -81,12 +109,8 @@ struct ImportCVWorkflowTests {
 
     @Test("every reason the import cannot read a text is a failure of its own")
     func unreadableTextIsAFailure() async {
-        let pairs: [(ImportError, ImportFailure)] = [
-            (.empty, .empty), (.tooLarge, .tooLarge), (.tooManyPages, .tooManyPages), (.encrypted, .encrypted),
-            (.unreadable, .unreadable), (.noText, .noText),
-        ]
         let ids = CountingID(5)
-        for (error, failure) in pairs {
+        for (error, failure) in everyImportError {
             await #expect(throws: failure) { try await workflow(ScriptedImporter { _ in throw error }, ids: ids).importCV(fromText: "x") }
         }
         struct Unexpected: Error {}
@@ -111,6 +135,7 @@ struct ImportCVWorkflowTests {
         let pasted = "  Mira Valdez\r\n\tPlatform Engineer \n"
         _ = try await workflow(importer).importCV(fromText: pasted)
         #expect(importer.received == [pasted])
+        #expect(importer.receivedPDFs.isEmpty)
     }
 
     @Test("a CV too big to save is still returned, whole")
@@ -161,5 +186,63 @@ struct ImportCVWorkflowTests {
         let outcome = try await workflow(ScriptedImporter { _ in FullImport.result }).importCV(fromText: FullImport.text)
         #expect(outcome.saving == .ok)
         #expect(outcome.saving == outcome.cv.saveCheck())
+    }
+
+    // MARK: A PDF
+
+    @Test("a PDF gives the same kind of outcome as a text: an unsaved CV with its review, and no text is read")
+    func pdfGivesTheSameKindOfOutcome() async throws {
+        let importer = ScriptedImporter.pdf { _ in FullImport.result }
+        let outcome = try await workflow(importer).importCV(fromPDF: somePDF)
+        #expect(importer.receivedPDFs == [somePDF])
+        #expect(importer.received.isEmpty)
+        #expect(outcome.cv.id == FixedID(5).id)
+        #expect(outcome.cv.revision == 0 && outcome.cv.createdAt == nil && outcome.cv.updatedAt == nil)
+        #expect(outcome.review.isEmpty == false)
+        #expect(outcome.saving == .ok)
+    }
+
+    @Test("a cancelled PDF import stays a cancellation and takes no id")
+    func pdfCancellationPassesThrough() async {
+        let ids = CountingID(5)
+        await #expect(throws: CancellationError.self) {
+            let importer = ScriptedImporter.pdf { _ in throw CancellationError() }
+            return try await workflow(importer, ids: ids).importCV(fromPDF: somePDF)
+        }
+        #expect(ids.calls == 0)
+    }
+
+    @Test("every reason the import cannot read a PDF is the failure of its own, and takes no id")
+    func eachImportErrorOfAPDFIsItsFailure() async {
+        let ids = CountingID(5)
+        for (error, failure) in everyImportError {
+            await #expect(throws: failure) {
+                try await workflow(ScriptedImporter.pdf { _ in throw error }, ids: ids).importCV(fromPDF: somePDF)
+            }
+        }
+        #expect(ids.calls == 0)
+    }
+
+    @Test("any other error of a PDF import is unreadable")
+    func anyOtherPDFErrorIsUnreadable() async {
+        struct Unexpected: Error {}
+        await #expect(throws: ImportFailure.unreadable) {
+            try await workflow(ScriptedImporter.pdf { _ in throw Unexpected() }).importCV(fromPDF: somePDF)
+        }
+    }
+
+    @Test("a PDF goes through the same mapper as a text, and a failed one takes no id")
+    func pdfUsesTheSameMapperAndNoCVIdOnFailure() async throws {
+        let fromPDF = try await workflow(ScriptedImporter.pdf { _ in FullImport.result }).importCV(fromPDF: somePDF)
+        let text = ScriptedImporter { _ in FullImport.result }
+        let fromText = try await workflow(text).importCV(fromText: FullImport.text)
+        #expect(fromPDF == fromText)
+        #expect(fromPDF == ImportedCVMapper().map(FullImport.result, id: FixedID(5).id))
+        let ids = CountingID(5)
+        await #expect(throws: ImportFailure.noText) {
+            let importer = ScriptedImporter.pdf { _ in throw ImportError.noText }
+            return try await workflow(importer, ids: ids).importCV(fromPDF: somePDF)
+        }
+        #expect(ids.calls == 0)
     }
 }
