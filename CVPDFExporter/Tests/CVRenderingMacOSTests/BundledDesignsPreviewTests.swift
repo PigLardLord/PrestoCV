@@ -18,9 +18,9 @@ import CVBundledHeadings
 struct BundledDesignsPreviewTests {
     /// UPDATE_PREVIEWS=1 prints the English sample with each design and stores the first page as the package's preview,
     /// over the file in the checkout. The package's hash changes: pin the new one in `BundledDesignsRenderingTests`.
-    @Test("UPDATE_PREVIEWS=1 stores the first page of each design as its preview")
+    @Test("UPDATE_PREVIEWS=1 stores the first page of each design as its preview",
+          .enabled(if: ProcessInfo.processInfo.environment["UPDATE_PREVIEWS"] == "1", "runs only with UPDATE_PREVIEWS=1"))
     func previews() async throws {
-        guard ProcessInfo.processInfo.environment["UPDATE_PREVIEWS"] == "1" else { return }
         let renderer = MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules())
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
         for package in try await BundleDesignSource().bundledPackages() {
@@ -62,12 +62,22 @@ struct BundledDesignsPreviewTests {
         return try #require(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]))
     }
 
+    /// Writes the preview as the package's last key and leaves the rest of the file as written, so that its diff shows only
+    /// the preview; a preview stored before is replaced.
     static func store(_ png: Data, in name: String, data: Data) throws {
-        var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        object["previewImageBase64"] = png.base64EncodedString()
+        let key = ",\n  \"previewImageBase64\": \"", preview = png.base64EncodedString()
+        var text = try #require(String(data: data, encoding: .utf8)).trimmingCharacters(in: .whitespacesAndNewlines)
+        if let old = text.range(of: key) { text = String(text[..<old.lowerBound]) + "\n}" }
+        try #require(text.hasSuffix("\n}"), "\(name): the package must end with a closing brace on a line of its own")
+        let stored = Data((String(text.dropLast(2)) + key + preview + "\"\n}\n").utf8)
+        let before = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let after = try #require(try JSONSerialization.jsonObject(with: stored) as? [String: Any])
+        try #require(after["previewImageBase64"] as? String == preview, "\(name): the preview is not the stored one")
+        try #require(NSDictionary(dictionary: after.filter { $0.key != "previewImageBase64" })
+                     == NSDictionary(dictionary: before.filter { $0.key != "previewImageBase64" }), "\(name): the rest of the package changed")
         let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/CVBundledDesigns/Designs/\(name).mcvt")
-        try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]).write(to: file)
+        try stored.write(to: file)
     }
 }
 #endif

@@ -21,7 +21,8 @@ enum SHA256 {
     private static func padded(_ data: Data) -> [UInt8] {
         var bytes = [UInt8](data) + [0x80]
         while bytes.count % 64 != 56 { bytes.append(0) }
-        return bytes + (0..<8).map { UInt8(truncatingIfNeeded: UInt64(data.count) * 8 >> UInt64(56 - 8 * $0)) }
+        let bits = UInt64(data.count) * 8   // apart: in Swift `>>` binds tighter than `*`
+        return bytes + (0..<8).map { UInt8(truncatingIfNeeded: bits >> UInt64(56 - 8 * $0)) }
     }
 
     private static func compress(_ h: inout [UInt32], _ block: ArraySlice<UInt8>) {
