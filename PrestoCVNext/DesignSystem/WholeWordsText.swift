@@ -77,22 +77,38 @@ enum WordFit {
         return DynamicTypeSize.allCases.filter { $0 >= smallest && $0 <= size }.reversed()
     }
 
-    /// The pieces between which a line may break: at a space, and after a hyphen.
+    /// The pieces between which a line surely may break: at a space, a tab or a line break, and after a hyphen between
+    /// two letters. A point where a line may not break, such as a no-break space ("Code d’erreur : …" in French) or a
+    /// hyphen before a digit, stays inside a piece: a piece measured wider than it is only makes the text a size smaller,
+    /// one measured narrower would let it break inside a word.
     static func words(in text: String) -> [String] {
-        text.split(whereSeparator: \.isWhitespace).flatMap { word -> [String] in
-            var pieces: [String] = []
-            var piece = ""
-            for character in word {
-                piece.append(character)
-                if character == "-" {
+        let characters = Array(text)
+        var pieces: [String] = []
+        var piece = ""
+        for (index, character) in characters.enumerated() {
+            if isBreakingSpace(character) {
+                if !piece.isEmpty {
                     pieces.append(piece)
                     piece = ""
                 }
+                continue
             }
-            if !piece.isEmpty {
+            piece.append(character)
+            if character == "-", index > 0, characters[index - 1].isLetter,
+               index + 1 < characters.count, characters[index + 1].isLetter {
                 pieces.append(piece)
+                piece = ""
             }
-            return pieces
         }
+        if !piece.isEmpty {
+            pieces.append(piece)
+        }
+        return pieces
+    }
+
+    /// A space at which a line may break: the ordinary space, a tab, a line break. The no-break spaces (U+00A0, U+2007,
+    /// U+202F) are spaces too, but join the words around them.
+    private static func isBreakingSpace(_ character: Character) -> Bool {
+        character == " " || character == "\t" || character.isNewline
     }
 }

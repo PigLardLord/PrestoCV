@@ -81,4 +81,22 @@ struct WholeWordsTextSizeTests {
         #expect(label.height == wrapped.height, "\(label) against \(wrapped) at \(largest)")
         #expect(label.width <= width)
     }
+
+    @Test("A no-break space keeps its words on one line: the French code line keeps \"d’erreur :\" whole at the size where it fits")
+    func noBreakSpaceKeepsItsWordsTogether() throws {
+        let font = Font.footnote.monospaced()
+        let joined = "d’erreur\u{00A0}:"
+        let line = "Code \(joined) 42"
+        // Wider than "d’erreur" alone and narrower than "d’erreur :" at the largest size
+        let alone = try size(of: Text(verbatim: "d’erreur"), font: font, at: .accessibility5, proposal: .unspecified).width
+        let together = try size(of: Text(verbatim: joined), font: font, at: .accessibility5, proposal: .unspecified).width
+        let width = (alone + together) / 2
+        let largest = try largestFitting(joined, font: font, width: width)
+        try #require(largest < .accessibility5, "The joined words do not fit at the largest size, so the case is the one shown")
+        let proposal = ProposedViewSize(width: width, height: nil)
+        let label = try size(of: label(line), font: font, at: .accessibility5, proposal: proposal)
+        let wrapped = try size(of: Text(verbatim: line), font: font, at: largest, proposal: proposal)
+        #expect(label.height == wrapped.height, "\(label) against \(wrapped) at \(largest)")
+        #expect(label.width <= width)
+    }
 }
