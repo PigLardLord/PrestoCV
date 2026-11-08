@@ -9,6 +9,8 @@ final class EditorStoreSpy {
     struct Failure: Error {}
 
     private(set) var writes: [String] = []
+    /// How many writes have begun, held ones and failed ones included.
+    private(set) var writesBegun = 0
     /// What each write was told about the store: whether it held the content already.
     private(set) var storedBeforeEachWrite: [Bool] = []
     /// The most writes that ran at the same time.
@@ -51,6 +53,7 @@ final class EditorStoreSpy {
     }
 
     func write(_ content: String, isStored: Bool) async throws {
+        writesBegun += 1
         writesInProgress += 1
         mostWritesAtOnce = max(mostWritesAtOnce, writesInProgress)
         writingWaiters.forEach { $0.resume() }
@@ -71,6 +74,31 @@ final class EditorStoreSpy {
 final class WriteDiagnostics {
     private(set) var causes: [any Error] = []
     func report(_ cause: any Error) { causes.append(cause) }
+}
+
+/// Lets the other tasks run until `condition` holds, for a bounded number of turns: a test that waits for something that
+/// never happens records it and goes on, instead of waiting until its time limit.
+@MainActor
+func waitUntil(_ what: Comment, _ condition: @MainActor () -> Bool) async {
+    for _ in 0..<10_000 {
+        if condition() { return }
+        await Task.yield()
+    }
+    Issue.record("Timed out waiting until \(what)")
+}
+
+/// What a single flush found once it returned.
+@MainActor
+final class SingleFlushReturn {
+    /// The writes the store held when the single flush returned, or nil while it has not returned.
+    var writes: [String]?
+}
+
+/// The two ways a single flush can meet a draining flush over the same write in progress: the drain's write runs when the
+/// single flush is called, or the pause's write runs and the drain is called after the single flush.
+enum FlushOverlap: String, Sendable, CaseIterable {
+    case drainWritesFirst
+    case drainCalledAfterTheSingleFlush
 }
 
 /// Waits for the work a change scheduled. A test that runs past its time limit is cancelled, and so is the work, so that
@@ -413,6 +441,62 @@ struct AutosaveTests {
         await finish(autosave.scheduledWrite)
         #expect(store.writes == ["Ada L"])
         #expect(autosave.status == .upToDate)
+    }
+
+    @Test(
+        "a single flush that meets a draining flush while the person keeps typing returns after at most two writes",
+        arguments: FlushOverlap.allCases
+    )
+    func singleFlushBesideADrain(_ overlap: FlushOverlap) async throws {
+        let autosave = autosave()
+        let returned = SingleFlushReturn()
+        store.close()
+        var drain: Task<Void, any Error>?
+        var pauseWrite: Task<Void, Never>?
+        switch overlap {
+        case .drainWritesFirst:
+            autosave.changed(to: "Ada L")
+            drain = Task { try await autosave.flush() }
+            await store.waitUntilWriting()
+        case .drainCalledAfterTheSingleFlush:
+            pauseWrite = autosave.changed(to: "Ada L")
+            clock.advance(by: .seconds(1))
+            await store.waitUntilWriting()
+        }
+        // The single flush is called while the first write holds "Ada L": the form shows "Ada Lo"
+        autosave.changed(to: "Ada Lo")
+        let once = Task {
+            await autosave.flushOnce()
+            returned.writes = store.writes
+        }
+        await waitUntil("the single flush waits for the write in progress") { autosave.scheduledWrite == nil }
+        if overlap == .drainCalledAfterTheSingleFlush {
+            autosave.changed(to: "Ada Lov")
+            drain = Task { try await autosave.flush() }
+            await waitUntil("the drain waits for the write in progress") { autosave.scheduledWrite == nil }
+        }
+
+        // The person keeps typing while each write runs, so the drain always has more to write
+        autosave.changed(to: "Ada Love")
+        store.open()
+        store.close()
+        await waitUntil("the second write begins") { store.writesBegun == 2 }
+        autosave.changed(to: "Ada Lovel")
+        store.open()
+        store.close()
+        await waitUntil("the single flush returns") { returned.writes != nil }
+
+        #expect(
+            returned.writes == ["Ada L", "Ada Love"],
+            "The single flush returns once a write begun after its call has stored what the form showed at the call"
+        )
+        store.open()
+        try await drain?.value
+        await once.value
+        await finish(pauseWrite)
+        #expect(store.writes == ["Ada L", "Ada Love", "Ada Lovel"])
+        #expect(autosave.status == .upToDate)
+        #expect(store.mostWritesAtOnce == 1)
     }
 
     // MARK: - A failure that no longer matters

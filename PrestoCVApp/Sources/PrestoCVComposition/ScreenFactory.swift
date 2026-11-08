@@ -74,11 +74,12 @@ public final class ScreenFactory {
     }
 
     /// Stores every editor that is still alive once, in turn, so that the list reads the store after them. Each editor
-    /// stores what it shows at its turn with one write (`saveWhatItShows()`, not the draining `saveNow()`), so an edit
-    /// made while that write runs does not hold the list; an editor made while an earlier one is storing gets a turn as
-    /// well. An editor already stored is not visited again, so an edit made after its turn is left to its autosave and to
-    /// the list's next load: going round again while the person types would never end. An editor already released is not
-    /// waited for: whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
+    /// stores what it shows at its turn and waits for two writes at most (`saveWhatItShows()`, not the draining
+    /// `saveNow()`), so an edit made while those writes run does not hold the list, nor does a `saveNow()` of that editor
+    /// that runs meanwhile; an editor made while an earlier one is storing gets a turn as well. An editor already stored
+    /// is not visited again, so an edit made after its turn is left to its autosave and to the list's next load: going
+    /// round again while the person types would never end. An editor already released is not waited for: whoever lets an
+    /// editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
     ///
     /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made
     /// after a stored one was freed may take its address, and would then be skipped.
