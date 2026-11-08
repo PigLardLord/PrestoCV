@@ -82,7 +82,8 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         screens = ScreenFactory(
-            repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock
+            repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
+            editorClock: ContinuousClock()
         )
         self.rules = rules
     }

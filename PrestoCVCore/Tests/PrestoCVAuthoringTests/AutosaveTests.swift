@@ -334,6 +334,87 @@ struct AutosaveTests {
         #expect(!autosave.hasChangesToWrite)
     }
 
+    // MARK: - A single flush writes once, for whoever must not wait for a person who keeps typing
+
+    @Test("a single flush writes once, and leaves a change made during its write to the pause")
+    func singleFlushLeavesALaterChangeToThePause() async throws {
+        let autosave = autosave()
+        store.close()
+        autosave.changed(to: "Ada L")
+        let flush = Task { await autosave.flushOnce() }
+        await store.waitUntilWriting()
+
+        autosave.changed(to: "Ada Lovelace")
+        store.open()
+        await flush.value
+
+        #expect(store.writes == ["Ada L"], "The change came after the call: the single flush does not wait for it")
+        #expect(autosave.status == .pending, "The change waits for its pause")
+        clock.advance(by: .seconds(1))
+        await finish(autosave.scheduledWrite)
+        #expect(store.writes == ["Ada L", "Ada Lovelace"])
+        #expect(autosave.status == .upToDate)
+    }
+
+    @Test("a single flush called while the pause's write runs waits for it, then writes what the form showed at the call")
+    func singleFlushFollowsTheWriteInProgress() async throws {
+        let autosave = autosave()
+        store.close()
+        let first = autosave.changed(to: "Ada L")
+        clock.advance(by: .seconds(1))
+        await store.waitUntilWriting()
+        autosave.changed(to: "Ada Lo")
+
+        let flush = Task { await autosave.flushOnce() }
+        store.open()
+        await flush.value
+        await finish(first)
+
+        #expect(store.writes == ["Ada L", "Ada Lo"], "The write in progress held an older content")
+        #expect(autosave.status == .upToDate)
+        #expect(autosave.scheduledWrite == nil, "The single flush took the place of the pause")
+    }
+
+    @Test("a single flush with nothing to write writes nothing")
+    func singleFlushWithNothingToWrite() async {
+        let autosave = autosave()
+
+        await autosave.flushOnce()
+
+        #expect(store.writes.isEmpty)
+        #expect(autosave.status == .upToDate)
+    }
+
+    @Test("a single flush whose write fails returns, and the status says so")
+    func singleFlushThatFails() async {
+        let autosave = autosave()
+        autosave.changed(to: "Ada L")
+        store.fails = true
+
+        await autosave.flushOnce()
+
+        #expect(store.writes.isEmpty)
+        #expect(autosave.status == .failed)
+        #expect(diagnostics.causes.count == 1)
+    }
+
+    @Test("a single flush whose write is cancelled leaves the content to the pause, with no failure")
+    func singleFlushThatIsCancelled() async {
+        let autosave = autosave()
+        autosave.changed(to: "Ada L")
+        store.failure = CancellationError()
+
+        await autosave.flushOnce()
+
+        #expect(autosave.status == .pending)
+        #expect(autosave.scheduledWrite != nil, "A pause starts, so that the content is written without another change")
+        store.failure = nil
+        clock.advance(by: .seconds(1))
+        await finish(autosave.scheduledWrite)
+        #expect(store.writes == ["Ada L"])
+        #expect(autosave.status == .upToDate)
+    }
+
     // MARK: - A failure that no longer matters
 
     @Test("a failure goes when the content returns to what the store holds, and Try Again then writes nothing")

@@ -14,15 +14,25 @@ public final class ScreenFactory {
     private let browsing: BrowseCVsWorkflow
     private let editing: EditCVWorkflow
     private let clock: any TimeSource
+    /// The clock the editors' autosave pause runs on.
+    private let editorClock: any Clock<Duration>
     /// The editors made and not yet released. The factory never keeps one alive.
     private var editors: [WeakEditor] = []
     /// How many editors the factory has made: each one is known by its number, which is never reused.
     private var made = 0
 
-    init(repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource) {
+    /// - Parameters:
+    ///   - clock: The time of day, for the list's dates.
+    ///   - editorClock: The clock the editors' autosave pause runs on: the composition gives the real one, a test one it
+    ///     moves by hand.
+    init(
+        repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
+        editorClock: any Clock<Duration>
+    ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
         self.clock = clock
+        self.editorClock = editorClock
     }
 
     /// The list of CVs.
@@ -30,10 +40,11 @@ public final class ScreenFactory {
     ///   - untitled: The view's words for a CV with no title (R13).
     ///   - numbered: How the view numbers a title that reads like another row's (R13).
     ///
-    /// Before it reads the store, the list has every editor still alive store what it shows at its turn (`editorsStored`).
-    /// An edit made after an editor's turn is not waited for: the autosave stores it, and the list shows it on its next
-    /// load (step 5-11a reloads the list after each store, issue #402). The factory holds editors weakly, so whoever lets
-    /// an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
+    /// Before it reads the store, the list has every editor still alive store what it shows at its turn, once
+    /// (`editorsStored`, through each editor's `saveWhatItShows()`). An edit made after an editor's turn, even while that
+    /// editor's own write runs, is not waited for: the autosave stores it, and the list shows it on its next load (step
+    /// 5-11a reloads the list after each store, issue #402). The factory holds editors weakly, so whoever lets an editor go
+    /// waits for its `saveNow()` first, which stores every edit (the shell's navigation, step 5-11a).
     public func makeCVList(
         untitled: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
@@ -55,7 +66,7 @@ public final class ScreenFactory {
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
     public func makeEditor(start: EditorStart, copyTitle: @escaping @MainActor (String) -> String) -> EditorViewModel {
         let editor = EditorViewModel(
-            start: start, editing: editing, clock: ContinuousClock(), pause: Autosave<CV>.pause, copyTitle: copyTitle
+            start: start, editing: editing, clock: editorClock, pause: Autosave<CV>.pause, copyTitle: copyTitle
         )
         made += 1
         editors = editors.filter { $0.editor != nil } + [WeakEditor(editor, number: made)]
@@ -63,10 +74,11 @@ public final class ScreenFactory {
     }
 
     /// Stores every editor that is still alive once, in turn, so that the list reads the store after them. Each editor
-    /// stores what it shows at its turn; an editor made while an earlier one is storing gets a turn as well. An editor
-    /// already stored is not visited again, so an edit made after its turn is left to its autosave and to the list's next
-    /// load: going round again while the person types would never end. An editor already released is not waited for:
-    /// whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
+    /// stores what it shows at its turn with one write (`saveWhatItShows()`, not the draining `saveNow()`), so an edit
+    /// made while that write runs does not hold the list; an editor made while an earlier one is storing gets a turn as
+    /// well. An editor already stored is not visited again, so an edit made after its turn is left to its autosave and to
+    /// the list's next load: going round again while the person types would never end. An editor already released is not
+    /// waited for: whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
     ///
     /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made
     /// after a stored one was freed may take its address, and would then be skipped.
@@ -75,7 +87,7 @@ public final class ScreenFactory {
         while let next = editors.first(where: { $0.editor != nil && !stored.contains($0.number) }),
               let editor = next.editor {
             stored.insert(next.number)
-            await editor.saveNow()
+            await editor.saveWhatItShows()
         }
     }
 }

@@ -228,8 +228,8 @@ struct ScreenFactoryTests {
         withExtendedLifetime(editor) {}
     }
 
-    /// Holds one write, the n-th `create`, at a gate the test opens, so that what the main actor does meanwhile is
-    /// deterministic. The other writes pass.
+    /// Holds one write, the n-th (a `create` or an `update`), at a gate the test opens, so that what the main actor does
+    /// meanwhile is deterministic. The other writes pass, and are counted.
     private actor WriteGate {
         private let holding: Int
         private var calls = 0
@@ -241,6 +241,9 @@ struct ScreenFactoryTests {
         init(holding call: Int) {
             holding = call
         }
+
+        /// How many writes have come to the gate.
+        var count: Int { calls }
 
         func hold() async {
             calls += 1
@@ -264,7 +267,7 @@ struct ScreenFactoryTests {
         }
     }
 
-    /// The in-memory repository whose `create` calls go through the gate.
+    /// The in-memory repository whose writes, `create` and `update`, go through the gate.
     private struct GatedRepository: CVRepository {
         let inner: InMemoryCVRepository
         let gate: WriteGate
@@ -273,7 +276,10 @@ struct ScreenFactoryTests {
             await gate.hold()
             return try await inner.create(cv)
         }
-        func update(_ cv: CV) async throws(RepositoryError) -> CV { try await inner.update(cv) }
+        func update(_ cv: CV) async throws(RepositoryError) -> CV {
+            await gate.hold()
+            return try await inner.update(cv)
+        }
         func load(_ id: CVID) async throws(RepositoryError) -> CV { try await inner.load(id) }
         func list() async throws(RepositoryError) -> CVListing { try await inner.list() }
         func delete(_ id: CVID, revision: Int) async throws(RepositoryError) { try await inner.delete(id, revision: revision) }
@@ -284,7 +290,8 @@ struct ScreenFactoryTests {
         let gate = WriteGate(holding: 1)
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
-            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock()
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
+            editorClock: ManualClock()
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -308,7 +315,8 @@ struct ScreenFactoryTests {
         let gate = WriteGate(holding: 2)
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
-            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock()
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
+            editorClock: ManualClock()
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -325,13 +333,39 @@ struct ScreenFactoryTests {
         await gate.open()
         await loading.value
 
-        // The edit came after the first editor's turn, so the list does not wait for it. The autosave runs on the real
-        // clock and may store it before the read or after: both are what the contract allows.
-        let labels = Set(list.rows.map(\.label))
-        #expect(labels == ["First", "Second"] || labels == ["First, edited", "Second"], "the list shows \(labels)")
+        // The edit came after the first editor's turn, so the list does not wait for it, and the autosave's pause has not
+        // passed: the list shows what the first editor stored at its turn
+        #expect(Set(list.rows.map(\.label)) == ["First", "Second"])
         await list.load()
         #expect(Set(list.rows.map(\.label)) == ["First, edited", "Second"])
         withExtendedLifetime((first, second)) {}
+    }
+
+    @Test("The list's wait stores an editor once and does not chase an edit made while that write runs", .timeLimit(.minutes(1)))
+    func listDoesNotChaseTyping() async throws {
+        let gate = WriteGate(holding: 1)
+        let factory = ScreenFactory(
+            repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
+            editorClock: ManualClock()
+        )
+        let editor = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        await editor.load()
+        Self.typed(editor, title: "First")
+        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let loading = Task { @MainActor in await list.load() }
+        await gate.waitReached()
+        // The editor's write is held: the person goes on typing while it runs
+        Self.typed(editor, title: "First, edited")
+
+        await gate.open()
+        await loading.value
+
+        #expect(list.rows.map(\.label) == ["First"])
+        #expect(await gate.count == 1, "the list's wait wrote once")
+        await list.load()
+        #expect(list.rows.map(\.label) == ["First, edited"])
+        withExtendedLifetime(editor) {}
     }
 
     @Test("The factory does not keep an editor alive")

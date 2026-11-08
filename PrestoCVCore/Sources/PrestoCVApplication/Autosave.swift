@@ -176,6 +176,21 @@ public final class Autosave<Content: Equatable & Sendable> {
         }
     }
 
+    /// Writes the content once, if it has changed, after any write that is running, and does not chase the changes made
+    /// while it writes: their pause writes them. It is for a caller that must not wait for a person who keeps typing, such
+    /// as the list of CVs, which has each editor store what it shows before it reads the store.
+    ///
+    /// A write that fails leaves the content to be written, and the status says `failed`, as for `flush()`. A write the
+    /// store cancelled leaves the content to a pause, with no failure.
+    public func flushOnce() async {
+        flushes += 1
+        cancelThePause()
+        _ = await writeOnce()
+        flushes -= 1
+        writeAgainIfTheContentIsNotStored()
+        updateStatus()
+    }
+
     // MARK: - Private Methods
 
     private func startThePause() -> Task<Void, Never> {
