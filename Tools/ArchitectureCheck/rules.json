@@ -121,7 +121,9 @@
   "adr": "0032",
   "files": [
    "PrestoCV/PrestoCVApp.swift",
-   "PrestoCV/App/AppEnvironment.swift"
+   "PrestoCV/App/AppEnvironment.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/Composition.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/TraceChain.swift"
   ],
   "modules": [
    "DiagnosticTraceFiles",
@@ -273,6 +275,17 @@
     "DiagnosticLoggingTestSupport",
     "DiagnosticTrace",
     "DiagnosticTraceTestSupport"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVImportingTestSupport",
+   "path": "PrestoCVCore/Sources/PrestoCVImportingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "PrestoCVImporting",
+    "PrestoCVDomain",
+    "Foundation"
    ],
    "rules": []
   },
@@ -723,6 +736,7 @@
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVRendering",
@@ -753,6 +767,8 @@
     "PrestoCVApplication",
     "PrestoCVCoreTestSupport",
     "PrestoCVDomain",
+    "PrestoCVImporting",
+    "PrestoCVImportingTestSupport",
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVRendering",
@@ -828,6 +844,13 @@
     "CVRenderingPDFKitInspector",
     "CVDrafting",
     "CVDraftingFoundationModels",
+    "DiagnosticLogging",
+    "DiagnosticLoggingOSLog",
+    "DiagnosticTrace",
+    "DiagnosticTraceFiles",
+    "DiagnosticTraceDistribution",
+    "WebKit",
+    "Synchronization",
     "Foundation"
    ],
    "rules": [
@@ -838,6 +861,25 @@
     "R14",
     "R17"
    ]
+  },
+  {
+   "name": "PrestoCVCompositionTests",
+   "path": "PrestoCVApp/Tests/PrestoCVCompositionTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "WebKit",
+    "PrestoCVComposition",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "CVRenderingWebKitSupport",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
+   ],
+   "rules": [],
+   "kind": "test"
   },
   {
    "name": "DiagnosticLogging",

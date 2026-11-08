@@ -12,7 +12,7 @@ public struct Sourced<Value: Hashable & Sendable>: Hashable, Sendable {
     /// Why the person should check the value; nil when the rules are sure of it.
     public internal(set) var check: CheckReason?
 
-    init(value: Value, spans: [SourceSpan], reading: ReadingRule? = nil, check: CheckReason? = nil) {
+    package init(value: Value, spans: [SourceSpan], reading: ReadingRule? = nil, check: CheckReason? = nil) {
         self.value = value
         self.spans = spans
         self.reading = reading
@@ -33,7 +33,7 @@ public enum ReadingRule: String, Hashable, Sendable {
 }
 
 /// Why a value of an import should be checked by the person.
-public enum CheckReason: String, Hashable, Sendable {
+public enum CheckReason: String, Hashable, Sendable, CaseIterable {
     /// The name was taken from its place at the top, with no label or mark that says it is the name, or a heading that
     /// closed the head could have been it.
     case nameByPosition
@@ -143,14 +143,14 @@ public struct UnplacedText: Hashable, Sendable {
 }
 
 /// A value of an imported CV with its place in the CV: `experience[0].role`. The trace of a test build lists them
-/// (ADR 0032); the grounding counts their spans.
-struct ImportedField: Hashable, Sendable {
-    let path: String
+/// (ADR 0032); the grounding counts their spans; the app's mirror-completeness test walks them.
+public struct ImportedField: Hashable, Sendable {
+    public let path: String
     /// The value as text: the quoted text, or what a reading rule read in it.
-    let value: String
-    let spans: [SourceSpan]
-    let reading: ReadingRule?
-    let check: CheckReason?
+    public let value: String
+    public let spans: [SourceSpan]
+    public let reading: ReadingRule?
+    public let check: CheckReason?
 }
 
 extension ImportedCV {
@@ -159,7 +159,7 @@ extension ImportedCV {
 
     /// Every value of the CV, in the order of the CV, and the checks of whole entries. A new field of the CV joins this
     /// list.
-    var fields: [ImportedField] {
+    public var fields: [ImportedField] {
         var fields: [ImportedField] = []
         func add<Value>(_ path: String, _ value: Sourced<Value>?, as text: (Value) -> String) {
             guard let value else { return }
@@ -224,5 +224,45 @@ extension ImportedPeriod {
         case .current: return text(start) + " – current"
         case .unstated: return text(start) + " –"
         }
+    }
+}
+
+// MARK: - Construction for tests
+
+// Inside the package only: a test support target builds imports that no reader read, so that the app's tests can script
+// one. Nothing outside the package can make a value without its evidence.
+extension ImportedLink {
+    package static func scripted(_ kind: Kind, _ address: Sourced<WebLink>) -> ImportedLink { ImportedLink(address: address, kind: kind) }
+}
+
+extension ImportedExperience {
+    package static func scripted(role: Sourced<String>?, employer: Sourced<String>?, location: Sourced<String>?,
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?) -> ImportedExperience {
+        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check)
+    }
+}
+
+extension ImportedEducation {
+    package static func scripted(degree: Sourced<String>?, school: Sourced<String>?, location: Sourced<String>?,
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?) -> ImportedEducation {
+        ImportedEducation(degree: degree, school: school, location: location, period: period, details: details, check: check)
+    }
+}
+
+extension ImportedLanguage {
+    package static func scripted(_ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?) -> ImportedLanguage {
+        ImportedLanguage(name: name, level: level, levelWords: levelWords)
+    }
+}
+
+extension ImportedCertification {
+    package static func scripted(_ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?) -> ImportedCertification {
+        ImportedCertification(name: name, issuer: issuer, year: year)
+    }
+}
+
+extension UnplacedText {
+    package static func scripted(section: SectionKind, heading: String?, text: String, span: SourceSpan) -> UnplacedText {
+        UnplacedText(section: section, heading: heading, text: text, span: span)
     }
 }

@@ -8,6 +8,7 @@ var products: [Product] = [
     .library(name: "PrestoCVPersistence", targets: ["PrestoCVPersistence"]),
     .library(name: "PrestoCVCoreTestSupport", targets: ["PrestoCVCoreTestSupport"]),
     .library(name: "PrestoCVImporting", targets: ["PrestoCVImporting"]),
+    .library(name: "PrestoCVImportingTestSupport", targets: ["PrestoCVImportingTestSupport"]),
 ]
 let logging = Target.Dependency.product(name: "DiagnosticLogging", package: "DiagnosticLogging")
 let loggingTestSupport = Target.Dependency.product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging")
@@ -23,6 +24,8 @@ var targets: [Target] = [
     // CV Import (ADR 0027): downstream of Authoring, whose value objects it reads.
     // It logs its decisions through the logger it is given (ADR 0030), and traces a text import's steps (ADR 0032).
     .target(name: "PrestoCVImporting", dependencies: ["PrestoCVDomain", logging, trace]),
+    // Imports that no reader read, for the tests of what consumes them: it uses what the package keeps to itself.
+    .target(name: "PrestoCVImportingTestSupport", dependencies: ["PrestoCVImporting", "PrestoCVDomain"]),
     // The synthetic corpus is shared with the PDFKit reader's tests, so it sits next to both test targets.
     .testTarget(
         name: "PrestoCVImportingTests",
