@@ -42,6 +42,13 @@ struct StringRules: Sendable {
     var properNamesOfKey: [String: Set<String>] = [:]
     /// Only the keys with this prefix are checked for a promise of availability; all keys when nil.
     var promiseKeyPrefix: String?
+    /// Literals handed to a view that are deliberately not a key, each with the reason: a name, a format, a file name.
+    /// A literal without a letter pair (a number, a symbol, values only) needs no entry.
+    var nonKeyLiterals: [String: String] = [:]
+    /// Views of the app's own design system that take a key as their first argument, besides the views of SwiftUI.
+    var extraViews: [String] = []
+    /// Labels of arguments that take a key, on any view: `ErrorStateView(title: "failed.title")`.
+    var extraArguments: [String] = []
 }
 
 // MARK: - Catalog

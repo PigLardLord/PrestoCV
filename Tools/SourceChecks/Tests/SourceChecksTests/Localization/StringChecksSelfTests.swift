@@ -69,4 +69,48 @@ struct StringChecksSelfTests {
         #expect(findings.unused.isEmpty)
         #expect(findings.missingLanguage == ["plant.no_german (de)"])
     }
+
+    // MARK: Literals handed to views
+
+    private static func runOnLiterals(rules: StringRules = StringRules()) throws -> [String] {
+        try StringChecks.run(
+            catalog: planted.appendingPathComponent("Localizable.xcstrings"),
+            sources: [planted.appendingPathComponent("PlantedLiterals.swift")],
+            rules: rules
+        ).lookedUpButMissing
+    }
+
+    private static func literals(_ found: [String]) -> [String] {
+        found.map { String($0.split(separator: " (").first ?? "") }.sorted()
+    }
+
+    @Test("A key typed wrongly in a view, and English written in a view, are found; a key, a number, a symbol and verbatim text are not")
+    func literalsOfViews() throws {
+        let found = Self.literals(try Self.runOnLiterals())
+
+        let expected: Set = ["\\(count) pages", "Double tap to save", "PDF", "Save your CV", "plant.heading", "plant.titel"]
+        #expect(Set(found) == expected, "\(found)")
+    }
+
+    @Test("A literal that is deliberately not a key is exempt with its reason, and no other")
+    func nonKeyLiteralsAreExempt() throws {
+        var rules = StringRules()
+        rules.nonKeyLiterals = ["PDF": "the name of the file format"]
+        let found = Self.literals(try Self.runOnLiterals(rules: rules))
+
+        #expect(!found.contains("PDF"))
+        #expect(found.contains("plant.titel"))
+    }
+
+    @Test("The views of the design system and the arguments that take a key are read like the views of SwiftUI")
+    func extraViewsAndArguments() throws {
+        var rules = StringRules()
+        rules.extraViews = ["ScreenTitle"]
+        rules.extraArguments = ["title"]
+        let found = Self.literals(try Self.runOnLiterals(rules: rules))
+
+        #expect(found.contains("plant.screen_title"))
+        #expect(found.contains("plant.box_title"))
+        #expect(!found.contains("plant.complete"), "\(found)")
+    }
 }
