@@ -25,13 +25,20 @@ final class LaunchUITests: XCTestCase {
         XCTAssertEqual(reachedState(of: app), "root.failed.launchFixturesRejected")
     }
 
-    /// The identifier of the first screen once the composition is no longer loading, or nil when it never got there.
+    /// The identifier of the first screen once the composition is no longer loading. When it never gets there, the
+    /// identifier the first screen still shows (`root.loading` for a composition that never ends), or nil when there is no
+    /// first screen at all.
     @MainActor
     private func reachedState(of app: XCUIApplication) -> String? {
         let reached = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH 'root.' AND identifier != 'root.loading'"))
             .firstMatch
-        guard reached.waitForExistence(timeout: 30) else { return nil }
+        guard reached.waitForExistence(timeout: 30) else {
+            let shown = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH 'root.'"))
+                .firstMatch
+            return shown.exists ? shown.identifier : nil
+        }
         return reached.identifier
     }
 }
