@@ -3,10 +3,10 @@ import SwiftUI
 /// A screen that waits: a progress indicator and what it waits for. The indicator and the text are one element for
 /// VoiceOver, and VoiceOver focus moves to it when it appears.
 struct LoadingView: View {
-    private let label: LocalizedStringKey
+    private let label: LocalizedStringResource
     @AccessibilityFocusState private var focused: Bool
 
-    init(_ label: LocalizedStringKey) {
+    init(_ label: LocalizedStringResource) {
         self.label = label
     }
 

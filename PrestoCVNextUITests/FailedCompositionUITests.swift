@@ -42,15 +42,16 @@ final class FailedCompositionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["error.retry"].waitForExistence(timeout: 30))
     }
 
-    /// The height of the code line, which wraps more as the text grows: the same screen at two sizes tells whether the
-    /// size took effect.
+    /// The height of the message, which wraps more as the text grows: the same screen at two sizes tells whether the
+    /// size took effect. Every word of the message fits on a line at the largest size, so the message takes that size;
+    /// the code line does not tell, as it takes the largest size at which its code fits on a line whole.
     @MainActor
-    private func codeHeight(largestText: Bool) -> CGFloat {
+    private func messageHeight(largestText: Bool) -> CGFloat {
         let app = launchFailing(largestText: largestText)
         XCTAssertTrue(screen(of: app).waitForExistence(timeout: 30))
-        let code = app.staticTexts["error.code"]
-        XCTAssertTrue(code.waitForExistence(timeout: 30))
-        let height = code.frame.height
+        let message = app.staticTexts["error.message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 30))
+        let height = message.frame.height
         app.terminate()
         return height
     }
@@ -58,10 +59,10 @@ final class FailedCompositionUITests: XCTestCase {
     /// At the largest accessibility text size the retry stays reachable: the screen scrolls to it and it can be tapped.
     @MainActor
     func testTheRetryCanBeTappedAtTheLargestTextSize() throws {
-        let normal = codeHeight(largestText: false)
+        let normal = messageHeight(largestText: false)
         let app = launchFailing(largestText: true)
         XCTAssertTrue(screen(of: app).waitForExistence(timeout: 30))
-        XCTAssertGreaterThan(app.staticTexts["error.code"].frame.height, normal * 2, "The largest size took effect")
+        XCTAssertGreaterThan(app.staticTexts["error.message"].frame.height, normal * 2, "The largest size took effect")
         let retry = app.buttons["error.retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 30))
         for _ in 0..<5 where !retry.isHittable {

@@ -1214,6 +1214,19 @@
    ]
   },
   {
+   "name": "PrestoCVNextTests",
+   "path": "PrestoCVNextTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "SwiftUI",
+    "PrestoCVNext"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
    "name": "PrestoCV",
    "path": "PrestoCV",
    "kind": "legacy",

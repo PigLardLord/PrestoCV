@@ -20,6 +20,13 @@
         "identifier" : "7F121E40E0510CC724113715",
         "name" : "PrestoCVNextUITests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:PrestoCV.xcodeproj",
+        "identifier" : "8546F134D9674E9BA0776D24",
+        "name" : "PrestoCVNextTests"
+      }
     }
   ],
   "version" : 1

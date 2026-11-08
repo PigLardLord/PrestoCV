@@ -3,19 +3,19 @@ import SwiftUI
 /// A screen for something that went wrong: a symbol, a title, a message, the code that names the failure and the action
 /// that tries again. VoiceOver focus moves to the title when it appears. It scrolls, so that it stays usable at the largest text size.
 struct ErrorStateView: View {
-    private let title: LocalizedStringKey
-    private let message: LocalizedStringKey
-    private let code: LocalizedStringKey
-    private let retryTitle: LocalizedStringKey
+    private let title: LocalizedStringResource
+    private let message: LocalizedStringResource
+    private let code: LocalizedStringResource
+    private let retryTitle: LocalizedStringResource
     private let retry: () -> Void
     @AccessibilityFocusState private var titleFocused: Bool
 
     /// `code` is the line that names the failure, already formed with the failure's code in it.
     init(
-        title: LocalizedStringKey,
-        message: LocalizedStringKey,
-        code: LocalizedStringKey,
-        retryTitle: LocalizedStringKey,
+        title: LocalizedStringResource,
+        message: LocalizedStringResource,
+        code: LocalizedStringResource,
+        retryTitle: LocalizedStringResource,
         retry: @escaping () -> Void
     ) {
         self.title = title
@@ -36,6 +36,7 @@ struct ErrorStateView: View {
                     .accessibilityFocused($titleFocused)
                 WholeWordsText(message)
                     .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("error.message")
                 WholeWordsText(code)
                     .font(.footnote.monospaced())
                     .foregroundStyle(.secondary)

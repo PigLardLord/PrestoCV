@@ -2,9 +2,9 @@ import SwiftUI
 
 /// The headline of a screen, announced to VoiceOver as a heading.
 struct ScreenTitle: View {
-    private let key: LocalizedStringKey
+    private let key: LocalizedStringResource
 
-    init(_ key: LocalizedStringKey) {
+    init(_ key: LocalizedStringResource) {
         self.key = key
     }
 

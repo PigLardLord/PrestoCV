@@ -2,10 +2,10 @@ import SwiftUI
 
 /// The main action of a screen: filled with the tint, at least as tall as the smallest tap target.
 struct PrimaryButton: View {
-    private let title: LocalizedStringKey
+    private let title: LocalizedStringResource
     private let action: () -> Void
 
-    init(_ title: LocalizedStringKey, action: @escaping () -> Void) {
+    init(_ title: LocalizedStringResource, action: @escaping () -> Void) {
         self.title = title
         self.action = action
     }
