@@ -64,6 +64,11 @@ public final class ScreenFactory {
         )
     }
 
+    /// The navigation of the shell: which CV is open, and which column a compact screen shows.
+    public func makeShell() -> ShellNavigationModel {
+        ShellNavigationModel()
+    }
+
     /// The first run.
     public func makeFirstRun() -> FirstRunViewModel {
         FirstRunViewModel(browsing: browsing, editing: editing)

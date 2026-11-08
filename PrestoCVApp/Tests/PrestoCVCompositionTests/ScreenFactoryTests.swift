@@ -90,6 +90,24 @@ struct ScreenFactoryTests {
         #expect(text.contains("Renamed by the list"))
     }
 
+    @Test("The shell's navigation model starts with the list and follows the rows the list reads")
+    func shell() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        _ = try await fixture.composition.repository.create(FixtureCV.full())
+        let list = Self.list(fixture)
+        await list.load()
+        let row = try #require(list.rows.first)
+
+        let shell = fixture.composition.screens.makeShell()
+        #expect(shell.selection == nil)
+        shell.select(row.reference)
+        shell.reconcile(with: list.rows)
+        #expect(shell.selection == row.reference)
+        shell.reconcile(with: [])
+        #expect(shell.selection == nil)
+    }
+
     @Test("On an empty store the first run offers the examples, then the import, then blank")
     func firstRunWithExamples() async throws {
         let fixture = try await Self.fixture()
