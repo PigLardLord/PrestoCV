@@ -78,8 +78,10 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "DiagnosticTraceDistribution", package: "DiagnosticTrace"),
 ]))
 targets.append(.testTarget(name: "PrestoCVCompositionTests", dependencies: [
-    "PrestoCVComposition",
+    "PrestoCVComposition", "PrestoCVPresentation",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
+    .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    .product(name: "PrestoCVPersistence", package: "PrestoCVCore"),
     .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
     .product(name: "CVRenderingWebKitSupport", package: "CVPDFExporter"),
     .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
