@@ -69,6 +69,8 @@ public final class Autosave<Content: Equatable & Sendable> {
     private var lastWriteFailed = false
     /// The flushes in progress: each one writes what is left, so a write that ends needs no pause of its own after it.
     private var flushes = 0
+    /// The writes begun so far. Writes run one at a time, so the running one, if any, is the last of them.
+    private var writesStarted = 0
 
     private enum WriteOutcome {
         case nothingToWrite
@@ -176,6 +178,42 @@ public final class Autosave<Content: Equatable & Sendable> {
         }
     }
 
+    /// Stores the content as it is at this call, if it has changed, and does not chase the changes made later: their pause
+    /// writes them. It is for a caller that must not wait for a person who keeps typing, such as the list of CVs, which has
+    /// each editor store what it shows before it reads the store.
+    ///
+    /// It waits for at most two writes, whoever starts them: the write that runs at this call, which holds older content,
+    /// and then the first write begun after this call, which holds the content of this call or newer. When no write began
+    /// once the running one ended, it writes the content itself. So a `flush()` that keeps writing while the person types
+    /// never holds it longer.
+    ///
+    /// A write that fails leaves the content to be written, and the status says `failed`, as for `flush()`. A write the
+    /// store cancelled leaves the content to a pause, with no failure.
+    public func flushOnce() async {
+        flushes += 1
+        cancelThePause()
+        // Every write begun up to here took its content before this call
+        let begunBefore = writesStarted
+        // The write that runs now holds older content: it is waited for once, never the writes begun after it
+        if let running {
+            _ = await running.value
+        }
+        if writesStarted > begunBefore {
+            // A write begun after this call stores what the form showed at it, or newer. Only the first is waited for:
+            // once a second one has begun, the first has ended
+            if writesStarted == begunBefore + 1, let running {
+                _ = await running.value
+            }
+        } else {
+            // No write began since the running one ended, so none runs: the write starts at once, with the content of now
+            cancelThePause()
+            _ = await writeOnce()
+        }
+        flushes -= 1
+        writeAgainIfTheContentIsNotStored()
+        updateStatus()
+    }
+
     // MARK: - Private Methods
 
     private func startThePause() -> Task<Void, Never> {
@@ -224,6 +262,7 @@ public final class Autosave<Content: Equatable & Sendable> {
             self.updateStatus()
             return outcome
         }
+        writesStarted += 1
         running = writing
         updateStatus()
         return await writing.value

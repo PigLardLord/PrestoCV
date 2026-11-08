@@ -68,6 +68,8 @@ public final class Composition {
     let logger: any DiagnosticLogger
     let tracer: any DiagnosticTracer
     let traceAccess: TraceAccess
+    /// Makes the view models of the screens over this composition's repository, clock and ids.
+    public let screens: ScreenFactory
     private let rules: WKContentRuleList
 
     private init(inputs: Inputs, rules: WKContentRuleList, trace: TraceChain) {
@@ -81,6 +83,10 @@ public final class Composition {
         logger = trace.logger
         tracer = trace.tracer
         traceAccess = trace.access
+        screens = ScreenFactory(
+            repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
+            editorClock: ContinuousClock()
+        )
         self.rules = rules
     }
 

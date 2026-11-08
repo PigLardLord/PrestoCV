@@ -47,7 +47,7 @@ public final class CVListViewModel {
     ///   - untitled: The view's words for a CV with no title, as "Untitled CV" (R13).
     ///   - numbered: How the view numbers a title that reads like another row's, as "Backend (2)" (R13).
     ///   - now: The time the view words "saved ... ago" from.
-    ///   - editorsStored: Returns when the editors that were left have stored what they showed; the store is read after.
+    ///   - editorsStored: Returns when every open editor has stored what it showed at its turn; the store is read after.
     public init(
         browsing: any CVBrowsing, editing: any CVEditing, untitled: String,
         numbered: @escaping @MainActor (String, Int) -> String, now: @escaping @MainActor () -> Date,

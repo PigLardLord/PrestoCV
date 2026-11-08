@@ -17,6 +17,18 @@ extension EditorViewModel {
         }
     }
 
+    /// Stores what the form shows at this call, after any replacement, and returns without waiting for edits made
+    /// meanwhile: the autosave stores those a pause after them. It waits for two writes at most (`Autosave.flushOnce()`),
+    /// even beside a `saveNow()` that keeps writing. It is for whoever must not wait for a person who keeps typing, as the
+    /// list of CVs, which reads the store after each editor's turn. A failed or cancelled write shows in the status, as
+    /// for `saveNow()`.
+    public func saveWhatItShows() async {
+        while let replacing { await replacing.value }
+        guard let autosave else { return }
+        await autosave.flushOnce()
+        refreshSaveStatus()
+    }
+
     /// After a conflict: the form takes the stored CV, and the person's unstored text goes. In any other state it does
     /// nothing. It waits for the write the old autosave still runs before it reads the store, and the old autosave writes
     /// nothing once the stored CV is taken. If the person types while the store is read, the stored CV is not taken: the

@@ -64,6 +64,7 @@
     { "path": "PrestoCVCore/Tests/ImportFixtures/de-jonas/chat.txt", "target-membership": [ "PrestoCVUITests/resources" ] },
     { "path": "PrestoCVCore/Tests/ImportFixtures/en-emily/linkedin.pdf", "target-membership": [ "PrestoCVUITests/resources" ] },
     { "kind": "folder", "path": "PrestoCVNext", "target-membership": [ "PrestoCVNext" ] },
+    { "path": "PrestoCV/Resources/Samples", "target-membership": [ "PrestoCVNext/resources" ] },
     { "kind": "folder", "path": "PrestoCVNextUITests", "target-membership": [ "PrestoCVNextUITests" ] },
     { "kind": "folder", "path": "PrestoCVNextTests", "target-membership": [ "PrestoCVNextTests" ] },
     { "path": "<PRODUCTS>/PrestoCV.app", "id": "237D7D9E2E91379300212357", "type": "wrapper.application", "index": false },
