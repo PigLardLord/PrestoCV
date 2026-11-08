@@ -87,9 +87,18 @@ struct LocalizationCatalog {
             return (unit["state"] as? String, [value])
         }
         let forms = ((localization["variations"] as? [String: Any])?["plural"] as? [String: Any]) ?? [:]
-        let units = forms.keys.sorted().compactMap { forms[$0] as? [String: Any] }.compactMap { $0["stringUnit"] as? [String: Any] }
-        guard !units.isEmpty else { return nil }
-        return (units.first?["state"] as? String, units.compactMap { $0["value"] as? String })
+        guard !forms.isEmpty else { return nil }
+        // Every form counts, in sorted order: a form with no text reads as an empty one, and the state is `translated`
+        // only when every form is.
+        var state: String? = "translated"
+        var texts: [String] = []
+        for name in forms.keys.sorted() {
+            let unit = (forms[name] as? [String: Any])?["stringUnit"] as? [String: Any]
+            texts.append(unit?["value"] as? String ?? "")
+            let formState = unit?["value"] is String ? unit?["state"] as? String : "no text"
+            if state == "translated" { state = formState }
+        }
+        return (state, texts)
     }
 
     func texts(of key: String, in language: String) -> [String]? {
