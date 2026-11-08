@@ -375,10 +375,10 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 
 | Folder | Contents | May import |
 |---|---|---|
-| `App/` | `@main` (holds the composition), `RootView` (loading, ready, failed) with `CompositionFailedView`, scenes and macOS commands; `#if os` allowed here | SwiftUI, `PrestoCVComposition`, `PrestoCVPresentation` |
-| `Features/` | SwiftUI views per screen; `NavigationSplitView` navigation; no `#if` | SwiftUI, `PrestoCVPresentation` |
-| `DesignSystem/` | tokens and reusable components | SwiftUI |
-| `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
+| `App/` | `@main` (holds the composition), `RootView` (loading, the shell when ready, failed) with `CompositionFailedView`, scenes and macOS commands; `#if os` allowed here | SwiftUI, `PrestoCVComposition`, `PrestoCVPresentation` |
+| `Features/` | SwiftUI views per screen; `NavigationSplitView` navigation (`Shell/`: the sidebar of CVs and the opened CV, over `ShellNavigationModel`); no `#if` | SwiftUI, `PrestoCVPresentation` |
+| `DesignSystem/` | tokens and reusable components (loading, error and empty states, buttons, readable width, whole-words text) | SwiftUI |
+| `Platform/` | the platform shims (so far the inline navigation title): iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
 | `Resources/` | `Localizable.xcstrings`, sample CV JSON, assets | — |
 
 **The legacy target `PrestoCV`**, which version 1 ships ([ADR 0022](adr/0022-ship-legacy-app-as-v1.md)), imports the legacy `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`, and also `PrestoCVDomain` and `PrestoCVApplication`, whose rules its view models call ([ADR 0025](adr/0025-hold-the-legacy-app-to-the-separation-rules.md)), and `PrestoCVImporting` with its PDFKit reader, for the import of version 1 ([ADR 0027](adr/0027-import-a-cv-from-its-text-with-rules.md)) and for a CV pasted in the AI draft ([ADR 0034](adr/0034-read-a-text-that-is-already-a-cv-with-the-import.md)), and `DiagnosticLogging` with `DiagnosticLoggingOSLog` ([ADR 0030](adr/0030-log-through-one-interface-that-carries-no-cv-content.md)), and `DiagnosticTrace` with `DiagnosticTraceFiles` and `DiagnosticTraceDistribution` ([ADR 0032](adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)):

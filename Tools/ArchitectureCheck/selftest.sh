@@ -504,6 +504,26 @@ legacy_tests "R17"; printf '%s\n' 'init(now: @escaping () -> Date = { Date() }) 
 expect "R17: a legacy target with R17 is checked for it, and only for it" 1 "Tests/Old/OldTests.swift:4: R17 defaultDependency"
 if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL a legacy target with R17 was checked for more"; sed 's/^/     /' "$ROOT/out.txt"
 else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothing else"; fi
+# --- the folders of the new app: the repository's own entry of a folder, applied to a fixture file
+real_folder() {   # the fixture's one source file is put under the repository's target named $1, with that target's imports and rules
+  setup; mkdir -p "$ROOT/Folder"
+  python3 - "$ROOT/rules.json" "$HERE/rules.json" "$1" <<'PY'
+import json, sys
+p, real, name = sys.argv[1], json.load(open(sys.argv[2])), sys.argv[3]; r = json.load(open(p))
+t = next(t for t in real["targets"] if t["name"] == name)
+r["targets"].append({"name": name, "path": "Folder", "allowedImports": t["allowedImports"], "rules": t["rules"]})
+json.dump(r, open(p, "w"))
+PY
+  printf '%s\n' "$2" > "$ROOT/Folder/V.swift"
+}
+real_folder PrestoCVNextFeatures $'import SwiftUI\nstruct V: View {\n    var body: some View {\n        #if os(iOS)\n        Text("a")\n        #endif\n    }\n}'
+expect "Features/: a platform condition is refused (R11)" 1 "R11 platformCondition"
+real_folder PrestoCVNextFeatures $'import SwiftUI\nimport UIKit\nstruct V: View { var body: some View { Text("a") } }'
+expect "Features/: an import of UIKit is refused (R1)" 1 "R1 import"
+real_folder PrestoCVNextFeatures $'import SwiftUI\nstruct V: View { var body: some View { Text("a") } }'
+expect "Features/: a view of SwiftUI only is clean" 0 ""
+real_folder PrestoCVNextDesignSystem $'import SwiftUI\nimport UIKit\nstruct V: View { var body: some View { Text("a") } }'
+expect "DesignSystem/: an import of UIKit is refused (R1)" 1 "R1 import"
 # --- ADR 0032: the trace store and the distribution check are composition-only: only the files the rule lists may import
 # their modules or make the chain's types, in production and legacy targets alike; tests may
 composition_only() {   # a legacy app with a composition file and a screen, its legacy tests, and the rule (ADR $1)
