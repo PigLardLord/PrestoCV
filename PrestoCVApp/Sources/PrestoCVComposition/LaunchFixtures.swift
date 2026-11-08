@@ -92,12 +92,20 @@ struct LaunchFixtures: Equatable, Sendable {
         return AppPaths(root: root, temporary: device.temporary)
     }
 
-    /// Makes the fixture ready before the app reads it: for a fixture folder, checks that it is a plain folder of the
-    /// temporary folder and then writes the seed. Nothing is made or written before the check passes, so a link planted in
-    /// the temporary folder never leads a launch into another folder, such as the real store.
-    func prepare(_ paths: AppPaths) throws(Failure) {
+    /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no
+    /// link on the way to its store or trace folder, and nothing outside the temporary folder. The composition runs it
+    /// before anything touches these paths, the purge of the trace included, so a link planted in the temporary folder
+    /// never leads a launch into another folder, such as the real store or its traces.
+    func check(_ paths: AppPaths) throws(Failure) {
         guard storage != .device else { return }
         try Self.requirePlainFolders(of: paths)
+    }
+
+    /// Makes the fixture ready before the app reads it: for a fixture folder, checks it again and then writes the seed.
+    /// Nothing is made or written before the check passes.
+    func prepare(_ paths: AppPaths) throws(Failure) {
+        guard storage != .device else { return }
+        try check(paths)
         try writeSeed(into: paths.store)
     }
 

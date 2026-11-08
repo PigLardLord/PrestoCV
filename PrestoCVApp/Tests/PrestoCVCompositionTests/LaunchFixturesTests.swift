@@ -224,6 +224,33 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
+    @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone")
+    func linkedRootOnAClosedLaunch() async throws {
+        let target = try Self.target()
+        let traces = target.appendingPathComponent("Diagnostics", isDirectory: true)
+        try FileManager.default.createDirectory(at: traces, withIntermediateDirectories: true)
+        let marker = traces.appendingPathComponent("marker")
+        try Data("kept".utf8).write(to: marker)
+        let name = Self.unique()
+        let link = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer {
+            try? FileManager.default.removeItem(at: link)
+            try? FileManager.default.removeItem(at: target)
+        }
+
+        let state = await Composition.launch(
+            arguments: [Self.program, "-PrestoCVNextStorage", name, "-PrestoCVNextDistribution", "production"]
+        )
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: marker.path), "No trace is purged through a folder the check refused")
+    }
+
+    @MainActor
     @Test("A fixture folder that is a plain folder still launches with its seed")
     func plainFolderLaunches() async throws {
         let name = Self.unique()

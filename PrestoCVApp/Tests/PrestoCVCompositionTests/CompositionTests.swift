@@ -61,6 +61,7 @@ struct CompositionTests {
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             compileRules: compileRules,
             settleDeadline: Self.neverFires,
+            check: {},
             prepare: {}
         )
     }

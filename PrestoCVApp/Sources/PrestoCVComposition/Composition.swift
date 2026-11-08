@@ -47,6 +47,10 @@ public final class Composition {
         /// screen even while the distribution has not answered (the store may fetch over the network); the purge of a
         /// closed launch then still follows the answer (ADR 0032). The launch chooses it, so a test fires it at once.
         let settleDeadline: @Sendable () async -> Void
+        /// Checks, without making or removing anything, that the launch's paths are safe to use, such as the folder of a UI
+        /// test. It runs before the trace chain starts, because a closed launch purges the trace folder: a path it refuses
+        /// is never purged through. It fails with a code.
+        let check: @MainActor () throws(CompositionFailure) -> Void
         /// What a launch does before the folders are made, such as writing the seed of a UI test. It fails with a code.
         let prepare: @MainActor () throws(CompositionFailure) -> Void
     }
@@ -87,11 +91,18 @@ public final class Composition {
         #endif
     }
 
-    /// Assembles the app, or fails with one code. The trace chain starts first, so that its answer and the purge of a
-    /// closed launch (ADR 0032) do not depend on the rest. When the assembly fails, `make` waits for the purge only until
-    /// `settleDeadline`: the error screen must not wait for a distribution that has not answered. The purge is not brought
-    /// forward, it follows the answer on the trace chain's own task, as it does on a launch that succeeds.
+    /// Assembles the app, or fails with one code. The paths are checked first: paths that fail their check fail the launch
+    /// before anything is made, and the trace chain never starts, so nothing is purged through them. Then the trace chain
+    /// starts, so that its answer and the purge of a closed launch (ADR 0032) do not depend on the rest. When the assembly
+    /// fails after that, `make` waits for the purge only until `settleDeadline`: the error screen must not wait for a
+    /// distribution that has not answered. The purge is not brought forward, it follows the answer on the trace chain's own
+    /// task, as it does on a launch that succeeds.
     static func make(_ inputs: Inputs) async -> CompositionState {
+        do {
+            try inputs.check()
+        } catch {
+            return .failed(error)
+        }
         let trace = TraceChain(
             directory: inputs.paths.trace, shareDirectory: inputs.paths.traceShare, gate: inputs.gate,
             device: inputs.device, log: inputs.log
@@ -137,10 +148,11 @@ public final class Composition {
         let device = AppPaths.onDevice()
         let paths: AppPaths
         let gate: TraceLaunchGate
+        let check: @MainActor () throws(CompositionFailure) -> Void
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         #if DEBUG
-        // A fixture that cannot be read fails the launch inside `make`, like the other failures, with the device's
-        // paths and the Debug gate: nothing was asked for, so nothing is made.
+        // A fixture that cannot be read, or a fixture folder that fails its check, fails the launch inside `make` before
+        // the trace chain starts: nothing is made, and nothing is purged.
         let fixtures: LaunchFixtures
         let rejected: CompositionFailure?
         do {
@@ -152,8 +164,15 @@ public final class Composition {
         }
         paths = fixtures.paths(device: device, fresh: UUID())
         gate = fixtures.distribution.map { .asking(GivenDistribution(given: $0)) } ?? .debug
-        prepare = { () throws(CompositionFailure) in
+        check = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
+            do throws(LaunchFixtures.Failure) {
+                try fixtures.check(paths)
+            } catch {
+                throw CompositionFailure(error)
+            }
+        }
+        prepare = { () throws(CompositionFailure) in
             do throws(LaunchFixtures.Failure) {
                 try fixtures.prepare(paths)
             } catch {
@@ -163,6 +182,7 @@ public final class Composition {
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
+        check = {}
         prepare = {}
         #endif
         return await make(Inputs(
@@ -184,6 +204,7 @@ public final class Composition {
                     return
                 }
             },
+            check: check,
             prepare: prepare
         ))
     }

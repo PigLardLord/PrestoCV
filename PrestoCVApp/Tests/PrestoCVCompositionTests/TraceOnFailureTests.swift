@@ -24,6 +24,7 @@ struct TraceOnFailureTests {
         _ paths: AppPaths,
         gate: TraceLaunchGate = .asking(FixedDistribution(.production)),
         settleDeadline: @escaping @Sendable () async -> Void = TraceOnFailureTests.neverFires,
+        check: @escaping @MainActor () throws(CompositionFailure) -> Void = TraceOnFailureTests.passes,
         compileRules: @escaping Composition.CompileRules
     ) -> Composition.Inputs {
         Composition.Inputs(
@@ -36,9 +37,13 @@ struct TraceOnFailureTests {
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             compileRules: compileRules,
             settleDeadline: settleDeadline,
+            check: check,
             prepare: {}
         )
     }
+
+    /// A check that every path passes.
+    private static let passes: @MainActor () throws(CompositionFailure) -> Void = {}
 
     /// A deadline that never fires: nothing waits for it to end.
     private static let neverFires: @Sendable () async -> Void = {
@@ -97,6 +102,25 @@ struct TraceOnFailureTests {
             return
         }
         #expect(!FileManager.default.fileExists(atPath: paths.trace.path), "The traces are purged when make returns")
+    }
+
+    @Test("Paths that fail their check purge nothing: the trace chain never starts on them")
+    func failedCheckPurgesNothing() async {
+        let base = Self.base()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let paths = AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
+        await Self.storeARun(in: paths)
+        #expect(FileManager.default.fileExists(atPath: paths.trace.path))
+
+        let state = await Composition.make(Self.inputs(
+            paths, check: { () throws(CompositionFailure) in throw .launchFixturesRejected }, compileRules: Self.failingRules
+        ))
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: paths.trace.path), "No trace is purged through paths that failed their check")
     }
 
     @Test("A distribution that never answers does not hold back the error state, and the purge waits for the answer",
