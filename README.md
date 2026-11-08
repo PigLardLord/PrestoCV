@@ -34,6 +34,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). The app icon is `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
 | `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
+| `PrestoCVNext/`, `PrestoCVNextUITests/` | The second app target, where the new app grows beside the shipped one until the switch (step 5 of the migration), and its UI tests. |
 | `CVPDFExporterExamples/` | The exporter's demos and template viewer, kept apart from the library. |
 | `DiagnosticLogging/`, `docs/logging.md` | The diagnostic log (ADR 0030): one interface that carries no CV content, its decorators and its unified log adapter; the guide says how to read the log, what each event holds and how to add one. |
 | `DiagnosticTrace/` | The trace of a test build (ADR 0032): each step of the AI draft and the import, with its text, kept on the device in TestFlight and Debug builds only, and shared by the person; `docs/logging.md` says where it is and how to read it. |
