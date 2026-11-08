@@ -118,4 +118,93 @@ struct ImportFileLifetimeTests {
 
         #expect(world.files.released(file) == 1)
     }
+
+    // MARK: - A link that moves while an import holds it
+
+    /// A real folder with two files and a link `link` that points at the first, removed with the value.
+    private final class Links {
+        let folder: URL
+        let first: URL
+        let second: URL
+        let link: URL
+
+        init() throws {
+            let manager = FileManager.default
+            folder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("links-\(UUID().uuidString)")
+            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+            first = folder.appendingPathComponent("first.pdf")
+            second = folder.appendingPathComponent("second.pdf")
+            link = folder.appendingPathComponent("link.pdf")
+            try Data("1".utf8).write(to: first)
+            try Data("2".utf8).write(to: second)
+            try manager.createSymbolicLink(at: link, withDestinationURL: first)
+        }
+
+        deinit { try? FileManager.default.removeItem(at: folder) }
+
+        /// The link points at the second file from now on.
+        func retarget() throws {
+            let manager = FileManager.default
+            try manager.removeItem(at: link)
+            try manager.createSymbolicLink(at: link, withDestinationURL: second)
+        }
+    }
+
+    @Test("a link retargeted while its import runs does not let that task release the file the link now names")
+    func retargetedLinkDoesNotReleaseAnotherTasksFile() async throws {
+        let links = try Links()
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: links.link) }
+        model.cancel()
+        try links.retarget()
+        model.importFile(at: links.second)
+        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
+
+        await letTheOldTaskEnd(world)
+        #expect(world.files.released(links.second) == 0)
+        model.importFile(at: links.second)                      // refused: the import of it still runs
+        #expect(world.files.released(links.second) == 0)
+
+        await finishTheNewImport(world, model)
+        #expect(world.files.released(links.second) == 1)
+        #expect(world.files.released(links.link) == 1)
+        #expect(world.files.recorded.filter { if case .released = $0 { true } else { false } }.count == 2)
+    }
+
+    @Test("a file refused under a link that was retargeted is not released while the link's import runs")
+    func refusedRetargetedLinkIsKept() async throws {
+        let links = try Links()
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: links.link) }
+        try links.retarget()
+
+        model.importFile(at: links.link)
+        #expect(world.files.released(links.link) == 0)
+
+        await world.files.gate.open()
+        await world.importer.gate.open()
+        await waitUntil("the draft") { model.status == .ready }
+        await settle()
+        #expect(world.files.released(links.link) == 1)
+    }
+
+    @Test("two imports of one link, retargeted between them, release it once, when the last one ends")
+    func sameLinkRetargetedBetweenTwoImports() async throws {
+        let links = try Links()
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: links.link) }
+        model.cancel()
+        try links.retarget()
+        model.importFile(at: links.link)
+        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
+
+        await letTheOldTaskEnd(world)
+        #expect(world.files.released(links.link) == 0)
+
+        await finishTheNewImport(world, model)
+        #expect(world.files.released(links.link) == 1)
+    }
 }

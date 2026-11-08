@@ -108,13 +108,13 @@ public final class ImportViewModel {
         generation += 1
         let mine = generation
         self.source = source
-        if let file { holds.hold(file) }
+        let held = file.map { holds.hold($0) }
         result = nil
         status = .importing
         let holds = holds
         running = Task { [weak self] in
             // After the draft or the problem is published, so that the file outlives its own import only.
-            defer { if let file { holds.letGo(file) } }
+            defer { if let held { holds.letGo(held) } }
             let ended: Result<ImportOutcome, any Error>
             do { ended = .success(try await work()) } catch { ended = .failure(error) }
             self?.finish(mine, ended, from: source)
@@ -147,36 +147,56 @@ public final class ImportViewModel {
         if error is ImportFailure || error is CancellationError { return error }
         return ImportFailure.fileNotRead
     }
-
-    /// The same file however it is spelled: links resolved, `.` and `..` taken out.
-    fileprivate static func canonical(_ url: URL) -> URL { url.resolvingSymlinksInPath().standardizedFileURL }
 }
 
-/// How many tasks hold each file, by its canonical spelling: a task holds its file until it ends, also after a cancel.
-/// A file is released exactly once, by the last task that gives it back; the tasks hold this object, not the view model.
+/// What one import holds of a file: the spellings it took when it started, and the URL as it was handed over. The
+/// file system is read once, at that moment, and never again for this hold: a link may point elsewhere by the time the
+/// import ends.
+private struct FileHold: Sendable {
+    let id: Int
+    /// The file however it is spelled: links resolved, `.` and `..` taken out, as they were when the hold began.
+    let key: URL
+    /// The spelling as written: `.` and `..` taken out, links kept.
+    let spelling: URL
+    let url: URL
+
+    /// Whether `other` may be the same file: by the key or the spelling either one took.
+    func mayBeTheFileOf(_ other: FileHold) -> Bool { key == other.key || spelling == other.spelling }
+}
+
+/// Which imports hold which files: an import holds its file until it ends, also after a cancel. A file is released
+/// exactly once, by the last import that gives it back; the imports hold this object, not the view model.
+///
+/// When in doubt a file is kept: a release that comes late only keeps a copy a little longer, one that comes early
+/// breaks a read in progress. So a file counts as held by every hold that matches it by its captured key or by its
+/// spelling, and the file system is never asked again about a hold already taken.
 @MainActor
 private final class FileHolds {
     private let files: any ImportFileReading
-    private var counts: [URL: Int] = [:]
+    private var held: [FileHold] = []
+    private var issued = 0
 
     init(_ files: any ImportFileReading) { self.files = files }
 
-    func hold(_ file: URL) { counts[ImportViewModel.canonical(file), default: 0] += 1 }
-
-    /// A task gives its file back: the file goes when no other task holds it.
-    func letGo(_ file: URL) {
-        let key = ImportViewModel.canonical(file)
-        let left = (counts[key] ?? 1) - 1
-        if left > 0 {
-            counts[key] = left
-        } else {
-            counts[key] = nil
-            files.release(file)
-        }
+    func hold(_ file: URL) -> FileHold {
+        issued += 1
+        let taken = FileHold(id: issued, key: file.resolvingSymlinksInPath().standardizedFileURL,
+                             spelling: file.standardizedFileURL, url: file)
+        held.append(taken)
+        return taken
     }
 
-    /// A file handed over and not read: it goes at once, unless a task still holds it (that task lets it go).
+    /// An import gives its file back: the file goes when no other import holds it.
+    func letGo(_ gone: FileHold) {
+        guard let index = held.firstIndex(where: { $0.id == gone.id }) else { return }
+        held.remove(at: index)
+        if !held.contains(where: { $0.mayBeTheFileOf(gone) }) { files.release(gone.url) }
+    }
+
+    /// A file handed over and not read: it goes at once, unless an import holds it (that import lets it go).
     func refuse(_ file: URL) {
-        if counts[ImportViewModel.canonical(file)] == nil { files.release(file) }
+        let asked = FileHold(id: 0, key: file.resolvingSymlinksInPath().standardizedFileURL,
+                             spelling: file.standardizedFileURL, url: file)
+        if !held.contains(where: { $0.mayBeTheFileOf(asked) }) { files.release(file) }
     }
 }
