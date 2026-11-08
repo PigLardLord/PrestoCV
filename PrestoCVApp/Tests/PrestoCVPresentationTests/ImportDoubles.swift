@@ -54,32 +54,72 @@ enum FileEvent: Equatable, Sendable {
     case released(URL)
 }
 
+/// What the fake saw of one received file, by its id.
+struct ReceivedRecord: Sendable {
+    let file: ReceivedFile
+    var reads = 0
+    var readEnded = 0
+    var releases = 0
+    /// What was wrong when it was released or read, in words.
+    var violations: [String] = []
+}
+
 /// The file port, scripted: every read gives the same answer after a gate a test can close. The hooks run on the main
-/// actor inside a read (before its gate) and inside a release, as the caller's code can.
+/// actor inside a read (before its gate) and inside a release, as the caller's code can. It records each received file
+/// by its id, and what it saw go wrong: a release while the file's read runs, a read after the release.
 final class FileReadingFake: ImportFileReading {
     let gate = Gate()
     let events = Mutex<[FileEvent]>([])
+    let records = Mutex<[Int: ReceivedRecord]>([:])
     let whenRead = Mutex<(@MainActor @Sendable (URL) -> Void)?>(nil)
     let whenReleased = Mutex<(@MainActor @Sendable (URL) -> Void)?>(nil)
     private let answer: Mutex<Result<Data, any Error>>
+    private let issued = Mutex(0)
 
     init(_ answer: Result<Data, any Error>) { self.answer = Mutex(answer) }
 
     var recorded: [FileEvent] { events.withLock { $0 } }
     var reads: Int { recorded.filter { if case .read = $0 { true } else { false } }.count }
+    var received: [ReceivedRecord] { records.withLock { $0.values.sorted { $0.file.id < $1.file.id } } }
 
     func released(_ url: URL) -> Int { recorded.filter { $0 == .released(url) }.count }
 
-    func readPDF(fromFileAt url: URL) async throws -> Data {
-        events.withLock { $0.append(.read(url)) }
-        if let hook = whenRead.withLock({ $0 }) { await hook(url) }
+    /// Everything wrong the fake saw, over all files: a file not released exactly once is reported when `ended` is true.
+    func problems(ended: Bool) -> [String] {
+        received.flatMap { record -> [String] in
+            var found = record.violations.map { "file \(record.file.id): \($0)" }
+            if ended && record.releases != 1 { found.append("file \(record.file.id): released \(record.releases) times") }
+            return found
+        }
+    }
+
+    func receive(_ url: URL) -> ReceivedFile {
+        let file = ReceivedFile(id: issued.withLock { $0 += 1; return $0 }, url: url)
+        records.withLock { $0[file.id] = ReceivedRecord(file: file) }
+        return file
+    }
+
+    func readPDF(of file: ReceivedFile) async throws -> Data {
+        events.withLock { $0.append(.read(file.url)) }
+        records.withLock {
+            $0[file.id]?.reads += 1
+            if $0[file.id]?.releases ?? 0 > 0 { $0[file.id]?.violations.append("read after its release") }
+        }
+        defer { records.withLock { $0[file.id]?.readEnded += 1 } }
+        if let hook = whenRead.withLock({ $0 }) { await hook(file.url) }
         await gate.pass()
         return try answer.withLock { $0 }.get()
     }
 
-    func release(_ url: URL) {
-        events.withLock { $0.append(.released(url)) }
-        if let hook = whenReleased.withLock({ $0 }) { MainActor.assumeIsolated { hook(url) } }
+    func release(_ file: ReceivedFile) {
+        events.withLock { $0.append(.released(file.url)) }
+        records.withLock {
+            guard var record = $0[file.id] else { return }
+            record.releases += 1
+            if record.reads > record.readEnded { record.violations.append("released while its read runs") }
+            $0[file.id] = record
+        }
+        if let hook = whenReleased.withLock({ $0 }) { MainActor.assumeIsolated { hook(file.url) } }
     }
 }
 

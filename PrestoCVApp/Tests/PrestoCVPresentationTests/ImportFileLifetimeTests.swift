@@ -3,21 +3,14 @@ import Testing
 @testable import PrestoCVPresentation
 import PrestoCVWorkflowPorts
 
-/// A file is let go exactly once, when no import of it holds it any more, however often it is handed over (ADR 0027).
+/// Each file the screen receives is released exactly once, after the import that reads it has ended, however it ended,
+/// or at once when it is not read. Which URLs name one file is the adapter's to know, not the view model's (ADR 0027).
 @MainActor
 @Suite("Lifetime of an imported file")
 struct ImportFileLifetimeTests {
 
     private let file = ImportValues.file
     private let otherFile = ImportValues.otherFile
-
-    /// Holds the read of `first`, cancels it, and holds the read of `second` too.
-    private func cancelAndStartAgain(_ world: ImportWorld, _ model: ImportViewModel, first: URL, second: URL) async {
-        await world.hold(model) { $0.importFile(at: first) }
-        model.cancel()
-        model.importFile(at: second)
-        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
-    }
 
     /// Lets both reads go on: the cancelled task ends, the new import waits at the import's gate.
     private func letTheOldTaskEnd(_ world: ImportWorld) async {
@@ -31,53 +24,93 @@ struct ImportFileLifetimeTests {
         await settle()
     }
 
-    @Test("a file imported again after a cancel is not let go by the cancelled task, but once after the new import")
+    /// Holds the read of `first`, cancels it, and holds the read of `second` too.
+    private func cancelAndStartAgain(_ world: ImportWorld, _ model: ImportViewModel, first: URL, second: URL) async {
+        await world.hold(model) { $0.importFile(at: first) }
+        model.cancel()
+        model.importFile(at: second)
+        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
+    }
+
+    @Test("every file is received before it is read, and a file read is released once, after the import, on success")
+    func successReleasesOnceAfterTheImport() async {
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: file) }
+        #expect(world.files.received.map(\.file.url) == [file])
+
+        await world.files.gate.open()
+        await settle()
+        #expect(world.files.released(file) == 0)                // the import still runs
+
+        await finishTheNewImport(world, model)
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file whose read fails is released once")
+    func failureReleasesOnce() async {
+        let world = ImportWorld(file: .failure(ImportFailure.fileNotRead))
+        let model = world.model()
+
+        model.importFile(at: file)
+        await waitUntil("the problem") { model.status == .failed(ImportProblem(.fileNotRead)) }
+        await settle()
+
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file cancelled during its read is released once, when its task ends, not before")
+    func cancelDuringTheReadReleasesWhenTheTaskEnds() async {
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: file) }
+
+        model.cancel()
+        #expect(world.files.released(file) == 0)                // its read still runs
+
+        await letTheOldTaskEnd(world)
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file cancelled during its import is released once, when its task ends")
+    func cancelDuringTheImportReleasesWhenTheTaskEnds() async {
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: file) }
+        await world.files.gate.open()
+        await waitUntil("the import") { world.importer.calls == 1 }
+
+        model.cancel()
+        #expect(world.files.released(file) == 0)                // the import still runs
+
+        await world.importer.gate.open()
+        await settle()
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file imported again after a cancel is released once by the cancelled task and once by the new import")
     func sameFileAgainAfterCancel() async {
         let world = ImportWorld()
         let model = world.model()
         await cancelAndStartAgain(world, model, first: file, second: file)
+        #expect(world.files.received.count == 2)
 
         await letTheOldTaskEnd(world)
-        #expect(world.files.released(file) == 0)
+        #expect(world.files.received.first?.releases == 1)      // the cancelled task's own received file
+        #expect(world.files.received.last?.releases == 0)
         #expect(model.status == .importing)
 
         await finishTheNewImport(world, model)
-        #expect(world.files.recorded == [.read(file), .read(file), .released(file)])
+        #expect(world.files.received.map(\.releases) == [1, 1])
+        #expect(world.files.problems(ended: true).isEmpty)
     }
 
-    @Test("the same holds when the file is handed over again under another spelling")
-    func sameFileAgainUnderAnotherSpelling() async {
-        let world = ImportWorld()
-        let model = world.model()
-        await cancelAndStartAgain(world, model, first: file, second: URL(fileURLWithPath: "/invented/x/../cvs/cv.pdf"))
-
-        await letTheOldTaskEnd(world)
-        #expect(world.files.released(file) == 0)
-
-        await finishTheNewImport(world, model)
-        #expect(world.files.recorded.filter { if case .released = $0 { true } else { false } }.count == 1)
-    }
-
-    @Test("a cancelled file handed over again while another import runs is let go once, when its old task ends")
-    func cancelledFileHandedOverAgainWhileAnotherRuns() async {
-        let world = ImportWorld()
-        let model = world.model()
-        await cancelAndStartAgain(world, model, first: file, second: otherFile)
-
-        model.importFile(at: file)
-        #expect(world.files.released(file) == 0)
-
-        await letTheOldTaskEnd(world)
-        #expect(world.files.released(file) == 1)
-        #expect(world.files.released(otherFile) == 0)
-
-        await finishTheNewImport(world, model)
-        #expect(world.files.released(file) == 1)
-        #expect(world.files.released(otherFile) == 1)
-    }
-
-    @Test("a file handed over while another import runs, and held by none, is let go at once")
-    func refusedFileNobodyHoldsIsReleasedAtOnce() async {
+    @Test("a file handed over while an import runs is released at once, unread, and the import is not touched")
+    func refusedFileIsReleasedAtOnce() async {
         let world = ImportWorld()
         let model = world.model()
         await world.hold(model) { $0.importFile(at: file) }
@@ -86,10 +119,67 @@ struct ImportFileLifetimeTests {
 
         #expect(world.files.released(otherFile) == 1)
         #expect(world.files.released(file) == 0)
+        #expect(world.files.received.last?.reads == 0)
+        #expect(model.status == .importing)
+
+        await world.files.gate.open()
+        await finishTheNewImport(world, model)
+        #expect(world.files.released(otherFile) == 1)
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
     }
 
-    @Test("a file held by two imports is let go once when the view model is gone before both end")
-    func twoHoldersModelGone() async {
+    @Test("the same file handed over again while an import runs is released at once, as its own received file")
+    func sameFileRefusedIsReleasedAtOnce() async {
+        let world = ImportWorld()
+        let model = world.model()
+        await world.hold(model) { $0.importFile(at: file) }
+
+        model.importFile(at: file)
+        #expect(world.files.received.map(\.releases) == [0, 1])
+
+        await world.files.gate.open()
+        await finishTheNewImport(world, model)
+        #expect(world.files.received.map(\.releases) == [1, 1])
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a cancelled file handed over again while another import runs is released at once, its old task later")
+    func cancelledFileHandedOverAgainWhileAnotherRuns() async {
+        let world = ImportWorld()
+        let model = world.model()
+        await cancelAndStartAgain(world, model, first: file, second: otherFile)
+
+        model.importFile(at: file)
+        #expect(world.files.released(file) == 1)                // the third, refused
+
+        await letTheOldTaskEnd(world)
+        #expect(world.files.released(file) == 2)                // plus the cancelled task's own
+        #expect(world.files.released(otherFile) == 0)
+
+        await finishTheNewImport(world, model)
+        #expect(world.files.released(otherFile) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file is released once when the view model is gone before its import ends")
+    func oneImportModelGone() async {
+        let world = ImportWorld()
+        var model: ImportViewModel? = world.model()
+        await world.hold(model!) { $0.importFile(at: file) }
+
+        model = nil
+        #expect(world.files.released(file) == 0)
+        await world.files.gate.open()
+        await world.importer.gate.open()
+        await settle()
+
+        #expect(world.files.released(file) == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("two imports of files, the view model gone before both end, release each file once")
+    func twoImportsModelGone() async {
         let world = ImportWorld()
         var model: ImportViewModel? = world.model()
         await world.hold(model!) { $0.importFile(at: file) }
@@ -102,109 +192,7 @@ struct ImportFileLifetimeTests {
         await world.importer.gate.open()
         await settle()
 
-        #expect(world.files.released(file) == 1)
-    }
-
-    @Test("a file held by one import is let go once when the view model is gone before it ends")
-    func oneHolderModelGone() async {
-        let world = ImportWorld()
-        var model: ImportViewModel? = world.model()
-        await world.hold(model!) { $0.importFile(at: file) }
-
-        model = nil
-        await world.files.gate.open()
-        await world.importer.gate.open()
-        await settle()
-
-        #expect(world.files.released(file) == 1)
-    }
-
-    // MARK: - A link that moves while an import holds it
-
-    /// A real folder with two files and a link `link` that points at the first, removed with the value.
-    private final class Links {
-        let folder: URL
-        let first: URL
-        let second: URL
-        let link: URL
-
-        init() throws {
-            let manager = FileManager.default
-            folder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("links-\(UUID().uuidString)")
-            try manager.createDirectory(at: folder, withIntermediateDirectories: true)
-            first = folder.appendingPathComponent("first.pdf")
-            second = folder.appendingPathComponent("second.pdf")
-            link = folder.appendingPathComponent("link.pdf")
-            try Data("1".utf8).write(to: first)
-            try Data("2".utf8).write(to: second)
-            try manager.createSymbolicLink(at: link, withDestinationURL: first)
-        }
-
-        deinit { try? FileManager.default.removeItem(at: folder) }
-
-        /// The link points at the second file from now on.
-        func retarget() throws {
-            let manager = FileManager.default
-            try manager.removeItem(at: link)
-            try manager.createSymbolicLink(at: link, withDestinationURL: second)
-        }
-    }
-
-    @Test("a link retargeted while its import runs does not let that task release the file the link now names")
-    func retargetedLinkDoesNotReleaseAnotherTasksFile() async throws {
-        let links = try Links()
-        let world = ImportWorld()
-        let model = world.model()
-        await world.hold(model) { $0.importFile(at: links.link) }
-        model.cancel()
-        try links.retarget()
-        model.importFile(at: links.second)
-        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
-
-        await letTheOldTaskEnd(world)
-        #expect(world.files.released(links.second) == 0)
-        model.importFile(at: links.second)                      // refused: the import of it still runs
-        #expect(world.files.released(links.second) == 0)
-
-        await finishTheNewImport(world, model)
-        #expect(world.files.released(links.second) == 1)
-        #expect(world.files.released(links.link) == 1)
-        #expect(world.files.recorded.filter { if case .released = $0 { true } else { false } }.count == 2)
-    }
-
-    @Test("a file refused under a link that was retargeted is not released while the link's import runs")
-    func refusedRetargetedLinkIsKept() async throws {
-        let links = try Links()
-        let world = ImportWorld()
-        let model = world.model()
-        await world.hold(model) { $0.importFile(at: links.link) }
-        try links.retarget()
-
-        model.importFile(at: links.link)
-        #expect(world.files.released(links.link) == 0)
-
-        await world.files.gate.open()
-        await world.importer.gate.open()
-        await waitUntil("the draft") { model.status == .ready }
-        await settle()
-        #expect(world.files.released(links.link) == 1)
-    }
-
-    @Test("two imports of one link, retargeted between them, release it once, when the last one ends")
-    func sameLinkRetargetedBetweenTwoImports() async throws {
-        let links = try Links()
-        let world = ImportWorld()
-        let model = world.model()
-        await world.hold(model) { $0.importFile(at: links.link) }
-        model.cancel()
-        try links.retarget()
-        model.importFile(at: links.link)
-        await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
-
-        await letTheOldTaskEnd(world)
-        #expect(world.files.released(links.link) == 0)
-
-        await finishTheNewImport(world, model)
-        #expect(world.files.released(links.link) == 1)
+        #expect(world.files.received.map(\.releases) == [1, 1])
+        #expect(world.files.problems(ended: true).isEmpty)
     }
 }

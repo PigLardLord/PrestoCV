@@ -131,21 +131,22 @@ struct ImportFileTests {
         #expect(typed.files.recorded == [.released(file)])
     }
 
-    @Test("the file being read, handed over again under another spelling, is not let go before its import ends")
-    func theFileBeingReadIsNotReleasedByTheSecondRequest() async {
+    @Test("the file being read, handed over again, is released at once as its own received file; the first, after its import")
+    func theSecondRequestOfTheFileBeingReadIsReleasedAtOnce() async {
         let world = ImportWorld()
         let model = world.model()
-        await world.hold(model) { $0.importFile(at: URL(fileURLWithPath: "/invented/cvs/cv.pdf")) }
+        await world.hold(model) { $0.importFile(at: file) }
 
-        model.importFile(at: URL(fileURLWithPath: "/invented/cvs/./cv.pdf"))
-        model.importFile(at: URL(fileURLWithPath: "/invented/other/../cvs/cv.pdf"))
+        model.importFile(at: file)
+        model.importFile(at: file)
 
-        #expect(world.files.recorded == [.read(file)])
+        #expect(world.files.recorded == [.read(file), .released(file), .released(file)])
         await world.files.gate.open()
         await world.importer.gate.open()
         await waitUntil("the draft") { model.status == .ready }
         await settle()
-        #expect(world.files.recorded == [.read(file), .released(file)])
+        #expect(world.files.recorded == [.read(file), .released(file), .released(file), .released(file)])
+        #expect(world.files.problems(ended: true).isEmpty)
     }
 
     @Test("a read cancelled, from the screen or by the port, is no problem and reaches no import")
@@ -233,7 +234,7 @@ struct ImportFileTests {
         #expect(model.status == .ready && model.result != nil)
     }
 
-    @Test("files handed over from inside the read: the same one is not let go early, another is let go unread")
+    @Test("files handed over from inside the read are not read, and each is released at once")
     func filesHandedOverFromInsideTheReadAreNotRead() async {
         let world = ImportWorld()
         let model = world.model()
@@ -244,7 +245,7 @@ struct ImportFileTests {
         world.files.whenRead.withLock {
             $0 = { _ in
                 files.whenRead.withLock { $0 = nil }
-                box.model?.importFile(at: URL(fileURLWithPath: "/invented/cvs/../cvs/cv.pdf"))
+                box.model?.importFile(at: ImportValues.file)
                 box.model?.importFile(at: other)
             }
         }
@@ -253,7 +254,8 @@ struct ImportFileTests {
         await waitUntil("the draft") { model.status == .ready }
         await settle()
 
-        #expect(world.files.recorded == [.read(file), .released(otherFile), .released(file)])
+        #expect(world.files.recorded == [.read(file), .released(file), .released(otherFile), .released(file)])
         #expect(world.importer.calls == 1)
+        #expect(world.files.problems(ended: true).isEmpty)
     }
 }

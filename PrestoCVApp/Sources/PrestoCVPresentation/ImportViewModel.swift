@@ -25,8 +25,6 @@ public final class ImportViewModel {
     @ObservationIgnored private let importer: any CVImporting
     @ObservationIgnored private let files: any ImportFileReading
     @ObservationIgnored private var running: Task<Void, Never>?
-    /// Which tasks hold which files. The tasks hold it too, so it outlives the view model until the last task ends.
-    @ObservationIgnored private let holds: FileHolds
     /// Counts the intents that start or end an import: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
 
@@ -34,7 +32,6 @@ public final class ImportViewModel {
     public init(importer: any CVImporting, files: any ImportFileReading) {
         self.importer = importer
         self.files = files
-        holds = FileHolds(files)
     }
 
     // MARK: - Intents
@@ -49,28 +46,29 @@ public final class ImportViewModel {
     public func importText() {
         guard canImportText else { return }
         let text = text, importer = importer
-        start(from: .pasted, reading: nil) { try await importer.importCV(fromText: text) }
+        start(from: .pasted, releasing: nil) { try await importer.importCV(fromText: text) }
     }
 
     /// A PDF the person pasted, such as one copied in Files: it goes to the import as a PDF, like a file.
     public func importPDF(_ data: Data) {
         guard status != .importing else { return }
         let importer = importer
-        start(from: .file, reading: nil) { try await importer.importCV(fromPDF: data) }
+        start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
     }
 
-    /// A PDF file the person chose or opened in the app. A file is let go once, when no import uses it any more,
-    /// however its import ended. One handed over while an import runs is not read; it is let go at once, unless an
-    /// import still uses it (the same file, however spelled), which lets it go: nothing of a file is kept (ADR 0027).
+    /// A PDF file the person chose or opened in the app. The port receives it first. If an import runs, the file is not
+    /// read and is released at once; otherwise the import task reads it and releases it when the task ends, however the
+    /// import ended, also when the view model is gone. The view model never decides which files are the same.
     public func importFile(at url: URL) {
+        let received = files.receive(url)
         guard status != .importing else {
-            holds.refuse(url)
+            files.release(received)
             return
         }
         let importer = importer, files = files
-        start(from: .file, reading: url) {
+        start(from: .file, releasing: { files.release(received) }) {
             let data: Data
-            do { data = try await files.readPDF(fromFileAt: url) } catch {
+            do { data = try await files.readPDF(of: received) } catch {
                 throw Self.readFailure(error)
             }
             try Task.checkCancellation()
@@ -102,19 +100,17 @@ public final class ImportViewModel {
 
     // MARK: - Running
 
-    private func start(from source: ImportSource, reading file: URL?,
+    private func start(from source: ImportSource, releasing release: (@Sendable () -> Void)?,
                        _ work: @escaping @MainActor () async throws -> ImportOutcome) {
         running?.cancel()
         generation += 1
         let mine = generation
         self.source = source
-        let held = file.map { holds.hold($0) }
         result = nil
         status = .importing
-        let holds = holds
         running = Task { [weak self] in
-            // After the draft or the problem is published, so that the file outlives its own import only.
-            defer { if let held { holds.letGo(held) } }
+            // After the draft or the problem is published; the closure holds the port, not the view model.
+            defer { release?() }
             let ended: Result<ImportOutcome, any Error>
             do { ended = .success(try await work()) } catch { ended = .failure(error) }
             self?.finish(mine, ended, from: source)
@@ -146,57 +142,5 @@ public final class ImportViewModel {
     private static func readFailure(_ error: any Error) -> any Error {
         if error is ImportFailure || error is CancellationError { return error }
         return ImportFailure.fileNotRead
-    }
-}
-
-/// What one import holds of a file: the spellings it took when it started, and the URL as it was handed over. The
-/// file system is read once, at that moment, and never again for this hold: a link may point elsewhere by the time the
-/// import ends.
-private struct FileHold: Sendable {
-    let id: Int
-    /// The file however it is spelled: links resolved, `.` and `..` taken out, as they were when the hold began.
-    let key: URL
-    /// The spelling as written: `.` and `..` taken out, links kept.
-    let spelling: URL
-    let url: URL
-
-    /// Whether `other` may be the same file: by the key or the spelling either one took.
-    func mayBeTheFileOf(_ other: FileHold) -> Bool { key == other.key || spelling == other.spelling }
-}
-
-/// Which imports hold which files: an import holds its file until it ends, also after a cancel. A file is released
-/// exactly once, by the last import that gives it back; the imports hold this object, not the view model.
-///
-/// When in doubt a file is kept: a release that comes late only keeps a copy a little longer, one that comes early
-/// breaks a read in progress. So a file counts as held by every hold that matches it by its captured key or by its
-/// spelling, and the file system is never asked again about a hold already taken.
-@MainActor
-private final class FileHolds {
-    private let files: any ImportFileReading
-    private var held: [FileHold] = []
-    private var issued = 0
-
-    init(_ files: any ImportFileReading) { self.files = files }
-
-    func hold(_ file: URL) -> FileHold {
-        issued += 1
-        let taken = FileHold(id: issued, key: file.resolvingSymlinksInPath().standardizedFileURL,
-                             spelling: file.standardizedFileURL, url: file)
-        held.append(taken)
-        return taken
-    }
-
-    /// An import gives its file back: the file goes when no other import holds it.
-    func letGo(_ gone: FileHold) {
-        guard let index = held.firstIndex(where: { $0.id == gone.id }) else { return }
-        held.remove(at: index)
-        if !held.contains(where: { $0.mayBeTheFileOf(gone) }) { files.release(gone.url) }
-    }
-
-    /// A file handed over and not read: it goes at once, unless an import holds it (that import lets it go).
-    func refuse(_ file: URL) {
-        let asked = FileHold(id: 0, key: file.resolvingSymlinksInPath().standardizedFileURL,
-                             spelling: file.standardizedFileURL, url: file)
-        if !held.contains(where: { $0.mayBeTheFileOf(asked) }) { files.release(file) }
     }
 }
