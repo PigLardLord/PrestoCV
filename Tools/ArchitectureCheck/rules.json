@@ -645,6 +645,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "CVDesignCatalog",
     "CVDesignCatalogFileStore",
     "CVRenderingTestSupport",
@@ -664,7 +665,8 @@
     "Testing",
     "Foundation",
     "CVDesignCatalog",
-    "CVBundledDesigns"
+    "CVBundledDesigns",
+    "CVRenderingTestSupport"
    ],
    "rules": [
     "R16"

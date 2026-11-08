@@ -3,9 +3,12 @@ import Foundation
 import CVDesignCatalog
 import CVBundledDesigns
 
-func designData(_ css: String, id: String = "ok", extra: [String: Any] = [:], manifestExtra: [String: Any] = [:], contract: Int = 1) -> Data {
-    var manifest: [String: Any] = ["id": id, "name": "x", "version": "1", "description": "", "markupContract": contract]
+func designData(_ css: String, id: String = "ok", extra: [String: Any] = [:], manifestExtra: [String: Any] = [:],
+                manifestWithout: [String] = [], contract: Int = 1) -> Data {
+    var manifest: [String: Any] = ["id": id, "name": "x", "version": "1.0.0", "description": "", "defaultPalette": "ink",
+                                   "defaultFonts": "system", "markupContract": contract]
     manifest.merge(manifestExtra) { $1 }
+    for key in manifestWithout { manifest[key] = nil }
     var object: [String: Any] = ["manifest": manifest, "cssContent": css]
     object.merge(extra) { $1 }
     return try! JSONSerialization.data(withJSONObject: object)   // test fixture only
