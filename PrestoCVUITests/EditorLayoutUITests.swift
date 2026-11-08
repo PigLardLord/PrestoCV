@@ -53,8 +53,7 @@ final class EditorLayoutUITests: XCTestCase {
         launch()
         assertOneExportControlInTheNavigationBar(context: "in portrait")
 
-        if !app.turn(to: .landscapeLeft) {
-            try XCTSkipUnless(safariTurns(), "This screen stays upright for every app, as the outer screen of the iPhone Duo; portrait passed")
+        guard try app.turnsToLandscape() else {
             XCTFail("The screen should turn to landscape")
             return
         }
@@ -123,14 +122,5 @@ final class EditorLayoutUITests: XCTestCase {
         XCTAssertTrue(form.exists, "The editor should show its form \(context)")
         let window = app.windows.firstMatch
         XCTAssertGreaterThan(form.frame.maxY, window.frame.maxY - 44, "Nothing should sit below the form \(context)")
-    }
-
-    /// Whether Safari's screen turns to landscape with the device already turned, as on every screen that turns: a
-    /// screen where Safari stays upright too has no landscape, and one where only the app stays upright is a defect.
-    private func safariTurns() -> Bool {
-        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
-        safari.launch()
-        defer { safari.terminate() }
-        return safari.turn(to: .landscapeLeft)
     }
 }
