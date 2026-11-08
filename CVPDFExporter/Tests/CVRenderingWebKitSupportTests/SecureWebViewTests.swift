@@ -1,57 +1,9 @@
 #if canImport(WebKit)   // Apple platforms only (R11)
 import Testing
 import Foundation
-import Network
-import Synchronization
 import WebKit
 @testable import CVRenderingWebKitSupport
-
-/// A local TCP port that counts connections, and the requests sent over them. The pages under test point every
-/// resource at it, so anything that escapes the web view shows up. WebKit may open a connection ahead of a navigation
-/// (a preconnect) without sending anything, so a connection alone is not a request.
-final class ConnectionCounter: Sendable {
-    private let listener: NWListener
-    private let connections = Mutex(0), requests = Mutex(0), started = Mutex(false)
-    var count: Int { connections.withLock { $0 } }
-    var requestCount: Int { requests.withLock { $0 } }
-
-    init() throws {
-        let parameters = NWParameters.tcp
-        parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
-        listener = try NWListener(using: parameters)
-    }
-
-    /// Starts listening; returns the base URL the pages use.
-    func start() async throws -> String {
-        let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
-            listener.stateUpdateHandler = { [self] state in
-                let result: Result<UInt16, any Error>?
-                switch state {
-                case .ready: result = listener.port.map { .success($0.rawValue) } ?? .failure(NWError.posix(.EADDRNOTAVAIL))
-                case .failed(let error): result = .failure(error)
-                default: result = nil
-                }
-                guard let result, started.withLock({ was in defer { was = true }; return !was }) else { return }
-                continuation.resume(with: result)
-            }
-            listener.newConnectionHandler = { [self] connection in
-                connections.withLock { $0 += 1 }
-                connection.start(queue: .global())
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [self] data, _, _, _ in
-                    guard let data, !data.isEmpty else { connection.cancel(); return }
-                    requests.withLock { $0 += 1 }
-                    // A prompt answer, so a web view does not retry or wait on a resource that blocks rendering.
-                    let notFound = Data("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
-                    connection.send(content: notFound, completion: .contentProcessed { _ in connection.cancel() })
-                }
-            }
-            listener.start(queue: .global())
-        }
-        return "http://127.0.0.1:\(port)"
-    }
-
-    func stop() { listener.cancel() }
-}
+import CVRenderingNativeTestSupport
 
 /// Every kind of load a page can start, pointing at the test listener, and whether a web view without the rules makes
 /// it offscreen. Recorded on iOS 26.5, iOS 27.0, macOS 26 and macOS 27: the table holds on every release the app
@@ -89,25 +41,9 @@ let pageLoads: [(kind: String, html: @Sendable (_ base: String, _ port: String) 
 /// rules-only view does not is one the rules blocked.
 enum Setup { case production, rulesOnly, control }
 
-/// The bound on a wait for something that must happen. It is generous: it costs time only when the code is broken, and the
-/// first page a newly created simulator loads has taken more than a minute.
-let patience: Duration = .seconds(300)
-
 /// A timeout no test reaches: an operation given it that ends early ended for another reason, such as a cancellation.
 let unreachedTimeout: Duration = .seconds(3_600)
 
-/// Waits until `condition` holds or `timeout` passes, and says which. A slow machine then delays a test instead of
-/// failing it.
-@MainActor func eventually(within timeout: Duration = patience, _ condition: () -> Bool) async -> Bool {
-    let deadline = ContinuousClock.now + timeout
-    while !condition() {
-        guard ContinuousClock.now < deadline else { return false }
-        do { try await Task.sleep(for: .milliseconds(50)) } catch { return condition() }
-    }
-    return true
-}
-
-let onePixelPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 /// Allows every navigation, as a web view without a delegate does, and tells when the page's own load has ended.
 @MainActor
@@ -183,7 +119,7 @@ struct SecureWebViewTests {
     /// rules, loaded after the page under test, makes a request, and the wait ends when the listener has it. A request
     /// the page under test was going to make had at least as long to arrive, however slow the machine.
     func waitForALaterPageToMakeARequest() async throws {
-        let counter = try ConnectionCounter()
+        let counter = try LoopbackListener()
         defer { counter.stop() }
         let base = try await counter.start()
         let (view, observer) = try await load("<p>Probe</p><img src=\"\(base)/probe.png\">", as: .control)
@@ -213,10 +149,10 @@ struct SecureWebViewTests {
         let probe = pageLoads[index]
         // The control is loaded last, and every page stays open until the end: the request the control makes closes
         // the window in which the pages with the rules could have made theirs.
-        var pages: [(setup: Setup, counter: ConnectionCounter, view: WKWebView, delegate: NSObject)] = []
+        var pages: [(setup: Setup, counter: LoopbackListener, view: WKWebView, delegate: NSObject)] = []
         defer { pages.forEach { $0.counter.stop() } }
         for setup in [Setup.production, .rulesOnly, .control] {
-            let counter = try ConnectionCounter()
+            let counter = try LoopbackListener()
             let base = try await counter.start()
             let port = String(base.split(separator: ":").last ?? "")
             let (view, delegate) = try await load("<p>Loaded</p>" + probe.html(base, port), as: setup)
@@ -289,7 +225,7 @@ struct SecureWebViewTests {
 
     @Test("only the initial load happens: a meta refresh and a link are cancelled, and nothing is requested")
     func singleLoad() async throws {
-        let counter = try ConnectionCounter()
+        let counter = try LoopbackListener()
         defer { counter.stop() }
         let base = try await counter.start()
         let view = try await webView(secure: false), delegate = SingleLoadNavigationDelegate()   // no rules: the delegate alone
@@ -310,7 +246,7 @@ struct SecureWebViewTests {
     /// before the navigation is cancelled (a preconnect), but sends nothing over it.
     @Test("in production, links and a refresh do not connect; a clicked link connects at most, and sends nothing")
     func productionNavigation() async throws {
-        let counter = try ConnectionCounter()
+        let counter = try LoopbackListener()
         defer { counter.stop() }
         let base = try await counter.start()
         let view = try await webView(secure: true), delegate = SingleLoadNavigationDelegate()

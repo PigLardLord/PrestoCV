@@ -25,15 +25,37 @@ enum DraftStep: CaseIterable, Sendable {
     }
 }
 
-/// How long each request of a draft may take on the device (ADR 0031). A call of the on-device model that runs past its time is
-/// stopped: a model caught repeating itself would otherwise run until its window fills, minutes later (#354).
-struct DraftingLimits: Equatable, Sendable {
-    /// How long the request that extracts the facts may take. The longest description takes about a quarter of it on a Mac.
-    let extraction: Duration
-    /// How long each request that writes a section, or repairs one, may take.
-    let section: Duration
+/// How long one call of a pass may take, and the clock its time runs on (#400): the app's is the continuous clock, a test's
+/// ends the time when the test says so.
+struct TimeLimit: Sendable {
+    let duration: Duration
+    let clock: any Clock<Duration>
+}
 
-    static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30))
+/// How long each request of a draft and its claim check may take on the device (ADR 0031, ADR 0028). A call of the on-device model
+/// that runs past its time is stopped: a model caught repeating itself would otherwise run until its window fills, minutes later
+/// (#354). The use case is given them as one value, so that a test puts every one of them on a clock of its own (#413).
+struct DraftingLimits: Sendable {
+    /// How long the request that extracts the facts may take. The longest description takes about a quarter of it on a Mac.
+    let extraction: TimeLimit
+    /// How long each request that writes a section, or repairs one, may take.
+    let section: TimeLimit
+    /// The batches and the time of the claim check that judges the personal items the draft keeps.
+    let claimCheck: ClaimCheckLimits
+
+    /// - Parameter clock: The clock both times run on.
+    init(extraction: Duration, section: Duration, claimCheck: ClaimCheckLimits, on clock: any Clock<Duration>) {
+        self.extraction = TimeLimit(duration: extraction, clock: clock)
+        self.section = TimeLimit(duration: section, clock: clock)
+        self.claimCheck = claimCheck
+    }
+
+    static let standard = DraftingLimits(extraction: .seconds(90), section: .seconds(30), claimCheck: .standard, on: ContinuousClock())
+
+    /// The same times on `clock`, the claim check's too: a test keeps the app's limits and ends them when it says so (#413).
+    func on(_ clock: any Clock<Duration>) -> DraftingLimits {
+        DraftingLimits(extraction: extraction.duration, section: section.duration, claimCheck: claimCheck.on(clock), on: clock)
+    }
 }
 
 /// One call of a pass of the model, within its time, tried once more when it fails below the model.
@@ -48,7 +70,7 @@ enum DraftAttempt {
     /// - Throws: `CVGenerationError.generationFailed` when the time runs out, whatever `work` throws otherwise, and CancellationError
     ///   when the task is cancelled.
     static func run<Value: Sendable>(
-        within limit: Duration, retried: (any Error) -> Void = { _ in },
+        within limit: TimeLimit, retried: (any Error) -> Void = { _ in },
         _ work: @escaping @Sendable @MainActor () async throws -> Value
     ) async throws -> Value {
         do {
@@ -60,30 +82,33 @@ enum DraftAttempt {
         }
     }
 
-    private static func once<Value: Sendable>(
-        within limit: Duration, _ work: @escaping @Sendable @MainActor () async throws -> Value
+    /// One call of `work`, raced against `limit` on its clock, off the main actor (#400): the time runs in a child task of its own,
+    /// so a busy main actor delays neither the end of the time nor the decision of which came first. The first to finish decides:
+    /// the call's answer, its error, or the end of its time, which cancels the call. A call that answers after its time has run out
+    /// is not taken.
+    nonisolated private static func once<Value: Sendable>(
+        within limit: TimeLimit, _ work: @escaping @Sendable @MainActor () async throws -> Value
     ) async throws -> Value {
-        let call = Task { @MainActor in try await work() }
-        let deadline = Deadline()
-        let timer = Task { @MainActor in
-            try await Task.sleep(for: limit)
-            deadline.passed = true
-            call.cancel()
-        }
-        defer { timer.cancel() }
         do {
-            return try await withTaskCancellationHandler { try await call.value } onCancel: { call.cancel() }
+            return try await withThrowingTaskGroup(of: CallEnd<Value>.self) { group in
+                group.addTask { .answered(try await work()) }
+                group.addTask {
+                    try await limit.clock.sleep(for: limit.duration)
+                    return .timedOut
+                }
+                defer { group.cancelAll() }
+                guard case .answered(let value)? = try await group.next() else { throw CVGenerationError.generationFailed }
+                return value
+            }
         } catch {
             try Task.checkCancellation()
-            // A call stopped by its deadline reports the cancellation, or an error of its own.
-            if deadline.passed { throw CVGenerationError.generationFailed }
             throw error
         }
     }
+}
 
-    /// Whether the time of a call ran out.
-    @MainActor
-    private final class Deadline {
-        var passed = false
-    }
+/// How one call of a pass ended: with the call's answer, or with the end of its time.
+private enum CallEnd<Value: Sendable>: Sendable {
+    case answered(Value)
+    case timedOut
 }

@@ -28,7 +28,7 @@ var targets: [Target] = [
     .testTarget(
         name: "CVRenderingTests",
         dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVBundledHeadings", "CVDesignCatalog"],
-        resources: [.copy("Golden")]
+        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json")]
     ),
 ]
 
@@ -45,10 +45,23 @@ targets += [
     .target(name: "CVRenderingIOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingMacOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingPDFKitInspector", dependencies: ["CVRendering"]),
-    .testTarget(name: "CVRenderingWebKitSupportTests", dependencies: ["CVRenderingWebKitSupport"]),
+    // The native renderer checks both platforms run (#78, #80): a library, since Swift Testing runs no tests from one,
+    // and each platform's test target wraps every check in a one-line test.
+    .target(name: "CVRenderingNativeTestSupport", dependencies: [
+        "CVRendering", "CVRenderingTestSupport", "CVRenderingPDFKitInspector", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings",
+    ]),
+    .testTarget(name: "CVRenderingPDFKitInspectorTests", dependencies: [
+        "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingNativeTestSupport",
+    ]),
+    .testTarget(name: "CVRenderingWebKitSupportTests", dependencies: ["CVRenderingWebKitSupport", "CVRenderingNativeTestSupport"]),
+    .testTarget(name: "CVRenderingIOSTests", dependencies: [
+        "CVRenderingIOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
+        "CVRenderingNativeTestSupport",
+    ]),
     .testTarget(name: "CVRenderingMacOSTests", dependencies: [
         "CVRenderingMacOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
         "CVDocumentModel", "CVDesignCatalog", "CVBundledDesigns", "CVBundledHeadings",
+        "CVRenderingNativeTestSupport",
     ]),
 ]
 #endif

@@ -11,19 +11,20 @@ struct LoggingGuideTests {
     private static let root = Repository.root
     private static let guide = "docs/logging.md"
 
-    /// The sources that may log through the interface: the packages and the app.
+    /// The sources that may log through the interface: the packages, the app and the app's own targets.
     static let sourceFolders = [
         "DiagnosticLogging/Sources", "DiagnosticTrace/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCV",
+        "PrestoCVApp/Sources",
     ]
 
     /// An event as the code names it, in a shorthand (`logger.info(.draft, "draft.started", …)`) or in an entry
-    /// (`event: "import.finished"`).
+    /// (`event: "import.finished"`). A name has two parts or more (`import.file.notRead`).
     private static var eventInCode: Regex<(Substring, Substring)> {
-        /(?:\.(?:debug|info|notice|error|fault)\(\s*\.[A-Za-z]+\s*,\s*|event:\s*)"([a-z]+\.[A-Za-z]+)"/
+        /(?:\.(?:debug|info|notice|error|fault)\(\s*\.[A-Za-z]+\s*,\s*|event:\s*)"([a-z]+(?:\.[A-Za-z]+)+)"/
     }
 
     /// An event as the guide lists it: the first cell of a row of its tables.
-    private static var eventInGuide: Regex<(Substring, Substring)> { /^\|\s*`([a-z]+\.[A-Za-z]+)`\s*\|/ }
+    private static var eventInGuide: Regex<(Substring, Substring)> { /^\|\s*`([a-z]+(?:\.[A-Za-z]+)+)`\s*\|/ }
 
     private static func text(_ path: String) throws -> String {
         try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)

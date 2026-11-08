@@ -110,8 +110,9 @@ final class UncheckedAIDraftUITests: XCTestCase {
         draftTheNursesCV()
         XCTAssertTrue(notice.waitForExistence(timeout: 30), "The editor should say what could not be checked, in one element")
 
-        guard app.turn(to: .landscapeLeft) else {
-            throw XCTSkip("This screen does not turn to landscape, as the outer screen of the iPhone Duo")
+        guard try app.turnsToLandscape() else {
+            XCTFail("The editor should turn to landscape")
+            return
         }
         XCTAssertTrue(notice.waitForExistence(timeout: 10), "The notice should stay, in one element, in landscape")
         add(app.keptScreenshot(named: shot))

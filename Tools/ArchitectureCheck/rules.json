@@ -112,17 +112,15 @@
   }
  ],
  "notYetImplemented": [
-  "App/",
-  "Features/",
-  "DesignSystem/",
-  "Platform/",
-  "Resources/"
+  "Features/"
  ],
  "compositionOnly": {
   "adr": "0032",
   "files": [
    "PrestoCV/PrestoCVApp.swift",
-   "PrestoCV/App/AppEnvironment.swift"
+   "PrestoCV/App/AppEnvironment.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/Composition.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/TraceChain.swift"
   ],
   "modules": [
    "DiagnosticTraceFiles",
@@ -274,6 +272,17 @@
     "DiagnosticLoggingTestSupport",
     "DiagnosticTrace",
     "DiagnosticTraceTestSupport"
+   ],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVImportingTestSupport",
+   "path": "PrestoCVCore/Sources/PrestoCVImportingTestSupport",
+   "kind": "test",
+   "allowedImports": [
+    "PrestoCVImporting",
+    "PrestoCVDomain",
+    "Foundation"
    ],
    "rules": []
   },
@@ -489,6 +498,8 @@
    "allowedImports": [
     "CVRendering",
     "PDFKit",
+    "AppKit",
+    "UIKit",
     "Foundation"
    ],
    "rules": [
@@ -516,6 +527,29 @@
    "kind": "test"
   },
   {
+   "name": "CVRenderingNativeTestSupport",
+   "path": "CVPDFExporter/Sources/CVRenderingNativeTestSupport",
+   "allowedImports": [
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVRenderingPDFKitInspector",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVBundledHeadings",
+    "CoreGraphics",
+    "CoreText",
+    "Foundation",
+    "Network",
+    "PDFKit",
+    "Synchronization",
+    "WebKit"
+   ],
+   "rules": [
+    "R16"
+   ],
+   "kind": "test"
+  },
+  {
    "name": "CVRenderingTests",
    "path": "CVPDFExporter/Tests/CVRenderingTests",
    "allowedImports": [
@@ -531,6 +565,25 @@
    "rules": [
     "R16"
    ],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingIOSTests",
+   "path": "CVPDFExporter/Tests/CVRenderingIOSTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "UIKit",
+    "PDFKit",
+    "WebKit",
+    "CVRendering",
+    "CVRenderingIOS",
+    "CVRenderingWebKitSupport",
+    "CVRenderingPDFKitInspector",
+    "CVRenderingTestSupport",
+    "CVRenderingNativeTestSupport"
+   ],
+   "rules": ["R16"],
    "kind": "test"
   },
   {
@@ -550,7 +603,8 @@
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVBundledDesigns",
-    "CVBundledHeadings"
+    "CVBundledHeadings",
+    "CVRenderingNativeTestSupport"
    ],
    "rules": [],
    "kind": "test"
@@ -561,10 +615,26 @@
    "allowedImports": [
     "Testing",
     "Foundation",
-    "Network",
-    "Synchronization",
     "WebKit",
-    "CVRenderingWebKitSupport"
+    "CVRenderingWebKitSupport",
+    "CVRenderingNativeTestSupport"
+   ],
+   "rules": [
+    "R16"
+   ],
+   "kind": "test"
+  },
+  {
+   "name": "CVRenderingPDFKitInspectorTests",
+   "path": "CVPDFExporter/Tests/CVRenderingPDFKitInspectorTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "AppKit",
+    "UIKit",
+    "CVRendering",
+    "CVRenderingPDFKitInspector",
+    "CVRenderingNativeTestSupport"
    ],
    "rules": [
     "R16"
@@ -667,6 +737,7 @@
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVRendering",
@@ -685,6 +756,44 @@
     "R17",
     "R18"
    ]
+  },
+  {
+   "name": "PrestoCVIntegrationTests",
+   "path": "PrestoCVApp/Tests/PrestoCVIntegrationTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "PrestoCVIntegration",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "PrestoCVDomain",
+    "PrestoCVImporting",
+    "PrestoCVImportingTestSupport",
+    "CVDocumentModel",
+    "CVDesignCatalog",
+    "CVRendering",
+    "CVRenderingTestSupport",
+    "CVBundledHeadings"
+   ],
+   "rules": [],
+   "kind": "test"
+  },
+  {
+   "name": "PrestoCVPresentationTests",
+   "path": "PrestoCVApp/Tests/PrestoCVPresentationTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "PrestoCVPresentation",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
+    "PrestoCVDomain"
+   ],
+   "rules": [],
+   "kind": "test"
   },
   {
    "name": "PrestoCVPresentation",
@@ -715,14 +824,58 @@
    }
   },
   {
+   "name": "PrestoCVImportFiles",
+   "path": "PrestoCVApp/Sources/PrestoCVImportFiles",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "PrestoCVImporting",
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization",
+    "Glibc",
+    "Darwin",
+    "Android"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVImportFilesTests",
+   "path": "PrestoCVApp/Tests/PrestoCVImportFilesTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "Glibc",
+    "Darwin",
+    "Android",
+    "PrestoCVImportFiles",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVImporting",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVComposition",
    "path": "PrestoCVApp/Sources/PrestoCVComposition",
    "allowedImports": [
+    "PrestoCVImportFiles",
     "PrestoCVIntegration",
     "PrestoCVPresentation",
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
+    "PrestoCVImportingPDFKit",
     "PrestoCVPersistence",
     "CVDocumentModel",
     "CVDesignCatalog",
@@ -736,6 +889,14 @@
     "CVRenderingPDFKitInspector",
     "CVDrafting",
     "CVDraftingFoundationModels",
+    "DiagnosticLogging",
+    "DiagnosticLoggingOSLog",
+    "DiagnosticTrace",
+    "DiagnosticTraceFiles",
+    "DiagnosticTraceDistribution",
+    "WebKit",
+    "Synchronization",
+    "Observation",
     "Foundation"
    ],
    "rules": [
@@ -746,6 +907,32 @@
     "R14",
     "R17"
    ]
+  },
+  {
+   "name": "PrestoCVCompositionTests",
+   "path": "PrestoCVApp/Tests/PrestoCVCompositionTests",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Observation",
+    "WebKit",
+    "PrestoCVComposition",
+    "PrestoCVIntegration",
+    "PrestoCVPresentation",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "PrestoCVImporting",
+    "PrestoCVPersistence",
+    "PrestoCVCoreTestSupport",
+    "CVRenderingWebKitSupport",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "DiagnosticTrace",
+    "DiagnosticTraceTestSupport"
+   ],
+   "rules": [],
+   "kind": "test"
   },
   {
    "name": "DiagnosticLogging",
@@ -1001,6 +1188,97 @@
     "DiagnosticTraceTestSupport"
    ],
    "rules": []
+  },
+  {
+   "name": "PrestoCVNextApp",
+   "path": "PrestoCVNext/App",
+   "docName": "App/",
+   "allowedImports": [
+    "SwiftUI",
+    "PrestoCVComposition",
+    "PrestoCVPresentation"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R5",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextDesignSystem",
+   "path": "PrestoCVNext/DesignSystem",
+   "docName": "DesignSystem/",
+   "allowedImports": [
+    "SwiftUI"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R5",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextPlatform",
+   "path": "PrestoCVNext/Platform",
+   "docName": "Platform/",
+   "allowedImports": [
+    "SwiftUI",
+    "UIKit",
+    "AppKit",
+    "WebKit",
+    "PDFKit",
+    "QuickLook",
+    "UniformTypeIdentifiers",
+    "CVRenderingWebKitSupport",
+    "PrestoCVPresentation"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextResources",
+   "path": "PrestoCVNext/Resources",
+   "docName": "Resources/",
+   "allowedImports": [],
+   "rules": []
+  },
+  {
+   "name": "PrestoCVNextUITests",
+   "path": "PrestoCVNextUITests",
+   "kind": "test",
+   "allowedImports": [
+    "XCTest"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
+   "name": "PrestoCVNextTests",
+   "path": "PrestoCVNextTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "SwiftUI",
+    "PrestoCVNext"
+   ],
+   "rules": [
+    "R16"
+   ]
   },
   {
    "name": "PrestoCV",

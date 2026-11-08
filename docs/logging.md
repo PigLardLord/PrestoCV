@@ -77,6 +77,9 @@ The tables list every event the code writes; the source checks fail when the cod
 
 | Event | Level | Fields | When |
 |---|---|---|---|
+| `import.file.notRead` | error | `reason` (`notReceived`, `noIdentity` or `releasedDuringRead`), or `error` (`notTheFile`, or a system error by name, such as `ENOENT`) | The file the person chose could not be read: the screen never received it, its identity could not be taken when it came, the path no longer names that regular file, or it was let go while it was read. The import then fails with `fileNotRead`. |
+| `import.file.releasedAgain` | notice | none | A file was let go twice, or one never received was let go; nothing else happens. |
+| `import.file.copyNotDeleted` | error | `error` (`notTheFile`, `leftAside`, or a system error by name) | A copy the system made of the chosen file, in one of the app's copy folders, could not be deleted when the last import of that file ended. One line per copy. |
 | `pdf.read` | info | `pages`, `words` | PDFKit read the words of a PDF's pages. |
 | `pdf.limit` | notice | `limit` | The PDF reader stopped at a bound of the reading: `bytes`, `pages`, `characters` or `words`. It throws that bound as a `LimitReached`, so `import.failed` names it too. |
 | `import.sections` | info | one count per kind of section recognised, such as `experience=2` | The text was read into sections. |
@@ -84,6 +87,8 @@ The tables list every event the code writes; the source checks fail when the cod
 | `import.finished` | info | `kind` (`pdf` or `text`), `pages` (a PDF only), `characters`, `sections`, `elapsed` | The draft is ready for the review. |
 | `import.failed` | error | `kind`, `error`, `limit` (when a bound was reached, whether the core or the PDF reader found it: `bytes`, `pages`, `characters`, `words`, `lines`, `cells` or `steps`), `elapsed` | The import failed, and the person is told why. |
 | `import.cancelled` | info | `kind`, `elapsed` | The screen went away while the import ran. |
+
+The `import.file.*` events name no path and no file name: a file is only ever described by what happened to it.
 
 The AI screen reads every text with the import before it asks for a draft ([ADR 0034](architecture/adr/0034-read-a-text-that-is-already-a-cv-with-the-import.md)), so the import's events, with `kind=text`, come before the draft's. When the import fails, or reads a text that is not a CV, the person is not told and the AI draft starts; the diagnostics of a TestFlight install then list a CV import before the AI draft.
 

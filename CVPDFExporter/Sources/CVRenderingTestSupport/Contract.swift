@@ -4,7 +4,7 @@ import CVDesignCatalog
 
 /// Linux inspector for the uncompressed PDFs written by `FakePDFRenderer`, whose text is UTF-8.
 /// Apple platforms use PDFKit.
-public struct MinimalPDFInspector: PDFInspecting {
+public struct MinimalPDFInspector: PDFLayoutInspecting {
     public init() {}
     public func pageCount(of data: Data) -> Int? {
         guard let s = String(data: data, encoding: .utf8), s.hasPrefix("%PDF-"), s.contains("%%EOF") else { return nil }
@@ -12,6 +12,36 @@ public struct MinimalPDFInspector: PDFInspecting {
     }
     public func text(of data: Data) -> String? {
         guard pageCount(of: data) != nil, let s = String(data: data, encoding: .utf8) else { return nil }
+        return Self.shownStrings(in: s[...]).joined(separator: "\n")
+    }
+
+    /// Reads the layout `FakePDFRenderer` wrote: each page's media box, and each line at its text position, one
+    /// leading below the last, as high as its font size. The fake writes no glyph widths, so a box is 0 wide.
+    public func layout(of data: Data) -> PDFLayout? {
+        guard pageCount(of: data) != nil, let s = String(data: data, encoding: .utf8) else { return nil }
+        let pageDictionary = /\/Type \/Page\n\/Parent 2 0 R \/MediaBox \[(\S+) (\S+) (\S+) (\S+)\] \/Contents (\d+) 0 R/
+        let textState = /BT \/F1 (\S+) Tf (\S+) TL (\S+) (\S+) Td\n/
+        var pages: [PDFBox] = [], lines: [PDFTextLine] = []
+        for match in s.matches(of: pageDictionary) {
+            guard let left = Double(match.output.1), let bottom = Double(match.output.2),
+                  let right = Double(match.output.3), let top = Double(match.output.4),
+                  let stream = s.range(of: "\n\(match.output.5) 0 obj\n"),
+                  let end = s.range(of: "\nendstream", range: stream.upperBound..<s.endIndex),
+                  let state = s[stream.upperBound..<end.lowerBound].firstMatch(of: textState),
+                  let size = Double(state.output.1), let leading = Double(state.output.2),
+                  let x = Double(state.output.3), let y = Double(state.output.4) else { return nil }
+            let page = pages.count
+            pages.append(PDFBox(x: left, y: bottom, width: right - left, height: top - bottom))
+            for (row, text) in Self.shownStrings(in: s[state.range.upperBound..<end.lowerBound]).enumerated() {
+                let box = PDFBox(x: x, y: y - leading * Double(row), width: 0, height: size)
+                lines.append(PDFTextLine(pageIndex: page, text: text, box: box, glyphHeight: size))
+            }
+        }
+        return PDFLayout(pages: pages, lines: lines)
+    }
+
+    /// The strings shown with `Tj`, unescaped, in order.
+    static func shownStrings(in s: Substring) -> [String] {
         var out: [String] = []
         var range = s.startIndex..<s.endIndex
         while let r = s.range(of: #"\((?:\\.|[^\\)])*\) Tj"#, options: .regularExpression, range: range) {
@@ -19,13 +49,25 @@ public struct MinimalPDFInspector: PDFInspecting {
             out.append(literal.replacingOccurrences(of: #"\\(.)"#, with: "$1", options: .regularExpression))
             range = r.upperBound..<s.endIndex
         }
-        return out.joined(separator: "\n")
+        return out
     }
 }
 
-/// Fake renderer that writes a real (uncompressed, text-only) PDF: 40 lines per page.
+/// Fake renderer that writes a real (uncompressed, text-only) PDF: 40 lines per page, placed as `placement` says.
 public struct FakePDFRenderer: PDFRendering {
-    public init() {}
+    /// Where the text goes and how big it is, in points: the first line's origin, the font size, and the distance
+    /// from one line to the next. A placement off the page or below the minimum glyph height makes a PDF that the
+    /// geometric check rejects.
+    public struct TextPlacement: Sendable, Equatable {
+        public var fontSize: Double, leading: Double, x: Double, y: Double
+        public static let regular = TextPlacement(fontSize: 10, leading: 12, x: 40, y: 800)
+        public init(fontSize: Double, leading: Double, x: Double, y: Double) {
+            self.fontSize = fontSize; self.leading = leading; self.x = x; self.y = y
+        }
+    }
+    let placement: TextPlacement
+    public init() { placement = .regular }
+    public init(placement: TextPlacement) { self.placement = placement }
     public func render(html: String, page: PageSetup) async throws -> RenderedPDF {
         try Task.checkCancellation()
         let text = html.replacingOccurrences(of: #"<[^>]+>"#, with: "\n", options: .regularExpression)
@@ -36,16 +78,17 @@ public struct FakePDFRenderer: PDFRendering {
         let pages = stride(from: 0, to: max(lines.count, 1), by: 40).map { Array(lines[$0..<min($0 + 40, lines.count)]) }
         let kept = Array(pages.prefix(page.maxPages))
         for _ in kept { await Task.yield(); try Task.checkCancellation() }   // in-flight cancellation point
-        return RenderedPDF(data: Self.pdf(pages: kept), pageCount: kept.count, requiredPages: pages.count)
+        return RenderedPDF(data: Self.pdf(pages: kept, placement: placement), pageCount: kept.count, requiredPages: pages.count)
     }
 
-    static func pdf(pages: [[String]]) -> Data {
+    static func pdf(pages: [[String]], placement: TextPlacement) -> Data {
         var objects: [String] = ["<< /Type /Catalog /Pages 2 0 R >>", ""]
         var kids: [String] = []
         for lines in pages {
             let body = lines.map { "(" + $0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "(", with: "\\(")
                 .replacingOccurrences(of: ")", with: "\\)") + ") Tj T*" }.joined(separator: "\n")
-            let stream = "BT /F1 10 Tf 12 TL 40 800 Td\n\(body)\nET"
+            let p = placement
+            let stream = "BT /F1 \(number(p.fontSize)) Tf \(number(p.leading)) TL \(number(p.x)) \(number(p.y)) Td\n\(body)\nET"
             objects.append("<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream")
             let contentRef = objects.count
             objects.append("<< /Type /Page\n/Parent 2 0 R /MediaBox [0 0 595 842] /Contents \(contentRef) 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>")
@@ -58,6 +101,11 @@ public struct FakePDFRenderer: PDFRendering {
         out += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n" + offsets.map { String(format: "%010d 00000 n \n", $0) }.joined()
         out += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
         return Data(out.utf8)
+    }
+
+    /// A PDF number: whole values without a decimal point, others as Swift prints them.
+    static func number(_ value: Double) -> String {
+        value.rounded() == value && abs(value) < 1e15 ? String(Int(value)) : String(value)
     }
 }
 

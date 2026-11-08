@@ -18,6 +18,10 @@ struct TwoPassDraftTests {
     private let plainSummary = "A caring teacher who plans lessons and works closely with families."
     private let plainDuties = "Plans lessons, teaches reading and writing, and keeps in touch with families."
 
+    /// The clock of the times of the passes under test: a time runs out only when a test says so (`runOut()`).
+    private let clock = TestCallClock()
+    private var limit: TimeLimit { TimeLimit(duration: .seconds(30), clock: clock) }
+
     /// What a pass under test counts, from the main actor that runs it.
     @MainActor
     private final class Calls {
@@ -31,7 +35,7 @@ struct TwoPassDraftTests {
         DraftWriting(summary: summary, roleDescriptions: duties, technologies: technologies, softSkills: softSkills)
     }
 
-    private func generator(_ service: FakeCVGenerationService, limits: DraftingLimits = .standard,
+    private func generator(_ service: FakeCVGenerationService, limits: DraftingLimits = .onTestClock(),
                            logger: any DiagnosticLogger = SilentLogger()) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: logger, clock: ContinuousClock(),
@@ -369,11 +373,32 @@ struct TwoPassDraftTests {
     @Test("A pass that runs past its time fails with generationFailed, and is not tried again")
     func timeout() async {
         let calls = Calls()
+        let clock = clock
 
         await #expect(throws: CVGenerationError.generationFailed) {
-            try await DraftAttempt.run(within: .milliseconds(20)) {
+            try await DraftAttempt.run(within: limit) {
                 calls.count += 1
+                clock.runOut()
                 try await Task.sleep(for: .seconds(30))
+                return 1
+            }
+        }
+        #expect(calls.count == 1)
+    }
+
+    @Test("A pass times out even while its call holds the main actor past its time (#400)", .timeLimit(.minutes(1)))
+    func timeoutWhileTheMainActorIsBusy() async {
+        let calls = Calls()
+        let clock = clock
+
+        await #expect(throws: CVGenerationError.generationFailed) {
+            try await DraftAttempt.run(within: limit) {
+                calls.count += 1
+                clock.runOut()
+                // Holds the main actor until the call is cancelled, as a model that answers on it would: a timer that needs the
+                // main actor cannot end the call while it does. The bound only keeps a broken pass from hanging the suite.
+                let start = ContinuousClock.now
+                while !Task.isCancelled && ContinuousClock.now - start < .seconds(30) { usleep(1_000) }
                 return 1
             }
         }
@@ -384,7 +409,7 @@ struct TwoPassDraftTests {
     func retryOnServiceFailure() async throws {
         let calls = Calls()
 
-        let value = try await DraftAttempt.run(within: .seconds(30), retried: { calls.retries.append(String(describing: $0)) }) {
+        let value = try await DraftAttempt.run(within: limit, retried: { calls.retries.append(String(describing: $0)) }) {
             calls.count += 1
             if calls.count == 1 { throw CVGenerationError.serviceFailed }
             return 7
@@ -400,7 +425,7 @@ struct TwoPassDraftTests {
         let calls = Calls()
 
         await #expect(throws: CVGenerationError.serviceFailed) {
-            try await DraftAttempt.run(within: .seconds(30)) { () async throws -> Int in
+            try await DraftAttempt.run(within: limit) { () async throws -> Int in
                 calls.count += 1
                 throw CVGenerationError.serviceFailed
             }
@@ -415,7 +440,7 @@ struct TwoPassDraftTests {
         let calls = Calls()
 
         await #expect(throws: error) {
-            try await DraftAttempt.run(within: .seconds(30)) { () async throws -> Int in
+            try await DraftAttempt.run(within: limit) { () async throws -> Int in
                 calls.count += 1
                 throw error
             }
@@ -425,8 +450,9 @@ struct TwoPassDraftTests {
 
     @Test("A cancelled pass throws the cancellation, not a timeout")
     func cancellation() async {
+        let limit = limit
         let task = Task { @MainActor in
-            try await DraftAttempt.run(within: .seconds(30)) {
+            try await DraftAttempt.run(within: limit) {
                 try await Task.sleep(for: .seconds(30))
                 return 1
             }
@@ -442,10 +468,11 @@ struct TwoPassDraftTests {
     func firstPassTimeout() async {
         let service = drafting(english)
         service.generateDelay = .seconds(30)
-        let limits = DraftingLimits(extraction: .milliseconds(20), section: .seconds(30))
+        // The first time to start is the first pass's.
+        clock.runOut()
 
         await #expect(throws: CVGenerationError.generationFailed) {
-            try await generator(service, limits: limits).generateCV(from: CVGenerationRequest(userPrompt: english.description))
+            try await generator(service, limits: .onTestClock(clock)).generateCV(from: CVGenerationRequest(userPrompt: english.description))
         }
         #expect(service.generateRequests.count == 1)
         #expect(service.sectionCalls.isEmpty)

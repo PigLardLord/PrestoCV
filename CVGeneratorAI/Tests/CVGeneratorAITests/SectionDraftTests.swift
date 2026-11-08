@@ -67,7 +67,7 @@ struct SectionDraftTests {
     }
 
     private func generator(
-        _ service: FakeCVGenerationService, limits: DraftingLimits = .standard, logger: any DiagnosticLogger = SilentLogger()
+        _ service: FakeCVGenerationService, limits: DraftingLimits = .onTestClock(), logger: any DiagnosticLogger = SilentLogger()
     ) -> CVGeneratorUseCase {
         CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: logger, clock: ContinuousClock(),
@@ -76,7 +76,7 @@ struct SectionDraftTests {
     }
 
     private func draft(
-        _ service: FakeCVGenerationService, limits: DraftingLimits = .standard, logger: any DiagnosticLogger = SilentLogger(),
+        _ service: FakeCVGenerationService, limits: DraftingLimits = .onTestClock(), logger: any DiagnosticLogger = SilentLogger(),
         of text: String? = nil
     ) async throws -> CVData {
         let request = CVGenerationRequest(userPrompt: text ?? description)
@@ -662,12 +662,14 @@ struct SectionDraftTests {
     func timeoutAndRetries(how: String) async throws {
         let logger = RecordingLogger()
         let service = service()
+        let clock = TestCallClock()
         if how == "timedOut" {
             service.sectionDelays["job 0"] = .seconds(30)
+            service.onSection = { if $0 == "job 0" { clock.runOut() } }
         } else {
             service.sectionFailures["job 0"] = [CVGenerationError.serviceFailed, CVGenerationError.serviceFailed]
         }
-        let limits = DraftingLimits(extraction: .seconds(30), section: .milliseconds(200))
+        let limits = DraftingLimits.onTestClock(clock)
 
         let draft = try await draft(service, limits: limits, logger: logger)
 
@@ -688,14 +690,16 @@ struct SectionDraftTests {
     func secondFailure(how: String) async throws {
         let logger = RecordingLogger()
         let service = service()
+        let clock = TestCallClock()
         if how == "timedOut" {
             service.sectionDelays["job 1"] = .seconds(30)
             service.sectionDelays["tools"] = .seconds(30)
+            service.onSection = { if $0 == "job 1" || $0 == "tools" { clock.runOut() } }
         } else {
             service.sectionFailures["job 1"] = [CVGenerationError.generationFailed]
             service.sectionFailures["tools"] = [CVGenerationError.generationFailed]
         }
-        let limits = DraftingLimits(extraction: .seconds(30), section: .milliseconds(200))
+        let limits = DraftingLimits.onTestClock(clock)
 
         let draft = try await draft(service, limits: limits, logger: logger)
 
@@ -815,7 +819,7 @@ struct SectionDraftTests {
         let spanish = CVDataSanitizer(languageOfText: { _ in "es" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let generator = CVGeneratorUseCase(
             service: service, claimChecker: FakeClaimChecker(), logger: SilentLogger(), clock: ContinuousClock(),
-            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: spanish, limits: .standard
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: spanish, limits: .onTestClock()
         )
 
         let draft = try await generator.generateCV(from: CVGenerationRequest(userPrompt: Self.spanish)).cvData

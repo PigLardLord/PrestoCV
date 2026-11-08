@@ -22,7 +22,7 @@ public struct CV: Hashable, Sendable {
     package init(id: CVID, revision: Int, createdAt: Date?, updatedAt: Date?, title: String, personal: PersonalDetails,
                  sections: CVSections, design: DesignChoice?, language: DocumentLanguage?) {
         self.id = id; self.revision = revision; self.createdAt = createdAt; self.updatedAt = updatedAt
-        self.title = title; self.personal = personal; self.sections = sections; self.design = design; self.language = language
+        self.title = TextRules.singleLine(title); self.personal = personal; self.sections = sections; self.design = design; self.language = language
     }
 
     /// The same content as stored by a repository at `revision`, at time `now`.
@@ -31,8 +31,8 @@ public struct CV: Hashable, Sendable {
            sections: sections, design: design, language: language)
     }
 
-    /// "Has enough content to be saved", as `SaveRule` defines it.
-    public var canBeSaved: Bool {
+    /// "Has enough content to be saved", as `SaveRule` defines it. The size limits are not part of it: `saveCheck()` has both.
+    var hasEnoughContent: Bool {
         let p = personal, s = sections
         return SaveRule.allowsSaving(
             personalDetails: [p.fullName, p.professionalTitle, p.email?.value ?? "", p.phone?.value ?? "", p.location,
@@ -42,12 +42,26 @@ public struct CV: Hashable, Sendable {
         )
     }
 
-    public mutating func rename(_ newTitle: String) { title = newTitle }
+    /// Whether the CV can be saved: enough content, and within `CVLimits`. `saveCheck()` says why not.
+    public var canBeSaved: Bool { saveCheck() == .ok }
+
+    public mutating func rename(_ newTitle: String) { title = TextRules.singleLine(newTitle) }
     public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
     /// Every edit of the entries goes through here; the order is the one the user chose.
     public mutating func setSections(_ newSections: CVSections) { sections = newSections }
     public mutating func choose(design: DesignChoice?) { self.design = design }
     public mutating func setLanguage(_ language: DocumentLanguage?) { self.language = language }
+
+    /// This CV with the text of `other`: its title, details and sections. The identity, the revision, the times, the design
+    /// and the language stay this CV's own, so that an editor's text can be written over the stored CV it started from
+    /// without undoing a look or a language chosen since.
+    public func holding(contentOf other: CV) -> CV {
+        var result = self
+        result.rename(other.title)
+        result.setPersonalDetails(other.personal)
+        result.setSections(other.sections)
+        return result
+    }
 
     /// Duplication rule: the copy keeps the content and the design, not the identity or the history.
     /// The new title is composed by presentation, which knows the language (R13).

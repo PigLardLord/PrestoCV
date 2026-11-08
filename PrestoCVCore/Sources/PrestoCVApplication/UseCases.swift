@@ -4,6 +4,9 @@ import PrestoCVDomain
 /// What presentation needs to know, without the port's error shape (R7).
 public enum AuthoringError: Error, Equatable, Sendable {
     case notEnoughContent, conflict(storedRevision: Int), deletedElsewhere, tooLarge, unavailable
+    /// A size limit of the domain (`CVLimits`): which text, which section, or the CV as a whole. The file's own size
+    /// cap, found when the written file is read back, stays `tooLarge`.
+    case textTooLong(CVTextField), tooManyEntries(CVSection), cvTooLarge
 }
 
 /// A new, unsaved CV with a fresh identity.
@@ -18,7 +21,13 @@ public struct SaveCV: Sendable {
     let repository: any CVRepository
     public init(repository: any CVRepository) { self.repository = repository }
     public func callAsFunction(_ cv: CV) async throws(AuthoringError) -> CV {
-        guard cv.canBeSaved else { throw .notEnoughContent }
+        switch cv.saveCheck() {
+        case .ok: break
+        case .notEnoughContent: throw .notEnoughContent
+        case .textTooLong(let field): throw .textTooLong(field)
+        case .tooManyEntries(let section): throw .tooManyEntries(section)
+        case .cvTooLarge: throw .cvTooLarge
+        }
         do { return cv.revision == 0 ? try await repository.create(cv) : try await repository.update(cv) }
         catch .conflict(_, let stored) { throw .conflict(storedRevision: stored) }
         catch .notFound { throw .deletedElsewhere }
@@ -44,13 +53,13 @@ public struct ListCVs: Sendable {
     }
 }
 
-/// Renames a stored CV: a conditional update, so a rename never overwrites another window's changes.
+/// Renames a stored CV: a conditional update, so a rename never overwrites another window's changes. The title is trimmed, and it is one line.
 public struct RenameCV: Sendable {
     let save: SaveCV
     public init(repository: any CVRepository) { save = SaveCV(repository: repository) }
     public func callAsFunction(_ cv: CV, to title: String) async throws(AuthoringError) -> CV {
         var renamed = cv
-        renamed.rename(title)
+        renamed.rename(title.trimmingCharacters(in: .whitespacesAndNewlines))
         return try await save(renamed)
     }
 }

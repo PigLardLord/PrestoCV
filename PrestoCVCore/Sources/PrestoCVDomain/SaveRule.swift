@@ -14,3 +14,49 @@ public enum SaveRule {
         personalDetails.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } || sectionSizes.contains { $0 > 0 }
     }
 }
+
+/// Whether a CV can be saved, and if not, why (R6, R7).
+public enum SaveVerdict: Hashable, Sendable {
+    case ok
+    /// Nothing is written yet, by `SaveRule`.
+    case notEnoughContent
+    /// A text is above `CVLimits.maxTextBytes` or `CVLimits.maxTextCharacters`.
+    case textTooLong(CVTextField)
+    /// A section has more than `CVLimits.maxEntriesPerSection` entries.
+    case tooManyEntries(CVSection)
+    /// All the texts together are above `CVLimits.maxTotalTextBytes`.
+    case cvTooLarge
+}
+
+extension CV {
+    /// The save rule and the size limits, in this order: enough content, each text, each section, the whole CV. The first
+    /// that fails is the reason. Text is never cut to fit.
+    public func saveCheck() -> SaveVerdict {
+        guard hasEnoughContent else { return .notEnoughContent }
+        let p = personal, s = sections
+        var texts: [(field: CVTextField, text: String)] = [
+            (.title, title), (.fullName, p.fullName), (.professionalTitle, p.professionalTitle), (.location, p.location), (.summary, p.summary),
+        ]
+        texts += s.experiences.flatMap { [(CVTextField.experienceRole, $0.role), (.experienceCompany, $0.company),
+                                          (.experienceLocation, $0.location), (.experienceDescription, $0.description)] }
+        texts += s.education.flatMap { [(CVTextField.educationDegree, $0.degree), (.educationSchool, $0.school), (.educationDescription, $0.description)] }
+        texts += s.skills.map { (CVTextField.skillName, $0.name) }
+        texts += s.languages.map { (CVTextField.language, $0.language) }
+        texts += s.certifications.flatMap { [(CVTextField.certificationName, $0.name), (.certificationIssuer, $0.issuer),
+                                             (.certificationDescription, $0.description)] }
+        texts += s.profiles.map { (CVTextField.profilePlatform, $0.platform) }
+        texts += s.interests.map { (CVTextField.interest, $0) }
+        for (field, text) in texts where text.utf8.count > CVLimits.maxTextBytes || text.count > CVLimits.maxTextCharacters {
+            return .textTooLong(field)
+        }
+        let sizes: [(CVSection, Int)] = [(.experiences, s.experiences.count), (.education, s.education.count), (.skills, s.skills.count),
+                                         (.languages, s.languages.count), (.certifications, s.certifications.count),
+                                         (.profiles, s.profiles.count), (.interests, s.interests.count)]
+        if let (section, _) = sizes.first(where: { $0.1 > CVLimits.maxEntriesPerSection }) { return .tooManyEntries(section) }
+        // The addresses and the language tag count too: they are printed. Each has its own bound, so no field is named for them.
+        let others = [p.email?.value, p.phone?.value, p.website?.value, language?.tag].compactMap { $0 }
+            + s.certifications.compactMap { $0.link?.value } + s.profiles.map { $0.link.value }
+        let total = texts.reduce(0) { $0 + $1.text.utf8.count } + others.reduce(0) { $0 + $1.utf8.count }
+        return total > CVLimits.maxTotalTextBytes ? .cvTooLarge : .ok
+    }
+}
