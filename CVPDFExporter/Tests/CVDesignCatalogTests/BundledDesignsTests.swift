@@ -51,11 +51,21 @@ struct BundledDesignsTests {
         }
     }
 
-    /// The declarations of the canonical rule whose selector list contains `selector` (`.cv` or `main.cv`).
+    @Test("each bundled design carries its preview, a PNG the validator has checked")
+    func carriesAPreview() async throws {
+        for (name, design) in try await Self.designs() {
+            #expect(design.previewPNG?.isEmpty == false, "\(name) has no preview")
+        }
+    }
+
+    /// The declarations of the rules whose selector list contains `selector` (`.cv` or `main.cv`), joined. It reads the
+    /// validated canonical CSS, which the policy writes back from its tokens, so no comment or string can hold a brace;
+    /// only top-level rules count, as a rule inside an at-rule's block never matches the selector.
     static func declarations(of selector: String, in css: String) -> String? {
         css.split(separator: "}").compactMap { rule -> String? in
             let parts = rule.split(separator: "{", maxSplits: 1)
-            guard parts.count == 2, parts[0].split(separator: ",").contains(where: { $0 == Substring(selector) || $0 == Substring("main" + selector) }) else { return nil }
+            guard parts.count == 2, parts[0].split(separator: ",").map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                .contains(where: { $0 == selector || $0 == "main" + selector }) else { return nil }
             return String(parts[1])
         }.joined(separator: ";")
         .nilIfEmpty

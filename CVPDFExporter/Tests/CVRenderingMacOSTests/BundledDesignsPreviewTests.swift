@@ -8,14 +8,30 @@ import CVDesignCatalog
 import CVRendering
 import CVRenderingMacOS
 import CVRenderingWebKitSupport
+import CVRenderingPDFKitInspector
 import CVRenderingTestSupport
 import CVBundledDesigns
 import CVBundledHeadings
 
-/// #3: the preview of each bundled design, printed from the real render path.
+/// #3: each bundled design on the real render path: it passes the rendering gate, and its preview is printed there.
 @MainActor
-@Suite("#3 · bundled design previews", .serialized, .timeLimit(.minutes(10)))
+@Suite("#3 · bundled designs on the macOS renderer", .serialized, .timeLimit(.minutes(10)))
 struct BundledDesignsPreviewTests {
+    /// What #3 asks: the contract fixture prints completely with each design. PDFKit reads every text node back, inside
+    /// the page and at a readable size.
+    @Test("every bundled design passes the rendering gate with the macOS renderer, read with PDFKit")
+    func gate() async throws {
+        let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it")
+        let gate = FixtureRenderingGate(renderer: MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules()),
+                                        inspector: PDFKitInspector(), fixture: ContractFixture.document,
+                                        headings: headings, palette: ContractFixture.palette)
+        let packages = try await BundleDesignSource().bundledPackages()
+        #expect(packages.count == 3)
+        for package in packages {
+            do { try await gate.verify(try DesignPackageValidator().validate(package.data)) } catch { Issue.record("\(package.name): \(error)") }
+        }
+    }
+
     /// UPDATE_PREVIEWS=1 prints the English sample with each design and stores the first page as the package's preview,
     /// over the file in the checkout. The package's hash changes: pin the new one in `BundledDesignsRenderingTests`.
     @Test("UPDATE_PREVIEWS=1 stores the first page of each design as its preview",
@@ -65,6 +81,7 @@ struct BundledDesignsPreviewTests {
     /// Writes the preview as the package's last key and leaves the rest of the file as written, so that its diff shows only
     /// the preview; a preview stored before is replaced.
     static func store(_ png: Data, in name: String, data: Data) throws {
+        try #require(DesignManifest.isValidID(name), "\(name) cannot name a design file")
         let key = ",\n  \"previewImageBase64\": \"", preview = png.base64EncodedString()
         var text = try #require(String(data: data, encoding: .utf8)).trimmingCharacters(in: .whitespacesAndNewlines)
         if let old = text.range(of: key) { text = String(text[..<old.lowerBound]) + "\n}" }

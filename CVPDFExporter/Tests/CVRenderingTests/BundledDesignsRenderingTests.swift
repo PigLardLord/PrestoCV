@@ -12,7 +12,8 @@ import CVBundledHeadings
 @Suite("The bundled designs render the fixture (#3)")
 struct BundledDesignsRenderingTests {
     /// The SHA-256 of each bundled package, by `id@version`. The catalog's sync never replaces an installed design of the
-    /// same version, so a changed package needs a new version: bump it in the manifest, then pin the new hash here.
+    /// same version, so a shipped package that changes needs a new version; `Designs/README.md` gives the steps, and the
+    /// new hash is pinned here last.
     static let pins: [String: String] = [
         "minimal@1.1.0": "02fa1a03cf8c63eb44c541882ccc52a9e5878395e1640d32397151c4697f7ec5",
         "modern@1.1.0": "d41791a6cc1b331459fec039efad319589c7d00f39878764c518596954238721",
@@ -35,7 +36,9 @@ struct BundledDesignsRenderingTests {
         #expect(SHA256.hex(Data(text.utf8)) == hex, "\(text.utf8.count) bytes")
     }
 
-    @Test("every bundled design passes the rendering gate with a complete PDF")
+    /// The gate's text and geometry checks over the fake renderer's PDF; the real renderer runs the same gate in the macOS
+    /// suite `BundledDesignsPreviewTests.gate`.
+    @Test("every bundled design passes the rendering gate with the fake renderer and the minimal PDF reader")
     func gate() async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it")
         let gate = FixtureRenderingGate(renderer: FakePDFRenderer(), inspector: MinimalPDFInspector(), fixture: ContractFixture.document,
@@ -49,8 +52,9 @@ struct BundledDesignsRenderingTests {
 
     @Test("each bundled package is pinned to its id and version: a change needs a new version (#3)")
     func pinned() async throws {
-        let hashes = Dictionary(uniqueKeysWithValues: try await Self.packages().map { ("\($0.design.manifest.id)@\($0.design.manifest.version)", SHA256.hex($0.data)) })
-        #expect(hashes == Self.pins)
+        let hashes = try await Self.packages().map { (key: "\($0.design.manifest.id)@\($0.design.manifest.version)", hex: SHA256.hex($0.data)) }
+        #expect(Set(hashes.map(\.key)).count == hashes.count, "two packages share an id and a version: \(hashes.map(\.key))")
+        #expect(Dictionary(hashes.map { ($0.key, $0.hex) }, uniquingKeysWith: { first, _ in first }) == Self.pins)
     }
 
     @Test("golden output: the fixture renders exactly to the reviewed HTML of each design")
