@@ -23,6 +23,7 @@ struct TraceOnFailureTests {
     private static func inputs(
         _ paths: AppPaths,
         gate: TraceLaunchGate = .asking(FixedDistribution(.production)),
+        settlement: TraceSettlement = TraceSettlement(),
         settleDeadline: @escaping @Sendable () async -> Void = TraceOnFailureTests.neverFires,
         check: @escaping @MainActor () throws(CompositionFailure) -> Void = TraceOnFailureTests.passes,
         compileRules: @escaping Composition.CompileRules
@@ -34,6 +35,7 @@ struct TraceOnFailureTests {
             log: RecordingLogger(),
             gate: gate,
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
+            settlement: settlement,
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             compileRules: compileRules,
             settleDeadline: settleDeadline,
@@ -59,7 +61,7 @@ struct TraceOnFailureTests {
         let earlier = TraceChain(
             directory: paths.trace, shareDirectory: paths.traceShare, gate: .asking(FixedDistribution(.sandbox)),
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
-            log: RecordingLogger()
+            log: RecordingLogger(), after: nil
         )
         #expect(await earlier.access.isOn())
         let run = earlier.tracer.begin(.textImport)
@@ -142,5 +144,53 @@ struct TraceOnFailureTests {
         }
         #expect(FileManager.default.fileExists(atPath: paths.trace.path), "No purge without an answer")
         await distribution.answer(with: .production)
+    }
+
+    @Test("A retry records nothing until the failed launch's trace has settled, and its runs then survive that launch's purge",
+          .timeLimit(.minutes(1)))
+    func retryWaitsForTheFailedLaunchTrace() async throws {
+        let base = Self.base()
+        defer { try? FileManager.default.removeItem(at: base) }
+        let paths = AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
+        await Self.storeARun(in: paths)
+        let settlement = TraceSettlement()
+        let late = HeldDistribution()
+        let failed = await Composition.make(Self.inputs(
+            paths, gate: .asking(late), settlement: settlement, settleDeadline: {}, compileRules: Self.failingRules
+        ))
+        guard case .failed(.contentRulesUnavailable) = failed else {
+            Issue.record("expected failed, got \(failed)")
+            return
+        }
+
+        // The retry: the distribution answers open at once, but the first launch has not answered yet
+        let retried = await Composition.make(Self.inputs(
+            paths, gate: .asking(FixedDistribution(.sandbox)), settlement: settlement,
+            compileRules: { @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
+                try await SecureWebViewConfiguration.compileRules()
+            }
+        ))
+        guard case .ready(let composition) = retried else {
+            Issue.record("expected ready, got \(retried)")
+            return
+        }
+        let early = composition.tracer.begin(.textImport)
+        early.record(.input, .text("text", Self.marker))
+        early.finish(.finished)
+        #expect(
+            await composition.traceAccess.reader.runs().count == 1,
+            "Only the run of the earlier install: the retry records nothing before the first launch has settled"
+        )
+
+        // The first launch now learns that it may not record, and purges what the earlier install stored
+        await late.answer(with: .production)
+        #expect(await composition.traceAccess.isOn())
+        let after = composition.tracer.begin(.textImport)
+        after.record(.input, .text("text", "after"))
+        after.finish(.finished)
+        await settlement.settled()
+
+        let runs = await composition.traceAccess.reader.runs()
+        #expect(runs.count == 1, "The retry's run stays, the purge of the first launch did not take it")
     }
 }

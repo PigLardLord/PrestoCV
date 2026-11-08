@@ -5,13 +5,15 @@ import SwiftUI
 /// comes from `PrestoCVComposition` and `PrestoCVPresentation`.
 @main
 struct PrestoCVNextApp: App {
-    /// The only composition of the process (R4, ADR 0008), made from the launch arguments: every window waits for the same
-    /// one.
-    private static let composition = Task { await Composition.launch(arguments: ProcessInfo.processInfo.arguments) }
+    /// The only composition of the process (R4, ADR 0008), made from the launch arguments: every window shows the same
+    /// one, and a retry after a failure makes a new one.
+    private static let holder = CompositionHolder(launch: { settlement in
+        await Composition.launch(arguments: ProcessInfo.processInfo.arguments, settlement: settlement)
+    })
 
     var body: some Scene {
         WindowGroup {
-            RootView(composition: Self.composition)
+            RootView(holder: Self.holder)
         }
     }
 }
