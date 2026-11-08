@@ -47,6 +47,9 @@ struct StringRules: Sendable {
     var nonKeyLiterals: [String: String] = [:]
     /// Views of the app's own design system that take a key as their first argument, besides the views of SwiftUI.
     var extraViews: [String] = []
+    /// The folders (relative to the repository root) whose views are read for literals; all the sources when nil. The legacy
+    /// app reads its own views only: the exporter package it links is standalone and its demo button is not localized.
+    var viewFolders: [String]?
     /// Labels of arguments that take a key, on any view: `ErrorStateView(title: "failed.title")`.
     var extraArguments: [String] = []
 }
@@ -170,7 +173,7 @@ enum StringChecks {
         }
         findings.titleCase = try titleCaseTexts(in: catalog, rules: rules)
         findings.availabilityPromises = availabilityPromises(in: catalog, rules: rules)
-        findings.lookedUpButMissing = lookedUpButMissing(from: catalog, in: sources)
+        findings.lookedUpButMissing = lookedUpButMissing(from: catalog, in: sources) + notKeys(handedToViews: sources, catalog: catalog, rules: rules)
         return findings
     }
 
@@ -201,6 +204,10 @@ enum StringChecks {
             if !names.isSubset(of: capitalised) {
                 stale.append("\(key) no longer capitalises \(names.subtracting(capitalised).sorted()): remove it from properNamesOfKey")
             }
+        }
+        let handed = Set(viewLiterals(in: try urls.map(SwiftSource.init(url:)), rules: rules).map(\.literal))
+        for literal in rules.nonKeyLiterals.keys.sorted() where !handed.contains(literal) {
+            stale.append("\"\(literal)\" is handed to no view: remove it from nonKeyLiterals")
         }
         return stale
     }
@@ -341,6 +348,38 @@ enum StringChecks {
             }
         }
         return missing
+    }
+
+    // MARK: Literals handed to views
+
+    private static let swiftUIViews = "Text|Label|Button|Section|Toggle|TextField|SecureField|Picker|Menu|NavigationLink|DisclosureGroup|LabeledContent|ProgressView|Link"
+    private static let swiftUIModifiers = "navigationTitle|accessibilityLabel|accessibilityHint|accessibilityValue|help|badge"
+
+    /// A literal followed by `.localized` is a lookup, which the lookup check reads.
+    private static let notLookedUpAsMember = #"(?!\s*\.)"#
+
+    /// Every literal that a source hands to a view as its text, with the file. `Text(verbatim:)` is not one.
+    private static func viewLiterals(in sources: [SwiftSource], rules: StringRules) -> [(literal: String, path: String)] {
+        let views = ([swiftUIViews] + rules.extraViews.map(NSRegularExpression.escapedPattern(for:))).joined(separator: "|")
+        var patterns = ["\\b(?:\(views))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)", "\\.(?:\(swiftUIModifiers))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)"]
+        if !rules.extraArguments.isEmpty {
+            patterns.append("\\b(?:\(rules.extraArguments.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|"))):\\s*\(stringLiteral)\(notLookedUpAsMember)")
+        }
+        let read = sources.filter { file in rules.viewFolders.map { folders in folders.contains { file.path.hasPrefix($0 + "/") } } ?? true }
+        return read.flatMap { file in
+            patterns.flatMap { file.code.matches(of: $0) }.map { (literal: $0, path: file.path) }
+        }
+    }
+
+    /// The literals handed to a view that are neither a key of the catalog nor a deliberate non-key. A typo in a key
+    /// shows the raw key on screen, and English written in a view is not translated (#24). A text of values and
+    /// symbols only, such as "\(a) / \(b)", has nothing to translate.
+    private static func notKeys(handedToViews sources: [SwiftSource], catalog: LocalizationCatalog, rules: StringRules) -> [String] {
+        viewLiterals(in: sources, rules: rules).compactMap { literal, path in
+            let hasWords = literal.asFormatKey.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
+            guard hasWords, !catalog.isLookedUp(literal), rules.nonKeyLiterals[literal] == nil else { return nil }
+            return "\(literal) (\(path))"
+        }
     }
 
     /// The words written as the message of an `AppError`, by file. The message is shown to the user.

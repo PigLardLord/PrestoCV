@@ -65,7 +65,8 @@ struct LocalizationCatalogTests {
         properNames: properNames,
         personNames: personNames,
         properNamesOfKey: properNamesOfKey,
-        promiseKeyPrefix: promiseKeyPrefix
+        promiseKeyPrefix: promiseKeyPrefix,
+        viewFolders: ["PrestoCV"]
     )
 
     static let catalogPath = "PrestoCV/Localizable.xcstrings"

@@ -21,7 +21,10 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
     /// (checked for step 5-15a: none looks up a text, and R13 leaves the text to the views).
     static let next = CatalogUnderCheck(
         name: "the catalog of the new app", catalog: "PrestoCVNext/Resources/Localizable.xcstrings",
-        folders: ["PrestoCVNext"], rules: StringRules())
+        folders: ["PrestoCVNext"], rules: StringRules(
+            // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
+            extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
+            extraArguments: ["title", "message", "code", "retryTitle"]))
 
     static let all = [legacy, next]
 
