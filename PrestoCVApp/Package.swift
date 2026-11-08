@@ -8,6 +8,7 @@ var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
     .library(name: "PrestoCVPresentation", targets: ["PrestoCVPresentation"]),
+    .library(name: "PrestoCVImportFiles", targets: ["PrestoCVImportFiles"]),
 ]
 var targets: [Target] = [
     .target(name: "PrestoCVWorkflowPorts", dependencies: [
@@ -23,12 +24,17 @@ var targets: [Target] = [
         .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
         .product(name: "CVRendering", package: "CVPDFExporter"),
         .product(name: "CVDrafting", package: "CVGeneratorAI"),
-        .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
     .target(name: "PrestoCVPresentation", dependencies: [
         "PrestoCVWorkflowPorts",
         .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
         .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    ]),
+    // The files handed to the import: a portable outbound adapter, tested on Linux against the real file system
+    .target(name: "PrestoCVImportFiles", dependencies: [
+        "PrestoCVWorkflowPorts",
+        .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
+        .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
 ]
 
@@ -44,6 +50,10 @@ targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
     .product(name: "CVRendering", package: "CVPDFExporter"),
     .product(name: "CVRenderingTestSupport", package: "CVPDFExporter"),
     .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
+]))
+targets.append(.testTarget(name: "PrestoCVImportFilesTests", dependencies: [
+    "PrestoCVImportFiles", "PrestoCVWorkflowPorts",
+    .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
     .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
 ]))
@@ -58,10 +68,11 @@ targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
 #if !os(Linux)
 products.append(.library(name: "PrestoCVComposition", targets: ["PrestoCVComposition"]))
 targets.append(.target(name: "PrestoCVComposition", dependencies: [
-    "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVImportFiles", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImportingPDFKit", package: "PrestoCVCore"),
     .product(name: "PrestoCVPersistence", package: "PrestoCVCore"),
     .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
@@ -82,9 +93,10 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "DiagnosticTraceDistribution", package: "DiagnosticTrace"),
 ]))
 targets.append(.testTarget(name: "PrestoCVCompositionTests", dependencies: [
-    "PrestoCVComposition", "PrestoCVPresentation",
+    "PrestoCVComposition", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
     .product(name: "PrestoCVPersistence", package: "PrestoCVCore"),
     .product(name: "PrestoCVCoreTestSupport", package: "PrestoCVCore"),
     .product(name: "CVRenderingWebKitSupport", package: "CVPDFExporter"),

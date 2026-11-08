@@ -16,7 +16,7 @@ public struct ReceivedFile: Sendable, Hashable {
 }
 
 /// Reads the PDF of a file the person chose, and lets the file go. The import screen owns this port (R3); its adapter
-/// belongs to the composition. Contents, layer and allowed imports: docs/architecture/modules.md.
+/// is `ImportFileAdapter`, in `PrestoCVImportFiles`. Contents, layer and allowed imports: docs/architecture/modules.md.
 ///
 /// Each received file has its own start and its own stop, as security-scoped access has: `receive` starts, `release`
 /// stops, once for each file.

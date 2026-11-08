@@ -8,6 +8,10 @@ import DiagnosticTrace
 import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
+import PrestoCVImportFiles
+import PrestoCVImporting
+import PrestoCVImportingPDFKit
+import PrestoCVIntegration
 import PrestoCVPersistence
 import Synchronization
 import WebKit
@@ -25,7 +29,7 @@ public enum CompositionState: Sendable {
 }
 
 /// The one place that creates infrastructure (R4, ADR 0008): the paths, the repository, the platform renderer over the
-/// content rules compiled once, the clock, the ids, the log and the trace. The view model factories follow in later steps.
+/// content rules compiled once, the import's PDF reader and file port, the clock, the ids, the log and the trace.
 @MainActor
 public final class Composition {
     /// Compiles the content rules of every web view. The composition calls it once, so a test counts the calls.
@@ -44,6 +48,9 @@ public final class Composition {
         let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
+        /// The folders where the system puts the copy of a file opened in the app: the import deletes a copy only when it
+        /// lies directly in one of them, and never a file the person chose where it is.
+        let copyFolders: [URL]
         let compileRules: CompileRules
         /// Returns when a failed launch should stop waiting for the distribution's answer. A failed launch shows its error
         /// screen even while the distribution has not answered (the store may fetch over the network); the purge of a
@@ -83,9 +90,17 @@ public final class Composition {
         logger = trace.logger
         tracer = trace.tracer
         traceAccess = trace.access
+        let importer = ImportCV(
+            pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
+            clock: ContinuousClock(), tracer: trace.tracer
+        )
+        let importFiles = ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: inputs.copyFolders,
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
+        )
         screens = ScreenFactory(
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock()
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles
         )
         self.rules = rules
     }
@@ -204,6 +219,7 @@ public final class Composition {
             device: .current,
             settlement: settlement,
             samples: (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true),
+            copyFolders: AppPaths.importCopiesOnDevice(),
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
             },

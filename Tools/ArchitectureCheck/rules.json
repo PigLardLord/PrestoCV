@@ -738,8 +738,6 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVDrafting",
-    "DiagnosticLogging",
-    "Synchronization",
     "Foundation"
    ],
    "rules": [
@@ -772,10 +770,7 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVRenderingTestSupport",
-    "CVBundledHeadings",
-    "DiagnosticLogging",
-    "DiagnosticLoggingTestSupport",
-    "Synchronization"
+    "CVBundledHeadings"
    ],
    "rules": [],
    "kind": "test"
@@ -825,15 +820,58 @@
    }
   },
   {
+   "name": "PrestoCVImportFiles",
+   "path": "PrestoCVApp/Sources/PrestoCVImportFiles",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "PrestoCVImporting",
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization",
+    "Glibc",
+    "Darwin",
+    "Android"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVImportFilesTests",
+   "path": "PrestoCVApp/Tests/PrestoCVImportFilesTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Synchronization",
+    "Glibc",
+    "Darwin",
+    "Android",
+    "PrestoCVImportFiles",
+    "PrestoCVWorkflowPorts",
+    "PrestoCVImporting",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVComposition",
    "path": "PrestoCVApp/Sources/PrestoCVComposition",
    "allowedImports": [
+    "PrestoCVImportFiles",
     "PrestoCVIntegration",
     "PrestoCVPresentation",
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
     "PrestoCVImporting",
+    "PrestoCVImportingPDFKit",
     "PrestoCVPersistence",
     "CVDocumentModel",
     "CVDesignCatalog",
@@ -875,9 +913,12 @@
     "Observation",
     "WebKit",
     "PrestoCVComposition",
+    "PrestoCVIntegration",
     "PrestoCVPresentation",
+    "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
     "PrestoCVPersistence",
     "PrestoCVCoreTestSupport",
     "CVRenderingWebKitSupport",
