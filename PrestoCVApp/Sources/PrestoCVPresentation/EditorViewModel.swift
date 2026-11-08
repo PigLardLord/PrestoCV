@@ -19,6 +19,9 @@ public final class EditorViewModel {
         set { edit(newValue) }
     }
 
+    /// The row the person asked to remove, which waits for `confirmRemoval()` or `cancelRemoval()`.
+    public internal(set) var pendingRemoval: RowRemoval?
+
     public private(set) var opening: OpeningStatus = .opening
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
@@ -44,6 +47,8 @@ public final class EditorViewModel {
 
     /// The form as typed.
     var form = EditorContent.empty
+    /// The ids of the form's rows: every row this editor made has one no other row has had.
+    @ObservationIgnored var rowIDs = RowIDs()
     /// The CV the form stands on: its identity, the sections, and the look and the language it was opened with.
     var base: CV?
     /// The CV the writer gave back from the last change of the look or the language, nil when none was made since the form
@@ -115,7 +120,8 @@ public final class EditorViewModel {
 
     private func open(_ cv: CV, unchangedFrom unchanged: CV?, stored: CV?) {
         guard autosave == nil else { return }
-        form = EditorContent(cv)
+        form = admit(EditorContent(cv, ids: &rowIDs))
+        pendingRemoval = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
     }
@@ -123,11 +129,20 @@ public final class EditorViewModel {
     // MARK: - Editing
 
     func edit(_ content: EditorContent) {
-        if content != form { formEdits += 1 }
-        if content.title != form.title { titleEdits += 1 }
-        form = content
+        let admitted = admit(content)
+        if admitted != form { formEdits += 1 }
+        if admitted.title != form.title { titleEdits += 1 }
+        form = admitted
         passOnTheForm()
         refreshSaveStatus()
+    }
+
+    /// `content` with unique row ids, the one place every entry of rows into the form passes through. The row waiting for its
+    /// removal is named by its id: if that id arrives on more than one row, or on none, the rows cannot be told apart, so the
+    /// request is withdrawn and nothing is removed.
+    func admit(_ content: EditorContent) -> EditorContent {
+        if let request = pendingRemoval, content.rowCount(withID: request.row) != 1 { pendingRemoval = nil }
+        return rowIDs.unique(content)
     }
 
     /// Gives the autosave the CV the form shows, unless a replacement runs: it is given once that ends.
