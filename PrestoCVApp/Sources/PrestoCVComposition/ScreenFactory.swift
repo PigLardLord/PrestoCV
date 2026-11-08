@@ -16,6 +16,8 @@ public final class ScreenFactory {
     private let clock: any TimeSource
     /// The editors made and not yet released. The factory never keeps one alive.
     private var editors: [WeakEditor] = []
+    /// How many editors the factory has made: each one is known by its number, which is never reused.
+    private var made = 0
 
     init(repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
@@ -54,24 +56,33 @@ public final class ScreenFactory {
         let editor = EditorViewModel(
             start: start, editing: editing, clock: ContinuousClock(), pause: Autosave<CV>.pause, copyTitle: copyTitle
         )
-        editors = editors.filter { $0.editor != nil } + [WeakEditor(editor)]
+        made += 1
+        editors = editors.filter { $0.editor != nil } + [WeakEditor(editor, number: made)]
         return editor
     }
 
     /// Returns once every editor that is still alive has stored what it shows, so that the list reads the store after them.
     /// An editor made while an earlier one is storing is stored as well. An editor already released is not waited for:
     /// whoever lets an editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
+    ///
+    /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made
+    /// after a stored one was freed may take its address, and would then be skipped.
     private func storeEditors() async {
-        var stored = Set<ObjectIdentifier>()
-        while let next = editors.compactMap(\.editor).first(where: { !stored.contains(ObjectIdentifier($0)) }) {
-            stored.insert(ObjectIdentifier(next))
-            await next.saveNow()
+        var stored = Set<Int>()
+        while let next = editors.first(where: { $0.editor != nil && !stored.contains($0.number) }),
+              let editor = next.editor {
+            stored.insert(next.number)
+            await editor.saveNow()
         }
     }
 }
 
 private struct WeakEditor {
     weak var editor: EditorViewModel?
+    let number: Int
 
-    init(_ editor: EditorViewModel) { self.editor = editor }
+    init(_ editor: EditorViewModel, number: Int) {
+        self.editor = editor
+        self.number = number
+    }
 }
