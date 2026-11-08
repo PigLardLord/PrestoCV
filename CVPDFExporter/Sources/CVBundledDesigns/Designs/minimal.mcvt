@@ -2,8 +2,10 @@
   "manifest": {
     "id": "minimal",
     "name": "Minimal",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Plain, airy layout that lets the content speak, with no rules or boxes.",
+    "defaultPalette": "ink",
+    "defaultFonts": "system",
     "markupContract": 1,
     "author": "PrestoCV",
     "price": 0.0

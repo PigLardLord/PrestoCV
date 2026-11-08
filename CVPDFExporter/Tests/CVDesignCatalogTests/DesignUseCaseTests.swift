@@ -1,0 +1,630 @@
+import Testing
+import Foundation
+import CVDesignCatalog
+import CVBundledDesigns
+import CVRenderingTestSupport
+
+@Suite("listing and getting designs (#125)")
+struct ListAndGetDesignTests {
+    @Test("an empty store lists no designs")
+    func emptyList() async throws {
+        #expect(try await ListDesigns(store: InMemoryDesignStore())() == [])
+    }
+
+    @Test("the installed designs are listed in the store's order, by identifier")
+    func list() async throws {
+        let store = InMemoryDesignStore()
+        let clean = try DesignStoreContract.design(id: "clean"), bold = try DesignStoreContract.design(id: "bold")
+        try await store.save(clean)
+        try await store.save(bold)
+        #expect(try await ListDesigns(store: store)() == [bold.manifest, clean.manifest])
+    }
+
+    @Test("a store that cannot be reached is reported, not listed as empty")
+    func listUnavailable() async {
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await ListDesigns(store: UnavailableStore())() }
+    }
+
+    @Test("an installed design is returned as it was stored, preview included")
+    func get() async throws {
+        let store = InMemoryDesignStore()
+        let clean = try DesignStoreContract.design(id: "clean", preview: true)
+        try await store.save(clean)
+        try await store.save(DesignStoreContract.design(id: "bold"))
+        #expect(try await GetDesign(store: store)(id: "clean") == clean)
+    }
+
+    @Test("an identifier with no design is unknown, whatever it looks like", arguments: ["bold", "", "../clean", "Clean", "clean\n"])
+    func getUnknown(id: String) async throws {
+        let store = InMemoryDesignStore()
+        try await store.save(DesignStoreContract.design(id: "clean"))
+        await #expect(throws: DesignCatalogError.unknownDesign(id)) { _ = try await GetDesign(store: store)(id: id) }
+    }
+
+    @Test("a store that cannot be reached is reported, not an unknown design")
+    func getUnavailable() async {
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await GetDesign(store: UnavailableStore())(id: "clean") }
+    }
+}
+
+private func bundled(_ id: String, version: String = "1.0.0", css: String = ".cv-name{color:var(--color-primary)}") throws -> (name: String, data: Data) {
+    (id, try DesignStoreContract.package(id: id, version: version, css: css))
+}
+
+private let otherCSS = ".cv-entry-title{font-weight:600}"
+
+/// A design as an earlier sync installed it: the store records it as bundled.
+private func installedBySync(_ design: ValidatedDesign, in store: some DesignStore) async throws {
+    _ = try await store.saveIfNewer(design)
+}
+
+@Suite("the spy store keeps the port's promises (#127)")
+struct SpyDesignStoreTests {
+    @Test("origins are listed only for the designs the store holds")
+    func originsOfInstalledDesigns() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled, "ghost": .imported])
+        #expect(try await store.installedOrigins() == ["clean": .bundled])
+    }
+}
+
+@Suite("syncing the bundled designs (#125)")
+struct SyncBundledDesignsTests {
+    // MARK: Installing and upgrading
+
+    @Test("into an empty store every bundled design is rendered and installed, in the order of the source")
+    func installsAll() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["clean", "bold"])
+        #expect(report.upgraded.isEmpty && report.unchanged.isEmpty && report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await store.installedDesigns().map(\.id) == ["bold", "clean"])
+        #expect(await gate.verified == ["clean", "bold"])
+    }
+
+    @Test("a bundled design newer than the installed one is rendered and replaces it", arguments: [("1.0.0", "1.0.1"), ("1.9.9", "2.0.0"), ("1.0.9", "1.0.10")])
+    func upgrades(installed: String, bundledVersion: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        try await installedBySync(DesignStoreContract.design(id: "clean", version: installed), in: store)
+        let newer = try bundled("clean", version: bundledVersion, css: otherCSS)
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [newer]), gate: gate, store: store)()
+        #expect(report.upgraded == ["clean"])
+        #expect(report.installed.isEmpty && report.unchanged.isEmpty && report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty)
+        let stored = try await GetDesign(store: store)(id: "clean")
+        #expect(stored.manifest.version.text == bundledVersion && stored.stylesheet.css == otherCSS)
+        #expect(await gate.verified == ["clean"])
+    }
+
+    @Test("a bundled design of the same version leaves the installed one alone, and is not rendered")
+    func equalVersion() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let installed = try DesignStoreContract.design(id: "clean", version: "1.2.3")
+        try await installedBySync(installed, in: store)
+        let sameVersion = try bundled("clean", version: "1.2.3", css: otherCSS)
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [sameVersion]), gate: gate, store: store)()
+        #expect(report.unchanged == ["clean"])
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == installed)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a bundled design never downgrades a newer one that is installed as bundled", arguments: [("2.0.0", "1.9.9"), ("1.0.10", "1.0.9"), ("1.10.0", "1.9.0")])
+    func neverDowngrades(installed: String, bundledVersion: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let newer = try DesignStoreContract.design(id: "clean", version: installed)
+        try await installedBySync(newer, in: store)
+        let older = try bundled("clean", version: bundledVersion, css: otherCSS)
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [older]), gate: gate, store: store)()
+        #expect(report.unchanged == ["clean"])
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == newer)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a mixed source is reported in the order processed")
+    func mixed() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        for (id, version) in [("b", "1.0.0"), ("c", "1.0.0"), ("d", "2.0.0")] { try await installedBySync(DesignStoreContract.design(id: id, version: version), in: store) }
+        let source = FixedBundledSource(packages: [try bundled("a"), try bundled("b", version: "1.1.0"), try bundled("c"), try bundled("d")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["a"] && report.upgraded == ["b"] && report.unchanged == ["c", "d"] && report.rejected.isEmpty)
+        #expect(try await store.installedDesigns().map(\.version.text) == ["1.0.0", "1.1.0", "1.0.0", "2.0.0"])
+        #expect(await gate.verified == ["a", "b"])
+    }
+
+    @Test("the same design twice, the newer second: installed, then upgraded, and the store holds the newer")
+    func newerSecond() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("clean", version: "1.1.0", css: otherCSS)])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["clean"] && report.upgraded == ["clean"] && report.unchanged.isEmpty)
+        let stored = try await GetDesign(store: store)(id: "clean")
+        #expect(stored.manifest.version.text == "1.1.0" && stored.stylesheet.css == otherCSS)
+    }
+
+    @Test("the same design twice, the older second: installed, then unchanged, and the store holds the first")
+    func olderSecond() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let source = FixedBundledSource(packages: [try bundled("clean", version: "1.1.0", css: otherCSS), try bundled("clean")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["clean"] && report.unchanged == ["clean"] && report.upgraded.isEmpty)
+        let stored = try await GetDesign(store: store)(id: "clean")
+        #expect(stored.manifest.version.text == "1.1.0" && stored.stylesheet.css == otherCSS)
+        #expect(await gate.verified == ["clean"])
+    }
+
+    @Test("a second sync finds every design unchanged, and saves nothing")
+    func steadyState() async throws {
+        let store = SpyDesignStore(), gate = FakeRenderingGate()
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")]), gate: gate, store: store)
+        let first = try await sync()
+        #expect(first.installed == ["clean", "bold"])
+        #expect(await store.savedIDs == ["clean", "bold"])
+        #expect(await gate.verified == ["clean", "bold"])
+        let second = try await sync()
+        #expect(second.unchanged == ["clean", "bold"])
+        #expect(second.installed.isEmpty && second.upgraded.isEmpty && second.rejected.isEmpty && second.notRendered.isEmpty && second.failed.isEmpty)
+        #expect(await store.savedIDs == ["clean", "bold"])
+        #expect(await gate.verified == ["clean", "bold"])
+    }
+
+    @Test("a newer design saved while the sync renders is not overwritten by the older bundled design", .timeLimit(.minutes(1)))
+    func savedWhileRendering() async throws {
+        let store = InMemoryDesignStore(), gate = SuspendingRenderingGate(holding: "clean")
+        try await installedBySync(DesignStoreContract.design(id: "clean", version: "1.0.0"), in: store)
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean", version: "2.0.0", css: otherCSS)]), gate: gate, store: store)
+        let running = Task { try await sync() }
+        guard await gate.waitUntilEntered() else {
+            Issue.record("the sync did not reach the rendering gate in time")
+            running.cancel()
+            return
+        }
+        let newest = try DesignStoreContract.design(id: "clean", version: "3.0.0", css: ".cv-skill{font-weight:700}")
+        try await installedBySync(newest, in: store)
+        await gate.release()
+        let report = try await running.value
+        #expect(report.unchanged == ["clean"])
+        #expect(report.upgraded.isEmpty && report.installed.isEmpty && report.failed.isEmpty && report.notRendered.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == newest)
+    }
+
+    @Test("an imported design saved while the sync renders is not replaced by the bundled design, and is reported as a conflict", .timeLimit(.minutes(1)))
+    func importedWhileRendering() async throws {
+        let store = InMemoryDesignStore(), gate = SuspendingRenderingGate(holding: "clean")
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean", version: "2.0.0", css: otherCSS)]), gate: gate, store: store)
+        let running = Task { try await sync() }
+        guard await gate.waitUntilEntered() else {
+            Issue.record("the sync did not reach the rendering gate in time")
+            running.cancel()
+            return
+        }
+        let mine = try DesignStoreContract.design(id: "clean", version: "1.0.0")
+        try await store.save(mine)
+        await gate.release()
+        let report = try await running.value
+        #expect(report.conflicts == ["clean"])
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty && report.failed.isEmpty && report.notRendered.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == mine)
+        #expect(try await store.installedOrigins() == ["clean": .imported])
+    }
+
+    @Test("an installed design is listed, never read: one that cannot be read does not stop the sync")
+    func unreadableInstalledDesign() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled], unreadable: ["clean"])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
+        let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)()
+        #expect(report.unchanged == ["clean"] && report.installed == ["bold"])
+    }
+
+    // MARK: Designs the sync did not install
+
+    @Test("an imported design that holds a bundled identifier is left alone, not rendered, and reported as a conflict, whatever the versions",
+          arguments: ["0.0.1", "1.0.0", "999999999.0.0"])
+    func importedIsAConflict(importedVersion: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let mine = try DesignStoreContract.design(id: "clean", version: importedVersion, css: otherCSS)
+        try await store.save(mine)
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)()
+        #expect(report.conflicts == ["clean"])
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty && report.rejected.isEmpty
+                && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == mine)
+        #expect(try await store.installedOrigins() == ["clean": .imported])
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a design with no recorded origin is the bundled one if it equals it, identifier, version and content: it is adopted. Otherwise it is an import",
+          arguments: [("1.0.0", false, false), ("1.0.0", true, true), ("0.9.0", false, true), ("1.0.1", false, true), ("2.0.0", false, true)])
+    func unrecordedOrigin(installedVersion: String, otherContent: Bool, isConflict: Bool) async throws {
+        let installed = try DesignStoreContract.design(id: "clean", version: installedVersion, css: otherContent ? otherCSS : ".cv-name{color:var(--color-primary)}")
+        let store = SpyDesignStore(installed: [installed]), gate = FakeRenderingGate()
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)()
+        #expect(report.conflicts == (isConflict ? ["clean"] : []))
+        #expect(report.adopted == (isConflict ? [] : ["clean"]))
+        #expect(report.installed.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty && report.rejected.isEmpty
+                && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == installed)
+        #expect(try await store.installedOrigins() == (isConflict ? [:] : ["clean": .bundled]))
+        #expect(await store.savedIDs.isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an adopted design is bundled from then on: a second sync leaves it alone, and a newer bundled version upgrades it")
+    func adoptedUpgradesLater() async throws {
+        let installed = try DesignStoreContract.design(id: "clean")
+        let store = SpyDesignStore(installed: [installed]), gate = FakeRenderingGate()
+        func sync(_ package: (name: String, data: Data)) async throws -> SyncReport {
+            try await SyncBundledDesigns(source: FixedBundledSource(packages: [package]), gate: gate, store: store)()
+        }
+        #expect(try await sync(bundled("clean")).adopted == ["clean"])
+        let steady = try await sync(bundled("clean"))
+        #expect(steady.unchanged == ["clean"] && steady.adopted.isEmpty && steady.conflicts.isEmpty)
+        #expect(await gate.verified.isEmpty)
+        let upgrade = try await sync(bundled("clean", version: "1.1.0"))
+        #expect(upgrade.upgraded == ["clean"] && upgrade.conflicts.isEmpty && upgrade.adopted.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean").manifest.version.text == "1.1.0")
+        #expect(try await store.installedOrigins() == ["clean": .bundled])
+        #expect(await gate.verified == ["clean"])
+    }
+
+    @Test("a design the store fails to adopt is reported as failed, left as it was, and the others still sync")
+    func adoptionFails() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], savesFailFor: ["clean"])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
+        let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)()
+        #expect(report.failed == ["clean"] && report.installed == ["bold"] && report.adopted.isEmpty && report.conflicts.isEmpty)
+        #expect(try await store.installedOrigins() == ["bold": .bundled])
+    }
+
+    @Test("a design the store no longer adopts, because an import took it meanwhile, is a conflict")
+    func adoptionRefused() async throws {
+        struct Refusing: DesignStore {
+            let base = InMemoryDesignStore()
+            @discardableResult func save(_ design: ValidatedDesign) async throws -> ImportSave { try await base.save(design) }
+            func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await base.saveIfNewer(design) }
+            func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
+            func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
+            func installedOrigins() async throws -> [String: DesignOrigin] { [:] }
+            func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { false }
+        }
+        let store = Refusing()
+        try await store.save(DesignStoreContract.design(id: "clean"))
+        let gate = FakeRenderingGate()
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)()
+        #expect(report.conflicts == ["clean"] && report.adopted.isEmpty && report.unchanged.isEmpty && report.failed.isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a bundled design never replaces an imported one: conflicts are reported in the order processed, the others still sync")
+    func importedAmongBundled() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        try await store.save(DesignStoreContract.design(id: "b", version: "0.0.1"))
+        try await installedBySync(DesignStoreContract.design(id: "c", version: "1.0.0"), in: store)
+        let source = FixedBundledSource(packages: [try bundled("a"), try bundled("b", version: "2.0.0"), try bundled("c", version: "1.1.0"), try bundled("b")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["a"] && report.upgraded == ["c"] && report.conflicts == ["b", "b"])
+        #expect(report.unchanged.isEmpty && report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty)
+        #expect(try await store.installedDesigns().map(\.version.text) == ["1.0.0", "0.0.1", "1.1.0"])
+        #expect(try await store.installedOrigins() == ["a": .bundled, "b": .imported, "c": .bundled])
+        #expect(await gate.verified == ["a", "c"])
+    }
+
+    // MARK: A package that does not make it
+
+    @Test("a rejected package is reported with its name and violations, and the others still sync")
+    func rejectedAmongValid() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let broken = (name: "broken-file", data: designData(".cv{}", id: "broken", manifestExtra: ["defaultPalette": "minimal", "version": "1"]))
+        let source = FixedBundledSource(packages: [try bundled("clean"), broken, try bundled("bold")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.installed == ["clean", "bold"])
+        #expect(report.rejected.map(\.name) == ["broken-file"])
+        #expect(report.rejected.map(\.violations) == [[.invalidVersion("1"), .unknownPalette("minimal")]])
+        #expect(try await store.installedDesigns().map(\.id) == ["bold", "clean"])
+        #expect(await gate.verified == ["clean", "bold"])
+    }
+
+    @Test("the validator given to the use case is the one that judges the packages")
+    func customValidator() async throws {
+        let store = InMemoryDesignStore(), package = try bundled("clean")
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [package]), validator: DesignPackageValidator(maxBytes: 10),
+                                                  gate: FakeRenderingGate(), store: store)()
+        #expect(report.rejected.map(\.name) == ["clean"])
+        #expect(report.rejected.map(\.violations) == [[.tooLarge(package.data.count)]])
+        #expect(try await store.installedDesigns().isEmpty)
+    }
+
+    @Test("a design that does not render is reported, not stored, and the others still sync")
+    func notRendered() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate(refusing: ["bold"])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold"), try bundled("plain")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.notRendered == ["bold"] && report.installed == ["clean", "plain"])
+        #expect(report.rejected.isEmpty && report.failed.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty)
+        #expect(try await store.installedDesigns().map(\.id) == ["clean", "plain"])
+    }
+
+    @Test("an upgrade that does not render leaves the installed design in place")
+    func upgradeNotRendered() async throws {
+        let store = InMemoryDesignStore()
+        let installed = try DesignStoreContract.design(id: "clean")
+        try await installedBySync(installed, in: store)
+        let source = FixedBundledSource(packages: [try bundled("clean", version: "1.1.0", css: otherCSS)])
+        let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(refusing: ["clean"]), store: store)()
+        #expect(report.notRendered == ["clean"] && report.upgraded.isEmpty)
+        #expect(try await GetDesign(store: store)(id: "clean") == installed)
+    }
+
+    @Test("a cancelled render ends the sync in a cancellation, and what came before stays saved")
+    func cancelled() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate(cancellingOn: ["bold"])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold"), try bundled("plain")])
+        let sync = SyncBundledDesigns(source: source, gate: gate, store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(try await store.installedDesigns().map(\.id) == ["clean"])
+        #expect(await gate.verified == ["clean", "bold"])
+    }
+
+    @Test("a design the store fails to save is reported, and the others still sync")
+    func saveFails() async throws {
+        let store = SpyDesignStore(savesFailFor: ["bold"])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold"), try bundled("plain")])
+        let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)()
+        #expect(report.failed == ["bold"] && report.installed == ["clean", "plain"])
+        #expect(report.rejected.isEmpty && report.notRendered.isEmpty && report.upgraded.isEmpty && report.unchanged.isEmpty)
+        #expect(await store.savedIDs == ["clean", "plain"])
+    }
+
+    // MARK: What stops the sync
+
+    @Test("a cancellation while the installed designs or their origins are listed ends the sync in a cancellation, not in an unavailable store",
+          arguments: [SpyDesignStore.Operation.installedDesigns, .installedOrigins])
+    func cancelledListing(operation: SpyDesignStore.Operation) async throws {
+        let gate = FakeRenderingGate(), store = SpyDesignStore(cancelling: [operation])
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a cancellation while a design is adopted ends the sync in a cancellation, not in a failed design")
+    func cancelledAdoption() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], cancelling: [.adoptAsBundled])
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")]), gate: FakeRenderingGate(), store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await store.savedIDs.isEmpty)
+    }
+
+    @Test("a source that cannot be read is reported")
+    func sourceUnavailable() async {
+        let sync = SyncBundledDesigns(source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        await #expect(throws: DesignCatalogError.bundledDesignsUnavailable) { _ = try await sync() }
+    }
+
+    @Test("a store whose installed designs cannot be listed is unavailable, and nothing is rendered or saved")
+    func storeUnavailable() async throws {
+        let source = FixedBundledSource(packages: [try bundled("clean")])
+        for store in [UnavailableStore(), SpyDesignStore(listingFails: true)] as [any DesignStore] {
+            let gate = FakeRenderingGate()
+            let sync = SyncBundledDesigns(source: source, gate: gate, store: store)
+            await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await sync() }
+            #expect(await gate.verified.isEmpty)
+        }
+    }
+
+    @Test("the real bundle installs all three designs, each rendered once, and a second sync changes nothing")
+    func realBundle() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let sync = SyncBundledDesigns(source: BundleDesignSource(), gate: gate, store: store)
+        let first = try await sync()
+        #expect(first.installed == ["minimal", "modern", "professional"])
+        #expect(first.rejected.isEmpty && first.upgraded.isEmpty && first.unchanged.isEmpty && first.notRendered.isEmpty && first.failed.isEmpty)
+        #expect(try await store.installedDesigns().map(\.id) == ["minimal", "modern", "professional"])
+        #expect(await gate.verified.count == 3)
+        let second = try await sync()
+        #expect(second.unchanged == ["minimal", "modern", "professional"] && second.installed.isEmpty)
+        #expect(await gate.verified.count == 3)
+    }
+}
+
+@Suite("importing a design (#127)")
+struct InstallDesignTests {
+    @Test("an import that takes the identifier of a bundled design is refused, whatever its version: the bundled design stays",
+          arguments: ["0.0.1", "1.0.0", "999999999.0.0"])
+    func refusedOverBundled(version: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let source = FixedBundledSource(packages: [try bundled("modern")])
+        _ = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        let bundledModern = try await GetDesign(store: store)(id: "modern")
+        let importGate = FakeRenderingGate()
+        let install = InstallDesign(source: source, gate: importGate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(DesignStoreContract.package(id: "modern", version: version, css: otherCSS)) }
+        #expect(try await GetDesign(store: store)(id: "modern") == bundledModern)
+        #expect(try await store.installedOrigins() == ["modern": .bundled])
+        #expect(await importGate.verified.isEmpty)
+    }
+
+    @Test("a bundled identifier is refused before the sync has installed the design, and nothing is stored")
+    func refusedBeforeTheSync() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern"), try bundled("clean")]), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("clean")) { _ = try await install(DesignStoreContract.package(id: "clean", version: "999999999.0.0")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an import is refused when the store records the identifier as bundled, even if the design has left the bundle")
+    func refusedOverRecordedBundled() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let former = try DesignStoreContract.design(id: "former")
+        try await installedBySync(former, in: store)
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("former")) { _ = try await install(DesignStoreContract.package(id: "former", version: "9.0.0", css: otherCSS)) }
+        #expect(try await GetDesign(store: store)(id: "former") == former)
+        #expect(try await store.installedOrigins() == ["former": .bundled])
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an import may replace a design recorded as imported, or one with no recorded origin")
+    func replacesImportsAndUnrecorded() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "old")], origins: ["mine": .imported])
+        try await store.save(DesignStoreContract.design(id: "mine"))
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: FakeRenderingGate(), store: store)
+        for id in ["old", "mine"] {
+            let design = try await install(DesignStoreContract.package(id: id, version: "2.0.0", css: otherCSS))
+            #expect(try await GetDesign(store: store)(id: id) == design)
+        }
+        #expect(try await store.installedOrigins() == ["old": .imported, "mine": .imported])
+    }
+
+    @Test("a store whose origins cannot be listed stops the import: nothing is rendered or stored")
+    func originsUnavailable() async throws {
+        let gate = FakeRenderingGate(), store = SpyDesignStore(listingFails: true)
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(await store.savedIDs.isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a store that keeps its bundled design when the import is saved, because the sync installed it meanwhile, refuses the import")
+    func refusedAtTheSave() async throws {
+        struct SyncedMeanwhile: DesignStore {
+            let base = InMemoryDesignStore()
+            func save(_ design: ValidatedDesign) async throws -> ImportSave {
+                _ = try await base.saveIfNewer(design)   // the sync installs the bundled design while the import renders
+                return try await base.save(design)
+            }
+            func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await base.saveIfNewer(design) }
+            func design(id: String) async throws -> ValidatedDesign? { try await base.design(id: id) }
+            func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
+            func installedOrigins() async throws -> [String: DesignOrigin] { try await base.installedOrigins() }
+            func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await base.adoptAsBundled(design) }
+        }
+        let store = SyncedMeanwhile()
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
+        await #expect(throws: DesignCatalogError.bundledIdentifier("late")) { _ = try await install(DesignStoreContract.package(id: "late")) }
+        #expect(try await store.installedOrigins() == ["late": .bundled])
+    }
+
+    @Test("a store that fails to save the import is reported as unavailable, not passed through raw")
+    func saveFails() async throws {
+        let store = SpyDesignStore(savesFailFor: ["mine"]), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(await store.savedIDs.isEmpty)
+    }
+
+    @Test("a cancellation while the bundled source is read, the origins are listed or the design is saved passes through unchanged")
+    func cancelled() async throws {
+        let gate = FakeRenderingGate()
+        let cancelledSource = InstallDesign(source: CancelledBundledSource(), gate: gate, store: InMemoryDesignStore())
+        await #expect(throws: CancellationError.self) { _ = try await cancelledSource(DesignStoreContract.package(id: "mine")) }
+        #expect(await gate.verified.isEmpty)
+        for operation in [SpyDesignStore.Operation.installedOrigins, .save] {
+            let store = SpyDesignStore(cancelling: [operation])
+            let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
+            await #expect(throws: CancellationError.self) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+            #expect(await store.savedIDs.isEmpty)
+        }
+    }
+
+    @Test("an import with an identifier of its own is rendered, stored and recorded as imported")
+    func installsImport() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: [try bundled("modern")]), gate: gate, store: store)
+        let design = try await install(DesignStoreContract.package(id: "mine", css: otherCSS))
+        #expect(try await GetDesign(store: store)(id: "mine") == design)
+        #expect(try await store.installedOrigins() == ["mine": .imported])
+        #expect(await gate.verified == ["mine"])
+    }
+
+    @Test("every identifier in the bundled source is reserved, also that of a package the validator refuses")
+    func refusedBundledPackageStillReservesItsIdentifier() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let broken = (name: "broken-file", data: designData(".cv{}", id: "modern", manifestExtra: ["version": "1"]))
+        let source = FixedBundledSource(packages: [broken, try bundled("clean")])
+        let install = InstallDesign(source: source, gate: gate, store: store)
+        for id in ["modern", "clean"] {
+            await #expect(throws: DesignCatalogError.bundledIdentifier(id)) { _ = try await install(DesignStoreContract.package(id: id, version: "999999999.0.0")) }
+        }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("one validator, one cap: a bundled package the sync installs is reserved by the import, and the others still import")
+    func withinTheCapIsInstalledAndReserved() async throws {
+        let package = try bundled("modern", css: String(repeating: ".cv-name{color:var(--color-primary)}", count: 20))
+        let validator = DesignPackageValidator(maxBytes: package.data.count)
+        let source = FixedBundledSource(packages: [package])
+        let report = try await SyncBundledDesigns(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())()
+        #expect(report.installed == ["modern"])
+        let install = InstallDesign(source: source, validator: validator, gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await install(DesignStoreContract.package(id: "modern", version: "999999999.0.0")) }
+        #expect(try await install(DesignStoreContract.package(id: "mine")).manifest.id == "mine")
+    }
+
+    @Test("a bundled package over the cap cannot be inspected: it blocks every import, and once the bundle is repaired the sync installs it with no conflict")
+    func oversizedBundledPackageFailsClosed() async throws {
+        let oversized = try bundled("modern", css: String(repeating: ".cv-name{color:var(--color-primary)}", count: 20))
+        let validator = DesignPackageValidator(maxBytes: oversized.data.count - 1)
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let broken = FixedBundledSource(packages: [try bundled("clean"), oversized])
+        let install = InstallDesign(source: broken, validator: validator, gate: gate, store: store)
+        for id in ["modern", "mine"] {
+            await #expect(throws: DesignCatalogError.bundledPackageUninspectable("modern")) { _ = try await install(DesignStoreContract.package(id: id, version: "999999999.0.0")) }
+        }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+        let before = try await SyncBundledDesigns(source: broken, validator: validator, gate: gate, store: store)()
+        #expect(before.rejected.map(\.violations) == [[.tooLarge(oversized.data.count)]] && before.installed == ["clean"])
+        // The bundle is repaired: the package fits the cap, and nothing took its identifier meanwhile.
+        let repaired = FixedBundledSource(packages: [try bundled("clean"), try bundled("modern")])
+        let after = try await SyncBundledDesigns(source: repaired, validator: validator, gate: gate, store: store)()
+        #expect(after.installed == ["modern"] && after.unchanged == ["clean"] && after.conflicts.isEmpty && after.rejected.isEmpty)
+        let again = InstallDesign(source: repaired, validator: validator, gate: gate, store: store)
+        #expect(try await again(DesignStoreContract.package(id: "mine")).manifest.id == "mine")
+        await #expect(throws: DesignCatalogError.bundledIdentifier("modern")) { _ = try await again(DesignStoreContract.package(id: "modern", version: "999999999.0.0")) }
+    }
+
+    @Test("the identifiers of the designs that ship with the app are reserved")
+    func realBundleReservesItsIdentifiers() async throws {
+        let install = InstallDesign(source: BundleDesignSource(), gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        for id in ["minimal", "modern", "professional"] {
+            await #expect(throws: DesignCatalogError.bundledIdentifier(id)) { _ = try await install(DesignStoreContract.package(id: id)) }
+        }
+    }
+
+    @Test("a bundled package that cannot be inspected blocks every import, named as the source names it: nothing is rendered or stored",
+          arguments: ["not JSON", "{}", #"{"manifest":[]}"#, ""])
+    func uninspectableBundledPackageFailsClosed(json: String) async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let packages: [(name: String, data: Data)] = [try bundled("clean"), ("damaged-file", Data(json.utf8))]
+        let install = InstallDesign(source: FixedBundledSource(packages: packages), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledPackageUninspectable("damaged-file")) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("a bundled package whose manifest names no valid identifier reserves nothing, and does not stop the import")
+    func noIdentifierReservesNothing() async throws {
+        let store = InMemoryDesignStore()
+        let packages: [(name: String, data: Data)] = [("no-id", designData(".cv{}", id: "../clean")), ("no-key", designData(".cv{}", manifestWithout: ["id"]))]
+        let install = InstallDesign(source: FixedBundledSource(packages: packages), gate: FakeRenderingGate(), store: store)
+        _ = try await install(DesignStoreContract.package(id: "mine"))
+        #expect(try await store.installedOrigins() == ["mine": .imported])
+    }
+
+    @Test("a bundled source that cannot be read stops the import: nothing is rendered or stored")
+    func sourceUnavailable() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate()
+        let install = InstallDesign(source: FixedBundledSource(packages: nil), gate: gate, store: store)
+        await #expect(throws: DesignCatalogError.bundledDesignsUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
+        #expect(try await store.installedDesigns().isEmpty)
+        #expect(await gate.verified.isEmpty)
+    }
+
+    @Test("an invalid package is refused as invalid, before the bundled designs are read")
+    func invalidPackage() async throws {
+        let install = InstallDesign(source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), store: InMemoryDesignStore())
+        await #expect(throws: DesignPackageRejected.self) { _ = try await install(designData(".cv{display:none}", id: "bad")) }
+    }
+}

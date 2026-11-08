@@ -2,8 +2,10 @@
   "manifest": {
     "id": "modern",
     "name": "Modern",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Contemporary layout with a large name, a colour accent bar and spaced-out section titles.",
+    "defaultPalette": "ocean",
+    "defaultFonts": "system",
     "markupContract": 1,
     "author": "PrestoCV",
     "price": 0.0

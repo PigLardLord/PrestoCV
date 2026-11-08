@@ -17,14 +17,15 @@ import CVBundledHeadings
 @MainActor
 @Suite("#3 · bundled designs on the macOS renderer", .serialized, .timeLimit(.minutes(10)))
 struct BundledDesignsPreviewTests {
-    /// What #3 asks: the contract fixture prints completely with each design. PDFKit reads every text node back, inside
+    /// What #3 asks: the contract fixture prints completely with each design, in its default palette, under every font
+    /// scheme (the gate renders them all). PDFKit reads every text node back, inside
     /// the page and at a readable size.
     @Test("every bundled design passes the rendering gate with the macOS renderer, read with PDFKit")
     func gate() async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "it")
         let gate = FixtureRenderingGate(renderer: MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules()),
                                         inspector: PDFKitInspector(), fixture: ContractFixture.document,
-                                        headings: headings, palette: ContractFixture.palette)
+                                        headings: headings)
         let packages = try await BundleDesignSource().bundledPackages()
         #expect(packages.count == 3)
         for package in packages {
@@ -32,7 +33,7 @@ struct BundledDesignsPreviewTests {
         }
     }
 
-    /// UPDATE_PREVIEWS=1 prints the English sample with each design and stores the first page as the package's preview,
+    /// UPDATE_PREVIEWS=1 prints the English sample with each design, in its default palette and fonts, and stores the first page as the package's preview,
     /// over the file in the checkout. The package's hash changes: pin the new one in `BundledDesignsRenderingTests`.
     @Test("UPDATE_PREVIEWS=1 stores the first page of each design as its preview",
           .enabled(if: ProcessInfo.processInfo.environment["UPDATE_PREVIEWS"] == "1", "runs only with UPDATE_PREVIEWS=1"))
@@ -41,7 +42,8 @@ struct BundledDesignsPreviewTests {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
         for package in try await BundleDesignSource().bundledPackages() {
             let design = try DesignPackageValidator().validate(package.data)
-            let html = DocumentHTMLBuilder().build(Self.sample, stylesheet: design.stylesheet, palette: ContractFixture.palette, headings: headings)
+            let html = DocumentHTMLBuilder().build(Self.sample, stylesheet: design.stylesheet,
+                                                       palette: design.manifest.defaultPalette.palette, fonts: design.manifest.defaultFonts, headings: headings)
             let pdf = try await renderer.render(html: html, page: .a4)
             #expect(!pdf.truncated, "\(design.manifest.id): truncated")
             try Self.store(try Self.firstPagePNG(pdf.data), in: package.name, data: package.data)

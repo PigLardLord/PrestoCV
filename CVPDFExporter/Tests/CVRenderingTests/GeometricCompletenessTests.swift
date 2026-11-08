@@ -121,7 +121,7 @@ struct FixedLayoutInspector: PDFLayoutInspecting {
 struct GeometryGateTests {
     func gate(_ renderer: any PDFRendering, _ inspector: any PDFLayoutInspecting) throws -> FixtureRenderingGate {
         FixtureRenderingGate(renderer: renderer, inspector: inspector, fixture: fixture,
-                             headings: try headingsCatalog.headings(for: "it"), palette: palette)
+                             headings: try headingsCatalog.headings(for: "it"))
     }
 
     @Test("a design whose fixture text lies outside the page is not stored")
@@ -129,7 +129,7 @@ struct GeometryGateTests {
         let store = InMemoryDesignStore()
         let pastTheRightEdge = FakePDFRenderer(placement: FakePDFRenderer.TextPlacement(fontSize: 10, leading: 12, x: 600, y: 800))
         let error = await #expect(throws: FixtureRenderingGate.Rejection.self) {
-            _ = try await InstallDesign(gate: try gate(pastTheRightEdge, MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
+            _ = try await InstallDesign(source: FixedBundledSource(packages: []), gate: try gate(pastTheRightEdge, MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
         }
         guard case .outsidePage(let texts)? = error else { Issue.record("expected outsidePage, got \(String(describing: error))"); return }
         #expect(texts.contains("Mathematics"), "every line of the fixture lies past the right edge")
@@ -141,7 +141,7 @@ struct GeometryGateTests {
         let store = InMemoryDesignStore()
         let threePoints = FakePDFRenderer(placement: FakePDFRenderer.TextPlacement(fontSize: 3, leading: 4, x: 40, y: 800))
         let error = await #expect(throws: FixtureRenderingGate.Rejection.self) {
-            _ = try await InstallDesign(gate: try gate(threePoints, MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
+            _ = try await InstallDesign(source: FixedBundledSource(packages: []), gate: try gate(threePoints, MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
         }
         guard case .glyphTooSmall(let texts)? = error else { Issue.record("expected glyphTooSmall, got \(String(describing: error))"); return }
         #expect(texts.contains("Mathematics"), "every line of the fixture is 3 pt high")
@@ -152,7 +152,7 @@ struct GeometryGateTests {
     func noLayout() async throws {
         let store = InMemoryDesignStore()
         let error = await #expect(throws: FixtureRenderingGate.Rejection.self) {
-            _ = try await InstallDesign(gate: try gate(FakePDFRenderer(), NoLayoutInspector()), store: store)(designData(cleanCSS, id: "clean"))
+            _ = try await InstallDesign(source: FixedBundledSource(packages: []), gate: try gate(FakePDFRenderer(), NoLayoutInspector()), store: store)(designData(cleanCSS, id: "clean"))
         }
         #expect(error == .unreadablePDF)
         #expect(try await store.design(id: "clean") == nil)
@@ -162,7 +162,7 @@ struct GeometryGateTests {
     func rejection(of layout: PDFLayout) async throws -> FixtureRenderingGate.Rejection? {
         let store = InMemoryDesignStore()
         let error = await #expect(throws: FixtureRenderingGate.Rejection.self) {
-            _ = try await InstallDesign(gate: try gate(FakePDFRenderer(), FixedLayoutInspector(layout: layout)), store: store)(designData(cleanCSS, id: "clean"))
+            _ = try await InstallDesign(source: FixedBundledSource(packages: []), gate: try gate(FakePDFRenderer(), FixedLayoutInspector(layout: layout)), store: store)(designData(cleanCSS, id: "clean"))
         }
         #expect(try await store.design(id: "clean") == nil)
         return error
@@ -187,7 +187,7 @@ struct GeometryGateTests {
     @Test("a design that renders inside the page at a readable size is stored")
     func clean() async throws {
         let store = InMemoryDesignStore()
-        _ = try await InstallDesign(gate: try gate(FakePDFRenderer(), MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
+        _ = try await InstallDesign(source: FixedBundledSource(packages: []), gate: try gate(FakePDFRenderer(), MinimalPDFInspector()), store: store)(designData(cleanCSS, id: "clean"))
         #expect(try await store.design(id: "clean") != nil)
     }
 }
