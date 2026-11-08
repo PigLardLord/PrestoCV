@@ -301,7 +301,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVImporting`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels` |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, load, save, rename, duplicate, delete, and the writer of the open CV, which writes its text and changes its look or document language), `CVBrowsing` (the list with the store's issues, the first-run state, the samples) and `CVExporting`. The editing and browsing operations have typed `throws(EditFailure)`; `CVExporting` and `CVAutosaveWriting` have untyped `throws`, so cancellation passes through.
@@ -327,13 +327,16 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 **`PrestoCVComposition`**
 - The only place that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
-  - file locations under Application Support;
-  - one `FileCVRepository` and one `FileDesignStore`;
-  - the web-view rule list, compiled once;
-  - the platform renderer and the PDFKit inspector;
+  - file locations (`AppPaths`, the only code that asks the system for a folder): the root is `Application Support/PrestoCVNext`, never the legacy `PrestoCV/CVs`; the store is `Store/` in it, the trace is `Diagnostics/`, and the copies made to share are `DiagnosticsShare/` in the temporary folder;
+  - one `FileCVRepository` over the store and one `FileDesignStore`;
+  - the web-view rule list, compiled once per composition (a failed compile is a failed state, never a fallback);
+  - the platform renderer and the PDFKit inspector, the bundled headings and the sample source;
   - the AI adapter, the PDFKit reader of the import, `TimeSource`, `IDGenerator` and logger;
-  - the `ScreenFactory`.
-- **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. A launch argument selects it. No production target depends on a test-support target.
+  - the trace chain of ADR 0032 (`TraceChain`, which builds the recorder, the gate and the store), built here and nowhere else;
+  - the `ScreenFactory`;
+  - the deadline of a failed launch (`Inputs.settleDeadline`): `make` returns the failed state even while the distribution has not answered, and the purge of a closed launch follows the answer;
+  - `CompositionState`, ready or failed with a code (`CompositionFailure`) the app shows as one error screen.
+- **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. Launch arguments select it (`-PrestoCVNextStorage <name>`, `-PrestoCVNextEmptyStorage`, `-PrestoCVNextSeed <base 64>`, `-PrestoCVNextDistribution <answer>`); they are parsed into `LaunchFixtures`, which exists in Debug builds only. No production target depends on a test-support target.
 
 **Test support.** `PrestoCVAppTestSupport` holds fakes for the workflow ports.
 
@@ -386,7 +389,8 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                                    └─▶ PrestoCVImporting ─────────────────────────────┘
      └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVPersistence, PrestoCVImportingPDFKit, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
-                                CVRenderingPDFKitInspector, CVDraftingFoundationModels
+                                CVRenderingPDFKitInspector, CVDraftingFoundationModels,
+                                DiagnosticLogging, DiagnosticLoggingOSLog, DiagnosticTrace, DiagnosticTraceFiles, DiagnosticTraceDistribution
 PrestoCVImportingPDFKit ─▶ PrestoCVImporting
 PrestoCVImporting, PrestoCVImportingPDFKit, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticLogging
 PrestoCV (app) ─▶ DiagnosticLoggingOSLog ─▶ DiagnosticLogging

@@ -121,6 +121,28 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The answer of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// The new app's fixtures (storage, seed, answer of the store) are launch arguments of the UI tests.
+    @Test("The launch arguments of the new app's fixtures are read only by Debug builds")
+    func theFixturesOfTheNewAppAreReadOnlyInDebugBuilds() {
+        let reads = Self.shippedLines().filter { $0.code.contains("\"-PrestoCVNext") }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixtures: update it with the code")
+        #expect(offenders.isEmpty, "The fixtures of the new app outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// Where the new app keeps its data is decided in one place, so a second folder cannot appear unnoticed.
+    @Test("Only AppPaths asks the system for a folder in the composition")
+    func onlyAppPathsAsksForFolders() throws {
+        let ask = try NSRegularExpression(pattern: #"applicationSupportDirectory|temporaryDirectory|NSHomeDirectory|urls\(for:|documentDirectory"#)
+        let lines = Self.shippedLines().filter { $0.file.hasPrefix("PrestoCVApp/Sources/PrestoCVComposition/") }
+
+        let asking = Set(lines.filter { ask.firstMatch(in: $0.code, range: NSRange($0.code.startIndex..., in: $0.code)) != nil }.map(\.file))
+
+        #expect(asking == ["PrestoCVApp/Sources/PrestoCVComposition/AppPaths.swift"], "Asking for a folder in \(asking.sorted())")
+    }
+
     // MARK: Privacy manifest
 
     /// The categories of required-reason APIs (Apple's list), each with a pattern for the calls and keys that use them.
