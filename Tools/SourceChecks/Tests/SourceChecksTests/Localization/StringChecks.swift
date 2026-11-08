@@ -53,6 +53,8 @@ struct StringRules: Sendable {
     var viewFolders: [String]?
     /// Labels of arguments that take a key, on any view: `ErrorStateView(title: "failed.title")`.
     var extraArguments: [String] = []
+    /// Read every string literal with words in the view folders, wherever it stands, instead of the literals handed to a view.
+    var everyLiteralInViews = false
 }
 
 // MARK: - Catalog

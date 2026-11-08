@@ -18,6 +18,11 @@ struct PlantedViews {
             Text("plant.plural_review")
             Text("plant.plural_no_value")
             Text("plant.plural_empty")
+            Text("plant.reversed")
+            Text("plant.reordered")
+            Text("plant.plural_count")
+            Text("plant.plural_omitted_count")
+            Text("plant.plural_conflict")
             Text("plant.absent".localized)
         }
     }

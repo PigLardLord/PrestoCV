@@ -63,7 +63,26 @@ struct StringChecksSelfTests {
 
     @Test("A text with other placeholders than the English one is found")
     func otherPlaceholders() throws {
-        #expect(try Self.run().otherPlaceholders == ["plant.placeholders (it)"])
+        #expect(Set(try Self.run().otherPlaceholders).contains("plant.placeholders (it)"))
+    }
+
+    @Test("Placeholders are compared by argument position: a reversed mixed-type translation is found, a numbered reorder is not")
+    func placeholdersByPosition() throws {
+        let found = try Self.run().otherPlaceholders
+        #expect(found.contains("plant.reversed (de)"), "\(found)")
+        #expect(!found.contains { $0.hasPrefix("plant.reordered") }, "\(found)")
+    }
+
+    @Test("A plural form that omits the count passes while another form uses it; a position with two types in one language is found")
+    func pluralPlaceholders() throws {
+        let found = try Self.run().otherPlaceholders
+        #expect(!found.contains { $0.hasPrefix("plant.plural_omitted_count") || $0.hasPrefix("plant.plural_count") }, "\(found)")
+        #expect(found.contains("plant.plural_conflict (de)"), "\(found)")
+    }
+
+    @Test("Nothing else is reported for its placeholders")
+    func onlyThePlantedPlaceholders() throws {
+        #expect(Set(try Self.run().otherPlaceholders) == ["plant.placeholders (it)", "plant.reversed (de)", "plant.plural_conflict (de)"])
     }
 
     @Test("A promise of availability is found in any language")
@@ -143,5 +162,44 @@ struct StringChecksSelfTests {
         #expect(found.contains("plant.screen_title"))
         #expect(found.contains("plant.box_title"))
         #expect(!found.contains("plant.complete"), "\(found)")
+    }
+
+    // MARK: Every literal of the views
+
+    private static func runOnBypasses(rules: StringRules) throws -> [String] {
+        literals(try StringChecks.run(
+            catalog: planted.appendingPathComponent("Localizable.xcstrings"),
+            sources: [planted.appendingPathComponent("PlantedBypasses.swift")],
+            rules: rules
+        ).lookedUpButMissing)
+    }
+
+    @Test("With every literal read, English reaches a view by a ternary, a local, a multiline or raw literal, or a member call, and is found")
+    func everyLiteralIsRead() throws {
+        var rules = StringRules()
+        rules.everyLiteralInViews = true
+        let found = try Self.runOnBypasses(rules: rules)
+
+        #expect(Set(found) == [
+            "Ready to send", "Try once more", "Name your resume", "Tell us about your last job", "Review your draft", "Raw words here",
+        ], "\(found)")
+    }
+
+    @Test("A key, a lookup, a verbatim text, an identifier, a symbol name and a comment are not English in a view")
+    func everyLiteralHasItsExemptions() throws {
+        var rules = StringRules()
+        rules.everyLiteralInViews = true
+        rules.nonKeyLiterals = ["Review your draft": "a test reason"]
+        let found = try Self.runOnBypasses(rules: rules)
+
+        #expect(!found.contains("Review your draft"))
+        for exempt in ["plant.complete", "Plain words here", "profile.save.button", "doc.text", "doc.richtext", "hero-banner", "Commented words", "Documented words", "Trailing words"] {
+            #expect(!found.contains(exempt), "\(exempt): \(found)")
+        }
+    }
+
+    @Test("Without the option the legacy scan stays: only the literals handed straight to a view are read")
+    func legacyScanIsUnchanged() throws {
+        #expect(try Self.runOnBypasses(rules: StringRules()).isEmpty)
     }
 }
