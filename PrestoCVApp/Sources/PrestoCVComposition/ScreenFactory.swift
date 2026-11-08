@@ -1,0 +1,67 @@
+import Foundation
+import PrestoCVApplication
+import PrestoCVDomain
+import PrestoCVIntegration
+import PrestoCVPresentation
+
+/// Makes the view models of the screens over the composition's one repository, clock and id source (R4, R5). A view is
+/// given its view model by this factory and never builds one. The methods do no I/O: each view model loads in its own
+/// `load()`.
+///
+/// The two workflows are stateless, so the factory makes one of each and every view model shares them.
+@MainActor
+public final class ScreenFactory {
+    private let browsing: BrowseCVsWorkflow
+    private let editing: EditCVWorkflow
+    private let clock: any TimeSource
+    /// The editors made and not yet released. The factory never keeps one alive.
+    private var editors: [WeakEditor] = []
+
+    init(repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource) {
+        browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
+        editing = EditCVWorkflow(repository: repository, ids: ids)
+        self.clock = clock
+    }
+
+    /// The list of CVs.
+    /// - Parameters:
+    ///   - untitled: The view's words for a CV with no title (R13).
+    ///   - numbered: How the view numbers a title that reads like another row's (R13).
+    public func makeCVList(
+        untitled: String, numbered: @escaping @MainActor (String, Int) -> String
+    ) -> CVListViewModel {
+        let clock = clock
+        return CVListViewModel(
+            browsing: browsing, editing: editing, untitled: untitled, numbered: numbered, now: { clock.now() },
+            editorsStored: { [weak self] in await self?.storeEditors() }
+        )
+    }
+
+    /// The first run.
+    public func makeFirstRun() -> FirstRunViewModel {
+        FirstRunViewModel(browsing: browsing, editing: editing)
+    }
+
+    /// An editor, stored by the autosave a pause after the last change (one second, as in version 1).
+    /// - Parameters:
+    ///   - start: What the editor opens.
+    ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
+    public func makeEditor(start: EditorStart, copyTitle: @escaping @MainActor (String) -> String) -> EditorViewModel {
+        let editor = EditorViewModel(
+            start: start, editing: editing, clock: ContinuousClock(), pause: Autosave<CV>.pause, copyTitle: copyTitle
+        )
+        editors = editors.filter { $0.editor != nil } + [WeakEditor(editor)]
+        return editor
+    }
+
+    /// Returns once every editor that is still alive has stored what it shows, so that the list reads the store after them.
+    private func storeEditors() async {
+        for editor in editors.compactMap(\.editor) { await editor.saveNow() }
+    }
+}
+
+private struct WeakEditor {
+    weak var editor: EditorViewModel?
+
+    init(_ editor: EditorViewModel) { self.editor = editor }
+}

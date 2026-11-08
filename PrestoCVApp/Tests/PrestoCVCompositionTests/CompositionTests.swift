@@ -26,7 +26,7 @@ struct CompositionTests {
         }
     }
 
-    private static func counting(_ counter: CompileCounter) -> Composition.CompileRules {
+    static func counting(_ counter: CompileCounter) -> Composition.CompileRules {
         { @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in try await counter.compile() }
     }
 
@@ -39,12 +39,12 @@ struct CompositionTests {
         for await _ in AsyncStream<Void> { _ in } {}
     }
 
-    private static func paths() -> AppPaths {
+    static func paths() -> AppPaths {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("CompositionTests-\(UUID().uuidString)", isDirectory: true)
         return AppPaths(root: base.appendingPathComponent("Root", isDirectory: true), temporary: base)
     }
 
-    private static func inputs(
+    static func inputs(
         _ paths: AppPaths,
         log: any DiagnosticLogger = RecordingLogger(),
         clock: any TimeSource = SteppingClock(),
@@ -66,7 +66,7 @@ struct CompositionTests {
         )
     }
 
-    private static func ready(_ state: CompositionState) throws -> Composition {
+    static func ready(_ state: CompositionState) throws -> Composition {
         guard case .ready(let composition) = state else {
             throw Failed(state: "\(state)")
         }
