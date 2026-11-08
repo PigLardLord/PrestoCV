@@ -1,0 +1,85 @@
+// This file imports nothing of the domain or the application layer, and not `@testable`: what it uses is what a view sees.
+import Testing
+import PrestoCVPresentation
+
+/// Every public member of the editor, each with its type spelled out. It compiles only while each type is the
+/// presentation's own: a domain type in the public surface breaks it.
+@MainActor
+func useEveryPublicMember(of editor: EditorViewModel) async {
+    let content: EditorContent = editor.content
+    editor.content = content
+    let _: OpeningStatus = editor.opening
+    let _: SaveStatus = editor.saveStatus
+    let _: ExportStatus = editor.exportStatus
+    let _: Bool = editor.isSavedOnThisDevice
+    let _: String? = editor.documentLanguage
+    let _: EditorLook? = editor.look
+    await editor.load()
+    await editor.saveNow()
+    await editor.reload()
+    await editor.saveAsCopy()
+    let tag: String? = nil
+    await editor.setDocumentLanguage(tag)
+    let parts: Set<LookPart> = [.design]
+    await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
+    let document: ExportedDocument? = await editor.export()
+    _ = document.map { ($0.pdf, $0.pages) }
+}
+
+/// Every value a status can take, with a field or a section where it has one. The switches break when a case is added,
+/// so that it is added here too.
+func everySaveStatus() -> [SaveStatus] {
+    let all: [SaveStatus] = [.saved, .pending, .saving, .notEnoughContent, .tooLarge, .conflict, .deletedElsewhere, .failed]
+        + EditorField.allCases.flatMap { [SaveStatus.textTooLong($0), .unreadable($0)] }
+        + EditorSection.allCases.map(SaveStatus.tooManyEntries)
+    for status in all {
+        switch status {
+        case .saved, .pending, .saving, .notEnoughContent, .textTooLong, .tooManyEntries, .tooLarge, .unreadable, .conflict,
+             .deletedElsewhere, .failed:
+            break
+        }
+    }
+    return all
+}
+
+func everyExportStatus() -> [ExportStatus] {
+    let all: [ExportStatus] = [.idle, .exporting, .done(pages: 1), .truncated(pages: 1, required: 2), .languageNeeded,
+                               .notReady, .unsupportedLanguage, .invalid, .incomplete, .failed]
+    for status in all {
+        switch status {
+        case .idle, .exporting, .done, .truncated, .languageNeeded, .notReady, .unsupportedLanguage, .invalid, .incomplete,
+             .failed:
+            break
+        }
+    }
+    return all
+}
+
+/// The strings anywhere inside `value`.
+func strings(in value: Any) -> [String] {
+    if let text = value as? String { return [text] }
+    return Mirror(reflecting: value).children.flatMap { strings(in: $0.value) }
+}
+
+@MainActor
+@Suite("Editor public surface")
+struct PublicSurfaceTests {
+
+    @Test("the public surface holds no domain type: this file uses all of it importing only the presentation")
+    func noDomainTypeInThePublicAPI() async {
+        let editor = Editing().editor(.blank)
+
+        await useEveryPublicMember(of: editor)
+
+        #expect(editor.opening == .open)
+    }
+
+    @Test("statuses are codes: none carries a text")
+    func statusesCarryNoText() {
+        let opening: [OpeningStatus] = [.opening, .open, .missing, .failed]
+        let values: [Any] = everySaveStatus() + everyExportStatus() + opening
+
+        #expect(values.flatMap { strings(in: $0) }.isEmpty)
+        #expect(Set(everySaveStatus()).count == everySaveStatus().count)
+    }
+}
