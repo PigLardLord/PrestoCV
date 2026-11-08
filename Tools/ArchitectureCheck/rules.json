@@ -738,6 +738,8 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVDrafting",
+    "DiagnosticLogging",
+    "Synchronization",
     "Foundation"
    ],
    "rules": [
@@ -770,7 +772,10 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVRenderingTestSupport",
-    "CVBundledHeadings"
+    "CVBundledHeadings",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport",
+    "Synchronization"
    ],
    "rules": [],
    "kind": "test"
@@ -828,6 +833,7 @@
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
     "PrestoCVDomain",
+    "PrestoCVImporting",
     "PrestoCVPersistence",
     "CVDocumentModel",
     "CVDesignCatalog",

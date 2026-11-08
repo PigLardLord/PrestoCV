@@ -23,6 +23,7 @@ var targets: [Target] = [
         .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
         .product(name: "CVRendering", package: "CVPDFExporter"),
         .product(name: "CVDrafting", package: "CVGeneratorAI"),
+        .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
     .target(name: "PrestoCVPresentation", dependencies: [
         "PrestoCVWorkflowPorts",
@@ -43,6 +44,8 @@ targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
     .product(name: "CVRendering", package: "CVPDFExporter"),
     .product(name: "CVRenderingTestSupport", package: "CVPDFExporter"),
     .product(name: "CVBundledHeadings", package: "CVPDFExporter"),
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
 ]))
 targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
     "PrestoCVPresentation", "PrestoCVWorkflowPorts",
@@ -58,6 +61,7 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
+    .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
     .product(name: "PrestoCVPersistence", package: "PrestoCVCore"),
     .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     .product(name: "CVDesignCatalog", package: "CVPDFExporter"),
