@@ -2,19 +2,27 @@ import Foundation
 
 /// How much the claim check may ask of the device (ADR 0028): the on-device model reads about one item a second, and a longer prompt
 /// answers worse and, past its window, not at all. So the candidates go to the model in batches, and the whole check has a time.
-struct ClaimCheckLimits: Equatable, Sendable {
+struct ClaimCheckLimits: Sendable {
     /// How many candidates one call judges. A batch is small enough for the model to answer every item and for its prompt to fit the
     /// window of the model whatever the description.
     let batchSize: Int
     /// How long the whole check may take, from the first batch to the last. Past it the check gives no answer.
     let time: Duration
+    /// The clock `time` runs on (#400): the app's is the continuous clock, a test's ends the time when the test says so.
+    let clock: any Clock<Duration>
 
-    static let standard = ClaimCheckLimits(batchSize: 8, time: .seconds(60))
+    static let standard = ClaimCheckLimits(batchSize: 8, time: .seconds(60), on: ContinuousClock())
 
     /// - Parameter batchSize: At least 1: a smaller number counts as 1.
-    init(batchSize: Int, time: Duration) {
+    init(batchSize: Int, time: Duration, on clock: any Clock<Duration>) {
         self.batchSize = max(1, batchSize)
         self.time = time
+        self.clock = clock
+    }
+
+    /// The same batch and time on `clock`: a test keeps the app's limits and ends the time when it says so (#413).
+    func on(_ clock: any Clock<Duration>) -> ClaimCheckLimits {
+        ClaimCheckLimits(batchSize: batchSize, time: time, on: clock)
     }
 }
 
@@ -55,15 +63,17 @@ enum ClaimWithdrawal {
     /// or time that runs out) every personal item it would have judged is withdrawn and the draft says so: never a retry, and
     /// never the rules alone. Cancellation passes through.
     /// - Note: A checker must stop when its task is cancelled, or the time limit cannot cut it short.
+    /// - Parameter limits: No default (#413): the app gives `.standard` through `DraftingLimits`, a test gives limits on its test clock.
     static func checking(_ grounded: CVData, in description: String, with checker: any ClaimChecking,
-                         within limits: ClaimCheckLimits = .standard) async throws -> GeneratedDraft {
+                         within limits: ClaimCheckLimits) async throws -> GeneratedDraft {
         try await report(on: grounded, in: description, with: checker, within: limits).draft
     }
 
     /// What `checking` gives, with what the check said for the trace of a test build (ADR 0032): the candidates, the judgement of
     /// each, and why the check gave no answer when it did not.
+    /// - Parameter limits: No default (#413), as for `checking`.
     static func report(on grounded: CVData, in description: String, with checker: any ClaimChecking,
-                       within limits: ClaimCheckLimits = .standard) async throws -> ClaimCheckReport {
+                       within limits: ClaimCheckLimits) async throws -> ClaimCheckReport {
         let candidates = ClaimCandidates.of(grounded, in: description)
         guard !candidates.isEmpty else {
             return ClaimCheckReport(draft: GeneratedDraft(cvData: grounded, personalItemsUnchecked: false), candidates: [],
@@ -124,7 +134,7 @@ enum ClaimWithdrawal {
                 return judgements
             }
             group.addTask {
-                try await Task.sleep(for: limits.time)
+                try await limits.clock.sleep(for: limits.time)
                 return nil
             }
             defer { group.cancelAll() }
