@@ -19,7 +19,7 @@ import CVRenderingMacOS
 
 /// How the app was assembled: ready, or failed with the one code the app shows as one error screen. Later steps add the
 /// design state to the ready case, so that the app keeps a single switch.
-public enum CompositionState {
+public enum CompositionState: Sendable {
     case ready(Composition)
     case failed(CompositionFailure)
 }
