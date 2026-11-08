@@ -750,6 +750,8 @@
     "Foundation",
     "PrestoCVIntegration",
     "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
+    "PrestoCVCoreTestSupport",
     "PrestoCVDomain",
     "CVDocumentModel",
     "CVDesignCatalog",
