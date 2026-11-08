@@ -6,6 +6,8 @@ struct EmptyStateView: View {
     private let symbol: String
     private let title: LocalizedStringResource
     private let message: LocalizedStringResource
+    /// The symbol grows with the text size, as the text beside it does
+    @ScaledMetric(relativeTo: .largeTitle) private var symbolSize = IconSize.state
 
     /// `symbol` is the name of a system symbol.
     init(symbol: String, title: LocalizedStringResource, message: LocalizedStringResource) {
@@ -18,7 +20,7 @@ struct EmptyStateView: View {
         ScrollView {
             VStack(spacing: Spacing.medium) {
                 Image(systemName: symbol)
-                    .font(.system(size: IconSize.state))
+                    .font(.system(size: symbolSize))
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 ScreenTitle(title)

@@ -18,7 +18,7 @@ struct SidebarView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("shell.sidebar.empty")
         } else if list.rows.isEmpty, list.status == .loading {
-            LoadingView("root.loading")
+            LoadingView("shell.sidebar.loading")
                 .accessibilityIdentifier("shell.sidebar.loading")
         } else {
             List(selection: selection) {

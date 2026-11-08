@@ -72,6 +72,12 @@ final class ShellUITests: XCTestCase {
             XCTAssertTrue(row.waitForExistence(timeout: 30))
             XCTAssertTrue(row.isHittable)
             XCTAssertFalse(heading.exists)
+
+            // The person can open the CV again: going back left nothing selected, so the row is a new selection
+            row.tap()
+            XCTAssertTrue(heading.waitForExistence(timeout: 30))
+            XCTAssertEqual(heading.label, title)
+            XCTAssertFalse(row.isHittable, "One column at a time")
         } else {
             XCTAssertTrue(row.isHittable, "Both columns")
             XCTAssertTrue(heading.isHittable)
@@ -83,9 +89,19 @@ final class ShellUITests: XCTestCase {
     func testTheDetailSaysNoCVIsOpenWhereBothColumnsShow() throws {
         let app = try launchWithOneCV()
         XCTAssertTrue(row(of: app).waitForExistence(timeout: 30))
-        guard !isCompact(app) else { return }
+        try XCTSkipIf(isCompact(app), "A compact screen shows one column at a time")
 
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "shell.detail.empty").firstMatch.exists)
+    }
+
+    /// On a compact screen the list shows first, with no detail beside it.
+    @MainActor
+    func testTheDetailIsNotShownBesideTheListOnACompactScreen() throws {
+        let app = try launchWithOneCV()
+        XCTAssertTrue(row(of: app).waitForExistence(timeout: 30))
+        try XCTSkipUnless(isCompact(app), "A regular screen shows both columns")
+
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "shell.detail.empty").firstMatch.exists)
     }
 
     @MainActor

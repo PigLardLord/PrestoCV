@@ -28,20 +28,33 @@ struct RootView: View {
     }
 }
 
-/// The shell over the view models the composition's factory makes, once for as long as the shell is on screen (R4).
-private struct ReadyShell: View {
-    @State private var shell: ShellNavigationModel
-    @State private var list: CVListViewModel
+/// The view models of the shell, made once. A state object takes its initial value as an autoclosure that SwiftUI runs
+/// only when it keeps no object yet, so a pass over the body neither makes the models again nor reads the strings again.
+@MainActor
+private final class ShellModels: ObservableObject {
+    let shell: ShellNavigationModel
+    let list: CVListViewModel
 
     init(screens: ScreenFactory) {
-        _shell = State(initialValue: screens.makeShell())
-        _list = State(initialValue: screens.makeCVList(
-            untitled: String(localized: "shell.untitled"), numbered: { title, number in "\(title) (\(number))" }
-        ))
+        shell = screens.makeShell()
+        list = screens.makeCVList(
+            untitled: String(localized: "shell.untitled"),
+            // The order and the punctuation of a title and its number are the translation's
+            numbered: { title, number in String(localized: "shell.numbered \(title) \(number)") }
+        )
+    }
+}
+
+/// The shell over the view models the composition's factory makes, once for as long as the shell is on screen (R4).
+private struct ReadyShell: View {
+    @StateObject private var models: ShellModels
+
+    init(screens: ScreenFactory) {
+        _models = StateObject(wrappedValue: ShellModels(screens: screens))
     }
 
     var body: some View {
-        ShellView(shell: shell, list: list)
+        ShellView(shell: models.shell, list: models.list)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
     }

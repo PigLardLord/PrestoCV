@@ -6,6 +6,10 @@ import Testing
 struct NextCatalogTests {
     private static let languages = ["de", "en", "es", "fr", "it", "pt"]
 
+    /// Formats that read the same in every language: they carry only the order of their values and the punctuation, which
+    /// a translation may still change.
+    private static let sameInEveryLanguage: Set<String> = ["shell.numbered %@ %lld"]
+
     private static func catalog() throws -> [String: [String: Any]] {
         let url = Repository.root.appendingPathComponent("PrestoCVNext/Resources/Localizable.xcstrings")
         let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
@@ -39,7 +43,7 @@ struct NextCatalogTests {
                 if Self.placeholders(in: found.value) != Self.placeholders(in: english) {
                     defects.append("\(key) (\(language)): placeholders differ from English")
                 }
-                if language != "en", found.value == english { defects.append("\(key) (\(language)): copies English") }
+                if language != "en", found.value == english, !Self.sameInEveryLanguage.contains(key) { defects.append("\(key) (\(language)): copies English") }
             }
         }
         #expect(defects.isEmpty, "\(defects)")

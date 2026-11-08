@@ -6,6 +6,7 @@ import SwiftUI
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         NavigationSplitView(preferredCompactColumn: column) {
@@ -20,7 +21,7 @@ struct ShellView: View {
 
     @ViewBuilder
     private var detail: some View {
-        if let reference = shell.selection, let row = list.rows.first(where: { $0.reference == reference }) {
+        if let row = shell.selectedRow(in: list.rows) {
             OpenedCVPlaceholderView(label: row.label)
         } else {
             DetailPlaceholderView()
@@ -37,12 +38,13 @@ struct ShellView: View {
         )
     }
 
-    /// Going back to the list on a compact screen closes the open CV.
+    /// Going back to the list closes the open CV, when one column shows at a time (a compact width). The system also
+    /// writes the sidebar while it changes between one column and two, which is not the person going back.
     private var column: Binding<NavigationSplitViewColumn> {
         Binding(
             get: { shell.preferredColumn == .detail ? .detail : .sidebar },
             set: { column in
-                if column == .sidebar { shell.deselect() }
+                shell.columnChanged(to: column == .sidebar ? .sidebar : .detail, isCollapsed: horizontalSizeClass == .compact)
             }
         )
     }

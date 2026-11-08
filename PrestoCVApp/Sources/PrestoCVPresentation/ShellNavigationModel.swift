@@ -32,9 +32,22 @@ public final class ShellNavigationModel {
         selection = nil
     }
 
+    /// The listed row of the open CV, nil when none is open or the list does not have it.
+    public func selectedRow(in rows: [CVRow]) -> CVRow? {
+        guard let selection else { return nil }
+        return rows.first { $0.reference == selection }
+    }
+
+    /// The system moved to `column`. Going back to the list closes the open CV only while the split view shows one column
+    /// at a time: the sidebar the system writes while the split view changes between one column and two (a rotation, a
+    /// resized window) is not the person going back.
+    public func columnChanged(to column: ShellColumn, isCollapsed: Bool) {
+        if column == .sidebar, isCollapsed { deselect() }
+    }
+
     /// Closes the open CV when the list no longer has it, such as after it was deleted or the store lost it.
     public func reconcile(with rows: [CVRow]) {
-        guard let selection, !rows.contains(where: { $0.reference == selection }) else { return }
+        guard selection != nil, selectedRow(in: rows) == nil else { return }
         deselect()
     }
 }
