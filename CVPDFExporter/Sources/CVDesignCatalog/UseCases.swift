@@ -157,8 +157,9 @@ public struct SyncReport: Equatable, Sendable {
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
 ///   the store fails to save it (`failed`). The other packages still sync.
 /// - What stops the sync: a store that cannot list its designs (`DesignCatalogError.storeUnavailable`), a source that
-///   cannot be read (`DesignCatalogError.bundledDesignsUnavailable`), and cancellation. The gate can be cancelled
-///   (ADR 0003), so this throws untyped: a `DesignCatalogError`, or a `CancellationError` passed through unchanged.
+///   cannot be read (`DesignCatalogError.bundledDesignsUnavailable`), and cancellation. A cancellation passes through
+///   unchanged at every call (the source, the listings, the adoption, the gate and the save), and the designs saved before it
+///   stay saved (ADR 0003), so this throws untyped: a `DesignCatalogError`, or a `CancellationError`.
 public struct SyncBundledDesigns: Sendable {
     let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
     public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
@@ -168,7 +169,9 @@ public struct SyncBundledDesigns: Sendable {
 
     public func callAsFunction() async throws -> SyncReport {
         let packages: [(name: String, data: Data)]
-        do { packages = try await source.bundledPackages() } catch { throw DesignCatalogError.bundledDesignsUnavailable }
+        do { packages = try await source.bundledPackages() } catch let cancellation as CancellationError { throw cancellation } catch {
+            throw DesignCatalogError.bundledDesignsUnavailable
+        }
         var (versions, origins) = try await listInstalled()
         var report = SyncReport()
         for (name, data) in packages {
@@ -209,7 +212,7 @@ public struct SyncBundledDesigns: Sendable {
                 continue
             }
             let outcome: ConditionalSave
-            do { outcome = try await store.saveIfNewer(design) } catch {
+            do { outcome = try await store.saveIfNewer(design) } catch let cancellation as CancellationError { throw cancellation } catch {
                 report.failed.append(id)
                 continue
             }

@@ -394,6 +394,24 @@ struct SyncBundledDesignsTests {
         #expect(await store.savedIDs.isEmpty)
     }
 
+    @Test("a cancellation while the source is read ends the sync in a cancellation, not in an unavailable source (#175)")
+    func cancelledSource() async throws {
+        let gate = FakeRenderingGate(), store = InMemoryDesignStore()
+        let sync = SyncBundledDesigns(source: CancelledBundledSource(), gate: gate, store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await gate.verified.isEmpty)
+        #expect(try await store.installedDesigns().isEmpty)
+    }
+
+    @Test("a cancellation while a design is saved ends the sync in a cancellation, not in a failed design (#175)")
+    func cancelledSave() async throws {
+        let store = SpyDesignStore(cancelling: [.saveIfNewer])
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
+        let sync = SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)
+        await #expect(throws: CancellationError.self) { _ = try await sync() }
+        #expect(await store.savedIDs.isEmpty)
+    }
+
     @Test("a source that cannot be read is reported")
     func sourceUnavailable() async {
         let sync = SyncBundledDesigns(source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), store: InMemoryDesignStore())
