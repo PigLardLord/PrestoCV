@@ -157,7 +157,7 @@ only when that language is unclear.
 swift test
 ```
 
-The package builds only on Apple platforms. Tests use `FakeCVGenerationService` and `FakeClaimChecker`; the mapping of
+The package builds only on Apple platforms. Tests use `FakeCVGenerationService` and `FakeClaimChecker`, and every use case they build has its time limits (the model's requests and the claim check's) on `TestCallClock`, so that no test runs out of time on a busy machine (the evaluations that call the real model keep the real ones); the mapping of
 the framework's availability and errors (`FoundationModelsServiceTests`) needs macOS 26 with the FoundationModels
 framework.
 

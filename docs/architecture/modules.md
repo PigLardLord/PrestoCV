@@ -173,7 +173,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 | `CVRenderingWebKitSupport` | adapter support | iOS, macOS | `CVRendering`, WebKit, Foundation |
 | `CVRenderingIOS` | outbound adapter | iOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, UIKit, Foundation |
 | `CVRenderingMacOS` | outbound adapter | macOS | `CVRenderingWebKitSupport`, `CVRendering`, WebKit, AppKit, Foundation |
-| `CVRenderingPDFKitInspector` | outbound adapter | iOS, macOS | `CVRendering`, PDFKit, Foundation |
+| `CVRenderingPDFKitInspector` | outbound adapter | iOS, macOS | `CVRendering`, PDFKit, AppKit, UIKit, Foundation |
 | *(future)* `CVRenderingServer` | outbound adapter | Linux | `CVRendering`, Foundation |
 
 **`CVDocumentModel`**
@@ -212,9 +212,13 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **`HeadingsCatalog`:** JSON heading tables per language plus an index, matched by BCP 47. An unsupported language is a typed error. It reads the tables as raw bytes through **`HeadingTableSource`**, its outbound port, and decodes them itself; only a tag that reads as BCP 47 reaches the source ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
 - **`PDFRendering`**, the outbound port: `render(html:page:) async throws -> RenderedPDF`, with `data`, `pageCount` and `requiredPages`. `truncated` is derived from those.
 - **`PDFInspecting`**, the outbound port that reads the page count and text of a PDF.
+- **`PDFLayoutInspecting`** refines it with `layout(of:)`: each page's box, and each text line with its page, its box (points, origin at the lower left, as in PDF) and its glyph height.
 - **`RenderedDocument`:** the builder's output, meaning the HTML plus the exact text nodes it contains.
 - **`DocumentCompleteness`:** every text node needs its own span of the PDF text, which no other node uses, ignoring case and spacing.
-- **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design, and requires a complete, untruncated PDF.
+  - The search has a budget of 100 000 steps, and `report(in:expected:)` says how many it used. A search that runs out of budget reads as incomplete.
+  - On the real renderers (macOS 27 and the iOS 26.5 simulator) the contract fixture uses 41 steps, and the flex and grid designs 12 each; a test keeps them under a tenth of the budget.
+- **`GeometricCompleteness`:** every text line lies inside its page, within 1 pt, and its glyphs are at least 6 pt high (`minimumGlyphHeight`; the CSS policy allows 7 pt and up). A line of unknown height, and a layout with no page or no text, fail.
+- **`FixtureRenderingGate`:** implements the catalog's `DesignRenderingGate`. It renders a fixture that uses every section with the candidate design. It requires an untruncated, complete PDF whose geometry passes (`Rejection.outsidePage`, `Rejection.glyphTooSmall` otherwise).
 - **Policy:** the required fields and page limit, shared by preview and export.
 
 **`CVBundledHeadings`** holds the heading tables as resources, served as raw bytes through `Bundle.module` by `BundleHeadingTableSource`. An Android app ships no SwiftPM bundle: its edge reads the same files from the app's assets and passes them through the same port ([ADR 0026](adr/0026-keep-the-core-portable-to-android.md)).
@@ -235,7 +239,11 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - On iOS the web view is never put in a window. A `UIPrintPageRenderer` with a fixed paper and printable area paginates it, and each page is drawn in turn into a `UIGraphicsPDFRenderer` context, with a check for cancellation before each one. No step waits on a print callback, so a stalled print cannot hang the export (#101); the load and the readiness wait have time limits.
 
 **`CVRenderingPDFKitInspector`**
-- `PDFInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`.
+- `PDFLayoutInspecting` on PDFKit, used by the export workflow and by the native contract tests. Every file is wrapped in `#if canImport(PDFKit)`; it imports AppKit on macOS and UIKit on iOS, for the font type.
+- A line is one of PDFKit's `selectionsByLine()` over the whole page, and its box is the selection's bounds in page space, whatever the page's rotation.
+- A line's glyph height is the smallest `.font` point size of its attributed string, the page's transform included. A line with a character that has no font gets none, so the geometry check rejects it.
+- Text drawn wholly outside the page is not in the page's text at all, so `DocumentCompleteness` reports it; text that crosses an edge is a line whose box crosses it.
+- **`CVRenderingPDFKitInspectorTests`** check this on iOS and macOS against PDFs drawn with CoreText at known positions: boxes and sizes, text past each edge, 3 pt text and text shrunk by a transform, a rotated page, a line with no font, and data that is not a PDF.
 
 **Test support and tests.**
 - **`CVRenderingTestSupport`** may import `CVRendering`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings` (the contract fixture prints the shipped Italian headings), Foundation. It holds `InMemoryDesignStore`, the **`DesignStore` contract suite** that it and `FileDesignStore` pass, and:
@@ -247,7 +255,15 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`.
-- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test, in-flight cancellation and the content-completeness test for every bundled design.
+- **`CVRenderingNativeTestSupport`** (iOS and macOS) holds what both native renderers' tests share: `NativeRendererChecks`, the loopback listener that counts connections, and `DrawnPDF`, which draws PDFs with CoreText. It may import `CVRendering`, `CVRenderingTestSupport`, `CVRenderingPDFKitInspector`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings`, CoreGraphics, CoreText, Foundation, Network, PDFKit, Synchronization and WebKit (the listener's control page).
+- **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation. They run the checks of `NativeRendererChecks`, one line each:
+  - a field the renderer drops is reported missing;
+  - flex and grid at the minimum column gap keep skills, profiles and interests apart;
+  - R8: a script does not run; a remote image, stylesheet and font, a link and a meta refresh make no connection; the PDF keeps the document's text;
+  - link annotations: macOS keeps one per link, whose destinations are the builder's `href`s, and iOS keeps none. Each platform's test fails if that changes;
+  - the fixture's PDF has no geometry violation;
+  - the step budget above.
+- The completeness and geometry tests of every bundled design wait for the bundled designs of the new stack.
 
 **Separate package `CVPDFExporterExamples`** holds the demos. The library package contains no executables (R14).
 
@@ -332,6 +348,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 ## Xcode app target `PrestoCV` (iOS 26.5, macOS 26)
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
+
+**Until the switch to the new stack**, these folders live under `PrestoCVNext/`, in a second app target, `PrestoCVNext`, with the same platforms; the legacy target below keeps shipping and its scheme keeps archiving. The `PrestoCVNext` scheme builds the second target and runs its test plan, `TestPlans/Next.xctestplan`; its UI test target, `PrestoCVNextUITests`, is held to R16. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
 
 | Folder | Contents | May import |
 |---|---|---|

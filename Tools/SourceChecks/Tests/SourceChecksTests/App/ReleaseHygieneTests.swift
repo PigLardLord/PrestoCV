@@ -26,10 +26,13 @@ struct ReleaseHygieneTests {
         "DiagnosticTrace": "DiagnosticTrace/Sources/DiagnosticTrace",
         "DiagnosticTraceFiles": "DiagnosticTrace/Sources/DiagnosticTraceFiles",
         "DiagnosticTraceDistribution": "DiagnosticTrace/Sources/DiagnosticTraceDistribution",
+        "PrestoCVComposition": "PrestoCVApp/Sources/PrestoCVComposition",
+        "PrestoCVPresentation": "PrestoCVApp/Sources/PrestoCVPresentation",
     ]
 
-    /// The sources whose code ships with the app.
-    static let shippedFolders = ["PrestoCV"] + linkedProducts.values.sorted()
+    /// The sources whose code ships with the app: the shipped target, the second one that becomes it at the switch
+    /// (docs/architecture/modules.md), and the products they link.
+    static let shippedFolders = ["PrestoCV", "PrestoCVNext"] + linkedProducts.values.sorted()
 
     private struct Line {
         let file: String
