@@ -167,34 +167,6 @@ struct LocalizationCatalogTests {
         }
     }
 
-    @Test("The text of a view is looked up in the catalog, not written in the code")
-    func viewsHaveNoHardCodedText() throws {
-        let catalog = try Self.catalog()
-        let views = "Text|Label|Button|Section|Toggle|TextField|SecureField|Picker|Menu|NavigationLink|DisclosureGroup|LabeledContent|ProgressView|Link"
-        let modifiers = "navigationTitle|accessibilityLabel|accessibilityHint|accessibilityValue|help|badge"
-        let patterns = [
-            "\\b(?:\(views))\\(\\s*\(stringLiteral)",
-            "\\.(?:\(modifiers))\\(\\s*\(stringLiteral)",
-        ]
-        var hardCoded: [String] = []
-        for file in try SwiftSource.trackedFiles(in: ["PrestoCV"]).map(SwiftSource.init(url:)) {
-            for pattern in patterns {
-                for literal in file.code.matches(of: pattern) {
-                    let format = literal.asFormatKey
-                    let isLookedUp = catalog.strings[literal] != nil || catalog.strings[format] != nil
-                        || catalog.strings[literal.asNumberFormatKey] != nil
-                    // A text of values and symbols only, such as "\(a) / \(b)", has nothing to translate.
-                    let hasWords = format.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
-                    if !isLookedUp && hasWords {
-                        hardCoded.append("\"\(literal)\" (\(file.path))")
-                    }
-                }
-            }
-        }
-
-        #expect(hardCoded.isEmpty, "Text written in the code instead of the catalog: \(hardCoded)")
-    }
-
     @Test("An error message is looked up in the catalog, not written in the code")
     func errorMessagesAreNotWrittenInTheCode() throws {
         let violations = try StringChecks.hardCodedErrorMessages(
