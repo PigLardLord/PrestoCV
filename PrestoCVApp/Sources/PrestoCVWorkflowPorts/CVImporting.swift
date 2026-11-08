@@ -79,10 +79,14 @@ public enum ImportFailure: Error, Equatable, Sendable {
     case unreadable
     /// A document without a text layer.
     case noText
+    /// The file the person chose could not be read, for a reason that is none of the above (`ImportFileReading`).
+    case fileNotRead
 }
 
-/// Reads the CV a person already has into a new CV. The failure is an `ImportFailure`; a cancelled task stays a
-/// `CancellationError` (R3, R7).
+/// Reads the CV a person already has into a new CV, from a text or from the bytes of a PDF. The failure is an
+/// `ImportFailure`; a cancelled task stays a `CancellationError` (R3, R7).
 public protocol CVImporting: Sendable {
     func importCV(fromText text: String) async throws -> ImportOutcome
+    /// A PDF is read as a PDF, with the layout of its words, never as a text taken out of it first (ADR 0027).
+    func importCV(fromPDF data: Data) async throws -> ImportOutcome
 }
