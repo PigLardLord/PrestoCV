@@ -12,7 +12,7 @@ public struct ImportResult: Hashable, Sendable {
     /// rule has a defect: the contract table requires it empty.
     public internal(set) var ungrounded: [String] = []
 
-    init(document: SourceDocument, cv: ImportedCV, language: CVLanguage?, unplaced: [UnplacedText], leftOut: [LeftOutText]) {
+    package init(document: SourceDocument, cv: ImportedCV, language: CVLanguage?, unplaced: [UnplacedText], leftOut: [LeftOutText]) {
         self.document = document
         self.cv = cv
         self.language = language
