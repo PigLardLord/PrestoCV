@@ -198,8 +198,8 @@ struct StringChecksSelfTests {
         }
     }
 
-    @Test("Without the option the legacy scan stays: only the literals handed straight to a view are read")
-    func legacyScanIsUnchanged() throws {
-        #expect(try Self.runOnBypasses(rules: StringRules()).isEmpty)
+    @Test("Without the option only the literals handed straight to a view are read, in any form: raw and with a member call too")
+    func legacyScanReadsWhatIsHandedToAView() throws {
+        #expect(try Self.runOnBypasses(rules: StringRules()) == ["Raw words here", "Review your draft"])
     }
 }

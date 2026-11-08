@@ -118,8 +118,8 @@ struct LocalizationCatalog {
     }
 
     /// Whether a literal of the code is looked up under this key, with its values read as text or as numbers.
-    func isLookedUp(_ literal: String) -> Bool {
-        strings[literal] != nil || strings[literal.asFormatKey] != nil || strings[literal.asNumberFormatKey] != nil
+    func isLookedUp(_ literal: SwiftLiteral) -> Bool {
+        strings[literal.text] != nil || strings[literal.key] != nil || strings[literal.numberKey] != nil
     }
 }
 
@@ -128,7 +128,7 @@ struct LocalizationCatalog {
 /// A Swift file as the checks read it.
 struct SwiftSource {
     let path: String
-    /// The code that ships: without comment lines, and without the previews at the end of the file.
+    /// The code that ships: without the previews at the end of the file. The lexer skips the comments.
     let code: String
 
     init(url: URL) throws {
@@ -151,10 +151,7 @@ struct SwiftSource {
         for marker in ["PreviewProvider", "#Preview"] {
             if let range = text.range(of: marker), range.lowerBound < end { end = range.lowerBound }
         }
-        return text[..<end]
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-            .joined(separator: "\n")
+        return String(text[..<end])
     }
 }
 
@@ -166,20 +163,7 @@ extension String {
             Range(match.range(at: group), in: self).map { String(self[$0]) }
         }
     }
-
-    /// The key a text with values in it is looked up under: `"\(title). \(message)"` is `"%@. %@"`.
-    var asFormatKey: String { replacingValues(with: "%@") }
-
-    /// The same key when the values are numbers: `"\(count) CVs"` is `"%lld CVs"`.
-    var asNumberFormatKey: String { replacingValues(with: "%lld") }
-
-    private func replacingValues(with placeholder: String) -> String {
-        replacingOccurrences(of: #"\\\((?:[^()]|\([^()]*\))*\)"#, with: placeholder, options: .regularExpression)
-    }
 }
-
-/// A string literal: its text may hold escaped characters and values.
-let stringLiteral = #""((?:[^"\\\n]|\\.)*)""#
 
 // MARK: - The checks
 
@@ -227,7 +211,7 @@ enum StringChecks {
                 stale.append("\(key) no longer capitalises \(names.subtracting(capitalised).sorted()): remove it from properNamesOfKey")
             }
         }
-        let handed = Set(viewLiterals(in: try urls.map(SwiftSource.init(url:)), rules: rules).map(\.literal))
+        let handed = Set(viewLiterals(in: try urls.map(SwiftSource.init(url:)), rules: rules).map(\.literal.text))
         for literal in rules.nonKeyLiterals.keys.sorted() where !handed.contains(literal) {
             stale.append("\"\(literal)\" is handed to no view: remove it from nonKeyLiterals")
         }
@@ -289,9 +273,8 @@ enum StringChecks {
         let keys = Set(catalog.keys)
         var used: Set<String> = []
         for file in sources {
-            for literal in file.code.matches(of: stringLiteral) {
-                if keys.contains(literal) { used.insert(literal) }
-                for format in [literal.asFormatKey, literal.asNumberFormatKey] where keys.contains(format) { used.insert(format) }
+            for literal in StringLiteralLexer.literals(in: file.code) {
+                for name in [literal.text, literal.key, literal.numberKey] where keys.contains(name) { used.insert(name) }
             }
         }
         return used
@@ -371,25 +354,24 @@ enum StringChecks {
         return promises
     }
 
+
     // MARK: Lookups
 
-    private static let lookups = [
-        "(\(stringLiteral))\\s*\\.(?:localized|asLoclizedKey|localizedWithArgs)\\b",
-        #"String\(\s*localized:\s*"([^"\\\n]+)""#,
-        #"LocalizedStringKey\(\s*"([^"\\\n]+)""#,
-    ]
+    /// A lookup of a key: `"key".localized`, `String(localized: "key")`, `LocalizedStringKey("key")`,
+    /// `LocalizedStringResource("key")`. The lookup check reads it and the every-literal rule does not.
+    static func isLookup(_ literal: SwiftLiteral) -> Bool {
+        literal.after.range(of: #"^\s*\.(?:localized|asLoclizedKey|localizedWithArgs)\b"#, options: .regularExpression) != nil
+            || literal.before.range(of: #"(?:String\(\s*localized:|LocalizedStringKey\(|LocalizedStringResource\()$"#, options: .regularExpression) != nil
+    }
 
-    /// The keys that the sources look up and the catalog lacks, with the file.
+    /// The keys that the sources look up and the catalog lacks, with the file. A lookup is checked whatever the form of
+    /// its literal (plain, raw, multiline, with values) and wherever it stands, nested in a value of another literal too.
     private static func lookedUpButMissing(from catalog: LocalizationCatalog, in sources: [SwiftSource]) -> [String] {
-        var missing: [String] = []
-        for file in sources {
-            for pattern in lookups {
-                for literal in file.code.matches(of: pattern, group: pattern == lookups[0] ? 2 : 1) where catalog.strings[literal] == nil {
-                    missing.append("\(literal) (\(file.path))")
-                }
-            }
+        sources.flatMap { file in
+            StringLiteralLexer.literals(in: file.code)
+                .filter { isLookup($0) && !catalog.isLookedUp($0) }
+                .map { "\($0.text) (\(file.path))" }
         }
-        return missing
     }
 
     // MARK: Literals handed to views
@@ -397,102 +379,26 @@ enum StringChecks {
     private static let swiftUIViews = "Text|Label|Button|Section|Toggle|TextField|SecureField|Picker|Menu|NavigationLink|DisclosureGroup|LabeledContent|ProgressView|Link"
     private static let swiftUIModifiers = "navigationTitle|accessibilityLabel|accessibilityHint|accessibilityValue|help|badge"
 
-    /// A literal followed by `.localized` is a lookup, which the lookup check reads.
-    private static let notLookedUpAsMember = #"(?!\s*\.)"#
-
     /// Every literal that a source hands to a view as its text, with the file. `Text(verbatim:)` is not one. With
     /// `everyLiteralInViews`, every literal of the view folders that is not a lookup or the argument of a non-text parameter.
-    private static func viewLiterals(in sources: [SwiftSource], rules: StringRules) -> [(literal: String, path: String)] {
+    private static func viewLiterals(in sources: [SwiftSource], rules: StringRules) -> [(literal: SwiftLiteral, path: String)] {
         let read = sources.filter { file in rules.viewFolders.map { folders in folders.contains { file.path.hasPrefix($0 + "/") } } ?? true }
         if rules.everyLiteralInViews {
             return read.flatMap { file in
-                literals(in: file.code).filter { !isLookup($0) && !rules.nonTextArguments.keys.contains(where: $0.before.hasSuffix) }
-                    .map { (literal: $0.text, path: file.path) }
+                StringLiteralLexer.literals(in: file.code)
+                    .filter { !isLookup($0) && !rules.nonTextArguments.keys.contains(where: $0.before.hasSuffix) }
+                    .map { (literal: $0, path: file.path) }
             }
         }
         let views = ([swiftUIViews] + rules.extraViews.map(NSRegularExpression.escapedPattern(for:))).joined(separator: "|")
-        var patterns = ["\\b(?:\(views))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)", "\\.(?:\(swiftUIModifiers))\\(\\s*\(stringLiteral)\(notLookedUpAsMember)"]
+        var handedTo = ["\\b(?:\(views))\\($", "\\.(?:\(swiftUIModifiers))\\($"]
         if !rules.extraArguments.isEmpty {
-            patterns.append("\\b(?:\(rules.extraArguments.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|"))):\\s*\(stringLiteral)\(notLookedUpAsMember)")
+            handedTo.append("\\b(?:\(rules.extraArguments.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|"))):$")
         }
         return read.flatMap { file in
-            patterns.flatMap { file.code.matches(of: $0) }.map { (literal: $0, path: file.path) }
-        }
-    }
-
-    /// A string literal of the code, with the code that stands before it and after it on the line or lines around.
-    struct Literal {
-        let text: String
-        /// The last characters of the code before the literal, without trailing white space.
-        let before: String
-        /// The first characters of the code after the literal.
-        let after: String
-    }
-
-    /// A lookup of a key: `"key".localized`, `String(localized: "key")`, `LocalizedStringKey("key")`. The lookup check reads it.
-    private static func isLookup(_ literal: Literal) -> Bool {
-        literal.after.range(of: #"^\s*\.(?:localized|asLoclizedKey|localizedWithArgs)\b"#, options: .regularExpression) != nil
-            || literal.before.range(of: #"(?:String\(\s*localized:|LocalizedStringKey\()$"#, options: .regularExpression) != nil
-    }
-
-    /// The string literals of Swift code, single-line, multiline (`"""`) and raw (`#"` ... `"#`), wherever they stand.
-    /// Comments are skipped, and a literal inside a value of another literal is not read on its own.
-    static func literals(in code: String) -> [Literal] {
-        let chars = Array(code)
-        var found: [(range: Range<Int>, text: String)] = []
-        var i = 0
-        func hasPrefix(_ prefix: String, at index: Int) -> Bool {
-            let p = Array(prefix)
-            return index + p.count <= chars.count && Array(chars[index..<index + p.count]) == p
-        }
-        /// The end of the literal that opens at `start` with `hashes` pound signs and `quotes` quotes, and its text.
-        func literal(from start: Int, hashes: Int, quotes: Int) -> (end: Int, text: String) {
-            let pounds = String(repeating: "#", count: hashes)
-            let closing = String(repeating: "\"", count: quotes) + pounds
-            var j = start + hashes + quotes
-            let textStart = j
-            while j < chars.count {
-                if hasPrefix(closing, at: j) { return (j + closing.count, String(chars[textStart..<j])) }
-                if chars[j] == "\\" && hasPrefix("\\" + pounds + "(", at: j) {
-                    j += 1 + hashes + 1
-                    var depth = 1
-                    while j < chars.count && depth > 0 {
-                        if chars[j] == "\"" { j = literal(from: j, hashes: 0, quotes: 1).end; continue }
-                        if chars[j] == "(" { depth += 1 } else if chars[j] == ")" { depth -= 1 }
-                        j += 1
-                    }
-                    continue
-                }
-                if chars[j] == "\\" && hashes == 0 { j += 2; continue }
-                if quotes == 1 && chars[j] == "\n" { break }
-                j += 1
-            }
-            return (min(j, chars.count), String(chars[textStart..<min(j, chars.count)]))
-        }
-        while i < chars.count {
-            if hasPrefix("//", at: i) {
-                while i < chars.count && chars[i] != "\n" { i += 1 }
-            } else if hasPrefix("/*", at: i) {
-                i += 2
-                while i < chars.count && !hasPrefix("*/", at: i) { i += 1 }
-                i += 2
-            } else if chars[i] == "#" || chars[i] == "\"" {
-                var hashes = 0
-                while i + hashes < chars.count && chars[i + hashes] == "#" { hashes += 1 }
-                guard i + hashes < chars.count, chars[i + hashes] == "\"" else { i += hashes; continue }
-                let quotes = hasPrefix("\"\"\"", at: i + hashes) ? 3 : 1
-                let read = literal(from: i, hashes: hashes, quotes: quotes)
-                found.append((i..<read.end, quotes == 3 ? read.text.trimmingCharacters(in: .whitespacesAndNewlines) : read.text))
-                i = read.end
-            } else {
-                i += 1
-            }
-        }
-        return found.map { range, text in
-            Literal(
-                text: text,
-                before: String(chars[max(0, range.lowerBound - 80)..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines),
-                after: String(chars[range.upperBound..<min(chars.count, range.upperBound + 40)]))
+            StringLiteralLexer.literals(in: file.code)
+                .filter { literal in !isLookup(literal) && handedTo.contains { literal.before.range(of: $0, options: .regularExpression) != nil } }
+                .map { (literal: $0, path: file.path) }
         }
     }
 
@@ -501,9 +407,8 @@ enum StringChecks {
     /// symbols only, such as "\(a) / \(b)", has nothing to translate.
     private static func notKeys(handedToViews sources: [SwiftSource], catalog: LocalizationCatalog, rules: StringRules) -> [String] {
         viewLiterals(in: sources, rules: rules).compactMap { literal, path in
-            let hasWords = literal.asFormatKey.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
-            guard hasWords, !catalog.isLookedUp(literal), rules.nonKeyLiterals[literal] == nil else { return nil }
-            return "\(literal) (\(path))"
+            guard literal.hasWords, !catalog.isLookedUp(literal), rules.nonKeyLiterals[literal.text] == nil else { return nil }
+            return "\(literal.text) (\(path))"
         }
     }
 
@@ -512,11 +417,173 @@ enum StringChecks {
         let errors = "unknown|invalidData|notFound|networkError|validationError|decodingError|encodingError|fileSystemError"
         var found: [String: [String]] = [:]
         for file in try sources.map(SwiftSource.init(url:)) {
-            for literal in file.code.matches(of: "AppError\\.(?:\(errors))\\(\\s*\(stringLiteral)") {
-                let hasWords = literal.asFormatKey.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
-                if hasWords && catalog.strings[literal] == nil { found[file.path, default: []].append(literal) }
+            for literal in StringLiteralLexer.literals(in: file.code)
+            where literal.before.range(of: "\\bAppError\\.(?:\(errors))\\($", options: .regularExpression) != nil {
+                if literal.hasWords && catalog.strings[literal.text] == nil { found[file.path, default: []].append(literal.text) }
             }
         }
         return found
+    }
+}
+
+// MARK: - The lexer
+
+/// A string literal of Swift code.
+struct SwiftLiteral: Equatable {
+    /// The content, with the escapes decoded and the indentation of a multiline literal removed. A value stays as
+    /// `\(expression)`, for a raw literal too.
+    let text: String
+    /// The key the literal would be in a catalog: each value is `%@`.
+    let key: String
+    /// The same key when the values are numbers: each value is `%lld`.
+    let numberKey: String
+    /// The last characters of the code before the literal, without trailing white space: the call or the argument label
+    /// it is the argument of, or the operator that joins it to other code.
+    let before: String
+    /// The first characters of the code after the literal.
+    let after: String
+
+    /// Whether the text has words to translate, once the values are taken out.
+    var hasWords: Bool { key.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil }
+}
+
+/// The one reader of string literals of the string checks: single-line, multiline (`"""`) and raw (`#"` with any number of
+/// pound signs) literals, with their escapes and values, and every literal nested in a value at any depth. Comments (`//`
+/// and nested `/* */`) are skipped, and a comment marker inside a literal is text.
+struct StringLiteralLexer {
+    private let chars: [Unicode.Scalar]
+    private var index = 0
+    private var found: [(range: Range<Int>, text: String, key: String, numberKey: String)] = []
+
+    /// A character that stands for a decoded `\n`, so that the indentation of a multiline literal is removed only after
+    /// the lines that really end.
+    private static let decodedNewline = Unicode.Scalar(0xE000)!
+
+    static func literals(in code: String) -> [SwiftLiteral] {
+        var lexer = StringLiteralLexer(chars: Array(code.unicodeScalars))
+        lexer.scan(untilClosingParenthesis: false)
+        return lexer.found.sorted { $0.range.lowerBound < $1.range.lowerBound }.map { range, text, key, numberKey in
+            SwiftLiteral(
+                text: text, key: key, numberKey: numberKey,
+                before: lexer.string(max(0, range.lowerBound - 80)..<range.lowerBound).trimmingCharacters(in: .whitespacesAndNewlines),
+                after: lexer.string(range.upperBound..<min(lexer.chars.count, range.upperBound + 40)))
+        }
+    }
+
+    private init(chars: [Unicode.Scalar]) { self.chars = chars }
+
+    private func string(_ range: Range<Int>) -> String {
+        var view = String.UnicodeScalarView()
+        view.append(contentsOf: chars[range])
+        return String(view)
+    }
+
+    private func hasPrefix(_ prefix: String, at position: Int) -> Bool {
+        let scalars = Array(prefix.unicodeScalars)
+        return position + scalars.count <= chars.count && Array(chars[position..<position + scalars.count]) == scalars
+    }
+
+    /// Reads code from `index`, recording the literals; stops after the parenthesis that closes a value of a literal.
+    private mutating func scan(untilClosingParenthesis nested: Bool) {
+        var depth = 0
+        while index < chars.count {
+            let c = chars[index]
+            if hasPrefix("//", at: index) {
+                while index < chars.count && chars[index] != "\n" { index += 1 }
+            } else if hasPrefix("/*", at: index) {
+                var comments = 0
+                repeat {
+                    if hasPrefix("/*", at: index) { comments += 1; index += 2 }
+                    else if hasPrefix("*/", at: index) { comments -= 1; index += 2 }
+                    else { index += 1 }
+                } while comments > 0 && index < chars.count
+            } else if c == "#" || c == "\"" {
+                var hashes = 0
+                while index + hashes < chars.count && chars[index + hashes] == "#" { hashes += 1 }
+                guard index + hashes < chars.count, chars[index + hashes] == "\"" else { index += hashes; continue }
+                readLiteral(hashes: hashes)
+            } else if nested && c == "(" {
+                depth += 1
+                index += 1
+            } else if nested && c == ")" {
+                if depth == 0 { return }
+                depth -= 1
+                index += 1
+            } else {
+                index += 1
+            }
+        }
+    }
+
+    /// Reads the literal that opens at `index`, and records it.
+    private mutating func readLiteral(hashes: Int) {
+        let start = index
+        let pounds = String(repeating: "#", count: hashes)
+        let isMultiline = hasPrefix("\"\"\"", at: start + hashes)
+        let closing = (isMultiline ? "\"\"\"" : "\"") + pounds
+        index = start + hashes + (isMultiline ? 3 : 1)
+        var text = String.UnicodeScalarView(), key = String.UnicodeScalarView(), numberKey = String.UnicodeScalarView()
+        func append(_ scalar: Unicode.Scalar) { text.append(scalar); key.append(scalar); numberKey.append(scalar) }
+        func append(_ string: String) { string.unicodeScalars.forEach(append) }
+        while index < chars.count {
+            if hasPrefix(closing, at: index) { index += closing.unicodeScalars.count; break }
+            let c = chars[index]
+            if c == "\\" && hasPrefix("\\" + pounds, at: index) {
+                let afterEscape = index + 1 + hashes
+                if afterEscape < chars.count && chars[afterEscape] == "(" {
+                    index = afterEscape + 1
+                    let expressionStart = index
+                    scan(untilClosingParenthesis: true)
+                    text.append(contentsOf: "\\(".unicodeScalars + chars[expressionStart..<index] + ")".unicodeScalars)
+                    key.append(contentsOf: "%@".unicodeScalars)
+                    numberKey.append(contentsOf: "%lld".unicodeScalars)
+                    index = min(index + 1, chars.count)
+                    continue
+                }
+                index = afterEscape
+                guard index < chars.count else { break }
+                switch chars[index] {
+                case "n": append(Self.decodedNewline)
+                case "t": append("\t")
+                case "r": append("\r")
+                case "0": append(Unicode.Scalar(0))
+                case "u" where index + 1 < chars.count && chars[index + 1] == "{":
+                    var end = index + 2
+                    while end < chars.count && chars[end] != "}" && chars[end] != "\n" { end += 1 }
+                    if end < chars.count, chars[end] == "}", let value = UInt32(string(index + 2..<end), radix: 16), let scalar = Unicode.Scalar(value) {
+                        append(scalar)
+                        index = end
+                    } else {
+                        append("u")
+                    }
+                case "\n", "\r": break   // a line continuation in a multiline literal
+                default: append(chars[index])
+                }
+                index += 1
+                continue
+            }
+            if !isMultiline && c == "\n" { break }
+            append(c)
+            index += 1
+        }
+        let decode = { (view: String.UnicodeScalarView) -> String in
+            let content = isMultiline ? Self.withoutIndentation(String(view)) : String(view)
+            return content.replacingOccurrences(of: String(Self.decodedNewline), with: "\n")
+        }
+        found.append((start..<index, decode(text), decode(key), decode(numberKey)))
+    }
+
+    /// The content of a multiline literal: without the line break after the opening quotes, and without the last line
+    /// break and the indentation of the closing quotes, which every line loses.
+    private static func withoutIndentation(_ content: String) -> String {
+        var lines = content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard lines.count >= 2, lines[0].trimmingCharacters(in: .whitespaces).isEmpty,
+              let indentation = lines.last, indentation.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return content.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        lines.removeFirst()
+        lines.removeLast()
+        return lines.map { $0.hasPrefix(indentation) ? String($0.dropFirst(indentation.count)) : $0.trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n")
     }
 }

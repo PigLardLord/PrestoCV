@@ -150,4 +150,15 @@ struct StringLiteralFormsTests {
 
         #expect(try Self.reported(code: code, catalogKeys: []) == ["Real words"])
     }
+
+    @Test("The lexer decodes escapes and indentation, gives the key of a value, and the context of each literal")
+    func lexerDetails() {
+        let code = "Text(\"a\\tb \\\"q\\\" \\(n + 1)\")\nlet x = \"\"\"\n    one\n      two \\(n)\n    \"\"\"\nBanner(title: #\"raw \\n \\#(m)\"#)"
+        let found = StringLiteralLexer.literals(in: code)
+
+        #expect(found.map(\.text) == ["a\tb \"q\" \\(n + 1)", "one\n  two \\(n)", "raw \\n \\(m)"])
+        #expect(found.map(\.key) == ["a\tb \"q\" %@", "one\n  two %@", "raw \\n %@"])
+        #expect(found.map(\.numberKey)[0] == "a\tb \"q\" %lld")
+        #expect(found[0].before == "Text(" && found[2].before.hasSuffix("title:"))
+    }
 }
