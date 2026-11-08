@@ -192,7 +192,7 @@ struct LaunchFixturesTests {
             try? FileManager.default.removeItem(at: target)
         }
 
-        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name), settlement: TraceSettlement())
 
         guard case .failed(.launchFixturesRejected) = state else {
             Issue.record("expected failed, got \(state)")
@@ -214,7 +214,7 @@ struct LaunchFixturesTests {
             try? FileManager.default.removeItem(at: target)
         }
 
-        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name), settlement: TraceSettlement())
 
         guard case .failed(.launchFixturesRejected) = state else {
             Issue.record("expected failed, got \(state)")
@@ -240,7 +240,8 @@ struct LaunchFixturesTests {
         }
 
         let state = await Composition.launch(
-            arguments: [Self.program, "-PrestoCVNextStorage", name, "-PrestoCVNextDistribution", "production"]
+            arguments: [Self.program, "-PrestoCVNextStorage", name, "-PrestoCVNextDistribution", "production"],
+            settlement: TraceSettlement()
         )
 
         guard case .failed(.launchFixturesRejected) = state else {
@@ -257,7 +258,7 @@ struct LaunchFixturesTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let state = await Composition.launch(arguments: try Self.arguments(storage: name))
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name), settlement: TraceSettlement())
 
         guard case .ready = state else {
             Issue.record("expected ready, got \(state)")

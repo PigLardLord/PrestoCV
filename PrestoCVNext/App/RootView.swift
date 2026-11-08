@@ -1,25 +1,30 @@
 import PrestoCVComposition
 import SwiftUI
 
-/// The first screen: it waits for the app's one composition and names the state it reached, for the UI tests. It shows
-/// nothing yet; the loading state, the error screen and the shell replace it in step 5-9.
+/// The first screen: it shows what the holder's composition has reached. While the composition is launching it shows the
+/// loading state, and when it failed the error screen with a retry. The identifiers name each state for the UI tests; the
+/// shell replaces the ready state in step 5-9b.
 struct RootView: View {
-    /// The app's one composition, made once for the whole process
-    let composition: Task<CompositionState, Never>
-    @State private var reached: CompositionState?
+    /// The app's one composition holder, made once for the whole process
+    let holder: CompositionHolder
 
     var body: some View {
-        Color.clear
-            .accessibilityElement()
-            .accessibilityIdentifier(identifier)
-            .task { reached = await composition.value }
+        content
+            .task { holder.start() }
     }
 
-    private var identifier: String {
-        switch reached {
-        case nil: "root.loading"
-        case .ready: "root.ready"
-        case .failed(let failure): "root.failed.\(failure.rawValue)"
+    @ViewBuilder
+    private var content: some View {
+        switch holder.phase {
+        case .launching:
+            LoadingView("root.loading")
+                .accessibilityIdentifier("root.loading")
+        case .ready:
+            Color.clear
+                .accessibilityElement()
+                .accessibilityIdentifier("root.ready")
+        case .failed(let failure):
+            CompositionFailedView(failure: failure, retry: holder.retry)
         }
     }
 }

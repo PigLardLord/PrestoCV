@@ -24,7 +24,7 @@ struct TraceChainTests {
 
     private static func chain(_ paths: AppPaths, gate: TraceLaunchGate, log: any DiagnosticLogger) -> TraceChain {
         TraceChain(
-            directory: paths.trace, shareDirectory: paths.traceShare, gate: gate, device: device, log: log
+            directory: paths.trace, shareDirectory: paths.traceShare, gate: gate, device: device, log: log, after: nil
         )
     }
 

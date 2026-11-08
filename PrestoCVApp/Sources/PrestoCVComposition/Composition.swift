@@ -40,6 +40,8 @@ public final class Composition {
         let log: any DiagnosticLogger
         let gate: TraceLaunchGate
         let device: TraceDevice
+        /// Where the trace of the launches before this one stands: this launch's trace waits for them
+        let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
         let compileRules: CompileRules
@@ -102,7 +104,8 @@ public final class Composition {
     /// starts, so that its answer and the purge of a closed launch (ADR 0032) do not depend on the rest. When the assembly
     /// fails after that, `make` waits for the purge only until `settleDeadline`: the error screen must not wait for a
     /// distribution that has not answered. The purge is not brought forward, it follows the answer on the trace chain's own
-    /// task, as it does on a launch that succeeds.
+    /// task, as it does on a launch that succeeds. A launch after a failure puts its trace behind the earlier launch's
+    /// (`TraceSettlement`): it records nothing until the earlier purge has ended, so a retry never loses what it wrote.
     static func make(_ inputs: Inputs) async -> CompositionState {
         do {
             try inputs.check()
@@ -111,8 +114,9 @@ public final class Composition {
         }
         let trace = TraceChain(
             directory: inputs.paths.trace, shareDirectory: inputs.paths.traceShare, gate: inputs.gate,
-            device: inputs.device, log: inputs.log
+            device: inputs.device, log: inputs.log, after: inputs.settlement.previous()
         )
+        inputs.settlement.record(trace.startup)
         let state = await assemble(inputs, trace: trace)
         if case .failed = state { await first(of: { await trace.settle() }, or: inputs.settleDeadline) }
         return state
@@ -150,7 +154,7 @@ public final class Composition {
 
     /// Assembles the app for this launch. A Debug build reads the fixtures its launch arguments ask for; a Release build
     /// has no code that does (`ReleaseHygieneTests`).
-    public static func launch(arguments: [String]) async -> CompositionState {
+    public static func launch(arguments: [String], settlement: TraceSettlement) async -> CompositionState {
         let device = AppPaths.onDevice()
         let paths: AppPaths
         let gate: TraceLaunchGate
@@ -198,6 +202,7 @@ public final class Composition {
             log: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv"),
             gate: gate,
             device: .current,
+            settlement: settlement,
             samples: (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true),
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
