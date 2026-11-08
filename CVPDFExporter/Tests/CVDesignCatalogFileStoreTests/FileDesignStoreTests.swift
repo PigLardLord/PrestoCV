@@ -22,6 +22,23 @@ extension URL {
     var index: URL { appendingPathComponent("index.json") }
     func file(_ id: String, generation: Int = 1) -> URL { appendingPathComponent("Designs/\(id).\(generation).mcvt") }
     var designFiles: Set<String> { Set((try? FileManager.default.contentsOfDirectory(atPath: appendingPathComponent("Designs").path)) ?? []) }
+
+    /// Rewrites each entry of this index through `transform`, as an index written by another version of the store has it.
+    func rewriteIndexEntries(_ transform: ([String: Any]) -> [String: Any]) throws {
+        guard var root = try JSONSerialization.jsonObject(with: Data(contentsOf: self)) as? [String: Any], let designs = root["designs"] as? [[String: Any]] else {
+            Issue.record("the index is not an index"); return
+        }
+        root["designs"] = designs.map(transform)
+        try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]).write(to: self, options: .atomic)
+    }
+
+    /// Takes the origin out of the entries of this store's index for `ids` (all of them if nil): the designs then have no recorded origin.
+    func removeOrigins(of ids: Set<String>? = nil) throws {
+        try index.rewriteIndexEntries { entry in
+            let id = (entry["manifest"] as? [String: Any])?["id"] as? String ?? ""
+            return ids.map { $0.contains(id) } ?? true ? entry.filter { $0.key != "origin" } : entry
+        }
+    }
 }
 
 /// An index listing one design `x`, whose manifest has the given JSON fields replaced. Schema 2 unless told otherwise.
@@ -245,9 +262,9 @@ struct FileDesignStoreTests {
         try await inTemporaryStore { dir in
             let store = FileDesignStore(directory: dir)
             try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
-            try FileManager.default.removeItem(at: dir.origins)   // "clean" now has no recorded origin
-            try await store.save(DesignStoreContract.design(id: "plain", version: "2.0.0"))   // the record lists "plain" only
-            let index = try Data(contentsOf: dir.index), origins = try Data(contentsOf: dir.origins), files = dir.designFiles
+            try dir.removeOrigins()   // "clean" now has no recorded origin
+            try await store.save(DesignStoreContract.design(id: "plain", version: "2.0.0"))   // "plain" is recorded as imported
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
             for id in ["clean", "plain"] {
                 for version in ["3.0.0", "2.0.0", "1.0.0"] {
                     let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: id, version: version, css: ".cv-skill{font-weight:700}"))
@@ -255,7 +272,6 @@ struct FileDesignStoreTests {
                 }
             }
             #expect(try Data(contentsOf: dir.index) == index)
-            #expect(try Data(contentsOf: dir.origins) == origins)
             #expect(dir.designFiles == files)
             #expect(try await store.installedOrigins() == ["plain": .imported])
         }
