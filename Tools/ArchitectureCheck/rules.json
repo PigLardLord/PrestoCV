@@ -112,10 +112,7 @@
   }
  ],
  "notYetImplemented": [
-  "Features/",
-  "DesignSystem/",
-  "Platform/",
-  "Resources/"
+  "Features/"
  ],
  "compositionOnly": {
   "adr": "0032",
@@ -851,6 +848,7 @@
     "DiagnosticTraceDistribution",
     "WebKit",
     "Synchronization",
+    "Observation",
     "Foundation"
    ],
    "rules": [
@@ -868,6 +866,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Observation",
     "WebKit",
     "PrestoCVComposition",
     "PrestoCVApplication",
@@ -1154,6 +1153,54 @@
     "R14",
     "R17"
    ]
+  },
+  {
+   "name": "PrestoCVNextDesignSystem",
+   "path": "PrestoCVNext/DesignSystem",
+   "docName": "DesignSystem/",
+   "allowedImports": [
+    "SwiftUI"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R5",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextPlatform",
+   "path": "PrestoCVNext/Platform",
+   "docName": "Platform/",
+   "allowedImports": [
+    "SwiftUI",
+    "UIKit",
+    "AppKit",
+    "WebKit",
+    "PDFKit",
+    "QuickLook",
+    "UniformTypeIdentifiers",
+    "CVRenderingWebKitSupport",
+    "PrestoCVPresentation"
+   ],
+   "rules": [
+    "R1",
+    "R4",
+    "R7",
+    "R9",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVNextResources",
+   "path": "PrestoCVNext/Resources",
+   "docName": "Resources/",
+   "allowedImports": [],
+   "rules": []
   },
   {
    "name": "PrestoCVNextUITests",

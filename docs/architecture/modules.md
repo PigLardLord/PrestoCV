@@ -302,7 +302,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVWorkflowPorts` | app ports | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVApplication`, `PrestoCVDomain`, Foundation |
 | `PrestoCVIntegration` | app application layer | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain`, `PrestoCVImporting`, `CVDocumentModel`, `CVDesignCatalog`, `CVRendering`, `CVDrafting`, Foundation |
 | `PrestoCVPresentation` | inbound adapter | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVApplication`, `PrestoCVDomain` (both `internal import`), Observation, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization, Observation |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, load, save, rename, duplicate, delete, and the writer of the open CV, which writes its text and changes its look or document language), `CVBrowsing` (the list with the store's issues, the first-run state, the samples) and `CVExporting`. The editing and browsing operations have typed `throws(EditFailure)`; `CVExporting` and `CVAutosaveWriting` have untyped `throws`, so cancellation passes through.
@@ -346,6 +346,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the `ScreenFactory`;
   - the deadline of a failed launch (`Inputs.settleDeadline`): `make` returns the failed state even while the distribution has not answered, and the purge of a closed launch follows the answer;
   - `CompositionState`, ready or failed with a code (`CompositionFailure`) the app shows as one error screen.
+  - `CompositionHolder`: the `@MainActor @Observable` holder the root view reads. It starts the launch once, and after a failure `retry()` launches again; one launch runs at a time, and a retry while launching or ready does nothing.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. Launch arguments select it (`-PrestoCVNextStorage <name>`, `-PrestoCVNextEmptyStorage`, `-PrestoCVNextSeed <base 64>`, `-PrestoCVNextDistribution <answer>`); they are parsed into `LaunchFixtures`, which exists in Debug builds only. No production target depends on a test-support target.
 
 **Test support.** `PrestoCVAppTestSupport` holds fakes for the workflow ports.
@@ -360,7 +361,7 @@ A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-
 
 | Folder | Contents | May import |
 |---|---|---|
-| `App/` | `@main` (holds the composition), scenes and macOS commands; `#if os` allowed here | SwiftUI, `PrestoCVComposition`, `PrestoCVPresentation` |
+| `App/` | `@main` (holds the composition), `RootView` (loading, ready, failed) with `CompositionFailedView`, scenes and macOS commands; `#if os` allowed here | SwiftUI, `PrestoCVComposition`, `PrestoCVPresentation` |
 | `Features/` | SwiftUI views per screen; `NavigationSplitView` navigation; no `#if` | SwiftUI, `PrestoCVPresentation` |
 | `DesignSystem/` | tokens and reusable components | SwiftUI |
 | `Platform/` | the platform shims: iOS-only modifiers wrapped for `Features/`, HTML and PDF previews, sharing, pasteboard, file import and export | SwiftUI, UIKit, AppKit, WebKit, PDFKit, QuickLook, UniformTypeIdentifiers, `CVRenderingWebKitSupport`, `PrestoCVPresentation` |
