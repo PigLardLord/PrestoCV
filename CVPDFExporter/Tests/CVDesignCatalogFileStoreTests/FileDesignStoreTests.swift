@@ -8,7 +8,7 @@ import Android
 import Darwin
 #endif
 import CVDesignCatalog
-import CVDesignCatalogFileStore
+@testable import CVDesignCatalogFileStore
 import CVRenderingTestSupport
 
 /// Runs `body` with a store directory of its own, removed afterwards (R10: hermetic). The directory is not created.
@@ -22,7 +22,61 @@ extension URL {
     var index: URL { appendingPathComponent("index.json") }
     func file(_ id: String, generation: Int = 1) -> URL { appendingPathComponent("Designs/\(id).\(generation).mcvt") }
     var designFiles: Set<String> { Set((try? FileManager.default.contentsOfDirectory(atPath: appendingPathComponent("Designs").path)) ?? []) }
+
+    /// Rewrites each entry of this index through `transform`, as an index written by another version of the store has it.
+    func rewriteIndexEntries(_ transform: ([String: Any]) -> [String: Any]) throws {
+        guard var root = try JSONSerialization.jsonObject(with: Data(contentsOf: self)) as? [String: Any], let designs = root["designs"] as? [[String: Any]] else {
+            Issue.record("the index is not an index"); return
+        }
+        root["designs"] = designs.map(transform)
+        try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]).write(to: self, options: .atomic)
+    }
+
+    /// Takes the origin out of the entries of this store's index for `ids` (all of them if nil): the designs then have no recorded origin.
+    func removeOrigins(of ids: Set<String>? = nil) throws {
+        try index.rewriteIndexEntries { entry in
+            let id = (entry["manifest"] as? [String: Any])?["id"] as? String ?? ""
+            return ids.map { $0.contains(id) } ?? true ? entry.filter { $0.key != "origin" } : entry
+        }
+    }
 }
+
+/// An index listing one design `x`, whose manifest has the given JSON fields replaced. Schema 2 unless told otherwise.
+private func index(_ fields: [String: String] = [:], generation: Int = 1, schemaVersion: Int = 2) -> String {
+    var manifest = ["id": "\"x\"", "name": "\"X\"", "version": "\"1.0.0\"", "description": "\"\"", "defaultPalette": "\"ink\"",
+                    "defaultFonts": "\"system\"", "markupContract": "1"]
+    manifest.merge(fields) { $1 }
+    let body = manifest.sorted { $0.key < $1.key }.map { "\"\($0.key)\":\($0.value)" }.joined(separator: ",")
+    return #"{"schemaVersion":\#(schemaVersion),"designs":[{"generation":\#(generation),"manifest":{\#(body)}}]}"#
+}
+
+private func quoted(_ text: String) -> String { "\"" + text + "\"" }
+
+/// Index files the store refuses, with the error it reports. Built step by step: a long literal array is slow to type-check.
+private let badIndexes: [(String, FileDesignStoreError)] = {
+    var cases: [(String, FileDesignStoreError)] = []
+    cases.append((#"{"schemaVersion":3,"designs":[],"themes":[]}"#, .indexFromNewerVersion(3)))
+    cases.append(("not JSON", .indexCorrupt("no schema version")))
+    cases.append((index(schemaVersion: 1), .indexCorrupt("schema version 1")))
+    cases.append((index(schemaVersion: 0), .indexCorrupt("schema version 0")))
+    cases.append((#"{"schemaVersion":2}"#, .indexCorrupt("not an index")))
+    cases.append((index(["id": quoted("../x")]), .indexCorrupt("entries")))
+    cases.append((index(generation: 0), .indexCorrupt("entries")))
+    // An entry the validator would refuse is corrupt: the fields an index holds are checked as a package's are.
+    cases.append((index(["name": quoted("")]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted(String(repeating: "n", count: 81))]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted("two\\nlines")]), .indexCorrupt("entries")))
+    cases.append((index(["name": quoted("a\\u202eb")]), .indexCorrupt("entries")))
+    cases.append((index(["description": quoted(String(repeating: "d", count: 501))]), .indexCorrupt("entries")))
+    cases.append((index(["description": quoted("a\\u0000b")]), .indexCorrupt("entries")))
+    cases.append((index(["markupContract": "2"]), .indexCorrupt("entries")))
+    // Typed fields fail to decode, like any other malformed entry.
+    cases.append((index(["version": quoted("1.0")]), .indexCorrupt("not an index")))
+    cases.append((index(["version": "1"]), .indexCorrupt("not an index")))
+    cases.append((index(["defaultPalette": quoted("pale")]), .indexCorrupt("not an index")))
+    cases.append((index(["defaultFonts": quoted("comic")]), .indexCorrupt("not an index")))
+    return cases
+}()
 
 @Suite("R10 · design store contract")
 struct DesignStoreContractTests {
@@ -114,14 +168,7 @@ struct FileDesignStoreTests {
         }
     }
 
-    @Test("an index from a newer version or a corrupt one is reported and left untouched, even by a save",
-          arguments: [(#"{"schemaVersion":2,"designs":[],"themes":[]}"#, FileDesignStoreError.indexFromNewerVersion(2)),
-                      ("not JSON", .indexCorrupt("no schema version")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":1,"manifest":{"id":"../x","name":"","version":"1","description":"","markupContract":1}}]}"#,
-                       .indexCorrupt("entries")),
-                      (#"{"schemaVersion":1,"designs":[{"generation":0,"manifest":{"id":"x","name":"","version":"1","description":"","markupContract":1}}]}"#,
-                       .indexCorrupt("entries")),
-                      (#"{"schemaVersion":1}"#, .indexCorrupt("not an index"))] as [(String, FileDesignStoreError)])
+    @Test("an index from a newer version or a corrupt one is reported and left untouched, even by a save", arguments: badIndexes)
     func badIndex(contents: String, error: FileDesignStoreError) async throws {
         try await inTemporaryStore { dir in
             let store = FileDesignStore(directory: dir)
@@ -130,9 +177,31 @@ struct FileDesignStoreTests {
             await #expect(throws: error) { _ = try await store.installedDesigns() }
             await #expect(throws: error) { _ = try await store.design(id: "clean") }
             await #expect(throws: error) { try await store.save(DesignStoreContract.design(id: "bold")) }
+            await #expect(throws: error) { _ = try await store.saveIfNewer(DesignStoreContract.design(id: "bold")) }
+            await #expect(throws: error) { _ = try await store.adoptAsBundled(DesignStoreContract.design(id: "clean")) }
             #expect(try Data(contentsOf: dir.index) == Data(contents.utf8))
             #expect(!FileManager.default.fileExists(atPath: dir.file("bold").path))
         }
+    }
+
+    @Test("an index of schema 2 whose fields are within bounds is read")
+    func goodIndex() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean"))
+            let description = String(repeating: "d", count: 500), name = String(repeating: "n", count: 80)
+            try Data(index(["name": quoted(name), "description": quoted(description), "version": quoted("12.0.3")]).utf8).write(to: dir.index)
+            let manifests = try await store.installedDesigns()
+            #expect(manifests.map(\.id) == ["x"] && manifests.map(\.name) == [name] && manifests.map(\.version.text) == ["12.0.3"])
+        }
+    }
+
+    @Test("the index version follows the identifiers the index holds: bump it when a palette or font scheme is added")
+    func indexVersionFollowsIdentifiers() {
+        let message: Comment = "an index written with a new palette or font scheme cannot be read by an older app: bump the index version when these change"
+        #expect(FileDesignStore.indexVersion == 2, message)
+        #expect(NamedPalette.allCases.map(\.rawValue) == ["ink", "slate", "ocean", "plum"], message)
+        #expect(FontScheme.allCases.map(\.rawValue) == ["system", "serif", "rounded"], message)
     }
 
     @Test("an index that is a symbolic link is not followed")
@@ -170,6 +239,56 @@ struct FileDesignStoreTests {
             try await store.save(DesignStoreContract.design(id: "bold"))
             #expect(dir.designFiles == ["bold.1.mcvt", "clean.2.mcvt", "notes.txt"])
             #expect(try await store.design(id: "clean") == cleanV2)
+        }
+    }
+
+    @Test("a conditional save that keeps the installed design writes nothing")
+    func keptWritesNothing() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            _ = try await store.saveIfNewer(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
+            for version in ["2.0.0", "1.9.9", "1.0.0"] {
+                let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: "clean", version: version, css: ".cv-skill{font-weight:700}"))
+                #expect(outcome == .keptInstalled)
+            }
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(dir.designFiles == files)
+        }
+    }
+
+    @Test("a conditional save over an imported design, or one with no recorded origin, keeps it and writes nothing, whatever the versions")
+    func keptImportedWritesNothing() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            try await store.save(DesignStoreContract.design(id: "clean", version: "2.0.0"))
+            try dir.removeOrigins()   // "clean" now has no recorded origin
+            try await store.save(DesignStoreContract.design(id: "plain", version: "2.0.0"))   // "plain" is recorded as imported
+            let index = try Data(contentsOf: dir.index), files = dir.designFiles
+            for id in ["clean", "plain"] {
+                for version in ["3.0.0", "2.0.0", "1.0.0"] {
+                    let outcome = try await store.saveIfNewer(DesignStoreContract.design(id: id, version: version, css: ".cv-skill{font-weight:700}"))
+                    #expect(outcome == .keptImported)
+                }
+            }
+            #expect(try Data(contentsOf: dir.index) == index)
+            #expect(dir.designFiles == files)
+            #expect(try await store.installedOrigins() == ["plain": .imported])
+        }
+    }
+
+    @Test("conditional saves from two instances, newest first, leave the newest version")
+    func racingConditionalSaves() async throws {
+        try await inTemporaryStore { dir in
+            let stores = [FileDesignStore(directory: dir), FileDesignStore(directory: dir)]
+            let designs = try (0..<40).map { try DesignStoreContract.design(id: "clean", version: "1.0.\($0)") }
+            let outcomes = try await withThrowingTaskGroup(of: ConditionalSave.self) { group in
+                for (n, design) in designs.reversed().enumerated() { group.addTask { try await stores[n % 2].saveIfNewer(design) } }
+                return try await group.reduce(into: []) { $0.append($1) }
+            }
+            #expect(try await FileDesignStore(directory: dir).design(id: "clean") == designs[39])
+            #expect(outcomes.filter { $0 == .installed }.count == 1)
+            #expect(outcomes.filter { $0 == .upgraded }.count + outcomes.filter { $0 == .keptInstalled }.count == 39)
         }
     }
 

@@ -22,6 +22,8 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
     static let next = CatalogUnderCheck(
         name: "the catalog of the new app", catalog: "PrestoCVNext/Resources/Localizable.xcstrings",
         folders: ["PrestoCVNext"], rules: StringRules(
+            // A format that carries only the order of its values and the punctuation, which a translation may still change.
+            sameInEveryLanguage: ["shell.numbered %@ %lld"],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
             extraArguments: ["title", "message", "code", "retryTitle"],

@@ -29,7 +29,7 @@ struct BundledDesignsTests {
     func manifests() async throws {
         for (name, design) in try await Self.designs() {
             #expect(design.manifest.id == name && design.manifest.markupContract == MarkupContract.version)
-            #expect(design.manifest.version.fullyMatches(#"\d+\.\d+\.\d+"#), "\(name): version \(design.manifest.version)")
+            #expect(design.manifest.version.text.fullyMatches(#"\d+\.\d+\.\d+"#), "\(name): version \(design.manifest.version.text)")
             #expect(!design.manifest.name.isEmpty && !design.manifest.description.isEmpty)
         }
     }

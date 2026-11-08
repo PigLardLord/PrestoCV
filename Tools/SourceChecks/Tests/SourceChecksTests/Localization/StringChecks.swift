@@ -63,6 +63,7 @@ struct StringRules: Sendable {
         "accessibilityIdentifier(": "an identifier for the UI tests, never shown",
         "systemName:": "the name of an SF Symbol",
         "systemImage:": "the name of an SF Symbol",
+        "symbol:": "the name of an SF Symbol, handed to a view of the design system (EmptyStateView)",
         "named:": "the name of an image or a color in the asset catalog",
     ]
 }
@@ -429,8 +430,9 @@ struct SwiftLiteral: Equatable {
     let text: String
     /// The key the literal would be in a catalog: each value is `%@`.
     let key: String
-    /// The same key when the values are numbers: each value is `%lld`.
-    let numberKey: String
+    /// Every key the literal can be in a catalog when an initializer reads its interpolation: each value is `%@` or
+    /// `%lld`, by a type the checks cannot see. The first is `key`; past six values only the two uniform keys are listed.
+    let formatKeys: [String]
     /// The last characters of the code before the literal, without trailing white space: the call or the argument label
     /// it is the argument of, or the operator that joins it to other code.
     let before: String
@@ -454,11 +456,12 @@ struct SwiftLiteral: Equatable {
 
     /// The keys under which the app can find the literal at run time. A String extension asks for the text with its
     /// values filled in, which no catalog key can match, so a literal with a value has none. An initializer that reads
-    /// the interpolation asks for the format, `%@` or `%lld` by the value's type, which the checks cannot tell apart.
+    /// the interpolation asks for the format, `%@` or `%lld` for each value by its type, which the checks cannot tell
+    /// apart: any of `formatKeys`.
     var runtimeKeys: [String] {
         switch lookup {
         case .builtText?: hasValue ? [] : [text]
-        case .format?, nil: [text, key, numberKey]
+        case .format?, nil: [text] + formatKeys
         }
     }
 }
@@ -480,24 +483,39 @@ enum LiteralLookup: Equatable {
 struct StringLiteralLexer {
     private let chars: [Unicode.Scalar]
     private var index = 0
-    private var found: [(range: Range<Int>, text: String, key: String, numberKey: String)] = []
+    private var found: [(range: Range<Int>, text: String, format: String)] = []
 
     /// A character that stands for a decoded `\n`, so that the indentation of a multiline literal is removed only after
     /// the lines that really end.
     private static let decodedNewline = Unicode.Scalar(0xE000)!
+    /// A character that stands for a value in the format of a literal, until a placeholder is chosen for it.
+    private static let valueMarker = Unicode.Scalar(0xE001)!
+    /// The most values whose placeholders are mixed in `SwiftLiteral.formatKeys`.
+    private static let mixedValuesLimit = 6
 
     static func literals(in code: String) -> [SwiftLiteral] {
         var lexer = StringLiteralLexer(chars: Array(code.unicodeScalars))
         lexer.scan(untilClosingParenthesis: false)
-        return lexer.found.sorted { $0.range.lowerBound < $1.range.lowerBound }.map { range, text, key, numberKey in
-            SwiftLiteral(
-                text: text, key: key, numberKey: numberKey,
+        return lexer.found.sorted { $0.range.lowerBound < $1.range.lowerBound }.map { range, text, format in
+            let keys = formatKeys(of: format)
+            return SwiftLiteral(
+                text: text, key: keys[0], formatKeys: keys,
                 before: lexer.string(max(0, range.lowerBound - 80)..<range.lowerBound).trimmingCharacters(in: .whitespacesAndNewlines),
                 after: lexer.string(range.upperBound..<min(lexer.chars.count, range.upperBound + 40)))
         }
     }
 
     private init(chars: [Unicode.Scalar]) { self.chars = chars }
+
+    /// The keys of a format whose values are `valueMarker`: each value `%@` or `%lld`, all `%@` first.
+    private static func formatKeys(of format: String) -> [String] {
+        let parts = format.split(separator: Character(valueMarker), omittingEmptySubsequences: false).map(String.init)
+        let values = parts.count - 1
+        let placeholders: [[String]] = values <= mixedValuesLimit
+            ? (0..<(1 << values)).map { mask in (0..<values).map { ((mask >> $0) & 1) == 0 ? "%@" : "%lld" } }
+            : [Array(repeating: "%@", count: values), Array(repeating: "%lld", count: values)]
+        return placeholders.map { chosen in zip(parts, chosen + [""]).map { $0 + $1 }.joined() }
+    }
 
     private func string(_ range: Range<Int>) -> String {
         var view = String.UnicodeScalarView()
@@ -549,8 +567,8 @@ struct StringLiteralLexer {
         let isMultiline = hasPrefix("\"\"\"", at: start + hashes)
         let closing = (isMultiline ? "\"\"\"" : "\"") + pounds
         index = start + hashes + (isMultiline ? 3 : 1)
-        var text = String.UnicodeScalarView(), key = String.UnicodeScalarView(), numberKey = String.UnicodeScalarView()
-        func append(_ scalar: Unicode.Scalar) { text.append(scalar); key.append(scalar); numberKey.append(scalar) }
+        var text = String.UnicodeScalarView(), format = String.UnicodeScalarView()
+        func append(_ scalar: Unicode.Scalar) { text.append(scalar); format.append(scalar) }
         func append(_ string: String) { string.unicodeScalars.forEach(append) }
         while index < chars.count {
             if hasPrefix(closing, at: index) { index += closing.unicodeScalars.count; break }
@@ -562,8 +580,7 @@ struct StringLiteralLexer {
                     let expressionStart = index
                     scan(untilClosingParenthesis: true)
                     text.append(contentsOf: "\\(".unicodeScalars + chars[expressionStart..<index] + ")".unicodeScalars)
-                    key.append(contentsOf: "%@".unicodeScalars)
-                    numberKey.append(contentsOf: "%lld".unicodeScalars)
+                    format.append(Self.valueMarker)
                     index = min(index + 1, chars.count)
                     continue
                 }
@@ -597,7 +614,7 @@ struct StringLiteralLexer {
             let content = isMultiline ? Self.withoutIndentation(String(view)) : String(view)
             return content.replacingOccurrences(of: String(Self.decodedNewline), with: "\n")
         }
-        found.append((start..<index, decode(text), decode(key), decode(numberKey)))
+        found.append((start..<index, decode(text), decode(format)))
     }
 
     /// The content of a multiline literal: without the line break after the opening quotes, and without the last line

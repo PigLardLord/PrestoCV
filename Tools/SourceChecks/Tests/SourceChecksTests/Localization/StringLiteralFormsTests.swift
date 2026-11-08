@@ -133,6 +133,21 @@ struct StringLiteralFormsTests {
         #expect(byInitializer.unused.isEmpty)
     }
 
+    @Test("A format lookup with a text value and a number value is found under its mixed key, which counts as used")
+    func formatWithValuesOfTwoTypes() throws {
+        let code = "let s = String(localized: \"shell.numbered \\(title) \\(number)\")\n"
+        let mixed = try Self.findings(code: code, catalogKeys: ["shell.numbered %@ %lld"])
+
+        #expect(mixed.lookedUpButMissing.isEmpty && mixed.unused.isEmpty)
+    }
+
+    @Test("The name of an SF Symbol handed to a view as symbol: is not text to translate")
+    func symbolArgument() throws {
+        let code = "struct V {\n    var body: some View {\n        EmptyStateView(symbol: \"doc.text\", title: \"plant.ok\", message: \"plant.ok\")\n    }\n}\n"
+
+        #expect(try Self.reported(code: code, catalogKeys: ["plant.ok"]).isEmpty)
+    }
+
     @Test("Both English alternatives of a ternary inside an interpolation are reported")
     func ternaryInsideAnInterpolation() throws {
         let code = "Text(\"\\(isReady ? \"Save your CV\" : \"Try again\")\")\n"
@@ -190,7 +205,8 @@ struct StringLiteralFormsTests {
 
         #expect(found.map(\.text) == ["a\tb \"q\" \\(n + 1)", "one\n  two \\(n)", "raw \\n \\(m)"])
         #expect(found.map(\.key) == ["a\tb \"q\" %@", "one\n  two %@", "raw \\n %@"])
-        #expect(found.map(\.numberKey)[0] == "a\tb \"q\" %lld")
+        #expect(found.map(\.formatKeys)[0] == ["a\tb \"q\" %@", "a\tb \"q\" %lld"])
+        #expect(StringLiteralLexer.literals(in: "\"\\(a) of \\(b)\"")[0].formatKeys == ["%@ of %@", "%lld of %@", "%@ of %lld", "%lld of %lld"])
         #expect(found[0].before == "Text(" && found[2].before.hasSuffix("title:"))
     }
 }
