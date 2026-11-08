@@ -37,6 +37,7 @@ struct CompositionHolderTests {
     @MainActor
     final class ScriptedLaunch {
         private(set) var launches = 0
+        private(set) var settlements: [TraceSettlement] = []
         private var results: [CompositionState]
         private let began = Signal()
         private let released = Signal()
@@ -45,8 +46,9 @@ struct CompositionHolderTests {
             self.results = results
         }
 
-        func launch() async -> CompositionState {
+        func launch(_ settlement: TraceSettlement) async -> CompositionState {
             launches += 1
+            settlements.append(settlement)
             began.fire()
             await released.wait()
             return results.removeFirst()
@@ -60,7 +62,7 @@ struct CompositionHolderTests {
     }
 
     private func holder(_ script: ScriptedLaunch) -> CompositionHolder {
-        CompositionHolder(launch: { await script.launch() })
+        CompositionHolder(launch: { await script.launch($0) })
     }
 
     /// Returns once the holder is no longer launching
@@ -71,7 +73,7 @@ struct CompositionHolderTests {
     }
 
     private func readyState() async throws -> CompositionState {
-        let state = await Composition.launch(arguments: ["holder-test", "-PrestoCVNextEmptyStorage"])
+        let state = await Composition.launch(arguments: ["holder-test", "-PrestoCVNextEmptyStorage"], settlement: TraceSettlement())
         guard case .ready = state else { throw NotReady(state: "\(state)") }
         return state
     }
@@ -146,6 +148,24 @@ struct CompositionHolderTests {
 
         #expect(script.launches == 2)
         guard case .failed = holder.phase else { Issue.record("expected failed"); return }
+    }
+
+    @Test("Every launch of a holder gets the one settlement, so a retry's trace waits for the launch before it")
+    func launchesShareTheSettlement() async {
+        let script = ScriptedLaunch([.failed(.storeUnavailable), .failed(.storeUnavailable)])
+        let holder = holder(script)
+        holder.start()
+        await script.nextLaunchBegan()
+        script.release()
+        await settled(holder)
+
+        holder.retry()
+        await script.nextLaunchBegan()
+        script.release()
+        await settled(holder)
+
+        #expect(script.settlements.count == 2)
+        #expect(script.settlements[0] === script.settlements[1])
     }
 
     @Test("A retry while the first launch runs, or after it is ready, launches nothing")

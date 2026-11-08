@@ -42,11 +42,26 @@ final class FailedCompositionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["error.retry"].waitForExistence(timeout: 30))
     }
 
+    /// The height of the code line, which wraps more as the text grows: the same screen at two sizes tells whether the
+    /// size took effect.
+    @MainActor
+    private func codeHeight(largestText: Bool) -> CGFloat {
+        let app = launchFailing(largestText: largestText)
+        XCTAssertTrue(screen(of: app).waitForExistence(timeout: 30))
+        let code = app.staticTexts["error.code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 30))
+        let height = code.frame.height
+        app.terminate()
+        return height
+    }
+
     /// At the largest accessibility text size the retry stays reachable: the screen scrolls to it and it can be tapped.
     @MainActor
     func testTheRetryCanBeTappedAtTheLargestTextSize() throws {
+        let normal = codeHeight(largestText: false)
         let app = launchFailing(largestText: true)
         XCTAssertTrue(screen(of: app).waitForExistence(timeout: 30))
+        XCTAssertGreaterThan(app.staticTexts["error.code"].frame.height, normal * 2, "The largest size took effect")
         let retry = app.buttons["error.retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 30))
         for _ in 0..<5 where !retry.isHittable {

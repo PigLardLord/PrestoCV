@@ -16,9 +16,12 @@ public final class CompositionHolder {
     public private(set) var phase = Phase.launching
 
     private var started = false
-    private let launch: @Sendable () async -> CompositionState
+    private let launch: @Sendable (TraceSettlement) async -> CompositionState
+    private let settlement = TraceSettlement()
 
-    public init(launch: @escaping @Sendable () async -> CompositionState) {
+    /// - Parameter launch: Makes one composition. It gets the settlement shared by all launches of this holder, so that the
+    ///   trace of a retry waits for the purge of the launch before it.
+    public init(launch: @escaping @Sendable (TraceSettlement) async -> CompositionState) {
         self.launch = launch
     }
 
@@ -37,8 +40,9 @@ public final class CompositionHolder {
 
     private func run() {
         phase = .launching
+        let launch = launch, settlement = settlement
         Task {
-            switch await launch() {
+            switch await launch(settlement) {
             case .ready(let composition): phase = .ready(composition)
             case .failed(let failure): phase = .failed(failure)
             }

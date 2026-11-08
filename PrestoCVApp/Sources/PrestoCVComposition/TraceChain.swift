@@ -2,6 +2,7 @@ import DiagnosticLogging
 import DiagnosticTrace
 import DiagnosticTraceFiles
 import Foundation
+import Synchronization
 
 /// The trace of a test build (ADR 0032), as the composition builds it: the log entries go to the open run of their kind as
 /// well, and every run goes through the gate to a recorder that keeps it in the store. A launch whose gate stays closed
@@ -15,13 +16,19 @@ struct TraceChain {
     let logger: any DiagnosticLogger
     /// Whether the trace records on this launch, and the runs it stored
     let access: TraceAccess
-    private let startup: Task<Void, Never>
+    /// Ends once the gate has answered and a closed launch has purged, and after the launch before it has ended
+    let startup: Task<Void, Never>
 
     /// - Parameters:
     ///   - directory: The folder of the stored runs, made on the first run the gate lets through.
     ///   - shareDirectory: The folder of the copies made to share.
     ///   - log: The log the entries go on to. The store reports its own failures to it, and not to the trace.
-    init(directory: URL, shareDirectory: URL, gate launch: TraceLaunchGate, device: TraceDevice, log: any DiagnosticLogger) {
+    ///   - earlier: The startup of the launch before this one, if there was one. Until it has ended this launch records
+    ///     nothing and purges nothing, so the purge of the earlier launch cannot remove what this one writes.
+    init(
+        directory: URL, shareDirectory: URL, gate launch: TraceLaunchGate, device: TraceDevice, log: any DiagnosticLogger,
+        after earlier: Task<Void, Never>?
+    ) {
         let store = TraceFileStore(directory: directory, shareDirectory: shareDirectory, logger: log)
         let recorder = TraceRecorder(
             store: store,
@@ -37,12 +44,15 @@ struct TraceChain {
         )
         // A build that may not record keeps nothing: a TestFlight install replaced by the App Store build keeps its data
         // container, and with it the runs the earlier install stored. The store does it on its own task, after the answer.
+        let turn = TurnGate(launch.gate)
         startup = Task {
+            await earlier?.value
+            turn.begin()
             await launch.answered()
             if !launch.gate.isOpen { await store.purge() }
         }
         let startup = startup
-        let tracer = GatedTracer(gate: launch.gate, next: recorder)
+        let tracer = GatedTracer(gate: turn, next: recorder)
         self.tracer = tracer
         logger = TracingLogger(tracer: tracer, next: log, kinds: ["draft": .aiDraft, "import": .textImport])
         access = TraceAccess(
@@ -59,6 +69,24 @@ struct TraceChain {
     /// the error screen never leaves the traces of an earlier install behind.
     func settle() async {
         await startup.value
+    }
+}
+
+/// A gate that stays closed until the launch before it has settled, and then follows the launch's own gate.
+private final class TurnGate: TraceGate {
+    private let launch: any TraceGate
+    private let begun = Mutex(false)
+
+    init(_ launch: any TraceGate) {
+        self.launch = launch
+    }
+
+    func begin() {
+        begun.withLock { $0 = true }
+    }
+
+    var isOpen: Bool {
+        begun.withLock { $0 } && launch.isOpen
     }
 }
 

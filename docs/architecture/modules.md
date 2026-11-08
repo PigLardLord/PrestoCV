@@ -345,8 +345,9 @@ A local package next to the Xcode project. The compiler holds the app's layers t
   - the trace chain of ADR 0032 (`TraceChain`, which builds the recorder, the gate and the store), built here and nowhere else;
   - the `ScreenFactory`;
   - the deadline of a failed launch (`Inputs.settleDeadline`): `make` returns the failed state even while the distribution has not answered, and the purge of a closed launch follows the answer;
+  - the order of the traces of a retry (`TraceSettlement`): the holder hands one to every launch, and a launch's trace chain records nothing and purges nothing until the chain of the launch before it has ended its startup (its answer and its purge). A purge of an earlier launch therefore never removes what a later launch wrote, and neither the error screen nor the retry waits for it: a run begun in the meantime is not recorded, as before an answer;
   - `CompositionState`, ready or failed with a code (`CompositionFailure`) the app shows as one error screen.
-  - `CompositionHolder`: the `@MainActor @Observable` holder the root view reads. It starts the launch once, and after a failure `retry()` launches again; one launch runs at a time, and a retry while launching or ready does nothing.
+  - `CompositionHolder`: the `@MainActor @Observable` holder the root view reads. It starts the launch once, and after a failure `retry()` launches again; one launch runs at a time, and a retry while launching or ready does nothing. Each launch gets the holder's one `TraceSettlement`.
 - **UI tests and previews** use the production `FileCVRepository` on a temporary directory seeded from fixture JSON. Launch arguments select it (`-PrestoCVNextStorage <name>`, `-PrestoCVNextEmptyStorage`, `-PrestoCVNextSeed <base 64>`, `-PrestoCVNextDistribution <answer>`); they are parsed into `LaunchFixtures`, which exists in Debug builds only. No production target depends on a test-support target.
 
 **Test support.** `PrestoCVAppTestSupport` holds fakes for the workflow ports.

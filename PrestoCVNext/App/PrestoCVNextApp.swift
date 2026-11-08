@@ -7,8 +7,8 @@ import SwiftUI
 struct PrestoCVNextApp: App {
     /// The only composition of the process (R4, ADR 0008), made from the launch arguments: every window shows the same
     /// one, and a retry after a failure makes a new one.
-    private static let holder = CompositionHolder(launch: {
-        await Composition.launch(arguments: ProcessInfo.processInfo.arguments)
+    private static let holder = CompositionHolder(launch: { settlement in
+        await Composition.launch(arguments: ProcessInfo.processInfo.arguments, settlement: settlement)
     })
 
     var body: some Scene {
