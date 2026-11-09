@@ -23,6 +23,38 @@ public final class CVListViewModel {
     /// The files the store could not read, until the person dismisses the notice (for this launch).
     public var notice: StoreNotice? { isNoticeDismissed || issues.isEmpty ? nil : StoreNotice(kinds: issues) }
 
+    /// What shows in place of the rows: loading until the first read ends, the ways to start for a store with no CV.
+    public var content: ListContent {
+        guard rows.isEmpty else { return .rows }
+        switch status {
+        case .loading: return .loading
+        case .loaded: return .empty
+        case .failed: return .rows
+        }
+    }
+
+    /// The notices above the rows: the store's state first, then the files it could not read.
+    public var notices: [ListNotice] {
+        var notices: [ListNotice] = []
+        if status == .failed { notices.append(isStale ? .stale : .failed) }
+        if let notice { notices.append(.unreadable(notice)) }
+        return notices
+    }
+
+    /// Every action of a row, in the order the menu offers them.
+    public let rowActions: [RowAction] = [.duplicate, .rename, .delete]
+    /// The swipe from the leading edge.
+    public let leadingSwipeActions: [RowAction] = [.duplicate]
+    /// The swipe from the trailing edge.
+    public let trailingSwipeActions: [RowAction] = [.delete]
+
+    /// The first row, in the list's order, whose last change did not work, until the person dismisses it.
+    public var rowAlert: RowAlert? {
+        rows.lazy.compactMap { row in
+            self.rowStatuses[row.reference].map { RowAlert(reference: row.reference, label: row.label, status: $0) }
+        }.first
+    }
+
     private var issues: [StoreIssueKind] = []
     private var isNoticeDismissed = false
 
@@ -94,6 +126,9 @@ public final class CVListViewModel {
 
     public func dismissNotice() { isNoticeDismissed = true }
 
+    /// The person read what the last change of the row did not do.
+    public func dismissStatus(of reference: CVReference) { rowStatuses[reference] = nil }
+
     private func show(_ listing: CVListing) {
         listed = listing.cvs
         issues = listing.issues.map(StoreIssueKind.init)
@@ -114,7 +149,7 @@ public final class CVListViewModel {
         let labels = CVTitle.labels(for: titles, untitled: untitled, numbered: numbered)
         rows = listed.map { cv in
             CVRow(
-                reference: CVReference(id: cv.id), label: labels[cv.id.raw.uuidString] ?? untitled,
+                reference: CVReference(id: cv.id), label: labels[cv.id.raw.uuidString] ?? untitled, title: cv.title,
                 subtitle: CVSubtitle.text(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle) ?? "",
                 lastSaved: cv.updatedAt ?? cv.createdAt, language: cv.language?.tag
             )

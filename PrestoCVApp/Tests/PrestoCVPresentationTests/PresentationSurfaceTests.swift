@@ -12,12 +12,29 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
     let _: Bool = list.isStale
     let _: StoreNotice? = list.notice
     let _: [CVReference: RowStatus] = list.rowStatuses
+    let _: ListContent = list.content
+    for notice in list.notices as [ListNotice] {
+        switch notice {
+        case .stale, .failed: break
+        case .unreadable(let unreadable):
+            let _: Int = unreadable.count
+            let _: [StoreIssueKind] = unreadable.kinds + unreadable.distinctKinds
+        }
+    }
+    let _: [RowAction] = list.rowActions + list.leadingSwipeActions + list.trailingSwipeActions
+    if let alert: RowAlert = list.rowAlert {
+        let _: CVReference = alert.reference
+        let _: String = alert.label
+        let _: RowStatus = alert.status
+        list.dismissStatus(of: alert.reference)
+    }
     _ = list.now
     list.refreshNow()
     list.dismissNotice()
     if let row = rows.first {
         let _: CVReference = row.reference
         let _: String = row.label
+        let _: String = row.title
         let _: String = row.subtitle
         let _: String? = row.language
         _ = row.lastSaved
@@ -92,6 +109,12 @@ func everyListCode() -> [Any] {
     let examples: [ExamplesIssue] = [.unavailable, .failed]
     let look: [LookStatus] = [.loading, .ready, .applying, .applied, .missing, .conflict, .failed]
     let screens: [ShellScreen] = [.loading, .welcome, .split]
+    let contents: [ListContent] = [.loading, .empty, .rows]
+    let notices: [ListNotice] = [.stale, .failed]
+    let actions: [RowAction] = [.duplicate, .rename, .delete]
+    for value in contents { switch value { case .loading, .empty, .rows: break } }
+    for value in notices { switch value { case .stale, .failed, .unreadable: break } }
+    for value in actions { switch value { case .duplicate, .rename, .delete: break } }
     for value in status { switch value { case .loading, .loaded, .failed: break } }
     for value in rows { switch value { case .conflict, .gone, .tooLarge, .failed: break } }
     for value in kinds { switch value { case .corrupt, .upgradeRequired, .unreadable, .tooLarge, .quarantineFailed: break } }
@@ -106,6 +129,9 @@ func everyListCode() -> [Any] {
     examples.forEach { all.append($0) }
     look.forEach { all.append($0) }
     screens.forEach { all.append($0) }
+    contents.forEach { all.append($0) }
+    notices.forEach { all.append($0) }
+    actions.forEach { all.append($0) }
     all.append(StartChoice.importCV)
     all.append(StartChoice.blank)
     return all

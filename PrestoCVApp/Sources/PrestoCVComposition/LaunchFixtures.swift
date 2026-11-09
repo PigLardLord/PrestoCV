@@ -11,6 +11,8 @@ import Foundation
 /// - `-PrestoCVNextSeed <base 64>`: the CV files to put in that folder before the app reads it, as a JSON map from file name
 ///   to content. It needs one of the two storage arguments, so that it never writes into the device's own folder.
 /// - `-PrestoCVNextDistribution <answer>`: the answer the store would give about how the app was installed (ADR 0032).
+/// - `-PrestoCVNextNoSamples`: the examples come from a folder of the fixture that nothing makes, so the app cannot read
+///   them. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
 
@@ -21,6 +23,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case unreadableSeed
         case unreadableDistribution
         case seedWithoutFolder
+        case samplesWithoutFolder
         case seedUnwritable
         /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
         case unsafeFolder
@@ -30,6 +33,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let emptyStorageArgument = "-PrestoCVNextEmptyStorage"
     static let seedArgument = "-PrestoCVNextSeed"
     static let distributionArgument = "-PrestoCVNextDistribution"
+    static let noSamplesArgument = "-PrestoCVNextNoSamples"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -38,6 +42,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var distribution: DistributionAnswer?
     /// The arguments that start like a fixture and are none: ignored, and named so that a test's typo shows
     var unknownArguments: [String] = []
+    /// The examples are read from a folder that is not there
+    var withoutSamples = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -62,6 +68,8 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableDistribution
                 }
                 fixtures.distribution = answer
+            case noSamplesArgument:
+                fixtures.withoutSamples = true
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:
@@ -76,6 +84,7 @@ struct LaunchFixtures: Equatable, Sendable {
             fixtures.storage = .empty
         }
         if hasSeed && fixtures.storage == .device { throw .seedWithoutFolder }
+        if fixtures.withoutSamples && fixtures.storage == .device { throw .samplesWithoutFolder }
         return fixtures
     }
 
@@ -90,6 +99,11 @@ struct LaunchFixtures: Equatable, Sendable {
         }
         let root = device.temporary.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
         return AppPaths(root: root, temporary: device.temporary)
+    }
+
+    /// The folder the examples are read from: the bundle's, or without examples a folder of the fixture that nothing makes.
+    func samples(bundled: URL, paths: AppPaths) -> URL {
+        withoutSamples ? paths.root.appendingPathComponent("Samples", isDirectory: true) : bundled
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no

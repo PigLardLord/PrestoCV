@@ -59,6 +59,36 @@ struct BrowseCVsWorkflowTests {
         #expect(try await workflow().onboarding() == .returning)
     }
 
+    /// The store reports a file it could not read on one listing only, the one that sets it aside; at launch that is the
+    /// read of the first-run screen. The first-run screen and the list hold copies of one workflow.
+    @Test("a file the store reported once, to the first-run screen, is in every later listing of the launch")
+    func anIssueReportedOnceStaysForTheLaunch() async throws {
+        let browsing = workflow()
+        let firstRun: any CVBrowsing = browsing, list: any CVBrowsing = browsing
+        let issue = StoreIssue.corrupt(file: "a.json", reason: "x")
+        await repository.report([issue])
+        #expect(try await firstRun.onboarding() == .returning)
+
+        await repository.report([])
+
+        #expect(try await list.list().issues == [issue])
+        #expect(try await list.list().issues == [issue])
+        #expect(try await firstRun.onboarding() == .returning)
+    }
+
+    @Test("a file reported again counts once, as the store last reported it, where the store first met it")
+    func anIssueReportedAgainCountsOnce() async throws {
+        let browsing = workflow()
+        await repository.report([.unreadable(file: "c.json"), .corrupt(file: "a.json", reason: "x")])
+        _ = try await browsing.list()
+
+        await repository.report([.tooLarge(file: "c.json", bytes: 99), .unreadable(file: "d.json")])
+
+        #expect(try await browsing.list().issues == [
+            .tooLarge(file: "c.json", bytes: 99), .corrupt(file: "a.json", reason: "x"), .unreadable(file: "d.json"),
+        ])
+    }
+
     @Test("a store that cannot be read is 'unavailable', never an empty list")
     func anUnreadableStoreIsUnavailable() async {
         await repository.fail(with: .storeUnavailable(.cannotList))

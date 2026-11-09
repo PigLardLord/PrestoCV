@@ -240,6 +240,8 @@ public final class Composition {
         let gate: TraceLaunchGate
         let check: @MainActor () throws(CompositionFailure) -> Void
         let prepare: @MainActor () throws(CompositionFailure) -> Void
+        let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
+        let samples: URL
         #if DEBUG
         // A fixture that cannot be read, or a fixture folder that fails its check, fails the launch inside `make` before
         // the trace chain starts: nothing is made, and nothing is purged.
@@ -254,6 +256,7 @@ public final class Composition {
         }
         paths = fixtures.paths(device: device, fresh: UUID())
         gate = fixtures.distribution.map { .asking(GivenDistribution(given: $0)) } ?? .debug
+        samples = fixtures.samples(bundled: bundled, paths: paths)
         check = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
             do throws(LaunchFixtures.Failure) {
@@ -272,6 +275,7 @@ public final class Composition {
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
+        samples = bundled
         check = {}
         prepare = {}
         #endif
@@ -283,7 +287,7 @@ public final class Composition {
             gate: gate,
             device: .current,
             settlement: settlement,
-            samples: (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true),
+            samples: samples,
             copyFolders: AppPaths.importCopiesOnDevice(),
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()

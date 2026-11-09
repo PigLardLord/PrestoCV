@@ -31,8 +31,46 @@ public enum StoreIssueKind: Hashable, Sendable {
 public struct StoreNotice: Hashable, Sendable {
     public let kinds: [StoreIssueKind]
     public var count: Int { kinds.count }
+    /// Each kind once, in the order the store met them: the view words one line per kind.
+    public var distinctKinds: [StoreIssueKind] {
+        kinds.reduce(into: []) { seen, kind in
+            if !seen.contains(kind) { seen.append(kind) }
+        }
+    }
 
     public init(kinds: [StoreIssueKind]) { self.kinds = kinds }
+}
+
+/// What the list column shows in place of its rows.
+public enum ListContent: Hashable, Sendable {
+    /// The first read has not ended.
+    case loading
+    /// The store holds no CV: the ways to start show.
+    case empty
+    /// The rows, none when the store could not be read (a notice says so).
+    case rows
+}
+
+/// A notice above the rows, in the order the view shows them.
+public enum ListNotice: Hashable, Sendable {
+    /// A change was stored and the list could not be read again: the rows may be out of date.
+    case stale
+    /// The store could not be read.
+    case failed
+    /// Files the store could not read, until the person dismisses it.
+    case unreadable(StoreNotice)
+}
+
+/// What the person can do to a row. The menu and the actions of VoiceOver offer each; a swipe offers some of them.
+public enum RowAction: Hashable, Sendable {
+    case duplicate, rename, delete
+}
+
+/// The row whose last change did not work, named by its label.
+public struct RowAlert: Hashable, Sendable {
+    public let reference: CVReference
+    public let label: String
+    public let status: RowStatus
 }
 
 extension RowStatus {

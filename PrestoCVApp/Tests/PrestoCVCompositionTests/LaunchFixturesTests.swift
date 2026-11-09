@@ -17,6 +17,7 @@ struct LaunchFixturesTests {
     func plainLaunch() throws {
         let fixtures = try LaunchFixtures.parse([Self.program])
         #expect(fixtures == LaunchFixtures(storage: .device, seed: [:], distribution: nil, unknownArguments: []))
+        #expect(!fixtures.withoutSamples)
     }
 
     @Test("A named storage is read as the name")
@@ -104,6 +105,19 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The argument without examples is read, with a folder of its own")
+    func withoutSamples() throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextNoSamples"])
+        #expect(fixtures.withoutSamples)
+    }
+
+    @Test("The examples are taken away only with a folder of the fixture: never on the device storage")
+    func samplesWithoutFolder() {
+        #expect(throws: LaunchFixtures.Failure.samplesWithoutFolder) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextNoSamples"])
+        }
+    }
+
     // MARK: Where the fixtures put the files
 
     private static let device = AppPaths(
@@ -132,6 +146,19 @@ struct LaunchFixturesTests {
         fixtures.storage = .empty
         #expect(fixtures.paths(device: Self.device, fresh: Self.fresh).root.path
             == "/tmp/t/PrestoCVNextFixture-00000000-0000-0000-0000-000000000001")
+    }
+
+    @Test("The examples come from the bundle, or without examples from a folder of the fixture that nothing makes")
+    func samplesFolder() throws {
+        let bundled = URL(filePath: "/app/Samples", directoryHint: .isDirectory)
+        var fixtures = LaunchFixtures()
+        fixtures.storage = .named("no-samples")
+        let paths = fixtures.paths(device: Self.device, fresh: Self.fresh)
+        #expect(fixtures.samples(bundled: bundled, paths: paths) == bundled)
+
+        fixtures.withoutSamples = true
+
+        #expect(fixtures.samples(bundled: bundled, paths: paths).path == "/tmp/t/PrestoCVNextFixture-no-samples/Samples")
     }
 
     @Test("The seed is written as files in the store folder, which it makes")
