@@ -23,12 +23,15 @@ final class CVListUITests: XCTestCase {
 
     /// A store folder of its own with the given CVs, and files that are not CVs under the given identities.
     @MainActor
-    private func launch(_ cvs: [StoredCV], corrupt: [String] = [], largestText: Bool = false) throws -> XCUIApplication {
+    private func launch(_ cvs: [StoredCV], corrupt: [String] = [], largestText: Bool = false, failingRenames: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
             "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try seed(cvs, corrupt: corrupt),
         ]
+        if failingRenames {
+            app.launchArguments += ["-PrestoCVNextFailRenamesInPairs"]
+        }
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
@@ -165,6 +168,47 @@ final class CVListUITests: XCTestCase {
 
         XCTAssertTrue(self.row(titled: "Works Planner", in: app).waitForExistence(timeout: 30))
         XCTAssertFalse(self.row(titled: "Site Manager", in: app).exists)
+    }
+
+    /// Two renames that fail together leave two alerts pending. The second must show once the person has read the first:
+    /// the alert closes before the next one is given, or the screen keeps a failure pending with nothing shown.
+    @MainActor
+    func testASecondRowAlertShowsAfterTheFirstIsDismissed() throws {
+        let app = try launch([siteManager, costEstimator], failingRenames: true)
+        let first = row(titled: "Site Manager", in: app)
+        XCTAssertTrue(first.waitForExistence(timeout: 30))
+
+        rename(titled: "Site Manager", to: "Works Planner", in: app)
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 10), "The first rename is held, nothing is told yet")
+        rename(titled: "Cost Estimator", to: "Bid Manager", in: app)
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "The first failure is told")
+        let told = alert.label
+        alert.buttons["OK"].tap()
+
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "The second failure is told after the first one is read")
+        XCTAssertNotEqual(alert.label, told, "The second alert is the other row's")
+        alert.buttons["OK"].tap()
+
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 10), "Nothing is left to tell")
+    }
+
+    /// The rename alert of the row titled `title`, filled with `name`.
+    @MainActor
+    private func rename(titled title: String, to name: String, in app: XCUIApplication) {
+        let row = row(titled: title, in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 30))
+        _ = openMenu(of: row, in: app)
+        app.buttons["Rename"].tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30))
+        let field = alert.textFields.firstMatch
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 5) {
+            field.tap()
+        }
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 20) + name)
+        alert.buttons["Rename"].tap()
     }
 
     /// The copy is a new row whose title says what it copies.

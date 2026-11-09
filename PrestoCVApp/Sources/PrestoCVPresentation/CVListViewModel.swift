@@ -67,6 +67,8 @@ public final class CVListViewModel {
     private var latestFailure: [CVReference: Int] = [:]
     /// The number of the failure `rowAlert` shows.
     private var givenFailure: Int?
+    /// An alert was dismissed and the screen has not yet reported it closed: no alert is given until `rowAlertClosed()`.
+    private var closing = false
 
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
@@ -139,9 +141,9 @@ public final class CVListViewModel {
 
     public func dismissNotice() { isNoticeDismissed = true }
 
-    /// The person read the alert given: the failure shown goes, and the next one waits in `rowAlert`, in the order of the
-    /// first one: the listed rows, then the rows no longer listed. A newer failure of the same row stays pending and is
-    /// given in its turn.
+    /// The person read the alert given: the failure shown goes and `rowAlert` is empty, so that the screen sees the alert
+    /// closed. The next one is given by `rowAlertClosed()`, in the order of the first one: the listed rows, then the rows no
+    /// longer listed. A newer failure of the same row stays pending and is given in its turn.
     public func dismissRowAlert() {
         guard let alert = rowAlert else { return }
         if latestFailure[alert.reference] == givenFailure {
@@ -151,12 +153,21 @@ public final class CVListViewModel {
         }
         rowAlert = nil
         givenFailure = nil
+        closing = true
+    }
+
+    /// The screen shows no alert: the one dismissed has closed, so the next pending failure is given. It does nothing
+    /// unless an alert was dismissed and none is given since, so a failure or a reload meanwhile cannot fill the slot
+    /// before the screen has seen it empty.
+    public func rowAlertClosed() {
+        guard closing else { return }
+        closing = false
         giveNextRowAlert()
     }
 
     /// Gives the first pending failure when none is given. Every place that adds a pending failure or frees the slot calls it.
     private func giveNextRowAlert() {
-        guard rowAlert == nil else { return }
+        guard rowAlert == nil, !closing else { return }
         let listedAlert = rows.lazy.compactMap { row in
             self.rowStatuses[row.reference].map { RowAlert(reference: row.reference, label: row.label, status: $0) }
         }.first

@@ -31,6 +31,7 @@ struct CVListView: View {
                 case .failed: Text("list.status.failed")
                 }
             }
+            .onChange(of: list.rowAlert == nil) { list.rowAlertClosed() }
     }
 
     @ViewBuilder
@@ -121,8 +122,9 @@ struct CVListView: View {
         Task { await list.load() }
     }
 
-    /// The alert shows while the list has one given; it stays until the person closes it, which dismisses that failure, and
-    /// then the next one shows.
+    /// The alert shows while the list has one given; closing it dismisses that failure and leaves the list with none. The
+    /// list gives the next failure only when the screen reports the empty slot (`onChange` above), so the alert has closed
+    /// before the next one is presented.
     private var showingRowAlert: Binding<Bool> {
         Binding(
             get: { list.rowAlert != nil },

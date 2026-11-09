@@ -131,6 +131,7 @@ struct CVListPresentationTests {
         #expect(alert.status == .conflict)
 
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -148,6 +149,7 @@ struct CVListPresentationTests {
         await list.rename(world.reference(two), to: "Renamed")
         #expect(list.rowAlert?.reference == world.reference(one))
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert?.reference == world.reference(two))
         #expect(Array(list.rowStatuses.keys) == [world.reference(two)])
     }
@@ -189,9 +191,11 @@ struct CVListPresentationTests {
         #expect(list.rowAlert == alertOfB)
         #expect(Set(list.rowStatuses.keys) == [a, b])
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert?.reference == a)
         #expect(list.rowStatuses.keys.contains(a))
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -216,8 +220,10 @@ struct CVListPresentationTests {
 
         #expect(list.rowAlert == given)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert?.reference == listed[0])
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
     }
 
@@ -239,6 +245,7 @@ struct CVListPresentationTests {
         #expect(alert.status == .gone)
 
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -258,6 +265,7 @@ struct CVListPresentationTests {
         #expect(list.rowAlert?.status == .gone)
 
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
     }
 
@@ -324,6 +332,7 @@ struct CVListPresentationTests {
         #expect(alert.label == "Backend")
         #expect(alert.status == .gone)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -341,6 +350,7 @@ struct CVListPresentationTests {
         #expect(list.rowAlert?.label == "Backend")
         #expect(list.rowAlert?.status == .gone)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -361,6 +371,7 @@ struct CVListPresentationTests {
         await list.load()
         #expect(list.rowAlert == alert)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -381,13 +392,86 @@ struct CVListPresentationTests {
         #expect(list.rowAlert?.reference == world.reference(second))
         #expect(list.rowAlert?.label == "Second")
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert?.reference == world.reference(listed))
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert?.reference == world.reference(first))
         #expect(list.rowAlert?.label == "First")
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
+    }
+
+    // MARK: The alert closes before the next one is given
+
+    /// Two rows whose changes failed: the first alert is given, the second waits.
+    private func twoFailedRows(_ world: Browsing) async throws -> (list: CVListViewModel, other: CVReference) {
+        let first = try await world.stored(title: "First")
+        let second = try await world.stored(title: "Second")
+        let list = await world.loadedList()
+        // Each conflict reads the list again, so the other window saves the second CV only after the first conflict
+        try await world.editing.otherWindowSaves(first, fullName: "Someone Else")
+        await list.rename(world.reference(first), to: "One")
+        try await world.editing.otherWindowSaves(second, fullName: "Someone Else")
+        await list.rename(world.reference(second), to: "Two")
+        return (list, world.reference(second))
+    }
+
+    @Test("after a dismissal no alert is given until the screen reports the alert closed; then the next one is")
+    func nextAlertWaitsForTheClose() async throws {
+        let world = Browsing()
+        let (list, other) = try await twoFailedRows(world)
+
+        list.dismissRowAlert()
+
+        #expect(list.rowAlert == nil, "The screen first sees the alert gone, so that it can present the next one")
+        list.rowAlertClosed()
+        #expect(list.rowAlert?.reference == other)
+    }
+
+    @Test("a failure recorded between the dismissal and the close is not given before the close")
+    func failureBetweenDismissalAndCloseWaits() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        let row = world.reference(cv)
+        world.editing.duplicateErrors.withLock { $0 = [.unavailable, .unavailable] }
+        await list.duplicate(row, title: "Copy")
+        list.dismissRowAlert()
+
+        await list.duplicate(row, title: "Copy 2")
+
+        #expect(list.rowAlert == nil)
+        list.rowAlertClosed()
+        #expect(list.rowAlert?.reference == row)
+        #expect(list.rowAlert?.status == .failed)
+    }
+
+    @Test("a reload between the dismissal and the close gives no alert either")
+    func reloadBetweenDismissalAndCloseWaits() async throws {
+        let world = Browsing()
+        let (list, other) = try await twoFailedRows(world)
+        list.dismissRowAlert()
+
+        await list.load()
+
+        #expect(list.rowAlert == nil)
+        list.rowAlertClosed()
+        #expect(list.rowAlert?.reference == other)
+    }
+
+    @Test("a close with no dismissal before it changes nothing")
+    func closeWithoutDismissal() async throws {
+        let world = Browsing()
+        let (list, _) = try await twoFailedRows(world)
+        let given = list.rowAlert
+
+        list.rowAlertClosed()
+
+        #expect(list.rowAlert == given)
+        #expect(list.rowAlert != nil)
     }
 
     // MARK: A newer failure of the row whose alert is given
@@ -408,11 +492,13 @@ struct CVListPresentationTests {
         #expect(list.rowStatuses[row] == .failed)
 
         list.dismissRowAlert()
+        list.rowAlertClosed()
 
         #expect(list.rowAlert?.reference == row)
         #expect(list.rowAlert?.status == .failed)
         #expect(list.rowStatuses[row] == .failed)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -436,10 +522,12 @@ struct CVListPresentationTests {
         #expect(list.rowStatuses[row] == .failed)
 
         list.dismissRowAlert()
+        list.rowAlertClosed()
 
         #expect(list.rowAlert?.reference == row)
         #expect(list.rowAlert?.status == .failed)
         list.dismissRowAlert()
+        list.rowAlertClosed()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }

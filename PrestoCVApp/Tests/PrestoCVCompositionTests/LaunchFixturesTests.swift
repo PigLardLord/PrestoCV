@@ -118,6 +118,20 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The argument that fails the renames two at a time is read, with a folder of its own")
+    func failsRenamesInPairs() throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextFailRenamesInPairs"])
+        #expect(fixtures.failsRenamesInPairs)
+        #expect(!(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage"])).failsRenamesInPairs)
+    }
+
+    @Test("The failing renames need a folder of the fixture: never on the device storage")
+    func failuresWithoutFolder() {
+        #expect(throws: LaunchFixtures.Failure.failuresWithoutFolder) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextFailRenamesInPairs"])
+        }
+    }
+
     // MARK: Where the fixtures put the files
 
     private static let device = AppPaths(

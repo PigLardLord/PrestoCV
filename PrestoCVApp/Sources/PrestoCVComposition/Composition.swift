@@ -44,6 +44,9 @@ public final class Composition {
     /// Makes the gate that renders a bundled design before the sync saves it, over the composition's one renderer,
     /// inspector and headings. The composition calls it once, so a test counts the calls.
     typealias MakeGate = @MainActor (any PDFRendering, any PDFLayoutInspecting, Headings) -> any DesignRenderingGate
+    /// Gives the editing the list uses from the one the screens share. A launch gives it back as it is; in a Debug build a UI
+    /// test's fixture wraps it.
+    typealias WrapListEditing = @MainActor (any CVEditing) -> any CVEditing
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -75,6 +78,7 @@ public final class Composition {
         let check: @MainActor () throws(CompositionFailure) -> Void
         /// What a launch does before the folders are made, such as writing the seed of a UI test. It fails with a code.
         let prepare: @MainActor () throws(CompositionFailure) -> Void
+        let wrapListEditing: WrapListEditing
     }
 
     let paths: AppPaths
@@ -126,7 +130,8 @@ public final class Composition {
         screens = ScreenFactory(
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
-            lookOptions: parts.lookOptions, languages: parts.languages
+            lookOptions: parts.lookOptions, languages: parts.languages,
+            wrapListEditing: inputs.wrapListEditing
         )
     }
 
@@ -240,6 +245,7 @@ public final class Composition {
         let gate: TraceLaunchGate
         let check: @MainActor () throws(CompositionFailure) -> Void
         let prepare: @MainActor () throws(CompositionFailure) -> Void
+        let wrapListEditing: WrapListEditing
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         #if DEBUG
@@ -272,12 +278,14 @@ public final class Composition {
                 throw CompositionFailure(error)
             }
         }
+        wrapListEditing = { fixtures.listEditing($0) }
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
         samples = bundled
         check = {}
         prepare = {}
+        wrapListEditing = { $0 }
         #endif
         return await make(Inputs(
             paths: paths,
@@ -305,7 +313,8 @@ public final class Composition {
                 }
             },
             check: check,
-            prepare: prepare
+            prepare: prepare,
+            wrapListEditing: wrapListEditing
         ))
     }
 }

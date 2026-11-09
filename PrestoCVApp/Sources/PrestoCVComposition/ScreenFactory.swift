@@ -17,6 +17,8 @@ import PrestoCVWorkflowPorts
 public final class ScreenFactory {
     private let browsing: BrowseCVsWorkflow
     private let editing: EditCVWorkflow
+    /// What the list edits through: `editing`, or the wrapper the composition gives it.
+    private let listEditing: any CVEditing
     private let importing: ImportCVWorkflow
     private let importFiles: any ImportFileReading
     private let exporter: any CVExporting
@@ -40,13 +42,17 @@ public final class ScreenFactory {
     ///   - exporter: Renders a CV with the design it keeps, for the export sheets.
     ///   - lookOptions: The designs, palettes and fonts the look pickers offer.
     ///   - languages: The languages the export sheets offer.
+    ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
+    ///     launch fixture wraps it.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
-        exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage]
+        exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage],
+        wrapListEditing: (any CVEditing) -> any CVEditing
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
+        listEditing = wrapListEditing(editing)
         importing = ImportCVWorkflow(importer: importer, ids: ids)
         self.importFiles = importFiles
         self.exporter = exporter
@@ -71,7 +77,7 @@ public final class ScreenFactory {
     ) -> CVListViewModel {
         let clock = clock
         return CVListViewModel(
-            browsing: browsing, editing: editing, untitled: untitled, numbered: numbered, now: { clock.now() },
+            browsing: browsing, editing: listEditing, untitled: untitled, numbered: numbered, now: { clock.now() },
             editorsStored: { [weak self] in await self?.storeEditors() }
         )
     }
