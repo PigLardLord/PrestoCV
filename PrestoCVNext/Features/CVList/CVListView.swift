@@ -84,6 +84,7 @@ struct CVListView: View {
                 InlineNotice(
                     actionTitle: "list.hide",
                     actionIdentifier: "list.rowFailure.hide",
+                    actionLabel: "list.rowFailure.hide \(failure.label)",
                     action: { list.dismissRowFailure(failure) }
                 ) { rowFailureMessage(failure) }
                     .accessibilityIdentifier("list.rowFailure")

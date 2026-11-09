@@ -186,15 +186,25 @@ final class CVListUITests: XCTestCase {
         XCTAssertTrue(hides.firstMatch.waitForExistence(timeout: 30), "A failure is told")
         XCTAssertEqual(hides.count, 2, "Both failures are told at once, each with its own button")
         XCTAssertEqual(notices.count, 2, "Each failure is a notice of its own")
+        let labels = [siteManagerHide, costEstimatorHide]
+        XCTAssertEqual(
+            Set(hides.allElementsBoundByIndex.map(\.label)), Set(labels),
+            "VoiceOver tells which CV each button hides the notice of"
+        )
 
+        let hidden = hides.firstMatch.label
         hides.firstMatch.tap()
         XCTAssertTrue(app.buttons.matching(identifier: "list.rowFailure.hide").element(boundBy: 1).waitForNonExistence(timeout: 10))
         XCTAssertEqual(hides.count, 1, "Hiding one leaves the other")
+        XCTAssertEqual(hides.firstMatch.label, labels.first { $0 != hidden }, "The notice left is the other CV's")
 
         hides.firstMatch.tap()
         XCTAssertTrue(hides.firstMatch.waitForNonExistence(timeout: 10), "Nothing is left to tell")
         XCTAssertEqual(notices.count, 0)
     }
+
+    private let siteManagerHide = "Hide the notice about “Site Manager”"
+    private let costEstimatorHide = "Hide the notice about “Cost Estimator”"
 
     /// The rename alert of the row titled `title`, filled with `name`.
     @MainActor
