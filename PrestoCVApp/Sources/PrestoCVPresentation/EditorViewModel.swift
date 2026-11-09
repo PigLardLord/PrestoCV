@@ -21,6 +21,8 @@ public final class EditorViewModel {
 
     /// The row the person asked to remove, which waits for `confirmRemoval()` or `cancelRemoval()`.
     public internal(set) var pendingRemoval: RowRemoval?
+    /// The row just added, which the view focuses and scrolls into view, then reports with `rowWasShown()`.
+    public internal(set) var addedRow: RowID?
 
     public private(set) var opening: OpeningStatus = .opening
     /// Nothing is open yet: the store is being read.

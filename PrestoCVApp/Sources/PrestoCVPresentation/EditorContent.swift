@@ -65,9 +65,10 @@ struct RowIDs {
     }
 }
 
-/// A row of a section: it has an id, and it can have nothing in it.
+/// A row of a section: it has an id and a name, and it can have nothing in it.
 protocol EditorRow {
     var id: RowID { get set }
+    var rowName: RowName { get }
     var isBlank: Bool { get }
 }
 
