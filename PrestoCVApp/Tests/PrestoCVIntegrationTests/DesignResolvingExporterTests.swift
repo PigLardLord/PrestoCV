@@ -19,6 +19,62 @@ private actor RecordingRenderer: PDFRendering {
     }
 }
 
+/// An in-memory store whose first design read waits the way the file store's lock wait does: the wait sleeps in a task of
+/// its own, so it ignores the caller's cancellation, and then reads or times out. It counts the design reads.
+private actor HeldDesignStore: DesignStore {
+    struct LockTimeout: Error {}
+    private let store = InMemoryDesignStore()
+    private let installed: [ValidatedDesign]
+    private let timesOut: Bool
+    private var held = true
+    private(set) var reads = 0
+    private let entered: AsyncStream<Void>, enteredSignal: AsyncStream<Void>.Continuation
+    private let released: AsyncStream<Void>, releaseSignal: AsyncStream<Void>.Continuation
+
+    init(installed: [ValidatedDesign], timesOut: Bool) {
+        self.installed = installed
+        self.timesOut = timesOut
+        (entered, enteredSignal) = AsyncStream.makeStream(of: Void.self)
+        (released, releaseSignal) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    /// Lets the held read go on.
+    func release() { releaseSignal.yield() }
+
+    /// Waits until a read is held: true, or false after `timeout`.
+    func waitUntilEntered(timeout: Duration = .seconds(10)) async -> Bool {
+        let stream = entered
+        return await withTaskGroup(of: Bool.self) { group in
+            group.addTask { for await _ in stream { return true }; return false }
+            group.addTask {
+                do { try await Task.sleep(for: timeout) } catch { return false }
+                return false
+            }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+    }
+
+    func design(id: String) async throws -> ValidatedDesign? {
+        reads += 1
+        if held {
+            held = false
+            enteredSignal.yield()
+            let released = released
+            await Task { for await _ in released { return } }.value
+            if timesOut { throw LockTimeout() }
+        }
+        return installed.first { $0.manifest.id == id }
+    }
+
+    func installedDesigns() async throws -> [DesignManifest] { installed.map(\.manifest) }
+    @discardableResult func save(_ design: ValidatedDesign) async throws -> ImportSave { try await store.save(design) }
+    func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await store.saveIfNewer(design) }
+    func installedOrigins() async throws -> [String: DesignOrigin] { try await store.installedOrigins() }
+    func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.adoptAsBundled(design) }
+}
+
 /// Two installed designs that differ in stylesheet, default palette and default fonts.
 private enum Installed {
     static let defaultID = "professional"
@@ -169,6 +225,23 @@ struct DesignResolvingExporterTests {
         await #expect(throws: CancellationError.self) {
             try await exporter(store, renderer: FakePDFRenderer()).export(cv(nil), language: try italian())
         }
+    }
+
+    @Test("an export cancelled while the store waits for its lock is cancelled, whether the wait then reads or times out; nothing more is read or rendered", arguments: [false, true], [nil, "gone"])
+    func cancelledDuringTheStoreWait(timesOut: Bool, design: String?) async throws {
+        let store = HeldDesignStore(installed: try Installed.designs(), timesOut: timesOut)
+        let renderer = RecordingRenderer()
+        let language = try italian()
+        let snapshot = cv(try design.map { try choice($0, palette: nil, fonts: nil) })
+
+        let export = Task { try await exporter(store, renderer: renderer).export(snapshot, language: language) }
+        try #require(await store.waitUntilEntered())
+        export.cancel()
+        await store.release()
+
+        await #expect(throws: CancellationError.self) { try await export.value }
+        #expect(await store.reads == 1)
+        #expect(await renderer.rendered.isEmpty)
     }
 
     @Test("the export's own failures pass through: a CV without a name is notReady")
