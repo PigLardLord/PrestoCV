@@ -1,3 +1,5 @@
+import CVBundledDesigns
+import CVRenderingTestSupport
 import CVRenderingWebKitSupport
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
@@ -39,6 +41,8 @@ struct TraceOnFailureTests {
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             copyFolders: [],
             compileRules: compileRules,
+            designs: BundleDesignSource(),
+            makeGate: { _, _, _ in FakeRenderingGate() },
             settleDeadline: settleDeadline,
             check: check,
             prepare: {}

@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 import Observation
 import Testing
@@ -72,8 +71,11 @@ struct CompositionHolderTests {
         }
     }
 
-    private func readyState() async throws -> CompositionState {
-        let state = await Composition.launch(arguments: ["holder-test", "-PrestoCVNextEmptyStorage"], settlement: TraceSettlement())
+    /// A ready composition over `paths` and a fake gate: the holder needs a ready state, not a real render
+    /// (`Composition.launch` renders the bundled designs, and the platform renderer refuses a third print at once).
+    private func readyState(_ paths: AppPaths) async throws -> CompositionState {
+        let compile = CompositionTests.counting(CompositionTests.CompileCounter())
+        let state = await Composition.make(CompositionTests.inputs(paths, compileRules: compile))
         guard case .ready = state else { throw NotReady(state: "\(state)") }
         return state
     }
@@ -113,7 +115,9 @@ struct CompositionHolderTests {
 
     @Test("A retry after a failure launches again and gives the new state")
     func retryAfterFailure() async throws {
-        let script = ScriptedLaunch([.failed(.contentRulesUnavailable), try await readyState()])
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let script = ScriptedLaunch([.failed(.contentRulesUnavailable), try await readyState(paths)])
         let holder = holder(script)
         holder.start()
         await script.nextLaunchBegan()
@@ -170,7 +174,9 @@ struct CompositionHolderTests {
 
     @Test("A retry while the first launch runs, or after it is ready, launches nothing")
     func retryOnlyAfterFailure() async throws {
-        let script = ScriptedLaunch([try await readyState()])
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let script = ScriptedLaunch([try await readyState(paths)])
         let holder = holder(script)
         holder.start()
         await script.nextLaunchBegan()
@@ -184,4 +190,3 @@ struct CompositionHolderTests {
         #expect(script.launches == 1)
     }
 }
-#endif

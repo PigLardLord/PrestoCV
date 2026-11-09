@@ -127,6 +127,17 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 | `trace.readFailed` | error | `error` (`corruptRun` or `write`) | A stored run or the session's events did not read back, or the folder could not be listed; the run is left out of the list. |
 | `trace.shareFailed` | error | `error` (`share`) | The copies of a run to share could not be made or removed. |
 
+### The designs (category `designs`)
+
+Every launch brings the designs that ship with the app into the design store before the first screen, and renders a design only when it is new or changed. The first launch renders the three bundled designs; a launch after it renders none.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
+| `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the launch goes on with the designs installed before, if the default design is among them. |
+| `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync. The designs saved before it stay saved, so the next launch does not render them again. |
+| `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The store gives no default design, so the launch fails with this code. |
+
 ## The trace of a test build
 
 A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.

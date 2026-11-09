@@ -13,6 +13,8 @@ struct AppPaths: Equatable, Sendable {
 
     /// The CVs, one file each
     var store: URL { root.appendingPathComponent("Store", isDirectory: true) }
+    /// The installed designs: their store makes its own folders inside, on the launch's first sync
+    var designs: URL { root.appendingPathComponent("Designs", isDirectory: true) }
     /// The runs of the trace, made by its store on the first run the gate lets through
     var trace: URL { root.appendingPathComponent("Diagnostics", isDirectory: true) }
     /// The copies of a run made to share

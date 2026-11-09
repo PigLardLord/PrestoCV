@@ -93,9 +93,9 @@ struct LaunchFixtures: Equatable, Sendable {
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no
-    /// link on the way to its store or trace folder, and nothing outside the temporary folder. The composition runs it
+    /// link on the way to its store, design or trace folder, and nothing outside the temporary folder. The composition runs it
     /// before anything touches these paths, the purge of the trace included, so a link planted in the temporary folder
-    /// never leads a launch into another folder, such as the real store or its traces.
+    /// never leads a launch into another folder, such as the real store, its designs or its traces.
     func check(_ paths: AppPaths) throws(Failure) {
         guard storage != .device else { return }
         try Self.requirePlainFolders(of: paths)
@@ -133,11 +133,11 @@ struct LaunchFixtures: Equatable, Sendable {
 
     // MARK: Checking
 
-    /// Refuses a root, a store or a trace folder, or any folder between them and the temporary folder, that is a link, and
+    /// Refuses a root, a store, a design or a trace folder, or any folder between them and the temporary folder, that is a link, and
     /// a root that resolves to somewhere outside the temporary folder.
     private static func requirePlainFolders(of paths: AppPaths) throws(Failure) {
         let temporary = paths.temporary.standardizedFileURL.path
-        for folder in [paths.store, paths.trace] {
+        for folder in [paths.store, paths.designs, paths.trace] {
             var url = folder.standardizedFileURL
             while url.path.hasPrefix(temporary + "/") {
                 if isLink(url) { throw .unsafeFolder }
