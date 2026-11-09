@@ -14,8 +14,11 @@ extension LogCategory {
 /// - With no default design to give, the launch fails: `designStoreUnavailable` when the store could not be read or could
 ///   not save the default design, `bundledDesignsUnavailable` when the bundle could not be read or its default design was
 ///   refused.
-/// - A cancellation is `designSyncInterrupted`. The designs saved before it stay saved, so the next launch does not render
-///   them again.
+/// - A design the store lists but cannot read is left out (`designs.unreadable`), and the launch goes on with the others. A
+///   default design the store cannot read fails the launch with `designStoreUnavailable`.
+/// - A cancelled launch is `designSyncInterrupted`, even when the cancellation is seen only once a store step returns (the
+///   file store's lock wait does not end early when its caller is cancelled). The designs saved before it stay saved, so
+///   the next launch does not render them again.
 struct DesignBootstrap: Sendable {
     /// The design a CV that keeps none exports with: the default of version 1, and the first bundled design.
     static let defaultDesign = "professional"
@@ -37,17 +40,47 @@ struct DesignBootstrap: Sendable {
     func run() async throws(CompositionFailure) -> Designs {
         let stopwatch = Stopwatch(started: clock)
         let missing = try await sync(stopwatch)
+        let defaultDesign: DesignManifest, listed: [DesignManifest]
         do {
-            let defaultDesign = try await GetDesign(store: store)(id: Self.defaultDesign).manifest
-            let installed = try await ListDesigns(store: store)()
-            return Designs(installed: installed, defaultDesign: defaultDesign)
-        } catch is CancellationError {
-            throw interrupted(stopwatch)
-        } catch DesignCatalogError.unknownDesign {
-            throw unavailable(missing, stopwatch)
+            defaultDesign = try await GetDesign(store: store)(id: Self.defaultDesign).manifest
+            listed = try await ListDesigns(store: store)()
         } catch {
-            throw unavailable(.store, stopwatch)
+            throw failure(error, missing, stopwatch)
         }
+        let installed = try await readable(listed, defaultDesign: defaultDesign, stopwatch)
+        guard !Task.isCancelled else { throw interrupted(stopwatch) }
+        return Designs(installed: installed, defaultDesign: defaultDesign)
+    }
+
+    /// What a launch fails with when the store does not give the default design or the list of the installed designs.
+    private func failure(_ error: any Error, _ missing: Missing, _ stopwatch: Stopwatch) -> CompositionFailure {
+        if error is CancellationError || Task.isCancelled { return interrupted(stopwatch) }
+        if case DesignCatalogError.unknownDesign = error { return unavailable(missing, stopwatch) }
+        return unavailable(.store, stopwatch)
+    }
+
+    /// The listed designs the store can read, in the store's order. A design it cannot read is left out and counted in the
+    /// log, so one damaged package does not stop the launch; the default design was read already.
+    private func readable(
+        _ listed: [DesignManifest], defaultDesign: DesignManifest, _ stopwatch: Stopwatch
+    ) async throws(CompositionFailure) -> [DesignManifest] {
+        var readable: [DesignManifest] = []
+        for manifest in listed {
+            guard manifest.id != defaultDesign.id else {
+                readable.append(defaultDesign)
+                continue
+            }
+            do {
+                readable.append(try await GetDesign(store: store)(id: manifest.id).manifest)
+            } catch {
+                if error is CancellationError || Task.isCancelled { throw interrupted(stopwatch) }
+            }
+        }
+        if readable.count < listed.count {
+            logger.notice(.designs, "designs.unreadable",
+                .count("leftOut", listed.count - readable.count), .duration("elapsed", stopwatch.elapsed))
+        }
+        return readable
     }
 
     /// Runs the sync and logs what it did. Returns what to blame if the store then has no default design.
@@ -55,7 +88,7 @@ struct DesignBootstrap: Sendable {
         let report: SyncReport
         do {
             report = try await SyncBundledDesigns(source: source, validator: DesignPackageValidator(), gate: gate, store: store)()
-        } catch is CancellationError {
+        } catch let error where error is CancellationError || Task.isCancelled {
             throw interrupted(stopwatch)
         } catch DesignCatalogError.bundledDesignsUnavailable {
             return syncFailed(.bundle, stopwatch)
@@ -70,6 +103,7 @@ struct DesignBootstrap: Sendable {
             .count("failed", report.failed.count), .count("conflicts", report.conflicts.count),
             .duration("elapsed", stopwatch.elapsed),
         ]))
+        guard !Task.isCancelled else { throw interrupted(stopwatch) }
         return report.failed.contains(Self.defaultDesign) ? .store : .bundle
     }
 

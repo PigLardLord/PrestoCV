@@ -135,7 +135,8 @@ Every launch brings the designs that ship with the app into the design store bef
 |---|---|---|---|
 | `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
 | `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the launch goes on with the designs installed before, if the default design is among them. |
-| `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync. The designs saved before it stay saved, so the next launch does not render them again. |
+| `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync or while the store was read. The designs saved before it stay saved, so the next launch does not render them again. |
+| `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read were left out of the launch; the launch goes on with the others. |
 | `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The store gives no default design, so the launch fails with this code. |
 
 ## The trace of a test build
