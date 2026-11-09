@@ -89,7 +89,7 @@ struct Browsing {
         )
     }
 
-    func firstRun() -> FirstRunViewModel { FirstRunViewModel(browsing: browsing, editing: editing) }
+    func firstRun(offersImport: Bool = true) -> FirstRunViewModel { FirstRunViewModel(browsing: browsing, editing: editing, offersImport: offersImport) }
 
     func look(of cv: CV) -> LookViewModel {
         LookViewModel(reference: CVReference(id: cv.id), editing: editing, options: LookOptionsFake())

@@ -59,7 +59,7 @@ struct FirstRunViewModelTests {
         let firstRun = world.firstRun()
         await firstRun.load()
         let sample = try #require(world.browsing.sampleList.withLock { $0.first })
-        let example = try #require(firstRun.choices.first)
+        let example = try #require(firstRun.choices.first { if case .example = $0 { true } else { false } })
 
         let destination = firstRun.start(example)
 
@@ -108,6 +108,56 @@ struct FirstRunViewModelTests {
 
         guard case .importCV = destination else { Issue.record("expected the import"); return }
         #expect(try await world.editing.store.list().cvs.isEmpty)
+    }
+
+    @Test("the import leads, then the examples in their order, then blank")
+    func importLeadsThenExamplesThenBlank() async throws {
+        let world = Browsing()
+        samples(world, ["Nurse", "Electrician"])
+        let firstRun = world.firstRun()
+        await firstRun.load()
+
+        let examples = firstRun.choices.filter { if case .example = $0 { true } else { false } }
+        try #require(examples.count == 2)
+        #expect(firstRun.choices == [.importCV] + examples + [.blank])
+    }
+
+    @Test("without the import offered, the examples come first and blank last, and without examples blank stands alone")
+    func noImportWhenNotOffered() async throws {
+        let world = Browsing()
+        samples(world, ["Nurse", "Electrician"])
+        let withExamples = world.firstRun(offersImport: false)
+        await withExamples.load()
+        let examples = withExamples.choices.filter { if case .example = $0 { true } else { false } }
+        try #require(examples.count == 2)
+
+        #expect(withExamples.choices == examples + [.blank])
+
+        let empty = Browsing()
+        empty.browsing.samplesError.withLock { $0 = .unavailable }
+        let withoutExamples = empty.firstRun(offersImport: false)
+        await withoutExamples.load()
+
+        #expect(withoutExamples.choices == [.blank])
+    }
+
+    @Test("an example carries its own summary, as its title, to tell two examples apart")
+    func exampleChoiceCarriesItsSummary() async {
+        let world = Browsing()
+        let summaries = ["Cares for patients on a busy ward.", "Wires homes and small offices."]
+        let cvs = zip(["Nurse", "Electrician"], summaries).map { title, summary in
+            CV(id: world.editing.ids.next(), title: title, personal: PersonalDetails(fullName: "Example Person", summary: summary))
+        }
+        world.browsing.sampleList.withLock { $0 = cvs }
+        let firstRun = world.firstRun()
+
+        await firstRun.load()
+
+        let read = firstRun.choices.compactMap { choice -> String? in
+            if case .example(let example) = choice { return example.summary }
+            return nil
+        }
+        #expect(read == summaries)
     }
 
     @Test("blank is always offered last")

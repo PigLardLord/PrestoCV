@@ -9,9 +9,11 @@ public enum StartChoice: Hashable, Sendable {
     case blank
 }
 
-/// An example CV the person can start from. Its text is the example's own.
+/// An example CV the person can start from. Its title and summary are the example's own text.
 public struct ExampleChoice: Hashable, Sendable {
     public let title: String
+    /// The example's own summary, which tells two examples apart.
+    public let summary: String
     let id: CVID
 }
 

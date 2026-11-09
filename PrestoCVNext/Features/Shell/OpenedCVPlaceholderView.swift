@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// The detail column while a CV is open: its label, until the editor takes its place.
+/// The detail column while a CV is open: its label, or "New CV" for a draft, until the editor takes its place.
 struct OpenedCVPlaceholderView: View {
-    let label: String
+    let title: Text
 
     var body: some View {
         ScrollView {
-            Text(verbatim: label)
+            title
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
@@ -14,7 +14,7 @@ struct OpenedCVPlaceholderView: View {
                 .padding(Spacing.large)
                 .readableWidth()
         }
-        .navigationTitle(Text(verbatim: label))
+        .navigationTitle(title)
         .inlineNavigationTitle()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shell.detail.opened")

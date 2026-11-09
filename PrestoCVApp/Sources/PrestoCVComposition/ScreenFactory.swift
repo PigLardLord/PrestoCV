@@ -81,9 +81,10 @@ public final class ScreenFactory {
         ShellNavigationModel()
     }
 
-    /// The first run.
+    /// The first run and the ways to start another CV. It does not offer the import while the app has no import screen
+    /// (step 5-13 adds the screen and the choice), so that no choice leads nowhere.
     public func makeFirstRun() -> FirstRunViewModel {
-        FirstRunViewModel(browsing: browsing, editing: editing)
+        FirstRunViewModel(browsing: browsing, editing: editing, offersImport: false)
     }
 
     /// The import of a CV the person already has: a text, a pasted PDF or a PDF file.

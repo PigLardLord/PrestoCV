@@ -34,9 +34,11 @@ struct RootView: View {
 private final class ShellModels: ObservableObject {
     let shell: ShellNavigationModel
     let list: CVListViewModel
+    let firstRun: FirstRunViewModel
 
     init(screens: ScreenFactory) {
         shell = screens.makeShell()
+        firstRun = screens.makeFirstRun()
         list = screens.makeCVList(
             untitled: String(localized: "shell.untitled"),
             // The order and the punctuation of a title and its number are the translation's
@@ -54,7 +56,7 @@ private struct ReadyShell: View {
     }
 
     var body: some View {
-        ShellView(shell: models.shell, list: models.list)
+        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
     }

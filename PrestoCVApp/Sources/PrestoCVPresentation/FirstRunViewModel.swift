@@ -13,8 +13,8 @@ public final class FirstRunViewModel {
     /// Why there are no examples, nil when they were read.
     public private(set) var examplesIssue: ExamplesIssue?
 
-    /// The ways to start: the examples, then the import, then blank.
-    public var choices: [StartChoice] { examples.map(StartChoice.example) + [.importCV, .blank] }
+    /// The ways to start: the import when it is offered, then the examples, then blank.
+    public var choices: [StartChoice] { (offersImport ? [.importCV] : []) + examples.map(StartChoice.example) + [.blank] }
 
     private var examples: [ExampleChoice] = []
     @ObservationIgnored private var samples: [CVID: CV] = [:]
@@ -22,10 +22,13 @@ public final class FirstRunViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
+    @ObservationIgnored private let offersImport: Bool
 
-    public init(browsing: any CVBrowsing, editing: any CVEditing) {
+    /// `offersImport` is false while the app has no import screen, so no choice leads nowhere.
+    public init(browsing: any CVBrowsing, editing: any CVEditing, offersImport: Bool) {
         self.browsing = browsing
         self.editing = editing
+        self.offersImport = offersImport
     }
 
     /// Reads the store and, once, the examples. The view calls it from its `.task`. Only the latest read publishes.
@@ -48,7 +51,7 @@ public final class FirstRunViewModel {
             let read = try await browsing.samples()
             guard mine == generation else { return }
             samples = Dictionary(read.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            examples = read.map { ExampleChoice(title: CVTitle(name: $0.title, person: "", role: $0.personal.professionalTitle).text(untitled: ""), id: $0.id) }
+            examples = read.map { ExampleChoice(title: CVTitle(name: $0.title, person: "", role: $0.personal.professionalTitle).text(untitled: ""), summary: $0.personal.summary, id: $0.id) }
             examplesIssue = nil
             examplesRead = true
         } catch {
