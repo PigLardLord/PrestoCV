@@ -4,7 +4,8 @@ import SwiftUI
 /// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it shows
 /// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
 /// what is open, which column shows, whether the welcome shows and whether the open CV may be left; this view binds to
-/// them. When the app goes to the background, the open CV is stored at once.
+/// them. It tells the shell when the scene stops being active, which stores the open CV at once on its way to the
+/// background.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
@@ -18,9 +19,7 @@ struct ShellView: View {
     var body: some View {
         screen
             .task { await firstRun.load() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .background { Task { await shell.flushAll() } }
-            }
+            .onChange(of: scenePhase) { _, phase in shell.sceneChanged(isActive: phase == .active) }
     }
 
     @ViewBuilder

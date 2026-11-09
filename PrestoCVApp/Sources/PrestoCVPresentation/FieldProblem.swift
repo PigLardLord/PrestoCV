@@ -23,6 +23,12 @@ extension EditorViewModel {
         return form.unreadable.filter(metProblems.contains)
     }
 
+    /// The problem of a field of the details that the person has met, which its note names; nil when the field shows no
+    /// note.
+    public func problem(of field: EditorField) -> FieldProblem.Code? {
+        problems.first { $0.row == nil && $0.field == field }?.code
+    }
+
     /// The person left a field of the details: text in it that cannot be read is a problem from now on, until it reads.
     public func fieldWasLeft(_ field: EditorField) {
         meet(form.unreadable.filter { $0.row == nil && $0.field == field })

@@ -65,6 +65,12 @@ public final class EditorViewModel {
     var restyled: CV?
     /// The CV the form stands on, with the look and the language chosen last: the one shown, exported and copied.
     var held: CV? { restyled ?? base }
+    /// The CV this editor stores, nil while the store holds none of it: a draft has one after its first write, and after a
+    /// copy is saved the copy is the CV it stores.
+    var storedReference: CVReference? {
+        guard let base, autosave?.isStored == true else { return nil }
+        return CVReference(id: base.id)
+    }
     @ObservationIgnored var autosave: Autosave<CV>?
     /// The writer of the CV the form stands on, which keeps its revision.
     @ObservationIgnored var writer: (any CVAutosaveWriting)?

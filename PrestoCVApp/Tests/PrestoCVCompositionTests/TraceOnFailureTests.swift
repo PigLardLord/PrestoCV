@@ -46,7 +46,8 @@ struct TraceOnFailureTests {
             settleDeadline: settleDeadline,
             check: check,
             prepare: {},
-            wrapListEditing: { $0 }
+            wrapListEditing: { $0 },
+            backgroundTime: NoBackgroundTime()
         )
     }
 

@@ -254,9 +254,26 @@ struct Editing {
         await waitUntil("\(expected) writes") { editing.writeCount >= expected }
     }
 
-    /// The navigation of the shell, opening its editors over this store.
-    func shell() -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { editor($0) })
+    /// The navigation of the shell, opening its editors over this store, with the system's background time seen by `time`.
+    func shell(time: BackgroundTimeSpy = BackgroundTimeSpy()) -> ShellNavigationModel {
+        ShellNavigationModel(makeEditor: { editor($0) }, backgroundTime: time)
+    }
+}
+
+/// The system's background time as a test sees it: each hold asked for, and what `probe` read when it began and when it
+/// ended.
+@MainActor
+final class BackgroundTimeSpy: BackgroundTime {
+    /// Read when a hold begins and when it ends, such as how many writes the store took by then.
+    var probe: @MainActor () -> Int = { 0 }
+    /// What `probe` read as each hold began, in order.
+    private(set) var begun: [Int] = []
+    /// What `probe` read as each hold ended, in order of their ends.
+    private(set) var ended: [Int] = []
+
+    func hold() -> BackgroundHold {
+        begun.append(probe())
+        return BackgroundHold { [self] in ended.append(probe()) }
     }
 }
 

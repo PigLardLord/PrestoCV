@@ -99,7 +99,8 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let screen: ShellScreen = shell.screen(for: .firstRun)
     switch screen { case .loading, .welcome, .split: break }
     shell.reconcile(with: rows)
-    await shell.flushAll()
+    shell.sceneChanged(isActive: false)
+    shell.sceneChanged(isActive: true)
     verdicts.append(shell.deselect())
     for verdict in verdicts {
         switch verdict {

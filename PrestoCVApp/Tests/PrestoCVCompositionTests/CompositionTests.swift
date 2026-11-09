@@ -99,7 +99,8 @@ struct CompositionTests {
             settleDeadline: Self.neverFires,
             check: {},
             prepare: {},
-            wrapListEditing: { $0 }
+            wrapListEditing: { $0 },
+            backgroundTime: NoBackgroundTime()
         )
     }
 

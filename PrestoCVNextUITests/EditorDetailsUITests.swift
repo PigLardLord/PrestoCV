@@ -255,11 +255,12 @@ final class EditorDetailsUITests: XCTestCase {
         XCTAssertTrue(waitUntilGone(keyboard), "Done puts the keyboard of \(name) away")
     }
 
-    /// An e-mail address being typed is not one yet: the line under the title says the text is not stored, and no note
-    /// shows. Once the person leaves the field (here with Done), the note under it says what to write, and the line
-    /// points to it.
+    /// An e-mail address being typed is not one yet: the line under the title says the text is not stored, and names no
+    /// problem. Once the person leaves the field (here with Done), the line points to the note under it. The note itself
+    /// is hidden from accessibility, since the field carries its words for VoiceOver, so it is not in the tree a UI test
+    /// reads; which field has a note is the editor's (`FieldProblemTests`).
     @MainActor
-    func testEmailNoteAppearsOnlyAfterLeavingTheField() throws {
+    func testEmailProblemIsNamedOnlyAfterLeavingTheField() throws {
         let app = try launch([backendEngineer], largestText: false)
         open(backendEngineer, in: app)
 
@@ -268,13 +269,13 @@ final class EditorDetailsUITests: XCTestCase {
         email.tap()
         email.typeText("mara.at.example")
 
+        // No problem is named while the person types
         XCTAssertTrue(waitUntil(status(of: app), reads: unsavedChanges), status(of: app).label)
-        XCTAssertFalse(element("editor.note.email", in: app).exists, "No problem is named while the person types")
 
         app.buttons["keyboard.done"].tap()
 
-        XCTAssertTrue(element("editor.note.email", in: app).waitForExistence(timeout: 30), "The note shows once the field is left")
         XCTAssertTrue(waitUntil(status(of: app), reads: oneFieldNotSaved), status(of: app).label)
+        XCTAssertTrue(email.exists, "The note under the field leaves its identifier on the text field")
     }
 
     // MARK: Accessibility

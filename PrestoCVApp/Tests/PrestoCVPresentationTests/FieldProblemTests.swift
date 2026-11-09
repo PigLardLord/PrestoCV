@@ -36,6 +36,23 @@ struct FieldProblemTests {
         #expect(editor.saveStatus == .unreadable(.email))
     }
 
+    @Test("a field of the details shows the note of its problem, and only once the person has left it")
+    func noteOfAField() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.type(\.email, "mara at example")
+        editor.type(\.phone, "call me")
+        editor.type(\.website, "https://mara.example.org")
+        #expect(editor.problem(of: .email) == nil, "the person is still typing the email")
+
+        editor.fieldWasLeft(.email)
+        editor.fieldWasLeft(.website)
+
+        #expect(editor.problem(of: .email) == .unreadable)
+        #expect(editor.problem(of: .phone) == nil, "the phone cannot be read either, but the person has not left it yet")
+        #expect(editor.problem(of: .website) == nil, "a web address that reads has no note")
+    }
+
     @Test("a problem goes as soon as the text reads, and text typed again after that waits until the field is left again")
     func problemGoesWhenTheTextReads() async throws {
         let world = Editing()

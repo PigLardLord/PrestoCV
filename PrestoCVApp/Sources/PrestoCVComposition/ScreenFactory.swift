@@ -28,6 +28,8 @@ public final class ScreenFactory {
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
+    /// The time the system grants the shell to store its editors once the app leaves the foreground.
+    private let backgroundTime: any BackgroundTime
     /// The editors made and not yet released. The factory never keeps one alive.
     private var editors: [WeakEditor] = []
     /// How many editors the factory has made: each one is known by its number, which is never reused.
@@ -44,11 +46,12 @@ public final class ScreenFactory {
     ///   - languages: The languages the export sheets offer.
     ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
     ///     launch fixture wraps it.
+    ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage],
-        wrapListEditing: (any CVEditing) -> any CVEditing
+        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
@@ -60,6 +63,7 @@ public final class ScreenFactory {
         self.languages = languages
         self.clock = clock
         self.editorClock = editorClock
+        self.backgroundTime = backgroundTime
     }
 
     /// The list of CVs.
@@ -96,7 +100,7 @@ public final class ScreenFactory {
                     await firstRun?.load()
                 }
             })
-        })
+        }, backgroundTime: backgroundTime)
     }
 
     /// The first run and the ways to start another CV. It does not offer the import while the app has no import screen

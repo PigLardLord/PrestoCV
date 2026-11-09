@@ -32,6 +32,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         case .unreadable: break
         }
     }
+    let _: FieldProblem.Code? = editor.problem(of: .email)
     let _: FieldInput = EditorField.email.input
     editor.addRow(to: .skills)
     let added: RowID = editor.content.skills[0].id

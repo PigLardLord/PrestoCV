@@ -28,8 +28,9 @@ public enum ShellScreen: Hashable, Sendable {
 /// draft stays are here (R5).
 ///
 /// The shell owns the open CV's editor. Leaving it never waits for the store: the editor left is handed to its
-/// `saveNow()`, which stores every change, and the shell keeps it alive until that ended. An editor whose text no write
-/// can store as it is keeps the person in it, and the verdict says why.
+/// `saveNow()`, which stores every change, and the shell keeps it alive until that ended. Opening that CV again
+/// meanwhile gets the same editor back, so one writer keeps its writes in order. An editor whose text no write can store
+/// as it is keeps the person in it, and the verdict says why.
 @MainActor
 @Observable
 public final class ShellNavigationModel {
@@ -40,9 +41,16 @@ public final class ShellNavigationModel {
     public private(set) var editor: EditorViewModel?
 
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart) -> EditorViewModel
+    @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
-    @ObservationIgnored private var flushing: [Int: Task<Void, Never>] = [:]
+    @ObservationIgnored private var flushing: [Int: Leaving] = [:]
     @ObservationIgnored private var leavings = 0
+
+    /// An editor left, and its `saveNow()`, which stores it.
+    private struct Leaving {
+        let editor: EditorViewModel
+        let storing: Task<Void, Never>
+    }
 
     /// The stored CV open in the detail, nil when none is open or the detail holds a draft, which has no row.
     public var selection: CVReference? {
@@ -58,21 +66,37 @@ public final class ShellNavigationModel {
     /// stays where it was (`open(_:)` and `deselect()` say why).
     public var canLeave: Bool { blockingStatus == nil }
 
-    /// - Parameter makeEditor: Makes the editor of what the detail opens.
-    public init(makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel) {
+    /// - Parameters:
+    ///   - makeEditor: Makes the editor of what the detail opens.
+    ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
+    public init(makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel, backgroundTime: any BackgroundTime) {
         self.makeEditor = makeEditor
+        self.backgroundTime = backgroundTime
+    }
+
+    /// The scene became active, or stopped being active. On its way to the background a scene is inactive first, and from
+    /// then on the open CV and the ones left are stored at once, under time asked of the system, so that a suspension
+    /// does not cut a write off; the time is given back once every write ended. As any store the person asks for, it
+    /// names the fields that cannot be read.
+    public func sceneChanged(isActive: Bool) {
+        guard !isActive else { return }
+        let hold = backgroundTime.hold()
+        Task {
+            await flushAll()
+            hold.end()
+        }
     }
 
     /// Opens a stored CV or a draft in the detail, in place of what was open. Opening the stored CV that is open changes
-    /// nothing; a draft is new each time, so it always replaces. The editor that was open stays when its text cannot be
-    /// stored as it is.
+    /// nothing; a draft is new each time, so it always replaces. Opening a CV whose editor was left and still stores it
+    /// gets that editor back. The editor that was open stays when its text cannot be stored as it is.
     @discardableResult
     public func open(_ start: EditorStart) -> LeaveVerdict {
         if case .stored(let reference) = start, reference == selection { return .left }
         if let status = blockingStatus { return .stayed(status) }
         letGo()
         detail = start
-        editor = makeEditor(start)
+        editor = takeBack(start) ?? makeEditor(start)
         return .left
     }
 
@@ -87,12 +111,12 @@ public final class ShellNavigationModel {
     }
 
     /// Stores the open editor, which stays open, and waits for the editors left before it to end their writes: for the
-    /// scene going to the background. As any store the person asks for, it names the fields that cannot be read.
-    public func flushAll() async {
+    /// scene leaving the foreground (`sceneChanged(isActive:)`).
+    func flushAll() async {
         let open = editor
-        let left = Array(flushing.values)
+        let left = flushing.values.map(\.storing)
         await open?.saveNow()
-        for leaving in left { await leaving.value }
+        for storing in left { await storing.value }
     }
 
     /// What the window shows. A first run shows the welcome until something is open; a store that was used, or could not
@@ -144,9 +168,21 @@ public final class ShellNavigationModel {
         editor = nil
         leavings += 1
         let number = leavings
-        flushing[number] = Task { [weak self] in
+        let storing = Task { [weak self] in
             await left.saveNow()
             self?.flushing[number] = nil
         }
+        flushing[number] = Leaving(editor: left, storing: storing)
+    }
+
+    /// The editor left that still stores the CV `start` opens, no longer among the ones left; nil when none does. It is
+    /// found by the CV it stores now, not by what it opened, since a draft stores a CV from its first write on. Taking it
+    /// back keeps its writer: its writes stay in order, and its text not stored yet is not read again from an older
+    /// revision, which would conflict with its own write (#402).
+    private func takeBack(_ start: EditorStart) -> EditorViewModel? {
+        guard case .stored(let reference) = start,
+              let found = flushing.first(where: { $0.value.editor.storedReference == reference }) else { return nil }
+        flushing[found.key] = nil
+        return found.value.editor
     }
 }
