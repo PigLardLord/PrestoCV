@@ -18,7 +18,8 @@ struct ExperienceSection: View {
             fields.line("editor.field.location", job.location, .experienceLocation)
             PeriodField(
                 period: job.period, field: .experiencePeriod, current: "editor.period.current.job",
-                problem: editor.problem(of: .experiencePeriod, row: row.id), row: row.id, focus: focus
+                problem: editor.problem(of: .experiencePeriod, row: row.id), row: row.id, focus: focus,
+                picked: { editor.fieldWasLeft(.experiencePeriod, row: row.id) }
             )
             fields.paragraph("editor.field.description", job.description, .experienceDescription)
         }

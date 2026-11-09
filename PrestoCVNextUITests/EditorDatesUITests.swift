@@ -184,6 +184,75 @@ final class EditorDatesUITests: XCTestCase {
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", saved), status), "Named no more: \(status.label)")
     }
 
+    /// The menu closes on the pick, so an end month picked before the start month is named at once: the year was left
+    /// before, and nothing else is touched after the pick.
+    @MainActor
+    func testEndMonthPickedBeforeTheStartIsNamed() throws {
+        let app = try launchWithAJob(largestText: false)
+        let status = app.staticTexts["editor.status"]
+        pick("March", in: start, app)
+        type("2020", in: start, app)
+        type("2020", in: end, app)
+        scroll(until: status, named: "The status line", forward: false, in: app)
+        XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", saved), status), "No month, no problem: \(status.label)")
+
+        pick("January", in: end, app)
+
+        scroll(until: status, named: "The status line", forward: false, in: app)
+        XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", oneFieldNotSaved), status), status.label)
+    }
+
+    /// Taps near the end of the field, past the last word, once the field is well inside the screen: a field that can be
+    /// hit may still sit at the very edge, where a tap takes no focus. The form is moved on in steps like `scroll`.
+    @MainActor
+    private func tapTheEnd(of field: XCUIElement, in app: XCUIApplication) {
+        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        let screen = app.windows.firstMatch.frame
+        for _ in 0..<10 where field.frame.maxY > screen.minY + screen.height * 0.7 {
+            low.press(forDuration: 0.05, thenDragTo: high, withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        XCTAssertLessThan(field.frame.maxY, screen.maxY, "The link is inside the screen")
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+    }
+
+    /// A link that is no address is named once the person leaves its field, and no more once it reads, for a certification
+    /// and for a profile. The note is for the eye; the status line points to it. Scrolling the form puts the keyboard
+    /// away, so the form is not scrolled while the person types.
+    @MainActor
+    func testLinkNoteAppearsOnlyAfterLeavingTheField() throws {
+        let app = try launchWithAJob(largestText: false)
+        let status = app.staticTexts["editor.status"]
+        // A profile exists only with a link, so its row is added when its turn comes
+        for (section, name, link) in [
+            ("certifications", "Rigging", "editor.field.certificationLink"), ("profiles", "Portfolio", "editor.field.profileLink"),
+        ] {
+            addRow(to: section, typing: name, in: app)
+            let field = app.textFields[link]
+            scroll(until: field, named: "The link \(link)", forward: true, in: app)
+            tapTheEnd(of: field, in: app)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "The link takes the keyboard")
+            field.typeText("not an address")
+            putKeyboardAway(in: app)
+            scroll(until: status, named: "The status line", forward: false, in: app)
+            XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", oneFieldNotSaved), status), status.label)
+
+            scroll(until: field, named: "The link \(link)", forward: true, in: app)
+            tapTheEnd(of: field, in: app)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "The link takes the keyboard")
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "not an address".count))
+            field.typeText("https://example.com")
+            putKeyboardAway(in: app)
+            let reads = field.value as? String ?? ""
+            scroll(until: status, named: "The status line", forward: false, in: app)
+            XCTAssertTrue(
+                wait(for: NSPredicate(format: "label == %@", saved), status),
+                "Named no more: \(status.label); the link reads \(reads)"
+            )
+        }
+    }
+
     /// At the largest text size each control of a period and of a certification's date can be reached, is at least as
     /// tall as the smallest tap target, and stays inside the screen; in landscape too.
     @MainActor

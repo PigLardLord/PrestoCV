@@ -13,13 +13,15 @@ struct PeriodField: View {
     let problem: FieldProblem.Code?
     let row: RowID
     let focus: FocusState<RowFocus?>.Binding
+    /// Told after the person picks a month: the pick is their last word on that date.
+    let picked: () -> Void
 
     var body: some View {
         let note = noteWords(of: problem, unreadable: "editor.note.period")
         VStack(alignment: .leading, spacing: Spacing.medium) {
             DateField(
                 date: $period.start, month: "editor.period.startMonth", year: "editor.period.startYear", focus: focus,
-                name: RowFocus(row: row, field: field)
+                name: RowFocus(row: row, field: field), picked: picked
             )
             .accessibilityIdentifier("editor.field.\(field).start")
             Toggle(isOn: $period.isCurrent) { Text(current) }
@@ -28,7 +30,7 @@ struct PeriodField: View {
             if period.asksForEnd {
                 DateField(
                     date: $period.end, month: "editor.period.endMonth", year: "editor.period.endYear", focus: focus,
-                    name: RowFocus(row: row, field: field, isEnd: true)
+                    name: RowFocus(row: row, field: field, isEnd: true), picked: picked
                 )
                 .accessibilityIdentifier("editor.field.\(field).end")
             }
@@ -47,13 +49,15 @@ struct IssuedField: View {
     let problem: FieldProblem.Code?
     let row: RowID
     let focus: FocusState<RowFocus?>.Binding
+    /// Told after the person picks a month: the pick is their last word on that date.
+    let picked: () -> Void
 
     var body: some View {
         let note = noteWords(of: problem, unreadable: "editor.note.issued")
         VStack(alignment: .leading, spacing: Spacing.small) {
             DateField(
                 date: $date, month: "editor.field.month", year: "editor.field.year", focus: focus,
-                name: RowFocus(row: row, field: .certificationIssued)
+                name: RowFocus(row: row, field: .certificationIssued), picked: picked
             )
             if let note {
                 FieldNote(note)
@@ -73,6 +77,8 @@ private struct DateField: View {
     let year: LocalizedStringResource
     let focus: FocusState<RowFocus?>.Binding
     let name: RowFocus
+    /// Told after the person picks a month, never when the editor changes the date itself.
+    let picked: () -> Void
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var textSize
 
@@ -94,7 +100,7 @@ private struct DateField: View {
     private var monthMenu: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             FieldLabel(month)
-            Picker(selection: $date.month) {
+            Picker(selection: pickedMonth) {
                 Text("editor.date.noMonth").tag(Int?.none)
                 ForEach(EditorChoices.months, id: \.self) { number in
                     Text(verbatim: monthNames[number - 1]).tag(Int?.some(number))
@@ -105,6 +111,17 @@ private struct DateField: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .frame(minHeight: TapTarget.minimumHeight)
+        }
+    }
+
+    /// The month as the person picks it: the menu closes on the pick, so the pick leaves the date, and the editor may name
+    /// a problem with it.
+    private var pickedMonth: Binding<Int?> {
+        Binding {
+            date.month
+        } set: { month in
+            date.month = month
+            picked()
         }
     }
 

@@ -17,7 +17,8 @@ struct EducationSection: View {
             fields.line("editor.field.school", study.school, .educationSchool)
             PeriodField(
                 period: study.period, field: .educationPeriod, current: "editor.period.current.study",
-                problem: editor.problem(of: .educationPeriod, row: row.id), row: row.id, focus: focus
+                problem: editor.problem(of: .educationPeriod, row: row.id), row: row.id, focus: focus,
+                picked: { editor.fieldWasLeft(.educationPeriod, row: row.id) }
             )
             fields.paragraph("editor.field.description", study.description, .educationDescription)
         }

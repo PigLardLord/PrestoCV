@@ -1805,6 +1805,47 @@
         }
       }
     },
+    "editor.note.link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht gespeichert: Geben Sie die ganze Adresse ein, beginnend mit https://."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved: write the whole address, starting with https://."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha guardado: escribe la dirección completa, empezando por https://."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non enregistré : saisissez l’adresse complète, en commençant par https://."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non salvato: scrivi l’indirizzo completo, che inizia con https://."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não guardado: escreve o endereço completo, a começar por https://."
+          }
+        }
+      }
+    },
     "editor.note.period" : {
       "extractionState" : "manual",
       "localizations" : {

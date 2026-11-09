@@ -112,8 +112,11 @@ struct RowFields {
     let row: RowID
     let focus: FocusState<RowFocus?>.Binding
 
-    func line(_ label: LocalizedStringResource, _ text: Binding<String>, _ field: EditorField) -> some View {
-        LabeledField(label, text: text, focus: focus, as: RowFocus(row: row, field: field))
+    /// `note` is what the person should know about the text, once the editor names a problem with it.
+    func line(
+        _ label: LocalizedStringResource, _ text: Binding<String>, _ field: EditorField, note: LocalizedStringResource? = nil
+    ) -> some View {
+        LabeledField(label, text: text, focus: focus, as: RowFocus(row: row, field: field), note: note)
             .fieldInput(field.input)
             .accessibilityIdentifier("editor.field.\(field)")
     }

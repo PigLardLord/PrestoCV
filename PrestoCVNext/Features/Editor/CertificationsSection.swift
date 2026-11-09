@@ -17,9 +17,12 @@ struct CertificationsSection: View {
             fields.line("editor.field.issuer", certification.issuer, .certificationIssuer)
             IssuedField(
                 date: certification.issued, problem: editor.problem(of: .certificationIssued, row: row.id), row: row.id,
-                focus: focus
+                focus: focus, picked: { editor.fieldWasLeft(.certificationIssued, row: row.id) }
             )
-            fields.line("editor.field.link", certification.link, .certificationLink)
+            fields.line(
+                "editor.field.link", certification.link, .certificationLink,
+                note: noteWords(of: editor.problem(of: .certificationLink, row: row.id), unreadable: "editor.note.link")
+            )
             fields.paragraph("editor.field.description", certification.description, .certificationDescription)
         }
     }
