@@ -253,37 +253,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Noch keine Lebensläufe"
+            "value" : "Keine Lebensläufe"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No CVs yet"
+            "value" : "No CVs"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aún no hay CV"
+            "value" : "No hay CV"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun CV pour l’instant"
+            "value" : "Aucun CV"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ancora nessun CV"
+            "value" : "Nessun CV"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ainda não há CV"
+            "value" : "Não há CV"
           }
         }
       }
