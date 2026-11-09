@@ -102,7 +102,9 @@ struct ScreenFactoryTests {
         await list.load()
         let row = try #require(list.rows.first)
 
-        let shell = fixture.composition.screens.makeShell(list: list, copyTitle: { "Copy of \($0)" })
+        let shell = fixture.composition.screens.makeShell(
+            list: list, firstRun: fixture.composition.screens.makeFirstRun(), copyTitle: { "Copy of \($0)" }
+        )
         #expect(shell.selection == nil)
         shell.open(.stored(row.reference))
         let editor = try #require(shell.editor)
@@ -113,6 +115,32 @@ struct ScreenFactoryTests {
         shell.reconcile(with: [])
         #expect(shell.selection == nil)
         #expect(shell.editor == nil)
+    }
+
+    @Test("The first CV a first run stores ends the first run: leaving it shows the list, not the welcome", .timeLimit(.minutes(1)))
+    func theFirstStoredCVEndsTheFirstRun() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let screens = fixture.composition.screens
+        let firstRun = screens.makeFirstRun()
+        await firstRun.load()
+        #expect(firstRun.state == .firstRun)
+        let shell = screens.makeShell(list: Self.list(fixture), firstRun: firstRun, copyTitle: { $0 })
+        guard case .draft(let draft)? = firstRun.start(.blank) else {
+            Issue.record("expected a draft from blank")
+            return
+        }
+        shell.open(.draft(draft))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        Self.typed(editor, title: "Night Shift Nurse")
+
+        await editor.saveNow()
+        for await state in Observations({ firstRun.state }) where state != .firstRun { break }
+        shell.deselect()
+
+        #expect(firstRun.state == .returning, "the write of the editor read the store again")
+        #expect(shell.screen(for: firstRun.state) == .split)
     }
 
     @Test("On an empty store the first run offers the examples, then blank, and no import while the app has no import screen")
@@ -408,7 +436,7 @@ struct ScreenFactoryTests {
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 }
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
-        let shell = factory.makeShell(list: list, copyTitle: { $0 })
+        let shell = factory.makeShell(list: list, firstRun: factory.makeFirstRun(), copyTitle: { $0 })
         shell.open(.blank)
         let first = try #require(shell.editor)
         await first.load()

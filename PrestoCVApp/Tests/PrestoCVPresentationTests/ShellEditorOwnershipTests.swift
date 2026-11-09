@@ -54,6 +54,7 @@ struct ShellEditorOwnershipTests {
         #expect(shell.editor === editor, "the person's text stays where they can still keep it")
         #expect(shell.selection == CVReference(id: cv.id))
         #expect(shell.preferredColumn == .detail)
+        #expect(!shell.canLeave, "the way back is not offered while leaving would stay")
     }
 
     @Test("while the store refuses the open CV's text the person stays; once a write took it, they can go")
@@ -71,8 +72,10 @@ struct ShellEditorOwnershipTests {
 
         #expect(shell.deselect() == .stayed(.failed))
         #expect(shell.editor === editor)
+        #expect(!shell.canLeave)
 
         await editor.saveNow()
+        #expect(shell.canLeave, "a write took the text, so the way back is offered again")
         #expect(shell.deselect() == .left)
         #expect(shell.editor == nil)
         #expect(await world.storedName(of: cv) == "Mara Reyes")

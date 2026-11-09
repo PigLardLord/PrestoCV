@@ -54,6 +54,10 @@ public final class ShellNavigationModel {
     /// both columns whatever this says.
     public var preferredColumn: ShellColumn { detail == nil ? .sidebar : .detail }
 
+    /// Whether the person can leave the open editor now. While they cannot, the view offers no way back, and a selection
+    /// stays where it was (`open(_:)` and `deselect()` say why).
+    public var canLeave: Bool { blockingStatus == nil }
+
     /// - Parameter makeEditor: Makes the editor of what the detail opens.
     public init(makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel) {
         self.makeEditor = makeEditor

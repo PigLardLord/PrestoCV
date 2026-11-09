@@ -10,6 +10,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.content = content
     let _: OpeningStatus = editor.opening
     let _: SaveStatus = editor.saveStatus
+    let _: SaveStatus? = editor.statusChange
     let _: Bool = editor.isSavedOnThisDevice
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look

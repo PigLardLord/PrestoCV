@@ -83,14 +83,19 @@ public final class ScreenFactory {
     }
 
     /// The navigation of the shell: which CV is open, its editor, and which column a compact screen shows. Each editor it
-    /// opens reloads `list` after each write the store took, so that the list shows the CV as stored; the shell does not
-    /// keep the list alive.
+    /// opens reloads `list` and `firstRun` after each write the store took, so that the list shows the CV as stored and
+    /// the first CV stored ends a first run: leaving it shows the list, not the welcome. The shell keeps neither alive.
     /// - Parameter copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
     public func makeShell(
-        list: CVListViewModel, copyTitle: @escaping @MainActor (String) -> String
+        list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String
     ) -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { [weak list] start in
-            self.makeEditor(start: start, copyTitle: copyTitle, didStore: { Task { await list?.load() } })
+        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
+            self.makeEditor(start: start, copyTitle: copyTitle, didStore: {
+                Task {
+                    await list?.load()
+                    await firstRun?.load()
+                }
+            })
         })
     }
 

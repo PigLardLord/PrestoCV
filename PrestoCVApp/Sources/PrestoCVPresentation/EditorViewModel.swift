@@ -26,6 +26,12 @@ public final class EditorViewModel {
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
 
+    /// The status the person is told of as it changes (VoiceOver), in words the view picks from the code: nil until the
+    /// status settles somewhere other than where it stood when the CV opened. Typing and the autosave's writes
+    /// (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure, and the save
+    /// after one or the first save of a new CV, each change it.
+    public private(set) var statusChange: SaveStatus?
+
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
 
@@ -81,6 +87,8 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
+    /// Where the status last settled (`statusChange`), nil until the CV opened.
+    @ObservationIgnored var settled: SaveStatus?
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
@@ -204,6 +212,9 @@ public final class EditorViewModel {
     func refreshSaveStatus() {
         let status = currentSaveStatus()
         if status != saveStatus { saveStatus = status }
+        guard status != .pending, status != .saving, status != settled else { return }
+        if settled != nil { statusChange = status }
+        settled = status
     }
 
     private func currentSaveStatus() -> SaveStatus {

@@ -44,7 +44,9 @@ private final class ShellModels: ObservableObject {
             numbered: { title, number in String(localized: "shell.numbered \(title) \(number)") }
         )
         // A copy is named as the list names one, in the language the app shows (R13)
-        shell = screens.makeShell(list: list, copyTitle: { title in String(localized: "list.copy.title \(title)") })
+        shell = screens.makeShell(
+            list: list, firstRun: firstRun, copyTitle: { title in String(localized: "list.copy.title \(title)") }
+        )
     }
 }
 

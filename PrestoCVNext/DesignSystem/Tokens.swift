@@ -33,3 +33,9 @@ enum TapTarget {
 enum ReadableWidth {
     static let maximum: CGFloat = 560
 }
+
+/// The smallest height of a field of several lines at the default text size, about four lines of body text. It grows
+/// with the text size.
+enum ParagraphHeight {
+    static let minimum: CGFloat = 96
+}
