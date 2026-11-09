@@ -1,5 +1,6 @@
 import Testing
 import PrestoCVDomain
+import PrestoCVWorkflowPorts
 @testable import PrestoCVPresentation
 
 /// What the list column shows, decided by the view model so that the views only render it (R5): the content in place of
@@ -205,6 +206,121 @@ struct CVListPresentationTests {
         await list.delete(world.reference(cv))
 
         #expect(list.rows.isEmpty)
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    // MARK: A latest failure whose row another action removed
+
+    /// The kinds of action that follow a delete of the same row and fail after it, held in the store's door.
+    enum Later: CaseIterable, CustomStringConvertible {
+        case rename, language
+
+        var description: String { self == .rename ? "rename" : "language" }
+
+        func gate(of world: Browsing) -> Gate { self == .rename ? world.editing.renameGate : world.editing.gate }
+
+        func apply(to list: CVListViewModel, _ row: CVReference) async {
+            switch self {
+            case .rename: await list.rename(row, to: "Renamed")
+            case .language: await list.setDocumentLanguage(row, to: "de")
+            }
+        }
+    }
+
+    /// Starts a delete of the row, then `later` on it, both held; the delete goes first, then `later` reaches the store.
+    private func deleteThen(
+        _ later: Later, _ row: CVReference, in world: Browsing, _ list: CVListViewModel, deleteFirst: () async throws -> Void
+    ) async throws {
+        try await deleteFirst()
+        await world.editing.deleteGate.close()
+        await later.gate(of: world).close()
+        let deleting = Task { await list.delete(row) }
+        await waitUntil("the delete to wait") { await world.editing.deleteGate.waiting == 1 }
+        let following = Task { await later.apply(to: list, row) }
+        await waitUntil("the later action to wait") { await later.gate(of: world).waiting == 1 }
+        await world.editing.deleteGate.open()
+        await deleting.value
+        #expect(!list.rows.map(\.reference).contains(row))
+        await later.gate(of: world).open()
+        await following.value
+    }
+
+    @Test("a later action that fails as gone after a delete removed the row keeps its alert, by the label the row had", arguments: Later.allCases)
+    func laterGoneAfterDeleteKeepsTheAlert(later: Later) async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+
+        try await deleteThen(later, world.reference(cv), in: world, list) {}
+
+        let alert = try #require(list.rowAlert)
+        #expect(alert.reference == world.reference(cv))
+        #expect(alert.label == "Backend")
+        #expect(alert.status == .gone)
+        list.dismissStatus(of: world.reference(cv))
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("the same when the delete itself found the CV gone already", arguments: Later.allCases)
+    func laterGoneAfterDeleteThatFoundItGoneKeepsTheAlert(later: Later) async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+
+        try await deleteThen(later, world.reference(cv), in: world, list) {
+            try await world.editing.delete(try await world.editing.inStore(cv.id))
+        }
+
+        #expect(list.rowAlert?.label == "Backend")
+        #expect(list.rowAlert?.status == .gone)
+        list.dismissStatus(of: world.reference(cv))
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("a later action that fails for another reason after a delete removed the row keeps its alert by the label the row had")
+    func laterFailureAfterDeleteKeepsTheAlert() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        world.editing.restyleErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        try await deleteThen(.language, world.reference(cv), in: world, list) {}
+
+        let alert = try #require(list.rowAlert)
+        #expect(alert.label == "Backend")
+        #expect(alert.status == .failed)
+        // A reload keeps it
+        await list.load()
+        #expect(list.rowAlert == alert)
+        list.dismissStatus(of: world.reference(cv))
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("two rows found gone are told in the order found, after a listed row whose change did not work")
+    func goneAlertsComeInTheOrderFound() async throws {
+        let world = Browsing()
+        let first = try await world.stored(title: "First")
+        let second = try await world.stored(title: "Second")
+        let listed = try await world.stored(title: "Listed")
+        let list = await world.loadedList()
+        // The second CV is found gone before the first, whatever their order in the list
+        try await deleteThen(.rename, world.reference(second), in: world, list) {}
+        try await deleteThen(.rename, world.reference(first), in: world, list) {}
+        try await world.editing.otherWindowSaves(listed, fullName: "Someone Else")
+        await list.rename(world.reference(listed), to: "Renamed")
+
+        #expect(list.rowAlert?.reference == world.reference(listed))
+        list.dismissStatus(of: world.reference(listed))
+        #expect(list.rowAlert?.reference == world.reference(second))
+        #expect(list.rowAlert?.label == "Second")
+        list.dismissStatus(of: world.reference(second))
+        #expect(list.rowAlert?.reference == world.reference(first))
+        #expect(list.rowAlert?.label == "First")
+        list.dismissStatus(of: world.reference(first))
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
