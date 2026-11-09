@@ -15,7 +15,8 @@ public final class CVListViewModel {
     public private(set) var status: ListStatus = .loading
     /// A change succeeded and the list could not be read again: the rows may be out of date.
     public private(set) var isStale = false
-    /// What the last change of a row did not do. A row is cleared by its next change.
+    /// What the last change of a row did not do. A row is cleared by its next change, or when the person dismisses it. The
+    /// status of a CV that is gone stays after the reload that drops its row, so that the person is told.
     public private(set) var rowStatuses: [CVReference: RowStatus] = [:]
     /// The moment the view words "saved ... ago" from. It moves when the list is read or `refreshNow()` is called.
     public private(set) var now: Date
@@ -48,15 +49,19 @@ public final class CVListViewModel {
     /// The swipe from the trailing edge.
     public let trailingSwipeActions: [RowAction] = [.delete]
 
-    /// The first row, in the list's order, whose last change did not work, until the person dismisses it.
+    /// The first row, in the list's order, whose last change did not work, until the person dismisses it. A CV that went
+    /// from the list meanwhile follows the rows, named by the label it had.
     public var rowAlert: RowAlert? {
-        rows.lazy.compactMap { row in
+        let listed = rows.lazy.compactMap { row in
             self.rowStatuses[row.reference].map { RowAlert(reference: row.reference, label: row.label, status: $0) }
         }.first
+        return listed ?? goneAlerts.first { rowStatuses[$0.reference] != nil }
     }
 
     private var issues: [StoreIssueKind] = []
     private var isNoticeDismissed = false
+    /// The alerts of the CVs a change found gone, in the order they were found, with the label their row had.
+    private var goneAlerts: [RowAlert] = []
 
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
@@ -127,14 +132,17 @@ public final class CVListViewModel {
     public func dismissNotice() { isNoticeDismissed = true }
 
     /// The person read what the last change of the row did not do.
-    public func dismissStatus(of reference: CVReference) { rowStatuses[reference] = nil }
+    public func dismissStatus(of reference: CVReference) {
+        rowStatuses[reference] = nil
+        goneAlerts.removeAll { $0.reference == reference }
+    }
 
     private func show(_ listing: CVListing) {
         listed = listing.cvs
         issues = listing.issues.map(StoreIssueKind.init)
         showRows()
-        let present = Set(rows.map(\.reference))
-        rowStatuses = rowStatuses.filter { present.contains($0.key) }
+        let kept = Set(rows.map(\.reference)).union(goneAlerts.map(\.reference))
+        rowStatuses = rowStatuses.filter { kept.contains($0.key) }
         settled = .loaded
         status = .loaded
         isStale = false
@@ -197,9 +205,10 @@ public final class CVListViewModel {
         do {
             // The CV is gone from the store whatever came after: the row goes
             try await editing.delete(cv)
-            listed.removeAll { $0.id == cv.id }
-            listChanged()
-            await changed(reference, intent)
+            await deleted(cv, reference, intent)
+        } catch .deletedElsewhere {
+            // Gone already is what the person asked for
+            await deleted(cv, reference, intent)
         } catch {
             await failed(error, on: reference, intent)
         }
@@ -220,6 +229,12 @@ public final class CVListViewModel {
         } catch {
             await failed(error as? EditFailure ?? .unavailable, on: reference, intent)
         }
+    }
+
+    private func deleted(_ cv: CV, _ reference: CVReference, _ intent: Int) async {
+        listed.removeAll { $0.id == cv.id }
+        listChanged()
+        await changed(reference, intent)
     }
 
     private func begin(_ reference: CVReference) -> Int {
@@ -257,7 +272,13 @@ public final class CVListViewModel {
     private func failed(_ failure: EditFailure, on reference: CVReference, _ intent: Int) async {
         guard !Task.isCancelled else { return }
         let rowStatus = RowStatus(failure)
-        if isLatest(intent, on: reference) { rowStatuses[reference] = rowStatus }
+        if isLatest(intent, on: reference) {
+            rowStatuses[reference] = rowStatus
+            goneAlerts.removeAll { $0.reference == reference }
+            if rowStatus == .gone, let row = rows.first(where: { $0.reference == reference }) {
+                goneAlerts.append(RowAlert(reference: reference, label: row.label, status: .gone))
+            }
+        }
         switch rowStatus {
         case .conflict, .gone: await load()
         case .tooLarge, .failed: break

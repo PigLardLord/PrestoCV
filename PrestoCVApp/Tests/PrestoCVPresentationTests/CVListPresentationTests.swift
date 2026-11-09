@@ -154,4 +154,58 @@ struct CVListPresentationTests {
         #expect(list.rowAlert?.reference == order.last)
         #expect(Array(list.rowStatuses.keys) == [order[1]])
     }
+
+    // MARK: A row whose CV is gone
+
+    @Test("a rename of a CV deleted elsewhere keeps its alert, by the label it had, across the reload that drops the row")
+    func renameGoneKeepsTheAlertAcrossTheReload() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        try await world.editing.delete(try await world.editing.inStore(cv.id))
+
+        await list.rename(world.reference(cv), to: "Renamed")
+
+        #expect(list.rows.isEmpty)
+        let alert = try #require(list.rowAlert)
+        #expect(alert.reference == world.reference(cv))
+        #expect(alert.label == "Backend")
+        #expect(alert.status == .gone)
+
+        list.dismissStatus(of: world.reference(cv))
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("a duplicate of a CV deleted elsewhere keeps its alert, by the label it had, until it is dismissed")
+    func duplicateGoneKeepsTheAlertAcrossTheReload() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        try await world.editing.delete(try await world.editing.inStore(cv.id))
+        world.editing.duplicateErrors.withLock { $0 = [.deletedElsewhere] }
+
+        await list.duplicate(world.reference(cv), title: "Backend (copy)")
+
+        #expect(list.rows.isEmpty)
+        #expect(list.rowAlert?.label == "Backend")
+        #expect(list.rowAlert?.status == .gone)
+
+        list.dismissStatus(of: world.reference(cv))
+        #expect(list.rowAlert == nil)
+    }
+
+    @Test("a delete of a CV that is already gone is a delete that worked: the row goes and no alert shows")
+    func deleteGoneIsNoAlert() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        try await world.editing.delete(try await world.editing.inStore(cv.id))
+
+        await list.delete(world.reference(cv))
+
+        #expect(list.rows.isEmpty)
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
 }

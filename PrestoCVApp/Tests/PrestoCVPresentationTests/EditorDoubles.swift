@@ -58,6 +58,8 @@ final class EditingFake: CVEditing {
     let loads = Mutex(0)
     /// Thrown by the next reads (`load`), after the call passed the gate of the reads.
     let loadErrors = Mutex<[EditFailure]>([])
+    /// The failures the next duplicates throw, one each, after the store was left as it is.
+    let duplicateErrors = Mutex<[EditFailure]>([])
     /// Holds the copies (`duplicate`) before they reach the store, so that a test decides when one ends.
     let duplicateGate = Gate()
     /// Thrown by the next changes of the look or the language, once they are at the store's door.
@@ -88,6 +90,7 @@ final class EditingFake: CVEditing {
         let copy = cv.duplicated(as: ids.next(), title: title)
         copies.withLock { $0.append(copy) }
         await duplicateGate.pass()
+        if let error = duplicateErrors.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) { throw error }
         return try await save(copy)
     }
 
