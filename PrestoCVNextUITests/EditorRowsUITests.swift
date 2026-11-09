@@ -159,6 +159,25 @@ final class EditorRowsUITests: XCTestCase {
         }
     }
 
+    /// Rows added one after another to a long section: the add button sits at the foot of the screen, and each new row
+    /// still comes into view above the keyboard, with the cursor in its first field.
+    @MainActor
+    func testAddedRowsOfALongSectionComeIntoView() throws {
+        let app = try launchAndOpen()
+
+        for number in 1...4 {
+            addRow(to: "experiences", in: app)
+            let text = "Foreman \(number)"
+            app.typeText(text)
+            let role = app.textFields.matching(identifier: "editor.field.experienceRole")
+                .matching(NSPredicate(format: "value == %@", text)).firstMatch
+            XCTAssertTrue(role.waitForExistence(timeout: 30), "Row \(number) has the cursor")
+            let inView = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: role)
+            XCTAssertEqual(XCTWaiter().wait(for: [inView], timeout: 30), .completed, "Row \(number) is in view")
+            putKeyboardAway(in: app)
+        }
+    }
+
     // MARK: Removing
 
     /// A swipe offers Delete; a row with text goes only once the person confirms, in a dialog that names it. Cancel

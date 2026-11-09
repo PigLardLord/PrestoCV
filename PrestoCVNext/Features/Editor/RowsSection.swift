@@ -73,6 +73,9 @@ struct EditorRowView<Fields: View>: View {
                 Button("editor.row.delete", systemImage: "trash", action: remove)
                     .tint(.red)
             }
+            // The row is not an accessibility element of its own, so SwiftUI gives this action to each field and menu of
+            // the row, where VoiceOver lands. A containing element (`.accessibilityElement(children: .contain)`) would keep
+            // the action on the row and take it off the fields.
             .accessibilityAction(named: Text("editor.row.delete.named \(name)"), remove)
             .confirmationDialog(Text("editor.row.delete.title \(name)"), isPresented: asksToRemove, titleVisibility: .visible) {
                 Button("editor.row.delete", role: .destructive) { editor.confirmRemoval() }
