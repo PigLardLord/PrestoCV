@@ -15,7 +15,7 @@ struct CertificationsSection: View {
             let certification = $editor.content.certifications[row: row.id, or: row]
             fields.line("editor.field.certification", certification.name, .certificationName)
             fields.line("editor.field.issuer", certification.issuer, .certificationIssuer)
-            fields.line("editor.field.year", certification.issued, .certificationIssued)
+            fields.line("editor.field.year", certification.issued.year, .certificationIssued)
             fields.line("editor.field.link", certification.link, .certificationLink)
             fields.paragraph("editor.field.description", certification.description, .certificationDescription)
         }

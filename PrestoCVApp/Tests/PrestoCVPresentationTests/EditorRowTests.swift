@@ -132,12 +132,12 @@ struct EditorRowTests {
         let editor = await world.editor(on: cv)
         editor.addRow(to: .experiences)
         editor.content.experiences[0].role = "Designer"
-        editor.content.experiences[0].periodStart = "last spring"
+        editor.content.experiences[0].period.start.year = "last spring"
 
         await editor.saveNow()
 
         #expect(editor.saveStatus == .unreadable(.experiencePeriod))
-        #expect(editor.content.experiences[0].periodStart == "last spring")
+        #expect(editor.content.experiences[0].period.start.year == "last spring")
         let stored = try await world.editing.inStore(cv.id).sections.experiences
         #expect(stored.map(\.role) == ["Designer"])
         #expect(stored.map(\.period) == [nil])

@@ -49,10 +49,11 @@ struct DetailsSection: View {
     }
 
     /// The words of the note under a field for the problem the editor names with its text (R13); nil when it names none.
+    /// A field of the details is no period, so its end never comes before its start.
     private func words(of problem: FieldProblem.Code?, unreadable: LocalizedStringResource) -> LocalizedStringResource? {
         switch problem {
         case .unreadable: unreadable
-        case nil: nil
+        case .endBeforeStart, nil: nil
         }
     }
 }
