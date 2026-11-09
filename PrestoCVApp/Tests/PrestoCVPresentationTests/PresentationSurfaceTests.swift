@@ -32,17 +32,26 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
 func useEveryPublicMember(of firstRun: FirstRunViewModel) async {
     await firstRun.load()
     let _: FirstRunState = firstRun.state
-    let _: ExamplesIssue? = firstRun.examplesIssue
-    let choices: [StartChoice] = firstRun.choices
-    for choice in choices {
-        if case .example(let example) = choice {
-            let _: String = example.title
-            let _: String = example.summary
+    for entry in firstRun.entries as [StartEntry] {
+        let _: String = entry.id
+        var choices: [StartChoice] = []
+        switch entry {
+        case .importCV: choices = [.importCV]
+        case .examples(let examples):
+            for example in examples {
+                let _: String = example.title
+                let _: String = example.summary
+                choices.append(.example(example))
+            }
+        case .examplesIssue(let issue): let _: ExamplesIssue = issue
+        case .blank: choices = [.blank]
         }
-        let destination: StartDestination? = firstRun.start(choice)
-        switch destination {
-        case .draft(let draft): let _: CVDraft = draft
-        case .importCV, nil: break
+        for choice in choices {
+            let destination: StartDestination? = firstRun.start(choice)
+            switch destination {
+            case .draft(let draft): let _: CVDraft = draft
+            case .importCV, nil: break
+            }
         }
     }
 }

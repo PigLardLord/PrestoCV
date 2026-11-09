@@ -11,10 +11,19 @@ public final class FirstRunViewModel {
 
     public private(set) var state: FirstRunState = .loading
     /// Why there are no examples, nil when they were read.
-    public private(set) var examplesIssue: ExamplesIssue?
+    private var examplesIssue: ExamplesIssue?
 
-    /// The ways to start: the import when it is offered, then the examples, then blank.
-    public var choices: [StartChoice] { (offersImport ? [.importCV] : []) + examples.map(StartChoice.example) + [.blank] }
+    /// What the screen shows, in order: the import when it is offered, then the examples as one entry, or the reason they
+    /// are missing, then blank. The screen renders these and decides nothing about them.
+    public var entries: [StartEntry] {
+        var entries: [StartEntry] = offersImport ? [.importCV] : []
+        if !examples.isEmpty {
+            entries.append(.examples(examples))
+        } else if let examplesIssue {
+            entries.append(.examplesIssue(examplesIssue))
+        }
+        return entries + [.blank]
+    }
 
     private var examples: [ExampleChoice] = []
     @ObservationIgnored private var samples: [CVID: CV] = [:]

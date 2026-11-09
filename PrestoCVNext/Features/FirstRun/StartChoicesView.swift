@@ -1,7 +1,7 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The ways to start a CV, as the view model gives them: the import when it is offered, the examples, then blank. The
+/// The ways to start a CV, as the view model's entries give them, in their order. The
 /// examples are one way here, which opens them in a sheet. The first run shows the ways below its welcome, "+" in the
 /// sidebar in a sheet of its own.
 struct StartChoicesView: View {
@@ -17,44 +17,30 @@ struct StartChoicesView: View {
     var body: some View {
         let isDense = Self.isDense(dynamicTypeSize, verticalSizeClass)
         VStack(spacing: isDense ? Spacing.small : Spacing.medium) {
-            if firstRun.choices.contains(.importCV) {
-                PrimaryButton("start.import") { choose(.importCV) }
-                    .accessibilityIdentifier("start.import")
+            ForEach(firstRun.entries) { entry in
+                switch entry {
+                case .importCV:
+                    PrimaryButton("start.import") { choose(.importCV) }
+                        .accessibilityIdentifier("start.import")
+                case .examples(let examples):
+                    ChoiceButton(title: "start.examples", symbol: "doc.text.image", isDense: isDense) { showingExamples = true }
+                        .accessibilityIdentifier("start.examples")
+                        .sheet(isPresented: $showingExamples, onDismiss: openPickedExample) {
+                            ExamplesSheet(examples: examples) { example in
+                                pickedExample = example
+                                showingExamples = false
+                            }
+                        }
+                case .examplesIssue(let issue):
+                    switch issue {
+                    case .unavailable: issueLine("start.examples.unavailable")
+                    case .failed: issueLine("start.examples.failed")
+                    }
+                case .blank:
+                    ChoiceButton(title: "start.blank", symbol: "doc.badge.plus", isDense: isDense) { choose(.blank) }
+                        .accessibilityIdentifier("start.blank")
+                }
             }
-            if !examples.isEmpty {
-                ChoiceButton(title: "start.examples", symbol: "doc.text.image", isDense: isDense) { showingExamples = true }
-                    .accessibilityIdentifier("start.examples")
-            }
-            examplesIssue
-            ChoiceButton(title: "start.blank", symbol: "doc.badge.plus", isDense: isDense) { choose(.blank) }
-                .accessibilityIdentifier("start.blank")
-        }
-        .sheet(isPresented: $showingExamples, onDismiss: openPickedExample) {
-            ExamplesSheet(examples: examples) { example in
-                pickedExample = example
-                showingExamples = false
-            }
-        }
-    }
-
-    /// The examples among the choices, in their order.
-    private var examples: [ExampleChoice] {
-        firstRun.choices.compactMap { choice in
-            guard case .example(let example) = choice else { return nil }
-            return example
-        }
-    }
-
-    /// Why the examples are missing, where their way to start would be.
-    @ViewBuilder
-    private var examplesIssue: some View {
-        switch firstRun.examplesIssue {
-        case .unavailable?:
-            issueLine("start.examples.unavailable")
-        case .failed?:
-            issueLine("start.examples.failed")
-        case nil:
-            EmptyView()
         }
     }
 
