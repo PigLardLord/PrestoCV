@@ -25,6 +25,12 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [RowName] = content.experiences.map(\.rowName) + content.education.map(\.rowName)
         + content.skills.map(\.rowName) + content.languages.map(\.rowName) + content.certifications.map(\.rowName)
         + content.profiles.map(\.rowName) + content.interests.map(\.rowName)
+    let _: [RowID] = ids(content.experiences) + ids(content.education) + ids(content.skills) + ids(content.languages)
+        + ids(content.certifications) + ids(content.profiles) + ids(content.interests)
+    if let shown = content.interests.first {
+        let row: InterestRow = editor.content.interests[row: shown.id, or: shown]
+        editor.content.interests[row: shown.id, or: shown] = row
+    }
     if let removal: RowRemoval = editor.pendingRemoval {
         switch removal.name {
         case .text(let text): _ = text
@@ -60,6 +66,11 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let parts: Set<LookPart> = [.design]
     await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
     let _: ExportSnapshot? = editor.exportSnapshot()
+}
+
+/// The ids of rows that a view's `ForEach` lists by their ids.
+func ids<Row: Identifiable>(_ rows: [Row]) -> [RowID] where Row.ID == RowID {
+    rows.map(\.id)
 }
 
 /// Every value a status can take, with a field or a section where it has one. The switches break when a case is added,
