@@ -49,7 +49,8 @@ final class ShellUITests: XCTestCase {
 
         let row = row(of: app)
         XCTAssertTrue(row.waitForExistence(timeout: 30))
-        XCTAssertEqual(row.label, title)
+        // The row reads its label first, then the person and the time since the last save
+        XCTAssertTrue(row.label.hasPrefix(title + ", "), row.label)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch.exists)
     }
 

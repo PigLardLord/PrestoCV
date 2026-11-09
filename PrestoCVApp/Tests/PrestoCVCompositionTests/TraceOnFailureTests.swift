@@ -45,7 +45,8 @@ struct TraceOnFailureTests {
             makeGate: { _, _, _ in FakeRenderingGate() },
             settleDeadline: settleDeadline,
             check: check,
-            prepare: {}
+            prepare: {},
+            wrapListEditing: { $0 }
         )
     }
 

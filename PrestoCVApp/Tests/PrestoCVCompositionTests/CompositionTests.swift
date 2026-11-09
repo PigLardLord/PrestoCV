@@ -98,7 +98,8 @@ struct CompositionTests {
             makeGate: makeGate,
             settleDeadline: Self.neverFires,
             check: {},
-            prepare: {}
+            prepare: {},
+            wrapListEditing: { $0 }
         )
     }
 

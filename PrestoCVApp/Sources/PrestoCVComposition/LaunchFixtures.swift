@@ -1,6 +1,7 @@
 #if DEBUG
 import DiagnosticTrace
 import Foundation
+import PrestoCVWorkflowPorts
 
 /// What a UI test asks of a Debug build through its launch arguments, parsed once into a typed value (R13: codes, not
 /// sentences). The type exists only in Debug, so a Release build has no code that reads these arguments
@@ -11,6 +12,10 @@ import Foundation
 /// - `-PrestoCVNextSeed <base 64>`: the CV files to put in that folder before the app reads it, as a JSON map from file name
 ///   to content. It needs one of the two storage arguments, so that it never writes into the device's own folder.
 /// - `-PrestoCVNextDistribution <answer>`: the answer the store would give about how the app was installed (ADR 0032).
+/// - `-PrestoCVNextNoSamples`: the examples come from a folder of the fixture that nothing makes, so the app cannot read
+///   them. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
+///   failures of two rows are pending at once. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
 
@@ -21,6 +26,8 @@ struct LaunchFixtures: Equatable, Sendable {
         case unreadableSeed
         case unreadableDistribution
         case seedWithoutFolder
+        case samplesWithoutFolder
+        case failuresWithoutFolder
         case seedUnwritable
         /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
         case unsafeFolder
@@ -30,6 +37,8 @@ struct LaunchFixtures: Equatable, Sendable {
     static let emptyStorageArgument = "-PrestoCVNextEmptyStorage"
     static let seedArgument = "-PrestoCVNextSeed"
     static let distributionArgument = "-PrestoCVNextDistribution"
+    static let noSamplesArgument = "-PrestoCVNextNoSamples"
+    static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -38,6 +47,10 @@ struct LaunchFixtures: Equatable, Sendable {
     var distribution: DistributionAnswer?
     /// The arguments that start like a fixture and are none: ignored, and named so that a test's typo shows
     var unknownArguments: [String] = []
+    /// The examples are read from a folder that is not there
+    var withoutSamples = false
+    /// The list's renames fail two at a time
+    var failsRenamesInPairs = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -62,6 +75,10 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableDistribution
                 }
                 fixtures.distribution = answer
+            case noSamplesArgument:
+                fixtures.withoutSamples = true
+            case failRenamesInPairsArgument:
+                fixtures.failsRenamesInPairs = true
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:
@@ -76,6 +93,8 @@ struct LaunchFixtures: Equatable, Sendable {
             fixtures.storage = .empty
         }
         if hasSeed && fixtures.storage == .device { throw .seedWithoutFolder }
+        if fixtures.withoutSamples && fixtures.storage == .device { throw .samplesWithoutFolder }
+        if fixtures.failsRenamesInPairs && fixtures.storage == .device { throw .failuresWithoutFolder }
         return fixtures
     }
 
@@ -90,6 +109,16 @@ struct LaunchFixtures: Equatable, Sendable {
         }
         let root = device.temporary.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
         return AppPaths(root: root, temporary: device.temporary)
+    }
+
+    /// The folder the examples are read from: the bundle's, or without examples a folder of the fixture that nothing makes.
+    func samples(bundled: URL, paths: AppPaths) -> URL {
+        withoutSamples ? paths.root.appendingPathComponent("Samples", isDirectory: true) : bundled
+    }
+
+    /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
+    func listEditing(_ editing: any CVEditing) -> any CVEditing {
+        failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no

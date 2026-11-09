@@ -128,6 +128,25 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertFalse(element("firstRun.title", in: app).exists)
     }
 
+    /// Examples that cannot be read are said where their entry would be, and blank still starts a CV. The launch fixture
+    /// points the examples at a folder that is not there.
+    @MainActor
+    func testExamplesThatCannotBeReadAreSaidAndBlankStays() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextNoSamples"]
+        app.launch()
+
+        let issue = element("start.examples.issue", in: app)
+        XCTAssertTrue(issue.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["start.examples"].exists)
+        let blank = app.buttons["start.blank"]
+        XCTAssertTrue(blank.isHittable)
+
+        blank.tap()
+
+        XCTAssertTrue(app.staticTexts["shell.detail.title"].waitForExistence(timeout: 30))
+    }
+
     /// Cancel closes the examples and leaves the welcome, with nothing open.
     @MainActor
     func testCancelClosesTheExamples() throws {

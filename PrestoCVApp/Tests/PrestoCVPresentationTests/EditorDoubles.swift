@@ -58,8 +58,13 @@ final class EditingFake: CVEditing {
     let loads = Mutex(0)
     /// Thrown by the next reads (`load`), after the call passed the gate of the reads.
     let loadErrors = Mutex<[EditFailure]>([])
+    /// The failures the next duplicates throw, one each, after the store was left as it is.
+    let duplicateErrors = Mutex<[EditFailure]>([])
     /// Holds the copies (`duplicate`) before they reach the store, so that a test decides when one ends.
     let duplicateGate = Gate()
+    /// Holds the renames and the deletes of the list before they reach the store, so that a test decides when each ends.
+    let renameGate = Gate()
+    let deleteGate = Gate()
     /// Thrown by the next changes of the look or the language, once they are at the store's door.
     let restyleErrors = Mutex<[any Error]>([])
     private let writesRunning = Mutex(0)
@@ -81,6 +86,7 @@ final class EditingFake: CVEditing {
     }
 
     func rename(_ cv: CV, to title: String) async throws(EditFailure) -> CV {
+        await renameGate.pass()
         do { return try await RenameCV(repository: store)(cv, to: title) } catch { throw EditFailure(error) }
     }
 
@@ -88,10 +94,12 @@ final class EditingFake: CVEditing {
         let copy = cv.duplicated(as: ids.next(), title: title)
         copies.withLock { $0.append(copy) }
         await duplicateGate.pass()
+        if let error = duplicateErrors.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) { throw error }
         return try await save(copy)
     }
 
     func delete(_ cv: CV) async throws(EditFailure) {
+        await deleteGate.pass()
         do { try await DeleteCV(repository: store)(cv) } catch { throw EditFailure(error) }
     }
 

@@ -1,8 +1,8 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The frame of the app: the list of CVs in the sidebar and the open CV in the detail. On a compact screen it shows one
-/// column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
+/// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it shows
+/// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
 /// what is open, which column shows and whether the welcome shows; this view binds to them.
 struct ShellView: View {
     let shell: ShellNavigationModel
@@ -32,7 +32,7 @@ struct ShellView: View {
 
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
-            SidebarView(list: list, selection: selection)
+            CVListView(list: list, firstRun: firstRun, selection: selection, choose: start)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
@@ -42,7 +42,6 @@ struct ShellView: View {
         } detail: {
             detail
         }
-        .task { await list.load() }
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $addingCV, onDismiss: startChosenInSheet) {
