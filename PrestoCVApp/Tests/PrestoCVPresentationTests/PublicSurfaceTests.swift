@@ -1,5 +1,4 @@
 // This file imports nothing of the domain or the application layer, and not `@testable`: what it uses is what a view sees.
-import Foundation
 import Testing
 import PrestoCVPresentation
 
@@ -46,7 +45,6 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [Int] = EditorChoices.skillLevels
     let _: [String] = EditorChoices.proficiencies
     let _: [Int] = EditorChoices.months
-    let _: Bool = EditorChoices.monthBeforeYear(in: Locale(identifier: "en_US"))
     editor.fieldWasLeft(.email)
     let problems: [FieldProblem] = editor.problems
     for problem in problems {

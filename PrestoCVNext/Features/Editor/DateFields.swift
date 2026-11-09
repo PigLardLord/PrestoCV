@@ -81,7 +81,7 @@ private struct DateField: View {
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.medium))
             : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.medium))
         layout {
-            if EditorChoices.monthBeforeYear(in: locale) {
+            if MonthOrder.monthBeforeYear(in: locale) {
                 monthMenu
                 yearField
             } else {
