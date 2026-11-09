@@ -1,3 +1,6 @@
+import CVBundledDesigns
+import CVDesignCatalog
+import CVRenderingTestSupport
 import CVRenderingWebKitSupport
 import DiagnosticLogging
 import DiagnosticLoggingTestSupport
@@ -10,8 +13,8 @@ import Testing
 import WebKit
 @testable import PrestoCVComposition
 
-/// The composition over a temporary folder: fake clock, ids and logger, the real repository and the real rule compiler
-/// behind a counting seam.
+/// The composition over a temporary folder: fake clock, ids and logger, the real repository, the real design store and
+/// bundled designs, the real rule compiler behind a counting seam, and a fake gate that renders nothing.
 @MainActor
 @Suite("The composition")
 struct CompositionTests {
@@ -23,6 +26,32 @@ struct CompositionTests {
         func compile() async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList {
             calls += 1
             return try await SecureWebViewConfiguration.compileRules()
+        }
+    }
+
+    /// Counts the reads of the bundled designs
+    actor CountingSource: BundledDesignSource {
+        private(set) var reads = 0
+
+        func bundledPackages() async throws -> [(name: String, data: Data)] {
+            reads += 1
+            return try await BundleDesignSource().bundledPackages()
+        }
+    }
+
+    /// Hands out the given gate, and counts the gates the composition asks for
+    @MainActor
+    final class GateMaker {
+        private(set) var made = 0
+        private let gate: any DesignRenderingGate
+
+        init(_ gate: any DesignRenderingGate) { self.gate = gate }
+
+        var make: Composition.MakeGate {
+            { [self] _, _, _ in
+                made += 1
+                return gate
+            }
         }
     }
 
@@ -50,7 +79,9 @@ struct CompositionTests {
         clock: any TimeSource = SteppingClock(),
         ids: any IDGenerator = SequentialIDGenerator(),
         copyFolders: [URL] = [],
-        compileRules: @escaping Composition.CompileRules
+        compileRules: @escaping Composition.CompileRules,
+        designs: any BundledDesignSource = BundleDesignSource(),
+        makeGate: @escaping Composition.MakeGate = { _, _, _ in FakeRenderingGate() }
     ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
@@ -63,6 +94,8 @@ struct CompositionTests {
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             copyFolders: copyFolders,
             compileRules: compileRules,
+            designs: designs,
+            makeGate: makeGate,
             settleDeadline: Self.neverFires,
             check: {},
             prepare: {}
@@ -119,17 +152,107 @@ struct CompositionTests {
         #expect(clock.now() == referenceClock.now())
     }
 
-    @Test("The rules are compiled once per composition, also when the renderer is asked for twice")
-    func compilesOnce() async throws {
+    @Test("The rules are compiled once, the bundled designs are read once and the gate is made once per composition")
+    func buildsOnce() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
         let counter = CompileCounter()
+        let source = CountingSource()
+        let maker = GateMaker(FakeRenderingGate())
 
-        let composition = try Self.ready(await Composition.make(Self.inputs(paths, compileRules: Self.counting(counter))))
-        _ = composition.makeRenderer()
-        _ = composition.makeRenderer()
+        _ = try Self.ready(await Composition.make(
+            Self.inputs(paths, compileRules: Self.counting(counter), designs: source, makeGate: maker.make)
+        ))
 
         #expect(counter.calls == 1)
+        #expect(await source.reads == 1)
+        #expect(maker.made == 1)
+    }
+
+    @Test("The first launch renders and installs the three bundled designs in the designs folder, and the second renders none")
+    func designsInstalledOnce() async throws {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let first = FakeRenderingGate()
+        let second = FakeRenderingGate()
+
+        _ = try Self.ready(await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(first).make
+        )))
+        _ = try Self.ready(await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(second).make
+        )))
+
+        #expect(await first.verified == ["minimal", "modern", "professional"])
+        #expect(await second.verified.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.designs.path).isEmpty == false)
+    }
+
+    @Test("A designs folder that cannot be written gives designStoreUnavailable, and installs nothing")
+    func unwritableDesigns() async throws {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        try FileManager.default.createDirectory(at: paths.designs, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: paths.designs.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: paths.designs.path) }
+
+        let state = await Composition.make(Self.inputs(paths, compileRules: Self.counting(CompileCounter())))
+
+        guard case .failed(let failure) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(failure == .designStoreUnavailable)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: paths.designs.path).isEmpty)
+    }
+
+    @Test("Bundled designs that cannot be read, with none installed, give bundledDesignsUnavailable")
+    func unreadableBundle() async {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+
+        let state = await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()), designs: FixedBundledSource(packages: nil)
+        ))
+
+        guard case .failed(let failure) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(failure == .bundledDesignsUnavailable)
+    }
+
+    @Test("An interrupted sync gives designSyncInterrupted, and the next launch renders only the designs not yet saved")
+    func interruptedSync() async throws {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let next = FakeRenderingGate()
+
+        let state = await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()),
+            makeGate: GateMaker(FakeRenderingGate(cancellingOn: ["modern"])).make
+        ))
+        _ = try Self.ready(await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(next).make
+        )))
+
+        guard case .failed(let failure) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(failure == .designSyncInterrupted)
+        #expect(await next.verified == ["modern", "professional"])
+    }
+
+    @Test("A design the gate refuses is left out, and the launch is ready")
+    func refusedDesign() async throws {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+
+        _ = try Self.ready(await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()),
+            makeGate: GateMaker(FakeRenderingGate(refusing: ["modern"])).make
+        )))
     }
 
     @Test("Rules that cannot be compiled give a failed state with a code, and no store folder is left half made")

@@ -11,13 +11,18 @@ import PrestoCVWorkflowPorts
 ///
 /// The workflows are stateless, so the factory makes one of each and every view model shares them. The file port of the
 /// import is one too, shared by every import screen: it counts the files it received, so a file handed to two screens is
-/// let go only when both have released it.
+/// let go only when both have released it. The exporter, the look options and the languages are the composition's too:
+/// every look picker offers the same installed designs, and every export sheet renders through the one renderer.
 @MainActor
 public final class ScreenFactory {
     private let browsing: BrowseCVsWorkflow
     private let editing: EditCVWorkflow
     private let importing: ImportCVWorkflow
     private let importFiles: any ImportFileReading
+    private let exporter: any CVExporting
+    private let lookOptions: any LookOptionsProviding
+    /// The languages a PDF can be written in
+    private let languages: [ExportLanguage]
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
@@ -32,14 +37,21 @@ public final class ScreenFactory {
     ///     moves by hand.
     ///   - importer: Reads a text or a PDF for the import.
     ///   - importFiles: Reads and lets go the files handed to the import screens.
+    ///   - exporter: Renders a CV with the design it keeps, for the export sheets.
+    ///   - lookOptions: The designs, palettes and fonts the look pickers offer.
+    ///   - languages: The languages the export sheets offer.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
-        editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading
+        editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
+        exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage]
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
         importing = ImportCVWorkflow(importer: importer, ids: ids)
         self.importFiles = importFiles
+        self.exporter = exporter
+        self.lookOptions = lookOptions
+        self.languages = languages
         self.clock = clock
         self.editorClock = editorClock
     }
@@ -90,6 +102,34 @@ public final class ScreenFactory {
         made += 1
         editors = editors.filter { $0.editor != nil } + [WeakEditor(editor, number: made)]
         return editor
+    }
+
+    /// The look picker of a CV, over the installed designs.
+    public func makeLook(for reference: CVReference) -> LookViewModel {
+        LookViewModel(reference: reference, editing: editing, options: lookOptions)
+    }
+
+    /// The pause of the export sheet after the last change, as in version 1: several quick changes make one export.
+    static let exportPause = Duration.milliseconds(250)
+
+    /// The export sheet of a CV open in an editor, or nil while the editor has not loaded it. Each export reads the CV as
+    /// the editor shows it then, so the sheet holds the editor while the sheet lives; the editor never holds the sheet.
+    /// - Parameters:
+    ///   - appLanguage: The language of the app, offered first when the CV holds none.
+    ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
+    ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV; nil is automatic.
+    public func makeExportSheet(
+        for editor: EditorViewModel, appLanguage: ExportLanguage,
+        fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
+        onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void
+    ) -> ExportSheetViewModel? {
+        guard let loaded = editor.exportSnapshot() else { return nil }
+        return ExportSheetViewModel(
+            exporter: exporter,
+            snapshot: { editor.exportSnapshot() ?? loaded },
+            offeredLanguages: languages, appLanguage: appLanguage, fileNamePattern: fileNamePattern,
+            onLanguageChosen: onLanguageChosen, clock: editorClock, pause: Self.exportPause
+        )
     }
 
     /// Stores every editor that is still alive once, in turn, so that the list reads the store after them. Each editor

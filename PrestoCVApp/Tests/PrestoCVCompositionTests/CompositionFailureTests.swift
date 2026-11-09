@@ -1,3 +1,4 @@
+import CVRendering
 import CVRenderingWebKitSupport
 import Foundation
 import Testing
@@ -16,9 +17,22 @@ struct CompositionFailureTests {
         #expect(CompositionFailure(SecureWebViewConfiguration.Failure.contentRulesUnavailable) == .contentRulesUnavailable)
     }
 
+    @Test("Headings that cannot be read are headingsUnavailable")
+    func headings() {
+        let failures: [HeadingsCatalog.Failure] = [
+            .unsupportedLanguage("it"), .incomplete(language: "it", key: "experience"), .corruptTable("it"),
+        ]
+        for failure in failures {
+            #expect(CompositionFailure(failure) == .headingsUnavailable)
+        }
+    }
+
     @Test("The codes are distinct words")
     func rawValues() {
-        #expect(CompositionFailure.allCases.map(\.rawValue) == ["storeUnavailable", "contentRulesUnavailable", "launchFixturesRejected"])
+        #expect(CompositionFailure.allCases.map(\.rawValue) == [
+            "storeUnavailable", "contentRulesUnavailable", "launchFixturesRejected", "designStoreUnavailable",
+            "bundledDesignsUnavailable", "designSyncInterrupted", "headingsUnavailable",
+        ])
     }
 
     #if DEBUG

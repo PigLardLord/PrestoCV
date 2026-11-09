@@ -9,21 +9,22 @@ struct AppPathsTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("AppPathsTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    @Test("The store, the trace and its copies are derived from the root and the temporary folder")
+    @Test("The store, the designs, the trace and its copies are derived from the root and the temporary folder")
     func derived() {
         let root = URL(filePath: "/base/PrestoCVNext", directoryHint: .isDirectory)
         let temporary = URL(filePath: "/tmp/x", directoryHint: .isDirectory)
         let paths = AppPaths(root: root, temporary: temporary)
         #expect(paths.store.path == "/base/PrestoCVNext/Store")
+        #expect(paths.designs.path == "/base/PrestoCVNext/Designs")
         #expect(paths.trace.path == "/base/PrestoCVNext/Diagnostics")
         #expect(paths.traceShare.path == "/tmp/x/DiagnosticsShare")
     }
 
-    @Test("The three folders are distinct, and none is the legacy store, Application Support/PrestoCV/CVs")
+    @Test("The four folders are distinct, and none is the legacy store, Application Support/PrestoCV/CVs")
     func distinctFromTheLegacyStore() {
         let paths = AppPaths.onDevice()
-        let folders = [paths.store, paths.trace, paths.traceShare].map(\.standardizedFileURL.path)
-        #expect(Set(folders).count == 3)
+        let folders = [paths.store, paths.designs, paths.trace, paths.traceShare].map(\.standardizedFileURL.path)
+        #expect(Set(folders).count == 4)
         let legacy = URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/CVs").standardizedFileURL.path
         for folder in folders {
             #expect(folder != legacy)
@@ -32,7 +33,7 @@ struct AppPathsTests {
         #expect(paths.root.lastPathComponent == "PrestoCVNext")
     }
 
-    @Test("Creating makes the root and the store, once, and the trace folder is left to its store")
+    @Test("Creating makes the root and the store, once, and the trace and design folders are left to their stores")
     func creates() throws {
         let base = Self.base()
         defer { try? FileManager.default.removeItem(at: base) }
@@ -44,6 +45,7 @@ struct AppPathsTests {
         var isDirectory: ObjCBool = false
         #expect(FileManager.default.fileExists(atPath: paths.store.path, isDirectory: &isDirectory) && isDirectory.boolValue)
         #expect(!FileManager.default.fileExists(atPath: paths.trace.path), "The trace folder is made by its store on the first run")
+        #expect(!FileManager.default.fileExists(atPath: paths.designs.path), "The design folder is made by its store")
     }
 
     @Test("A root under a file fails with a typed error")

@@ -224,6 +224,28 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
+    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    func linkedDesigns() async throws {
+        let target = try Self.target()
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("Designs"), withDestinationURL: target)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: target)
+        }
+
+        let state = await Composition.launch(arguments: try Self.arguments(storage: name), settlement: TraceSettlement())
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(try Self.entries(target).isEmpty, "Nothing was written through the link")
+    }
+
+    @MainActor
     @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone")
     func linkedRootOnAClosedLaunch() async throws {
         let target = try Self.target()

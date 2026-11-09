@@ -1,3 +1,4 @@
+import CVRendering
 import Foundation
 import Observation
 import PrestoCVApplication
@@ -5,11 +6,13 @@ import PrestoCVCoreTestSupport
 import PrestoCVDomain
 import PrestoCVPersistence
 import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
 
 /// The factory of the screens' view models over a real composition: a temporary folder, the real repository, fake clock
-/// and ids. Nothing sleeps: a write is awaited through `saveNow()` and a result through `load()`.
+/// and ids. Nothing sleeps but an export sheet, which waits for its pause on the composition's clock: a write is awaited
+/// through `saveNow()`, a result through `load()`, and an export through the sheet's status.
 @MainActor
 @Suite("The screen factory")
 struct ScreenFactoryTests {
@@ -309,7 +312,8 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
+            lookOptions: FixedLookOptions(), languages: []
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -334,7 +338,8 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
+            lookOptions: FixedLookOptions(), languages: []
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await first.load()
@@ -365,7 +370,8 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles()
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
+            lookOptions: FixedLookOptions(), languages: []
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 })
         await editor.load()
@@ -486,17 +492,121 @@ struct ScreenFactoryTests {
         #expect(FileManager.default.fileExists(atPath: file.path), "a file the person chose is theirs")
     }
 
-    @Test("The rules are compiled once, also after the four factories were used")
+    @Test("The rules are compiled once, also after every factory was used")
     func rulesCompiledOnce() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
+        _ = try await fixture.composition.repository.create(FixtureCV.full())
+        let list = Self.list(fixture)
 
-        await Self.list(fixture).load()
+        await list.load()
         await fixture.composition.screens.makeFirstRun().load()
-        await Self.editor(fixture, .blank).load()
+        let editor = Self.editor(fixture, .blank)
+        await editor.load()
         _ = fixture.composition.screens.makeImport()
-        _ = fixture.composition.makeRenderer()
+        await fixture.composition.screens.makeLook(for: try #require(list.rows.first?.reference)).load()
+        _ = try Self.sheet(fixture, editor)
 
         #expect(fixture.counter.calls == 1)
+    }
+
+    // MARK: Look and export
+
+    private static func sheet(_ fixture: Fixture, _ editor: EditorViewModel) throws -> ExportSheetViewModel? {
+        fixture.composition.screens.makeExportSheet(
+            for: editor, appLanguage: try #require(ExportLanguage("en")), fileNamePattern: { _ in "CV %@" },
+            onLanguageChosen: { _ in }
+        )
+    }
+
+    /// The only CV of the store, stored with the look `design` keeps, and its reference.
+    private static func storedCV(_ fixture: Fixture, design: DesignChoice?) async throws -> CVReference {
+        var cv = FixtureCV.full()
+        cv.choose(design: design)
+        _ = try await fixture.composition.repository.create(cv)
+        let list = Self.list(fixture)
+        await list.load()
+        return try #require(list.rows.first?.reference)
+    }
+
+    /// The layout of the PDF an export sheet makes of the CV, through an editor that opens it.
+    private static func exported(_ fixture: Fixture, _ reference: CVReference) async throws -> PDFLayout {
+        let editor = Self.editor(fixture, .stored(reference))
+        await editor.load()
+        let sheet = try #require(try Self.sheet(fixture, editor))
+        sheet.start()
+        for await exporting in Observations({ sheet.status == .exporting }) where !exporting { break }
+        let pdf = try #require(sheet.document?.pdf, "the export ended with \(sheet.status)")
+        return try #require(fixture.composition.inspector.layout(of: pdf))
+    }
+
+    /// Chooses `design` in a look picker and applies it.
+    private static func choose(_ fixture: Fixture, _ reference: CVReference, design: String) async throws {
+        let look = fixture.composition.screens.makeLook(for: reference)
+        await look.load()
+        look.choose(design: design)
+        await look.apply()
+        try #require(look.status == .applied)
+    }
+
+    @Test("A look picker offers the installed designs by their codes, and shows the default design for a CV that keeps none")
+    func lookOffersTheInstalledDesigns() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let reference = try await Self.storedCV(fixture, design: nil)
+        let look = fixture.composition.screens.makeLook(for: reference)
+
+        await look.load()
+
+        #expect(look.status == .ready)
+        #expect(look.choices.designs.map(\.id) == ["minimal", "modern", "professional"])
+        #expect(look.choices.designs.map(\.nameCode) == ["design.minimal", "design.modern", "design.professional"])
+        #expect(look.shown.design == "professional")
+    }
+
+    @Test("No export sheet is made for an editor that has not loaded its CV, and one is once it has")
+    func sheetNeedsALoadedEditor() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let editor = Self.editor(fixture, .blank)
+
+        #expect(try Self.sheet(fixture, editor) == nil)
+        await editor.load()
+        #expect(try Self.sheet(fixture, editor) != nil)
+    }
+
+    @Test("An export sheet offers the languages of the bundled headings")
+    func sheetOffersTheBundledLanguages() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let editor = Self.editor(fixture, .blank)
+        await editor.load()
+
+        let sheet = try #require(try Self.sheet(fixture, editor))
+
+        let bundled = try fixture.composition.headings.supportedLanguages()
+        #expect(bundled.isEmpty == false)
+        #expect(Set(sheet.offeredLanguages.map(\.tag)) == Set(bundled.compactMap(ExportLanguage.init).map(\.tag)))
+    }
+
+    @Test("The export sheet waits 250 ms after the last change, as in version 1")
+    func exportPause() {
+        #expect(ScreenFactory.exportPause == .milliseconds(250))
+    }
+
+    @Test("A design chosen in the look picker changes the exported PDF, and a CV that keeps none exports with the default", .timeLimit(.minutes(1)))
+    func designChoiceChangesThePDF() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let reference = try await Self.storedCV(fixture, design: nil)
+
+        let none = try await Self.exported(fixture, reference)
+        try await Self.choose(fixture, reference, design: "minimal")
+        let minimal = try await Self.exported(fixture, reference)
+        try await Self.choose(fixture, reference, design: "professional")
+        let professional = try await Self.exported(fixture, reference)
+
+        #expect(minimal != none)
+        #expect(professional == none)
     }
 }

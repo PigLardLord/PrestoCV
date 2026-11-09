@@ -1,4 +1,7 @@
+import CVBundledDesigns
 import CVBundledHeadings
+import CVDesignCatalog
+import CVDesignCatalogFileStore
 import CVRendering
 import CVRenderingPDFKitInspector
 import CVRenderingWebKitSupport
@@ -8,11 +11,14 @@ import DiagnosticTrace
 import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
+import PrestoCVDomain
 import PrestoCVImportFiles
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
 import PrestoCVIntegration
 import PrestoCVPersistence
+import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 import Synchronization
 import WebKit
 #if os(iOS)
@@ -21,19 +27,23 @@ import CVRenderingIOS
 import CVRenderingMacOS
 #endif
 
-/// How the app was assembled: ready, or failed with the one code the app shows as one error screen. Later steps add the
-/// design state to the ready case, so that the app keeps a single switch.
+/// How the app was assembled: ready, or failed with the one code the app shows as one error screen. The designs are part
+/// of the assembly, so the app keeps a single switch.
 public enum CompositionState: Sendable {
     case ready(Composition)
     case failed(CompositionFailure)
 }
 
 /// The one place that creates infrastructure (R4, ADR 0008): the paths, the repository, the platform renderer over the
-/// content rules compiled once, the import's PDF reader and file port, the clock, the ids, the log and the trace.
+/// content rules compiled once, the design store with the bundled designs synced into it, the import's PDF reader and
+/// file port, the clock, the ids, the log and the trace.
 @MainActor
 public final class Composition {
     /// Compiles the content rules of every web view. The composition calls it once, so a test counts the calls.
     typealias CompileRules = @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList
+    /// Makes the gate that renders a bundled design before the sync saves it, over the composition's one renderer,
+    /// inspector and headings. The composition calls it once, so a test counts the calls.
+    typealias MakeGate = @MainActor (any PDFRendering, any PDFLayoutInspecting, Headings) -> any DesignRenderingGate
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -52,6 +62,9 @@ public final class Composition {
         /// lies directly in one of them, and never a file the person chose where it is.
         let copyFolders: [URL]
         let compileRules: CompileRules
+        /// The designs that ship with the app, synced into the design store at every launch
+        let designs: any BundledDesignSource
+        let makeGate: MakeGate
         /// Returns when a failed launch should stop waiting for the distribution's answer. A failed launch shows its error
         /// screen even while the distribution has not answered (the store may fetch over the network); the purge of a
         /// closed launch then still follows the answer (ADR 0032). The launch chooses it, so a test fires it at once.
@@ -66,6 +79,8 @@ public final class Composition {
 
     let paths: AppPaths
     let repository: FileCVRepository
+    /// The platform renderer over the rules compiled for this composition: the one every export and the gate render with
+    let renderer: any PDFRendering
     let inspector: any PDFLayoutInspecting
     let headings: HeadingsCatalog
     let samples: any SampleCVSource
@@ -77,13 +92,23 @@ public final class Composition {
     let traceAccess: TraceAccess
     /// Makes the view models of the screens over this composition's repository, clock and ids.
     public let screens: ScreenFactory
-    private let rules: WKContentRuleList
 
-    private init(inputs: Inputs, rules: WKContentRuleList, trace: TraceChain) {
+    /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
+    private struct Parts {
+        let renderer: any PDFRendering
+        let inspector: any PDFLayoutInspecting
+        let headings: HeadingsCatalog
+        let exporter: any CVExporting
+        let lookOptions: any LookOptionsProviding
+        let languages: [ExportLanguage]
+    }
+
+    private init(inputs: Inputs, parts: Parts, trace: TraceChain) {
         paths = inputs.paths
         repository = FileCVRepository(directory: inputs.paths.store, clock: inputs.clock)
-        inspector = PDFKitInspector()
-        headings = HeadingsCatalog(source: BundleHeadingTableSource())
+        renderer = parts.renderer
+        inspector = parts.inspector
+        headings = parts.headings
         samples = DirectorySampleCVSource(directory: inputs.samples)
         clock = inputs.clock
         ids = inputs.ids
@@ -100,13 +125,13 @@ public final class Composition {
         )
         screens = ScreenFactory(
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
+            lookOptions: parts.lookOptions, languages: parts.languages
         )
-        self.rules = rules
     }
 
     /// The renderer of this platform, over the rules compiled for this composition.
-    func makeRenderer() -> any PDFRendering {
+    private static func renderer(rules: WKContentRuleList) -> any PDFRendering {
         #if os(iOS)
         IOSPDFRenderer(rules: rules)
         #else
@@ -164,7 +189,47 @@ public final class Composition {
         } catch {
             return .failed(CompositionFailure(error))
         }
-        return .ready(Composition(inputs: inputs, rules: rules, trace: trace))
+        do {
+            let parts = try await rendering(inputs, rules: rules, logger: trace.logger)
+            return .ready(Composition(inputs: inputs, parts: parts, trace: trace))
+        } catch {
+            return .failed(error)
+        }
+    }
+
+    /// Makes the one renderer, inspector and headings, syncs the bundled designs into the design store through a gate
+    /// over them (`DesignBootstrap`), then makes the exporter and the look options over the store, and reads the
+    /// languages a PDF can be written in. The headings are read before anything renders.
+    private static func rendering(
+        _ inputs: Inputs, rules: WKContentRuleList, logger: any DiagnosticLogger
+    ) async throws(CompositionFailure) -> Parts {
+        let renderer = renderer(rules: rules)
+        let inspector = PDFKitInspector()
+        let headings = HeadingsCatalog(source: BundleHeadingTableSource())
+        let gateHeadings: Headings
+        let languages: [String]
+        do throws(HeadingsCatalog.Failure) {
+            gateHeadings = try headings.headings(for: GateFixture.document.language)
+            languages = try headings.supportedLanguages()
+        } catch {
+            throw CompositionFailure(error)
+        }
+        let store = FileDesignStore(directory: inputs.paths.designs, validator: DesignPackageValidator(), lockWait: .standard)
+        let designs = try await DesignBootstrap(
+            store: store, source: inputs.designs, gate: inputs.makeGate(renderer, inspector, gateHeadings), logger: logger,
+            clock: ContinuousClock()
+        ).run()
+        return Parts(
+            renderer: renderer,
+            inspector: inspector,
+            headings: headings,
+            exporter: DesignResolvingExporter(
+                store: store, defaultDesign: DesignBootstrap.defaultDesign, renderer: renderer, inspector: inspector,
+                headings: headings, policy: .standard
+            ),
+            lookOptions: CatalogLookOptions(installed: designs.installed, defaultDesign: designs.defaultDesign),
+            languages: languages.compactMap(ExportLanguage.init)
+        )
     }
 
     /// Assembles the app for this launch. A Debug build reads the fixtures its launch arguments ask for; a Release build
@@ -222,6 +287,10 @@ public final class Composition {
             copyFolders: AppPaths.importCopiesOnDevice(),
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
+            },
+            designs: BundleDesignSource(),
+            makeGate: { renderer, inspector, headings in
+                FixtureRenderingGate(renderer: renderer, inspector: inspector, fixture: GateFixture.document, headings: headings)
             },
             settleDeadline: {
                 do {
