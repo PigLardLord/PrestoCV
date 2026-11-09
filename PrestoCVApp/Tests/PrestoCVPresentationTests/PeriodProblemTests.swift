@@ -25,6 +25,8 @@ struct PeriodProblemTests {
         #expect(editor.problem(of: .experiencePeriod, row: rows[1]) == .endBeforeStart)
         #expect(editor.problem(of: .experiencePeriod, row: rows[0]) == nil)
         #expect(editor.saveStatus == .unreadable(.experiencePeriod))
+        // The note under the period is hidden from VoiceOver: the change of status is what it announces
+        #expect(editor.statusChange == .unreadable(.experiencePeriod), "VoiceOver is told when the person leaves")
         editor.content.experiences[1].period.end.year = "2023"
         #expect(editor.problems.isEmpty, "the period reads now")
     }
