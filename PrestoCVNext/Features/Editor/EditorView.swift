@@ -64,6 +64,10 @@ struct EditorView: View {
             .onChange(of: focus) { left, _ in
                 if let left { editor.fieldWasLeft(left) }
             }
+            // The same for a row's field; a period is left from either of its years
+            .onChange(of: rowFocus) { left, _ in
+                if let left { editor.fieldWasLeft(left.field, row: left.row) }
+            }
             // The row itself takes the focus once it is on screen (EditorRowView)
             .onChange(of: editor.addedRow) { _, added in
                 if let added { withAnimation { proxy.scrollTo(added) } }

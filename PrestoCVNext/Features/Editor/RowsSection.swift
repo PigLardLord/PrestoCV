@@ -1,10 +1,11 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// Where the person types in a row: the row, by its id, and the field.
+/// Where the person types in a row: the row, by its id, and the field; in a period, the year of its start or of its end.
 struct RowFocus: Hashable {
     let row: RowID
     let field: EditorField
+    var isEnd = false
 }
 
 /// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one at the end. The editor adds

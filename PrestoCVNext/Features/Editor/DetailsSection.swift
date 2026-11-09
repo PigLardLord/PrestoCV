@@ -23,13 +23,13 @@ struct DetailsSection: View {
             .accessibilityIdentifier("editor.field.professionalTitle")
             LabeledField(
                 "editor.field.email", text: $editor.content.email, focus: focus, as: .email,
-                note: words(of: editor.problem(of: .email), unreadable: "editor.note.email")
+                note: noteWords(of: editor.problem(of: .email), unreadable: "editor.note.email")
             )
             .fieldInput(EditorField.email.input)
             .accessibilityIdentifier("editor.field.email")
             LabeledField(
                 "editor.field.phone", text: $editor.content.phone, focus: focus, as: .phone,
-                note: words(of: editor.problem(of: .phone), unreadable: "editor.note.phone")
+                note: noteWords(of: editor.problem(of: .phone), unreadable: "editor.note.phone")
             )
             .fieldInput(EditorField.phone.input)
             .accessibilityIdentifier("editor.field.phone")
@@ -38,22 +38,13 @@ struct DetailsSection: View {
                 .accessibilityIdentifier("editor.field.location")
             LabeledField(
                 "editor.field.website", text: $editor.content.website, focus: focus, as: .website,
-                note: words(of: editor.problem(of: .website), unreadable: "editor.note.website")
+                note: noteWords(of: editor.problem(of: .website), unreadable: "editor.note.website")
             )
             .fieldInput(EditorField.website.input)
             .accessibilityIdentifier("editor.field.website")
             ParagraphField("editor.field.summary", text: $editor.content.summary, focus: focus, as: .summary)
                 .fieldInput(EditorField.summary.input)
                 .accessibilityIdentifier("editor.field.summary")
-        }
-    }
-
-    /// The words of the note under a field for the problem the editor names with its text (R13); nil when it names none.
-    /// A field of the details is no period, so its end never comes before its start.
-    private func words(of problem: FieldProblem.Code?, unreadable: LocalizedStringResource) -> LocalizedStringResource? {
-        switch problem {
-        case .unreadable: unreadable
-        case .endBeforeStart, nil: nil
         }
     }
 }

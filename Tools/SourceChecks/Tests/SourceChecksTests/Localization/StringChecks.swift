@@ -72,6 +72,7 @@ struct StringRules: Sendable {
         "systemImage:": "the name of an SF Symbol",
         "symbol:": "the name of an SF Symbol, handed to a view of the design system (EmptyStateView)",
         "named:": "the name of an image or a color in the asset catalog",
+        "id:": "the identity of an accessibility custom content key (AccessibilityCustomContentKey), never shown",
     ]
 }
 

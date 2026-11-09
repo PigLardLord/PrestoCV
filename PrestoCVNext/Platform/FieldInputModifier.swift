@@ -38,7 +38,7 @@ private extension FieldInput {
         case .email: .emailAddress
         case .phone: .phonePad
         case .webAddress: .URL
-        case .year: .numbersAndPunctuation
+        case .year: .numberPad
         case .personName, .jobTitle, .organization, .city, .plain, .sentence, .paragraph: .default
         }
     }
