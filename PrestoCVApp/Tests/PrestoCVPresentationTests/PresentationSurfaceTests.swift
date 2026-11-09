@@ -26,7 +26,7 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
         let _: CVReference = alert.reference
         let _: String = alert.label
         let _: RowStatus = alert.status
-        list.dismissStatus(of: alert.reference)
+        list.dismissRowAlert()
     }
     _ = list.now
     list.refreshNow()

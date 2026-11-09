@@ -121,12 +121,13 @@ struct CVListView: View {
         Task { await list.load() }
     }
 
-    /// The alert shows while a row has a status; closing it dismisses that status, and the next one shows.
+    /// The alert shows while the list has one given; it stays until the person closes it, which dismisses that failure, and
+    /// then the next one shows.
     private var showingRowAlert: Binding<Bool> {
         Binding(
             get: { list.rowAlert != nil },
             set: { shown in
-                if !shown, let alert = list.rowAlert { list.dismissStatus(of: alert.reference) }
+                if !shown { list.dismissRowAlert() }
             }
         )
     }

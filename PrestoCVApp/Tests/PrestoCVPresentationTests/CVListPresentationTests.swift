@@ -130,13 +130,13 @@ struct CVListPresentationTests {
         #expect(alert.label == "Backend")
         #expect(alert.status == .conflict)
 
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
 
-    @Test("of two rows whose change did not work, the first in the list is told first, the other once it is dismissed")
-    func rowAlertsFollowTheListOrder() async throws {
+    @Test("of two rows whose change did not work, the first to fail is told first, the other once it is dismissed")
+    func rowAlertsFollowTheOrderGiven() async throws {
         let world = Browsing()
         let one = try await world.stored(title: "One")
         let two = try await world.stored(title: "Two")
@@ -146,14 +146,79 @@ struct CVListPresentationTests {
         await list.rename(world.reference(one), to: "Renamed")
         try await world.editing.otherWindowSaves(two, fullName: "Someone Else")
         await list.rename(world.reference(two), to: "Renamed")
-        let failed = [world.reference(one), world.reference(two)]
-        let order = list.rows.map(\.reference).filter(failed.contains)
-        #expect(order.count == 2)
+        #expect(list.rowAlert?.reference == world.reference(one))
+        list.dismissRowAlert()
+        #expect(list.rowAlert?.reference == world.reference(two))
+        #expect(Array(list.rowStatuses.keys) == [world.reference(two)])
+    }
 
-        #expect(list.rowAlert?.reference == order.first)
-        list.dismissStatus(of: order[0])
-        #expect(list.rowAlert?.reference == order.last)
-        #expect(Array(list.rowStatuses.keys) == [order[1]])
+    /// Starts a rename of each row, held in the store's door, with both CVs saved elsewhere meanwhile; the one named first
+    /// fails first, then the other.
+    private func renamesHeld(
+        _ first: CVReference, _ second: CVReference, saved: [CV], in world: Browsing, _ list: CVListViewModel
+    ) async throws -> (first: Task<Void, Never>, second: Task<Void, Never>) {
+        await world.editing.renameGate.close()
+        let one = Task { await list.rename(first, to: "Renamed") }
+        await waitUntil("the first rename to wait") { await world.editing.renameGate.waiting == 1 }
+        let two = Task { await list.rename(second, to: "Renamed") }
+        await waitUntil("the second rename to wait") { await world.editing.renameGate.waiting == 2 }
+        for cv in saved { try await world.editing.otherWindowSaves(cv, fullName: "Someone Else") }
+        return (one, two)
+    }
+
+    @Test("the alert given stays until it is dismissed when an earlier-listed row fails after it; each failure shows once")
+    func alertGivenIsNotReplacedByAnEarlierListedFailure() async throws {
+        let world = Browsing()
+        let one = try await world.stored(title: "One")
+        let two = try await world.stored(title: "Two")
+        let list = await world.loadedList()
+        let listed = list.rows.map(\.reference)
+        let (a, b) = (listed[0], listed[1])
+        let cvs = [b, a].map { reference in reference == world.reference(one) ? one : two }
+        // The later-listed row fails first
+        let held = try await renamesHeld(a, b, saved: cvs, in: world, list)
+        await world.editing.renameGate.releaseNewest()
+        await held.second.value
+        #expect(list.rowAlert?.reference == b)
+        let alertOfB = try #require(list.rowAlert)
+        #expect(list.rows.map(\.reference).firstIndex(of: a)! < list.rows.map(\.reference).firstIndex(of: b)!)
+
+        await world.editing.renameGate.releaseAll()
+        await held.first.value
+
+        #expect(list.rowAlert == alertOfB)
+        #expect(Set(list.rowStatuses.keys) == [a, b])
+        list.dismissRowAlert()
+        #expect(list.rowAlert?.reference == a)
+        #expect(list.rowStatuses.keys.contains(a))
+        list.dismissRowAlert()
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("a reload while an alert is given does not replace it")
+    func reloadKeepsTheAlertGiven() async throws {
+        let world = Browsing()
+        let one = try await world.stored(title: "One")
+        let two = try await world.stored(title: "Two")
+        let list = await world.loadedList()
+        let listed = list.rows.map(\.reference)
+        // Each row fails on its own: the later-listed one first
+        for reference in listed.reversed() {
+            let cv = reference == world.reference(one) ? one : two
+            try await world.editing.otherWindowSaves(cv, fullName: "Someone Else")
+            await list.rename(reference, to: "Renamed")
+        }
+        let given = try #require(list.rowAlert)
+        #expect(given.reference == listed[1])
+
+        await list.load()
+
+        #expect(list.rowAlert == given)
+        list.dismissRowAlert()
+        #expect(list.rowAlert?.reference == listed[0])
+        list.dismissRowAlert()
+        #expect(list.rowAlert == nil)
     }
 
     // MARK: A row whose CV is gone
@@ -173,7 +238,7 @@ struct CVListPresentationTests {
         #expect(alert.label == "Backend")
         #expect(alert.status == .gone)
 
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -192,7 +257,7 @@ struct CVListPresentationTests {
         #expect(list.rowAlert?.label == "Backend")
         #expect(list.rowAlert?.status == .gone)
 
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
     }
 
@@ -258,7 +323,7 @@ struct CVListPresentationTests {
         #expect(alert.reference == world.reference(cv))
         #expect(alert.label == "Backend")
         #expect(alert.status == .gone)
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -275,7 +340,7 @@ struct CVListPresentationTests {
 
         #expect(list.rowAlert?.label == "Backend")
         #expect(list.rowAlert?.status == .gone)
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
@@ -295,12 +360,12 @@ struct CVListPresentationTests {
         // A reload keeps it
         await list.load()
         #expect(list.rowAlert == alert)
-        list.dismissStatus(of: world.reference(cv))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
 
-    @Test("two rows found gone are told in the order found, after a listed row whose change did not work")
+    @Test("two rows found gone are told in the order found, the listed row whose change did not work between them once the first is dismissed")
     func goneAlertsComeInTheOrderFound() async throws {
         let world = Browsing()
         let first = try await world.stored(title: "First")
@@ -313,14 +378,14 @@ struct CVListPresentationTests {
         try await world.editing.otherWindowSaves(listed, fullName: "Someone Else")
         await list.rename(world.reference(listed), to: "Renamed")
 
-        #expect(list.rowAlert?.reference == world.reference(listed))
-        list.dismissStatus(of: world.reference(listed))
         #expect(list.rowAlert?.reference == world.reference(second))
         #expect(list.rowAlert?.label == "Second")
-        list.dismissStatus(of: world.reference(second))
+        list.dismissRowAlert()
+        #expect(list.rowAlert?.reference == world.reference(listed))
+        list.dismissRowAlert()
         #expect(list.rowAlert?.reference == world.reference(first))
         #expect(list.rowAlert?.label == "First")
-        list.dismissStatus(of: world.reference(first))
+        list.dismissRowAlert()
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
