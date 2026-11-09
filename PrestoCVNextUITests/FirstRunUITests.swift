@@ -111,11 +111,17 @@ final class FirstRunUITests: XCTestCase {
 
         examples.tap()
 
-        let row = app.buttons.matching(identifier: "examples.row").firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 30))
-        XCTAssertGreaterThan(app.buttons.matching(identifier: "examples.row").count, 1)
-        XCTAssertTrue(element("examples.footer", in: app).exists)
-        row.tap()
+        let rows = app.buttons.matching(identifier: "examples.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 30))
+        XCTAssertGreaterThan(rows.count, 1)
+        // A list makes only the rows on screen: on a small iPhone the footer is below the examples
+        let footer = element("examples.footer", in: app)
+        for _ in 0..<3 where !footer.exists {
+            app.collectionViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(footer.exists)
+        // The last example is on screen beside the footer
+        rows.element(boundBy: rows.count - 1).tap()
 
         XCTAssertTrue(app.staticTexts["shell.detail.title"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.buttons.matching(identifier: "examples.row").firstMatch.exists)
