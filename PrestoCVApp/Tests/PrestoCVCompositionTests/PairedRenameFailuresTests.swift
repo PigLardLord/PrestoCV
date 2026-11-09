@@ -20,10 +20,10 @@ struct PairedRenameFailuresTests {
         let editing = editing()
         let cv = editing.new()
         let first = Task { () -> EditFailure? in
-            do { _ = try await editing.rename(cv, to: "One"); return nil } catch { return error }
+            do throws(EditFailure) { _ = try await editing.rename(cv, to: "One"); return nil } catch { return error }
         }
         let second = await Task { () -> EditFailure? in
-            do { _ = try await editing.rename(cv, to: "Two"); return nil } catch { return error }
+            do throws(EditFailure) { _ = try await editing.rename(cv, to: "Two"); return nil } catch { return error }
         }.value
         let firstFailure = await first.value
 
@@ -38,6 +38,7 @@ struct PairedRenameFailuresTests {
 
         var named = cv
         named.rename("Backend")
+        named.setPersonalDetails(PersonalDetails(fullName: "Mara Ellison"))
         let saved = try await editing.save(named)
         let loaded = try await editing.load(saved.id)
 
