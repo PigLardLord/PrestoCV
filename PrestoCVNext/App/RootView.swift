@@ -37,13 +37,14 @@ private final class ShellModels: ObservableObject {
     let firstRun: FirstRunViewModel
 
     init(screens: ScreenFactory) {
-        shell = screens.makeShell()
         firstRun = screens.makeFirstRun()
         list = screens.makeCVList(
             untitled: String(localized: "shell.untitled"),
             // The order and the punctuation of a title and its number are the translation's
             numbered: { title, number in String(localized: "shell.numbered \(title) \(number)") }
         )
+        // A copy is named as the list names one, in the language the app shows (R13)
+        shell = screens.makeShell(list: list, copyTitle: { title in String(localized: "list.copy.title \(title)") })
     }
 }
 

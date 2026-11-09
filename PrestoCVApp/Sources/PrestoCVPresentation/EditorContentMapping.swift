@@ -35,7 +35,7 @@ extension EditorContent {
     }
 
     /// `base` with the form's text: its identity, look and language stay. A field that cannot be read as its kind is left
-    /// out; `unreadableFields` names it.
+    /// out; `unreadable` names it.
     func applied(to base: CV) -> CV {
         var cv = base
         cv.rename(title)
@@ -51,17 +51,22 @@ extension EditorContent {
         return cv
     }
 
-    /// The fields whose text is not blank and cannot be read as its kind, in the form's order.
-    var unreadableFields: [EditorField] {
+    /// The fields whose text is not blank and cannot be read as its kind, each with its row, in the form's order.
+    var unreadable: [FieldProblem] {
         let readings: [(EditorField, String, Bool)] = [
             (.email, email, EmailAddress(email) != nil),
             (.phone, phone, PhoneNumber(phone) != nil),
             (.website, website, WebLink(website) != nil),
         ]
-        let personal = readings.filter { _, text, isRead in !isRead && !text.isBlank }.map(\.0)
-        return personal + experiences.flatMap(\.unreadableFields) + education.flatMap(\.unreadableFields)
-            + skills.flatMap(\.unreadableFields) + languages.flatMap(\.unreadableFields)
-            + certifications.flatMap(\.unreadableFields) + profiles.flatMap(\.unreadableFields)
+        let personal = readings.filter { _, text, isRead in !isRead && !text.isBlank }
+            .map { field, _, _ in FieldProblem(row: nil, field: field, code: .unreadable) }
+        return personal + unreadable(on: experiences, \.unreadableFields) + unreadable(on: education, \.unreadableFields)
+            + unreadable(on: skills, \.unreadableFields) + unreadable(on: languages, \.unreadableFields)
+            + unreadable(on: certifications, \.unreadableFields) + unreadable(on: profiles, \.unreadableFields)
+    }
+
+    private func unreadable<Row: EditorRow>(on rows: [Row], _ fields: (Row) -> [EditorField]) -> [FieldProblem] {
+        rows.flatMap { row in fields(row).map { FieldProblem(row: row.id, field: $0, code: .unreadable) } }
     }
 
     /// Whether the row of `section` with `id` has nothing in it. A row that is not there has nothing either.

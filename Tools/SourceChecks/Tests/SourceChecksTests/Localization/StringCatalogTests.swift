@@ -30,6 +30,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.row.saved \(saved)"#: ValueTypes(["%@"], "RelativeDateTimeFormatter gives a String"),
                 #"list.delete.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
+                #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
             ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.

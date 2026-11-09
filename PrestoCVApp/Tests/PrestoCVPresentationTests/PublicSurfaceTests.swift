@@ -22,6 +22,16 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [InterestRow] = content.interests
     _ = rows
     let _: RowRemoval? = editor.pendingRemoval
+    editor.fieldWasLeft(.email)
+    let problems: [FieldProblem] = editor.problems
+    for problem in problems {
+        let _: RowID? = problem.row
+        let _: EditorField = problem.field
+        switch problem.code {
+        case .unreadable: break
+        }
+    }
+    let _: FieldInput = EditorField.email.input
     editor.addRow(to: .skills)
     let added: RowID = editor.content.skills[0].id
     editor.removeRow(in: .skills, id: added)
@@ -90,7 +100,7 @@ struct PublicSurfaceTests {
     @Test("statuses are codes: none carries a text")
     func statusesCarryNoText() {
         let opening: [OpeningStatus] = [.opening, .open, .missing, .failed]
-        let values: [Any] = everySaveStatus() + everyExportStatus() + opening
+        let values: [Any] = everySaveStatus() + everyExportStatus() + opening + FieldInput.allCases
 
         #expect(values.flatMap { strings(in: $0) }.isEmpty)
         #expect(Set(everySaveStatus()).count == everySaveStatus().count)

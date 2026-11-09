@@ -44,7 +44,7 @@ struct ScreenFactoryTests {
     }
 
     private static func editor(_ fixture: Fixture, _ start: EditorStart) -> EditorViewModel {
-        fixture.composition.screens.makeEditor(start: start, copyTitle: { "Copy of \($0)" })
+        fixture.composition.screens.makeEditor(start: start, copyTitle: { "Copy of \($0)" }, didStore: {})
     }
 
     private static func store(_ fixture: Fixture) -> [String] {
@@ -93,7 +93,7 @@ struct ScreenFactoryTests {
         #expect(text.contains("Renamed by the list"))
     }
 
-    @Test("The shell's navigation model starts with the list and follows the rows the list reads")
+    @Test("The shell's navigation model starts with the list, opens a row in an editor, and follows the rows the list reads")
     func shell() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -102,13 +102,17 @@ struct ScreenFactoryTests {
         await list.load()
         let row = try #require(list.rows.first)
 
-        let shell = fixture.composition.screens.makeShell()
+        let shell = fixture.composition.screens.makeShell(list: list, copyTitle: { "Copy of \($0)" })
         #expect(shell.selection == nil)
         shell.open(.stored(row.reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        #expect(editor.opening == .open, "the editor opens the row's CV")
         shell.reconcile(with: list.rows)
         #expect(shell.selection == row.reference)
         shell.reconcile(with: [])
         #expect(shell.selection == nil)
+        #expect(shell.editor == nil)
     }
 
     @Test("On an empty store the first run offers the examples, then blank, and no import while the app has no import screen")
@@ -317,13 +321,13 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 }
         )
-        let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
         Self.typed(first, title: "First")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
-        let second = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await second.load()
         Self.typed(second, title: "Second")
 
@@ -343,10 +347,10 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 }
         )
-        let first = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
         Self.typed(first, title: "First")
-        let second = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await second.load()
         Self.typed(second, title: "Second")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
@@ -375,7 +379,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 }
         )
-        let editor = factory.makeEditor(start: .blank, copyTitle: { $0 })
+        let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await editor.load()
         Self.typed(editor, title: "First")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
@@ -392,6 +396,43 @@ struct ScreenFactoryTests {
         await list.load()
         #expect(list.rows.map(\.label) == ["First, edited"])
         withExtendedLifetime(editor) {}
+    }
+
+    @Test("An edit made while the list's wait holds another editor's write reaches the list once stored: the shell's editor reloads it", .timeLimit(.minutes(1)))
+    func aLaterEditReloadsTheList() async throws {
+        let gate = WriteGate(holding: 2)
+        let factory = ScreenFactory(
+            repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
+            samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
+            lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 }
+        )
+        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let shell = factory.makeShell(list: list, copyTitle: { $0 })
+        shell.open(.blank)
+        let first = try #require(shell.editor)
+        await first.load()
+        Self.typed(first, title: "First")
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        await second.load()
+        Self.typed(second, title: "Second")
+        let loading = Task { @MainActor in await list.load() }
+        await gate.waitReached()
+        // The first editor has stored at its turn, and the second one's write is held: the person edits the first.
+        Self.typed(first, title: "First, edited")
+        await gate.open()
+        await loading.value
+
+        // The autosave's pause has not passed on this clock: storing now stands for it. Nobody loads the list again.
+        await first.saveNow()
+
+        var shown: Set<String> = []
+        for await labels in Observations({ Set(list.rows.map(\.label)) }) {
+            shown = labels
+            if labels == ["First, edited", "Second"] { break }
+        }
+        #expect(shown == ["First, edited", "Second"], "the write of the edit reloaded the list")
+        withExtendedLifetime(second) {}
     }
 
     @Test("The factory does not keep an editor alive")

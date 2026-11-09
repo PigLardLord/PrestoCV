@@ -42,9 +42,14 @@ public final class EditorViewModel {
     let clock: any Clock<Duration>
     let pause: Duration
     let copyTitle: @MainActor (String) -> String
+    let didStore: @MainActor () -> Void
 
     /// The form as typed.
-    var form = EditorContent.empty
+    var form = EditorContent.empty {
+        didSet { forgetProblemsThatRead() }
+    }
+    /// The problems the person has met (`problems`), kept until their text reads.
+    var metProblems = Set<FieldProblem>()
     /// The ids of the form's rows: every row this editor made has one no other row has had.
     @ObservationIgnored var rowIDs = RowIDs()
     /// The CV the form stands on: its identity, the sections, and the look and the language it was opened with.
@@ -82,15 +87,18 @@ public final class EditorViewModel {
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
+    ///   - didStore: Called after each write the store took, never for one that failed, so that what shows the stored
+    ///     CVs can read them again. It is called even when the editor is gone by then.
     public init(
         start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
-        pause: Duration, copyTitle: @escaping @MainActor (String) -> String
+        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
     ) {
         self.start = start
         self.editing = editing
         self.clock = clock
         self.pause = pause
         self.copyTitle = copyTitle
+        self.didStore = didStore
     }
 
     /// Opens the CV. The view calls it from its `.task`; once the CV is open, it does nothing.
@@ -155,12 +163,17 @@ public final class EditorViewModel {
         let mine = generation
         writes.replace()
         let mineWrites = WritesInFlight()
+        let didStore = self.didStore
         let autosave = Autosave<CV>(
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
             onWriteFailure: { [weak self] error in self?.writeFailed(error, generation: mine) },
-            // Only the writer: a write that ends after the editor is gone still stores what it was given
-            write: { content, _ in try await mineWrites.run { try await writer.write(content) } }
+            // Only the writer and the callback: a write that ends after the editor is gone still stores what it was given,
+            // and still tells it
+            write: { content, _ in
+                try await mineWrites.run { try await writer.write(content) }
+                didStore()
+            }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
         self.autosave = autosave
@@ -197,14 +210,15 @@ public final class EditorViewModel {
         if let failure { return failure }
         if let changeFailure { return changeFailure }
         guard replacing == nil, let base, let autosave else { return .saving }
-        if let field = form.unreadableFields.first { return .unreadable(field) }
+        if let problem = problems.first { return .unreadable(problem.field) }
         switch autosave.status {
         case .writing, .retrying:
             return .saving
         case .failed:
             return .failed
         case .pending, .upToDate:
-            if autosave.isStored, autosave.storeHoldsTheContent { return .saved }
+            // Text the person is still typing that cannot be read yet is not stored: it waits for them
+            if autosave.isStored, autosave.storeHoldsTheContent { return form.unreadable.isEmpty ? .saved : .pending }
             return SaveStatus(waiting: form.applied(to: base).saveCheck())
         }
     }

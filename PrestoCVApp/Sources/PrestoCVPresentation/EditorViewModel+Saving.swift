@@ -5,8 +5,10 @@ import PrestoCVWorkflowPorts
 extension EditorViewModel {
 
     /// Stores what is left at once, as when the editor is left or the app goes to the background. Returns once the store
-    /// holds the form as it was when this was called, edits made meanwhile included, or once a write failed.
+    /// holds the form as it was when this was called, edits made meanwhile included, or once a write failed. It is the
+    /// person's attempt to store: every field that cannot be read is a problem from now on (`problems`).
     public func saveNow() async {
+        meetEveryProblem()
         while let replacing { await replacing.value }
         guard let autosave else { return }
         do {

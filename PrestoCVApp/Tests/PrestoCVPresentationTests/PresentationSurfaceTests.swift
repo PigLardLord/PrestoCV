@@ -88,17 +88,26 @@ func useEveryPublicMember(of look: LookViewModel) async {
 }
 
 @MainActor
-func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) {
+func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let reference: CVReference? = shell.selection
     let column: ShellColumn = shell.preferredColumn
     switch column { case .sidebar, .detail: break }
-    if let row = rows.first { shell.open(.stored(row.reference)) }
+    var verdicts: [LeaveVerdict] = []
+    if let row = rows.first { verdicts.append(shell.open(.stored(row.reference))) }
     let detail: EditorStart? = shell.detail
+    let editor: EditorViewModel? = shell.editor
     let screen: ShellScreen = shell.screen(for: .firstRun)
     switch screen { case .loading, .welcome, .split: break }
     shell.reconcile(with: rows)
-    shell.deselect()
-    _ = (reference, detail)
+    await shell.flushAll()
+    verdicts.append(shell.deselect())
+    for verdict in verdicts {
+        switch verdict {
+        case .left: break
+        case .stayed(let status): let _: SaveStatus = status
+        }
+    }
+    _ = (reference, detail, editor)
 }
 
 func everyListCode() -> [Any] {
@@ -150,7 +159,7 @@ struct PresentationSurfaceTests {
         await useEveryPublicMember(of: list, reference: world.reference(cv))
         await useEveryPublicMember(of: world.firstRun())
         await useEveryPublicMember(of: world.look(of: world.editing.new()))
-        useEveryPublicMember(of: ShellNavigationModel(), rows: list.rows)
+        await useEveryPublicMember(of: Editing().shell(), rows: list.rows)
 
         #expect(list.status == .loaded)
     }
