@@ -67,6 +67,7 @@ struct StringRules: Sendable {
     var nonTextArguments: [String: String] = [
         "verbatim:": "text shown as it is, by definition",
         "accessibilityIdentifier(": "an identifier for the UI tests, never shown",
+        "actionIdentifier:": "an identifier for the UI tests, handed to a notice of the design system (InlineNotice), never shown",
         "systemName:": "the name of an SF Symbol",
         "systemImage:": "the name of an SF Symbol",
         "symbol:": "the name of an SF Symbol, handed to a view of the design system (EmptyStateView)",

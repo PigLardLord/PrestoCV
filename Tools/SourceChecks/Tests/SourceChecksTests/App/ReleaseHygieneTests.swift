@@ -143,7 +143,7 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture without examples outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
-    /// A UI test makes two renames fail together to see two row alerts follow each other; no Release build may be able to.
+    /// A UI test makes two renames fail together to see two row notices at once; no Release build may be able to.
     @Test("The fixture that fails the list's renames two at a time is read only by Debug builds")
     func theFixtureThatFailsRenamesIsReadOnlyInDebugBuilds() {
         let names = ["failRenamesInPairsArgument", "failsRenamesInPairs", "PairedRenameFailures", "fixtures.listEditing"]
