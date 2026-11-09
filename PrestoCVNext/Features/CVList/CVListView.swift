@@ -4,7 +4,7 @@ import SwiftUI
 /// The list column: the CVs of the store in the view model's order, under the notices of the list. While the first read
 /// runs it waits; a store with no CV shows the ways to start. It reads the store when it appears, each time the app comes
 /// back to the front and on a pull; the view model reads it again after its own changes. A change of a row that did not
-/// work is said in an alert that names the row.
+/// work is said in a notice of its own that names the row and stays until the person hides it.
 struct CVListView: View {
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
@@ -22,16 +22,6 @@ struct CVListView: View {
                 list.refreshNow()
                 await list.load()
             }
-            .alert(Text(verbatim: list.rowAlert?.label ?? ""), isPresented: showingRowAlert, presenting: list.rowAlert) { _ in
-            } message: { alert in
-                switch alert.status {
-                case .conflict: Text("list.status.conflict")
-                case .gone: Text("list.status.gone")
-                case .tooLarge: Text("list.status.tooLarge")
-                case .failed: Text("list.status.failed")
-                }
-            }
-            .onChange(of: list.rowAlert == nil) { list.rowAlertClosed() }
     }
 
     @ViewBuilder
@@ -90,6 +80,28 @@ struct CVListView: View {
             case .unreadable(let unreadable):
                 InlineNotice(actionTitle: "list.hide", action: { list.dismissNotice() }) { unreadableMessage(unreadable) }
                     .accessibilityIdentifier("list.notice")
+            case .rowFailure(let failure):
+                InlineNotice(
+                    actionTitle: "list.hide",
+                    actionIdentifier: "list.rowFailure.hide",
+                    actionLabel: "list.rowFailure.hide \(failure.label)",
+                    action: { list.dismissRowFailure(failure) }
+                ) { rowFailureMessage(failure) }
+                    .accessibilityIdentifier("list.rowFailure")
+            }
+        }
+    }
+
+    /// The name of the CV as the person wrote it, then what did not work.
+    private func rowFailureMessage(_ failure: RowFailure) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            Text(verbatim: failure.label)
+                .font(.headline)
+            switch failure.status {
+            case .conflict: WholeWordsText("list.status.conflict")
+            case .gone: WholeWordsText("list.status.gone")
+            case .tooLarge: WholeWordsText("list.status.tooLarge")
+            case .failed: WholeWordsText("list.status.failed")
             }
         }
     }
@@ -120,17 +132,5 @@ struct CVListView: View {
 
     private func reload() {
         Task { await list.load() }
-    }
-
-    /// The alert shows while the list has one given; closing it dismisses that failure and leaves the list with none. The
-    /// list gives the next failure only when the screen reports the empty slot (`onChange` above), so the alert has closed
-    /// before the next one is presented.
-    private var showingRowAlert: Binding<Bool> {
-        Binding(
-            get: { list.rowAlert != nil },
-            set: { shown in
-                if !shown { list.dismissRowAlert() }
-            }
-        )
     }
 }

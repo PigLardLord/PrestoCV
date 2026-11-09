@@ -33,6 +33,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.delete.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
+                #"list.rowFailure.hide \(failure.label)"#: ValueTypes(["%@"], "RowFailure's label is a String"),
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
             ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.

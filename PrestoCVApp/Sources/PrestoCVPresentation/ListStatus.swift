@@ -59,6 +59,8 @@ public enum ListNotice: Hashable, Sendable {
     case failed
     /// Files the store could not read, until the person dismisses it.
     case unreadable(StoreNotice)
+    /// A row whose last change did not work, until the person dismisses it.
+    case rowFailure(RowFailure)
 }
 
 /// What the person can do to a row. The menu and the actions of VoiceOver offer each; a swipe offers some of them.
@@ -66,11 +68,13 @@ public enum RowAction: Hashable, Sendable {
     case duplicate, rename, delete
 }
 
-/// The row whose last change did not work, named by its label.
-public struct RowAlert: Hashable, Sendable {
+/// The row whose last change did not work, named by its label. The number tells this failure from a newer one of the same
+/// row, so that dismissing the older notice leaves the newer one.
+public struct RowFailure: Hashable, Sendable {
     public let reference: CVReference
     public let label: String
     public let status: RowStatus
+    public let number: Int
 }
 
 extension RowStatus {

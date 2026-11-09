@@ -34,11 +34,15 @@ public final class CVListViewModel {
         }
     }
 
-    /// The notices above the rows: the store's state first, then the files it could not read.
+    /// The notices above the rows: the store's state first, then the files it could not read, then one for each row whose
+    /// last change did not work. Those are the listed rows in the list's order, by the label each shows now, and then the
+    /// rows no longer listed (another action or a reload removed them), in the order the failures were found, by the label
+    /// the row had when the change began. Each stays until the person dismisses it, whatever else fails or loads meanwhile.
     public var notices: [ListNotice] {
         var notices: [ListNotice] = []
         if status == .failed { notices.append(isStale ? .stale : .failed) }
         if let notice { notices.append(.unreadable(notice)) }
+        notices += rowFailures.map(ListNotice.rowFailure)
         return notices
     }
 
@@ -49,26 +53,15 @@ public final class CVListViewModel {
     /// The swipe from the trailing edge.
     public let trailingSwipeActions: [RowAction] = [.delete]
 
-    /// The failure the person is told of. It stays until the person dismisses it, whatever else fails or loads meanwhile, so
-    /// what the person sees and what a dismissal removes are the same failure. When none is given, it takes the first row,
-    /// in the list's order, whose last change did not work; a row that is no longer listed follows the listed ones, in the
-    /// order the failures were found, named by the label it had when the change began. A failure is told whether or not its
-    /// row is still listed. Dismissing it removes only that failure: a newer failure of the same row stays pending.
-    public private(set) var rowAlert: RowAlert?
-
     private var issues: [StoreIssueKind] = []
     private var isNoticeDismissed = false
-    /// The alert of the latest failure of each row, in the order they were found, with the label the row had. The one in
-    /// `rowAlert` is told first; these wait for it to be dismissed.
-    private var failedAlerts: [RowAlert] = []
+    /// The latest failure of each row, in the order they were found, with the label the row had. A failure of a row that is
+    /// no longer listed is told from here.
+    private var failedAlerts: [RowFailure] = []
     /// Numbers each failure recorded, so that a dismissal removes the failure it showed and not a newer one of the same row.
     private var failuresRecorded = 0
     /// The number of the latest failure of each row that has a status; it goes with the status.
     private var latestFailure: [CVReference: Int] = [:]
-    /// The number of the failure `rowAlert` shows.
-    private var givenFailure: Int?
-    /// An alert was dismissed and the screen has not yet reported it closed: no alert is given until `rowAlertClosed()`.
-    private var closing = false
 
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
@@ -141,38 +134,30 @@ public final class CVListViewModel {
 
     public func dismissNotice() { isNoticeDismissed = true }
 
-    /// The person read the alert given: the failure shown goes and `rowAlert` is empty, so that the screen sees the alert
-    /// closed. The next one is given by `rowAlertClosed()`, in the order of the first one: the listed rows, then the rows no
-    /// longer listed. A newer failure of the same row stays pending and is given in its turn.
-    public func dismissRowAlert() {
-        guard let alert = rowAlert else { return }
-        if latestFailure[alert.reference] == givenFailure {
-            rowStatuses[alert.reference] = nil
-            failedAlerts.removeAll { $0.reference == alert.reference }
-            latestFailure[alert.reference] = nil
+    /// The person dismissed a notice of a row's failure. It removes that failure only: a newer failure of the same row has
+    /// another number, and stays.
+    public func dismissRowFailure(_ failure: RowFailure) {
+        guard latestFailure[failure.reference] == failure.number else { return }
+        rowStatuses[failure.reference] = nil
+        failedAlerts.removeAll { $0.reference == failure.reference }
+        latestFailure[failure.reference] = nil
+    }
+
+    /// The failures to tell, in the order of `notices`.
+    private var rowFailures: [RowFailure] {
+        let listed = rows.compactMap { row in
+            failure(of: row.reference, labelled: row.label)
         }
-        rowAlert = nil
-        givenFailure = nil
-        closing = true
+        let listedReferences = Set(rows.map(\.reference))
+        let removed = failedAlerts.compactMap { found in
+            listedReferences.contains(found.reference) ? nil : failure(of: found.reference, labelled: found.label)
+        }
+        return listed + removed
     }
 
-    /// The screen shows no alert: the one dismissed has closed, so the next pending failure is given. It does nothing
-    /// unless an alert was dismissed and none is given since, so a failure or a reload meanwhile cannot fill the slot
-    /// before the screen has seen it empty.
-    public func rowAlertClosed() {
-        guard closing else { return }
-        closing = false
-        giveNextRowAlert()
-    }
-
-    /// Gives the first pending failure when none is given. Every place that adds a pending failure or frees the slot calls it.
-    private func giveNextRowAlert() {
-        guard rowAlert == nil, !closing else { return }
-        let listedAlert = rows.lazy.compactMap { row in
-            self.rowStatuses[row.reference].map { RowAlert(reference: row.reference, label: row.label, status: $0) }
-        }.first
-        rowAlert = listedAlert ?? failedAlerts.first { rowStatuses[$0.reference] != nil }
-        givenFailure = rowAlert.flatMap { latestFailure[$0.reference] }
+    private func failure(of reference: CVReference, labelled label: String) -> RowFailure? {
+        guard let status = rowStatuses[reference], let number = latestFailure[reference] else { return nil }
+        return RowFailure(reference: reference, label: label, status: status, number: number)
     }
 
     private func show(_ listing: CVListing) {
@@ -182,7 +167,6 @@ public final class CVListViewModel {
         let kept = Set(rows.map(\.reference)).union(failedAlerts.map(\.reference))
         rowStatuses = rowStatuses.filter { kept.contains($0.key) }
         latestFailure = latestFailure.filter { rowStatuses[$0.key] != nil }
-        giveNextRowAlert()
         settled = .loaded
         status = .loaded
         isStale = false
@@ -320,7 +304,7 @@ public final class CVListViewModel {
     }
 
     /// A change did not work. A cancelled task is no failure. What the list shows is out of date after a conflict or a CV
-    /// that is gone, so it is read again; the row shows the failure only if no newer change of the row was taken. The alert
+    /// that is gone, so it is read again; the row shows the failure only if no newer change of the row was taken. The notice
     /// names the row by the label it shows now, else by the one it had when the change began: another action or a reload
     /// may have removed the row meanwhile.
     private func failed(_ failure: EditFailure, on reference: CVReference, _ intent: Int) async {
@@ -332,8 +316,7 @@ public final class CVListViewModel {
             latestFailure[reference] = failuresRecorded
             let label = rows.first { $0.reference == reference }?.label ?? labels[reference] ?? untitled
             failedAlerts.removeAll { $0.reference == reference }
-            failedAlerts.append(RowAlert(reference: reference, label: label, status: rowStatus))
-            giveNextRowAlert()
+            failedAlerts.append(RowFailure(reference: reference, label: label, status: rowStatus, number: failuresRecorded))
         }
         ended(reference, intent)
         switch rowStatus {

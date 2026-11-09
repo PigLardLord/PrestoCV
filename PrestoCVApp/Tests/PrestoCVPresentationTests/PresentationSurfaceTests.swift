@@ -16,18 +16,18 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
     for notice in list.notices as [ListNotice] {
         switch notice {
         case .stale, .failed: break
+        case .rowFailure(let failure):
+            let _: CVReference = failure.reference
+            let _: String = failure.label
+            let _: RowStatus = failure.status
+            let _: Int = failure.number
+            list.dismissRowFailure(failure)
         case .unreadable(let unreadable):
             let _: Int = unreadable.count
             let _: [StoreIssueKind] = unreadable.kinds + unreadable.distinctKinds
         }
     }
     let _: [RowAction] = list.rowActions + list.leadingSwipeActions + list.trailingSwipeActions
-    if let alert: RowAlert = list.rowAlert {
-        let _: CVReference = alert.reference
-        let _: String = alert.label
-        let _: RowStatus = alert.status
-        list.dismissRowAlert()
-    }
     _ = list.now
     list.refreshNow()
     list.dismissNotice()
@@ -123,7 +123,7 @@ func everyListCode() -> [Any] {
     let notices: [ListNotice] = [.stale, .failed]
     let actions: [RowAction] = [.duplicate, .rename, .delete]
     for value in contents { switch value { case .loading, .empty, .rows: break } }
-    for value in notices { switch value { case .stale, .failed, .unreadable: break } }
+    for value in notices { switch value { case .stale, .failed, .unreadable, .rowFailure: break } }
     for value in actions { switch value { case .duplicate, .rename, .delete: break } }
     for value in status { switch value { case .loading, .loaded, .failed: break } }
     for value in rows { switch value { case .conflict, .gone, .tooLarge, .failed: break } }

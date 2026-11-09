@@ -34,9 +34,7 @@ struct PairedRenameFailuresTests {
     @Test("Everything but a rename goes through to the editing it wraps")
     func otherCallsPassThrough() async throws {
         let editing = editing()
-        let cv = editing.new()
-
-        var named = cv
+        var named = FixtureCV.full()
         named.rename("Backend")
         named.setPersonalDetails(PersonalDetails(fullName: "Mara Ellison"))
         let saved = try await editing.save(named)

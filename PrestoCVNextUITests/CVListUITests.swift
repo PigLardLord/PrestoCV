@@ -170,29 +170,41 @@ final class CVListUITests: XCTestCase {
         XCTAssertFalse(self.row(titled: "Site Manager", in: app).exists)
     }
 
-    /// Two renames that fail together leave two alerts pending. The second must show once the person has read the first:
-    /// the alert closes before the next one is given, or the screen keeps a failure pending with nothing shown.
+    /// Two renames that fail together leave two failures pending. Both show at once, each as a notice of its own that
+    /// names its CV; hiding one leaves the other, and hiding both leaves nothing.
     @MainActor
-    func testASecondRowAlertShowsAfterTheFirstIsDismissed() throws {
+    func testTwoFailuresShowTwoNoticesThatAreHiddenOneByOne() throws {
         let app = try launch([siteManager, costEstimator], failingRenames: true)
         let first = row(titled: "Site Manager", in: app)
         XCTAssertTrue(first.waitForExistence(timeout: 30))
 
         rename(titled: "Site Manager", to: "Works Planner", in: app)
-        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 10), "The first rename is held, nothing is told yet")
         rename(titled: "Cost Estimator", to: "Bid Manager", in: app)
 
-        let alert = app.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 30), "The first failure is told")
-        let told = alert.label
-        alert.buttons["OK"].tap()
+        let notices = app.descendants(matching: .any).matching(identifier: "list.rowFailure")
+        let hides = app.buttons.matching(identifier: "list.rowFailure.hide")
+        XCTAssertTrue(hides.firstMatch.waitForExistence(timeout: 30), "A failure is told")
+        XCTAssertEqual(hides.count, 2, "Both failures are told at once, each with its own button")
+        XCTAssertEqual(notices.count, 2, "Each failure is a notice of its own")
+        let labels = [siteManagerHide, costEstimatorHide]
+        XCTAssertEqual(
+            Set(hides.allElementsBoundByIndex.map(\.label)), Set(labels),
+            "VoiceOver tells which CV each button hides the notice of"
+        )
 
-        XCTAssertTrue(alert.waitForExistence(timeout: 10), "The second failure is told after the first one is read")
-        XCTAssertNotEqual(alert.label, told, "The second alert is the other row's")
-        alert.buttons["OK"].tap()
+        let hidden = hides.firstMatch.label
+        hides.firstMatch.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "list.rowFailure.hide").element(boundBy: 1).waitForNonExistence(timeout: 10))
+        XCTAssertEqual(hides.count, 1, "Hiding one leaves the other")
+        XCTAssertEqual(hides.firstMatch.label, labels.first { $0 != hidden }, "The notice left is the other CV's")
 
-        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 10), "Nothing is left to tell")
+        hides.firstMatch.tap()
+        XCTAssertTrue(hides.firstMatch.waitForNonExistence(timeout: 10), "Nothing is left to tell")
+        XCTAssertEqual(notices.count, 0)
     }
+
+    private let siteManagerHide = "Hide the notice about “Site Manager”"
+    private let costEstimatorHide = "Hide the notice about “Cost Estimator”"
 
     /// The rename alert of the row titled `title`, filled with `name`.
     @MainActor
