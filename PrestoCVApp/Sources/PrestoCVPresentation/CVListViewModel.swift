@@ -53,7 +53,7 @@ public final class CVListViewModel {
     /// what the person sees and what a dismissal removes are the same failure. When none is given, it takes the first row,
     /// in the list's order, whose last change did not work; a row that is no longer listed follows the listed ones, in the
     /// order the failures were found, named by the label it had when the change began. A failure is told whether or not its
-    /// row is still listed.
+    /// row is still listed. Dismissing it removes only that failure: a newer failure of the same row stays pending.
     public private(set) var rowAlert: RowAlert?
 
     private var issues: [StoreIssueKind] = []
@@ -61,6 +61,12 @@ public final class CVListViewModel {
     /// The alert of the latest failure of each row, in the order they were found, with the label the row had. The one in
     /// `rowAlert` is told first; these wait for it to be dismissed.
     private var failedAlerts: [RowAlert] = []
+    /// Numbers each failure recorded, so that a dismissal removes the failure it showed and not a newer one of the same row.
+    private var failuresRecorded = 0
+    /// The number of the latest failure of each row that has a status; it goes with the status.
+    private var latestFailure: [CVReference: Int] = [:]
+    /// The number of the failure `rowAlert` shows.
+    private var givenFailure: Int?
 
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
@@ -133,13 +139,18 @@ public final class CVListViewModel {
 
     public func dismissNotice() { isNoticeDismissed = true }
 
-    /// The person read the alert given: its row's status goes, and the next failure waits in `rowAlert`, in the order of
-    /// the first one: the listed rows, then the rows no longer listed.
+    /// The person read the alert given: the failure shown goes, and the next one waits in `rowAlert`, in the order of the
+    /// first one: the listed rows, then the rows no longer listed. A newer failure of the same row stays pending and is
+    /// given in its turn.
     public func dismissRowAlert() {
         guard let alert = rowAlert else { return }
-        rowStatuses[alert.reference] = nil
-        failedAlerts.removeAll { $0.reference == alert.reference }
+        if latestFailure[alert.reference] == givenFailure {
+            rowStatuses[alert.reference] = nil
+            failedAlerts.removeAll { $0.reference == alert.reference }
+            latestFailure[alert.reference] = nil
+        }
         rowAlert = nil
+        givenFailure = nil
         giveNextRowAlert()
     }
 
@@ -150,6 +161,7 @@ public final class CVListViewModel {
             self.rowStatuses[row.reference].map { RowAlert(reference: row.reference, label: row.label, status: $0) }
         }.first
         rowAlert = listedAlert ?? failedAlerts.first { rowStatuses[$0.reference] != nil }
+        givenFailure = rowAlert.flatMap { latestFailure[$0.reference] }
     }
 
     private func show(_ listing: CVListing) {
@@ -158,6 +170,7 @@ public final class CVListViewModel {
         showRows()
         let kept = Set(rows.map(\.reference)).union(failedAlerts.map(\.reference))
         rowStatuses = rowStatuses.filter { kept.contains($0.key) }
+        latestFailure = latestFailure.filter { rowStatuses[$0.key] != nil }
         giveNextRowAlert()
         settled = .loaded
         status = .loaded
@@ -287,6 +300,7 @@ public final class CVListViewModel {
     private func changed(_ reference: CVReference, _ intent: Int) async {
         if isLatest(intent, on: reference) {
             rowStatuses[reference] = nil
+            latestFailure[reference] = nil
             failedAlerts.removeAll { $0.reference == reference }
         }
         ended(reference, intent)
@@ -303,6 +317,8 @@ public final class CVListViewModel {
         let rowStatus = RowStatus(failure)
         if isLatest(intent, on: reference) {
             rowStatuses[reference] = rowStatus
+            failuresRecorded += 1
+            latestFailure[reference] = failuresRecorded
             let label = rows.first { $0.reference == reference }?.label ?? labels[reference] ?? untitled
             failedAlerts.removeAll { $0.reference == reference }
             failedAlerts.append(RowAlert(reference: reference, label: label, status: rowStatus))

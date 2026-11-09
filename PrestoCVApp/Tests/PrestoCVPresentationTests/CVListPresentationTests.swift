@@ -389,4 +389,58 @@ struct CVListPresentationTests {
         #expect(list.rowAlert == nil)
         #expect(list.rowStatuses.isEmpty)
     }
+
+    // MARK: A newer failure of the row whose alert is given
+
+    @Test("a newer failure of the row, recorded while its alert is given, is told next; the dismissal removes only the one shown")
+    func newerFailureWhileAlertGivenStaysPending() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        let row = world.reference(cv)
+        try await world.editing.otherWindowSaves(cv, fullName: "Someone Else")
+        await list.rename(row, to: "Renamed")
+        #expect(list.rowAlert?.status == .conflict)
+        // A later action of the same row begins and fails before the alert is dismissed
+        world.editing.duplicateErrors.withLock { $0 = [.unavailable] }
+        await list.duplicate(row, title: "Copy")
+        #expect(list.rowAlert?.status == .conflict)
+        #expect(list.rowStatuses[row] == .failed)
+
+        list.dismissRowAlert()
+
+        #expect(list.rowAlert?.reference == row)
+        #expect(list.rowAlert?.status == .failed)
+        #expect(list.rowStatuses[row] == .failed)
+        list.dismissRowAlert()
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
+
+    @Test("a failure of the row after a change that worked, while the earlier alert is still given, is told next")
+    func failureAfterSuccessWhileAlertGivenStaysPending() async throws {
+        let world = Browsing()
+        let cv = try await world.stored(title: "Backend")
+        let list = await world.loadedList()
+        let row = world.reference(cv)
+        try await world.editing.otherWindowSaves(cv, fullName: "Someone Else")
+        await list.rename(row, to: "Renamed")
+        #expect(list.rowAlert?.status == .conflict)
+        // A change of the row works: its status goes, the alert given stays
+        await list.duplicate(row, title: "Copy")
+        #expect(list.rowStatuses[row] == nil)
+        #expect(list.rowAlert?.status == .conflict)
+        // Another change of the row fails
+        world.editing.duplicateErrors.withLock { $0 = [.unavailable] }
+        await list.duplicate(row, title: "Copy 2")
+        #expect(list.rowStatuses[row] == .failed)
+
+        list.dismissRowAlert()
+
+        #expect(list.rowAlert?.reference == row)
+        #expect(list.rowAlert?.status == .failed)
+        list.dismissRowAlert()
+        #expect(list.rowAlert == nil)
+        #expect(list.rowStatuses.isEmpty)
+    }
 }
