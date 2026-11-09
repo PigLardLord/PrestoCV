@@ -16,9 +16,12 @@ enum CornerRadius {
     static let control: CGFloat = 12
 }
 
-/// The size of the symbol that opens a state screen
+/// The size of the symbol that opens a screen
 enum IconSize {
+    /// A state screen: empty, failed
     static let state: CGFloat = 48
+    /// The welcome of the first run
+    static let hero: CGFloat = 64
 }
 
 /// The smallest height a control may have and still be easy to tap

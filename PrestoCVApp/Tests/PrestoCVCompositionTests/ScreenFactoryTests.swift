@@ -104,14 +104,14 @@ struct ScreenFactoryTests {
 
         let shell = fixture.composition.screens.makeShell()
         #expect(shell.selection == nil)
-        shell.select(row.reference)
+        shell.open(.stored(row.reference))
         shell.reconcile(with: list.rows)
         #expect(shell.selection == row.reference)
         shell.reconcile(with: [])
         #expect(shell.selection == nil)
     }
 
-    @Test("On an empty store the first run offers the examples, then the import, then blank")
+    @Test("On an empty store the first run offers the examples, then blank, and no import while the app has no import screen")
     func firstRunWithExamples() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -121,16 +121,15 @@ struct ScreenFactoryTests {
         await firstRun.load()
 
         #expect(firstRun.state == .firstRun)
-        #expect(firstRun.examplesIssue == nil)
-        #expect(firstRun.choices.count == 4)
-        guard case .example = firstRun.choices[0], case .example = firstRun.choices[1] else {
-            Issue.record("expected two examples first, got \(firstRun.choices)")
+        guard firstRun.entries.count == 2, case .examples(let examples) = firstRun.entries[0] else {
+            Issue.record("expected the examples, then blank, got \(firstRun.entries)")
             return
         }
-        #expect(Array(firstRun.choices.suffix(2)) == [.importCV, .blank])
+        #expect(examples.count == 2)
+        #expect(firstRun.entries.last == .blank)
     }
 
-    @Test("Without a Samples folder the first run says the examples are unavailable and still offers import and blank")
+    @Test("Without a Samples folder the first run says the examples are unavailable and still offers blank")
     func firstRunWithoutExamples() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -138,8 +137,7 @@ struct ScreenFactoryTests {
 
         await firstRun.load()
 
-        #expect(firstRun.examplesIssue == .unavailable)
-        #expect(firstRun.choices == [.importCV, .blank])
+        #expect(firstRun.entries == [.examplesIssue(.unavailable), .blank])
     }
 
     @Test("Blank and an example give a draft under an id of the composition's source, and store nothing")
@@ -149,7 +147,11 @@ struct ScreenFactoryTests {
         try await Self.writeSamples(fixture, count: 1)
         let firstRun = fixture.composition.screens.makeFirstRun()
         await firstRun.load()
-        let example = try #require(firstRun.choices.first)
+        guard case .examples(let examples)? = firstRun.entries.first(where: { if case .examples = $0 { true } else { false } }) else {
+            Issue.record("expected the examples")
+            return
+        }
+        let example = StartChoice.example(examples[0])
 
         let blank = firstRun.start(.blank)
         let fromExample = firstRun.start(example)

@@ -12,6 +12,12 @@ struct FirstRunViewModelTests {
         world.browsing.sampleList.withLock { $0 = cvs }
     }
 
+    /// The examples the entries hold, nil when they hold none.
+    private func examples(_ firstRun: FirstRunViewModel) -> [ExampleChoice]? {
+        for entry in firstRun.entries { if case .examples(let examples) = entry { return examples } }
+        return nil
+    }
+
     @Test("a store with nothing at all is a first run")
     func emptyStoreIsFirstRun() async {
         let world = Browsing()
@@ -43,13 +49,9 @@ struct FirstRunViewModelTests {
         await firstRun.load()
         await firstRun.load()
 
-        let titles = firstRun.choices.compactMap { choice -> String? in
-            if case .example(let example) = choice { return example.title }
-            return nil
-        }
-        #expect(titles == ["Nurse", "Electrician"])
+        #expect(examples(firstRun)?.map(\.title) == ["Nurse", "Electrician"])
         #expect(world.browsing.sampleCalls.withLock { $0 } == 1)
-        #expect(firstRun.examplesIssue == nil)
+        #expect(firstRun.entries == [.importCV, .examples(examples(firstRun) ?? []), .blank])
     }
 
     @Test("an example gives an unsaved draft under a new identity, and nothing is stored")
@@ -59,9 +61,9 @@ struct FirstRunViewModelTests {
         let firstRun = world.firstRun()
         await firstRun.load()
         let sample = try #require(world.browsing.sampleList.withLock { $0.first })
-        let example = try #require(firstRun.choices.first)
+        let example = try #require(examples(firstRun)?.first)
 
-        let destination = firstRun.start(example)
+        let destination = firstRun.start(.example(example))
 
         guard case .draft(let draft) = destination else { Issue.record("expected a draft"); return }
         #expect(draft.cv.id != sample.id)
@@ -93,8 +95,7 @@ struct FirstRunViewModelTests {
 
         await firstRun.load()
 
-        #expect(firstRun.choices == [.importCV, .blank])
-        #expect(firstRun.examplesIssue == .unavailable)
+        #expect(firstRun.entries == [.importCV, .examplesIssue(.unavailable), .blank])
         #expect(firstRun.state == .firstRun)
     }
 
@@ -110,16 +111,111 @@ struct FirstRunViewModelTests {
         #expect(try await world.editing.store.list().cvs.isEmpty)
     }
 
-    @Test("blank is always offered last")
+    @Test("the import leads, then the examples as one entry in their order, then blank")
+    func importLeadsThenExamplesThenBlank() async throws {
+        let world = Browsing()
+        samples(world, ["Nurse", "Electrician"])
+        let firstRun = world.firstRun()
+        await firstRun.load()
+
+        let examples = try #require(examples(firstRun))
+        #expect(examples.map(\.title) == ["Nurse", "Electrician"])
+        #expect(firstRun.entries == [.importCV, .examples(examples), .blank])
+    }
+
+    @Test("without the import offered, the examples come first and blank last")
+    func noImportWhenNotOffered() async throws {
+        let world = Browsing()
+        samples(world, ["Nurse", "Electrician"])
+        let firstRun = world.firstRun(offersImport: false)
+        await firstRun.load()
+
+        let examples = try #require(examples(firstRun))
+        #expect(firstRun.entries == [.examples(examples), .blank])
+    }
+
+    @Test("without the import and without examples, blank stands alone beside the reason")
+    func noImportNoExamples() async {
+        let world = Browsing()
+        world.browsing.samplesError.withLock { $0 = .unavailable }
+        let firstRun = world.firstRun(offersImport: false)
+        await firstRun.load()
+
+        #expect(firstRun.entries == [.examplesIssue(.unavailable), .blank])
+    }
+
+    @Test("examples that failed to read say so where their entry would be")
+    func failedExamplesShowTheirIssue() async {
+        let world = Browsing()
+        world.browsing.samplesError.withLock { $0 = .tooLarge }
+        let firstRun = world.firstRun()
+        await firstRun.load()
+
+        #expect(firstRun.entries == [.importCV, .examplesIssue(.failed), .blank])
+    }
+
+    @Test("an empty read of the examples leaves no entry and no issue")
+    func emptyExamplesLeaveNoEntry() async {
+        let world = Browsing()
+        let firstRun = world.firstRun()
+        await firstRun.load()
+
+        #expect(firstRun.entries == [.importCV, .blank])
+        #expect(world.firstRun(offersImport: false).entries == [.blank])
+    }
+
+    @Test("a failed read followed by a successful one replaces the issue by the examples entry")
+    func laterReadReplacesTheIssue() async throws {
+        let world = Browsing()
+        samples(world, ["Nurse"])
+        world.browsing.samplesError.withLock { $0 = .unavailable }
+        let firstRun = world.firstRun()
+        await firstRun.load()
+        #expect(firstRun.entries == [.importCV, .examplesIssue(.unavailable), .blank])
+
+        world.browsing.samplesError.withLock { $0 = nil }
+        await firstRun.load()
+
+        let examples = try #require(examples(firstRun))
+        #expect(examples.map(\.title) == ["Nurse"])
+        #expect(firstRun.entries == [.importCV, .examples(examples), .blank])
+    }
+
+    @Test("every entry has its own identity")
+    func entriesHaveDistinctIds() async {
+        let world = Browsing()
+        samples(world, ["Nurse"])
+        let firstRun = world.firstRun()
+        await firstRun.load()
+
+        #expect(Set(firstRun.entries.map(\.id)).count == firstRun.entries.count)
+        #expect(StartEntry.examplesIssue(.failed).id != StartEntry.examples([]).id)
+    }
+
+    @Test("an example carries its own summary, as its title, to tell two examples apart")
+    func exampleChoiceCarriesItsSummary() async {
+        let world = Browsing()
+        let summaries = ["Cares for patients on a busy ward.", "Wires homes and small offices."]
+        let cvs = zip(["Nurse", "Electrician"], summaries).map { title, summary in
+            CV(id: world.editing.ids.next(), title: title, personal: PersonalDetails(fullName: "Example Person", summary: summary))
+        }
+        world.browsing.sampleList.withLock { $0 = cvs }
+        let firstRun = world.firstRun()
+
+        await firstRun.load()
+
+        #expect(examples(firstRun)?.map(\.summary) == summaries)
+    }
+
+    @Test("blank is always the last entry")
     func blankIsListedLast() async {
         let world = Browsing()
         samples(world, ["Nurse", "Electrician"])
         let firstRun = world.firstRun()
         await firstRun.load()
 
-        #expect(firstRun.choices.last == .blank)
-        #expect(firstRun.choices.contains(.importCV))
-        #expect(firstRun.choices.count == 4)
+        #expect(firstRun.entries.last == .blank)
+        #expect(firstRun.entries.count == 3)
     }
 
     @Test("a cancelled load is no failure")

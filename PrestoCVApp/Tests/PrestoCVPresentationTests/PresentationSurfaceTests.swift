@@ -32,13 +32,26 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
 func useEveryPublicMember(of firstRun: FirstRunViewModel) async {
     await firstRun.load()
     let _: FirstRunState = firstRun.state
-    let _: ExamplesIssue? = firstRun.examplesIssue
-    let choices: [StartChoice] = firstRun.choices
-    for choice in choices {
-        let destination: StartDestination? = firstRun.start(choice)
-        switch destination {
-        case .draft(let draft): let _: CVDraft = draft
-        case .importCV, nil: break
+    for entry in firstRun.entries as [StartEntry] {
+        let _: String = entry.id
+        var choices: [StartChoice] = []
+        switch entry {
+        case .importCV: choices = [.importCV]
+        case .examples(let examples):
+            for example in examples {
+                let _: String = example.title
+                let _: String = example.summary
+                choices.append(.example(example))
+            }
+        case .examplesIssue(let issue): let _: ExamplesIssue = issue
+        case .blank: choices = [.blank]
+        }
+        for choice in choices {
+            let destination: StartDestination? = firstRun.start(choice)
+            switch destination {
+            case .draft(let draft): let _: CVDraft = draft
+            case .importCV, nil: break
+            }
         }
     }
 }
@@ -62,10 +75,13 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) {
     let reference: CVReference? = shell.selection
     let column: ShellColumn = shell.preferredColumn
     switch column { case .sidebar, .detail: break }
-    if let row = rows.first { shell.select(row.reference) }
+    if let row = rows.first { shell.open(.stored(row.reference)) }
+    let detail: EditorStart? = shell.detail
+    let screen: ShellScreen = shell.screen(for: .firstRun)
+    switch screen { case .loading, .welcome, .split: break }
     shell.reconcile(with: rows)
     shell.deselect()
-    _ = reference
+    _ = (reference, detail)
 }
 
 func everyListCode() -> [Any] {
@@ -75,6 +91,7 @@ func everyListCode() -> [Any] {
     let first: [FirstRunState] = [.loading, .firstRun, .returning, .failed]
     let examples: [ExamplesIssue] = [.unavailable, .failed]
     let look: [LookStatus] = [.loading, .ready, .applying, .applied, .missing, .conflict, .failed]
+    let screens: [ShellScreen] = [.loading, .welcome, .split]
     for value in status { switch value { case .loading, .loaded, .failed: break } }
     for value in rows { switch value { case .conflict, .gone, .tooLarge, .failed: break } }
     for value in kinds { switch value { case .corrupt, .upgradeRequired, .unreadable, .tooLarge, .quarantineFailed: break } }
@@ -88,6 +105,7 @@ func everyListCode() -> [Any] {
     first.forEach { all.append($0) }
     examples.forEach { all.append($0) }
     look.forEach { all.append($0) }
+    screens.forEach { all.append($0) }
     all.append(StartChoice.importCV)
     all.append(StartChoice.blank)
     return all

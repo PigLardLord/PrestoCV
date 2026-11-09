@@ -104,15 +104,21 @@ final class ShellUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "shell.detail.empty").firstMatch.exists)
     }
 
+    /// A store whose only file is corrupt was used, so it is no first run: the list shows, empty, and not the welcome.
+    /// (An empty store is a first run, `FirstRunUITests`.)
     @MainActor
-    func testAnEmptyStoreShowsTheEmptyState() throws {
+    func testAStoreWithOnlyACorruptFileShowsTheEmptyList() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-PrestoCVNextEmptyStorage"]
+        let files = ["\(identity).cv.json": "not a CV"]
+        app.launchArguments += [
+            "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try JSONEncoder().encode(files).base64EncodedString(),
+        ]
         app.launch()
 
         let empty = app.descendants(matching: .any).matching(identifier: "shell.sidebar.empty").firstMatch
         XCTAssertTrue(empty.waitForExistence(timeout: 30))
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "shell.row").count, 0)
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "firstRun.title").firstMatch.exists)
     }
 
     /// At the largest accessibility size the row can still be tapped, and it opens the CV.
