@@ -56,7 +56,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         }
     }
     let _: FieldProblem.Code? = editor.problem(of: .email)
-    if let notice = editor.problemNotice { let _: FieldProblem = notice.problem }
+    if let notice = editor.problemNotice { let _: [FieldProblem] = notice.problems }
     if let row = rows.first {
         editor.fieldWasLeft(.experiencePeriod, row: row.id)
         let _: FieldProblem.Code? = editor.problem(of: .experiencePeriod, row: row.id)

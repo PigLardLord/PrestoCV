@@ -81,9 +81,7 @@ struct PeriodProblemTests {
 
         editor.fieldWasLeft(.experiencePeriod, row: row)
 
-        #expect(editor.problemNotice?.problem.row == row)
-        #expect(editor.problemNotice?.problem.field == .experiencePeriod)
-        #expect(editor.problemNotice?.problem.code == .endBeforeStart)
+        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == [row])
         #expect(editor.statusChange == .unreadable(.email), "the status still tells the first problem")
     }
 
@@ -103,9 +101,7 @@ struct PeriodProblemTests {
 
         editor.fieldWasLeft(.experiencePeriod, row: rows[1])
 
-        #expect(editor.problemNotice?.problem.row == rows[1])
-        #expect(editor.problemNotice?.problem.field == .experiencePeriod)
-        #expect(editor.problemNotice?.problem.code == .endBeforeStart)
+        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == [rows[1]])
     }
 
     @Test("a problem that read and broke again is told again, while another problem holds the status")
@@ -126,8 +122,47 @@ struct PeriodProblemTests {
         editor.content.experiences[0].period.end.year = "2019"
         editor.fieldWasLeft(.experiencePeriod, row: row)
 
-        #expect(editor.problemNotice?.problem.row == row)
+        #expect(editor.problemNotice?.problems.map(\.row) == [row])
         #expect(editor.problemNotice != first, "a new value, so the view tells it again")
+    }
+
+    @Test("a store attempt that meets several problems while an invalid email holds the status tells each of them")
+    func severalProblemsUnderAnotherAreEachTold() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.addRow(to: .experiences)
+        editor.addRow(to: .experiences)
+        let rows = editor.content.experiences.map(\.id)
+        editor.type(\.email, "mara at example")
+        editor.fieldWasLeft(.email)
+        for index in 0..<2 {
+            editor.content.experiences[index].period.start.year = "2021"
+            editor.content.experiences[index].period.end.year = "2019"
+        }
+
+        await editor.saveNow()
+
+        #expect(editor.statusChange == .unreadable(.email), "the status still tells the email")
+        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == rows, "both periods, in the order of the form")
+    }
+
+    @Test("a store attempt that changes the status to the first of several problems tells the others by the notice")
+    func problemsAfterTheStatusAreTold() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.addRow(to: .experiences)
+        editor.addRow(to: .experiences)
+        let rows = editor.content.experiences.map(\.id)
+        editor.type(\.email, "mara at example")
+        for index in 0..<2 {
+            editor.content.experiences[index].period.start.year = "2021"
+            editor.content.experiences[index].period.end.year = "2019"
+        }
+
+        await editor.saveNow()
+
+        #expect(editor.statusChange == .unreadable(.email), "the status tells the first problem")
+        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == rows, "every other one, and not the email")
     }
 
     @Test("the first problem alone is told by the status, and the notice stays empty")
@@ -143,5 +178,10 @@ struct PeriodProblemTests {
 
         #expect(editor.statusChange == .unreadable(.experiencePeriod))
         #expect(editor.problemNotice == nil)
+    }
+
+    /// The rows of `problems` when each is an end of a job's period before its start, in their order; nil otherwise.
+    private func periodsBeforeTheirStart(_ problems: [FieldProblem]) -> [RowID?]? {
+        problems.allSatisfy { $0.field == .experiencePeriod && $0.code == .endBeforeStart } ? problems.map(\.row) : nil
     }
 }

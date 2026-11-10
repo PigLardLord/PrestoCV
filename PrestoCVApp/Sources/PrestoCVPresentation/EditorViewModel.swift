@@ -34,9 +34,9 @@ public final class EditorViewModel {
     /// after one or the first save of a new CV, each change it.
     public private(set) var statusChange: SaveStatus?
 
-    /// The problem the person has just met while the status did not change because of it (the status already names
-    /// another problem, or the same status holds): nil until one is. It is told by itself, never in the same update as
-    /// `statusChange`; a store attempt that meets several problems at once is told by the status, which names the first.
+    /// The problems the person has just met that the status does not tell: nil until one is. The status names only the
+    /// first problem, so this holds every other one met at the same moment (a store attempt meets every problem at once),
+    /// and one met while the status names another or the same status holds. Each problem met is told once, by one of them.
     public internal(set) var problemNotice: ProblemNotice?
 
     /// "Saved on this device": the store holds what the form shows, and nothing waits.

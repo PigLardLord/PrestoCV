@@ -19,7 +19,7 @@ struct EditorView: View {
             .accessibilityIdentifier("shell.detail.opened")
             .task { await editor.load() }
             .announce(editor.statusChange) { $0.words }
-            .announce(editor.problemNotice) { noteWords(of: $0.problem) }
+            .announce(editor.problemNotice) { $0.problems.map(noteWords(of:)) }
     }
 
     @ViewBuilder
