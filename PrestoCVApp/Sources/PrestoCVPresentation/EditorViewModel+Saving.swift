@@ -50,7 +50,7 @@ extension EditorViewModel {
                 pendingRemoval = nil
                 standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
             } catch {
-                failure = SaveStatus(error)
+                failed(with: SaveStatus(error))
             }
         }
     }
@@ -66,8 +66,9 @@ extension EditorViewModel {
                 // A title typed while the copy was stored stays, and goes to the autosave once this ends
                 if titleEdits == titleEdited { form.title = EditorContent(copy).title }
                 standOn(copy, unchangedFrom: copy, writer: editing.autosaveWriter(startingFrom: copy), isStored: true)
+                storeChanged()
             } catch {
-                failure = SaveStatus(error)
+                failed(with: SaveStatus(error))
             }
         }
     }

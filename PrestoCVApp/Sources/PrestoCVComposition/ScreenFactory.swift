@@ -94,7 +94,7 @@ public final class ScreenFactory {
         list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String
     ) -> ShellNavigationModel {
         ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
-            self.makeEditor(start: start, copyTitle: copyTitle, didStore: {
+            self.makeEditor(start: start, copyTitle: copyTitle, storeChanged: {
                 Task {
                     await list?.load()
                     await firstRun?.load()
@@ -118,13 +118,14 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - start: What the editor opens.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
-    ///   - didStore: Called after each write the store took, so that the list reads the CVs again.
+    ///   - storeChanged: Called when the store changed (a write the store took, or another save or a deletion the editor
+    ///     found), so that the list reads the CVs again.
     public func makeEditor(
-        start: EditorStart, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
+        start: EditorStart, copyTitle: @escaping @MainActor (String) -> String, storeChanged: @escaping @MainActor () -> Void
     ) -> EditorViewModel {
         let editor = EditorViewModel(
             start: start, editing: editing, clock: editorClock, pause: Autosave<CV>.pause, copyTitle: copyTitle,
-            didStore: didStore
+            storeChanged: storeChanged
         )
         made += 1
         editors = editors.filter { $0.editor != nil } + [WeakEditor(editor, number: made)]
@@ -164,7 +165,7 @@ public final class ScreenFactory {
     /// `saveNow()`), so an edit made while those writes run does not hold the list, nor does a `saveNow()` of that editor
     /// that runs meanwhile; an editor made while an earlier one is storing gets a turn as well. An editor already stored
     /// is not visited again, so an edit made after its turn is left to its autosave, whose write reloads the list
-    /// (`didStore`): going round again while the person types would never end. An editor already released is not waited
+    /// (`storeChanged`): going round again while the person types would never end. An editor already released is not waited
     /// for: the shell keeps an editor it lets go alive until its `saveNow()` ended, and that stores every edit.
     ///
     /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made

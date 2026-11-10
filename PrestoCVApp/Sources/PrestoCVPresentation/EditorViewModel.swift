@@ -48,7 +48,7 @@ public final class EditorViewModel {
     let clock: any Clock<Duration>
     let pause: Duration
     let copyTitle: @MainActor (String) -> String
-    let didStore: @MainActor () -> Void
+    let storeChanged: @MainActor () -> Void
 
     /// The form as typed.
     var form = EditorContent.empty {
@@ -93,6 +93,9 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
+    /// The change elsewhere the maker was last told of (`storeChanged`), nil since the form stood on its CV: it is told
+    /// once each time the editor learns it, not again while it stays.
+    @ObservationIgnored var toldChangedElsewhere: SaveStatus?
     /// Where the status last settled (`statusChange`), nil until the CV opened.
     @ObservationIgnored var settled: SaveStatus?
 
@@ -101,18 +104,20 @@ public final class EditorViewModel {
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
-    ///   - didStore: Called after each write the store took, never for one that failed, so that what shows the stored
-    ///     CVs can read them again. It is called even when the editor is gone by then.
+    ///   - storeChanged: Called when the store changed, so that what shows the stored CVs can read them again: after each
+    ///     write the store took, a copy saved included, and when a write, a reload or a copy found that another save or a
+    ///     deletion changed the CV, once each time the editor learns it. Never for a write that failed otherwise. It is
+    ///     called even when the editor is gone by then.
     public init(
         start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
-        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
+        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, storeChanged: @escaping @MainActor () -> Void
     ) {
         self.start = start
         self.editing = editing
         self.clock = clock
         self.pause = pause
         self.copyTitle = copyTitle
-        self.didStore = didStore
+        self.storeChanged = storeChanged
     }
 
     /// Opens the CV. The view calls it from its `.task`; once the CV is open, it does nothing.
@@ -177,7 +182,7 @@ public final class EditorViewModel {
         let mine = generation
         writes.replace()
         let mineWrites = WritesInFlight()
-        let didStore = self.didStore
+        let storeChanged = self.storeChanged
         let autosave = Autosave<CV>(
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
@@ -186,7 +191,7 @@ public final class EditorViewModel {
             // and still tells it
             write: { content, _ in
                 try await mineWrites.run { try await writer.write(content) }
-                didStore()
+                storeChanged()
             }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
@@ -198,6 +203,7 @@ public final class EditorViewModel {
         given = cv
         failure = nil
         changeFailure = nil
+        toldChangedElsewhere = nil
         refreshSaveStatus()
     }
 
@@ -205,8 +211,17 @@ public final class EditorViewModel {
 
     private func writeFailed(_ error: any Error, generation: Int) {
         guard generation == self.generation else { return }
-        failure = (error as? EditFailure).map { SaveStatus($0) } ?? .failed
+        failed(with: (error as? EditFailure).map { SaveStatus($0) } ?? .failed)
         refreshSaveStatus()
+    }
+
+    /// A write, a reload or a copy failed with `status`, which the editor shows until a write succeeds. When it says that
+    /// another save or a deletion changed the CV, the maker is told the store changed, unless it was told so already.
+    func failed(with status: SaveStatus) {
+        failure = status
+        guard status.saysTheCVChangedElsewhere, status != toldChangedElsewhere else { return }
+        toldChangedElsewhere = status
+        storeChanged()
     }
 
     private func autosaveChanged(to status: Autosave<CV>.Status, generation: Int) {

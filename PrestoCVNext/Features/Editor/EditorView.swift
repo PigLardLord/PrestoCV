@@ -2,13 +2,18 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
-/// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told when the
-/// status changes.
+/// where the text stands. While the text cannot be stored as it is, a notice above the form says what to do and offers
+/// the ways out (#402, decision 8). It waits while the CV is read, and says so when it cannot be, with a way to close
+/// it. VoiceOver is told when the status changes.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
     let title: Text
+    /// Closes the editor without storing its text.
+    let discard: () -> Void
     @FocusState private var focus: EditorField?
+    /// The editor's height, for the notice's cap where the form is short of room.
+    @State private var height: Double = 0
 
     var body: some View {
         content
@@ -26,11 +31,35 @@ struct EditorView: View {
         case .opening:
             LoadingView("editor.opening")
         case .missing:
-            EmptyStateView(symbol: "doc.questionmark", title: "editor.missing.title", message: "editor.missing.message")
+            EmptyStateView(
+                symbol: "doc.questionmark",
+                title: "editor.missing.title",
+                message: "editor.missing.message",
+                actions: [close]
+            )
         case .failed:
-            EmptyStateView(symbol: "exclamationmark.triangle", title: "editor.failed.title", message: "editor.failed.message")
+            EmptyStateView(
+                symbol: "exclamationmark.triangle",
+                title: "editor.failed.title",
+                message: "editor.failed.message",
+                actions: [tryAgain, close]
+            )
         case .open:
-            form
+            VStack(spacing: 0) {
+                StatusNotice(editor: editor, editorHeight: height, discard: discard)
+                form
+            }
+            .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { height = $0 }
+        }
+    }
+
+    private var close: NoticeAction {
+        NoticeAction("editor.action.close", actionIdentifier: "editor.close", perform: discard)
+    }
+
+    private var tryAgain: NoticeAction {
+        NoticeAction("editor.action.retry", actionIdentifier: "editor.retryOpening") {
+            Task { await editor.load() }
         }
     }
 

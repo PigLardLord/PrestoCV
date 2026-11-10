@@ -125,10 +125,18 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     for verdict in verdicts {
         switch verdict {
         case .left: break
-        case .stayed(let status): let _: SaveStatus = status
+        case .stayed(let status):
+            let _: Bool = status.blocksLeaving
+            let _: [StatusAction] = status.statusActions
         }
     }
     _ = (reference, detail, editor)
+}
+
+func useEveryPublicMember(of chrome: EditorChrome) {
+    let _: Double = EditorChrome.noticeShareOfHeight
+    let _: Bool = chrome.isCompactHeight || chrome.isAccessibilitySize || chrome.isShortOfRoom
+    let _: Double? = chrome.noticeHeight(fullHeight: 120, editorHeight: 760)
 }
 
 func everyListCode() -> [Any] {
@@ -142,6 +150,8 @@ func everyListCode() -> [Any] {
     let contents: [ListContent] = [.loading, .empty, .rows]
     let notices: [ListNotice] = [.stale, .failed]
     let actions: [RowAction] = [.duplicate, .rename, .delete]
+    let statusActions: [StatusAction] = [.reload, .saveAsCopy, .discard, .retry]
+    for value in statusActions { switch value { case .reload, .saveAsCopy, .discard, .retry: break } }
     for value in contents { switch value { case .loading, .empty, .rows: break } }
     for value in notices { switch value { case .stale, .failed, .unreadable, .rowFailure: break } }
     for value in actions { switch value { case .duplicate, .rename, .delete: break } }
@@ -162,6 +172,7 @@ func everyListCode() -> [Any] {
     contents.forEach { all.append($0) }
     notices.forEach { all.append($0) }
     actions.forEach { all.append($0) }
+    statusActions.forEach { all.append($0) }
     all.append(StartChoice.importCV)
     all.append(StartChoice.blank)
     return all
@@ -181,6 +192,7 @@ struct PresentationSurfaceTests {
         await useEveryPublicMember(of: world.firstRun())
         await useEveryPublicMember(of: world.look(of: world.editing.new()))
         await useEveryPublicMember(of: Editing().shell(), rows: list.rows)
+        useEveryPublicMember(of: EditorChrome(isCompactHeight: true, isAccessibilitySize: false))
 
         #expect(list.status == .loaded)
     }

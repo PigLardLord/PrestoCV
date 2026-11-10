@@ -37,6 +37,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
                 #"list.kept.open.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
                 #"list.kept.retry.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
+                #"editor.notice.textTooLong.named \(name)"#: ValueTypes(["%@"], "StatusNotice resolves the field's label to a String"),
             ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],

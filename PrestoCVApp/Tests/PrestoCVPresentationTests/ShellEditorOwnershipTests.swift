@@ -471,4 +471,57 @@ struct ShellEditorOwnershipTests {
         #expect(world.editing.writeCount == writes, "nothing the person discarded is written")
         #expect(await world.storedName(of: cv) == nil, "the CV stays deleted")
     }
+
+    // MARK: Saving as a copy
+
+    @Test("after a copy of a CV deleted elsewhere, the shell holds the copy: the list's reload keeps it open and selected")
+    func copyOfADeletedCVStaysOpen() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+
+        await editor.saveAsCopy()
+        let copy = try #require(editor.storedReference)
+        let list = await Browsing(editing: world.editing).loadedList()
+        shell.reconcile(with: list.rows)
+
+        #expect(copy != CVReference(id: cv.id))
+        #expect(list.rows.map(\.reference) == [copy])
+        #expect(shell.editor === editor, "the copy stays open")
+        #expect(shell.selection == copy)
+        #expect(shell.selectedRow(in: list.rows)?.reference == copy)
+        #expect(shell.canLeave)
+    }
+
+    @Test("after a copy of a CV changed elsewhere, the copy is selected, and opening the CV it was copied from opens that CV")
+    func copyOfAConflictingCVIsSelected() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        let original = CVReference(id: cv.id)
+        shell.open(.stored(original))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .conflict)
+
+        await editor.saveAsCopy()
+        let copy = try #require(editor.storedReference)
+
+        #expect(shell.selection == copy)
+        #expect(shell.open(.stored(copy)) == .left)
+        #expect(shell.editor === editor, "opening the copy that is open changes nothing")
+        #expect(shell.open(.stored(original)) == .left)
+        #expect(shell.editor !== editor, "the CV copied from opens in an editor of its own")
+        #expect(shell.selection == original)
+    }
 }

@@ -74,10 +74,11 @@ public final class ShellNavigationModel {
             .map { KeptEditor(id: $0.key, editor: $0.value.editor) }
     }
 
-    /// The stored CV open in the detail, nil when none is open or the detail holds a draft, which has no row.
+    /// The stored CV open in the detail: the one the detail opened, or the copy its editor was saved as since. Nil when
+    /// none is open or the detail holds a draft, which has no row.
     public var selection: CVReference? {
         guard case .stored(let reference)? = detail else { return nil }
-        return reference
+        return editor?.storedReference ?? reference
     }
 
     /// The column a compact screen shows: the detail when something is open, otherwise the list. A regular screen shows
@@ -214,11 +215,8 @@ public final class ShellNavigationModel {
     /// The status of the open editor when no write can store its text as it is, so that leaving would lose it: another
     /// save conflicts, the CV is gone, the store refuses the text, or a text or the CV is above its limit.
     private var blockingStatus: SaveStatus? {
-        guard let status = editor?.saveStatus else { return nil }
-        switch status {
-        case .conflict, .deletedElsewhere, .failed, .tooLarge, .textTooLong, .tooManyEntries: return status
-        case .saved, .pending, .saving, .notEnoughContent, .unreadable: return nil
-        }
+        guard let status = editor?.saveStatus, status.blocksLeaving else { return nil }
+        return status
     }
 
     /// Hands the open editor to its `saveNow()` and keeps it alive until that ended; when that did not store its text,
