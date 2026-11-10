@@ -24,8 +24,8 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" as English does.
-            sameInSomeLanguages: ["editor.field.website": ["de"]],
+            // German writes "Website" as English does; Spanish, French and Italian say "CV" as English does.
+            sameInSomeLanguages: ["editor.field.website": ["de"], "export.file_name": ["es", "fr", "it"]],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),

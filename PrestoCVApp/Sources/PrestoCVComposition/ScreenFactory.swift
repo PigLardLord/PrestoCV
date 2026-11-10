@@ -25,6 +25,8 @@ public final class ScreenFactory {
     private let lookOptions: any LookOptionsProviding
     /// The languages a PDF can be written in
     private let languages: [ExportLanguage]
+    /// The language of the app, which the shell's export sheets offer first when a CV holds none.
+    private let appLanguage: ExportLanguage
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
@@ -47,11 +49,12 @@ public final class ScreenFactory {
     ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
     ///     launch fixture wraps it.
     ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
+    ///   - appLanguage: The language of the app, which the shell's export sheets offer first when a CV holds none.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage],
-        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime
+        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime, appLanguage: ExportLanguage
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
@@ -64,6 +67,7 @@ public final class ScreenFactory {
         self.clock = clock
         self.editorClock = editorClock
         self.backgroundTime = backgroundTime
+        self.appLanguage = appLanguage
     }
 
     /// The list of CVs.
@@ -89,9 +93,14 @@ public final class ScreenFactory {
     /// The navigation of the shell: which CV is open, its editor, and which column a compact screen shows. Each editor it
     /// opens reloads `list` and `firstRun` after each write the store took, so that the list shows the CV as stored and
     /// the first CV stored ends a first run: leaving it shows the list, not the welcome. The shell keeps neither alive.
-    /// - Parameter copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
+    /// Its export sheet exports the CV as the open editor shows it, and takes a language chosen in the sheet to that
+    /// editor's CV, which stores it.
+    /// - Parameters:
+    ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
+    ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
     public func makeShell(
-        list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String
+        list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String,
+        fileNamePattern: @escaping @Sendable (ExportLanguage) -> String
     ) -> ShellNavigationModel {
         ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
             self.makeEditor(start: start, copyTitle: copyTitle, didStore: {
@@ -100,6 +109,13 @@ public final class ScreenFactory {
                     await firstRun?.load()
                 }
             })
+        }, makeExportSheet: { editor in
+            self.makeExportSheet(
+                for: editor, appLanguage: self.appLanguage, fileNamePattern: fileNamePattern,
+                onLanguageChosen: { [weak editor] language in
+                    Task { await editor?.setDocumentLanguage(language?.tag) }
+                }
+            )
         }, backgroundTime: backgroundTime)
     }
 

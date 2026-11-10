@@ -100,7 +100,8 @@ struct CompositionTests {
             check: {},
             prepare: {},
             wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime()
+            backgroundTime: NoBackgroundTime(),
+            appLanguage: .preferred(["en"])
         )
     }
 

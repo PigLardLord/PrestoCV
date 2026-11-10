@@ -80,7 +80,7 @@ public final class ExportSheetViewModel {
 
     // MARK: - Intents
 
-    /// Starts the export of the CV as it stands. The view calls it from its `.task`.
+    /// Starts the export of the CV as it stands. The shell calls it when it opens the sheet.
     public func start() { begin() }
 
     /// Exports in `language`, and takes the choice to the CV; nil is automatic. The export begins before the choice goes
@@ -202,3 +202,6 @@ public final class ExportSheetViewModel {
         return change()
     }
 }
+
+/// A sheet is the item its presentation is bound to: one sheet, one presentation.
+extension ExportSheetViewModel: Identifiable {}

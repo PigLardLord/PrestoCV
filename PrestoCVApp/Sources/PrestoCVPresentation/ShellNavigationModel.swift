@@ -40,7 +40,11 @@ public final class ShellNavigationModel {
     /// The editor of what the detail shows, nil when nothing is open.
     public private(set) var editor: EditorViewModel?
 
+    /// The export sheet over the open CV, nil when none is open. It goes with the editor it was opened over.
+    public private(set) var exportSheet: ExportSheetViewModel?
+
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart) -> EditorViewModel
+    @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -68,9 +72,14 @@ public final class ShellNavigationModel {
 
     /// - Parameters:
     ///   - makeEditor: Makes the editor of what the detail opens.
+    ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
-    public init(makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel, backgroundTime: any BackgroundTime) {
+    public init(
+        makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel,
+        makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?, backgroundTime: any BackgroundTime
+    ) {
         self.makeEditor = makeEditor
+        self.makeExportSheet = makeExportSheet
         self.backgroundTime = backgroundTime
     }
 
@@ -108,6 +117,22 @@ public final class ShellNavigationModel {
         letGo()
         detail = nil
         return .left
+    }
+
+    // MARK: Export
+
+    /// Opens the export sheet over the open CV and starts its export of the form as it stands, saved or not. Nothing opens
+    /// while no CV is open or its editor has not read it yet; while the sheet is open, the same sheet stays.
+    public func openExport() {
+        guard exportSheet == nil, let editor, let sheet = makeExportSheet(editor) else { return }
+        exportSheet = sheet
+        sheet.start()
+    }
+
+    /// Closes the export sheet: its running export stops and its PDF is dropped.
+    public func closeExport() {
+        exportSheet?.stop()
+        exportSheet = nil
     }
 
     /// Stores the open editor, which stays open, and waits for the editors left before it to end their writes: for the
@@ -162,8 +187,10 @@ public final class ShellNavigationModel {
         }
     }
 
-    /// Hands the open editor to its `saveNow()` and keeps it alive until that ended.
+    /// Closes the export sheet of the open editor, then hands the editor to its `saveNow()` and keeps it alive until that
+    /// ended.
     private func letGo() {
+        closeExport()
         guard let left = editor else { return }
         editor = nil
         leavings += 1

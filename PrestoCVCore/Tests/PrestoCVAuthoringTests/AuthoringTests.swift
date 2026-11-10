@@ -97,6 +97,9 @@ struct DomainTests {
           arguments: [("it", "it"), ("PT-br", "pt-BR"), ("zh-hant-tw", "zh-Hant-TW"), ("es-419", "es-419")])
     func languageTags(raw: String, tag: String) { #expect(DocumentLanguage(raw)?.tag == tag) }
 
+    @Test("English is the tag \"en\" in canonical case")
+    func english() { #expect(DocumentLanguage.english == DocumentLanguage("en")) }
+
     @Test("malformed language tags are rejected", arguments: ["", "i", "italian", "it-", "it-XX-extra-more", "it_IT", "e1", "it-1234"])
     func badLanguageTags(raw: String) { #expect(DocumentLanguage(raw) == nil) }
 

@@ -102,9 +102,7 @@ struct ScreenFactoryTests {
         await list.load()
         let row = try #require(list.rows.first)
 
-        let shell = fixture.composition.screens.makeShell(
-            list: list, firstRun: fixture.composition.screens.makeFirstRun(), copyTitle: { "Copy of \($0)" }
-        )
+        let shell = Self.shell(fixture, list: list, firstRun: fixture.composition.screens.makeFirstRun())
         #expect(shell.selection == nil)
         shell.open(.stored(row.reference))
         let editor = try #require(shell.editor)
@@ -125,7 +123,7 @@ struct ScreenFactoryTests {
         let firstRun = screens.makeFirstRun()
         await firstRun.load()
         #expect(firstRun.state == .firstRun)
-        let shell = screens.makeShell(list: Self.list(fixture), firstRun: firstRun, copyTitle: { $0 })
+        let shell = Self.shell(fixture, list: Self.list(fixture), firstRun: firstRun)
         guard case .draft(let draft)? = firstRun.start(.blank) else {
             Issue.record("expected a draft from blank")
             return
@@ -348,7 +346,7 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime()
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
@@ -375,7 +373,7 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime()
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
@@ -408,7 +406,7 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime()
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await editor.load()
@@ -437,10 +435,13 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
             lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime()
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
-        let shell = factory.makeShell(list: list, firstRun: factory.makeFirstRun(), copyTitle: { $0 })
+        let shell = factory.makeShell(
+            list: list, firstRun: factory.makeFirstRun(), copyTitle: { $0 },
+            fileNamePattern: { _ in "CV %@" }
+        )
         shell.open(.blank)
         let first = try #require(shell.editor)
         await first.load()
@@ -589,8 +590,20 @@ struct ScreenFactoryTests {
 
     private static func sheet(_ fixture: Fixture, _ editor: EditorViewModel) throws -> ExportSheetViewModel? {
         fixture.composition.screens.makeExportSheet(
-            for: editor, appLanguage: try #require(ExportLanguage("en")), fileNamePattern: { _ in "CV %@" },
-            onLanguageChosen: { _ in }
+            for: editor, appLanguage: try english(), fileNamePattern: { _ in "CV %@" }, onLanguageChosen: { _ in }
+        )
+    }
+
+    private static func english() throws -> ExportLanguage { try #require(ExportLanguage("en")) }
+
+    /// The shell of the app over `list` and `firstRun`, with copies titled "Copy of …", in a composition whose app language
+    /// is English.
+    private static func shell(
+        _ fixture: Fixture, list: CVListViewModel, firstRun: FirstRunViewModel
+    ) -> ShellNavigationModel {
+        fixture.composition.screens.makeShell(
+            list: list, firstRun: firstRun, copyTitle: { "Copy of \($0)" },
+            fileNamePattern: { _ in "CV %@" }
         )
     }
 
@@ -662,6 +675,29 @@ struct ScreenFactoryTests {
         let bundled = try fixture.composition.headings.supportedLanguages()
         #expect(bundled.isEmpty == false)
         #expect(Set(sheet.offeredLanguages.map(\.tag)) == Set(bundled.compactMap(ExportLanguage.init).map(\.tag)))
+    }
+
+    @Test("The shell's export sheet exports the open CV, and a language chosen in it is stored with the CV", .timeLimit(.minutes(1)))
+    func shellSheetTakesTheLanguageToTheCV() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let reference = try await Self.storedCV(fixture, design: nil)
+        let list = Self.list(fixture)
+        let shell = Self.shell(fixture, list: list, firstRun: fixture.composition.screens.makeFirstRun())
+        shell.open(.stored(reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        #expect(editor.documentLanguage == "it")
+
+        shell.openExport()
+        let sheet = try #require(shell.exportSheet)
+        sheet.select(language: try #require(ExportLanguage("de")))
+
+        for await language in Observations({ editor.documentLanguage }) where language == "de" { break }
+        #expect(try await fixture.composition.repository.load(FixtureCV.full().id).language?.tag == "de")
+        for await exporting in Observations({ sheet.status == .exporting }) where !exporting { break }
+        #expect(sheet.document != nil, "the export ended with \(sheet.status)")
+        shell.closeExport()
     }
 
     @Test("The export sheet waits 250 ms after the last change, as in version 1")

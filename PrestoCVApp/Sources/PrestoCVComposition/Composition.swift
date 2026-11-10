@@ -82,6 +82,8 @@ public final class Composition {
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
+        /// The language of the app, which the export sheets offer first when a CV holds none.
+        let appLanguage: ExportLanguage
     }
 
     let paths: AppPaths
@@ -134,7 +136,8 @@ public final class Composition {
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
             lookOptions: parts.lookOptions, languages: parts.languages,
-            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime
+            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
+            appLanguage: inputs.appLanguage
         )
     }
 
@@ -322,7 +325,8 @@ public final class Composition {
             check: check,
             prepare: prepare,
             wrapListEditing: wrapListEditing,
-            backgroundTime: backgroundTime
+            backgroundTime: backgroundTime,
+            appLanguage: .preferred(Bundle.main.preferredLocalizations)
         ))
     }
 }

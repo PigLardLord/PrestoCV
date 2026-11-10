@@ -12,6 +12,7 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: Export
     let _: ExportLanguage? = sheet.effectiveLanguage
     let offered: [ExportLanguage] = sheet.offeredLanguages
     let _: [String] = offered.map(\.tag)
+    let _: ExportLanguage = ExportLanguage.preferred(["de"])
     let _: ExportStatus = sheet.status
     let _: ExportedDocument? = sheet.document
     let _: ExportID? = sheet.documentID
