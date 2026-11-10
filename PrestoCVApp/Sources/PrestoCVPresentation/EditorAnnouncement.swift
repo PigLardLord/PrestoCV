@@ -4,7 +4,8 @@
 public struct EditorAnnouncement: Equatable, Sendable {
     /// Where the status settled, or nil when it has not moved since the last announcement the view told.
     public let status: SaveStatus?
-    /// The problems met since the last announcement the view told that the status does not name, in the order of the form.
+    /// The problems met since the last announcement the view told that still hold and that the status does not name, in
+    /// the order of the form.
     public let problems: [FieldProblem]
     /// Makes the same words, told and met again, a new value, so that the view tells them again.
     let serial: Int
@@ -20,14 +21,24 @@ extension EditorViewModel {
         guard status != nil || !met.isEmpty else { return }
         if let status { statusToTell = status }
         problemsToTell.formUnion(met)
-        let shown = problems
-        // The status names the first problem in general words; its note would tell it a second time
-        let named = shown.first.flatMap { statusToTell == .unreadable($0.field) ? $0 : nil }
-        announcements += 1
-        announcement = EditorAnnouncement(
-            status: statusToTell, problems: shown.filter { problemsToTell.contains($0) && $0 != named },
-            serial: announcements
-        )
+        remakeAnnouncement()
+    }
+
+    /// Takes back what waits to be told and no longer holds, once a problem is gone (the person fixed it, or its row
+    /// went) before the view told it: its note, and the status that names its field when no problem met is left there.
+    /// The status that takes its place, if any, is told by the save status that settles after the change.
+    func withdrawWhatNoLongerHolds() {
+        guard announcement != nil else { return }
+        let held = problemsToTell.intersection(metProblems)
+        let statusHolds = if case .unreadable(let field)? = statusToTell {
+            metProblems.contains { $0.field == field }
+        } else {
+            true
+        }
+        guard held != problemsToTell || !statusHolds else { return }
+        problemsToTell = held
+        if !statusHolds { statusToTell = nil }
+        remakeAnnouncement()
     }
 
     /// The view told `told`: what it held waits no more. A report of an older one changes nothing, so that what came after
@@ -37,5 +48,19 @@ extension EditorViewModel {
         announcement = nil
         statusToTell = nil
         problemsToTell = []
+    }
+
+    /// Makes the announcement from what waits: nil when nothing does.
+    private func remakeAnnouncement() {
+        let shown = problems
+        // The status names the first problem in general words; its note would tell it a second time
+        let named = shown.first.flatMap { statusToTell == .unreadable($0.field) ? $0 : nil }
+        let notes = shown.filter { problemsToTell.contains($0) && $0 != named }
+        guard statusToTell != nil || !notes.isEmpty else {
+            announcement = nil
+            return
+        }
+        announcements += 1
+        announcement = EditorAnnouncement(status: statusToTell, problems: notes, serial: announcements)
     }
 }

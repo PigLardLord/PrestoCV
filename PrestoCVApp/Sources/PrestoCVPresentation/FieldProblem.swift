@@ -42,11 +42,14 @@ extension EditorViewModel {
         meet(form.unreadable)
     }
 
-    /// Forgets the problems that no longer hold, so that a new one in their field waits until the field is left again.
+    /// Forgets the problems that no longer hold, so that a new one in their field waits until the field is left again,
+    /// and takes back what VoiceOver was still to tell of them.
     func forgetProblemsThatRead() {
         guard !metProblems.isEmpty else { return }
         let kept = metProblems.intersection(form.unreadable)
-        if kept != metProblems { metProblems = kept }
+        guard kept != metProblems else { return }
+        metProblems = kept
+        withdrawWhatNoLongerHolds()
     }
 
     /// Makes `problems` met, and tells each one met now once (`announcement`): the first by the status when the status

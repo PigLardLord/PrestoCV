@@ -143,6 +143,80 @@ struct StatusChangeTests {
         #expect(editor.announcement?.status == .unreadable(.experiencePeriod))
         #expect(editor.announcement?.problems == [], "what was told is not told again")
     }
+
+    // MARK: - What no longer holds before the view told it
+
+    @Test("a problem fixed before the view told it is not told, while a failure holds the status")
+    func aProblemFixedBeforeItWasToldIsNotTold() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+        editor.type(\.fullName, "Mara Ellison-Reyes")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .failed)
+        editor.viewToldTheAnnouncement()
+        editor.type(\.email, "mara at example")
+        editor.fieldWasLeft(.email)
+        #expect(editor.announcement?.status == nil, "the failure still holds: it was told")
+        #expect(editor.announcement?.problems.map(\.field) == [.email])
+
+        editor.type(\.email, "mara@example.org")
+
+        #expect(editor.announcement == nil, "the email reads again: its note would tell a problem the person fixed")
+    }
+
+    @Test("a problem the status names, fixed before the view told it, is not told")
+    func aProblemTheStatusNamesFixedBeforeItWasToldIsNotTold() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.type(\.email, "mara at example")
+        editor.fieldWasLeft(.email)
+        #expect(editor.announcement?.status == .unreadable(.email))
+
+        editor.type(\.email, "mara@example.org")
+
+        #expect(editor.announcement == nil, "the email reads again: the status no longer stands there")
+    }
+
+    @Test("a problem whose row went before the view told it is not told")
+    func aProblemOfARemovedRowIsNotTold() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.addRow(to: .experiences)
+        let row = editor.content.experiences[0].id
+        editor.type(\.email, "mara at example")
+        editor.content.experiences[0].period.start.year = "2021"
+        editor.content.experiences[0].period.end.year = "2019"
+        editor.fieldWasLeft(.email)
+        editor.fieldWasLeft(.experiencePeriod, row: row)
+        #expect(editor.announcement?.problems.map(\.row) == [row])
+
+        editor.removeRow(in: .experiences, id: row)
+        editor.confirmRemoval()
+
+        #expect(!editor.content.experiences.contains { $0.id == row })
+        #expect(editor.announcement?.status == .unreadable(.email), "the email still cannot be read")
+        #expect(editor.announcement?.problems == [], "the period went with its row")
+    }
+
+    @Test("a status whose problem was fixed before the view told it gives way to the problem still there")
+    func aFixedProblemsStatusGivesWayToTheNext() async throws {
+        let world = Editing()
+        let editor = await world.editor(on: try await world.storedCV())
+        editor.addRow(to: .experiences)
+        let row = editor.content.experiences[0].id
+        editor.type(\.email, "mara at example")
+        editor.content.experiences[0].period.start.year = "2021"
+        editor.content.experiences[0].period.end.year = "2019"
+        await editor.saveNow()
+        #expect(editor.announcement?.status == .unreadable(.email))
+        #expect(editor.announcement?.problems.map(\.row) == [row])
+
+        editor.type(\.email, "mara@example.org")
+
+        #expect(editor.announcement?.status == .unreadable(.experiencePeriod), "the period now keeps the CV from being stored")
+        #expect(editor.announcement?.problems == [], "the status names the period: its note would tell it twice")
+    }
 }
 
 extension EditorViewModel {
