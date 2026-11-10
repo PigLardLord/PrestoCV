@@ -47,6 +47,7 @@ struct TraceOnFailureTests {
             check: check,
             prepare: {},
             wrapListEditing: { $0 },
+            wrapStore: { $0 },
             backgroundTime: NoBackgroundTime()
         )
     }

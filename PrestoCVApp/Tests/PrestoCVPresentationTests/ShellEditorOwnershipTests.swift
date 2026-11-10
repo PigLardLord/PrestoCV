@@ -308,4 +308,31 @@ struct ShellEditorOwnershipTests {
         #expect(stored.personal.fullName == "Tobias Renn-Okafor")
         #expect(stored.personal.professionalTitle == "Teacher")
     }
+
+    // MARK: Discarding
+
+    @Test("a CV deleted elsewhere is discarded on the person's word: the detail shows nothing, and nothing is written")
+    func discardAfterDeletedElsewhereClearsTheEditor() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+        let writes = world.editing.writeCount
+
+        shell.discardEditor()
+        await shell.flushAll()
+
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+        #expect(shell.preferredColumn == .sidebar)
+        #expect(shell.canLeave)
+        #expect(world.editing.writeCount == writes, "nothing the person discarded is written")
+        #expect(await world.storedName(of: cv) == nil, "the CV stays deleted")
+    }
 }

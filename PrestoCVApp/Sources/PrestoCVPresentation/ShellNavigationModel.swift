@@ -150,6 +150,15 @@ public final class ShellNavigationModel {
         _ = deselect()
     }
 
+    // MARK: Discarding
+
+    /// Drops the open editor and its text that is not stored, on the person's word, so that the detail shows nothing:
+    /// after another window deleted the CV, the person chose not to keep the text as a copy. Nothing is written.
+    public func discardEditor() {
+        editor = nil
+        detail = nil
+    }
+
     // MARK: Leaving
 
     /// The status of the open editor when no write can store its text as it is, so that leaving would lose it: another
