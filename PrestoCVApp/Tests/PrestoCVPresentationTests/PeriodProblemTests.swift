@@ -25,8 +25,8 @@ struct PeriodProblemTests {
         #expect(editor.problem(of: .experiencePeriod, row: rows[1]) == .endBeforeStart)
         #expect(editor.problem(of: .experiencePeriod, row: rows[0]) == nil)
         #expect(editor.saveStatus == .unreadable(.experiencePeriod))
-        // The note under the period is hidden from VoiceOver: the change of status is what it announces
-        #expect(editor.statusChange == .unreadable(.experiencePeriod), "VoiceOver is told when the person leaves")
+        // VoiceOver is told by the status, which names the problem; the note is read with the period
+        #expect(editor.announcement?.status == .unreadable(.experiencePeriod), "VoiceOver is told when the person leaves")
         editor.content.experiences[1].period.end.year = "2023"
         #expect(editor.problems.isEmpty, "the period reads now")
     }
@@ -75,14 +75,16 @@ struct PeriodProblemTests {
         let row = editor.content.experiences[0].id
         editor.type(\.email, "mara at example")
         editor.fieldWasLeft(.email)
-        #expect(editor.problemNotice == nil, "the email is told by the status")
+        #expect(editor.announcement?.problems == [], "the email is told by the status")
+        editor.viewToldTheAnnouncement()
         editor.content.experiences[0].period.start.year = "2021"
         editor.content.experiences[0].period.end.year = "2019"
 
         editor.fieldWasLeft(.experiencePeriod, row: row)
 
-        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == [row])
-        #expect(editor.statusChange == .unreadable(.email), "the status still tells the first problem")
+        #expect(editor.announcement.map { periodsBeforeTheirStart($0.problems) } == [row])
+        #expect(editor.announcement?.status == nil, "the status did not move")
+        #expect(editor.saveStatus == .unreadable(.email), "the status still tells the first problem")
     }
 
     @Test("an end before the start on a second row is told with its row, though the status does not change")
@@ -97,11 +99,13 @@ struct PeriodProblemTests {
             editor.content.experiences[index].period.end.year = "2019"
         }
         editor.fieldWasLeft(.experiencePeriod, row: rows[0])
-        #expect(editor.problemNotice == nil, "the first problem is told by the status")
+        #expect(editor.announcement?.problems == [], "the first problem is told by the status")
+        editor.viewToldTheAnnouncement()
 
         editor.fieldWasLeft(.experiencePeriod, row: rows[1])
 
-        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == [rows[1]])
+        #expect(editor.announcement.map { periodsBeforeTheirStart($0.problems) } == [rows[1]])
+        #expect(editor.announcement?.status == nil, "the status did not move")
     }
 
     @Test("a problem that read and broke again is told again, while another problem holds the status")
@@ -115,15 +119,16 @@ struct PeriodProblemTests {
         editor.content.experiences[0].period.start.year = "2021"
         editor.content.experiences[0].period.end.year = "2019"
         editor.fieldWasLeft(.experiencePeriod, row: row)
-        let first = editor.problemNotice
-        #expect(first != nil)
+        let first = editor.announcement
+        #expect(first?.problems.map(\.row) == [row])
+        editor.viewToldTheAnnouncement()
 
         editor.content.experiences[0].period.end.year = "2023"
         editor.content.experiences[0].period.end.year = "2019"
         editor.fieldWasLeft(.experiencePeriod, row: row)
 
-        #expect(editor.problemNotice?.problems.map(\.row) == [row])
-        #expect(editor.problemNotice != first, "a new value, so the view tells it again")
+        #expect(editor.announcement?.problems.map(\.row) == [row])
+        #expect(editor.announcement != first, "a new value, so the view tells it again")
     }
 
     @Test("a store attempt that meets several problems while an invalid email holds the status tells each of them")
@@ -135,6 +140,7 @@ struct PeriodProblemTests {
         let rows = editor.content.experiences.map(\.id)
         editor.type(\.email, "mara at example")
         editor.fieldWasLeft(.email)
+        editor.viewToldTheAnnouncement()
         for index in 0..<2 {
             editor.content.experiences[index].period.start.year = "2021"
             editor.content.experiences[index].period.end.year = "2019"
@@ -142,11 +148,12 @@ struct PeriodProblemTests {
 
         await editor.saveNow()
 
-        #expect(editor.statusChange == .unreadable(.email), "the status still tells the email")
-        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == rows, "both periods, in the order of the form")
+        #expect(editor.saveStatus == .unreadable(.email), "the status still tells the email")
+        #expect(editor.announcement?.status == nil, "the status did not move")
+        #expect(editor.announcement.map { periodsBeforeTheirStart($0.problems) } == rows, "both periods, in the order of the form")
     }
 
-    @Test("a store attempt that changes the status to the first of several problems tells the others by the notice")
+    @Test("a store attempt that changes the status to the first of several problems tells the others after it")
     func problemsAfterTheStatusAreTold() async throws {
         let world = Editing()
         let editor = await world.editor(on: try await world.storedCV())
@@ -161,11 +168,11 @@ struct PeriodProblemTests {
 
         await editor.saveNow()
 
-        #expect(editor.statusChange == .unreadable(.email), "the status tells the first problem")
-        #expect(editor.problemNotice.map { periodsBeforeTheirStart($0.problems) } == rows, "every other one, and not the email")
+        #expect(editor.announcement?.status == .unreadable(.email), "the status tells the first problem")
+        #expect(editor.announcement.map { periodsBeforeTheirStart($0.problems) } == rows, "then every other one, and not the email")
     }
 
-    @Test("the first problem alone is told by the status, and the notice stays empty")
+    @Test("the first problem alone is told by the status, and not again by its note")
     func firstProblemAloneIsNotTwiceTold() async throws {
         let world = Editing()
         let editor = await world.editor(on: try await world.storedCV())
@@ -176,8 +183,8 @@ struct PeriodProblemTests {
 
         editor.fieldWasLeft(.experiencePeriod, row: row)
 
-        #expect(editor.statusChange == .unreadable(.experiencePeriod))
-        #expect(editor.problemNotice == nil)
+        #expect(editor.announcement?.status == .unreadable(.experiencePeriod))
+        #expect(editor.announcement?.problems == [])
     }
 
     /// The rows of `problems` when each is an end of a job's period before its start, in their order; nil otherwise.

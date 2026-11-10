@@ -28,16 +28,13 @@ public final class EditorViewModel {
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
 
-    /// The status the person is told of as it changes (VoiceOver), in words the view picks from the code: nil until the
-    /// status settles somewhere other than where it stood when the CV opened. Typing and the autosave's writes
-    /// (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure, and the save
-    /// after one or the first save of a new CV, each change it.
-    public private(set) var statusChange: SaveStatus?
-
-    /// The problems the person has just met that the status does not tell: nil until one is. The status names only the
-    /// first problem, so this holds every other one met at the same moment (a store attempt meets every problem at once),
-    /// and one met while the status names another or the same status holds. Each problem met is told once, by one of them.
-    public internal(set) var problemNotice: ProblemNotice?
+    /// What VoiceOver is still to tell of the changes (`EditorAnnouncement`): nil until the status settles somewhere other
+    /// than where it stood when the CV opened, or a problem is met, and again once the view told it all. Typing and the
+    /// autosave's writes (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure,
+    /// and the save after one or the first save of a new CV, each do. The status names only the first problem, so every
+    /// other one met at the same moment (a store attempt meets every problem at once), and one met while the status names
+    /// another, is told after it by its note. Each problem met is told once.
+    public internal(set) var announcement: EditorAnnouncement?
 
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
@@ -100,8 +97,14 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
-    /// Where the status last settled (`statusChange`), nil until the CV opened.
+    /// Where the status last settled, nil until the CV opened.
     @ObservationIgnored var settled: SaveStatus?
+    /// Where the status settled that the view has not told yet.
+    @ObservationIgnored var statusToTell: SaveStatus?
+    /// The problems met that the view has not told yet.
+    @ObservationIgnored var problemsToTell = Set<FieldProblem>()
+    /// Counts the announcements, so that the view's report of an older one is told apart.
+    @ObservationIgnored var announcements = 0
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
@@ -222,16 +225,20 @@ public final class EditorViewModel {
         refreshSaveStatus()
     }
 
-    /// Brings the status up to date. Returns whether it set `statusChange`.
-    @discardableResult
-    func refreshSaveStatus() -> Bool {
+    /// Brings the status up to date, and tells the person where it settled when it moved (`announcement`).
+    func refreshSaveStatus() {
+        tell(status: settleSaveStatus())
+    }
+
+    /// Brings `saveStatus` up to date. Returns the status it settled on when that is news: not typing or the autosave's
+    /// writes (`pending`, `saving`), which settle nowhere, nor where it stood when the CV opened.
+    func settleSaveStatus() -> SaveStatus? {
         let status = currentSaveStatus()
         if status != saveStatus { saveStatus = status }
-        guard status != .pending, status != .saving, status != settled else { return false }
-        let told = settled != nil
-        if told { statusChange = status }
+        guard status != .pending, status != .saving, status != settled else { return nil }
+        let isNews = settled != nil
         settled = status
-        return told
+        return isNews ? status : nil
     }
 
     private func currentSaveStatus() -> SaveStatus {
