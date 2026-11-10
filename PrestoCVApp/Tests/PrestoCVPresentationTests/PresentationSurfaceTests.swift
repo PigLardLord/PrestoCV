@@ -28,6 +28,14 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
         }
     }
     let _: [RowAction] = list.rowActions + list.leadingSwipeActions + list.trailingSwipeActions
+    let kept: KeptNotices = list.keptNotices([] as [KeptEditor])
+    let under: [CVReference: KeptNotice] = kept.under
+    for notice in kept.above + under.values {
+        let _: Int = notice.id
+        let _: String = notice.label
+        let _: SaveStatus = notice.status
+        let _: Bool = notice.canRetry
+    }
     _ = list.now
     list.refreshNow()
     list.dismissNotice()
@@ -98,10 +106,22 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let editor: EditorViewModel? = shell.editor
     let screen: ShellScreen = shell.screen(for: .firstRun)
     switch screen { case .loading, .welcome, .split: break }
+    let _: Bool = shell.canLeave
+    let _: CVRow? = shell.selectedRow(in: rows)
     shell.reconcile(with: rows)
     shell.sceneChanged(isActive: false)
     shell.sceneChanged(isActive: true)
+    for kept in shell.keptEditors as [KeptEditor] {
+        let _: Int = kept.id
+        let _: CVReference? = kept.reference
+        let _: SaveStatus = kept.status
+        let _: Bool = kept.canRetry
+        await shell.retryKept(kept.id)
+        verdicts.append(shell.openKept(kept.id))
+    }
+    shell.columnChanged(to: .detail, isCollapsed: true)
     verdicts.append(shell.deselect())
+    shell.discardEditor()
     for verdict in verdicts {
         switch verdict {
         case .left: break

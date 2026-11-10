@@ -36,7 +36,12 @@ struct ShellView: View {
 
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
-            CVListView(list: list, firstRun: firstRun, selection: selection, choose: start)
+            CVListView(
+                list: list, firstRun: firstRun, selection: selection, choose: start,
+                kept: list.keptNotices(shell.keptEditors),
+                retryKept: { id in Task { await shell.retryKept(id) } },
+                openKept: { id in _ = shell.openKept(id) }
+            )
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }

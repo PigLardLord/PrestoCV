@@ -192,6 +192,31 @@ public final class CVListViewModel {
         CVTitle(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle)
     }
 
+    // MARK: - Kept editors
+
+    /// The notices of the editors the shell kept (#402, decisions 16 and 17). The editor of a listed CV shows under its
+    /// row, named by the row's label; when a row has more than one, the one left last shows there and the others above the
+    /// rows, so that none is hidden. A draft and a CV the list does not have show above the rows, named by the title their
+    /// own text gives them. The notices above follow the order the editors were left in.
+    public func keptNotices(_ kept: [KeptEditor]) -> KeptNotices {
+        let labels = Dictionary(rows.map { ($0.reference, $0.label) }, uniquingKeysWith: { first, _ in first })
+        var notices = KeptNotices(above: [], under: [:])
+        for editor in kept.sorted(by: { $0.id < $1.id }) {
+            let row = editor.reference.flatMap { reference in labels[reference].map { (reference: reference, label: $0) } }
+            let notice = KeptNotice(
+                id: editor.id, label: row?.label ?? editor.title.text(untitled: untitled), status: editor.status,
+                canRetry: editor.canRetry
+            )
+            guard let row else {
+                notices.above.append(notice)
+                continue
+            }
+            if let earlier = notices.under.updateValue(notice, forKey: row.reference) { notices.above.append(earlier) }
+        }
+        notices.above.sort { $0.id < $1.id }
+        return notices
+    }
+
     // MARK: - Changes
 
     /// Renames the CV of the row; the store trims the title and keeps it to one line.
