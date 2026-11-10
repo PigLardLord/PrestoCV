@@ -103,7 +103,7 @@ final class CVListUITests: XCTestCase {
     @MainActor
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         var swipes = 0
-        while !element.isHittable && swipes < 6 {
+        while !element.canBeTapped(in: app) && swipes < 6 {
             app.swipeUp()
             swipes += 1
         }

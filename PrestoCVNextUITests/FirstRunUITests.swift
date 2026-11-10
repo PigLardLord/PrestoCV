@@ -174,8 +174,8 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
 
         XCTAssertEqual(firstOf("firstRun.title", "start.examples", in: app), "start.examples")
-        XCTAssertTrue(examples.isHittable)
-        XCTAssertTrue(app.buttons["start.blank"].isHittable)
+        XCTAssertTrue(examples.canBeTapped(in: app))
+        XCTAssertTrue(app.buttons["start.blank"].canBeTapped(in: app))
     }
 
     /// In compact height, an iPhone turned on its side, the ways to start come first and can be tapped without scrolling.
@@ -186,13 +186,14 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
         try XCTSkipUnless(isCompact(app), "Only an iPhone has a compact height on its side")
 
-        XCUIDevice.shared.orientation = .landscapeLeft
+        let turned = try app.turnsToLandscape()
+        XCTAssertTrue(turned, "The first run turns with the device, as Safari does")
 
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
         XCTAssertEqual(app.windows.firstMatch.verticalSizeClass, .compact, "The iPhone turned")
         XCTAssertEqual(firstOf("firstRun.title", "start.examples", in: app), "start.examples")
-        XCTAssertTrue(examples.isHittable)
-        XCTAssertTrue(app.buttons["start.blank"].isHittable)
+        XCTAssertTrue(examples.canBeTapped(in: app))
+        XCTAssertTrue(app.buttons["start.blank"].canBeTapped(in: app))
     }
 
     // MARK: A regular screen

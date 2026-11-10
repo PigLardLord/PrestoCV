@@ -56,7 +56,7 @@ final class EditorDatesUITests: XCTestCase {
     @MainActor
     private func addRow(to section: String, typing text: String, in app: XCUIApplication) {
         let add = app.buttons["editor.add.\(section)"]
-        scroll(until: add, named: "The add button of \(section)", forward: true, in: app)
+        app.scrollForm(until: add, named: "The add button of \(section)")
         add.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of \(section) takes the keyboard")
         app.typeText(text)
@@ -67,21 +67,6 @@ final class EditorDatesUITests: XCTestCase {
     private func putKeyboardAway(in app: XCUIApplication) {
         app.buttons["keyboard.done"].tap()
         XCTAssertTrue(wait(for: NSPredicate(format: "exists == false"), app.keyboards.firstMatch), "Done puts it away")
-    }
-
-    /// Scrolls the form, on or back, in steps shorter than the screen until the element can be tapped. A form shows only
-    /// the rows on screen. The drag stays in the form, away from the list beside it.
-    @MainActor
-    private func scroll(until element: XCUIElement, named name: String, forward: Bool, in app: XCUIApplication) {
-        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
-        for _ in 0..<15 where !(element.exists && element.isHittable) {
-            // Held at the end, so the form does not glide on
-            (forward ? low : high).press(forDuration: 0.05, thenDragTo: forward ? high : low, withVelocity: .slow,
-                                         thenHoldForDuration: 0.2)
-        }
-        XCTAssertTrue(element.exists && element.isHittable, "\(name) comes into view")
     }
 
     @MainActor
@@ -95,7 +80,7 @@ final class EditorDatesUITests: XCTestCase {
     @MainActor
     private func pick(_ month: String, in date: String, _ app: XCUIApplication) {
         let menu = app.buttons.matching(identifier: date).firstMatch
-        scroll(until: menu, named: "The month of \(date)", forward: true, in: app)
+        app.scrollForm(until: menu, named: "The month of \(date)")
         menu.tap()
         XCTAssertTrue(app.buttons["No month"].waitForExistence(timeout: 30), "The menu offers no month")
         app.buttons[month].tap()
@@ -107,7 +92,7 @@ final class EditorDatesUITests: XCTestCase {
     @MainActor
     private func type(_ year: String, in date: String, _ app: XCUIApplication) {
         let field = app.textFields[date]
-        scroll(until: field, named: "The year of \(date)", forward: true, in: app)
+        app.scrollForm(until: field, named: "The year of \(date)")
         field.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "The year takes the keyboard")
         if app.windows.firstMatch.horizontalSizeClass != .regular {
@@ -145,7 +130,7 @@ final class EditorDatesUITests: XCTestCase {
         XCTAssertEqual(app.textFields[start].label, "Start year", "VoiceOver reads the year by its label")
         XCTAssertEqual(app.textFields[end].value as? String, "2021")
         let status = app.staticTexts["editor.status"]
-        scroll(until: status, named: "The status line", forward: false, in: app)
+        app.scrollForm(until: status, named: "The status line", forward: false)
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", saved), status), status.label)
     }
 
@@ -155,7 +140,7 @@ final class EditorDatesUITests: XCTestCase {
         type("2018", in: start, app)
         type("2022", in: end, app)
         let toggle = app.switches[current]
-        scroll(until: toggle, named: "The switch", forward: true, in: app)
+        app.scrollForm(until: toggle, named: "The switch")
         XCTAssertEqual(toggle.label, "I work here now")
 
         flip(toggle)
@@ -176,11 +161,11 @@ final class EditorDatesUITests: XCTestCase {
         type("2021", in: start, app)
         type("2019", in: end, app)
 
-        scroll(until: status, named: "The status line", forward: false, in: app)
+        app.scrollForm(until: status, named: "The status line", forward: false)
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", oneFieldNotSaved), status), status.label)
 
         type("2023", in: end, app)
-        scroll(until: status, named: "The status line", forward: false, in: app)
+        app.scrollForm(until: status, named: "The status line", forward: false)
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", saved), status), "Named no more: \(status.label)")
     }
 
@@ -193,12 +178,12 @@ final class EditorDatesUITests: XCTestCase {
         pick("March", in: start, app)
         type("2020", in: start, app)
         type("2020", in: end, app)
-        scroll(until: status, named: "The status line", forward: false, in: app)
+        app.scrollForm(until: status, named: "The status line", forward: false)
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", saved), status), "No month, no problem: \(status.label)")
 
         pick("January", in: end, app)
 
-        scroll(until: status, named: "The status line", forward: false, in: app)
+        app.scrollForm(until: status, named: "The status line", forward: false)
         XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", oneFieldNotSaved), status), status.label)
     }
 
@@ -230,22 +215,22 @@ final class EditorDatesUITests: XCTestCase {
         ] {
             addRow(to: section, typing: name, in: app)
             let field = app.textFields[link]
-            scroll(until: field, named: "The link \(link)", forward: true, in: app)
+            app.scrollForm(until: field, named: "The link \(link)")
             tapTheEnd(of: field, in: app)
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "The link takes the keyboard")
             field.typeText("not an address")
             putKeyboardAway(in: app)
-            scroll(until: status, named: "The status line", forward: false, in: app)
+            app.scrollForm(until: status, named: "The status line", forward: false)
             XCTAssertTrue(wait(for: NSPredicate(format: "label == %@", oneFieldNotSaved), status), status.label)
 
-            scroll(until: field, named: "The link \(link)", forward: true, in: app)
+            app.scrollForm(until: field, named: "The link \(link)")
             tapTheEnd(of: field, in: app)
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "The link takes the keyboard")
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "not an address".count))
             field.typeText("https://example.com")
             putKeyboardAway(in: app)
             let reads = field.value as? String ?? ""
-            scroll(until: status, named: "The status line", forward: false, in: app)
+            app.scrollForm(until: status, named: "The status line", forward: false)
             XCTAssertTrue(
                 wait(for: NSPredicate(format: "label == %@", saved), status),
                 "Named no more: \(status.label); the link reads \(reads)"
@@ -269,16 +254,15 @@ final class EditorDatesUITests: XCTestCase {
         check(app.buttons.matching(identifier: issued).firstMatch, named: "The month issued", app)
         check(app.textFields[issued], named: "The year issued", app)
 
-        XCUIDevice.shared.orientation = .landscapeLeft
+        let turned = try app.turnsToLandscape()
+        XCTAssertTrue(turned, "The form turns with the device, as Safari does")
         check(app.textFields[issued], named: "The year issued in landscape", app)
     }
 
     @MainActor
     private func check(_ target: XCUIElement, named name: String, _ app: XCUIApplication) {
-        // On, unless it went above the form, as a turn of the screen can take it
-        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-        let above = target.exists && !target.isHittable && target.frame.midY < form.frame.midY
-        scroll(until: target, named: name, forward: !above, in: app)
+        // A turn of the screen can leave it above the form: its place gives the way
+        app.scrollForm(until: target, named: name)
         // A frame comes as a float: 44 points read 43.99…
         XCTAssertGreaterThan(target.frame.height, 43.99, "\(name) is tall enough to tap")
         XCTAssertLessThanOrEqual(target.frame.maxX, app.windows.firstMatch.frame.maxX + 0.5, "\(name) fits the screen")
