@@ -34,6 +34,11 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     }
     let _: FieldProblem.Code? = editor.problem(of: .email)
     let _: FieldInput = EditorField.email.input
+    let _: EditorField? = EditorField.title.nextDetail
+    switch FieldEntry("a", after: "", in: .title) {
+    case .text(let text): _ = text
+    case .returnKey(let next): let _: EditorField? = next
+    }
     editor.addRow(to: .skills)
     let added: RowID = editor.content.skills[0].id
     editor.removeRow(in: .skills, id: added)

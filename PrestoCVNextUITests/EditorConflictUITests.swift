@@ -59,7 +59,7 @@ final class EditorConflictUITests: XCTestCase {
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The stored version is saved and shown")
         XCTAssertTrue(waitUntilGone(element("editor.notice", in: app)), "The notice goes once the text is the stored one")
         XCTAssertEqual(
-            app.textFields["editor.field.title"].value as? String, backendEngineer.title,
+            textInput("editor.field.title", in: app).value as? String, backendEngineer.title,
             "Reload shows the stored title, without the change typed here")
     }
 
@@ -73,7 +73,7 @@ final class EditorConflictUITests: XCTestCase {
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The copy is saved")
         XCTAssertTrue(waitUntilGone(element("editor.notice", in: app)), "The notice goes once the copy is saved")
         XCTAssertEqual(
-            app.textFields["editor.field.title"].value as? String, copyTitle, "The editor now holds the copy")
+            textInput("editor.field.title", in: app).value as? String, copyTitle, "The editor now holds the copy")
         XCTAssertTrue(
             waitUntil(app.staticTexts["shell.detail.title"], reads: copyTitle), "The open CV is named as the copy's row")
         showList(in: app)
@@ -97,7 +97,7 @@ final class EditorConflictUITests: XCTestCase {
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The copy is saved")
         XCTAssertTrue(waitUntilGone(element("editor.notice", in: app)), "The notice goes once the copy is saved")
         XCTAssertEqual(
-            app.textFields["editor.field.title"].value as? String, copyTitle, "The editor now holds the copy")
+            textInput("editor.field.title", in: app).value as? String, copyTitle, "The editor now holds the copy")
         showList(in: app)
         XCTAssertTrue(row(titled: copyTitle, in: app).waitForExistence(timeout: 30), "The list shows the copy")
         XCTAssertTrue(
@@ -141,7 +141,7 @@ final class EditorConflictUITests: XCTestCase {
             XCTAssertTrue(element("editor.notice", in: app).exists, "Another row does not replace the editor")
         }
         XCTAssertEqual(
-            app.textFields["editor.field.title"].value as? String, edited, "The text typed is still in the editor")
+            textInput("editor.field.title", in: app).value as? String, edited, "The text typed is still in the editor")
 
         app.buttons["editor.notice.reload"].tap()
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The stored version is saved and shown")
@@ -152,7 +152,8 @@ final class EditorConflictUITests: XCTestCase {
         }
         open(dataAnalyst, in: app)
         XCTAssertEqual(
-            app.textFields["editor.field.title"].value as? String, dataAnalyst.title, "Another CV opens once the editor can be left")
+            textInput("editor.field.title", in: app).value as? String, dataAnalyst.title,
+            "Another CV opens once the editor can be left")
     }
 
     @MainActor
@@ -172,7 +173,7 @@ final class EditorConflictUITests: XCTestCase {
         guard scroll(notice, toShow: reload, named: "Reload", in: app) else { return }
         XCTAssertTrue(reload.isHittable, "Reload comes into view inside the notice")
         assertTall(reload, named: "Reload")
-        scrollUntilHittable(app.textFields["editor.field.title"], named: "The title field", in: app)
+        scrollUntilHittable(textInput("editor.field.title", in: app), named: "The title field", in: app)
 
         reload.tap()
         XCTAssertTrue(waitUntilGone(element("editor.notice", in: app)), "The notice goes once the text is the stored one")
@@ -186,7 +187,7 @@ final class EditorConflictUITests: XCTestCase {
     private func blocked(by words: String, in app: XCUIApplication) throws {
         open(backendEngineer, in: app)
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The CV opens stored")
-        let title = app.textFields["editor.field.title"]
+        let title = textInput("editor.field.title", in: app)
         scrollUntilHittable(title, named: "The title field", in: app)
         append(typed, to: title)
         XCTAssertTrue(element("editor.notice", in: app).waitForExistence(timeout: 30), "The notice says what to do")
@@ -229,7 +230,8 @@ final class EditorConflictUITests: XCTestCase {
         let row = row(titled: cv.title, in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 30), "The list shows \(cv.title)")
         row.tap()
-        XCTAssertTrue(app.textFields["editor.field.title"].waitForExistence(timeout: 30), "The form of \(cv.title) opens")
+        let title = textInput("editor.field.title", in: app)
+        XCTAssertTrue(title.waitForExistence(timeout: 30), "The form of \(cv.title) opens")
     }
 
     /// The list, from the editor: a compact screen goes back to it, a regular one shows it beside the editor.
@@ -247,6 +249,15 @@ final class EditorConflictUITests: XCTestCase {
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// The text input with this identifier, of either kind: a field of one line wraps at the largest text sizes, and
+    /// XCUITest may then show it as a text view.
+    private func textInput(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let kinds = NSPredicate(
+            format: "elementType == %lu OR elementType == %lu",
+            XCUIElement.ElementType.textField.rawValue, XCUIElement.ElementType.textView.rawValue)
+        return app.descendants(matching: .any).matching(identifier: identifier).matching(kinds).firstMatch
     }
 
     private func status(of app: XCUIApplication) -> XCUIElement {

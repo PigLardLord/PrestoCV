@@ -3,48 +3,71 @@ import SwiftUI
 
 /// The details of the CV in the order the PDF shows them: its name, the person, how to reach them, and the summary. The
 /// e-mail address and the phone are stacked, never side by side. A note under a contact field says its text cannot be
-/// read, once the person has left the field: the editor names the problem, and this view words it.
+/// read, once the person has left the field: the editor names the problem, and this view words it. The return key of a
+/// field of one line moves to the next field (`FieldEntry`), also where the field wraps at a large text size.
 struct DetailsSection: View {
     @Bindable var editor: EditorViewModel
     let focus: FocusState<EditorField?>.Binding
+    /// How many times the return key made each field anew, since a field that wraps shows its line break until then.
+    @State private var refreshed: [EditorField: Int] = [:]
 
     var body: some View {
         Section("editor.details") {
-            LabeledField("editor.field.title", text: $editor.content.title, focus: focus, as: .title)
-                .fieldInput(EditorField.title.input)
+            lineField("editor.field.title", .title, \.title)
                 .accessibilityIdentifier("editor.field.title")
-            LabeledField("editor.field.fullName", text: $editor.content.fullName, focus: focus, as: .fullName)
-                .fieldInput(EditorField.fullName.input)
+            lineField("editor.field.fullName", .fullName, \.fullName)
                 .accessibilityIdentifier("editor.field.fullName")
-            LabeledField(
-                "editor.field.professionalTitle", text: $editor.content.professionalTitle, focus: focus, as: .professionalTitle
-            )
-            .fieldInput(EditorField.professionalTitle.input)
-            .accessibilityIdentifier("editor.field.professionalTitle")
-            LabeledField(
-                "editor.field.email", text: $editor.content.email, focus: focus, as: .email,
+            lineField("editor.field.professionalTitle", .professionalTitle, \.professionalTitle)
+                .accessibilityIdentifier("editor.field.professionalTitle")
+            lineField(
+                "editor.field.email", .email, \.email,
                 note: words(of: editor.problem(of: .email), unreadable: "editor.note.email")
             )
-            .fieldInput(EditorField.email.input)
             .accessibilityIdentifier("editor.field.email")
-            LabeledField(
-                "editor.field.phone", text: $editor.content.phone, focus: focus, as: .phone,
+            lineField(
+                "editor.field.phone", .phone, \.phone,
                 note: words(of: editor.problem(of: .phone), unreadable: "editor.note.phone")
             )
-            .fieldInput(EditorField.phone.input)
             .accessibilityIdentifier("editor.field.phone")
-            LabeledField("editor.field.location", text: $editor.content.location, focus: focus, as: .location)
-                .fieldInput(EditorField.location.input)
+            lineField("editor.field.location", .location, \.location)
                 .accessibilityIdentifier("editor.field.location")
-            LabeledField(
-                "editor.field.website", text: $editor.content.website, focus: focus, as: .website,
+            lineField(
+                "editor.field.website", .website, \.website,
                 note: words(of: editor.problem(of: .website), unreadable: "editor.note.website")
             )
-            .fieldInput(EditorField.website.input)
             .accessibilityIdentifier("editor.field.website")
             ParagraphField("editor.field.summary", text: $editor.content.summary, focus: focus, as: .summary)
                 .fieldInput(EditorField.summary.input)
                 .accessibilityIdentifier("editor.field.summary")
+        }
+    }
+
+    /// A field of the details that takes one line, with the keyboard of its kind; its return key moves to the next field.
+    private func lineField(
+        _ label: LocalizedStringResource, _ field: EditorField, _ path: WritableKeyPath<EditorContent, String>,
+        note: LocalizedStringResource? = nil
+    ) -> some View {
+        LabeledField(
+            label, text: entry(field, path), focus: focus, as: field, note: note, refreshed: refreshed[field, default: 0]
+        )
+        .fieldInput(field.input)
+        .submitLabel(.next)
+        .onSubmit { focus.wrappedValue = field.nextDetail }
+    }
+
+    /// The field's text, through `FieldEntry`: the return key moves the focus on and leaves the text as it was, and the
+    /// field is made anew, since it still shows the line break.
+    private func entry(_ field: EditorField, _ path: WritableKeyPath<EditorContent, String>) -> Binding<String> {
+        Binding {
+            editor.content[keyPath: path]
+        } set: { new in
+            switch FieldEntry(new, after: editor.content[keyPath: path], in: field) {
+            case .text(let text):
+                editor.content[keyPath: path] = text
+            case .returnKey(let next):
+                refreshed[field, default: 0] += 1
+                focus.wrappedValue = next
+            }
         }
     }
 
