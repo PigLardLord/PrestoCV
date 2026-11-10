@@ -21,6 +21,12 @@ struct NoticeAction {
         self.label = label
         self.perform = perform
     }
+
+    /// The names Voice Control takes for the button: the title it shows, then the label VoiceOver reads when there is one,
+    /// so that the words on screen always work (WCAG 2.5.3, label in name).
+    var inputLabels: [LocalizedStringResource] {
+        [title] + (label.map { [$0] } ?? [])
+    }
 }
 
 /// The buttons of a notice or an empty state, in the order given. Each is at least as tall as the smallest tap target;
@@ -56,6 +62,7 @@ struct NoticeButtons: View {
         .buttonStyle(.bordered)
         .buttonBorderShape(.roundedRectangle(radius: CornerRadius.control))
         .accessibilityLabel(Text(action.label ?? action.title))
+        .accessibilityInputLabels(action.inputLabels.map { Text($0) })
         if let identifier = action.identifier {
             base.accessibilityIdentifier(identifier)
         } else {

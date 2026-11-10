@@ -138,4 +138,24 @@ struct StoreChangedTests {
         #expect(world.editing.writeCount == 0)
         #expect(world.storesTold.count == 0)
     }
+
+    @Test("a conflict found again after the failure cleared is told again")
+    func calledAgainForAConflictFoundAgain() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        try await world.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .conflict)
+        #expect(world.storesTold.count == 1)
+
+        editor.type(\.fullName, "Mara Ellison")
+        #expect(editor.saveStatus == .saved, "back to the text the editor stood on: the failure cleared")
+
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .conflict)
+        #expect(world.storesTold.count == 2, "the editor learned it again, so the list reads the store again")
+    }
 }

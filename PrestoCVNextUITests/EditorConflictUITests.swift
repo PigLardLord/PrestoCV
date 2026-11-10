@@ -53,6 +53,7 @@ final class EditorConflictUITests: XCTestCase {
         let reload = app.buttons["editor.notice.reload"]
         assertTall(reload, named: "Reload")
         assertTall(app.buttons["editor.notice.saveAsCopy"], named: "Save as a copy")
+        keepScreenshot("The notice of a conflict", of: app)
 
         reload.tap()
 
@@ -91,6 +92,7 @@ final class EditorConflictUITests: XCTestCase {
         let copy = app.buttons["editor.notice.saveAsCopy"]
         assertTall(copy, named: "Save as a copy")
         assertTall(app.buttons["editor.notice.discard"], named: "Discard")
+        keepScreenshot("The notice of a CV deleted elsewhere", of: app)
 
         copy.tap()
 
@@ -136,6 +138,8 @@ final class EditorConflictUITests: XCTestCase {
             let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
             edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
             XCTAssertTrue(element("editor.notice", in: app).exists, "The swipe from the edge does not leave the editor")
+            let list = row(titled: dataAnalyst.title, in: app)
+            XCTAssertFalse(list.exists && list.isHittable, "The list does not come into view")
         } else {
             row(titled: dataAnalyst.title, in: app).tap()
             XCTAssertTrue(element("editor.notice", in: app).exists, "Another row does not replace the editor")
@@ -173,6 +177,7 @@ final class EditorConflictUITests: XCTestCase {
         guard scroll(notice, toShow: reload, named: "Reload", in: app) else { return }
         XCTAssertTrue(reload.isHittable, "Reload comes into view inside the notice")
         assertTall(reload, named: "Reload")
+        keepScreenshot("The notice in landscape at the largest text size", of: app)
         scrollUntilHittable(textInput("editor.field.title", in: app), named: "The title field", in: app)
 
         reload.tap()
@@ -284,6 +289,15 @@ final class EditorConflictUITests: XCTestCase {
         add(record)
         XCTAssertGreaterThan(room, 0, "The editor shows below the bar: \(frames)")
         XCTAssertLessThanOrEqual(shown, room * 0.25 + 1, "The notice takes at most a quarter of the editor: \(frames)")
+    }
+
+    /// Keeps a picture of the screen with the result, for the review of what the person sees.
+    @MainActor
+    private func keepScreenshot(_ name: String, of app: XCUIApplication) {
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     /// The navigation bars over the window, and the line below them, where what the person sees of the screen begins.

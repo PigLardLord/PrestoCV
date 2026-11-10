@@ -472,6 +472,72 @@ struct ShellEditorOwnershipTests {
         #expect(await world.storedName(of: cv) == nil, "the CV stays deleted")
     }
 
+    @Test("Discard is refused while a copy runs: the editor stays, and its copy is stored once")
+    func discardWhileACopyRunsIsRefused() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+        await world.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy is held at the store's door") { await world.editing.duplicateGate.waiting == 1 }
+        #expect(editor.isReplacing)
+
+        shell.discardEditor()
+
+        #expect(shell.editor === editor, "the editor whose copy runs stays")
+        #expect(shell.detail != nil)
+        await world.editing.duplicateGate.open()
+        await copying.value
+        #expect(editor.saveStatus == .saved)
+        #expect(!editor.isReplacing)
+        #expect(world.editing.copies.withLock { $0.count } == 1)
+    }
+
+    @Test("Discard does nothing unless the CV was deleted elsewhere: the editor and its text stay", arguments: LeaveVerdictTests.Case.allCases.filter { $0 != .deletedElsewhere })
+    func discardIsRefusedUnlessDeletedElsewhere(_ given: LeaveVerdictTests.Case) async throws {
+        let world = Editing()
+        let shell = world.shell()
+        let editor = try await given.reach(in: world, shell)
+        #expect(editor.saveStatus == given.status)
+
+        shell.discardEditor()
+
+        #expect(shell.editor === editor, "only a CV deleted elsewhere, or one that could not be opened, is discarded")
+        #expect(shell.detail != nil)
+        await world.editing.gate.open()
+    }
+
+    @Test("a CV that is gone, or could not be opened, is closed on the person's word: the detail shows nothing")
+    func discardClosesAnOpeningThatFailed() async throws {
+        let world = Editing()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: world.editing.ids.next())))
+        let missing = try #require(shell.editor)
+        await missing.load()
+        #expect(missing.opening == .missing)
+        shell.discardEditor()
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+
+        let cv = try await world.storedCV()
+        world.editing.loadErrors.withLock { $0 = [.unavailable] }
+        shell.open(.stored(CVReference(id: cv.id)))
+        let failed = try #require(shell.editor)
+        await failed.load()
+        #expect(failed.opening == .failed)
+        shell.discardEditor()
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+        #expect(world.editing.writeCount == 0)
+    }
+
     // MARK: Saving as a copy
 
     @Test("after a copy of a CV deleted elsewhere, the shell holds the copy: the list's reload keeps it open and selected")

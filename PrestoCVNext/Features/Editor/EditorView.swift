@@ -4,7 +4,8 @@ import SwiftUI
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
 /// where the text stands. While the text cannot be stored as it is, a notice above the form says what to do and offers
 /// the ways out (#402, decision 8). It waits while the CV is read, and says so when it cannot be, with a way to close
-/// it. VoiceOver is told when the status changes.
+/// it. When the status changes, VoiceOver hears where the text stands and, while the person cannot leave, what to do and
+/// the ways on (`SaveStatus.spoken(in:)`).
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
@@ -14,6 +15,7 @@ struct EditorView: View {
     @FocusState private var focus: EditorField?
     /// The editor's height, for the notice's cap where the form is short of room.
     @State private var height: Double = 0
+    @Environment(\.locale) private var locale
 
     var body: some View {
         content
@@ -22,7 +24,7 @@ struct EditorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("shell.detail.opened")
             .task { await editor.load() }
-            .announce(editor.statusChange) { $0.words }
+            .announce(editor.statusChange) { $0.spoken(in: locale) }
     }
 
     @ViewBuilder

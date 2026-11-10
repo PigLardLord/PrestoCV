@@ -51,9 +51,17 @@ struct FieldEntryTests {
         #expect(FieldEntry("", after: "Backend Engineer", in: .title) == .text(""))
     }
 
-    @Test("a text that holds a break already, such as one stored before, takes a space for it at the next change")
-    func anOldBreakBecomesASpace() {
-        #expect(FieldEntry("Mara\nEllison\n", after: "Mara\nEllison", in: .fullName) == .text("Mara Ellison "))
+    @Test("the return key in a text that holds a break already, such as one stored before, moves on")
+    func returnKeyAfterAStoredBreak() {
+        #expect(
+            FieldEntry("Mara\nEllison\n", after: "Mara\nEllison", in: .fullName) == .returnKey(next: .professionalTitle)
+        )
+    }
+
+    @Test("a break stored before becomes a space at the next change that is not the return key")
+    func aStoredBreakBecomesASpaceAtTheNextChange() {
+        #expect(FieldEntry("Mara\nEllisonX", after: "Mara\nEllison", in: .fullName) == .text("Mara EllisonX"))
+        #expect(FieldEntry("Mara\nEllison", after: "Mara\nEllison", in: .fullName) == .text("Mara Ellison"))
     }
 
     @Test("a paragraph keeps its line breaks", arguments: [EditorField.summary, .experienceDescription])

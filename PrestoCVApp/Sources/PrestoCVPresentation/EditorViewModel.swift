@@ -23,6 +23,9 @@ public final class EditorViewModel {
     public internal(set) var pendingRemoval: RowRemoval?
 
     public private(set) var opening: OpeningStatus = .opening
+    /// A reload, a copy or a change of the look runs, which replaces the CV the form stands on: the notice's ways on wait
+    /// until it ends.
+    public private(set) var isReplacing = false
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
 
@@ -34,6 +37,16 @@ public final class EditorViewModel {
 
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
+
+    /// Whether the editor may be dropped with its text on the person's word (`ShellNavigationModel.discardEditor()`): the CV
+    /// could not be opened, or another window deleted it and no copy runs, which could store the text meanwhile.
+    var canBeDiscarded: Bool {
+        switch opening {
+        case .missing, .failed: true
+        case .opening: false
+        case .open: saveStatus == .deletedElsewhere && !isReplacing
+        }
+    }
 
     /// The tag of the language the document is written in, or nil when the CV says none.
     public var documentLanguage: String? { held?.language?.tag }
@@ -81,9 +94,11 @@ public final class EditorViewModel {
     /// The failure of the last change of the look or the language, shown until a change succeeds. A write that succeeds
     /// does not clear it, and it never hides `failure`: a change that succeeds clears only this one.
     @ObservationIgnored var changeFailure: SaveStatus?
-    /// A reload or a copy, which replaces the CV the form stands on. Edits made meanwhile wait for it, and are written
-    /// after it.
-    @ObservationIgnored var replacing: Task<Void, Never>?
+    /// A reload, a copy or a change of the look, which replaces the CV the form stands on. Edits made meanwhile wait for
+    /// it, and are written after it. `isReplacing` follows it.
+    @ObservationIgnored var replacing: Task<Void, Never>? {
+        didSet { isReplacing = replacing != nil }
+    }
     /// Counts the autosaves, so that one replaced cannot change the status any more.
     @ObservationIgnored var generation = 0
     /// The writes of the autosave the form stands on.
@@ -226,7 +241,11 @@ public final class EditorViewModel {
 
     private func autosaveChanged(to status: Autosave<CV>.Status, generation: Int) {
         guard generation == self.generation else { return }
-        if !status.hasUnresolvedFailure { failure = nil }
+        if !status.hasUnresolvedFailure {
+            // Nothing is left to retry: a change elsewhere found by a later write is news again
+            failure = nil
+            toldChangedElsewhere = nil
+        }
         refreshSaveStatus()
     }
 

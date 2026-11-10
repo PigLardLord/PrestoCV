@@ -204,9 +204,12 @@ public final class ShellNavigationModel {
     // MARK: Discarding
 
     /// Drops the open editor and its text that is not stored, on the person's word, so that the detail shows nothing:
-    /// after another window deleted the CV, the person chose not to keep the text as a copy. Nothing is written.
+    /// after another window deleted the CV, the person chose not to keep the text as a copy, or the CV could not be
+    /// opened. Nothing is written. In any other state it does nothing, and so while a copy runs (`isReplacing`): the copy
+    /// may store the text the person meant to drop, and the editor goes on with it.
     public func discardEditor() {
-        editor = nil
+        guard let editor, editor.canBeDiscarded else { return }
+        self.editor = nil
         detail = nil
     }
 

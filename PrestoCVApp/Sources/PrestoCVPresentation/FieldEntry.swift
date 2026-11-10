@@ -10,7 +10,10 @@ public enum FieldEntry: Hashable, Sendable {
 
     /// What `field` keeps when its text `old` became `new`. A change that adds one line break where the cursor was, or
     /// puts one in place of a selection, is the return key: a field that wraps takes it as a line break, and the
-    /// selection stays. Any other line break becomes a space.
+    /// selection stays. That holds in a text that has a break already, such as one stored before. Any other line break
+    /// becomes a space, a stored one too at the next change that is not the return key. A paste of one break with text
+    /// the field already holds at that place cannot be told from the return key over a selection ("Mara\nson" from
+    /// "Mara Ellison"), so it moves on as the return key does and leaves the text as it was.
     public init(_ new: String, after old: String, in field: EditorField) {
         if field.input == .paragraph {
             self = .text(new)
@@ -21,15 +24,16 @@ public enum FieldEntry: Hashable, Sendable {
         }
     }
 
-    /// Whether `new` is `old` with one line break in place of the text between a start and an end of it, maybe none.
-    /// "\r\n" is one character, so it counts once.
+    /// Whether `new` is `old` with one line break more, in place of the text between a start and an end of it, maybe
+    /// none. "\r\n" is one character, so it counts once.
     private static func isReturnKey(_ new: String, after old: String) -> Bool {
-        guard !old.contains(where: \.isNewline) else { return false }
         let breaks = new.indices.filter { new[$0].isNewline }
-        guard breaks.count == 1, let lineBreak = breaks.first else { return false }
-        let before = new[..<lineBreak]
-        let after = new[new.index(after: lineBreak)...]
-        return before.count + after.count <= old.count && old.hasPrefix(before) && old.hasSuffix(after)
+        guard breaks.count == old.count(where: \.isNewline) + 1 else { return false }
+        return breaks.contains { lineBreak in
+            let before = new[..<lineBreak]
+            let after = new[new.index(after: lineBreak)...]
+            return before.count + after.count <= old.count && old.hasPrefix(before) && old.hasSuffix(after)
+        }
     }
 }
 
