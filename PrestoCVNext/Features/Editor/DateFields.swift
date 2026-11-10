@@ -17,7 +17,7 @@ struct PeriodField: View {
     let picked: () -> Void
 
     var body: some View {
-        let note = noteWords(of: problem, unreadable: "editor.note.period")
+        let note = noteWords(of: problem, field: field)
         VStack(alignment: .leading, spacing: Spacing.medium) {
             DateField(
                 date: $period.start, month: "editor.period.startMonth", year: "editor.period.startYear", focus: focus,
@@ -53,7 +53,7 @@ struct IssuedField: View {
     let picked: () -> Void
 
     var body: some View {
-        let note = noteWords(of: problem, unreadable: "editor.note.issued")
+        let note = noteWords(of: problem, field: .certificationIssued)
         VStack(alignment: .leading, spacing: Spacing.small) {
             DateField(
                 date: $date, month: "editor.field.month", year: "editor.field.year", focus: focus,
@@ -139,12 +139,31 @@ private struct DateField: View {
 }
 
 /// The words of the note under a field for the problem the editor names with its text (R13); nil when it names none.
-/// `unreadable` says what the field needs to be read.
-func noteWords(of problem: FieldProblem.Code?, unreadable: LocalizedStringResource) -> LocalizedStringResource? {
-    switch problem {
-    case .unreadable: unreadable
+/// The field decides what `unreadable` says it needs to be read.
+func noteWords(of problem: FieldProblem.Code?, field: EditorField) -> LocalizedStringResource? {
+    problem.map { words(of: $0, field: field) }
+}
+
+/// The words of a problem told by itself, which are those of its note (VoiceOver does not read the note then).
+func noteWords(of problem: FieldProblem) -> LocalizedStringResource {
+    words(of: problem.code, field: problem.field)
+}
+
+private func words(of code: FieldProblem.Code, field: EditorField) -> LocalizedStringResource {
+    switch code {
+    case .unreadable: unreadableNote(of: field)
     case .endBeforeStart: "editor.note.endBeforeStart"
-    case nil: nil
+    }
+}
+
+private func unreadableNote(of field: EditorField) -> LocalizedStringResource {
+    switch field {
+    case .email: "editor.note.email"
+    case .phone: "editor.note.phone"
+    case .website: "editor.note.website"
+    case .experiencePeriod, .educationPeriod: "editor.note.period"
+    case .certificationIssued: "editor.note.issued"
+    default: "editor.note.link"
     }
 }
 

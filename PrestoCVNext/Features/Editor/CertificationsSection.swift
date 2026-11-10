@@ -21,7 +21,7 @@ struct CertificationsSection: View {
             )
             fields.line(
                 "editor.field.link", certification.link, .certificationLink,
-                note: noteWords(of: editor.problem(of: .certificationLink, row: row.id), unreadable: "editor.note.link")
+                note: noteWords(of: editor.problem(of: .certificationLink, row: row.id), field: .certificationLink)
             )
             fields.paragraph("editor.field.description", certification.description, .certificationDescription)
         }

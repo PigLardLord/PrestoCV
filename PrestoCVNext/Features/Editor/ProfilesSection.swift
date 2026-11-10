@@ -15,7 +15,7 @@ struct ProfilesSection: View {
             fields.line("editor.field.platform", profile.platform, .profilePlatform)
             fields.line(
                 "editor.field.link", profile.link, .profileLink,
-                note: noteWords(of: editor.problem(of: .profileLink, row: row.id), unreadable: "editor.note.link")
+                note: noteWords(of: editor.problem(of: .profileLink, row: row.id), field: .profileLink)
             )
         }
     }

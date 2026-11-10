@@ -34,6 +34,11 @@ public final class EditorViewModel {
     /// after one or the first save of a new CV, each change it.
     public private(set) var statusChange: SaveStatus?
 
+    /// The problem the person has just met while the status did not change because of it (the status already names
+    /// another problem, or the same status holds): nil until one is. It is told by itself, never in the same update as
+    /// `statusChange`; a store attempt that meets several problems at once is told by the status, which names the first.
+    public internal(set) var problemNotice: ProblemNotice?
+
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
 
@@ -217,12 +222,16 @@ public final class EditorViewModel {
         refreshSaveStatus()
     }
 
-    func refreshSaveStatus() {
+    /// Brings the status up to date. Returns whether it set `statusChange`.
+    @discardableResult
+    func refreshSaveStatus() -> Bool {
         let status = currentSaveStatus()
         if status != saveStatus { saveStatus = status }
-        guard status != .pending, status != .saving, status != settled else { return }
-        if settled != nil { statusChange = status }
+        guard status != .pending, status != .saving, status != settled else { return false }
+        let told = settled != nil
+        if told { statusChange = status }
         settled = status
+        return told
     }
 
     private func currentSaveStatus() -> SaveStatus {

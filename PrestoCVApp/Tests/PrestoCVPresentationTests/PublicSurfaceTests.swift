@@ -11,6 +11,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: OpeningStatus = editor.opening
     let _: SaveStatus = editor.saveStatus
     let _: SaveStatus? = editor.statusChange
+    let _: ProblemNotice? = editor.problemNotice
     let _: Bool = editor.isSavedOnThisDevice
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
@@ -55,6 +56,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         }
     }
     let _: FieldProblem.Code? = editor.problem(of: .email)
+    if let notice = editor.problemNotice { let _: FieldProblem = notice.problem }
     if let row = rows.first {
         editor.fieldWasLeft(.experiencePeriod, row: row.id)
         let _: FieldProblem.Code? = editor.problem(of: .experiencePeriod, row: row.id)

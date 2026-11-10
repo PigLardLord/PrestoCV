@@ -16,6 +16,14 @@ public struct FieldProblem: Hashable, Sendable {
     public let code: Code
 }
 
+/// A problem the person has just met, to tell them of by itself: the status line tells only the first problem, so one met
+/// while the status names another (or does not change because of it) is told by this.
+public struct ProblemNotice: Equatable, Sendable {
+    public let problem: FieldProblem
+    /// Makes the same problem, met again after it read and broke again, a new value, so that the view tells it again.
+    let serial: Int
+}
+
 extension EditorViewModel {
 
     /// The problems the person has met, in the form's order: of the fields they left, and of every field when they last
@@ -52,7 +60,13 @@ extension EditorViewModel {
     private func meet(_ problems: [FieldProblem]) {
         let met = metProblems.union(problems)
         guard met != metProblems else { return }
+        let added = problems.filter { !metProblems.contains($0) }
         metProblems = met
-        refreshSaveStatus()
+        // One announcement at a time: when the status tells the first problem, a store attempt that meets several at
+        // once is told by the status alone
+        let told = refreshSaveStatus()
+        if !told, let first = form.unreadable.first(where: added.contains) {
+            problemNotice = ProblemNotice(problem: first, serial: (problemNotice?.serial ?? 0) + 1)
+        }
     }
 }
