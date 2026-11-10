@@ -1747,7 +1747,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non enregistré : la fin précède le début. Modifiez l’une des deux dates."
+            "value" : "Non enregistré : la fin précède le début. Modifiez l’une des deux dates."
           }
         },
         "it" : {
@@ -1788,7 +1788,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non enregistré : saisissez l’année en quatre chiffres, par exemple 2019."
+            "value" : "Non enregistré : saisissez l’année en quatre chiffres, par exemple 2019."
           }
         },
         "it" : {
@@ -1870,7 +1870,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non enregistré : indiquez un début et, pour chaque date, l’année en quatre chiffres, par exemple 2019."
+            "value" : "Non enregistré : indiquez un début et, pour chaque date, l’année en quatre chiffres, par exemple 2019."
           }
         },
         "it" : {
@@ -5017,7 +5017,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Masquer l’avis sur « %@ »"
+            "value" : "Masquer l’avis sur « %@ »"
           }
         },
         "it" : {

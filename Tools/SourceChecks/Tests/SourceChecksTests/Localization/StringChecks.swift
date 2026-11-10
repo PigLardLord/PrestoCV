@@ -15,6 +15,8 @@ struct StringFindings: Equatable {
     var otherPlaceholders: [String] = []
     var availabilityPromises: [String] = []
     var titleCase: [String] = []
+    /// A French text with a space that can break where French typography puts one that cannot.
+    var breakingSpacesInFrench: [String] = []
     var unused: [String] = []
     var lookedUpButMissing: [String] = []
 
@@ -63,6 +65,10 @@ struct StringRules: Sendable {
     /// literal, a member call), instead of the literals handed straight to a view. A literal then passes only as a key, a
     /// lookup, a `nonKeyLiterals` entry or the argument of one of `nonTextArguments`.
     var everyLiteralInViews = false
+    /// Ask for a space that cannot break where French typography puts a space: before `:`, `;`, `?`, `!` and `»`, after
+    /// `«`. A plain space there lets the line break before the mark, which then starts a line alone. The legacy catalog
+    /// writes plain spaces and keeps them: it gets only fixes to the published version (ADR 0033).
+    var frenchNoBreakSpaces = false
     /// The arguments (the text before the literal) that take something other than text to translate, each with its reason.
     var nonTextArguments: [String: String] = [
         "verbatim:": "text shown as it is, by definition",
@@ -199,6 +205,7 @@ enum StringChecks {
             check(key, in: catalog, used: used, rules: rules, into: &findings)
         }
         findings.titleCase = try titleCaseTexts(in: catalog, rules: rules)
+        if rules.frenchNoBreakSpaces { findings.breakingSpacesInFrench = breakingSpacesInFrench(in: catalog) }
         findings.availabilityPromises = availabilityPromises(in: catalog, rules: rules)
         findings.lookedUpButMissing = lookedUpButMissing(from: catalog, in: sources, rules: rules) + notKeys(handedToViews: sources, catalog: catalog, rules: rules)
         return findings
@@ -361,6 +368,44 @@ enum StringChecks {
             if !isAbbreviation && !properNames.contains(word) { titleCase.append(word) }
         }
         return titleCase
+    }
+
+    // MARK: French spaces
+
+    /// The marks that French typography sets off with a space that cannot break: before each of `frenchClosingMarks`,
+    /// after each of `frenchOpeningMarks`.
+    private static let frenchClosingMarks: Set<Character> = [":", ";", "?", "!", "»"]
+    private static let frenchOpeningMarks: Set<Character> = ["«"]
+
+    /// The marks of a French text that have a space that can break beside them, where one that cannot belongs:
+    /// "Supprimer « %@ » ?" gives ["«", "»", "?"]. A mark with no space beside it is not one: the colon of "https://".
+    static func breakingSpaces(inFrench text: String) -> [Character] {
+        let characters = Array(text)
+        var marks: [Character] = []
+        for (index, character) in characters.enumerated() {
+            if frenchClosingMarks.contains(character), index > 0, canBreak(characters[index - 1]) {
+                marks.append(character)
+            }
+            if frenchOpeningMarks.contains(character), index + 1 < characters.count, canBreak(characters[index + 1]) {
+                marks.append(character)
+            }
+        }
+        return marks
+    }
+
+    /// Whether a line can break at this character: any white space but the no-break space and the narrow no-break space.
+    private static func canBreak(_ character: Character) -> Bool {
+        character.isWhitespace && character != "\u{00A0}" && character != "\u{202F}"
+    }
+
+    private static func breakingSpacesInFrench(in catalog: LocalizationCatalog) -> [String] {
+        catalog.keys.flatMap { key in
+            (catalog.texts(of: key, in: "fr") ?? []).compactMap { text in
+                let marks = breakingSpaces(inFrench: text)
+                guard !marks.isEmpty else { return nil }
+                return "\(key) (fr): a space that can break beside \(marks.map(String.init).joined(separator: " ")) in \(text)"
+            }
+        }
     }
 
     // MARK: Availability

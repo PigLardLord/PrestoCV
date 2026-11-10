@@ -23,6 +23,7 @@ struct PlantedViews {
             Text("plant.plural_count")
             Text("plant.plural_omitted_count")
             Text("plant.plural_conflict")
+            Text("plant.french_space")
             Text("plant.absent".localized)
         }
     }
