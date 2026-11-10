@@ -2,12 +2,14 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
-/// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told when the
-/// status changes.
+/// where the text stands, and Export once the CV is open. It waits while the CV is read, and says so when it cannot be.
+/// VoiceOver is told when the status changes.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
     let title: Text
+    /// Opens the export of this CV.
+    let export: () -> Void
     @FocusState private var focus: EditorField?
 
     var body: some View {
@@ -47,6 +49,14 @@ struct EditorView: View {
         }
         .formStyle(.grouped)
         .readableScrollContent()
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: export) {
+                    Label("editor.export", systemImage: "square.and.arrow.up")
+                }
+                .accessibilityIdentifier("editor.export")
+            }
+        }
         .keyboardDoneBar("editor.done") { focus = nil }
         // A problem with a field's text is named once the person leaves it, never while they type
         .onChange(of: focus) { left, _ in

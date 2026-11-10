@@ -4,8 +4,8 @@ import SwiftUI
 /// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it shows
 /// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
 /// what is open, which column shows, whether the welcome shows and whether the open CV may be left; this view binds to
-/// them. It tells the shell when the scene stops being active, which stores the open CV at once on its way to the
-/// background.
+/// them. It shows the export of the open CV in a sheet while the shell holds one. It tells the shell when the scene stops
+/// being active, which stores the open CV at once on its way to the background.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
@@ -54,6 +54,19 @@ struct ShellView: View {
                 addingCV = false
             }
         }
+        .sheet(item: exportSheet) { sheet in
+            ExportSheetView(sheet: sheet, close: { shell.closeExport() })
+        }
+    }
+
+    /// The export sheet of the open CV. A swipe down closes it as Close does, which stops an export that runs.
+    private var exportSheet: Binding<ExportSheetViewModel?> {
+        Binding(
+            get: { shell.exportSheet },
+            set: { sheet in
+                if sheet == nil { shell.closeExport() }
+            }
+        )
     }
 
     /// The open CV's editor, a new one for each CV opened. While its text cannot be stored, Back is hidden (which also
@@ -61,7 +74,7 @@ struct ShellView: View {
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor))
+            EditorView(editor: editor, title: title(of: editor), export: { shell.openExport() })
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
         } else {

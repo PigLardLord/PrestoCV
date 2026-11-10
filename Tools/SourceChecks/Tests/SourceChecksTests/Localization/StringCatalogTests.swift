@@ -24,8 +24,11 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" as English does; Spanish, French and Italian say "CV" as English does.
-            sameInSomeLanguages: ["editor.field.website": ["de"], "export.file_name": ["es", "fr", "it"]],
+            // German writes "Website" as English does; Spanish, French and Italian say "CV" as English does; French counts
+            // pages with the English word.
+            sameInSomeLanguages: [
+                "editor.field.website": ["de"], "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
+            ],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
@@ -35,6 +38,10 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
                 #"list.rowFailure.hide \(failure.label)"#: ValueTypes(["%@"], "RowFailure's label is a String"),
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
+                #"export.pages \(pages)"#: ValueTypes(["%lld"], "ExportedDocument's pages is an Int"),
+                #"export.error.too_many_pages \(required) \(pages)"#: ValueTypes(["%lld", "%lld"], "ExportStatus.truncated holds two Ints"),
+                #"export.status.incomplete \(missing)"#: ValueTypes(["%lld"], "ExportStatus.incomplete holds an Int"),
+                #"export.status.text_not_visible \(lines)"#: ValueTypes(["%lld"], "ExportStatus.textNotVisible holds an Int"),
             ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],

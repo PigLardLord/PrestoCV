@@ -39,3 +39,8 @@ enum ReadableWidth {
 enum ParagraphHeight {
     static let minimum: CGFloat = 96
 }
+
+/// The shape of a page of the PDF, its width over its height (A4)
+enum PageShape {
+    static let a4: CGFloat = 210.0 / 297.0
+}
