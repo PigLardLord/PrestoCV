@@ -24,12 +24,15 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
+            // German writes "Website" as English does.
+            sameInSomeLanguages: ["editor.field.website": ["de"]],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
                 #"list.row.saved \(saved)"#: ValueTypes(["%@"], "RelativeDateTimeFormatter gives a String"),
                 #"list.delete.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
+                #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
                 #"list.rowFailure.hide \(failure.label)"#: ValueTypes(["%@"], "RowFailure's label is a String"),
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
             ],

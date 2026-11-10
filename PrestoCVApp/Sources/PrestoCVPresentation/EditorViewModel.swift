@@ -26,6 +26,12 @@ public final class EditorViewModel {
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
 
+    /// The status the person is told of as it changes (VoiceOver), in words the view picks from the code: nil until the
+    /// status settles somewhere other than where it stood when the CV opened. Typing and the autosave's writes
+    /// (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure, and the save
+    /// after one or the first save of a new CV, each change it.
+    public private(set) var statusChange: SaveStatus?
+
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
 
@@ -42,9 +48,14 @@ public final class EditorViewModel {
     let clock: any Clock<Duration>
     let pause: Duration
     let copyTitle: @MainActor (String) -> String
+    let didStore: @MainActor () -> Void
 
     /// The form as typed.
-    var form = EditorContent.empty
+    var form = EditorContent.empty {
+        didSet { forgetProblemsThatRead() }
+    }
+    /// The problems the person has met (`problems`), kept until their text reads.
+    var metProblems = Set<FieldProblem>()
     /// The ids of the form's rows: every row this editor made has one no other row has had.
     @ObservationIgnored var rowIDs = RowIDs()
     /// The CV the form stands on: its identity, the sections, and the look and the language it was opened with.
@@ -54,6 +65,12 @@ public final class EditorViewModel {
     var restyled: CV?
     /// The CV the form stands on, with the look and the language chosen last: the one shown, exported and copied.
     var held: CV? { restyled ?? base }
+    /// The CV this editor stores, nil while the store holds none of it: a draft has one after its first write, and after a
+    /// copy is saved the copy is the CV it stores.
+    var storedReference: CVReference? {
+        guard let base, autosave?.isStored == true else { return nil }
+        return CVReference(id: base.id)
+    }
     @ObservationIgnored var autosave: Autosave<CV>?
     /// The writer of the CV the form stands on, which keeps its revision.
     @ObservationIgnored var writer: (any CVAutosaveWriting)?
@@ -76,21 +93,26 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
+    /// Where the status last settled (`statusChange`), nil until the CV opened.
+    @ObservationIgnored var settled: SaveStatus?
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
+    ///   - didStore: Called after each write the store took, never for one that failed, so that what shows the stored
+    ///     CVs can read them again. It is called even when the editor is gone by then.
     public init(
         start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
-        pause: Duration, copyTitle: @escaping @MainActor (String) -> String
+        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
     ) {
         self.start = start
         self.editing = editing
         self.clock = clock
         self.pause = pause
         self.copyTitle = copyTitle
+        self.didStore = didStore
     }
 
     /// Opens the CV. The view calls it from its `.task`; once the CV is open, it does nothing.
@@ -155,12 +177,17 @@ public final class EditorViewModel {
         let mine = generation
         writes.replace()
         let mineWrites = WritesInFlight()
+        let didStore = self.didStore
         let autosave = Autosave<CV>(
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
             onWriteFailure: { [weak self] error in self?.writeFailed(error, generation: mine) },
-            // Only the writer: a write that ends after the editor is gone still stores what it was given
-            write: { content, _ in try await mineWrites.run { try await writer.write(content) } }
+            // Only the writer and the callback: a write that ends after the editor is gone still stores what it was given,
+            // and still tells it
+            write: { content, _ in
+                try await mineWrites.run { try await writer.write(content) }
+                didStore()
+            }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
         self.autosave = autosave
@@ -191,20 +218,24 @@ public final class EditorViewModel {
     func refreshSaveStatus() {
         let status = currentSaveStatus()
         if status != saveStatus { saveStatus = status }
+        guard status != .pending, status != .saving, status != settled else { return }
+        if settled != nil { statusChange = status }
+        settled = status
     }
 
     private func currentSaveStatus() -> SaveStatus {
         if let failure { return failure }
         if let changeFailure { return changeFailure }
         guard replacing == nil, let base, let autosave else { return .saving }
-        if let field = form.unreadableFields.first { return .unreadable(field) }
+        if let problem = problems.first { return .unreadable(problem.field) }
         switch autosave.status {
         case .writing, .retrying:
             return .saving
         case .failed:
             return .failed
         case .pending, .upToDate:
-            if autosave.isStored, autosave.storeHoldsTheContent { return .saved }
+            // Text the person is still typing that cannot be read yet is not stored: it waits for them
+            if autosave.isStored, autosave.storeHoldsTheContent { return form.unreadable.isEmpty ? .saved : .pending }
             return SaveStatus(waiting: form.applied(to: base).saveCheck())
         }
     }

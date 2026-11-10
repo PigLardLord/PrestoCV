@@ -95,7 +95,7 @@ struct EditorContentMappingTests {
 
         #expect(cv.sections.languages.isEmpty)
         #expect(cv.sections.profiles.isEmpty)
-        #expect(content.unreadableFields == [.languageProficiency, .profileLink])
+        #expect(content.unreadable.map(\.field) == [.languageProficiency, .profileLink])
     }
 
     @Test("text that cannot be read as an address is a field code; the rest is stored and the text stays in the form")
@@ -106,7 +106,7 @@ struct EditorContentMappingTests {
 
         editor.type(\.email, "mara at example")
         editor.type(\.professionalTitle, "Product designer")
-        #expect(editor.saveStatus == .unreadable(.email))
+        #expect(editor.saveStatus == .pending, "the email is named once the person leaves it or stores (#33)")
         await editor.saveNow()
 
         #expect(editor.saveStatus == .unreadable(.email))

@@ -16,6 +16,9 @@ struct ShellNavigationModelTests {
         let draft: CVDraft
     }
 
+    /// A shell whose editors are never loaded here: these tests are about what it opens, not what its editors store.
+    private static func shell() -> ShellNavigationModel { Editing().shell() }
+
     private static func world() async throws -> World {
         let browsing = Browsing()
         _ = try await browsing.stored(title: "First")
@@ -27,7 +30,7 @@ struct ShellNavigationModelTests {
 
     @Test("A new shell has nothing selected and shows the list")
     func startsWithTheList() {
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         #expect(shell.selection == nil)
         #expect(shell.preferredColumn == .sidebar)
@@ -36,7 +39,7 @@ struct ShellNavigationModelTests {
     @Test("Opening a draft puts it in the detail and shows the detail on a compact screen; no row is selected")
     func openDraftSelectsTheDraft() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         shell.open(.draft(world.draft))
 
@@ -49,7 +52,7 @@ struct ShellNavigationModelTests {
     @Test("A draft is not a stored CV: reconciling with the list keeps it and writes nothing")
     func reconcileKeepsADraft() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.draft(world.draft))
 
         let wrote = Self.writes(to: shell) {
@@ -65,7 +68,7 @@ struct ShellNavigationModelTests {
     @Test("Opening a stored CV after a draft replaces the draft")
     func openingStoredAfterDraftReplacesIt() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.draft(world.draft))
 
         shell.open(.stored(world.first.reference))
@@ -78,7 +81,7 @@ struct ShellNavigationModelTests {
     @Test("Going back from a draft on a collapsed split view closes it, so the welcome of a first run shows again")
     func backFromADraftClosesIt() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.draft(world.draft))
 
         shell.columnChanged(to: .sidebar, isCollapsed: true)
@@ -91,18 +94,18 @@ struct ShellNavigationModelTests {
 
     @Test("A first run with nothing open shows the welcome")
     func welcomeWhileFirstRunAndNothingOpen() {
-        #expect(ShellNavigationModel().screen(for: .firstRun) == .welcome)
+        #expect(Self.shell().screen(for: .firstRun) == .welcome)
     }
 
     @Test("While the store is read, the shell shows it is loading")
     func loadingWhileTheFirstRunLoads() {
-        #expect(ShellNavigationModel().screen(for: .loading) == .loading)
+        #expect(Self.shell().screen(for: .loading) == .loading)
     }
 
     @Test("Once a draft is open, a first run shows the split view with the draft")
     func splitOnceADraftOpens() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         shell.open(.draft(world.draft))
 
@@ -111,7 +114,7 @@ struct ShellNavigationModelTests {
 
     @Test("A store that was used, or could not be read, shows the split view", arguments: [FirstRunState.returning, .failed])
     func splitWhenNotAFirstRun(state: FirstRunState) {
-        #expect(ShellNavigationModel().screen(for: state) == .split)
+        #expect(Self.shell().screen(for: state) == .split)
     }
 
     // MARK: Stored CVs
@@ -119,7 +122,7 @@ struct ShellNavigationModelTests {
     @Test("Selecting a CV sets the selection and shows the detail on a compact screen")
     func selectShowsTheDetail() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         shell.open(.stored(world.first.reference))
 
@@ -130,7 +133,7 @@ struct ShellNavigationModelTests {
     @Test("Selecting another CV replaces the selection")
     func selectReplaces() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.open(.stored(world.second.reference))
@@ -141,7 +144,7 @@ struct ShellNavigationModelTests {
     @Test("Selecting the CV that is selected writes nothing")
     func reselectChangesNothing() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         let wrote = Self.writes(to: shell) { shell.open(.stored(world.first.reference)) }
@@ -153,7 +156,7 @@ struct ShellNavigationModelTests {
     @Test("Selecting another CV is observed, so that the check of the other tests can fail")
     func selectIsObserved() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         let wrote = Self.writes(to: shell) { shell.open(.stored(world.second.reference)) }
@@ -163,7 +166,7 @@ struct ShellNavigationModelTests {
 
     @Test("Deselecting with nothing selected writes nothing")
     func deselectWithoutSelectionChangesNothing() {
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         let wrote = Self.writes(to: shell) { shell.deselect() }
 
@@ -173,7 +176,7 @@ struct ShellNavigationModelTests {
     @Test("Reconciling that keeps the selection writes nothing")
     func reconcileKeepsWithoutWriting() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         let wrote = Self.writes(to: shell) { shell.reconcile(with: world.rows) }
@@ -184,7 +187,7 @@ struct ShellNavigationModelTests {
     @Test("The row of the selection is the listed row with its reference")
     func selectedRowIsTheListedRow() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.second.reference))
 
         #expect(shell.selectedRow(in: world.rows)?.reference == world.second.reference)
@@ -194,7 +197,7 @@ struct ShellNavigationModelTests {
     @Test("There is no selected row when nothing is selected or the list does not have the CV")
     func noSelectedRow() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         #expect(shell.selectedRow(in: world.rows) == nil)
 
@@ -207,7 +210,7 @@ struct ShellNavigationModelTests {
     @Test("Going back to the list closes the open CV on a collapsed split view")
     func backToTheListDeselectsWhenCollapsed() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.columnChanged(to: .sidebar, isCollapsed: true)
@@ -218,7 +221,7 @@ struct ShellNavigationModelTests {
     @Test("The sidebar the system writes while the split view changes its size class keeps the open CV")
     func sidebarWhileNotCollapsedKeepsTheSelection() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.columnChanged(to: .sidebar, isCollapsed: false)
@@ -229,7 +232,7 @@ struct ShellNavigationModelTests {
     @Test("Showing the detail changes nothing, collapsed or not")
     func detailColumnChangesNothing() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.columnChanged(to: .detail, isCollapsed: true)
@@ -241,7 +244,7 @@ struct ShellNavigationModelTests {
     @Test("Deselecting clears the selection and shows the list")
     func deselectShowsTheList() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.deselect()
@@ -253,7 +256,7 @@ struct ShellNavigationModelTests {
     @Test("Reconciling keeps a selection that is still listed")
     func reconcileKeeps() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.reconcile(with: world.rows)
@@ -264,7 +267,7 @@ struct ShellNavigationModelTests {
     @Test("Reconciling clears a selection that is no longer listed")
     func reconcileClears() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.reconcile(with: [world.second])
@@ -276,7 +279,7 @@ struct ShellNavigationModelTests {
     @Test("Reconciling with an empty list clears the selection")
     func reconcileEmpty() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
         shell.open(.stored(world.first.reference))
 
         shell.reconcile(with: [])
@@ -287,7 +290,7 @@ struct ShellNavigationModelTests {
     @Test("Reconciling with nothing selected selects nothing")
     func reconcileWithoutSelection() async throws {
         let world = try await Self.world()
-        let shell = ShellNavigationModel()
+        let shell = Self.shell()
 
         shell.reconcile(with: world.rows)
 
@@ -302,6 +305,7 @@ struct ShellNavigationModelTests {
         let flag = Flag()
         withObservationTracking {
             _ = shell.detail
+            _ = shell.editor
             _ = shell.selection
             _ = shell.preferredColumn
         } onChange: {

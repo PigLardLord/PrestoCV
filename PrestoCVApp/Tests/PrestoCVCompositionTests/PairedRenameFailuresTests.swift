@@ -36,6 +36,7 @@ struct PairedRenameFailuresTests {
         let editing = editing()
         var named = FixtureCV.full()
         named.rename("Backend")
+        named.setPersonalDetails(PersonalDetails(fullName: "Mara Ellison"))
         let saved = try await editing.save(named)
         let loaded = try await editing.load(saved.id)
 

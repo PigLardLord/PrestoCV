@@ -79,6 +79,9 @@ public final class Composition {
         /// What a launch does before the folders are made, such as writing the seed of a UI test. It fails with a code.
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
+        /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
+        /// gives it, since asking for it is the app's own (UIKit on iOS).
+        let backgroundTime: any BackgroundTime
     }
 
     let paths: AppPaths
@@ -131,7 +134,7 @@ public final class Composition {
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
             lookOptions: parts.lookOptions, languages: parts.languages,
-            wrapListEditing: inputs.wrapListEditing
+            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime
         )
     }
 
@@ -239,7 +242,11 @@ public final class Composition {
 
     /// Assembles the app for this launch. A Debug build reads the fixtures its launch arguments ask for; a Release build
     /// has no code that does (`ReleaseHygieneTests`).
-    public static func launch(arguments: [String], settlement: TraceSettlement) async -> CompositionState {
+    /// - Parameter backgroundTime: The time the system grants to end the writes once the app leaves the foreground,
+    ///   which the app's platform layer asks for.
+    public static func launch(
+        arguments: [String], settlement: TraceSettlement, backgroundTime: any BackgroundTime
+    ) async -> CompositionState {
         let device = AppPaths.onDevice()
         let paths: AppPaths
         let gate: TraceLaunchGate
@@ -314,7 +321,8 @@ public final class Composition {
             },
             check: check,
             prepare: prepare,
-            wrapListEditing: wrapListEditing
+            wrapListEditing: wrapListEditing,
+            backgroundTime: backgroundTime
         ))
     }
 }

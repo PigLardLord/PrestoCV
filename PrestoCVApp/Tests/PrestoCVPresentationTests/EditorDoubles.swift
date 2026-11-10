@@ -223,10 +223,12 @@ extension EditFailure {
 struct Editing {
     let editing = EditingFake()
     let clock = ManualClock()
+    /// The calls of the editors' `didStore`.
+    let storesTold = CallCount()
 
     func editor(_ start: EditorStart) -> EditorViewModel {
         EditorViewModel(start: start, editing: editing, clock: self.clock, pause: .seconds(1),
-                        copyTitle: { "Copy of " + $0 })
+                        copyTitle: { "Copy of " + $0 }, didStore: { [storesTold] in storesTold.count += 1 })
     }
 
     /// A CV in the store with invented values: titled "Design roles", in Italian.
@@ -251,6 +253,28 @@ struct Editing {
         self.clock.advance(by: .seconds(1))
         await waitUntil("\(expected) writes") { editing.writeCount >= expected }
     }
+
+    /// The navigation of the shell, opening its editors over this store, with the system's background time seen by `time`.
+    func shell(time: BackgroundTimeSpy = BackgroundTimeSpy()) -> ShellNavigationModel {
+        ShellNavigationModel(makeEditor: { editor($0) }, backgroundTime: time)
+    }
+}
+
+/// The system's background time as a test sees it: each hold asked for, and what `probe` read when it began and when it
+/// ended.
+@MainActor
+final class BackgroundTimeSpy: BackgroundTime {
+    /// Read when a hold begins and when it ends, such as how many writes the store took by then.
+    var probe: @MainActor () -> Int = { 0 }
+    /// What `probe` read as each hold began, in order.
+    private(set) var begun: [Int] = []
+    /// What `probe` read as each hold ended, in order of their ends.
+    private(set) var ended: [Int] = []
+
+    func hold() -> BackgroundHold {
+        begun.append(probe())
+        return BackgroundHold { [self] in ended.append(probe()) }
+    }
 }
 
 /// A bounded wait that records an issue instead of hanging or passing by luck.
@@ -271,6 +295,10 @@ func settle() async {
 
 @MainActor
 final class Returned { var value = false }
+
+/// How many times a callback was called.
+@MainActor
+final class CallCount { var count = 0 }
 
 extension EditorViewModel {
     /// Types into a field of the form, as the person does.

@@ -71,12 +71,18 @@ final class Moment {
 /// The list, the first run and the look picker on the fakes. The editors have always stored, unless a test closes the gate.
 @MainActor
 struct Browsing {
-    let editing = EditingFake()
+    let editing: EditingFake
     let browsing: BrowsingFake
     let moment = Moment()
     let storedGate = Gate()
 
-    init() { browsing = BrowsingFake(editing: editing) }
+    init() { self.init(editing: EditingFake()) }
+
+    /// A list over the store of `editing`, so that it reads what editors stored there.
+    init(editing: EditingFake) {
+        self.editing = editing
+        browsing = BrowsingFake(editing: editing)
+    }
 
     /// The view's word for a CV with no title, and how it numbers a title
     static let untitled = "Untitled CV"

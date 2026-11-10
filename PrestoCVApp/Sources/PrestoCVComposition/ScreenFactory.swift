@@ -28,6 +28,8 @@ public final class ScreenFactory {
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
+    /// The time the system grants the shell to store its editors once the app leaves the foreground.
+    private let backgroundTime: any BackgroundTime
     /// The editors made and not yet released. The factory never keeps one alive.
     private var editors: [WeakEditor] = []
     /// How many editors the factory has made: each one is known by its number, which is never reused.
@@ -44,11 +46,12 @@ public final class ScreenFactory {
     ///   - languages: The languages the export sheets offer.
     ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
     ///     launch fixture wraps it.
+    ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exporter: any CVExporting, lookOptions: any LookOptionsProviding, languages: [ExportLanguage],
-        wrapListEditing: (any CVEditing) -> any CVEditing
+        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
@@ -60,6 +63,7 @@ public final class ScreenFactory {
         self.languages = languages
         self.clock = clock
         self.editorClock = editorClock
+        self.backgroundTime = backgroundTime
     }
 
     /// The list of CVs.
@@ -69,9 +73,9 @@ public final class ScreenFactory {
     ///
     /// Before it reads the store, the list has every editor still alive store what it shows at its turn, once
     /// (`editorsStored`, through each editor's `saveWhatItShows()`). An edit made after an editor's turn, even while that
-    /// editor's own write runs, is not waited for: the autosave stores it, and the list shows it on its next load (step
-    /// 5-11a reloads the list after each store, issue #402). The factory holds editors weakly, so whoever lets an editor go
-    /// waits for its `saveNow()` first, which stores every edit (the shell's navigation, step 5-11a).
+    /// editor's own write runs, is not waited for: the autosave stores it, and that write reloads the list (the shell's
+    /// editors call the list's `load()` after each write they stored). The factory holds editors weakly, and the shell
+    /// keeps an editor it lets go alive until its `saveNow()` ended, which stores every edit.
     public func makeCVList(
         untitled: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
@@ -82,9 +86,21 @@ public final class ScreenFactory {
         )
     }
 
-    /// The navigation of the shell: which CV is open, and which column a compact screen shows.
-    public func makeShell() -> ShellNavigationModel {
-        ShellNavigationModel()
+    /// The navigation of the shell: which CV is open, its editor, and which column a compact screen shows. Each editor it
+    /// opens reloads `list` and `firstRun` after each write the store took, so that the list shows the CV as stored and
+    /// the first CV stored ends a first run: leaving it shows the list, not the welcome. The shell keeps neither alive.
+    /// - Parameter copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
+    public func makeShell(
+        list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String
+    ) -> ShellNavigationModel {
+        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
+            self.makeEditor(start: start, copyTitle: copyTitle, didStore: {
+                Task {
+                    await list?.load()
+                    await firstRun?.load()
+                }
+            })
+        }, backgroundTime: backgroundTime)
     }
 
     /// The first run and the ways to start another CV. It does not offer the import while the app has no import screen
@@ -102,9 +118,13 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - start: What the editor opens.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
-    public func makeEditor(start: EditorStart, copyTitle: @escaping @MainActor (String) -> String) -> EditorViewModel {
+    ///   - didStore: Called after each write the store took, so that the list reads the CVs again.
+    public func makeEditor(
+        start: EditorStart, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
+    ) -> EditorViewModel {
         let editor = EditorViewModel(
-            start: start, editing: editing, clock: editorClock, pause: Autosave<CV>.pause, copyTitle: copyTitle
+            start: start, editing: editing, clock: editorClock, pause: Autosave<CV>.pause, copyTitle: copyTitle,
+            didStore: didStore
         )
         made += 1
         editors = editors.filter { $0.editor != nil } + [WeakEditor(editor, number: made)]
@@ -143,9 +163,9 @@ public final class ScreenFactory {
     /// stores what it shows at its turn and waits for two writes at most (`saveWhatItShows()`, not the draining
     /// `saveNow()`), so an edit made while those writes run does not hold the list, nor does a `saveNow()` of that editor
     /// that runs meanwhile; an editor made while an earlier one is storing gets a turn as well. An editor already stored
-    /// is not visited again, so an edit made after its turn is left to its autosave and to the list's next load: going
-    /// round again while the person types would never end. An editor already released is not waited for: whoever lets an
-    /// editor go waits for its `saveNow()` first (the shell's navigation, step 5-11a).
+    /// is not visited again, so an edit made after its turn is left to its autosave, whose write reloads the list
+    /// (`didStore`): going round again while the person types would never end. An editor already released is not waited
+    /// for: the shell keeps an editor it lets go alive until its `saveNow()` ended, and that stores every edit.
     ///
     /// The editors already stored are told apart by their numbers, not by the identity of the object: an editor made
     /// after a stored one was freed may take its address, and would then be skipped.

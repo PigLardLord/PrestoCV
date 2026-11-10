@@ -3,12 +3,15 @@ import SwiftUI
 
 /// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it shows
 /// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
-/// what is open, which column shows and whether the welcome shows; this view binds to them.
+/// what is open, which column shows, whether the welcome shows and whether the open CV may be left; this view binds to
+/// them. It tells the shell when the scene stops being active, which stores the open CV at once on its way to the
+/// background.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     @State private var addingCV = false
     /// The way to start chosen in the "+" sheet, opened when the sheet has closed.
     @State private var chosenInSheet: StartChoice?
@@ -16,6 +19,7 @@ struct ShellView: View {
     var body: some View {
         screen
             .task { await firstRun.load() }
+            .onChange(of: scenePhase) { _, phase in shell.sceneChanged(isActive: phase == .active) }
     }
 
     @ViewBuilder
@@ -52,19 +56,27 @@ struct ShellView: View {
         }
     }
 
+    /// The open CV's editor, a new one for each CV opened. While its text cannot be stored, Back is hidden (which also
+    /// stops the swipe), so the person answers the status first.
     @ViewBuilder
     private var detail: some View {
+        if let editor = shell.editor {
+            EditorView(editor: editor, title: title(of: editor))
+                .id(ObjectIdentifier(editor))
+                .navigationBarBackButtonHidden(!shell.canLeave)
+        } else {
+            DetailPlaceholderView()
+        }
+    }
+
+    /// The open CV's name as the list shows it, or "New CV" for a draft. A stored CV whose row has gone keeps the name it
+    /// has in the editor.
+    private func title(of editor: EditorViewModel) -> Text {
         switch shell.detail {
         case .stored?:
-            if let row = shell.selectedRow(in: list.rows) {
-                OpenedCVPlaceholderView(title: Text(verbatim: row.label))
-            } else {
-                DetailPlaceholderView()
-            }
-        case .draft?, .blank?:
-            OpenedCVPlaceholderView(title: Text("shell.draft.title"))
-        case nil:
-            DetailPlaceholderView()
+            shell.selectedRow(in: list.rows).map { Text(verbatim: $0.label) } ?? Text(verbatim: editor.content.title)
+        case .draft?, .blank?, nil:
+            Text("shell.draft.title")
         }
     }
 
@@ -82,7 +94,8 @@ struct ShellView: View {
         start(chosenInSheet)
     }
 
-    /// The system selects a row, and clears the selection when the person goes back.
+    /// The system selects a row, and clears the selection when the person goes back. The model may keep the open CV (its
+    /// text cannot be stored yet); the selection then stays on it.
     private var selection: Binding<CVReference?> {
         Binding(
             get: { shell.selection },
