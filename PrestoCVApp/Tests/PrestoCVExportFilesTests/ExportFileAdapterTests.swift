@@ -8,7 +8,7 @@ import Android
 #elseif canImport(Darwin)
 import Darwin
 #endif
-import PrestoCVExportFiles
+@testable import PrestoCVExportFiles
 import PrestoCVWorkflowPorts
 import Testing
 
@@ -18,6 +18,15 @@ struct ExportFileAdapterTests {
     private static let name = "Mara Ellison – CV.pdf"
 
     // MARK: Writing and removing
+
+    @Test("a share's file is written atomically, and on iOS with complete protection unless open")
+    func writingOptions() {
+        #if os(iOS)
+        #expect(ExportFileAdapter.writingOptions == [.atomic, .completeFileProtectionUnlessOpen])
+        #else
+        #expect(ExportFileAdapter.writingOptions == [.atomic], "a Mac does not apply the protection")
+        #endif
+    }
 
     @Test("a write puts the PDF under its name, in a folder of its own under the root")
     func writePutsThePDFUnderItsName() async throws {

@@ -12,8 +12,11 @@ import Synchronization
 /// - Making the adapter removes whatever is left under `root`: the folders of shares an earlier launch could not remove,
 ///   or did not live to remove. The composition makes it once, at launch, and no write can start before it is made, so
 ///   nothing of this launch is there yet.
-/// - `root` lies in the system's temporary folder, which no backup reads, so no file of a share is ever backed up. The
-///   file takes the app's default data protection.
+/// - `root` lies in the system's temporary folder, which no backup reads, so no file of a share is ever backed up.
+/// - On iOS the file, which holds the person's whole CV, is written with complete protection unless open: once the
+///   device locks, no one can open it, while a service of the share sheet that has it open already (AirDrop, Mail) can
+///   finish reading it. A Mac does not apply the protection, and a locked keybag would refuse the write there, as for
+///   the trace store, so a Mac writes it with none.
 /// - The log names a kind of failure only: never the file's name, which holds the person's name, nor its path.
 public final class ExportFileAdapter: ExportFileSharing {
     private struct State {
@@ -23,6 +26,15 @@ public final class ExportFileAdapter: ExportFileSharing {
 
     /// The longest file name, in UTF-8 bytes, that a file system takes for one path component.
     private static let maximumNameBytes = 255
+
+    /// Atomic, and on iOS with complete protection unless open (see the notes above).
+    static var writingOptions: Data.WritingOptions {
+        #if os(iOS)
+        [.atomic, .completeFileProtectionUnlessOpen]
+        #else
+        [.atomic]
+        #endif
+    }
 
     private let root: URL
     private let logger: any DiagnosticLogger
@@ -53,7 +65,7 @@ public final class ExportFileAdapter: ExportFileSharing {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             made = true
             let url = folder.appendingPathComponent(fileName, isDirectory: false)
-            try pdf.write(to: url, options: .atomic)
+            try pdf.write(to: url, options: Self.writingOptions)
             state.withLock { $0.folders[id] = folder }
             return SharedFile(id: id, url: url)
         } catch {
