@@ -7,6 +7,9 @@ import SwiftUI
 /// and the note are hidden from VoiceOver.
 ///
 /// At the accessibility text sizes the line wraps onto more lines, so that the whole text can be read without editing it.
+/// The wrapped field grows with its text and never scrolls it, so a drag that starts on it scrolls the form: on iOS 27
+/// its frame comes out a fraction of a point shorter than its text, and its text view took the drag instead (see
+/// `wrappedTextNeverScrolls(_:)`).
 /// The text keeps no line break of its own: a wrapping field takes the return key as one, and the binding decides what
 /// the field keeps of it, as `FieldEntry` does in the editor.
 ///
@@ -53,6 +56,7 @@ struct LabeledField<Focus: Hashable>: View {
                 .accessibilityCustomContent(
                     AccessibilityCustomContentKey("field.note", id: "field.note"), note.map { Text($0) }, importance: .high
                 )
+                .wrappedTextNeverScrolls(dynamicTypeSize.isAccessibilitySize)
                 .frame(minHeight: TapTarget.minimumHeight)
                 .focused(focus, equals: name)
                 .id(refreshed)

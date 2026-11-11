@@ -187,7 +187,9 @@ final class EditorConflictUITests: XCTestCase {
     // MARK: Helpers
 
     /// Opens Backend Engineer, types at the end of its title, and waits for the status the other window's change gives,
-    /// with the notice above the form. The keyboard is put away, so that only the notice and the form remain.
+    /// with the notice above the form. The keyboard is put away, so that only the notice and the form remain. While the
+    /// person types, the form may scroll the status line at its top off the screen, where a form shows no row: it is
+    /// brought back before it is read.
     @MainActor
     private func blocked(by words: String, in app: XCUIApplication) throws {
         open(backendEngineer, in: app)
@@ -196,9 +198,10 @@ final class EditorConflictUITests: XCTestCase {
         scrollUntilHittable(title, named: "The title field", in: app)
         append(typed, to: title)
         XCTAssertTrue(element("editor.notice", in: app).waitForExistence(timeout: 30), "The notice says what to do")
-        XCTAssertTrue(waitUntil(status(of: app), reads: words), "The status line says why the text is not stored")
         let done = app.buttons["keyboard.done"]
         if done.exists { done.tap() }
+        scrollBackUntilHittable(status(of: app), named: "The status line", in: app)
+        XCTAssertTrue(waitUntil(status(of: app), reads: words), "The status line says why the text is not stored")
     }
 
     @MainActor
@@ -356,20 +359,40 @@ final class EditorConflictUITests: XCTestCase {
         return XCTWaiter().wait(for: [gone], timeout: 30) == .completed
     }
 
+    /// Scrolls the form up in steps shorter than the screen until the element can be tapped.
     @MainActor
     private func scrollUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
+        scroll(until: element, named: name, in: app, from: 0.6, to: 0.3)
+    }
+
+    /// The same towards the top of the form. The drag starts below the notice, which scrolls by itself and would keep
+    /// the drag.
+    @MainActor
+    private func scrollBackUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
+        scroll(until: element, named: name, in: app, from: 0.5, to: 0.8)
+    }
+
+    /// Drags the form from one height to another, as fractions of its frame, until the element can be tapped.
+    @MainActor
+    private func scroll(
+        until element: XCUIElement, named name: String, in app: XCUIApplication, from start: CGFloat, to end: CGFloat
+    ) {
         let form = self.element("shell.detail.opened", in: app)
-        let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
+        let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: end))
         for _ in 0..<15 where !(element.exists && element.isHittable) {
+            // Held at the end, so the form does not glide on
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTAssertTrue(element.exists && element.isHittable, "\(name) comes into view")
     }
 
+    /// Puts the cursor after the text of the field and types: a tap near its end, past the last word, and low in the
+    /// field, on its last line where the field wraps. A tap at the middle of a field of two lines lands at the end of
+    /// the first.
     @MainActor
     private func append(_ text: String, to field: XCUIElement) {
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.9)).tap()
         field.typeText(text)
     }
 }

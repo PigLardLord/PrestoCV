@@ -5,7 +5,8 @@ import XCTest
 /// CV right after an edit stores that edit. Each field has the keyboard of its text and a Done button above it, reads its
 /// label to VoiceOver, and stays tall enough to tap at the largest text size. A field whose text cannot be read is named
 /// once the person leaves it, never while they type. A field of one line wraps onto more lines at the largest text
-/// size, so that its whole text can be read, and its return key moves to the next field and keeps no line break.
+/// size, so that its whole text can be read; a drag on it scrolls the form, and its return key moves to the next field
+/// and keeps no line break.
 final class EditorDetailsUITests: XCTestCase {
 
     /// A CV the launch fixture stores before the app starts.
@@ -17,6 +18,7 @@ final class EditorDetailsUITests: XCTestCase {
         let saved: String
         var role = ""
         var email: String?
+        var summary = ""
     }
 
     private let backendEngineer = StoredCV(
@@ -30,6 +32,17 @@ final class EditorDetailsUITests: XCTestCase {
         identity: "8D3B8E3A-3DAE-4E3D-9F77-3B5D4EAD9C03", title: "Payments Lead", person: "Mara Ellison",
         saved: "2026-01-03T00:00:00Z", role: "Senior Backend Engineer, Payments Platform",
         email: "mara.ellison@example.com")
+    /// A CV whose summary takes many more lines than an empty summary, at every text size and on every screen.
+    private let platformLead = StoredCV(
+        identity: "9E4C9F4B-4EBF-4F4E-8A88-4C6E5FBE8D04", title: "Platform Lead", person: "Ines Corr",
+        saved: "2026-01-04T00:00:00Z",
+        summary: "Backend engineer with ten years in payments and banking. I lead a team of six that runs the card "
+            + "platform, from the first design to the nights on call. I moved our settlement jobs to a queue that "
+            + "never loses a payment, cut the time of a release from a day to an hour, and wrote the guide our new "
+            + "engineers follow in their first month. I review each change with care and keep the tests close to "
+            + "the code they check. Before payments I built the booking system of a regional rail company, where I "
+            + "learned to plan a migration in small steps that can each be undone. I like plain code, short "
+            + "meetings, clear notes and teams that share what they learn.")
 
     /// The English words of the status line.
     private let saved = "Saved on this device"
@@ -63,9 +76,9 @@ final class EditorDetailsUITests: XCTestCase {
         if !cvs.isEmpty {
             app.launchArguments += ["-PrestoCVNextSeed", try seed(cvs)]
         }
-        if largestText {
-            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
-        }
+        // The default size is named too, so that a test can measure text at the size the app shows it
+        let size = largestText ? UIContentSizeCategory.accessibilityExtraExtraExtraLarge : .large
+        app.launchArguments += ["-UIPreferredContentSizeCategoryName", size.rawValue]
         app.launch()
         return app
     }
@@ -80,7 +93,7 @@ final class EditorDetailsUITests: XCTestCase {
             {"schemaVersion":1,"id":"\(cv.identity)","revision":1,
              "createdAt":"2026-01-01T00:00:00Z","updatedAt":"\(cv.saved)","title":"\(cv.title)",
              "personal":{"fullName":"\(cv.person)","professionalTitle":"\(cv.role)",\(email)"location":"",
-                         "summary":""},
+                         "summary":"\(cv.summary)"},
              "experiences":[],"education":[],"skills":[],"languages":[],"certifications":[],"profiles":[],"interests":[]}
             """
         }
@@ -166,34 +179,37 @@ final class EditorDetailsUITests: XCTestCase {
     /// tapped. A form shows only the rows on screen. The drag stays in the form, away from the list beside it.
     @MainActor
     private func scrollUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        scroll(until: element, named: name, in: app, from: 0.6, to: 0.3)
+        scroll(until: { element.exists && element.isHittable }, named: name, in: app, from: 0.6, to: 0.3)
     }
 
     /// The same towards the top of the form, to a field above those on screen.
     @MainActor
     private func scrollBackUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        scroll(until: element, named: name, in: app, from: 0.3, to: 0.6)
+        scroll(until: { element.exists && element.isHittable }, named: name, in: app, from: 0.3, to: 0.6)
     }
 
-    /// Drags the form from one height to another, as fractions of its frame, until the element can be tapped.
+    /// Drags the form from one height to another, as fractions of its frame, until `shown` holds.
     @MainActor
     private func scroll(
-        until element: XCUIElement, named name: String, in app: XCUIApplication, from start: CGFloat, to end: CGFloat
+        until shown: () -> Bool, named name: String, in app: XCUIApplication, from start: CGFloat, to end: CGFloat
     ) {
         let form = self.element("shell.detail.opened", in: app)
         let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
         let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: end))
-        for _ in 0..<15 where !(element.exists && element.isHittable) {
+        for _ in 0..<15 {
+            if shown() { break }
             // Held at the end, so the form does not glide on
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
         }
-        XCTAssertTrue(element.exists && element.isHittable, "\(name) comes into view")
+        XCTAssertTrue(shown(), "\(name) comes into view")
     }
 
-    /// Puts the cursor after the text of the field and types: a tap near its end, past the last word.
+    /// Puts the cursor after the text of the field and types: a tap near its end, past the last word, and low in the
+    /// field, on its last line where the field wraps. A tap at the middle of a field of two lines lands at the end of
+    /// the first.
     @MainActor
     private func append(_ text: String, to field: XCUIElement) {
-        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.9)).tap()
         field.typeText(text)
     }
 
@@ -353,7 +369,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         let title = textInput("editor.field.title", in: app)
         scrollUntilHittable(title, named: "The CV name", in: app)
-        title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.9)).tap()
         let next = returnKey(in: app)
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The keyboard of the CV name has a return key")
         next.tap()
@@ -446,6 +462,88 @@ final class EditorDetailsUITests: XCTestCase {
 
         XCTAssertGreaterThan(roleHeight, oneLine * 1.5, "The job title takes more lines than an empty field")
         XCTAssertGreaterThan(emailHeight, oneLine * 1.5, "The e-mail address takes more lines than an empty field")
+    }
+
+    /// At the largest text size a drag that starts on a field of several lines scrolls the form, as on any other row:
+    /// the field does not keep the drag to scroll its own text, which it shows whole.
+    @MainActor
+    func testADragOnAWrappedFieldScrollsTheForm() throws {
+        let app = try launch([paymentsLead], largestText: true)
+        open(paymentsLead, in: app)
+        let role = textInput("editor.field.professionalTitle", in: app)
+        checkADragScrollsTheForm(from: role, named: "The job title", in: app)
+    }
+
+    /// The same from a long summary, a field of several lines that grows with its text: at the largest text size it is
+    /// taller than the screen and its text fills it, so it could scroll that text if it came out shorter than it. An
+    /// empty summary is taller than its text and could never take the drag.
+    @MainActor
+    func testADragOnTheSummaryScrollsTheForm() throws {
+        let app = try launch([platformLead], largestText: true)
+        open(platformLead, in: app)
+        checkADragScrollsTheForm(from: app.textViews["editor.field.summary"], named: "The summary", in: app)
+    }
+
+    /// A long summary shows whole, at the default text size: the summary grows with its text, which it never scrolls
+    /// (#402), so it is at least as tall as its text laid out at the field's width, on a narrow screen and a wide one
+    /// alike, while an empty one is about four lines tall.
+    /// - The text is measured at the field's whole width, wider than the text view lays it out in, which keeps a margin
+    ///   on each side: it breaks into no more lines than the field's, so its height is a floor of the field's.
+    /// - XCUITest reads the frame of a field partly off the screen clipped to the screen, so the form first scrolls
+    ///   until the whole field lies on it.
+    @MainActor
+    func testALongSummaryShowsWhole() throws {
+        let app = try launch([platformLead], largestText: false)
+        open(platformLead, in: app)
+        let form = element("shell.detail.opened", in: app)
+        let summary = app.textViews["editor.field.summary"]
+        scroll(
+            until: {
+                summary.exists && form.frame.minY < summary.frame.minY && summary.frame.maxY + 10 < form.frame.maxY
+            },
+            named: "The whole summary", in: app, from: 0.6, to: 0.3)
+        XCTAssertEqual(summary.value as? String, platformLead.summary)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "A long summary"
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        let body = UIFont.preferredFont(
+            forTextStyle: .body, compatibleWith: UITraitCollection(preferredContentSizeCategory: .large))
+        let text = (platformLead.summary as NSString).boundingRect(
+            with: CGSize(width: summary.frame.width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: body], context: nil)
+        XCTAssertGreaterThan(text.height, body.lineHeight * 5, "The summary's text takes more lines than an empty one")
+        XCTAssertGreaterThanOrEqual(summary.frame.height, text.height, "The summary is as tall as its text")
+    }
+
+    /// Scrolls until the field's top lies on the form, more than 250 pt below the form's top and 150 pt above its
+    /// bottom, and drags the form up 200 pt from 40 pt under the field's top, held at the end so that the form does not
+    /// glide on: the field's top moves up with the form by more than 50 pt.
+    /// - The drag starts near the field's top: a field that can be tapped may still have its middle off the screen,
+    ///   and a drag from there never touches the field.
+    /// - The field's top stays on the screen through the drag: once the top of a field taller than the screen passes
+    ///   above the screen, XCUITest clips the field's frame to the screen, and its top then reads 0 however far the
+    ///   form moved.
+    /// - The drag goes up, toward the text's end: a text view whose text starts at its top lets a drag down pass to
+    ///   the form, so only a drag up shows whether it scrolls its own text.
+    @MainActor
+    private func checkADragScrollsTheForm(from field: XCUIElement, named name: String, in app: XCUIApplication) {
+        let form = element("shell.detail.opened", in: app)
+        scroll(
+            until: {
+                guard field.exists else { return false }
+                let top = field.frame.minY
+                return form.frame.minY + 250 < top && top + 150 < form.frame.maxY
+            },
+            named: name, in: app, from: 0.6, to: 0.3)
+        let top = field.frame.minY
+        let start = field.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: field.frame.width / 2, dy: min(40, field.frame.height / 2)))
+        start.press(
+            forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -200)), withVelocity: .slow,
+            thenHoldForDuration: 0.2)
+        XCTAssertLessThan(field.frame.minY, top - 50, "A drag on \(name.lowercased()) scrolls the form")
     }
 
     /// VoiceOver reads each field by its label, the summary's text view included.
