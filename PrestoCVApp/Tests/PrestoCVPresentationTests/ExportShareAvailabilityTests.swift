@@ -30,12 +30,15 @@ struct ExportShareAvailabilityTests {
         let world = SheetWorld()
         let sheet = world.sheet()
         #expect(sheet.shareAvailability == .unavailable)
+        await world.exporter.gate.close()
 
         sheet.start()
         #expect(sheet.shareAvailability == .preparing, "the pause counts as part of the export")
 
         await world.passThePause(thenExports: 1)
-        #expect(sheet.shareAvailability == .preparing)
+        await world.held(1)
+        #expect(sheet.shareAvailability == .preparing, "the export runs")
+        await world.exporter.gate.open()
         await waitUntil("the PDF") { sheet.document != nil }
         #expect(sheet.shareAvailability == .ready)
     }
@@ -102,7 +105,7 @@ struct ExportShareAvailabilityTests {
     // MARK: - Close or Done
 
     @Test("The sheet closes as Done after a save or a send, and as Close otherwise",
-          arguments: [(ShareResult.saved, true), (.sent, true), (.cancelled, false)])
+          arguments: [(ShareResult.saved, true), (.sent, true), (.other, false), (.cancelled, false), (.failed, false)])
     func closesAsDoneAfterAShare(result: ShareResult, done: Bool) async throws {
         let world = SheetWorld()
         let sheet = await exported(in: world)

@@ -25,6 +25,9 @@ public final class ExportSheetViewModel {
     public private(set) var missing = ExportMissing.unknown
     /// A share of the PDF that went through, until the next export.
     public private(set) var shareOutcome: ShareOutcome?
+    /// The last share of the PDF that could not go through: its file could not be written, or the share sheet reported
+    /// an error. A new try, a share that goes through and the next export clear it.
+    public private(set) var shareFailure: ShareFailure?
     /// The PDF on the whole screen, or nil when the sheet shows it at its own size. It is always the PDF the sheet holds:
     /// a new export and the end of the sheet close it.
     public private(set) var fullPDF: FullPDF?
@@ -68,6 +71,8 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var generation = 0
     /// True while the file of a share is being written: a second tap writes nothing, and Share shows it is preparing.
     private var writing = false
+    /// Counts the failed shares, so that each one is a new value.
+    @ObservationIgnored private var failures = 0
 
     /// - Parameters:
     ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.
@@ -138,14 +143,16 @@ public final class ExportSheetViewModel {
         fullPDF = nil
         openShare = nil
         writing = false
+        shareFailure = nil
     }
 
     /// Writes the PDF as a file under its name, then opens the share. Without a PDF, or while a share is open or its
-    /// file is being written, it does nothing. A file that cannot be written opens no share: the adapter logs it, and
-    /// the next tap tries again.
+    /// file is being written, it does nothing. A file that cannot be written opens no share and marks the share as
+    /// failed; the next tap tries again.
     public func share() {
         guard openShare == nil, !writing, let document, let documentID, let suggestedFileName else { return }
         writing = true
+        shareFailure = nil
         let mine = generation
         Task { [weak self, files] in
             do {
@@ -174,27 +181,43 @@ public final class ExportSheetViewModel {
         openShare = PDFShare(file: file, fileName: fileName, export: export, files: files, sheet: self)
     }
 
+    /// The file of a share could not be written: the share is marked as failed, unless a new export or the end of the
+    /// sheet came first.
     private func writeFailed(_ mine: Int) {
         guard mine == generation else { return }
         writing = false
+        markShareFailed()
     }
 
-    /// The share sheet of `share` ended: the sheet lets it go, and confirms it when it went through.
+    /// The share sheet of `share` ended: the sheet lets it go, confirms it when it went through, and marks it when it
+    /// failed.
     func shareEnded(_ share: PDFShare, with result: ShareResult) {
         if openShare === share { openShare = nil }
         shareEnded(result, of: share.export)
     }
 
-    /// The share sheet of the PDF made by export `shared` ended.
+    /// The share sheet of the PDF made by export `shared` ended. Only a save or a send is confirmed; a share that went
+    /// through another way, or was cancelled, says nothing.
     func shareEnded(_ result: ShareResult, of shared: ExportID) {
         // A share that ends after a newer export started is about a PDF no longer on screen, even when the new PDF holds
         // the same bytes
         guard shared == documentID else { return }
         switch result {
-        case .saved: shareOutcome = .saved
-        case .sent: shareOutcome = .sent
-        case .cancelled: break
+        case .saved: wentThrough(.saved)
+        case .sent: wentThrough(.sent)
+        case .failed: markShareFailed()
+        case .other, .cancelled: break
         }
+    }
+
+    private func wentThrough(_ outcome: ShareOutcome) {
+        shareOutcome = outcome
+        shareFailure = nil
+    }
+
+    private func markShareFailed() {
+        failures += 1
+        shareFailure = ShareFailure(ordinal: failures)
     }
 
     // MARK: - The export
@@ -208,6 +231,7 @@ public final class ExportSheetViewModel {
         documentID = nil
         suggestedFileName = nil
         shareOutcome = nil
+        shareFailure = nil
         fullPDF = nil
         openShare = nil
         writing = false

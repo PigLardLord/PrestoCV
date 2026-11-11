@@ -18,11 +18,13 @@ struct ExportSheetView: View {
                     PageCountLine(pages: sheet.document?.pages)
                     ExportStatusView(status: sheet.status)
                     ShareOutcomeLine(outcome: sheet.shareOutcome)
+                    ShareFailedLine(failure: sheet.shareFailure)
                     MissingFieldsView(missing: sheet.missing)
                 }
                 .padding(Spacing.medium)
                 .readableWidth()
                 .announce(sheet.shareOutcome) { $0.words }
+                .announce(sheet.shareFailure) { $0.words }
             }
             .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("export.sheet.title")

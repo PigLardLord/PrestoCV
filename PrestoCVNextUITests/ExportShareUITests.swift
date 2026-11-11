@@ -2,9 +2,9 @@ import XCTest
 
 /// Share, in the bar of the export sheet, opens the system's share sheet with the PDF. The system's share sheet runs in
 /// another process, which XCUITest cannot read, so these tests launch with the stand-in a Debug build shows in its
-/// place: the PDF's file name and the three ways a share sheet ends. A save or a send is confirmed by a line under the
-/// pages, and Close then reads Done; a share closed without going through says nothing. A CV without a name has no PDF,
-/// and Share stays off.
+/// place: the PDF's file name and the ways a share sheet ends. A save or a send is confirmed by a line under the pages,
+/// and Close then reads Done; a share closed without going through, or gone through to print or copy, says nothing; a
+/// share that fails says so. A CV without a name has no PDF, and Share stays off.
 final class ExportShareUITests: XCTestCase {
 
     /// A CV the launch fixture stores before the app starts, in English.
@@ -85,6 +85,39 @@ final class ExportShareUITests: XCTestCase {
         app.buttons["export.share"].tap()
         XCTAssertTrue(
             element("share.standIn.fileName", in: app).waitForExistence(timeout: 30), "Share opens the share sheet again")
+    }
+
+    @MainActor
+    func testAFailedShareSaysSoAndCanBeTriedAgain() throws {
+        let app = try launch(complete)
+        openSheet(of: complete, in: app)
+
+        share(answering: "share.standIn.fail", in: app)
+
+        let failed = element("export.share.failed", in: app)
+        XCTAssertTrue(failed.waitForExistence(timeout: 30), "A line says the share did not go through")
+        XCTAssertEqual(failed.label, "The PDF could not be sent or saved. Try again.", "The line says what to do")
+        XCTAssertFalse(element("export.confirmation", in: app).exists, "A failed share confirms nothing")
+        XCTAssertEqual(app.buttons["export.close"].label, "Close", "The sheet still closes with Close")
+        XCTAssertTrue(app.buttons["export.share"].isEnabled, "Share can be tapped again")
+        keepScreenshot("A failed share", of: app)
+
+        share(answering: "share.standIn.save", in: app)
+        XCTAssertTrue(
+            element("export.confirmation", in: app).waitForExistence(timeout: 30), "The next try goes through")
+        XCTAssertFalse(failed.exists, "A share that goes through takes the line away")
+    }
+
+    @MainActor
+    func testAPrintConfirmsNothing() throws {
+        let app = try launch(complete)
+        openSheet(of: complete, in: app)
+
+        share(answering: "share.standIn.other", in: app)
+
+        XCTAssertFalse(element("export.confirmation", in: app).exists, "A print says nothing of where the PDF went")
+        XCTAssertFalse(element("export.share.failed", in: app).exists, "A print or a copy did not fail")
+        XCTAssertEqual(app.buttons["export.close"].label, "Close", "The sheet still closes with Close")
     }
 
     @MainActor

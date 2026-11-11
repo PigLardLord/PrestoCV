@@ -227,7 +227,7 @@ struct ExportShareFileTests {
         #expect(world.files.written.count == 2)
     }
 
-    @Test("A file that cannot be written opens no share, and the next tap writes again")
+    @Test("A file that cannot be written opens no share and says so, and the next tap writes again")
     func failedWriteSharesNothing() async throws {
         let world = SheetWorld()
         let sheet = await exported(in: world)
@@ -235,26 +235,55 @@ struct ExportShareFileTests {
 
         sheet.share()
         await waitUntil("the write") { world.files.asked == 1 }
-        await settle()
+        await waitUntil("the failure") { sheet.shareFailure != nil }
         #expect(sheet.openShare == nil)
+        #expect(sheet.shareOutcome == nil)
 
         world.files.fails(false)
         sheet.share()
+        #expect(sheet.shareFailure == nil, "a new try clears the failure as soon as it starts")
         await waitUntil("the share") { sheet.openShare != nil }
         #expect(world.files.asked == 2)
         #expect(world.files.written.count == 1)
     }
 
+    @Test("A failed write of an earlier export says nothing about the PDF made after it")
+    func failedWriteOfAnEarlierExportIsIgnored() async throws {
+        let world = SheetWorld()
+        let sheet = await exported(in: world)
+        world.files.fails(true)
+        await world.files.gate.close()
+
+        sheet.share()
+        await waitUntil("the write held") { await world.files.gate.waiting == 1 }
+        sheet.refresh()
+        await world.passThePause(thenExports: 2)
+        await waitUntil("the second PDF") { sheet.document != nil }
+        await world.files.gate.open()
+        await settle()
+
+        #expect(sheet.shareFailure == nil)
+    }
+
     // MARK: - How the share sheet ended
 
-    @Test("The share sheet's end reads as saved, sent or cancelled", arguments: [
-        (nil as String?, false, ShareResult.cancelled),
-        ("com.apple.DocumentManagerUICore.SaveToFiles", false, .cancelled),
-        ("com.apple.DocumentManagerUICore.SaveToFiles", true, .saved),
-        ("com.apple.UIKit.activity.Mail", true, .sent),
-        (nil, true, .sent),
+    /// Only a save to Files and a send by mail, message or AirDrop are confirmed: print, copy and the other apps
+    /// went through, but the sheet cannot tell what they did with the PDF, and a wrong confirmation is worse than none.
+    @Test("The share sheet's end reads as saved, sent, other, cancelled or failed", arguments: [
+        (nil as String?, false, false, ShareResult.cancelled),
+        ("com.apple.DocumentManagerUICore.SaveToFiles", false, false, .cancelled),
+        ("com.apple.DocumentManagerUICore.SaveToFiles", true, false, .saved),
+        ("com.apple.UIKit.activity.Mail", true, false, .sent),
+        ("com.apple.UIKit.activity.Message", true, false, .sent),
+        ("com.apple.UIKit.activity.AirDrop", true, false, .sent),
+        ("com.apple.UIKit.activity.Print", true, false, .other),
+        ("com.apple.UIKit.activity.CopyToPasteboard", true, false, .other),
+        ("net.example.share", true, false, .other),
+        (nil, true, false, .other),
+        ("com.apple.UIKit.activity.Mail", false, true, .failed),
+        (nil, false, true, .failed),
     ])
-    func shareResultOfThePlatform(activity: String?, completed: Bool, result: ShareResult) {
-        #expect(ShareResult(activity: activity, completed: completed) == result)
+    func shareResultOfThePlatform(activity: String?, completed: Bool, failed: Bool, result: ShareResult) {
+        #expect(ShareResult(activity: activity, completed: completed, failed: failed) == result)
     }
 }

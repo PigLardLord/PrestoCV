@@ -36,7 +36,9 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShar
     let _: URL = share.url
     let _: String = share.fileName
     let _: ObjectIdentifier = share.id
-    let result = ShareResult(activity: nil, completed: false)
+    let _: ShareOutcome? = sheet.shareOutcome
+    let _: ShareFailure? = sheet.shareFailure
+    let result = ShareResult(activity: nil, completed: false, failed: false)
     share.end(result)
     sheet.refresh()
     sheet.stop()

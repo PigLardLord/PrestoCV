@@ -66,9 +66,9 @@ private struct SystemShareSheet: UIViewRepresentable {
         guard let share, context.coordinator.shown !== share else { return }
         context.coordinator.shown = share
         guard let presenter = Self.topmost(over: anchor), !presenter.isBeingDismissed else {
-            // Nothing can be shown from here now: the share ends unshared, after this update, so that its file goes and
-            // Share can be tapped again
-            Task { share.end(.cancelled) }
+            // Nothing can be shown from here now: the share ends as failed, after this update, so that its file goes,
+            // the sheet says so and Share can be tapped again
+            Task { share.end(.failed) }
             return
         }
         let sheet = UIActivityViewController(activityItems: [share.url], applicationActivities: nil)
@@ -76,8 +76,8 @@ private struct SystemShareSheet: UIViewRepresentable {
         sheet.popoverPresentationController?.sourceRect = anchor.bounds
         // The handler holds the share, so the file stays for as long as the share sheet can read it. UIKit does not
         // say on which thread it calls the handler, so the end goes to the main actor, where the share lives
-        sheet.completionWithItemsHandler = { activity, completed, _, _ in
-            let result = ShareResult(activity: activity?.rawValue, completed: completed)
+        sheet.completionWithItemsHandler = { activity, completed, _, error in
+            let result = ShareResult(activity: activity?.rawValue, completed: completed, failed: error != nil)
             Task { @MainActor in share.end(result) }
         }
         presenter.present(sheet, animated: true)
@@ -174,7 +174,7 @@ private final class ShareEnd: NSObject, NSSharingServicePickerDelegate, NSSharin
     nonisolated func sharingService(
         _ sharingService: NSSharingService, didFailToShareItems items: [Any], error: any Error
     ) {
-        Task { @MainActor in self.end(.cancelled) }
+        Task { @MainActor in self.end(.failed) }
     }
 }
 #endif
@@ -188,8 +188,8 @@ extension EnvironmentValues {
     @Entry var sharesWithStandIn = false
 }
 
-/// What the UI tests see in place of the system's share sheet: the name of the file, and the three ways a share sheet
-/// ends. Its texts are for the tests, in no catalog.
+/// What the UI tests see in place of the system's share sheet: the name of the file, and the ways a share sheet ends.
+/// Its texts are for the tests, in no catalog.
 private struct ShareStandIn: View {
     let share: PDFShare
 
@@ -201,6 +201,10 @@ private struct ShareStandIn: View {
                 .accessibilityIdentifier("share.standIn.save")
             Button { share.end(.sent) } label: { Text(verbatim: "Send") }
                 .accessibilityIdentifier("share.standIn.send")
+            Button { share.end(.other) } label: { Text(verbatim: "Print") }
+                .accessibilityIdentifier("share.standIn.other")
+            Button { share.end(.failed) } label: { Text(verbatim: "Fail") }
+                .accessibilityIdentifier("share.standIn.fail")
             Button(role: .cancel) { share.end(.cancelled) } label: { Text(verbatim: "Cancel") }
                 .accessibilityIdentifier("share.standIn.cancel")
         }
