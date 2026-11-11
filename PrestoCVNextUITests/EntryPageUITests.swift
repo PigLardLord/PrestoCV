@@ -166,7 +166,9 @@ final class EntryPageUITests: XCTestCase {
         let role = app.textFields["editor.field.experienceRole"]
         XCTAssertEqual(role.value as? String, "Foreman", "The role has the cursor")
         // The CV's form, under the page, has a status of its own
-        let status = app.entryPage.descendants(matching: .any).matching(identifier: "editor.status").firstMatch
+        // Read by type: on iOS 26.5 XCUITest also lists the hidden words that WholeWordsText measures, as Other
+        // elements with the status's identifier and no frame
+        let status = app.entryPage.staticTexts["editor.status"]
         XCTAssertTrue(status.waitForExistence(timeout: 30), "The page shows the save status")
         XCTAssertLessThan(status.frame.midY, role.frame.minY, "The save status comes before the fields")
         putKeyboardAway(in: app)
