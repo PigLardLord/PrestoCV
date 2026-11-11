@@ -171,16 +171,14 @@ struct EditorRowTests {
         }
     }
 
-    /// An editor whose every section has three rows, those of `filled` with text in them.
+    /// An editor whose every section has three rows, those at the places of `filled` with text in them.
     func editorWithRows(filled: Set<Int>, in world: Editing) async throws -> EditorViewModel {
         let editor = await world.editor(on: try await world.storedCV())
         for section in EditorSection.allCases {
-            for index in 0..<3 {
-                editor.addRow(to: section)
-                #expect(ids(editor.content, section).count == index + 1)
-                guard ids(editor.content, section).count == index + 1 else { continue }
-                if filled.contains(index) { fill(editor, section, at: index) }
-            }
+            for _ in 0..<3 { editor.addRow(to: section) }
+            #expect(ids(editor.content, section).count == 3)
+            guard ids(editor.content, section).count == 3 else { continue }
+            for index in filled.sorted() { fill(editor, section, at: index) }
         }
         return editor
     }
@@ -194,14 +192,17 @@ struct EditorRowTests {
     func addRowChangesOnlyItsSection(section: EditorSection) async throws {
         let editor = try await editorWithRows(filled: [0, 1, 2], in: Editing())
         let before = editor.content
+        let newestFirst: Set<EditorSection> = [.experiences, .education, .certifications]
 
         editor.addRow(to: section)
 
         let after = ids(editor.content, section)
         #expect(after.count == 4)
         guard after.count == 4 else { return }
-        #expect(Array(after.prefix(3)) == ids(before, section))
-        #expect(!ids(before, section).contains(after[3]))
+        let added = newestFirst.contains(section) ? after[0] : after[3]
+        #expect(after.filter { $0 != added } == ids(before, section))
+        #expect(!ids(before, section).contains(added))
+        #expect(editor.addedRow == added)
         #expect(idsOutside(section, editor.content) == idsOutside(section, before))
     }
 
@@ -421,7 +422,7 @@ struct EditorRowTests {
         takeRows(of: section, from: source.content, into: destination)
         destination.addRow(to: section)
 
-        #expect(filledText(destination.content, section).first == filledText(source.content, section).first)
+        #expect(filledText(destination.content, section).filter { !$0.isEmpty } == filledText(source.content, section))
         #expect(ids(destination.content, section).count == 2)
         #expect(Set(ids(destination.content, section)).count == 2)
     }

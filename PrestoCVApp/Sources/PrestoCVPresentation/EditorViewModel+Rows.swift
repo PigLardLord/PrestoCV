@@ -28,8 +28,9 @@ public enum RowName: Hashable, Sendable {
 
 extension EditorViewModel {
 
-    /// Adds an empty row at the end of the section, as the row to show (`addedRow`). It is an edit like typing: the
-    /// autosave stores the CV with it.
+    /// Adds an empty row as the row to show (`addedRow`): a job, a study or a certification first, as a CV lists the
+    /// newest first; a skill, a language, a profile or an interest last. It is an edit like typing: the autosave stores
+    /// the CV with it.
     public func addRow(to section: EditorSection) {
         var changed = form
         let id = rowIDs.make()
@@ -73,6 +74,42 @@ extension EditorViewModel {
         guard form.hasRow(in: request.section, id: request.row) else { return }
         var changed = form
         changed.removeRow(in: request.section, id: request.row)
+        edit(changed)
+    }
+
+    // MARK: Order
+
+    /// Whether the row of the section with `id` can move `offset` places, up for a negative offset: false for a row
+    /// that is not there, an offset of 0, and a place outside the section.
+    public func canMoveRow(in section: EditorSection, id: RowID, by offset: Int) -> Bool {
+        order(moving: id, by: offset, in: section) != nil
+    }
+
+    /// Moves the row of the section with `id` `offset` places, up for a negative offset. It is an edit like typing; a
+    /// move `canMoveRow` refuses does nothing.
+    public func moveRow(in section: EditorSection, id: RowID, by offset: Int) {
+        guard let order = order(moving: id, by: offset, in: section) else { return }
+        arrange(section, in: order)
+    }
+
+    /// Moves the rows of the section at `offsets` before the row at `destination`, as a list's drag reports it
+    /// (`destination` is the number of rows to move them last). It is an edit like typing; a move that changes no
+    /// place, or names a place outside the section, does nothing.
+    public func moveRows(in section: EditorSection, from offsets: IndexSet, to destination: Int) {
+        let count = form.rowIDs(in: section).count
+        guard let order = RowOrder.moving(offsets, to: destination, among: count) else { return }
+        arrange(section, in: order)
+    }
+
+    private func order(moving id: RowID, by offset: Int, in section: EditorSection) -> [Int]? {
+        let ids = form.rowIDs(in: section)
+        guard let index = ids.firstIndex(of: id) else { return nil }
+        return RowOrder.moving(index, by: offset, among: ids.count)
+    }
+
+    private func arrange(_ section: EditorSection, in order: [Int]) {
+        var changed = form
+        changed.arrange(section, in: order)
         edit(changed)
     }
 }

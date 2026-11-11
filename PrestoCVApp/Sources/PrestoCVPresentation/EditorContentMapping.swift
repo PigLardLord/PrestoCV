@@ -104,13 +104,15 @@ extension EditorContent {
         }
     }
 
+    /// Adds an empty row with `id`: a job, a study or a certification first, as a CV lists the newest first (#32); any
+    /// other row last.
     mutating func addRow(to section: EditorSection, id: RowID) {
         switch section {
-        case .experiences: experiences.append(ExperienceRow.blank(id: id))
-        case .education: education.append(EducationRow.blank(id: id))
+        case .experiences: experiences.insert(ExperienceRow.blank(id: id), at: 0)
+        case .education: education.insert(EducationRow.blank(id: id), at: 0)
         case .skills: skills.append(SkillRow.blank(id: id))
         case .languages: languages.append(LanguageRow.blank(id: id))
-        case .certifications: certifications.append(CertificationRow.blank(id: id))
+        case .certifications: certifications.insert(CertificationRow.blank(id: id), at: 0)
         case .profiles: profiles.append(ProfileRow.blank(id: id))
         case .interests: interests.append(InterestRow(id: id, text: ""))
         }

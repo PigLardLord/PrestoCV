@@ -1,4 +1,5 @@
 // This file imports nothing of the domain or the application layer, and not `@testable`: what it uses is what a view sees.
+import Foundation
 import Testing
 import PrestoCVPresentation
 
@@ -57,6 +58,9 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.removeRow(in: .skills, id: added)
     editor.confirmRemoval()
     editor.cancelRemoval()
+    let _: Bool = editor.canMoveRow(in: .skills, id: added, by: -1)
+    editor.moveRow(in: .skills, id: added, by: 1)
+    editor.moveRows(in: .skills, from: IndexSet(integer: 0), to: 1)
     await editor.load()
     await editor.saveNow()
     await editor.reload()
