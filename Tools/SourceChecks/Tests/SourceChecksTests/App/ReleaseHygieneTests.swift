@@ -50,7 +50,7 @@ struct ReleaseHygieneTests {
     static let shippedFolders = ["PrestoCV", "PrestoCVNext"]
         + linkedProducts.merging(transitiveProducts) { linked, _ in linked }.values.sorted()
 
-    private struct Line {
+    struct Line {
         let file: String
         let number: Int
         let code: String
@@ -59,7 +59,7 @@ struct ReleaseHygieneTests {
     }
 
     /// The code lines of the shipped sources, without comments and without the previews at the end of a file.
-    private static func shippedLines() -> [Line] {
+    static func shippedLines() -> [Line] {
         var lines: [Line] = []
         for folder in shippedFolders {
             let url = root.appendingPathComponent(folder)

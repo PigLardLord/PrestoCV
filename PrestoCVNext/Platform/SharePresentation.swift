@@ -175,7 +175,9 @@ private final class ShareEnd: NSObject, NSSharingServicePickerDelegate, NSSharin
     }
 
     nonisolated func sharingService(_ sharingService: NSSharingService, didShareItems items: [Any]) {
-        Task { @MainActor in self.end(.sent) }
+        // AppKit does not name the service that shared, so a send cannot be told from a copy or a note: the share
+        // went through, and the sheet confirms nothing.
+        Task { @MainActor in self.end(ShareResult(activity: nil, completed: true, failed: false)) }
     }
 
     nonisolated func sharingService(
