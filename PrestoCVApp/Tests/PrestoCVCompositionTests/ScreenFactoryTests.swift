@@ -344,9 +344,9 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
-            lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
+            exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
+            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
@@ -371,9 +371,9 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
-            lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
+            exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
+            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await first.load()
@@ -404,9 +404,9 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
-            lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
+            exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
+            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
         await editor.load()
@@ -433,9 +433,9 @@ struct ScreenFactoryTests {
         let factory = ScreenFactory(
             repository: GatedRepository(inner: InMemoryCVRepository(), gate: gate),
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
-            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(), exporter: NoExporter(),
-            lookOptions: FixedLookOptions(), languages: [], wrapListEditing: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
+            exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
+            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let shell = factory.makeShell(

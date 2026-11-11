@@ -866,9 +866,45 @@
    "rules": []
   },
   {
+   "name": "PrestoCVExportFiles",
+   "path": "PrestoCVApp/Sources/PrestoCVExportFiles",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "DiagnosticLogging",
+    "Foundation",
+    "Synchronization"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVExportFilesTests",
+   "path": "PrestoCVApp/Tests/PrestoCVExportFilesTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Glibc",
+    "Darwin",
+    "Android",
+    "PrestoCVExportFiles",
+    "PrestoCVWorkflowPorts",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVComposition",
    "path": "PrestoCVApp/Sources/PrestoCVComposition",
    "allowedImports": [
+    "PrestoCVExportFiles",
     "PrestoCVImportFiles",
     "PrestoCVIntegration",
     "PrestoCVPresentation",

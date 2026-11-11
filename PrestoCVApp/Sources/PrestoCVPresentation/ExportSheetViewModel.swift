@@ -28,6 +28,9 @@ public final class ExportSheetViewModel {
     /// The PDF on the whole screen, or nil when the sheet shows it at its own size. It is always the PDF the sheet holds:
     /// a new export and the end of the sheet close it.
     public private(set) var fullPDF: FullPDF?
+    /// The share the system's share sheet shows, from the moment its file is written; nil when there is none. The share
+    /// sheet ends it, and a new export or the end of the sheet lets it go.
+    public private(set) var openShare: PDFShare?
 
     /// The language of the PDF: the one chosen, else the one the CV holds.
     public var effectiveLanguage: ExportLanguage? { selectedLanguage ?? automaticLanguage }
@@ -41,6 +44,7 @@ public final class ExportSheetViewModel {
     // MARK: - State
 
     @ObservationIgnored private let exporter: any CVExporting
+    @ObservationIgnored private let files: any ExportFileSharing
     @ObservationIgnored private let snapshot: @MainActor () -> ExportSnapshot
     @ObservationIgnored private let offered: [ExportLanguage]
     @ObservationIgnored private let appLanguage: ExportLanguage
@@ -51,8 +55,11 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Counts the intents that start or end an export: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
+    /// True while the file of a share is being written: a second tap writes nothing.
+    @ObservationIgnored private var writing = false
 
     /// - Parameters:
+    ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.
     ///   - snapshot: The CV as the editor shows it now, read at the start of each export.
     ///   - offeredLanguages: The languages a PDF can be written in.
     ///   - appLanguage: The language of the app, offered first when the CV holds none.
@@ -61,11 +68,13 @@ public final class ExportSheetViewModel {
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last intent the export starts, so that several quick changes make one export.
     public init(
-        exporter: any CVExporting, snapshot: @escaping @MainActor () -> ExportSnapshot, offeredLanguages: [ExportLanguage],
+        exporter: any CVExporting, files: any ExportFileSharing, snapshot: @escaping @MainActor () -> ExportSnapshot,
+        offeredLanguages: [ExportLanguage],
         appLanguage: ExportLanguage, fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
         onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void, clock: any Clock<Duration>, pause: Duration
     ) {
         self.exporter = exporter
+        self.files = files
         self.snapshot = snapshot
         self.offered = offeredLanguages
         self.appLanguage = appLanguage
@@ -116,10 +125,57 @@ public final class ExportSheetViewModel {
         documentID = nil
         suggestedFileName = nil
         fullPDF = nil
+        openShare = nil
+        writing = false
+    }
+
+    /// Writes the PDF as a file under its name, then opens the share. Without a PDF, or while a share is open or its
+    /// file is being written, it does nothing. A file that cannot be written opens no share: the adapter logs it, and
+    /// the next tap tries again.
+    public func share() {
+        guard openShare == nil, !writing, let document, let documentID, let suggestedFileName else { return }
+        writing = true
+        let mine = generation
+        Task { [weak self, files] in
+            do {
+                let file = try await files.write(document.pdf, named: suggestedFileName)
+                guard let self else {
+                    files.remove(file)
+                    return
+                }
+                self.shareWritten(file, named: suggestedFileName, of: documentID, mine)
+            } catch {
+                self?.writeFailed(mine)
+            }
+        }
+    }
+
+    // MARK: - The share
+
+    /// The file of a share is written: the share opens, unless a new export or the end of the sheet came first, and then
+    /// the file goes at once.
+    private func shareWritten(_ file: SharedFile, named fileName: String, of export: ExportID, _ mine: Int) {
+        guard mine == generation else {
+            files.remove(file)
+            return
+        }
+        writing = false
+        openShare = PDFShare(file: file, fileName: fileName, export: export, files: files, sheet: self)
+    }
+
+    private func writeFailed(_ mine: Int) {
+        guard mine == generation else { return }
+        writing = false
+    }
+
+    /// The share sheet of `share` ended: the sheet lets it go, and confirms it when it went through.
+    func shareEnded(_ share: PDFShare, with result: ShareResult) {
+        if openShare === share { openShare = nil }
+        shareEnded(result, of: share.export)
     }
 
     /// The share sheet of the PDF made by export `shared` ended.
-    public func shareEnded(_ result: ShareResult, of shared: ExportID) {
+    func shareEnded(_ result: ShareResult, of shared: ExportID) {
         // A share that ends after a newer export started is about a PDF no longer on screen, even when the new PDF holds
         // the same bytes
         guard shared == documentID else { return }
@@ -142,6 +198,8 @@ public final class ExportSheetViewModel {
         suggestedFileName = nil
         shareOutcome = nil
         fullPDF = nil
+        openShare = nil
+        writing = false
         let waitForThePause = pauseFromNow()
         running = Task { [weak self] in
             do {

@@ -12,6 +12,7 @@ import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
 import PrestoCVDomain
+import PrestoCVExportFiles
 import PrestoCVImportFiles
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
@@ -128,14 +129,15 @@ public final class Composition {
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
         )
+        let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
         let importFiles = ImportFileAdapter(
             files: SystemImportFiles(), copyFolders: inputs.copyFolders,
             maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
         )
         screens = ScreenFactory(
             repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
-            lookOptions: parts.lookOptions, languages: parts.languages,
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
+            exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
             wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
             appLanguage: inputs.appLanguage
         )

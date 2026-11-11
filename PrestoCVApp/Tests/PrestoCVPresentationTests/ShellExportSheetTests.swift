@@ -121,6 +121,7 @@ struct ShellExportSheetTests {
 @MainActor
 final class ShellExports {
     let exporter = ExportingFake()
+    let files = SharedFilesFake()
     let clock = ManualClock()
     private(set) var made = 0
 
@@ -128,7 +129,7 @@ final class ShellExports {
         guard let loaded = editor.exportSnapshot() else { return nil }
         made += 1
         return ExportSheetViewModel(
-            exporter: exporter, snapshot: { editor.exportSnapshot() ?? loaded },
+            exporter: exporter, files: files, snapshot: { editor.exportSnapshot() ?? loaded },
             offeredLanguages: SheetWorld.offered, appLanguage: SheetWorld.appLanguage,
             fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" }, onLanguageChosen: { _ in },
             clock: clock, pause: SheetWorld.pause)
