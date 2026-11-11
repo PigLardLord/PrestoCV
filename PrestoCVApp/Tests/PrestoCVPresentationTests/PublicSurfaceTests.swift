@@ -59,6 +59,8 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.confirmRemoval()
     editor.cancelRemoval()
     let _: Bool = editor.canMoveRow(in: .skills, id: added, by: -1)
+    let _: Bool = editor.canReorderRows(in: .skills)
+    let _: Bool = editor.reordersRows
     editor.moveRow(in: .skills, id: added, by: 1)
     editor.moveRows(in: .skills, from: IndexSet(integer: 0), to: 1)
     await editor.load()

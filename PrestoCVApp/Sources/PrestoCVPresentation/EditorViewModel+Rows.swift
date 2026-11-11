@@ -85,6 +85,16 @@ extension EditorViewModel {
         order(moving: id, by: offset, in: section) != nil
     }
 
+    /// Whether the rows of the section can change their order: only with two rows or more.
+    public func canReorderRows(in section: EditorSection) -> Bool {
+        form.rowIDs(in: section).count > 1
+    }
+
+    /// Whether some section has rows that can change their order.
+    public var reordersRows: Bool {
+        EditorSection.allCases.contains { canReorderRows(in: $0) }
+    }
+
     /// Moves the row of the section with `id` `offset` places, up for a negative offset. It is an edit like typing; a
     /// move `canMoveRow` refuses does nothing.
     public func moveRow(in section: EditorSection, id: RowID, by offset: Int) {
