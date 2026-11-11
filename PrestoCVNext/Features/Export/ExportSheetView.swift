@@ -58,12 +58,13 @@ struct ExportSheetView: View {
     }
 
     /// Share opens the system's share sheet with the PDF. It waits for the PDF, and says so while the export runs;
-    /// without a PDF, it points to the lines under the pages, which say why.
+    /// without a PDF, it points to the lines under the pages, which say why. Its label is a BarButtonLabel, which keeps
+    /// that value on iOS 27.
     private var shareButton: some View {
         Button {
             sheet.share()
         } label: {
-            Label("export.share", systemImage: "square.and.arrow.up")
+            BarButtonLabel("export.share", systemImage: "square.and.arrow.up")
         }
         .buttonStyle(.glassProminent)
         .disabled(sheet.shareAvailability != .ready)

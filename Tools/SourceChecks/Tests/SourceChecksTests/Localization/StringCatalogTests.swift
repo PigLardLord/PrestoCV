@@ -44,8 +44,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"export.status.incomplete \(missing)"#: ValueTypes(["%lld"], "ExportStatus.incomplete holds an Int"),
                 #"export.status.text_not_visible \(lines)"#: ValueTypes(["%lld"], "ExportStatus.textNotVisible holds an Int"),
             ],
-            // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
-            extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
+            // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
+            // ErrorStateView as title:, message:, code: and retryTitle:.
+            extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText", "BarButtonLabel"],
             extraArguments: ["title", "message", "code", "retryTitle"],
             // Deny by default: English written anywhere in a view (a ternary, a local, a multiline literal) is not translated.
             everyLiteralInViews: true))
