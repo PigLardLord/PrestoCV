@@ -79,10 +79,6 @@ extension EducationRow {
     public var summary: EntrySummary { EntrySummary(title: [degree, school], years: period.years) }
 }
 
-extension SkillRow {
-    public var summary: EntrySummary { EntrySummary(title: [name]) }
-}
-
 extension LanguageRow {
     /// The language; its level.
     public var summary: EntrySummary { EntrySummary(title: [language], level: proficiency) }
@@ -99,8 +95,4 @@ extension CertificationRow {
 extension ProfileRow {
     /// The platform; the link.
     public var summary: EntrySummary { EntrySummary(title: [platform], details: [link]) }
-}
-
-extension InterestRow {
-    public var summary: EntrySummary { EntrySummary(title: [text]) }
 }

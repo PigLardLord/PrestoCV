@@ -50,8 +50,10 @@ extension EditorViewModel {
         openedEntry = entry
     }
 
-    /// The person went back to the form.
+    /// The person went back to the form. A row added on the page and not yet shown there is shown no more: the form holds
+    /// it as a line, with no field to take the focus.
     public func closeEntry() {
+        if addedRow == openedEntry?.row { addedRow = nil }
         openedEntry = nil
     }
 

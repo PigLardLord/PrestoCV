@@ -32,8 +32,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         + content.skills.map(\.rowName) + content.languages.map(\.rowName) + content.certifications.map(\.rowName)
         + content.profiles.map(\.rowName) + content.interests.map(\.rowName)
     let summaries: [EntrySummary] = content.experiences.map(\.summary) + content.education.map(\.summary)
-        + content.skills.map(\.summary) + content.languages.map(\.summary) + content.certifications.map(\.summary)
-        + content.profiles.map(\.summary) + content.interests.map(\.summary)
+        + content.languages.map(\.summary) + content.certifications.map(\.summary) + content.profiles.map(\.summary)
     let _: [[String]] = summaries.map(\.title) + summaries.map(\.details)
     let _: [String?] = summaries.map(\.level)
     for years in summaries.compactMap(\.years) {

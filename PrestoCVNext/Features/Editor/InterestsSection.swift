@@ -8,7 +8,7 @@ struct InterestsSection: View {
 
     var body: some View {
         RowsSection(
-            editor: editor, section: .interests, rows: editor.content.interests, name: \.rowName, summary: \.summary,
+            editor: editor, section: .interests, rows: editor.content.interests, name: \.rowName, summary: nil,
             focus: focus
         ) { row, fields in
             fields.line("editor.field.interest", $editor.content.interests[row: row.id, or: row].text, .interest)

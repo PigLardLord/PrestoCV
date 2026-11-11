@@ -8,7 +8,7 @@ struct SkillsSection: View {
 
     var body: some View {
         RowsSection(
-            editor: editor, section: .skills, rows: editor.content.skills, name: \.rowName, summary: \.summary,
+            editor: editor, section: .skills, rows: editor.content.skills, name: \.rowName, summary: nil,
             focus: focus
         ) { row, fields in
             let skill = $editor.content.skills[row: row.id, or: row]

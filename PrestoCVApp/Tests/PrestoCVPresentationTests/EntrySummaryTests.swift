@@ -162,16 +162,4 @@ struct EntrySummaryTests {
         #expect(summary.title == ["Portfolio"])
         #expect(summary.details == ["example.com/lena-hartmann"])
     }
-
-    @Test("a skill and an interest show their one text")
-    func oneTextRows() {
-        let editor = Editing().editor(.blank)
-        editor.addRow(to: .skills)
-        editor.addRow(to: .interests)
-        editor.content.skills[0].name = "Scheduling"
-        editor.content.interests[0].text = "Sailing"
-
-        #expect(editor.content.skills[0].summary.title == ["Scheduling"])
-        #expect(editor.content.interests[0].summary.title == ["Sailing"])
-    }
 }

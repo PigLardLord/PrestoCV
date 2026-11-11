@@ -4,11 +4,14 @@ import XCTest
 /// and the save status at the top; back shows it in the form as a line that names it, and a new job goes first. With
 /// two or more rows the section says how to move one. The page deletes its row once the person confirms, and closes.
 /// A language's line shows its level, and its context menu names it. The menu of the back button goes from a page
-/// straight to the list. On a wide screen the rows stay in the form, so these tests are skipped there.
+/// straight to the list, and a CV tapped right after it opens and stays open. The edge swipe goes back from a page as
+/// Back does, and the CV stays open. On a wide screen the rows stay in the form, so these tests are skipped there.
 final class EntryPageUITests: XCTestCase {
 
     private let identity = "3F6B9D2A-7C41-4E8B-A5D0-6E2C8B1F9A47"
     private let title = "Crane Operator"
+    private let otherIdentity = "8C2E4F71-9A3B-4D56-B1E0-2F7A6C9D3E85"
+    private let otherTitle = "Site Surveyor"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -16,31 +19,45 @@ final class EntryPageUITests: XCTestCase {
 
     // MARK: Launching
 
-    /// A store folder of its own with one CV whose sections are empty, in English, opened. Skips the test unless the
-    /// rows open on a page here.
+    /// A store folder of its own with one CV whose sections are empty, in English, opened; with `another`, a second CV
+    /// beside it. Skips the test unless the rows open on a page here.
     @MainActor
-    private func launchAndOpen() throws -> XCUIApplication {
+    private func launchAndOpen(withAnother another: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
         // The store reads a CV from the file named by its identity; the fixture takes a JSON map from file name to
         // content, in base 64
-        let cv = """
-        {"schemaVersion":1,"id":"\(identity)","revision":1,
-         "createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-02T00:00:00Z","title":"\(title)",
-         "personal":{"fullName":"Tobias Renn","professionalTitle":"","location":"","summary":""},
-         "experiences":[],"education":[],"skills":[],"languages":[],"certifications":[],"profiles":[],"interests":[]}
-        """
-        let seed = try JSONEncoder().encode(["\(identity).cv.json": cv]).base64EncodedString()
+        var files = ["\(identity).cv.json": cv(identity: identity, title: title, name: "Tobias Renn")]
+        if another {
+            files["\(otherIdentity).cv.json"] = cv(identity: otherIdentity, title: otherTitle, name: "Dario Venn")
+        }
+        let seed = try JSONEncoder().encode(files).base64EncodedString()
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
         ]
         app.launch()
         try XCTSkipUnless(app.opensOnAPage("experiences"), "A wide screen keeps the rows in the form")
-        let row = app.descendants(matching: .any).matching(identifier: "shell.row")
-            .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
+        let row = row(titled: title, in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 30), "The list shows \(title)")
         row.tap()
         XCTAssertTrue(app.textFields["editor.field.title"].waitForExistence(timeout: 30), "The form of \(title) opens")
         return app
+    }
+
+    /// A stored CV whose sections are empty.
+    private func cv(identity: String, title: String, name: String) -> String {
+        """
+        {"schemaVersion":1,"id":"\(identity)","revision":1,
+         "createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-02T00:00:00Z","title":"\(title)",
+         "personal":{"fullName":"\(name)","professionalTitle":"","location":"","summary":""},
+         "experiences":[],"education":[],"skills":[],"languages":[],"certifications":[],"profiles":[],"interests":[]}
+        """
+    }
+
+    /// The row of the list that shows the CV titled `title`.
+    @MainActor
+    private func row(titled title: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "shell.row")
+            .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
     }
 
     // MARK: Rows
@@ -91,6 +108,48 @@ final class EntryPageUITests: XCTestCase {
     private func waitUntilGone(_ element: XCUIElement) -> Bool {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         return XCTWaiter().wait(for: [gone], timeout: 30) == .completed
+    }
+
+    @MainActor
+    private func waitUntilHittable(_ element: XCUIElement) -> Bool {
+        let shown = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"),
+                                              object: element)
+        return XCTWaiter().wait(for: [shown], timeout: 30) == .completed
+    }
+
+    /// Whether `element` is still there after five seconds: about three seconds after a pop to the root, the list
+    /// writes its selection once more.
+    @MainActor
+    private func stays(_ element: XCUIElement) -> Bool {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+        return XCTWaiter().wait(for: [gone], timeout: 5) == .timedOut
+    }
+
+    /// The CV's form, while a CV is open.
+    @MainActor
+    private func cvForm(in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+    }
+
+    /// Goes from a row's page straight to the list, by the menu of the back button.
+    @MainActor
+    private func backToTheList(in app: XCUIApplication) {
+        app.navigationBars.buttons.firstMatch.press(forDuration: 1.2)
+        let list = app.buttons.matching(NSPredicate(format: "label == %@", "My CVs")).firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 30), "The menu of the back button offers the list")
+        list.tap()
+    }
+
+    /// Swipes from the left edge to the right, as the system's Back gesture does, halfway down the screen under the
+    /// bar, with the keyboard down.
+    @MainActor
+    private func swipeBackFromTheLeftEdge(in app: XCUIApplication) {
+        let bar = app.navigationBars.firstMatch
+        let top = bar.exists && bar.isHittable ? bar.frame.maxY : app.frame.minY
+        let y = (top + app.frame.maxY) / 2
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: 0, dy: y))
+        start.press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: app.frame.width * 0.8, dy: y)))
     }
 
     // MARK: Adding
@@ -215,18 +274,71 @@ final class EntryPageUITests: XCTestCase {
         addRow(to: "experiences", in: app)
         putKeyboardAway(in: app)
 
-        app.navigationBars.buttons.firstMatch.press(forDuration: 1.2)
-        let list = app.buttons.matching(NSPredicate(format: "label == %@", "My CVs")).firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 30), "The menu of the back button offers the list")
-        list.tap()
+        backToTheList(in: app)
 
-        let row = app.descendants(matching: .any).matching(identifier: "shell.row")
-            .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
+        let row = row(titled: title, in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 30), "The list shows \(title)")
-        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-        XCTAssertTrue(waitUntilGone(form), "No CV is open")
+        XCTAssertTrue(waitUntilGone(cvForm(in: app)), "No CV is open")
         row.tap()
         let opened = app.textFields["editor.field.title"]
         XCTAssertTrue(opened.waitForExistence(timeout: 30), "The row opens \(title) again")
+    }
+
+    /// Right after the back button's menu showed the list, a tap on the CV that was open opens it again, and it stays
+    /// open once the list has written its selection.
+    @MainActor
+    func testTheSameCVOpensRightAfterTheList() throws {
+        let app = try launchAndOpen()
+        addRow(to: "experiences", in: app)
+        putKeyboardAway(in: app)
+
+        backToTheList(in: app)
+        let row = row(titled: title, in: app)
+        XCTAssertTrue(waitUntilHittable(row), "The list shows \(title)")
+        row.tap()
+
+        let opened = app.textFields["editor.field.title"]
+        XCTAssertTrue(waitUntilHittable(opened), "The row opens \(title) again")
+        XCTAssertTrue(stays(cvForm(in: app)), "\(title) stays open")
+        XCTAssertTrue(opened.isHittable, "The form of \(title) still shows")
+    }
+
+    /// Right after the back button's menu showed the list, a tap on another CV opens that one, and it stays open once
+    /// the list has written its selection.
+    @MainActor
+    func testAnotherCVOpensRightAfterTheList() throws {
+        let app = try launchAndOpen(withAnother: true)
+        addRow(to: "experiences", in: app)
+        putKeyboardAway(in: app)
+
+        backToTheList(in: app)
+        let row = row(titled: otherTitle, in: app)
+        XCTAssertTrue(waitUntilHittable(row), "The list shows \(otherTitle)")
+        row.tap()
+
+        let heading = app.staticTexts.matching(NSPredicate(format: "identifier == %@ AND label == %@",
+                                                           "shell.detail.title", otherTitle)).firstMatch
+        XCTAssertTrue(waitUntilHittable(heading), "The row opens \(otherTitle)")
+        XCTAssertTrue(stays(heading), "\(otherTitle) stays open")
+        XCTAssertTrue(heading.isHittable, "The form of \(otherTitle) still shows")
+    }
+
+    /// The edge swipe goes back from a row's page to the CV's form, as Back does, and the CV stays open.
+    @MainActor
+    func testSwipeBackFromAPageKeepsTheCV() throws {
+        let app = try launchAndOpen()
+        addRow(to: "experiences", in: app)
+        app.typeText("Foreman")
+        putKeyboardAway(in: app)
+
+        swipeBackFromTheLeftEdge(in: app)
+
+        XCTAssertTrue(waitUntilGone(app.entryPage), "The swipe closes the page")
+        let form = cvForm(in: app)
+        XCTAssertTrue(form.exists, "The CV's form shows")
+        XCTAssertTrue(stays(form), "The CV stays open")
+        let job = app.buttons["editor.entry.experiences"]
+        app.scrollForm(until: job, named: "The row of the job", forward: false)
+        XCTAssertTrue(job.label.contains("Foreman"), "\(job.label) names the job")
     }
 }

@@ -19,8 +19,8 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
     let rows: [Row]
     /// What the row is called where the person must tell it from the others.
     let name: (Row) -> RowName
-    /// What the line of a row that opens on a page shows.
-    let summary: (Row) -> EntrySummary
+    /// What the line of a row that opens on a page shows; nil for a section whose rows always show in place.
+    let summary: ((Row) -> EntrySummary)?
     let focus: FocusState<RowFocus?>.Binding
     @ViewBuilder let fields: (Row, RowFields) -> Fields
 
@@ -29,7 +29,7 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
             ForEach(rows) { row in
                 let rowName = name(row).words
                 EditorRowView(editor: editor, section: section, id: row.id, name: rowName, focus: focus) {
-                    if editor.showsOnAPage(section) {
+                    if editor.showsOnAPage(section), let summary {
                         EntryRow(section: section, summary: summary(row), name: rowName) {
                             editor.openEntry(in: section, id: row.id)
                         }

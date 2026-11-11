@@ -240,6 +240,28 @@ struct ShellNavigationModelTests {
         #expect(shell.selection == nil, "once the page is closed, the sidebar is the person going back to the list")
     }
 
+    @Test("Going to the list from a row's page by the back button's menu closes the open CV once the list clears it")
+    func menuJumpFromARowsPageClosesTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        // The pop to the root writes the column and closes the page at once: the column is read while the page is open
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        editor.closeEntry()
+        #expect(shell.selection == world.first.reference)
+
+        // The list's own write of its selection, a moment later
+        shell.deselect()
+
+        #expect(shell.selection == nil)
+        #expect(shell.preferredColumn == .sidebar)
+    }
+
     @Test("The sidebar the system writes while the split view changes its size class keeps the open CV")
     func sidebarWhileNotCollapsedKeepsTheSelection() async throws {
         let world = try await Self.world()

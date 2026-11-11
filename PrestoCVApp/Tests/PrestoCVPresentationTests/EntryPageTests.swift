@@ -263,4 +263,49 @@ struct EntryPageTests {
         #expect(editor.saveStatus != .conflict)
         #expect(editor.openedEntry == nil)
     }
+
+    @Test("the page stays open when the form is saved as a copy after a conflict: the rows stay as they were")
+    func saveAsCopyKeepsThePage() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        let opened = try #require(editor.openedEntry)
+        try await world.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .conflict)
+
+        await editor.saveAsCopy()
+
+        #expect(editor.saveStatus != .conflict)
+        #expect(editor.openedEntry == opened)
+        #expect(editor.content.experiences.map(\.id).contains(opened.row))
+    }
+
+    @Test("closing the page before its new row was shown forgets the row, so the form gives it no focus later")
+    func closingBeforeShownForgetsTheAddedRow() {
+        let editor = editor(narrow: true)
+        editor.addRow(to: .experiences)
+        #expect(editor.addedRow != nil)
+
+        editor.closeEntry()
+
+        #expect(editor.addedRow == nil)
+        #expect(editor.openedEntry == nil)
+    }
+
+    @Test("closing the page leaves a row added elsewhere waiting for its focus")
+    func closingKeepsAnotherAddedRow() throws {
+        let editor = editor(narrow: true)
+        editor.addRow(to: .experiences)
+        let page = try #require(editor.openedEntry)
+        editor.addRow(to: .skills)
+        let skill = try #require(editor.addedRow)
+        #expect(editor.openedEntry == page)
+
+        editor.closeEntry()
+
+        #expect(editor.addedRow == skill)
+    }
 }
