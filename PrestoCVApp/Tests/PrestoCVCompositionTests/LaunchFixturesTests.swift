@@ -222,7 +222,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a link to another folder fails the launch, and nothing is written there")
+    @Test("A fixture folder that is a link to another folder fails the launch, and nothing is written there", .printsForReal)
     func linkedRoot() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -245,7 +245,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A store folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    @Test("A store folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal)
     func linkedStore() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -269,7 +269,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal)
     func linkedDesigns() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -293,7 +293,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone")
+    @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone", .printsForReal)
     func linkedRootOnAClosedLaunch() async throws {
         let target = try Self.target()
         let traces = target.appendingPathComponent("Diagnostics", isDirectory: true)
@@ -321,7 +321,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a plain folder still launches with its seed")
+    @Test("A fixture folder that is a plain folder still launches with its seed", .printsForReal)
     func plainFolderLaunches() async throws {
         let name = Self.unique()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)

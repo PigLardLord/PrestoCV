@@ -677,7 +677,7 @@ struct ScreenFactoryTests {
         #expect(Set(sheet.offeredLanguages.map(\.tag)) == Set(bundled.compactMap(ExportLanguage.init).map(\.tag)))
     }
 
-    @Test("The shell's export sheet exports the open CV, and a language chosen in it is stored with the CV", .timeLimit(.minutes(1)))
+    @Test("The shell's export sheet exports the open CV, and a language chosen in it is stored with the CV", .timeLimit(.minutes(1)), .printsForReal)
     func shellSheetTakesTheLanguageToTheCV() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -705,7 +705,7 @@ struct ScreenFactoryTests {
         #expect(ScreenFactory.exportPause == .milliseconds(250))
     }
 
-    @Test("A design chosen in the look picker changes the exported PDF, and a CV that keeps none exports with the default", .timeLimit(.minutes(1)))
+    @Test("A design chosen in the look picker changes the exported PDF, and a CV that keeps none exports with the default", .timeLimit(.minutes(1)), .printsForReal)
     func designChoiceChangesThePDF() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
