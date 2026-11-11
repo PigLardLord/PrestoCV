@@ -56,6 +56,7 @@ struct EditorView: View {
             }
             .formStyle(.grouped)
             .readableScrollContent()
+            .editRowsButton()
             .keyboardDoneBar("editor.done") {
                 focus = nil
                 rowFocus = nil
