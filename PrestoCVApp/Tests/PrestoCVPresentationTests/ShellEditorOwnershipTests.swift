@@ -423,6 +423,24 @@ struct ShellEditorOwnershipTests {
         #expect(shell.keptEditors.isEmpty)
     }
 
+    @Test("on a first run, a draft whose first write failed shows the split view, where its notice and Open and Retry are")
+    func keptFirstRunDraftShowsTheSplit() async throws {
+        let world = Editing()
+        let shell = world.shell()
+        shell.open(.blank)
+        let draft = try #require(shell.editor)
+        await draft.load()
+        draft.type(\.fullName, "Tobias Renn")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        shell.deselect()
+        await waitUntil("the failed draft is kept") { shell.keptEditors.count == 1 }
+
+        #expect(shell.detail == nil, "the draft is closed")
+        #expect(shell.screen(for: .firstRun) == .split, "the welcome has no notice: the draft would look lost")
+        #expect(shell.screen(for: .loading) == .split, "a reload of the first run does not hide the notice either")
+    }
+
     @Test("opening a kept editor while the open one cannot be left stays, and keeps both")
     func openKeptStaysWhileBlocked() async throws {
         let world = Editing()

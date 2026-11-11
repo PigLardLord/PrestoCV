@@ -171,9 +171,11 @@ public final class ShellNavigationModel {
     }
 
     /// What the window shows. A first run shows the welcome until something is open; a store that was used, or could not
-    /// be read, shows the split view, whose list says why.
+    /// be read, shows the split view, whose list says why. An editor left with text the store does not have shows the
+    /// split view too, on a first run as well: only its list shows the notice with Open and Retry. Once Retry stores a
+    /// first draft, the welcome shows again until the first run is read again and finds the stored CV.
     public func screen(for firstRun: FirstRunState) -> ShellScreen {
-        if detail != nil { return .split }
+        if detail != nil || !keptEditors.isEmpty { return .split }
         switch firstRun {
         case .loading: return .loading
         case .firstRun: return .welcome
