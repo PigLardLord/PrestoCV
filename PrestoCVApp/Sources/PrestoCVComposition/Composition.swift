@@ -85,6 +85,9 @@ public final class Composition {
         let backgroundTime: any BackgroundTime
         /// The language of the app, which the export sheets offer first when a CV holds none.
         let appLanguage: ExportLanguage
+        /// True when a share opens the stand-in of the system's share sheet: only a Debug build's launch argument sets it
+        /// (`LaunchFixtures`), for the UI tests.
+        let sharesWithStandIn: Bool
     }
 
     let paths: AppPaths
@@ -102,6 +105,9 @@ public final class Composition {
     let traceAccess: TraceAccess
     /// Makes the view models of the screens over this composition's repository, clock and ids.
     public let screens: ScreenFactory
+    /// True when a share should open the stand-in of the system's share sheet, which a UI test can read and answer. It is
+    /// true only in a Debug build launched with `-PrestoCVNextShareStandIn`; a Release build has no code that sets it.
+    public let sharesWithStandIn: Bool
 
     /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
     private struct Parts {
@@ -125,6 +131,7 @@ public final class Composition {
         logger = trace.logger
         tracer = trace.tracer
         traceAccess = trace.access
+        sharesWithStandIn = inputs.sharesWithStandIn
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
@@ -258,6 +265,7 @@ public final class Composition {
         let check: @MainActor () throws(CompositionFailure) -> Void
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
+        let sharesWithStandIn: Bool
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         #if DEBUG
@@ -291,6 +299,7 @@ public final class Composition {
             }
         }
         wrapListEditing = { fixtures.listEditing($0) }
+        sharesWithStandIn = fixtures.sharesWithStandIn
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
@@ -298,6 +307,7 @@ public final class Composition {
         check = {}
         prepare = {}
         wrapListEditing = { $0 }
+        sharesWithStandIn = false
         #endif
         return await make(Inputs(
             paths: paths,
@@ -328,7 +338,8 @@ public final class Composition {
             prepare: prepare,
             wrapListEditing: wrapListEditing,
             backgroundTime: backgroundTime,
-            appLanguage: .preferred(Bundle.main.preferredLocalizations)
+            appLanguage: .preferred(Bundle.main.preferredLocalizations),
+            sharesWithStandIn: sharesWithStandIn
         ))
     }
 }

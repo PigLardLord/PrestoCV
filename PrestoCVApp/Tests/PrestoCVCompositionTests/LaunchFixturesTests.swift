@@ -132,6 +132,15 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The argument that opens a stand-in of the share sheet is read, and needs no folder: it writes nothing")
+    func sharesWithStandIn() throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextShareStandIn"])
+        #expect(fixtures.sharesWithStandIn)
+        #expect(fixtures.storage == .device)
+        #expect(fixtures.unknownArguments.isEmpty)
+        #expect(!(try LaunchFixtures.parse([Self.program])).sharesWithStandIn)
+    }
+
     // MARK: Where the fixtures put the files
 
     private static let device = AppPaths(
@@ -331,11 +340,31 @@ struct LaunchFixturesTests {
             arguments: try Self.arguments(storage: name), settlement: TraceSettlement(), backgroundTime: NoBackgroundTime()
         )
 
-        guard case .ready = state else {
+        guard case .ready(let composition) = state else {
             Issue.record("expected ready, got \(state)")
             return
         }
         #expect(try Self.entries(root.appendingPathComponent("Store")) == ["planted.cv.json"])
+        #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
+    }
+
+    @MainActor
+    @Test("A launch with the argument of the stand-in gives a composition whose shares open the stand-in", .printsForReal)
+    func launchSharesWithStandIn() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let state = await Composition.launch(
+            arguments: try Self.arguments(storage: name) + ["-PrestoCVNextShareStandIn"], settlement: TraceSettlement(),
+            backgroundTime: NoBackgroundTime()
+        )
+
+        guard case .ready(let composition) = state else {
+            Issue.record("expected ready, got \(state)")
+            return
+        }
+        #expect(composition.sharesWithStandIn)
     }
 }
 #endif

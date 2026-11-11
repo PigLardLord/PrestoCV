@@ -16,6 +16,8 @@ import PrestoCVWorkflowPorts
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
 ///   failures of two rows are pending at once. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextShareStandIn`: a share opens a stand-in of the system's share sheet, which a UI test can read and
+///   answer (save, send, cancel), and never the system's own. It writes nothing, so it needs no folder.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
 
@@ -39,6 +41,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let distributionArgument = "-PrestoCVNextDistribution"
     static let noSamplesArgument = "-PrestoCVNextNoSamples"
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
+    static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -51,6 +54,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var withoutSamples = false
     /// The list's renames fail two at a time
     var failsRenamesInPairs = false
+    /// A share opens the stand-in of the share sheet
+    var sharesWithStandIn = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -79,6 +84,8 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.withoutSamples = true
             case failRenamesInPairsArgument:
                 fixtures.failsRenamesInPairs = true
+            case shareStandInArgument:
+                fixtures.sharesWithStandIn = true
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:

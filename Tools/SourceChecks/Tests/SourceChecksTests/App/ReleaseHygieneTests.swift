@@ -155,6 +155,22 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture that fails renames outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
+    /// carries the composition's flag, always false, and has no code that sets it, passes it on or shows the stand-in.
+    @Test("The stand-in of the share sheet is set, passed on and shown only by Debug builds")
+    func theShareStandInIsReachedOnlyInDebugBuilds() {
+        let names = [
+            "shareStandInArgument", "fixtures.sharesWithStandIn", "composition.sharesWithStandIn", "\\.sharesWithStandIn",
+            "ShareStandIn",
+        ]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reaches the stand-in: update it with the code")
+        #expect(offenders.isEmpty, "The stand-in of the share sheet outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// Where the new app keeps its data is decided in one place, so a second folder cannot appear unnoticed.
     @Test("Only AppPaths asks the system for a folder in the composition")
     func onlyAppPathsAsksForFolders() throws {

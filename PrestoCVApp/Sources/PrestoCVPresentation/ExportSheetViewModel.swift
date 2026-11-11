@@ -41,6 +41,17 @@ public final class ExportSheetViewModel {
         return [appLanguage] + offered.filter { $0 != appLanguage }
     }
 
+    /// Whether Share can be used now: it waits for the export and for the file of a share, and needs the PDF. The share
+    /// sheet itself is not counted: it covers the sheet until it ends.
+    public var shareAvailability: ShareAvailability {
+        if status == .exporting || writing { return .preparing }
+        guard document != nil, documentID != nil, suggestedFileName != nil else { return .unavailable }
+        return .ready
+    }
+
+    /// True when the sheet closes as Done: a share of its PDF went through.
+    public var closesAsDone: Bool { shareOutcome != nil }
+
     // MARK: - State
 
     @ObservationIgnored private let exporter: any CVExporting
@@ -55,8 +66,8 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Counts the intents that start or end an export: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
-    /// True while the file of a share is being written: a second tap writes nothing.
-    @ObservationIgnored private var writing = false
+    /// True while the file of a share is being written: a second tap writes nothing, and Share shows it is preparing.
+    private var writing = false
 
     /// - Parameters:
     ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.

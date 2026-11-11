@@ -21,7 +21,13 @@ struct RootView: View {
             LoadingView("root.loading")
                 .accessibilityIdentifier("root.loading")
         case .ready(let composition):
+            #if DEBUG
+            // A Debug build launched for the UI tests shares through a stand-in they can read
             ReadyShell(screens: composition.screens)
+                .environment(\.sharesWithStandIn, composition.sharesWithStandIn)
+            #else
+            ReadyShell(screens: composition.screens)
+            #endif
         case .failed(let failure):
             CompositionFailedView(failure: failure, retry: holder.retry)
         }

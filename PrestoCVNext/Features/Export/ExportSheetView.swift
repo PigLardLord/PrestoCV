@@ -1,9 +1,10 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The export of the open CV: its PDF as the person will send it, how many pages it has, where the export stands, and
-/// what the CV lacks. A tap on the pages, or their corner button, shows the PDF on the whole screen. It renders the
-/// sheet's model and forwards Close and the taps; the export itself is the model's (R5).
+/// The export of the open CV: its PDF as the person will send it, how many pages it has, where the export stands, a
+/// share that went through, and what the CV lacks. A tap on the pages, or their corner button, shows the PDF on the
+/// whole screen; Share, in the bar, opens the system's share sheet with it. It renders the sheet's model and forwards
+/// Close, Share and the taps; the export and the share are the model's (R5).
 struct ExportSheetView: View {
     let sheet: ExportSheetViewModel
     /// Closes the sheet, which stops an export that runs.
@@ -16,20 +17,22 @@ struct ExportSheetView: View {
                     preview
                     PageCountLine(pages: sheet.document?.pages)
                     ExportStatusView(status: sheet.status)
+                    ShareOutcomeLine(outcome: sheet.shareOutcome)
                     MissingFieldsView(missing: sheet.missing)
                 }
                 .padding(Spacing.medium)
                 .readableWidth()
+                .announce(sheet.shareOutcome) { $0.words }
             }
             .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("export.sheet.title")
             .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: close) {
-                        Label("export.close", systemImage: "xmark")
-                    }
-                    .accessibilityIdentifier("export.close")
+                    closeButton
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    shareButton
                 }
             }
         }
@@ -37,6 +40,33 @@ struct ExportSheetView: View {
             FullPDFView(full: full, done: { sheet.closeFullPDF() })
         }
         .presentationSizing(.page)
+    }
+
+    /// Close, which reads Done once a share of the PDF went through: the person has what they came for.
+    private var closeButton: some View {
+        Button(action: close) {
+            if sheet.closesAsDone {
+                Label("export.done", systemImage: "checkmark")
+            } else {
+                Label("export.close", systemImage: "xmark")
+            }
+        }
+        .accessibilityIdentifier("export.close")
+    }
+
+    /// Share opens the system's share sheet with the PDF. It waits for the PDF, and says so while the export runs; what
+    /// the CV lacks is said in the lines under the pages.
+    private var shareButton: some View {
+        Button {
+            sheet.share()
+        } label: {
+            Label("export.share", systemImage: "square.and.arrow.up")
+        }
+        .buttonStyle(.glassProminent)
+        .disabled(sheet.shareAvailability != .ready)
+        .accessibilityValue(sheet.shareAvailability == .preparing ? Text("export.loading") : Text(verbatim: ""))
+        .accessibilityIdentifier("export.share")
+        .sharePresentation(sheet.openShare)
     }
 
     /// The PDF on the whole screen; a swipe that closes it tells the model.

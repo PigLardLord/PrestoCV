@@ -48,7 +48,8 @@ struct TraceOnFailureTests {
             prepare: {},
             wrapListEditing: { $0 },
             backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"])
+            appLanguage: .preferred(["en"]),
+            sharesWithStandIn: false
         )
     }
 
