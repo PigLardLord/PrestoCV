@@ -2,7 +2,7 @@ import XCTest
 
 /// The order of a section's rows: a row moves up or down from its context menu, which stands in for its VoiceOver
 /// actions (XCUITest has no call for a custom action), or by a drag of its handle once the person taps Edit. A move the
-/// row cannot make is not offered.
+/// row cannot make is not offered, and Edit is off until a section has two rows.
 final class EditorReorderUITests: XCTestCase {
 
     private let identity = "5B0C2F7E-91D4-4C6A-8E3B-2A7D9F1C4E60"
@@ -15,9 +15,9 @@ final class EditorReorderUITests: XCTestCase {
 
     // MARK: Launching
 
-    /// A store folder of its own with one CV whose sections are empty, in English, opened, with the three skills added.
+    /// A store folder of its own with one CV whose sections are empty, in English, opened.
     @MainActor
-    private func launchWithSkills() throws -> XCUIApplication {
+    private func launchAndOpen() throws -> XCUIApplication {
         let app = XCUIApplication()
         // The store reads a CV from the file named by its identity; the fixture takes a JSON map from file name to
         // content, in base 64
@@ -37,6 +37,13 @@ final class EditorReorderUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 30), "The list shows \(title)")
         row.tap()
         XCTAssertTrue(app.textFields["editor.field.title"].waitForExistence(timeout: 30), "The form of \(title) opens")
+        return app
+    }
+
+    /// The CV opened, with the three skills added.
+    @MainActor
+    private func launchWithSkills() throws -> XCUIApplication {
+        let app = try launchAndOpen()
         for skill in skills {
             addSkill(skill, in: app)
         }
@@ -54,6 +61,24 @@ final class EditorReorderUITests: XCTestCase {
         app.typeText(name)
         app.buttons["keyboard.done"].tap()
         XCTAssertTrue(waitUntilGone(app.keyboards.firstMatch), "Done puts the keyboard away")
+    }
+
+    // MARK: Edit
+
+    /// Edit is off while no section has two rows: with no skill and with one. A second skill turns it on.
+    @MainActor
+    func testEditNeedsTwoRows() throws {
+        let app = try launchAndOpen()
+        let edit = app.buttons["editor.edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 30), "The bar has Edit")
+        XCTAssertFalse(edit.isEnabled, "No row: nothing to move")
+
+        addSkill(skills[0], in: app)
+        XCTAssertFalse(edit.isEnabled, "One row cannot move")
+
+        addSkill(skills[1], in: app)
+        let on = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: edit)
+        XCTAssertEqual(XCTWaiter().wait(for: [on], timeout: 30), .completed, "Two rows can move")
     }
 
     // MARK: Moving

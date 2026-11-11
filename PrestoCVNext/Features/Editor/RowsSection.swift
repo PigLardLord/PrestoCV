@@ -11,8 +11,8 @@ struct RowFocus: Hashable {
 /// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one, below them. A row shows its
 /// fields in place, or, where the editor says the section's rows open on a page of their own, a line that opens it, and
 /// then the section says under its rows how to move one. A row moves by a drag (on iOS once the person taps Edit), which
-/// the editor takes as a move of the section's rows. The editor adds, opens, moves and removes the rows; the section only
-/// shows them.
+/// the editor takes as a move of the section's rows; a section with one row shows no handle. The editor adds, opens,
+/// moves and removes the rows; the section only shows them.
 struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID {
     let editor: EditorViewModel
     let section: EditorSection
@@ -40,6 +40,7 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
                         .padding(.vertical, Spacing.small)
                     }
                 }
+                .moveDisabled(!editor.canReorderRows(in: section))
             }
             .onMove { offsets, destination in
                 editor.moveRows(in: section, from: offsets, to: destination)

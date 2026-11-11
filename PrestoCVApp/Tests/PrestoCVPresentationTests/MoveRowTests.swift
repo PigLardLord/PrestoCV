@@ -100,6 +100,41 @@ struct MoveRowTests {
         #expect(!editor.canMoveRow(in: .interests, id: skill, by: 1))
     }
 
+    // MARK: Whether a section can be reordered
+
+    @Test("a section with one row or none cannot be reordered; with two it can, and the others still cannot")
+    func reorderNeedsTwoRows() async throws {
+        let world = Editing()
+        let (editor, _) = try await editor(withSkills: [], in: world)
+        #expect(!editor.canReorderRows(in: .skills))
+
+        editor.addRow(to: .skills)
+        #expect(!editor.canReorderRows(in: .skills))
+
+        editor.addRow(to: .skills)
+        #expect(editor.canReorderRows(in: .skills))
+        #expect(EditorSection.allCases.filter { editor.canReorderRows(in: $0) } == [.skills])
+    }
+
+    @Test("the rows can be reordered only while some section has two rows or more")
+    func reordersRowsWhileASectionHasTwo() async throws {
+        let world = Editing()
+        let (editor, _) = try await editor(withSkills: [], in: world)
+        #expect(!editor.reordersRows)
+
+        for section in EditorSection.allCases {
+            editor.addRow(to: section)
+        }
+        #expect(!editor.reordersRows, "one row in each section")
+
+        editor.addRow(to: .languages)
+        #expect(editor.reordersRows)
+
+        // A blank row goes at once
+        editor.removeRow(in: .languages, id: try #require(editor.content.languages.first).id)
+        #expect(!editor.reordersRows)
+    }
+
     // MARK: Drag
 
     @Test("a drag of the first row to the end puts it last, and is an edit")
