@@ -3,8 +3,8 @@ import PrestoCVWorkflowPorts
 
 /// One share of the sheet's PDF: the file written for it, from the moment it is written until the system's share sheet
 /// is done with it. The platform's share sheet reads `url` and calls `end` when it closes. The file is removed then, or
-/// when the share goes, whichever comes first; it outlives a refresh and the end of the export sheet, so that a share
-/// sheet still open keeps reading it.
+/// when the share goes, whichever comes first. The share sheet's side holds the share until it calls `end`, so the
+/// share outlives a refresh and the end of the export sheet while a share sheet still reads the file.
 @MainActor
 public final class PDFShare: Identifiable {
     /// The export that made the PDF.

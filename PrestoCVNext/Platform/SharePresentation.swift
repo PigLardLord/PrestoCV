@@ -119,14 +119,13 @@ private struct SystemShareSheet: NSViewRepresentable {
     }
 }
 
-/// Opens the share picker for one share at a time. The picker and the service it opens hold their delegate weakly, so
-/// the picker keeps the delegate of the share it opened last.
+/// Opens the share picker for one share at a time, and ends the share it opened last when it opens a new one.
 @MainActor
 private final class SharePicker {
     /// The share shown last; weak, so that it never keeps a share, or its file, alive.
     weak var shown: PDFShare?
-    /// The delegate of the share shown last.
-    private var delegate: ShareEnd?
+    /// The delegate of the share shown last; weak, as `ShareEnd` keeps each delegate until its share ends.
+    private weak var delegate: ShareEnd?
 
     func show(_ share: PDFShare, from view: NSView) {
         delegate?.end(.cancelled)
@@ -144,15 +143,23 @@ private final class SharePicker {
 /// actor, so each end goes there; one delegate per share means that a late call never ends a share opened after it.
 @MainActor
 private final class ShareEnd: NSObject, NSSharingServicePickerDelegate, NSSharingServiceDelegate {
+    /// The delegates of the shares that have not ended. The picker and the service hold their delegate weakly, and the
+    /// view that opened the picker goes with the export sheet, which the person can close while a service, such as
+    /// AirDrop or Messages, still reads the file: this set keeps each delegate, with its share and file, until the
+    /// share ends. A service that never reports an end keeps its file until the next launch removes it.
+    private static var open: Set<ShareEnd> = []
     private var share: PDFShare?
 
     init(share: PDFShare) {
         self.share = share
+        super.init()
+        Self.open.insert(self)
     }
 
     func end(_ result: ShareResult) {
         share?.end(result)
         share = nil
+        Self.open.remove(self)
     }
 
     nonisolated func sharingServicePicker(_ picker: NSSharingServicePicker, didChoose service: NSSharingService?) {
