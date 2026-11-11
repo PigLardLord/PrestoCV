@@ -21,6 +21,12 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: Export
     let _: [ExportMissing.Field] = missing.blockers + missing.warnings
     let _: ShareOutcome? = sheet.shareOutcome
     let _: ExportSnapshot.Type = ExportSnapshot.self
+    sheet.showFullPDF()
+    let full: FullPDF? = sheet.fullPDF
+    let _: ExportID? = full?.id
+    let _: ExportedDocument? = full?.document
+    let _: String? = full?.fileName
+    sheet.closeFullPDF()
     sheet.start()
     sheet.select(language: ExportLanguage("de"))
     sheet.select(language: nil)

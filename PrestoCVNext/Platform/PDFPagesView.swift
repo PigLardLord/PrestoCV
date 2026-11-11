@@ -34,11 +34,14 @@ final class PDFPagesView: PDFView {
         configure()
     }
 
-    override var document: PDFDocument? {
-        didSet {
-            fittedScale = nil
-            askForLayout()
-        }
+    /// Shows a document at the fit, from its first page.
+    ///
+    /// A method, not an override of `document`: PDFKit reads `document` on its own queues (the page analyzer that looks
+    /// for form fields as pages come into view), and an override is main-actor code, which traps when read there.
+    func show(_ shown: PDFDocument?) {
+        document = shown
+        fittedScale = nil
+        askForLayout()
     }
 
     /// Keeps the fit and the zoom limits after a layout.
@@ -165,7 +168,7 @@ extension PDFPages {
         view.isForTheEyeOnly = isForTheEyeOnly
         guard shown.id != id else { return }
         shown.id = id
-        view.document = PDFDocument(data: pdf)
+        view.show(PDFDocument(data: pdf))
     }
 }
 

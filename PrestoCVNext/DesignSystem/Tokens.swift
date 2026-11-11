@@ -24,9 +24,16 @@ enum IconSize {
     static let hero: CGFloat = 64
 }
 
-/// The smallest height a control may have and still be easy to tap
+/// The smallest height a control may have and still be easy to tap; a control that is a symbol alone takes it as its
+/// width too
 enum TapTarget {
     static let minimumHeight: CGFloat = 44
+}
+
+/// The round backing of a symbol button laid over content, such as the corner button over the PDF's pages; its tap
+/// target stays `TapTarget.minimumHeight` on each side
+enum OverlayButton {
+    static let diameter: CGFloat = 28
 }
 
 /// The widest a block of reading text grows on a large screen

@@ -56,6 +56,17 @@ struct PDFPagesTests {
         #expect(abs(pages.minScaleFactor - fit) < 0.001, "The person cannot zoom out of the fit")
         #expect(abs(pages.maxScaleFactor - fit * PDFPagesView.zoomLimit) < 0.001, "The person zooms in up to four times")
     }
+
+    /// PDFKit's page analyzer, which looks for form fields as pages come into view, reads the view's document on a queue
+    /// of its own. Main-actor code there, such as an override of `document`, traps and ends the app: this test then
+    /// fails by a crash.
+    @Test("PDFKit reads the shown document from a queue of its own, as it does while it looks for form fields")
+    func documentIsReadOffTheMainActor() async throws {
+        let pages = try #require(pagesView(of: PDFPages(pdf: onePagePDF(), id: 1, isForTheEyeOnly: false)))
+
+        let read = await documentRead(offTheMainActorFrom: pages)
+        #expect(read, "The queue reads the document the view shows")
+    }
     #else
     @Test("Pages for the eye only give assistive technologies nothing to read")
     func pagesForTheEyeOnlyAreHidden() {
@@ -65,5 +76,24 @@ struct PDFPagesTests {
         #expect(pages.isAccessibilityElement() == false, "The pages are no element of their own")
         #expect(pages.accessibilityChildren()?.isEmpty ?? true, "The text PDFKit gives a screen reader is not given")
     }
+
+    /// PDFKit reads the view's document on queues of its own; main-actor code there, such as an override of `document`,
+    /// traps and ends the app: this test then fails by a crash.
+    @Test("PDFKit reads the document from a queue of its own")
+    func documentIsReadOffTheMainActor() async {
+        let pages = PDFPagesView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+
+        let read = await documentRead(offTheMainActorFrom: pages)
+        #expect(read == false, "The queue reads that the view shows no document yet")
+    }
     #endif
+
+    /// Whether a queue other than the main one, reading the view's document as PDFKit does, finds one.
+    private func documentRead(offTheMainActorFrom pages: PDFPagesView) async -> Bool {
+        await withCheckedContinuation { (read: CheckedContinuation<Bool, Never>) in
+            DispatchQueue.global().async {
+                read.resume(returning: pages.perform(NSSelectorFromString("document")) != nil)
+            }
+        }
+    }
 }

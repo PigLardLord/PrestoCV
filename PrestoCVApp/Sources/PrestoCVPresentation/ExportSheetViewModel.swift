@@ -18,12 +18,16 @@ public final class ExportSheetViewModel {
     public private(set) var document: ExportedDocument?
     /// The identity of the export that made `document`: set and cleared together with it. A share names the PDF by it.
     public private(set) var documentID: ExportID?
-    /// The name of the PDF's file, in the language of the PDF.
+    /// The name of the PDF's file, in the language of the PDF: set before the export starts, so it is there whenever
+    /// `document` is.
     public private(set) var suggestedFileName: String?
     /// What the CV lacks, as the sheet read it at the start of the last export.
     public private(set) var missing = ExportMissing.unknown
     /// A share of the PDF that went through, until the next export.
     public private(set) var shareOutcome: ShareOutcome?
+    /// The PDF on the whole screen, or nil when the sheet shows it at its own size. It is always the PDF the sheet holds:
+    /// a new export and the end of the sheet close it.
+    public private(set) var fullPDF: FullPDF?
 
     /// The language of the PDF: the one chosen, else the one the CV holds.
     public var effectiveLanguage: ExportLanguage? { selectedLanguage ?? automaticLanguage }
@@ -94,6 +98,15 @@ public final class ExportSheetViewModel {
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
     public func refresh() { begin() }
 
+    /// Shows the PDF on the whole screen, under the name of its file. Without a PDF there is nothing to show.
+    public func showFullPDF() {
+        guard let document, let documentID, let suggestedFileName else { return }
+        fullPDF = FullPDF(id: documentID, document: document, fileName: suggestedFileName)
+    }
+
+    /// The whole screen closes; the sheet keeps its PDF.
+    public func closeFullPDF() { fullPDF = nil }
+
     /// The sheet goes away: the running export stops and the PDF is dropped.
     public func stop() {
         running?.cancel()
@@ -102,6 +115,7 @@ public final class ExportSheetViewModel {
         document = nil
         documentID = nil
         suggestedFileName = nil
+        fullPDF = nil
     }
 
     /// The share sheet of the PDF made by export `shared` ended.
@@ -127,6 +141,7 @@ public final class ExportSheetViewModel {
         documentID = nil
         suggestedFileName = nil
         shareOutcome = nil
+        fullPDF = nil
         let waitForThePause = pauseFromNow()
         running = Task { [weak self] in
             do {
