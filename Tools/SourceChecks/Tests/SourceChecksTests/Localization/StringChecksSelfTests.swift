@@ -92,6 +92,14 @@ struct StringChecksSelfTests {
         #expect(promises.allSatisfy { $0.hasPrefix("plant.promise (") }, "\(promises)")
     }
 
+    @Test("Still none is a promise too, in German and Italian, but none alone is not", arguments: [
+        ("Noch kein PDF.", "de", true), ("Noch keine Sprachen", "de", true), ("Kein PDF zum Senden.", "de", false),
+        ("Ancora nessun PDF.", "it", true), ("Ancora nessuna lingua", "it", true), ("Nessun PDF da inviare.", "it", false),
+    ])
+    func stillNone(text: String, language: String, promises: Bool) {
+        #expect((StringChecks.availabilityPromise(in: text, language: language) != nil) == promises)
+    }
+
     @Test("English title case in Spanish, French, Italian or Portuguese is found")
     func titleCase() throws {
         let found = try Self.run().titleCase

@@ -2113,6 +2113,47 @@
         }
       }
     },
+    "export.share.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein PDF zum Senden oder Speichern. Der Grund steht weiter unten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No PDF to send or save. The reason is shown below."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay ningún PDF para enviar o guardar. El motivo aparece más abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun PDF à envoyer ou à enregistrer. La raison est indiquée plus bas."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun PDF da inviare o salvare. Il motivo è indicato sotto."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não há PDF para enviar ou salvar. O motivo aparece mais abaixo."
+          }
+        }
+      }
+    },
     "export.sheet.title" : {
       "extractionState" : "manual",
       "localizations" : {

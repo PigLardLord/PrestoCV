@@ -23,6 +23,7 @@ struct ExportSheetView: View {
                 }
                 .padding(Spacing.medium)
                 .readableWidth()
+                .announce(sheet.statusToAnnounce) { $0.words }
                 .announce(sheet.shareOutcome) { $0.words }
                 .announce(sheet.shareFailure) { $0.words }
             }
@@ -56,8 +57,8 @@ struct ExportSheetView: View {
         .accessibilityIdentifier("export.close")
     }
 
-    /// Share opens the system's share sheet with the PDF. It waits for the PDF, and says so while the export runs; what
-    /// the CV lacks is said in the lines under the pages.
+    /// Share opens the system's share sheet with the PDF. It waits for the PDF, and says so while the export runs;
+    /// without a PDF, it points to the lines under the pages, which say why.
     private var shareButton: some View {
         Button {
             sheet.share()
@@ -66,9 +67,18 @@ struct ExportSheetView: View {
         }
         .buttonStyle(.glassProminent)
         .disabled(sheet.shareAvailability != .ready)
-        .accessibilityValue(sheet.shareAvailability == .preparing ? Text("export.loading") : Text(verbatim: ""))
+        .accessibilityValue(shareValue)
         .accessibilityIdentifier("export.share")
         .sharePresentation(sheet.openShare)
+    }
+
+    /// What VoiceOver reads after Share's name: that the export runs, or that there is no PDF and why is said below.
+    private var shareValue: Text {
+        switch sheet.shareAvailability {
+        case .preparing: Text("export.loading")
+        case .unavailable: Text("export.share.unavailable")
+        case .ready: Text(verbatim: "")
+        }
     }
 
     /// The PDF on the whole screen; a swipe that closes it tells the model.

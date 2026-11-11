@@ -14,6 +14,10 @@ public final class ExportSheetViewModel {
     /// The language automatic stands for: the one the CV holds, or nil when it holds none.
     public private(set) var automaticLanguage: ExportLanguage?
     public private(set) var status: ExportStatus = .idle
+    /// The end of the last export for VoiceOver to tell, when the status line says a problem: set as an export ends
+    /// without its PDF or with a PDF shorter than the CV needs. It is nil while one runs, after one that made the PDF
+    /// in full, and when the CV lacks a field: the list under the pages says which, and Share's value points to it.
+    public private(set) var statusToAnnounce: ExportStatus?
     /// The PDF of the last export, or nil while one runs or when it failed.
     public private(set) var document: ExportedDocument?
     /// The identity of the export that made `document`: set and cleared together with it. A share names the PDF by it.
@@ -137,6 +141,7 @@ public final class ExportSheetViewModel {
         running?.cancel()
         generation += 1
         status = .idle
+        statusToAnnounce = nil
         document = nil
         documentID = nil
         suggestedFileName = nil
@@ -227,6 +232,7 @@ public final class ExportSheetViewModel {
         generation += 1
         let mine = generation
         status = .exporting
+        statusToAnnounce = nil
         document = nil
         documentID = nil
         suggestedFileName = nil
@@ -267,8 +273,14 @@ public final class ExportSheetViewModel {
         publish(mine) {
             self.document = document
             self.documentID = document.map { _ in ExportID(generation: mine) }
-            self.status = status
+            self.settle(status)
         }
+    }
+
+    /// The export ended with `ended`: the status line shows it, and VoiceOver is told it when it is a problem.
+    private func settle(_ ended: ExportStatus) {
+        status = ended
+        statusToAnnounce = ended.isTold ? ended : nil
     }
 
     /// Reads the CV, publishes what the sheet knows of it before the export, and gives it with the language of the PDF;
@@ -285,11 +297,11 @@ public final class ExportSheetViewModel {
         automaticLanguage = cv.language.map(ExportLanguage.init(language:))
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {
-            status = .notReady
+            settle(.notReady)
             return nil
         }
         guard let language = effectiveLanguage?.language else {
-            status = .languageNeeded
+            settle(.languageNeeded)
             return nil
         }
         suggestedFileName = fileName(of: cv, in: language)
@@ -313,3 +325,14 @@ public final class ExportSheetViewModel {
 
 /// A sheet is the item its presentation is bound to: one sheet, one presentation.
 extension ExportSheetViewModel: Identifiable {}
+
+private extension ExportStatus {
+    /// True for an end that the status line says as a problem, which VoiceOver is told. A CV that lacks a field is not:
+    /// the list under the pages names the field.
+    var isTold: Bool {
+        switch self {
+        case .idle, .exporting, .done, .notReady: false
+        case .truncated, .languageNeeded, .unsupportedLanguage, .invalid, .incomplete, .textNotVisible, .failed: true
+        }
+    }
+}

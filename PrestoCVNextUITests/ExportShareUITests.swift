@@ -131,6 +131,8 @@ final class ExportShareUITests: XCTestCase {
         let share = app.buttons["export.share"]
         XCTAssertTrue(share.exists, "Share stays in the bar")
         XCTAssertFalse(share.isEnabled, "Share is off while there is no PDF to share")
+        XCTAssertEqual(
+            share.value as? String, "No PDF to send or save. The reason is shown below.", "VoiceOver hears why Share is off")
     }
 
     // MARK: Launching
