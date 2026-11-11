@@ -3,8 +3,9 @@ import Foundation
 /// The person's text in the editor's form, as they typed it. The view model reads it into a CV when it stores or exports
 /// it; the form keeps the text as typed, spaces and half-written addresses and dates included.
 ///
-/// The sections are lists of rows. A row holds text and codes only: a period is the text of its start and its end, a level
-/// is a number, a proficiency is the code of its level. The domain reads them when the CV is built.
+/// The sections are lists of rows. A row holds text and codes only: a date is its parts (`DateParts`), a period its start,
+/// its end and whether it goes on (`PeriodParts`), a level is a number, a proficiency is the code of its level. The domain
+/// reads them when the CV is built.
 public struct EditorContent: Hashable, Sendable {
     public var title: String
     public var fullName: String
@@ -99,15 +100,12 @@ public struct InterestRow: Hashable, Sendable {
     public var text: String
 }
 
-/// A job in the form. The period is the text of its start and its end ("2020" or "2020-05"); `isCurrent` says it goes on.
 public struct ExperienceRow: Hashable, Sendable {
     public internal(set) var id: RowID
     public var role: String
     public var company: String
     public var location: String
-    public var periodStart: String
-    public var periodEnd: String
-    public var isCurrent: Bool
+    public var period: PeriodParts
     public var description: String
 }
 
@@ -115,9 +113,7 @@ public struct EducationRow: Hashable, Sendable {
     public internal(set) var id: RowID
     public var degree: String
     public var school: String
-    public var periodStart: String
-    public var periodEnd: String
-    public var isCurrent: Bool
+    public var period: PeriodParts
     public var description: String
 }
 
@@ -139,8 +135,8 @@ public struct CertificationRow: Hashable, Sendable {
     public internal(set) var id: RowID
     public var name: String
     public var issuer: String
-    /// The text of the date it was issued ("2021" or "2021-06").
-    public var issued: String
+    /// The date it was issued.
+    public var issued: DateParts
     public var link: String
     public var description: String
 }

@@ -63,7 +63,7 @@ final class EditorRowsUITests: XCTestCase {
     @MainActor
     private func addRow(to section: String, in app: XCUIApplication) {
         let add = app.buttons["editor.add.\(section)"]
-        scrollUntilHittable(add, named: "The add button of \(section)", in: app)
+        app.scrollForm(until: add, named: "The add button of \(section)")
         add.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of \(section) takes the keyboard")
     }
@@ -86,7 +86,7 @@ final class EditorRowsUITests: XCTestCase {
     @MainActor
     private func confirmDelete(in app: XCUIApplication) {
         let delete = app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).allElementsBoundByIndex
-            .last { $0.isHittable }
+            .last { $0.canBeTapped(in: app) }
         XCTAssertNotNil(delete, "The dialog offers Delete")
         delete?.tap()
     }
@@ -114,20 +114,6 @@ final class EditorRowsUITests: XCTestCase {
     private func waitUntilGone(_ element: XCUIElement) -> Bool {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         return XCTWaiter().wait(for: [gone], timeout: 30) == .completed
-    }
-
-    /// Scrolls the form up in steps shorter than the screen until the element can be tapped. A form shows only the rows
-    /// on screen. The drag stays in the form, away from the list beside it.
-    @MainActor
-    private func scrollUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-        let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
-        for _ in 0..<15 where !(element.exists && element.isHittable) {
-            // Held at the end, so the form does not glide on
-            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
-        }
-        XCTAssertTrue(element.exists && element.isHittable, "\(name) comes into view")
     }
 
     // MARK: Adding
@@ -254,7 +240,7 @@ final class EditorRowsUITests: XCTestCase {
     @MainActor
     private func choose(_ choice: String, in section: String, label: String, _ app: XCUIApplication) {
         let menu = app.buttons.matching(identifier: menus[section] ?? "").firstMatch
-        scrollUntilHittable(menu, named: "The menu \(label)", in: app)
+        app.scrollForm(until: menu, named: "The menu \(label)")
         XCTAssertTrue(menu.label.contains(label), "\(menu.label) reads its name")
         menu.tap()
         XCTAssertTrue(app.buttons["Not set"].waitForExistence(timeout: 30), "The menu \(label) offers no level")
@@ -285,7 +271,7 @@ final class EditorRowsUITests: XCTestCase {
             }
             targets.append(("editor.add.\(section.name)", app.buttons["editor.add.\(section.name)"]))
             for (name, target) in targets {
-                scrollUntilHittable(target, named: name, in: app)
+                app.scrollForm(until: target, named: name)
                 // A frame comes as a float: 44 points read 43.99…
                 XCTAssertGreaterThan(target.frame.height, 43.99, "\(name) is tall enough to tap")
             }

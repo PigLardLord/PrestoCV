@@ -1,10 +1,11 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// Where the person types in a row: the row, by its id, and the field.
+/// Where the person types in a row: the row, by its id, and the field; in a period, the year of its start or of its end.
 struct RowFocus: Hashable {
     let row: RowID
     let field: EditorField
+    var isEnd = false
 }
 
 /// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one, below them. A row
@@ -138,8 +139,11 @@ struct RowFields {
     let row: RowID
     let focus: FocusState<RowFocus?>.Binding
 
-    func line(_ label: LocalizedStringResource, _ text: Binding<String>, _ field: EditorField) -> some View {
-        LabeledField(label, text: text, focus: focus, as: RowFocus(row: row, field: field))
+    /// `note` is what the person should know about the text, once the editor names a problem with it.
+    func line(
+        _ label: LocalizedStringResource, _ text: Binding<String>, _ field: EditorField, note: LocalizedStringResource? = nil
+    ) -> some View {
+        LabeledField(label, text: text, focus: focus, as: RowFocus(row: row, field: field), note: note)
             .fieldInput(field.input)
             .accessibilityIdentifier("editor.field.\(field)")
     }

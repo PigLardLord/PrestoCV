@@ -65,10 +65,10 @@ final class FailedCompositionUITests: XCTestCase {
         XCTAssertGreaterThan(app.staticTexts["error.message"].frame.height, normal * 2, "The largest size took effect")
         let retry = app.buttons["error.retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 30))
-        for _ in 0..<5 where !retry.isHittable {
+        for _ in 0..<5 where !retry.canBeTapped(in: app) {
             app.swipeUp()
         }
-        XCTAssertTrue(retry.isHittable)
+        XCTAssertTrue(retry.canBeTapped(in: app))
 
         retry.tap()
 

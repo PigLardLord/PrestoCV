@@ -2,8 +2,9 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
-/// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told when the
-/// status changes. A row the person adds comes into view, and its first field takes the focus.
+/// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told of each change
+/// in one announcement, queued after what it is saying: where the status settled, then the problems met that it does not
+/// name. A row the person adds comes into view, and its first field takes the focus.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
@@ -18,7 +19,7 @@ struct EditorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("shell.detail.opened")
             .task { await editor.load() }
-            .announce(editor.statusChange) { $0.words }
+            .announce(editor.announcement, sentences: \.sentences) { editor.announcementWasTold($0) }
     }
 
     @ViewBuilder
@@ -64,6 +65,10 @@ struct EditorView: View {
             // A problem with a field's text is named once the person leaves it, never while they type
             .onChange(of: focus) { left, _ in
                 if let left { editor.fieldWasLeft(left) }
+            }
+            // The same for a row's field; a period is left from either of its years
+            .onChange(of: rowFocus) { left, _ in
+                if let left { editor.fieldWasLeft(left.field, row: left.row) }
             }
             // The row itself takes the focus once it is on screen (EditorRowView)
             .onChange(of: editor.addedRow) { _, added in
