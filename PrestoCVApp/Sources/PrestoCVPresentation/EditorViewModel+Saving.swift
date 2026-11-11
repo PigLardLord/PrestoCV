@@ -48,6 +48,7 @@ extension EditorViewModel {
                 guard formEdits == edits else { return }
                 form = admit(EditorContent(stored, ids: &rowIDs))
                 pendingRemoval = nil
+                openedEntry = nil
                 standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
             } catch {
                 failure = SaveStatus(error)

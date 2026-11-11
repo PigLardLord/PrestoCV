@@ -31,11 +31,24 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [RowName] = content.experiences.map(\.rowName) + content.education.map(\.rowName)
         + content.skills.map(\.rowName) + content.languages.map(\.rowName) + content.certifications.map(\.rowName)
         + content.profiles.map(\.rowName) + content.interests.map(\.rowName)
+    let summaries: [EntrySummary] = content.experiences.map(\.summary) + content.education.map(\.summary)
+        + content.skills.map(\.summary) + content.languages.map(\.summary) + content.certifications.map(\.summary)
+        + content.profiles.map(\.summary) + content.interests.map(\.summary)
+    let _: [[String]] = summaries.map(\.title) + summaries.map(\.details)
+    let _: [String?] = summaries.map(\.level)
+    for years in summaries.compactMap(\.years) {
+        switch years {
+        case .span(let from, let to): _ = [from, to]
+        case .ongoing(let since): _ = since
+        case .year(let year): _ = year
+        }
+    }
     let _: [RowID] = ids(content.experiences) + ids(content.education) + ids(content.skills) + ids(content.languages)
         + ids(content.certifications) + ids(content.profiles) + ids(content.interests)
     if let shown = content.interests.first {
         let row: InterestRow = editor.content.interests[row: shown.id, or: shown]
         editor.content.interests[row: shown.id, or: shown] = row
+        let _: InterestRow? = editor.content.interests[row: shown.id]
     }
     if let removal: RowRemoval = editor.pendingRemoval {
         switch removal.name {
@@ -76,6 +89,16 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: Bool = editor.canMoveRow(in: .skills, id: added, by: -1)
     editor.moveRow(in: .skills, id: added, by: 1)
     editor.moveRows(in: .skills, from: IndexSet(integer: 0), to: 1)
+    editor.layoutChanged(isNarrow: true)
+    let _: Bool = editor.showsOnAPage(.experiences)
+    let _: Bool = editor.showsMoveHint(in: .experiences)
+    editor.openEntry(in: .skills, id: added)
+    if let entry: EditorEntry = editor.openedEntry {
+        let _: EditorSection = entry.section
+        let _: RowID = entry.row
+    }
+    let _: Bool = editor.asksToRemove(row: added, onItsPage: true)
+    editor.closeEntry()
     await editor.load()
     await editor.saveNow()
     await editor.reload()

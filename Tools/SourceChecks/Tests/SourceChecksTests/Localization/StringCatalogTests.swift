@@ -28,12 +28,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             sameInSomeLanguages: [
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
+                "editor.entry.title.certification": ["fr"],
             ],
             nonKeyLiterals: ["native": "the code of a language level, which ProficiencyPicker words (R13)"],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
                 #"list.row.saved \(saved)"#: ValueTypes(["%@"], "RelativeDateTimeFormatter gives a String"),
+                #"editor.entry.since \(since)"#: ValueTypes(["%@"], "EntryYears' first year is a String"),
                 #"list.delete.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
@@ -41,6 +43,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
                 #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.delete.title \(removalName)"#: ValueTypes(["%@"], "EntryPage's removalName is a String"),
                 #"editor.row.moveUp.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(

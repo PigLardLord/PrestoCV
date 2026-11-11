@@ -4,7 +4,9 @@ import SwiftUI
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
 /// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told of each change
 /// in one announcement, queued after what it is saying: where the status settled, then the problems met that it does not
-/// name. A row the person adds comes into view, and its first field takes the focus.
+/// name. A row the person adds comes into view, and its first field takes the focus; the row with the focus stays in view
+/// when the keyboard rises. On a narrow screen a job, a study, a language, a certification and a profile open on a page
+/// of their own.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
@@ -19,6 +21,8 @@ struct EditorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("shell.detail.opened")
             .task { await editor.load() }
+            // A narrow screen opens a job, a study and the like on a page of its own
+            .onNarrowScreen { editor.layoutChanged(isNarrow: $0) }
             .announce(editor.announcement, sentences: \.sentences) { editor.announcementWasTold($0) }
     }
 
@@ -74,6 +78,23 @@ struct EditorView: View {
             .onChange(of: editor.addedRow) { _, added in
                 if let added { withAnimation { proxy.scrollTo(added) } }
             }
+            // The keyboard takes its room only after the focus lands, so a row near the bottom (a new skill goes last)
+            // would stay under it: once the room left for the form shrinks, the row with the focus comes into view
+            .onGeometryChange(for: CGFloat.self) { $0.size.height - $0.safeAreaInsets.bottom } action: { old, new in
+                if new < old, let row = rowFocus?.row { withAnimation { proxy.scrollTo(row) } }
+            }
+            .navigationDestination(item: openedEntry) { entry in
+                EntryPage(editor: editor, entry: entry)
+            }
+        }
+    }
+
+    /// The row whose page is open; going back to the form closes it.
+    private var openedEntry: Binding<EditorEntry?> {
+        Binding {
+            editor.openedEntry
+        } set: { entry in
+            if entry == nil { editor.closeEntry() }
         }
     }
 }

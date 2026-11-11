@@ -23,6 +23,11 @@ public final class EditorViewModel {
     public internal(set) var pendingRemoval: RowRemoval?
     /// The row just added, which the view focuses and scrolls into view, then reports with `rowWasShown()`.
     public internal(set) var addedRow: RowID?
+    /// The row open on a page of its own where the screen is narrow, which the view shows over the form; nil while the
+    /// form shows every row in place.
+    public internal(set) var openedEntry: EditorEntry?
+    /// Whether the screen is narrow (an iPhone), where a row with several fields opens on a page of its own.
+    var isNarrow = false
 
     public private(set) var opening: OpeningStatus = .opening
     /// Nothing is open yet: the store is being read.
@@ -149,6 +154,7 @@ public final class EditorViewModel {
         guard autosave == nil else { return }
         form = admit(EditorContent(cv, ids: &rowIDs))
         pendingRemoval = nil
+        openedEntry = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
     }
@@ -166,9 +172,11 @@ public final class EditorViewModel {
 
     /// `content` with unique row ids, the one place every entry of rows into the form passes through. The row waiting for its
     /// removal is named by its id: if that id arrives on more than one row, or on none, the rows cannot be told apart, so the
-    /// request is withdrawn and nothing is removed.
+    /// request is withdrawn and nothing is removed. The row open on its page is named by its id too: the page closes
+    /// when its row goes, leaves its section, or cannot be told apart from another.
     func admit(_ content: EditorContent) -> EditorContent {
         if let request = pendingRemoval, content.rowCount(withID: request.row) != 1 { pendingRemoval = nil }
+        if let entry = openedEntry, !content.holdsOnce(entry) { openedEntry = nil }
         return rowIDs.unique(content)
     }
 

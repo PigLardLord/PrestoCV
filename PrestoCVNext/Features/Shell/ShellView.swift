@@ -44,7 +44,10 @@ struct ShellView: View {
                     }
                 }
         } detail: {
-            detail
+            // A destination pushes only inside a stack: in a detail column without one, it replaces the column
+            NavigationStack {
+                detail
+            }
         }
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
@@ -56,8 +59,9 @@ struct ShellView: View {
         }
     }
 
-    /// The open CV's editor, a new one for each CV opened. While its text cannot be stored, Back is hidden (which also
-    /// stops the swipe), so the person answers the status first.
+    /// The open CV's editor, a new one for each CV opened, at the root of the detail's stack, so the page of a row opens
+    /// on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person answers
+    /// the status first.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {

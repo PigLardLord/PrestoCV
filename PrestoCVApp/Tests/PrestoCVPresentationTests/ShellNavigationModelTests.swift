@@ -218,6 +218,28 @@ struct ShellNavigationModelTests {
         #expect(shell.selection == nil)
     }
 
+    @Test("Going back from a row's page keeps the open CV: the sidebar comes before the page closes")
+    func backFromARowsPageKeepsTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        editor.closeEntry()
+
+        #expect(shell.selection == world.first.reference)
+        #expect(shell.editor === editor)
+        #expect(shell.preferredColumn == .detail)
+
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+
+        #expect(shell.selection == nil, "once the page is closed, the sidebar is the person going back to the list")
+    }
+
     @Test("The sidebar the system writes while the split view changes its size class keeps the open CV")
     func sidebarWhileNotCollapsedKeepsTheSelection() async throws {
         let world = try await Self.world()

@@ -138,9 +138,12 @@ public final class ShellNavigationModel {
 
     /// The system moved to `column`. Going back to the list closes what is open only while the split view shows one
     /// column at a time: the sidebar the system writes while the split view changes between one column and two (a
-    /// rotation, a resized window) is not the person going back.
+    /// rotation, a resized window) is not the person going back. Nor is the sidebar it writes while the person goes
+    /// back from a row's page to the CV's form: it writes it before it closes the page, so the CV stays open while a
+    /// page is.
     public func columnChanged(to column: ShellColumn, isCollapsed: Bool) {
-        if column == .sidebar, isCollapsed { _ = deselect() }
+        guard column == .sidebar, isCollapsed, editor?.openedEntry == nil else { return }
+        _ = deselect()
     }
 
     /// Closes the open CV when the list no longer has it, such as after it was deleted or the store lost it, unless its
