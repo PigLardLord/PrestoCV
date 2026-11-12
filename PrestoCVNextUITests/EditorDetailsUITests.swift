@@ -94,10 +94,6 @@ final class EditorDetailsUITests: XCTestCase {
             .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
     }
 
-    private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
-    }
-
     private func status(of app: XCUIApplication) -> XCUIElement {
         app.staticTexts["editor.status"]
     }
@@ -123,20 +119,6 @@ final class EditorDetailsUITests: XCTestCase {
     private func waitUntilGone(_ element: XCUIElement) -> Bool {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
         return XCTWaiter().wait(for: [gone], timeout: 30) == .completed
-    }
-
-    /// Scrolls the form up in steps shorter than the screen, so that no field is passed over, until the element can be
-    /// tapped. A form shows only the rows on screen. The drag stays in the form, away from the list beside it.
-    @MainActor
-    private func scrollUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        let form = self.element("shell.detail.opened", in: app)
-        let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
-        for _ in 0..<15 where !(element.exists && element.isHittable) {
-            // Held at the end, so the form does not glide on
-            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
-        }
-        XCTAssertTrue(element.exists && element.isHittable, "\(name) comes into view")
     }
 
     /// Puts the cursor after the text of the field and types: a tap near its end, past the last word.
@@ -244,7 +226,7 @@ final class EditorDetailsUITests: XCTestCase {
     ) {
         let keyboard = app.keyboards.firstMatch
         let done = app.buttons["keyboard.done"]
-        scrollUntilHittable(field, named: name, in: app)
+        app.scrollForm(until: field, named: name)
         field.tap()
         XCTAssertTrue(keyboard.waitForExistence(timeout: 30), "\(name) brings up the software keyboard")
         if isCompact(app) {
@@ -265,7 +247,7 @@ final class EditorDetailsUITests: XCTestCase {
         open(backendEngineer, in: app)
 
         let email = app.textFields["editor.field.email"]
-        scrollUntilHittable(email, named: "The e-mail address", in: app)
+        app.scrollForm(until: email, named: "The e-mail address")
         email.tap()
         email.typeText("mara.at.example")
 
@@ -288,7 +270,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         for field in fields {
             let element = app.descendants(matching: field.type)[field.identifier]
-            scrollUntilHittable(element, named: field.identifier, in: app)
+            app.scrollForm(until: element, named: field.identifier)
             // A frame comes as a float: 44 points read 43.99…
             XCTAssertGreaterThan(element.frame.height, 43.99, "\(field.identifier) is tall enough to tap")
         }
@@ -302,7 +284,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         for field in fields {
             let element = app.descendants(matching: field.type)[field.identifier]
-            scrollUntilHittable(element, named: field.identifier, in: app)
+            app.scrollForm(until: element, named: field.identifier)
             XCTAssertEqual(element.label, field.label, field.identifier)
         }
     }

@@ -10,7 +10,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.content = content
     let _: OpeningStatus = editor.opening
     let _: SaveStatus = editor.saveStatus
-    let _: SaveStatus? = editor.statusChange
+    let _: EditorAnnouncement? = editor.announcement
     let _: Bool = editor.isSavedOnThisDevice
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
@@ -22,6 +22,11 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [ProfileRow] = content.profiles
     let _: [InterestRow] = content.interests
     _ = rows
+    let periods: [PeriodParts] = content.experiences.map(\.period) + content.education.map(\.period)
+    let dates: [DateParts] = periods.flatMap { [$0.start, $0.end] } + content.certifications.map(\.issued)
+    let _: [Bool] = periods.map(\.isCurrent) + periods.map(\.asksForEnd)
+    let _: [String] = dates.map(\.year)
+    let _: [Int?] = dates.map(\.month)
     let _: [RowName] = content.experiences.map(\.rowName) + content.education.map(\.rowName)
         + content.skills.map(\.rowName) + content.languages.map(\.rowName) + content.certifications.map(\.rowName)
         + content.profiles.map(\.rowName) + content.interests.map(\.rowName)
@@ -39,16 +44,26 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     }
     let _: [Int] = EditorChoices.skillLevels
     let _: [String] = EditorChoices.proficiencies
+    let _: [Int] = EditorChoices.months
     editor.fieldWasLeft(.email)
     let problems: [FieldProblem] = editor.problems
     for problem in problems {
         let _: RowID? = problem.row
         let _: EditorField = problem.field
         switch problem.code {
-        case .unreadable: break
+        case .unreadable, .endBeforeStart: break
         }
     }
     let _: FieldProblem.Code? = editor.problem(of: .email)
+    if let told = editor.announcement {
+        let _: SaveStatus? = told.status
+        let _: [FieldProblem] = told.problems
+        editor.announcementWasTold(told)
+    }
+    if let row = rows.first {
+        editor.fieldWasLeft(.experiencePeriod, row: row.id)
+        let _: FieldProblem.Code? = editor.problem(of: .experiencePeriod, row: row.id)
+    }
     let _: FieldInput = EditorField.email.input
     editor.addRow(to: .skills)
     let _: RowID? = editor.addedRow

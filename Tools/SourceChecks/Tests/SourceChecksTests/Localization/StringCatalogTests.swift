@@ -48,7 +48,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
             extraArguments: ["title", "message", "code", "retryTitle"],
             // Deny by default: English written anywhere in a view (a ternary, a local, a multiline literal) is not translated.
-            everyLiteralInViews: true))
+            everyLiteralInViews: true,
+            // French typography: the texts of the new app write a space that cannot break before : ; ? ! and inside « ».
+            frenchNoBreakSpaces: true))
 
     static let all = [legacy, next]
 
@@ -95,6 +97,13 @@ struct StringCatalogTests {
         let titleCase = try pair.findings().titleCase
 
         #expect(titleCase.isEmpty, "Texts with capitals of an English title: \(titleCase)")
+    }
+
+    @Test("French texts have a space that cannot break before : ; ? ! » and after «, where the catalog asks for it", arguments: CatalogUnderCheck.all)
+    func frenchSpacesCannotBreak(_ pair: CatalogUnderCheck) throws {
+        let breaking = try pair.findings().breakingSpacesInFrench
+
+        #expect(breaking.isEmpty, "French texts with a space that can break before a mark (write U+00A0): \(breaking)")
     }
 
     @Test("The texts promise no future availability or readiness, in any language", arguments: CatalogUnderCheck.all)

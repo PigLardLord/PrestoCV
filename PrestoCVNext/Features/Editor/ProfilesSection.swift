@@ -13,7 +13,10 @@ struct ProfilesSection: View {
         ) { row, fields in
             let profile = $editor.content.profiles[row: row.id, or: row]
             fields.line("editor.field.platform", profile.platform, .profilePlatform)
-            fields.line("editor.field.link", profile.link, .profileLink)
+            fields.line(
+                "editor.field.link", profile.link, .profileLink,
+                note: noteWords(of: editor.problem(of: .profileLink, row: row.id), field: .profileLink)
+            )
         }
     }
 }
