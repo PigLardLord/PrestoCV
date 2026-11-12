@@ -66,6 +66,30 @@ struct EditorLanguageAndLookTests {
         #expect(editor.look == classicOcean)
     }
 
+    @Test("changes asked for behind a running one reach the writer in the order asked, and the last stays")
+    func changesQueuedBehindARunningOneKeepTheirOrder() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        await world.editing.gate.close()
+
+        let running = Task { await editor.setDocumentLanguage("de") }
+        await waitUntil("the first change at the writer") { await world.editing.gate.waiting == 1 }
+        let chosen = Task { await editor.setDocumentLanguage("fr") }
+        await settle()
+        let later = Task { await editor.setDocumentLanguage("en") }
+        await settle()
+        await world.editing.gate.open()
+        await running.value
+        await chosen.value
+        await later.value
+
+        #expect(world.editing.languages.withLock { $0.map { $0?.tag } } == ["de", "fr", "en"])
+        #expect(editor.documentLanguage == "en")
+        #expect(try await world.editing.inStore(cv.id).language?.tag == "en")
+        #expect(editor.saveStatus == .saved)
+    }
+
     @Test("a look and a language chosen before the first write are shown at once and stored by that write")
     func changesBeforeTheFirstWriteAreStoredByIt() async throws {
         let world = Editing()
