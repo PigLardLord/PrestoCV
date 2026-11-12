@@ -24,11 +24,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" as English does; Spanish, French and Italian say "CV" as English does; French counts
-            // pages with the English word.
+            // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
+            // Spanish, French and Italian say "CV" as English does; French counts pages with the English word.
             sameInSomeLanguages: [
-                "editor.field.website": ["de"], "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
+                "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
+                "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
+                "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
             ],
+            nonKeyLiterals: ["native": "the code of a language level, which ProficiencyPicker words (R13)"],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
@@ -43,6 +46,10 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"export.error.too_many_pages \(required) \(pages)"#: ValueTypes(["%lld", "%lld"], "ExportStatus.truncated holds two Ints"),
                 #"export.status.incomplete \(missing)"#: ValueTypes(["%lld"], "ExportStatus.incomplete holds an Int"),
                 #"export.status.text_not_visible \(lines)"#: ValueTypes(["%lld"], "ExportStatus.textNotVisible holds an Int"),
+                #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
+                    ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
             ],
             // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
             // ErrorStateView as title:, message:, code: and retryTitle:.

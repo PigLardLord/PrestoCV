@@ -65,9 +65,31 @@ struct RowIDs {
     }
 }
 
-/// A row of a section: it has an id, and it can have nothing in it.
+/// The rows go by their ids in a view's lists.
+extension ExperienceRow: Identifiable {}
+extension EducationRow: Identifiable {}
+extension SkillRow: Identifiable {}
+extension LanguageRow: Identifiable {}
+extension CertificationRow: Identifiable {}
+extension ProfileRow: Identifiable {}
+extension InterestRow: Identifiable {}
+
+extension Array where Element: Identifiable, Element.ID == RowID {
+    /// The row with this id, wherever it stands: a view binds a row's fields through it, never through its place (#32).
+    /// A row that went meanwhile reads as `shown`, the row as the view last had it, and a write to it is dropped.
+    public subscript(row id: RowID, or shown: Element) -> Element {
+        get { first { $0.id == id } ?? shown }
+        set {
+            guard let index = firstIndex(where: { $0.id == id }) else { return }
+            self[index] = newValue
+        }
+    }
+}
+
+/// A row of a section: it has an id and a name, and it can have nothing in it.
 protocol EditorRow {
     var id: RowID { get set }
+    var rowName: RowName { get }
     var isBlank: Bool { get }
 }
 
