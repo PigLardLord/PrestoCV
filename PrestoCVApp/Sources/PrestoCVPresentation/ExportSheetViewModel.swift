@@ -91,7 +91,8 @@ public final class ExportSheetViewModel {
     ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV; nil is automatic.
     ///   - languageDetector: Tells the language of the words of a CV that keeps none.
     ///   - onLanguageFound: Keeps in the CV the language its words were found in, unless the person chose one in the
-    ///     sheet: the headings then stay in that language (#407).
+    ///     sheet: the headings then stay in that language. It must never replace a language the CV keeps by the time it
+    ///     is stored, found by another sheet or chosen (#407).
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last intent the export starts, so that several quick changes make one export.
     public init(
@@ -307,7 +308,8 @@ public final class ExportSheetViewModel {
     }
 
     /// The language of the words of a CV that keeps none, or nil when they tell none. The first one found goes to the
-    /// CV, unless the person chose a language in the sheet: that choice goes to the CV instead. A save that fails
+    /// CV, unless the person chose a language in the sheet: that choice goes to the CV instead. The CV keeps the found
+    /// one only if it keeps none by the time it is stored (`onLanguageFound`). A save that fails
     /// leaves the CV without a language, as a failed choice does: the editor shows the failure, and the next sheet
     /// reads the words again.
     private func wordsLanguage(of cv: CV) -> DocumentLanguage? {
