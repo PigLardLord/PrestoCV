@@ -772,7 +772,26 @@ struct CVListViewModelTests {
         #expect(viewModel.cvs.map(\.name) == ["Stays"])
         #expect(isLoaded(viewModel), "A failed action must not replace the list with an error screen")
     }
-    
+
+    @Test("Deleting a CV forgets the import's notice kept for it, and only for it; a delete that fails keeps it (#452)")
+    func deleteForgetsTheKeptNotice() async {
+        let deleted = CVModel(name: "Deleted")
+        let failing = CVModel(name: "Stays")
+        let review = ImportReview(items: [], passages: [ImportReview.Passage(place: .top, text: "EU citizen", isWholeSection: false)])
+        let store = InMemoryEditorNoticeStore(notices: [deleted.id: .imported(review), failing.id: .imported(review)])
+        let repository = InMemoryCVRepository(cvs: [deleted, failing])
+        let useCase = CVManagementUseCase(cvRepository: repository, sampleRepository: UnusedSampleCVRepository())
+        let viewModel = CVListViewModel(cvManagementUseCase: useCase, noticeStore: store)
+        await viewModel.loadCVs()
+
+        await viewModel.deleteCV(withId: deleted.id)
+        await repository.fail(.delete, with: AppError.unknown("disk"))
+        await viewModel.deleteCV(withId: failing.id)
+
+        #expect(await store.notice(ofCVWithId: deleted.id) == nil)
+        #expect(await store.notice(ofCVWithId: failing.id) == .imported(review))
+    }
+
     @Test("A failed duplicate reports an error and keeps the list")
     func failedDuplicateReportsAnError() async {
         let cv = CVModel(name: "Original")

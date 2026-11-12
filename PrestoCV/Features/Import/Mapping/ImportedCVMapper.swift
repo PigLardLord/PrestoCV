@@ -19,7 +19,7 @@ struct ImportedCVMapper {
     func map(_ result: ImportResult) -> ImportedDraft {
         let imported = result.cv
         let person = imported.person
-        var notImported = result.unplaced.map(\.text)
+        var languagesLeftOut: [String] = []
         var items: [ImportReview.Item] = reviewItems(of: result)
 
         var languages: [Language] = []
@@ -31,7 +31,7 @@ struct ImportedCVMapper {
                 let text = [language.name.value, language.levelWords?.value].compactMap { $0 }.joined(separator: " — ")
                 let reason: ImportReview.Item.Reason = language.levelWords?.check == .levelsDiffer ? .languageLevels : .languageNotAdded
                 items.append(ImportReview.Item(field: .language, reason: reason, text: text))
-                notImported.append(text)
+                languagesLeftOut.append(text)
             }
         }
 
@@ -66,7 +66,47 @@ struct ImportedCVMapper {
             social: person.links.compactMap(social),
             documentLanguage: result.language?.rawValue
         )
-        return ImportedDraft(cv: cv, review: ImportReview(items: items, notImported: notImported.joined(separator: "\n")))
+        var passages = passages(of: result.unplaced)
+        if !languagesLeftOut.isEmpty {
+            passages.append(ImportReview.Passage(place: .elsewhere, text: languagesLeftOut.joined(separator: "\n"), isWholeSection: false))
+        }
+        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages))
+    }
+
+    // MARK: Text not imported
+
+    /// The sections the CV has no field for: their text is left out with its heading.
+    private static let sectionsWithoutField: Set<SectionKind> = [.projects, .volunteering, .references, .drivingLicence, .additional, .unknown]
+
+    /// The text not imported, one passage for each run of text from the same place, in the order of the CV: the import
+    /// gives it in that order, each piece with the section it stood in and that section's heading.
+    private func passages(of unplaced: [UnplacedText]) -> [ImportReview.Passage] {
+        var passages: [ImportReview.Passage] = []
+        var run: (section: SectionKind, heading: String?, texts: [String])?
+        func close() {
+            guard let current = run else { return }
+            passages.append(passage(section: current.section, heading: current.heading, text: current.texts.joined(separator: "\n")))
+        }
+        for piece in unplaced {
+            if let current = run, current.section == piece.section, current.heading == piece.heading {
+                run?.texts.append(piece.text)
+            } else {
+                close()
+                run = (piece.section, piece.heading, [piece.text])
+            }
+        }
+        close()
+        return passages
+    }
+
+    private func passage(section: SectionKind, heading: String?, text: String) -> ImportReview.Passage {
+        if section == .header {
+            return ImportReview.Passage(place: .top, text: text, isWholeSection: false)
+        }
+        guard let heading, !heading.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return ImportReview.Passage(place: .elsewhere, text: text, isWholeSection: false)
+        }
+        return ImportReview.Passage(place: .section(heading), text: text, isWholeSection: Self.sectionsWithoutField.contains(section))
     }
 
     // MARK: Review

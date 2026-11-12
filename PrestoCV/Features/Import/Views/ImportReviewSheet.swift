@@ -30,25 +30,23 @@ struct ImportReviewSheet: View {
                         Text("import.review.check_title".localized)
                     }
                 }
-                if !review.notImported.isEmpty {
+                ForEach(Array(review.passages.enumerated()), id: \.offset) { index, passage in
+                    let isLast = index == review.passages.count - 1
                     Section {
-                        Text(review.notImported)
+                        Text(passage.text)
                             .typography(.body)
                             .foregroundColor(DesignTokens.Colors.primary)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("import.review.not_imported")
-                        Button {
-                            UIPasteboard.general.string = review.notImported
-                            copied = true
-                        } label: {
-                            Label(copied ? "import.review.copied".localized : "import.review.copy".localized,
-                                  systemImage: copied ? "checkmark" : "doc.on.doc")
+                        if isLast {
+                            copyAllButton
                         }
-                        .buttonStyle(AccentTextButtonStyle())
                     } header: {
-                        Text("import.review.not_imported_title".localized)
+                        Text(header(of: passage))
                     } footer: {
-                        Text("import.review.not_imported_footer".localized)
+                        if isLast {
+                            Text("import.review.not_imported_footer".localized)
+                        }
                     }
                 }
             }
@@ -60,6 +58,26 @@ struct ImportReviewSheet: View {
                 }
             }
         }
+    }
+
+    /// Copies the whole text not imported, every passage in the order of the CV.
+    private var copyAllButton: some View {
+        Button {
+            UIPasteboard.general.string = review.notImported
+            copied = true
+        } label: {
+            Label(copied ? "import.review.copied".localized : "import.review.copy".localized,
+                  systemImage: copied ? "checkmark" : "doc.on.doc")
+        }
+        .buttonStyle(AccentTextButtonStyle())
+    }
+
+    /// Where the passage stood in the CV, with the section's heading as the CV writes it.
+    private func header(of passage: ImportReview.Passage) -> String {
+        if let heading = passage.heading {
+            return passage.headerKey.localizedWithArgs(heading)
+        }
+        return passage.headerKey.localized
     }
 
     /// The field, with the entry's number when it is one of a list.
@@ -82,7 +100,11 @@ struct ImportReviewSheet: View {
             ImportReview.Item(field: .experience(2), reason: .partsByOrder, text: "Night Shift — Corner Market Example"),
             ImportReview.Item(field: .language, reason: .languageNotAdded, text: "Englisch — verhandlungssicher"),
         ],
-        notImported: "Geburtsdatum: 14.05.1992\nEhrenamt: Trainerin im Kletterverein"
+        passages: [
+            ImportReview.Passage(place: .top, text: "Geburtsdatum: 14.05.1992", isWholeSection: false),
+            ImportReview.Passage(place: .section("Ehrenamt"), text: "Trainerin im Kletterverein", isWholeSection: true),
+            ImportReview.Passage(place: .elsewhere, text: "Englisch — verhandlungssicher", isWholeSection: false),
+        ]
     ))
 }
 #endif

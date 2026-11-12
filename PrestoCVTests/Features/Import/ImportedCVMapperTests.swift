@@ -108,6 +108,67 @@ struct ImportedCVMapperTests {
         #expect(draft.review.notImported.contains("Trainerin im Kletterverein"))
     }
 
+    @Test("Text that fits no field is kept by where it stood, and a section the CV has no field for is named")
+    func passagesByPlace() throws {
+        let review = ImportedCVMapper().map(try importedText(text)).review
+
+        #expect(review.passages == [
+            ImportReview.Passage(place: .section("Ehrenamt"), text: "Trainerin im Kletterverein", isWholeSection: true),
+            ImportReview.Passage(place: .elsewhere, text: "Englisch — verhandlungssicher", isWholeSection: false),
+        ])
+        #expect(review.sectionsNotImported == ["Ehrenamt"])
+    }
+
+    @Test("A section with an unknown heading, a combined heading and the header lines left out are each named to check (#452)")
+    func sectionsLeftOutAreNamed() throws {
+        let review = ImportedCVMapper().map(try importedText("""
+        # Tobias Renn
+        **Mobile Developer · Swift and Kotlin**
+        Leipzig, Germany · tobias.renn@example.com · +49 170 0000202
+        EU citizen · available from March 2026
+
+        ## Experience
+        **Senior Developer** | Kestrel Cloud | Hamburg | 08/2019 – today
+        - Built the offline sync of the field app
+
+        ## OWN VENTURES
+        **Tidepool Notes** | 2021 – today
+        - A note app for divers
+        **Harbor Timer** | 2018 – 2020
+        - A tide timer for sailors
+
+        ## STUDIES AND CERTIFICATES
+        2010 – 2014: BSc Computer Science, University of Lucca
+        """)).review
+
+        #expect(review.passages == [
+            ImportReview.Passage(place: .top, text: "Swift and Kotlin\nEU citizen\navailable from March 2026", isWholeSection: false),
+            ImportReview.Passage(
+                place: .section("OWN VENTURES"),
+                text: "Tidepool Notes | 2021 – today\nA note app for divers\nHarbor Timer | 2018 – 2020\nA tide timer for sailors",
+                isWholeSection: true
+            ),
+            ImportReview.Passage(place: .section("STUDIES AND CERTIFICATES"), text: "2010 – 2014: BSc Computer Science, University of Lucca", isWholeSection: true),
+        ])
+        #expect(review.sectionsNotImported == ["OWN VENTURES", "STUDIES AND CERTIFICATES"])
+    }
+
+    @Test("A review keeps its passages through the file it is kept in")
+    func reviewIsKeptWhole() throws {
+        let review = ImportReview(
+            items: [ImportReview.Item(field: .experience(2), reason: .partsByOrder, text: "Night Shift — Corner Market Example")],
+            passages: [
+                ImportReview.Passage(place: .top, text: "EU citizen", isWholeSection: false),
+                ImportReview.Passage(place: .section("OWN VENTURES"), text: "Tidepool Notes", isWholeSection: true),
+                ImportReview.Passage(place: .elsewhere, text: "Englisch — verhandlungssicher", isWholeSection: false),
+            ]
+        )
+
+        let kept = try JSONDecoder().decode(ImportReview.self, from: JSONEncoder().encode(review))
+
+        #expect(kept == review)
+    }
+
     @Test("Values the rules are unsure of are listed to check, with the entry's number as the editor counts")
     func valuesToCheck() throws {
         let draft = ImportedCVMapper().map(try importedText("""

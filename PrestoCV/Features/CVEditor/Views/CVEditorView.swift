@@ -191,15 +191,21 @@ struct CVEditorView: View {
     private func noticeBanner(_ notice: EditorNotice) -> some View {
         if let height = chrome.noticeHeight(fullHeight: noticeFullHeight, editorHeight: editorHeight) {
             ScrollView {
-                EditorNoticeBanner(notice: notice)
+                EditorNoticeBanner(notice: notice, onDismiss: noticeDismissal)
                     .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
             .frame(height: height)
         } else {
-            EditorNoticeBanner(notice: notice)
+            EditorNoticeBanner(notice: notice, onDismiss: noticeDismissal)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
         }
+    }
+
+    /// What dismissing the notice does, when the notice offers it.
+    private var noticeDismissal: (() -> Void)? {
+        guard viewModel.noticeIsDismissible else { return nil }
+        return { Task { await viewModel.dismissNotice() } }
     }
     
     private var isShowingDeleteConfirmation: Binding<Bool> {

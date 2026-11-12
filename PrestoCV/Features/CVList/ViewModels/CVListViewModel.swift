@@ -36,6 +36,8 @@ final class CVListViewModel: ObservableObject {
     private let storedCVChanges: ChangeStoredCV<CVModel>
     /// The changes to the stored CVs, one CV at a time, which the editors wait for.
     private let changeQueue: StoredCVChangeQueue
+    /// The notices of the imported CVs: a deleted CV's goes with it.
+    private let noticeStore: any EditorNoticeStore
     private let locale: Locale
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
@@ -93,6 +95,8 @@ final class CVListViewModel: ObservableObject {
     ///   - storedCVChanges: Renames a stored CV, or sets the language or the look of its PDF.
     ///   - changeQueue: Where the changes to a stored CV wait for the ones before them for the same CV; the editor of the CV
     ///     waits there too.
+    ///   - noticeStore: Where the notice of an imported CV is kept until the person dismisses it; a deleted CV's goes with
+    ///     it.
     ///   - locale: The language of the words that say when a CV was saved: the language of the app.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
@@ -105,6 +109,7 @@ final class CVListViewModel: ObservableObject {
         cvManagementUseCase: CVManagementUseCaseProtocol,
         storedCVChanges: ChangeStoredCV<CVModel>,
         changeQueue: StoredCVChangeQueue,
+        noticeStore: any EditorNoticeStore,
         locale: Locale,
         now: @escaping () -> Date,
         calendar: @escaping () -> Calendar,
@@ -116,6 +121,7 @@ final class CVListViewModel: ObservableObject {
         self.cvManagementUseCase = cvManagementUseCase
         self.storedCVChanges = storedCVChanges
         self.changeQueue = changeQueue
+        self.noticeStore = noticeStore
         self.locale = locale
         self.now = now
         self.waitBetweenTicks = sleep
@@ -217,10 +223,12 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Deletes a CV, and the notice of its import with it.
     func deleteCV(withId id: UUID) async {
         await changeQueue.enqueue(id) { [self] in
             await perform {
                 try await self.cvManagementUseCase.deleteCV(id: id)
+                await self.noticeStore.forget(cvWithId: id)
                 return .removed(id)
             }
         }.value

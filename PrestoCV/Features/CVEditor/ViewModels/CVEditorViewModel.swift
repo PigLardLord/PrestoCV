@@ -23,8 +23,9 @@ final class CVEditorViewModel: ObservableObject {
     private(set) var deletionTitle = ""
     /// What each contact field said when the person last left it: its check, which typing does not change.
     @Published private(set) var leftContactText: [ContactField: String] = [:]
-    /// The message shown above a new CV, set by the screen that opened it.
-    let notice: EditorNotice?
+    /// The message shown above the CV: set by the screen that opened a new CV, or the import's, kept with the CV until the
+    /// person dismisses it (ADR 0027).
+    @Published private(set) var notice: EditorNotice?
     
     // MARK: - Private Properties
     private let cvManagementUseCase: CVManagementUseCaseProtocol
@@ -37,6 +38,8 @@ final class CVEditorViewModel: ObservableObject {
     private let awaitStoredChanges: @MainActor (UUID) async -> Void
     /// Told why a write failed, which the banner does not say.
     private let reportSaveFailure: @MainActor @Sendable (any Error) -> Void
+    /// Keeps the import's notice with the CV once the store holds it, until the person dismisses it.
+    private let noticeKeeper: EditorNoticeKeeper
     /// Writes the form to the store; nil until the form shows a CV.
     private var autosave: Autosave<CVModel>?
     /// A failure has been announced, and the CV has not been saved since.
@@ -104,10 +107,12 @@ final class CVEditorViewModel: ObservableObject {
     ///   - awaitStoredChanges: Returns once the changes made to a stored CV outside its editor, a language or a look chosen
     ///     in the list, a rename, have been stored. The CV is read only after them, so that the editor's first save does not
     ///     undo them.
+    ///   - noticeStore: Where the import's notice is kept with the CV until the person dismisses it.
     ///   - reportSaveFailure: Told the cause of each write that fails.
     init(
         request: EditorRequest,
         cvManagementUseCase: CVManagementUseCaseProtocol,
+        noticeStore: any EditorNoticeStore,
         documentLanguageDetector: DocumentLanguageDetector,
         clock: any Clock<Duration>,
         awaitLeftEditors: @escaping @MainActor () async -> Void,
@@ -124,8 +129,9 @@ final class CVEditorViewModel: ObservableObject {
 
         switch request {
         case .stored:
-            self.notice = nil
+            self.noticeKeeper = EditorNoticeKeeper(store: noticeStore, notice: nil)
         case .new(let template, let notice):
+            self.noticeKeeper = EditorNoticeKeeper(store: noticeStore, notice: notice)
             self.notice = notice
             // A new CV gets an id of its own, and the standard look: never the look of the CV it started from. An AI
             // draft or an imported CV is stored as it is, without waiting for a change; a blank CV or an example once it
@@ -155,6 +161,7 @@ final class CVEditorViewModel: ObservableObject {
             guard let loadedCV = try await cvManagementUseCase.getCV(by: uuid) else {
                 throw AppError.notFound("error.subject.cv".localized)
             }
+            notice = await noticeKeeper.read(cvWithId: uuid)
             begin(showing: loadedCV, unchangedFrom: loadedCV, isStored: true)
         } catch {
             let appError = error as? AppError ?? AppError.unknown(error.localizedDescription)
@@ -162,6 +169,17 @@ final class CVEditorViewModel: ObservableObject {
         }
     }
     
+    /// Whether the message above the CV offers to dismiss it: the import's does, as it stays with the CV until the person
+    /// dismisses it (#452); the AI's reminder goes with the session.
+    var noticeIsDismissible: Bool { notice?.isKept == true }
+
+    /// The person dismissed the message above the CV: it goes, and the import's is no longer kept with the CV.
+    @MainActor
+    func dismissNotice() async {
+        notice = nil
+        await noticeKeeper.dismiss()
+    }
+
     /// Stores what the form shows at once, if it changed: the app is leaving the foreground, and iOS may end it, or the
     /// editor is being left. Changes made while it writes are stored too.
     /// - Returns: Whether the store holds what the form shows, or there is nothing to store; false when the write
@@ -329,6 +347,7 @@ final class CVEditorViewModel: ObservableObject {
     ///   - isStored: Whether the store holds the CV already.
     private func begin(showing cv: CVModel, unchangedFrom baseline: CVModel?, isStored: Bool) {
         let cvs = cvManagementUseCase
+        let keeper = noticeKeeper
         let autosave = Autosave(
             content: cv,
             unchangedFrom: baseline,
@@ -342,6 +361,7 @@ final class CVEditorViewModel: ObservableObject {
                     _ = try await cvs.updateCV(cv)
                 } else {
                     _ = try await cvs.storeNewCV(cv)
+                    await keeper.cvIsStored(withId: cv.id)
                 }
             }
         )
