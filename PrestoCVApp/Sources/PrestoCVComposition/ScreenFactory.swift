@@ -27,7 +27,10 @@ public final class ScreenFactory {
     private let lookOptions: any LookOptionsProviding
     /// The languages a PDF can be written in
     private let languages: [ExportLanguage]
-    /// The language of the app, which the shell's export sheets offer first when a CV holds none.
+    /// Reads the language of the words of a CV that keeps none, for the export sheets (#407).
+    private let languageDetector: any CVLanguageDetecting
+    /// The language of the app: the PDF's in the shell's export sheets when a CV keeps no language and its words tell
+    /// none.
     private let appLanguage: ExportLanguage
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
@@ -49,16 +52,19 @@ public final class ScreenFactory {
     ///   - exporter: Renders a CV with the design it keeps, for the export sheets.
     ///   - lookOptions: The designs, palettes and fonts the look pickers offer.
     ///   - languages: The languages the export sheets offer.
+    ///   - languageDetector: Reads the language of the words of a CV that keeps none, for the export sheets (#407).
     ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
     ///     launch fixture wraps it.
     ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
-    ///   - appLanguage: The language of the app, which the shell's export sheets offer first when a CV holds none.
+    ///   - appLanguage: The language of the app: the PDF's in the shell's export sheets when a CV keeps no language and
+    ///     its words tell none.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exportFiles: any ExportFileSharing, exporter: any CVExporting, lookOptions: any LookOptionsProviding,
-        languages: [ExportLanguage], wrapListEditing: (any CVEditing) -> any CVEditing,
-        backgroundTime: any BackgroundTime, appLanguage: ExportLanguage
+        languages: [ExportLanguage], languageDetector: any CVLanguageDetecting,
+        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime,
+        appLanguage: ExportLanguage
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
@@ -69,6 +75,7 @@ public final class ScreenFactory {
         self.exporter = exporter
         self.lookOptions = lookOptions
         self.languages = languages
+        self.languageDetector = languageDetector
         self.clock = clock
         self.editorClock = editorClock
         self.backgroundTime = backgroundTime
@@ -98,8 +105,8 @@ public final class ScreenFactory {
     /// The navigation of the shell: which CV is open, its editor, and which column a compact screen shows. Each editor it
     /// opens reloads `list` and `firstRun` after each write the store took, so that the list shows the CV as stored and
     /// the first CV stored ends a first run: leaving it shows the list, not the welcome. The shell keeps neither alive.
-    /// Its export sheet exports the CV as the open editor shows it, and takes a language chosen in the sheet to that
-    /// editor's CV, which stores it.
+    /// Its export sheet exports the CV as the open editor shows it, and takes to that editor's CV, which stores it, a
+    /// language chosen in the sheet, or the language the words of a CV that keeps none were found written in (#407).
     /// - Parameters:
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
     ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
@@ -119,6 +126,9 @@ public final class ScreenFactory {
                 for: editor, appLanguage: self.appLanguage, fileNamePattern: fileNamePattern,
                 onLanguageChosen: { [weak editor] language in
                     Task { await editor?.setDocumentLanguage(language?.tag) }
+                },
+                onLanguageFound: { [weak editor] language in
+                    Task { await editor?.setDocumentLanguage(language.tag) }
                 }
             )
         }, backgroundTime: backgroundTime)
@@ -163,20 +173,23 @@ public final class ScreenFactory {
     /// The export sheet of a CV open in an editor, or nil while the editor has not loaded it. Each export reads the CV as
     /// the editor shows it then, so the sheet holds the editor while the sheet lives; the editor never holds the sheet.
     /// - Parameters:
-    ///   - appLanguage: The language of the app, offered first when the CV holds none.
+    ///   - appLanguage: The language of the app: the PDF's when the CV keeps no language and its words tell none.
     ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
     ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV; nil is automatic.
+    ///   - onLanguageFound: Keeps in a CV that keeps no language the one its words were found written in, once (#407).
     public func makeExportSheet(
         for editor: EditorViewModel, appLanguage: ExportLanguage,
         fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
-        onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void
+        onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void,
+        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void
     ) -> ExportSheetViewModel? {
         guard let loaded = editor.exportSnapshot() else { return nil }
         return ExportSheetViewModel(
             exporter: exporter, files: exportFiles,
             snapshot: { editor.exportSnapshot() ?? loaded },
             offeredLanguages: languages, appLanguage: appLanguage, fileNamePattern: fileNamePattern,
-            onLanguageChosen: onLanguageChosen, clock: editorClock, pause: Self.exportPause
+            onLanguageChosen: onLanguageChosen, languageDetector: languageDetector, onLanguageFound: onLanguageFound,
+            clock: editorClock, pause: Self.exportPause
         )
     }
 

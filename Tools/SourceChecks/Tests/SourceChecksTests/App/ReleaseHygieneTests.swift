@@ -35,6 +35,7 @@ struct ReleaseHygieneTests {
     /// `scansCoverTheLinkedProducts` cannot see them; `scansCoverTheComposition` reads them from the package's manifest.
     static let transitiveProducts = [
         "PrestoCVExportFiles": "PrestoCVApp/Sources/PrestoCVExportFiles",
+        "PrestoCVApplicationNaturalLanguage": "PrestoCVCore/Sources/PrestoCVApplicationNaturalLanguage",
     ]
 
     /// The composition's other targets, which the scans do not read yet (#430): they are scanned when the scans follow

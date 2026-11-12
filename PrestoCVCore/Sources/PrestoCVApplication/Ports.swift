@@ -145,3 +145,21 @@ public protocol TimeSource: Sendable { func now() -> Date }
 public protocol SampleCVSource: Sendable {
     func samples() async throws(RepositoryError) -> [CV]
 }
+
+/// Reads which language a text is written in (#407). The rule that decides the CV's language is
+/// `DetectDocumentLanguage`; this port only reads.
+public protocol TextLanguageReading: Sendable {
+    /// What the reader finds in `text`: the language it finds on its own, and how likely each of `languages` is.
+    func reading(of text: String, among languages: [DocumentLanguage]) -> LanguageReading
+}
+
+/// What a `TextLanguageReading` finds in a text.
+public struct LanguageReading: Equatable, Sendable {
+    /// The language the reader finds on its own, among every language it knows; nil when it finds none.
+    public let dominant: DocumentLanguage?
+    /// How likely each language it was given is, from 0 to 1. A language it gives no likelihood for is not likely.
+    public let likelihoods: [DocumentLanguage: Double]
+    public init(dominant: DocumentLanguage?, likelihoods: [DocumentLanguage: Double]) {
+        self.dominant = dominant; self.likelihoods = likelihoods
+    }
+}

@@ -9,22 +9,116 @@ import PrestoCVWorkflowPorts
 @Suite("Export sheet language")
 struct ExportSheetLanguageTests {
 
-    @Test("With no language chosen and none in the CV nothing is exported, the status asks for one, the app's is offered first")
-    func noLanguageIsLanguageNeededAndStartsNothing() async {
+    // MARK: - A CV that keeps no language (#407)
+
+    @Test("A CV that keeps no language is exported in the language of its words, which goes to the CV once")
+    func wordsTellTheLanguage() async {
+        let world = SheetWorld()
+        world.cv = SheetWorld.cv(language: nil)
+        world.detector.answers(DocumentLanguage("de"))
+        let sheet = world.sheet()
+
+        sheet.start()
+        await world.passThePause(thenExports: 1)
+        await settle()
+
+        #expect(world.exporter.languages.map(\.tag) == ["de"])
+        #expect(sheet.automaticLanguage == SheetWorld.language("de"))
+        #expect(sheet.selectedLanguage == nil)
+        #expect(world.kept == [SheetWorld.language("de")])
+        #expect(world.chosen.isEmpty, "the language found is no choice of the person's")
+        #expect(world.detector.asked == [SheetWorld.offered.map(\.language)], "read once, among the languages offered")
+    }
+
+    @Test("A CV whose words tell no language is exported in the app's, and nothing goes to the CV")
+    func wordsTellNoLanguage() async {
         let world = SheetWorld()
         world.cv = SheetWorld.cv(language: nil)
         let sheet = world.sheet()
 
         sheet.start()
-        world.passThePause()
-        await waitUntil("the sheet to read the CV") { sheet.status != .exporting }
+        await world.passThePause(thenExports: 1)
         await settle()
 
-        #expect(sheet.status == .languageNeeded)
-        #expect(world.exporter.calls == 0, "no PDF in a language nobody chose")
-        #expect(sheet.effectiveLanguage == nil)
-        #expect(sheet.offeredLanguages.map(\.tag) == ["fr", "en", "de", "it"])
+        #expect(world.exporter.languages.map(\.tag) == ["fr"], "the app is in French")
+        #expect(sheet.automaticLanguage == SheetWorld.appLanguage)
+        #expect(world.kept.isEmpty, "the app's language is not the CV's: a later export reads the words again")
+        #expect(world.chosen.isEmpty)
     }
+
+    @Test("A CV that keeps a language is exported in it, and its words are not read")
+    func theCVsLanguageIsNotRead() async {
+        let world = SheetWorld()
+        world.detector.answers(DocumentLanguage("de"))
+        let sheet = world.sheet()
+
+        sheet.start()
+        await world.passThePause(thenExports: 1)
+        await settle()
+
+        #expect(world.exporter.languages.map(\.tag) == ["it"], "the CV is in Italian")
+        #expect(world.detector.asked.isEmpty)
+        #expect(world.kept.isEmpty)
+    }
+
+    @Test("A language chosen in the sheet goes to the CV, and the one found in the words does not")
+    func aChoiceIsNotOverwritten() async {
+        let world = SheetWorld()
+        world.cv = SheetWorld.cv(language: nil)
+        world.detector.answers(DocumentLanguage("de"))
+        let sheet = world.sheet()
+
+        sheet.select(language: SheetWorld.language("en"))
+        await world.passThePause(thenExports: 1)
+        await settle()
+
+        #expect(world.exporter.languages.map(\.tag) == ["en"])
+        #expect(world.chosen == [SheetWorld.language("en")])
+        #expect(world.kept.isEmpty, "the CV keeps the person's choice, which reaches it later than this snapshot")
+        #expect(sheet.automaticLanguage == SheetWorld.language("de"), "automatic still names what it stands for")
+    }
+
+    @Test("Choosing automatic again reads the words again, and their language goes to the CV")
+    func automaticReadsTheWordsAgain() async {
+        let world = SheetWorld()
+        world.cv = SheetWorld.cv(language: nil)
+        world.detector.answers(DocumentLanguage("de"))
+        let sheet = world.sheet()
+
+        sheet.select(language: SheetWorld.language("en"))
+        await world.passThePause(thenExports: 1)
+        sheet.select(language: nil)
+        await world.passThePause(thenExports: 2)
+        await settle()
+
+        #expect(world.exporter.languages.map(\.tag) == ["en", "de"])
+        #expect(world.chosen == [SheetWorld.language("en"), nil])
+        #expect(world.kept == [SheetWorld.language("de")])
+        #expect(world.detector.asked.count == 2)
+    }
+
+    @Test("Once the words told a language, a new export neither reads them again nor keeps it twice")
+    func theWordsAreReadOnce() async {
+        let world = SheetWorld()
+        world.cv = SheetWorld.cv(language: nil)
+        world.detector.answers(DocumentLanguage("de"))
+        let sheet = world.sheet()
+
+        sheet.start()
+        await world.passThePause(thenExports: 1)
+        await settle()
+        world.detector.answers(DocumentLanguage("it"))
+        sheet.refresh()
+        await world.passThePause(thenExports: 2)
+        await settle()
+
+        #expect(world.exporter.languages.map(\.tag) == ["de", "de"], "the snapshot lags the language kept")
+        #expect(world.detector.asked.count == 1)
+        #expect(world.kept == [SheetWorld.language("de")])
+    }
+
+    // MARK: - A language chosen
+
 
     @Test("A language chosen in the sheet beats the CV's own")
     func choiceBeatsTheCVsLanguage() async {
