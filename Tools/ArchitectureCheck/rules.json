@@ -1299,6 +1299,7 @@
    "allowedImports": [
     "Testing",
     "SwiftUI",
+    "UIKit",
     "PrestoCVNext"
    ],
    "rules": [

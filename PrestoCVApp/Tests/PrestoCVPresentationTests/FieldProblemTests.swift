@@ -75,8 +75,8 @@ struct FieldProblemTests {
         let editor = await world.editor(on: try await world.storedCV())
         editor.addRow(to: .experiences)
         editor.addRow(to: .experiences)
-        editor.content.experiences[0].periodStart = "last spring"
-        editor.content.experiences[1].periodStart = "two winters ago"
+        editor.content.experiences[0].period.start.year = "last spring"
+        editor.content.experiences[1].period.start.year = "two winters ago"
         editor.type(\.email, "mara at example")
         editor.fieldWasLeft(.email)
         editor.fieldWasLeft(.email)

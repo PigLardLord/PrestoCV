@@ -21,19 +21,19 @@ struct DetailsSection: View {
                 .accessibilityIdentifier("editor.field.professionalTitle")
             lineField(
                 "editor.field.email", .email, \.email,
-                note: words(of: editor.problem(of: .email), unreadable: "editor.note.email")
+                note: noteWords(of: editor.problem(of: .email), field: .email)
             )
             .accessibilityIdentifier("editor.field.email")
             lineField(
                 "editor.field.phone", .phone, \.phone,
-                note: words(of: editor.problem(of: .phone), unreadable: "editor.note.phone")
+                note: noteWords(of: editor.problem(of: .phone), field: .phone)
             )
             .accessibilityIdentifier("editor.field.phone")
             lineField("editor.field.location", .location, \.location)
                 .accessibilityIdentifier("editor.field.location")
             lineField(
                 "editor.field.website", .website, \.website,
-                note: words(of: editor.problem(of: .website), unreadable: "editor.note.website")
+                note: noteWords(of: editor.problem(of: .website), field: .website)
             )
             .accessibilityIdentifier("editor.field.website")
             ParagraphField("editor.field.summary", text: $editor.content.summary, focus: focus, as: .summary)
@@ -68,14 +68,6 @@ struct DetailsSection: View {
                 refreshed[field, default: 0] += 1
                 focus.wrappedValue = next
             }
-        }
-    }
-
-    /// The words of the note under a field for the problem the editor names with its text (R13); nil when it names none.
-    private func words(of problem: FieldProblem.Code?, unreadable: LocalizedStringResource) -> LocalizedStringResource? {
-        switch problem {
-        case .unreadable: unreadable
-        case nil: nil
         }
     }
 }

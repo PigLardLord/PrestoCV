@@ -1,7 +1,8 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The jobs: what the person did, where, and how it went. The period comes with the problems of the rows (5-11c).
+/// The jobs: what the person did, where, when, and how it went. A note under the period says why it is not stored, once
+/// the person has left it.
 struct ExperienceSection: View {
     @Bindable var editor: EditorViewModel
     let focus: FocusState<RowFocus?>.Binding
@@ -15,6 +16,11 @@ struct ExperienceSection: View {
             fields.line("editor.field.role", job.role, .experienceRole)
             fields.line("editor.field.company", job.company, .experienceCompany)
             fields.line("editor.field.location", job.location, .experienceLocation)
+            PeriodField(
+                period: job.period, field: .experiencePeriod, current: "editor.period.current.job",
+                problem: editor.problem(of: .experiencePeriod, row: row.id), row: row.id, focus: focus,
+                picked: { editor.fieldWasLeft(.experiencePeriod, row: row.id) }
+            )
             fields.paragraph("editor.field.description", job.description, .experienceDescription)
         }
     }

@@ -166,7 +166,7 @@ final class EditorConflictUITests: XCTestCase {
         try XCTSkipUnless(isCompact(app), "Only an iPhone has a compact height on its side")
         try blocked(by: changedElsewhere, in: app)
 
-        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(app.turn(to: .landscapeLeft), "The screen turned")
         XCTAssertEqual(app.windows.firstMatch.verticalSizeClass, .compact, "The iPhone turned")
 
         let editor = element("shell.detail.opened", in: app)

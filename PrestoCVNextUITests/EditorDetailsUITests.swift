@@ -175,35 +175,6 @@ final class EditorDetailsUITests: XCTestCase {
         return XCTWaiter().wait(for: [focused], timeout: 30) == .completed
     }
 
-    /// Scrolls the form up in steps shorter than the screen, so that no field is passed over, until the element can be
-    /// tapped. A form shows only the rows on screen. The drag stays in the form, away from the list beside it.
-    @MainActor
-    private func scrollUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        scroll(until: { element.exists && element.isHittable }, named: name, in: app, from: 0.6, to: 0.3)
-    }
-
-    /// The same towards the top of the form, to a field above those on screen.
-    @MainActor
-    private func scrollBackUntilHittable(_ element: XCUIElement, named name: String, in app: XCUIApplication) {
-        scroll(until: { element.exists && element.isHittable }, named: name, in: app, from: 0.3, to: 0.6)
-    }
-
-    /// Drags the form from one height to another, as fractions of its frame, until `shown` holds.
-    @MainActor
-    private func scroll(
-        until shown: () -> Bool, named name: String, in app: XCUIApplication, from start: CGFloat, to end: CGFloat
-    ) {
-        let form = self.element("shell.detail.opened", in: app)
-        let from = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: start))
-        let to = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: end))
-        for _ in 0..<15 {
-            if shown() { break }
-            // Held at the end, so the form does not glide on
-            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
-        }
-        XCTAssertTrue(shown(), "\(name) comes into view")
-    }
-
     /// Puts the cursor after the text of the field and types: a tap near its end, past the last word, and low in the
     /// field, on its last line where the field wraps. A tap at the middle of a field of two lines lands at the end of
     /// the first.
@@ -311,7 +282,7 @@ final class EditorDetailsUITests: XCTestCase {
     ) {
         let keyboard = app.keyboards.firstMatch
         let done = app.buttons["keyboard.done"]
-        scrollUntilHittable(field, named: name, in: app)
+        app.scrollForm(until: field, named: name)
         field.tap()
         XCTAssertTrue(keyboard.waitForExistence(timeout: 30), "\(name) brings up the software keyboard")
         if isCompact(app) {
@@ -332,7 +303,7 @@ final class EditorDetailsUITests: XCTestCase {
         open(backendEngineer, in: app)
 
         let email = app.textFields["editor.field.email"]
-        scrollUntilHittable(email, named: "The e-mail address", in: app)
+        app.scrollForm(until: email, named: "The e-mail address")
         email.tap()
         email.typeText("mara.at.example")
 
@@ -368,7 +339,7 @@ final class EditorDetailsUITests: XCTestCase {
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
 
         let title = textInput("editor.field.title", in: app)
-        scrollUntilHittable(title, named: "The CV name", in: app)
+        app.scrollForm(until: title, named: "The CV name")
         title.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.9)).tap()
         let next = returnKey(in: app)
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The keyboard of the CV name has a return key")
@@ -378,7 +349,7 @@ final class EditorDetailsUITests: XCTestCase {
         XCTAssertTrue(waitUntilFocused(fullName), "The return key moves to the full name")
         XCTAssertEqual(title.value as? String, backendEngineer.title, "The CV name keeps no line break")
         let statusLine = status(of: app)
-        scrollBackUntilHittable(statusLine, named: "The status", in: app)
+        app.scrollForm(until: statusLine, named: "The status", forward: false)
         XCTAssertEqual(statusLine.label, saved, "Nothing is left to store")
     }
 
@@ -391,7 +362,7 @@ final class EditorDetailsUITests: XCTestCase {
         UIPasteboard.general.string = "Payments platform.\nTeam of six."
 
         let location = textInput("editor.field.location", in: app)
-        scrollUntilHittable(location, named: "The location", in: app)
+        app.scrollForm(until: location, named: "The location")
         location.tap()
         XCTAssertTrue(waitUntilFocused(location), "A tap gives the location the keyboard focus")
         // A tap on the caret of a focused field opens its menu. The caret of the empty field is at its leading edge, and
@@ -404,7 +375,7 @@ final class EditorDetailsUITests: XCTestCase {
         let pasted = expectation(for: NSPredicate(format: "value == %@", oneLine), evaluatedWith: location)
         XCTAssertEqual(XCTWaiter().wait(for: [pasted], timeout: 30), .completed, String(describing: location.value))
         let statusLine = status(of: app)
-        scrollBackUntilHittable(statusLine, named: "The status", in: app)
+        app.scrollForm(until: statusLine, named: "The status", forward: false)
         XCTAssertTrue(waitUntil(statusLine, reads: saved), statusLine.label)
     }
 
@@ -428,7 +399,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         for field in fields {
             let element = textInput(field.identifier, in: app)
-            scrollUntilHittable(element, named: field.identifier, in: app)
+            app.scrollForm(until: element, named: field.identifier)
             // A frame comes as a float: 44 points read 43.99…
             XCTAssertGreaterThan(element.frame.height, 43.99, "\(field.identifier) is tall enough to tap")
         }
@@ -443,7 +414,7 @@ final class EditorDetailsUITests: XCTestCase {
         open(paymentsLead, in: app)
 
         let role = textInput("editor.field.professionalTitle", in: app)
-        scrollUntilHittable(role, named: "The job title", in: app)
+        app.scrollForm(until: role, named: "The job title")
         XCTAssertEqual(role.value as? String, paymentsLead.role)
         let roleHeight = role.frame.height
         let shot = XCTAttachment(screenshot: app.screenshot())
@@ -452,12 +423,12 @@ final class EditorDetailsUITests: XCTestCase {
         add(shot)
 
         let email = textInput("editor.field.email", in: app)
-        scrollUntilHittable(email, named: "The e-mail address", in: app)
+        app.scrollForm(until: email, named: "The e-mail address")
         XCTAssertEqual(email.value as? String, paymentsLead.email)
         let emailHeight = email.frame.height
 
         let location = textInput("editor.field.location", in: app)
-        scrollUntilHittable(location, named: "The location", in: app)
+        app.scrollForm(until: location, named: "The location")
         let oneLine = location.frame.height
 
         XCTAssertGreaterThan(roleHeight, oneLine * 1.5, "The job title takes more lines than an empty field")
@@ -554,7 +525,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         for field in fields {
             let element = app.descendants(matching: field.type)[field.identifier]
-            scrollUntilHittable(element, named: field.identifier, in: app)
+            app.scrollForm(until: element, named: field.identifier)
             XCTAssertEqual(element.label, field.label, field.identifier)
         }
     }

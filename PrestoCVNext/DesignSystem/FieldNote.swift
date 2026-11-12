@@ -3,6 +3,9 @@ import SwiftUI
 /// A note under a field about the text in it, such as text that cannot be read as an e-mail address: a warning symbol
 /// and what to do. It is for the eye only: the field carries its words for VoiceOver (`LabeledField`), so that they are
 /// read with the field and not a second time.
+///
+/// The note takes the height its lines need, whatever the row around it: in a form row that also holds a field of
+/// several lines (a job's description), the form gave the note the height of one line and cut the rest.
 struct FieldNote: View {
     private let words: LocalizedStringResource
 
@@ -18,6 +21,7 @@ struct FieldNote: View {
                 .foregroundStyle(.secondary)
         }
         .font(.footnote)
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityHidden(true)
     }
 }
