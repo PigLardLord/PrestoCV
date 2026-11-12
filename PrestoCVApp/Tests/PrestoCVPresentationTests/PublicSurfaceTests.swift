@@ -114,6 +114,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     await editor.saveAsCopy()
     let tag: String? = nil
     await editor.setDocumentLanguage(tag)
+    await editor.keepFoundLanguage("de")
     let parts: Set<LookPart> = [.design]
     await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
     let _: ExportSnapshot? = editor.exportSnapshot()
