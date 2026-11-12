@@ -96,11 +96,14 @@ public final class EditorViewModel {
     /// The failure of the last change of the look or the language, shown until a change succeeds. A write that succeeds
     /// does not clear it, and it never hides `failure`: a change that succeeds clears only this one.
     @ObservationIgnored var changeFailure: SaveStatus?
-    /// A reload, a copy or a change of the look, which replaces the CV the form stands on. Edits made meanwhile wait for
-    /// it, and are written after it. `isReplacing` follows it.
+    /// The last replacement queued: a reload or a copy, which replaces the CV the form stands on, or a change of the
+    /// look or the language. Each one runs after the one asked for before it. Edits made meanwhile wait for the last
+    /// one, and are written after it. `isReplacing` follows it.
     @ObservationIgnored var replacing: Task<Void, Never>? {
         didSet { isReplacing = replacing != nil }
     }
+    /// Counts the replacements asked for, so that only the last one queued clears the way (`replacing`).
+    @ObservationIgnored var replacements = 0
     /// Counts the autosaves, so that one replaced cannot change the status any more.
     @ObservationIgnored var generation = 0
     /// The writes of the autosave the form stands on.
