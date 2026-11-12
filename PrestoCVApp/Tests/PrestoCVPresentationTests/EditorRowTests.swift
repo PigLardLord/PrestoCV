@@ -32,7 +32,7 @@ struct EditorRowTests {
         editor.removeRow(in: .skills, id: id)
 
         #expect(editor.content.skills.map(\.name) == ["Prototyping"])
-        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: id))
+        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: id, name: .text("Prototyping")))
 
         editor.confirmRemoval()
 
@@ -225,7 +225,7 @@ struct EditorRowTests {
 
         editor.removeRow(in: section, id: chosen)
         #expect(ids(editor.content, section) == ids(before, section))
-        #expect(editor.pendingRemoval == RowRemoval(section: section, row: chosen))
+        #expect(editor.pendingRemoval.map { [$0.section: $0.row] } == [section: chosen])
         editor.confirmRemoval()
 
         #expect(ids(editor.content, section) == [ids(before, section)[0], ids(before, section)[2]])
@@ -304,7 +304,7 @@ struct EditorRowTests {
         editor.removeRow(in: .skills, id: ids[1])
 
         editor.content.skills.remove(at: 0)
-        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: ids[1]))
+        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: ids[1], name: .text("B")))
         editor.confirmRemoval()
 
         #expect(editor.content.skills.map(\.name) == ["C"])
@@ -470,7 +470,7 @@ struct EditorRowTests {
         let editor = await world.editor(on: try await world.storedCV())
         let ids = addSkills(["A"], to: editor)
         editor.removeRow(in: .skills, id: ids[0])
-        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: ids[0]))
+        #expect(editor.pendingRemoval == RowRemoval(section: .skills, row: ids[0], name: .text("A")))
         var content = editor.content
         let copy = content.skills[0]
         switch place {
