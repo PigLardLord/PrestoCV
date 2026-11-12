@@ -468,11 +468,11 @@ final class EditorDetailsUITests: XCTestCase {
         open(platformLead, in: app)
         let form = element("shell.detail.opened", in: app)
         let summary = app.textViews["editor.field.summary"]
-        scroll(
+        app.scrollForm(
             until: {
                 summary.exists && form.frame.minY < summary.frame.minY && summary.frame.maxY + 10 < form.frame.maxY
             },
-            named: "The whole summary", in: app, from: 0.6, to: 0.3)
+            named: "The whole summary")
         XCTAssertEqual(summary.value as? String, platformLead.summary)
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "A long summary"
@@ -501,13 +501,13 @@ final class EditorDetailsUITests: XCTestCase {
     @MainActor
     private func checkADragScrollsTheForm(from field: XCUIElement, named name: String, in app: XCUIApplication) {
         let form = element("shell.detail.opened", in: app)
-        scroll(
+        app.scrollForm(
             until: {
                 guard field.exists else { return false }
                 let top = field.frame.minY
                 return form.frame.minY + 250 < top && top + 150 < form.frame.maxY
             },
-            named: name, in: app, from: 0.6, to: 0.3)
+            named: name)
         let top = field.frame.minY
         let start = field.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: field.frame.width / 2, dy: min(40, field.frame.height / 2)))
