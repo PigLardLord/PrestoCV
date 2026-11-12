@@ -82,6 +82,11 @@ extension EditorContent {
             + interests.filter { $0.id == id }.count
     }
 
+    /// The name of the row of `section` with `id`, or nil if the section has no such row.
+    func rowName(in section: EditorSection, id: RowID) -> RowName? {
+        row(in: section, id: id)?.rowName
+    }
+
     /// Whether the section has the row with `id`.
     func hasRow(in section: EditorSection, id: RowID) -> Bool {
         row(in: section, id: id) != nil

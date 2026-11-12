@@ -24,8 +24,12 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" as English does.
-            sameInSomeLanguages: ["editor.field.website": ["de"]],
+            // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
+            sameInSomeLanguages: [
+                "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
+                "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
+            ],
+            nonKeyLiterals: ["native": "the code of a language level, which ProficiencyPicker words (R13)"],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
@@ -38,6 +42,10 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.kept.open.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
                 #"list.kept.retry.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
                 #"editor.notice.textTooLong.named \(name)"#: ValueTypes(["%@"], "StatusNotice resolves the field's label to a String"),
+                #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
+                    ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
             ],
             // The design system's views take a key; the screens hand one to ErrorStateView as title:, message:, code: and retryTitle:.
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText"],
