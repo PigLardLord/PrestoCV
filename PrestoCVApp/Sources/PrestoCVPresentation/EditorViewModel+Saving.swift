@@ -72,15 +72,23 @@ extension EditorViewModel {
         }
     }
 
-    /// Runs `body`, which replaces the CV the form stands on or the look and the language it holds, after any replacement
-    /// that runs. Edits made meanwhile stay in the form, and go to the autosave once it ends; `saveNow()` waits for it. A
-    /// replacement that reads the store takes what it read only if the form is as it was when the replacement began.
+    /// Runs `body`, which replaces the CV the form stands on or the look and the language it holds, after the
+    /// replacements asked for before it, in the order they were asked for. Edits made meanwhile stay in the form, and
+    /// go to the autosave once the last one queued ends; `saveNow()` waits for it. A replacement that reads the store
+    /// takes what it read only if the form is as it was when the replacement began.
+    ///
+    /// Each replacement waits for the one queued just before it, never in a loop on `replacing`: the tasks that wait
+    /// for one task resume last-first, so two changes asked for behind a running one would run in the reverse order.
+    /// A `body` never calls this: it would wait for itself.
     func replace(_ body: @escaping @MainActor () async -> Void) async {
-        while let replacing { await replacing.value }
+        let before = replacing
+        replacements += 1
+        let number = replacements
         let replacement = Task {
+            await before?.value
             await body()
-            // Cleared before the task ends, so that whoever waits for it finds the way free
-            replacing = nil
+            // Cleared by the last one queued before it ends, so that whoever waits for it finds the way free
+            if replacements == number { replacing = nil }
             passOnTheForm()
             refreshSaveStatus()
         }
