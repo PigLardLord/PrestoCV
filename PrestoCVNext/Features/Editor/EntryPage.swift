@@ -2,8 +2,8 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The page of one row on a narrow screen: where the text stands, the row's fields in groups, and the button that deletes
-/// it. A row with something in it goes only once the person confirms, here. The row just added takes the focus in its
-/// first field. The editor opens and closes the page; the page only shows the row.
+/// it. A row with something in it goes only once the person confirms, in a question that comes from that button. The
+/// row just added takes the focus in its first field. The editor opens and closes the page; the page shows the row.
 struct EntryPage: View {
     @Bindable var editor: EditorViewModel
     let entry: EditorEntry
@@ -24,6 +24,15 @@ struct EntryPage: View {
                 }
                 .frame(minHeight: TapTarget.minimumHeight)
                 .accessibilityIdentifier("editor.entry.delete")
+                // On the button, not on the form: on an iPhone the question is a popover from the view that holds it
+                .confirmationDialog(
+                    Text("editor.row.delete.title \(removalName)"), isPresented: asksToRemove, titleVisibility: .visible
+                ) {
+                    Button("editor.row.delete", role: .destructive) { editor.confirmRemoval() }
+                    Button("editor.cancel", role: .cancel) { editor.cancelRemoval() }
+                } message: {
+                    Text("editor.row.delete.message")
+                }
             }
         }
         .formStyle(.grouped)
@@ -35,14 +44,6 @@ struct EntryPage: View {
         // A problem with a field's text is named once the person leaves it, as in the form
         .onChange(of: focus) { left, _ in
             if let left { editor.fieldWasLeft(left.field, row: left.row) }
-        }
-        .confirmationDialog(
-            Text("editor.row.delete.title \(removalName)"), isPresented: asksToRemove, titleVisibility: .visible
-        ) {
-            Button("editor.row.delete", role: .destructive) { editor.confirmRemoval() }
-            Button("editor.cancel", role: .cancel) { editor.cancelRemoval() }
-        } message: {
-            Text("editor.row.delete.message")
         }
         .task(id: editor.addedRow) {
             guard editor.addedRow == entry.row else { return }

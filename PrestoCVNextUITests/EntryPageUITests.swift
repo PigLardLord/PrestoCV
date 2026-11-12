@@ -97,11 +97,27 @@ final class EntryPageUITests: XCTestCase {
 
     /// The Delete of the dialog: the page's own Delete button, or the menu's, may stay in the tree.
     @MainActor
-    private func confirmDelete(in app: XCUIApplication) {
-        let delete = app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).allElementsBoundByIndex
+    private func dialogDelete(in app: XCUIApplication) -> XCUIElement? {
+        app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).allElementsBoundByIndex
             .last { $0.canBeTapped(in: app) }
+    }
+
+    @MainActor
+    private func confirmDelete(in app: XCUIApplication) {
+        let delete = dialogDelete(in: app)
         XCTAssertNotNil(delete, "The dialog offers Delete")
         delete?.tap()
+    }
+
+    /// The points between `button` and the dialog that asks `question`, from its question to its Delete, above or below
+    /// the button: a popover from the button stands right beside it, with its arrow on it.
+    @MainActor
+    private func gap(between button: XCUIElement, andTheDialogOf question: XCUIElement, in app: XCUIApplication)
+        -> CGFloat? {
+        guard let action = dialogDelete(in: app) else { return nil }
+        let top = min(question.frame.minY, action.frame.minY)
+        let bottom = max(question.frame.maxY, action.frame.maxY)
+        return max(button.frame.minY - bottom, top - button.frame.maxY)
     }
 
     @MainActor
@@ -218,7 +234,11 @@ final class EntryPageUITests: XCTestCase {
         delete.tap()
         XCTAssertTrue(question.waitForExistence(timeout: 30), "The dialog names the job")
         XCTAssertTrue(app.staticTexts["This cannot be undone."].exists)
-        // The dialog is a popover from the page's Delete, with no Cancel: a tap outside it cancels
+        // The dialog is a popover from the page's Delete, with no Cancel: it stands by the button, and a tap outside it
+        // cancels
+        let distance = try XCTUnwrap(gap(between: delete, andTheDialogOf: question, in: app), "It offers Delete")
+        // Two tap heights at most: from the form, the popover stood half a screen away
+        XCTAssertLessThan(distance, 2 * 44, "The dialog stands by the page's Delete")
         app.cancelDialog(showing: question)
         XCTAssertTrue(waitUntilGone(question))
         XCTAssertTrue(app.entryPage.exists, "Cancel keeps the page")
