@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     # The Swift that .swift-version pins: 6.4.2, the Swift of Xcode 27.2 that Xcode Cloud builds with (ADR 0026).
     # Tools/check-linux.sh fails when they differ, and the source checks hold this file to .swift-version.
+    # The image already has git, and the checker's self-test needs only the Swift toolchain, so the job downloads no
+    # package at run time (#438).
     container: swift:6.4.2
     steps:
-      - name: Install the self-test's dependencies
-        run: apt-get update -qq && apt-get install -y -qq git python3 > /dev/null
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

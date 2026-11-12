@@ -29,7 +29,7 @@ Tools/ArchitectureCheck/check.sh --against base.json    # also fail if the basel
 swift build -c release --package-path Tools/ArchitectureCheck && Tools/ArchitectureCheck/selftest.sh
 ```
 
-The first build takes a few minutes, because it compiles SwiftSyntax.
+The first build takes a few minutes, because it compiles SwiftSyntax. The self-test needs only the Swift toolchain, git and bash: it edits its fixtures' `rules.json` with the package's own `JSONEdit` executable, which the same build makes.
 
 ## Pre-commit hook
 
