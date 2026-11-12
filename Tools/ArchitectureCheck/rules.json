@@ -1285,6 +1285,7 @@
    "path": "PrestoCVNextUITests",
    "kind": "test",
    "allowedImports": [
+    "UIKit",
     "XCTest"
    ],
    "rules": [

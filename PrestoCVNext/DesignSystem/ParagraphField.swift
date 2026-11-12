@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A field of several lines under its label, as `LabeledField` is for one line. Its return key starts a new line, and it
-/// is a few lines tall before the person writes, taller at a larger text size.
+/// A field of several lines under its label, as `LabeledField` is for a line of text. Its return key starts a new line,
+/// and it is a few lines tall before the person writes, taller at a larger text size.
 struct ParagraphField<Focus: Hashable>: View {
     private let label: LocalizedStringResource
     @Binding private var text: String

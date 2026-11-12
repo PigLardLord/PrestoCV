@@ -36,7 +36,12 @@ struct ShellView: View {
 
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
-            CVListView(list: list, firstRun: firstRun, selection: selection, choose: start)
+            CVListView(
+                list: list, firstRun: firstRun, selection: selection, choose: start,
+                kept: list.keptNotices(shell.keptEditors),
+                retryKept: { id in Task { await shell.retryKept(id) } },
+                openKept: { id in _ = shell.openKept(id) }
+            )
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
@@ -57,11 +62,12 @@ struct ShellView: View {
     }
 
     /// The open CV's editor, a new one for each CV opened. While its text cannot be stored, Back is hidden (which also
-    /// stops the swipe), so the person answers the status first.
+    /// stops the swipe), so the person answers the status first: the notice above the form offers the ways out, and
+    /// "Discard" closes the editor without storing its text.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor))
+            EditorView(editor: editor, title: title(of: editor), discard: { shell.discardEditor() })
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
         } else {

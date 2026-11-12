@@ -2,8 +2,9 @@ import PrestoCVPresentation
 import SwiftUI
 
 extension EditorAnnouncement {
-    /// The words VoiceOver tells: where the status settled, then the note of each problem the status does not name.
-    var sentences: [LocalizedStringResource] {
-        (status.map { [$0.words] } ?? []) + problems.map(noteWords(of:))
+    /// The words VoiceOver tells: where the status settled (with what to do while the person cannot leave), then the note
+    /// of each problem the status does not name.
+    func sentences(in locale: Locale) -> [LocalizedStringResource] {
+        (status.map { $0.spoken(in: locale) } ?? []) + problems.map(noteWords(of:))
     }
 }

@@ -39,6 +39,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
                 #"list.rowFailure.hide \(failure.label)"#: ValueTypes(["%@"], "RowFailure's label is a String"),
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
+                #"list.kept.open.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
+                #"list.kept.retry.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
+                #"editor.notice.textTooLong.named \(name)"#: ValueTypes(["%@"], "StatusNotice resolves the field's label to a String"),
                 #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
