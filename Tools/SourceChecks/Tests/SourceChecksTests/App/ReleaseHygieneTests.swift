@@ -155,6 +155,19 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture that fails renames outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test lets another window change or delete the open CV, to see the editor's conflict and deletion; no Release
+    /// build may be able to.
+    @Test("The fixture of the other window is read only by Debug builds")
+    func theFixtureOfTheOtherWindowIsReadOnlyInDebugBuilds() {
+        let names = ["otherWindowArgument", "OtherWindowStore", "fixtures.store", ".otherWindow"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture of the other window outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// Where the new app keeps its data is decided in one place, so a second folder cannot appear unnoticed.
     @Test("Only AppPaths asks the system for a folder in the composition")
     func onlyAppPathsAsksForFolders() throws {

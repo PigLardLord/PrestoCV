@@ -223,12 +223,12 @@ extension EditFailure {
 struct Editing {
     let editing = EditingFake()
     let clock = ManualClock()
-    /// The calls of the editors' `didStore`.
+    /// The calls of the editors' `storeChanged`.
     let storesTold = CallCount()
 
     func editor(_ start: EditorStart) -> EditorViewModel {
         EditorViewModel(start: start, editing: editing, clock: self.clock, pause: .seconds(1),
-                        copyTitle: { "Copy of " + $0 }, didStore: { [storesTold] in storesTold.count += 1 })
+                        copyTitle: { "Copy of " + $0 }, storeChanged: { [storesTold] in storesTold.count += 1 })
     }
 
     /// A CV in the store with invented values: titled "Design roles", in Italian.

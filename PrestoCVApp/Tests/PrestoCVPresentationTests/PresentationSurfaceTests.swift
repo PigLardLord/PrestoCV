@@ -28,6 +28,14 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
         }
     }
     let _: [RowAction] = list.rowActions + list.leadingSwipeActions + list.trailingSwipeActions
+    let kept: KeptNotices = list.keptNotices([] as [KeptEditor])
+    let under: [CVReference: KeptNotice] = kept.under
+    for notice in kept.above + under.values {
+        let _: Int = notice.id
+        let _: String = notice.label
+        let _: SaveStatus = notice.status
+        let _: Bool = notice.canRetry
+    }
     _ = list.now
     list.refreshNow()
     list.dismissNotice()
@@ -98,17 +106,37 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let editor: EditorViewModel? = shell.editor
     let screen: ShellScreen = shell.screen(for: .firstRun)
     switch screen { case .loading, .welcome, .split: break }
+    let _: Bool = shell.canLeave
+    let _: CVRow? = shell.selectedRow(in: rows)
     shell.reconcile(with: rows)
     shell.sceneChanged(isActive: false)
     shell.sceneChanged(isActive: true)
+    for kept in shell.keptEditors as [KeptEditor] {
+        let _: Int = kept.id
+        let _: CVReference? = kept.reference
+        let _: SaveStatus = kept.status
+        let _: Bool = kept.canRetry
+        await shell.retryKept(kept.id)
+        verdicts.append(shell.openKept(kept.id))
+    }
+    shell.columnChanged(to: .detail, isCollapsed: true)
     verdicts.append(shell.deselect())
+    shell.discardEditor()
     for verdict in verdicts {
         switch verdict {
         case .left: break
-        case .stayed(let status): let _: SaveStatus = status
+        case .stayed(let status):
+            let _: Bool = status.blocksLeaving
+            let _: [StatusAction] = status.statusActions
         }
     }
     _ = (reference, detail, editor)
+}
+
+func useEveryPublicMember(of chrome: EditorChrome) {
+    let _: Double = EditorChrome.noticeShareOfHeight
+    let _: Bool = chrome.isCompactHeight || chrome.isAccessibilitySize || chrome.isShortOfRoom
+    let _: Double? = chrome.noticeHeight(fullHeight: 120, editorHeight: 760)
 }
 
 func everyListCode() -> [Any] {
@@ -122,6 +150,8 @@ func everyListCode() -> [Any] {
     let contents: [ListContent] = [.loading, .empty, .rows]
     let notices: [ListNotice] = [.stale, .failed]
     let actions: [RowAction] = [.duplicate, .rename, .delete]
+    let statusActions: [StatusAction] = [.reload, .saveAsCopy, .discard, .retry]
+    for value in statusActions { switch value { case .reload, .saveAsCopy, .discard, .retry: break } }
     for value in contents { switch value { case .loading, .empty, .rows: break } }
     for value in notices { switch value { case .stale, .failed, .unreadable, .rowFailure: break } }
     for value in actions { switch value { case .duplicate, .rename, .delete: break } }
@@ -142,6 +172,7 @@ func everyListCode() -> [Any] {
     contents.forEach { all.append($0) }
     notices.forEach { all.append($0) }
     actions.forEach { all.append($0) }
+    statusActions.forEach { all.append($0) }
     all.append(StartChoice.importCV)
     all.append(StartChoice.blank)
     return all
@@ -161,6 +192,7 @@ struct PresentationSurfaceTests {
         await useEveryPublicMember(of: world.firstRun())
         await useEveryPublicMember(of: world.look(of: world.editing.new()))
         await useEveryPublicMember(of: Editing().shell(), rows: list.rows)
+        useEveryPublicMember(of: EditorChrome(isCompactHeight: true, isAccessibilitySize: false))
 
         #expect(list.status == .loaded)
     }

@@ -67,6 +67,15 @@ public enum EditorSection: Hashable, Sendable, CaseIterable {
 // MARK: - From the domain's codes
 
 extension SaveStatus {
+    /// Whether the status says that another save or a deletion changed the CV in the store.
+    var saysTheCVChangedElsewhere: Bool {
+        switch self {
+        case .conflict, .deletedElsewhere: true
+        case .saved, .pending, .saving, .notEnoughContent, .textTooLong, .tooManyEntries, .tooLarge, .unreadable, .failed:
+            false
+        }
+    }
+
     /// Every failure of the store has its status (R7).
     init(_ failure: EditFailure) {
         switch failure {

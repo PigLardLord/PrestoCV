@@ -1285,6 +1285,7 @@
    "path": "PrestoCVNextUITests",
    "kind": "test",
    "allowedImports": [
+    "UIKit",
     "XCTest"
    ],
    "rules": [
@@ -1298,6 +1299,7 @@
    "allowedImports": [
     "Testing",
     "SwiftUI",
+    "UIKit",
     "PrestoCVNext"
    ],
    "rules": [

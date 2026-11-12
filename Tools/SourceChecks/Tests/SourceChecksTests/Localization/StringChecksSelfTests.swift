@@ -98,6 +98,25 @@ struct StringChecksSelfTests {
         #expect(found.count == 1 && found[0].hasPrefix("plant.title_case (es)"), "\(found)")
     }
 
+    @Test("A French text with a space that can break before : ; ? ! » or after « is found, where the catalog asks for it")
+    func breakingSpaceInFrench() throws {
+        var rules = StringRules()
+        rules.frenchNoBreakSpaces = true
+        let found = try Self.run(rules: rules).breakingSpacesInFrench
+        #expect(found.count == 1 && found[0].hasPrefix("plant.french_space (fr): a space that can break beside « » ?"), "\(found)")
+        #expect(try Self.run().breakingSpacesInFrench.isEmpty, "a catalog that does not ask for it")
+    }
+
+    @Test("The space beside a French mark is read character by character", arguments: [
+        ("Supprimer la page ?", ["?"]), ("Non enregistré : saisissez l’année ; puis validez !", [":", ";", "!"]),
+        ("Masquer l’avis sur « %@ »", ["«", "»"]), ("Fin\t?", ["?"]), ("Fin\n!", ["!"]),
+        ("Non enregistré\u{00A0}: saisissez l’année", []), ("Supprimer «\u{00A0}%@\u{00A0}»\u{00A0}?", []),
+        ("Fin\u{202F}!", []), ("en commençant par https://.", []), ("Ouvrir «%@»", []),
+    ] as [(String, [Character])])
+    func breakingSpacesOfOneText(_ text: String, marks: [Character]) {
+        #expect(StringChecks.breakingSpaces(inFrench: text) == marks, "\(text)")
+    }
+
     @Test("A key that no source looks up is found")
     func unusedKey() throws {
         #expect(try Self.run().unused == ["plant.unused"])

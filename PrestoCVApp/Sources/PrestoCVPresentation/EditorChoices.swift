@@ -6,4 +6,7 @@ public enum EditorChoices {
     public static let skillLevels: [Int] = Array(1...5)
     /// How well the person speaks a language, from beginner to native: the codes `a1` to `c2` and `native`.
     public static let proficiencies: [String] = LanguageProficiency.allCases.map(\.rawValue)
+    /// The months of a date, January first: 1 to 12, those of the Gregorian calendar the domain stores. The view words
+    /// them in the person's language.
+    public static let months: [Int] = Array(1...12)
 }
