@@ -133,8 +133,9 @@ final class EntryPageUITests: XCTestCase {
         return XCTWaiter().wait(for: [shown], timeout: 30) == .completed
     }
 
-    /// Whether `element` is still there after five seconds: about three seconds after a pop to the root, the list
-    /// writes its selection once more.
+    /// Whether `element` is still there after five seconds. After a pop to the root by the back button's menu, the list
+    /// writes its selection nil about half a second after the page closed on iOS 27.0, and at once on iOS 26.5; five
+    /// seconds leave such a late write the time to close what the person opened.
     @MainActor
     private func stays(_ element: XCUIElement) -> Bool {
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
@@ -147,12 +148,19 @@ final class EntryPageUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
     }
 
-    /// Goes from a row's page straight to the list, by the menu of the back button.
+    /// Goes from a row's page straight to the list, by the menu of the back button. A plain press ends as a tap, which
+    /// goes back one step and closes the menu, so the press slides off the button to keep the menu open. The menu's
+    /// item is told apart from the bar's own back button, which takes the title of the screen before it, here also
+    /// "My CVs" once the page has gone.
     @MainActor
     private func backToTheList(in app: XCUIApplication) {
-        app.navigationBars.buttons.firstMatch.press(forDuration: 1.2)
-        let list = app.buttons.matching(NSPredicate(format: "label == %@", "My CVs")).firstMatch
+        let back = app.navigationBars.buttons.firstMatch
+        back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)))
+        let list = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "My CVs", "BackButton"))
+            .firstMatch
         XCTAssertTrue(list.waitForExistence(timeout: 30), "The menu of the back button offers the list")
+        XCTAssertTrue(app.entryPage.exists, "The menu opens over the page")
         list.tap()
     }
 
@@ -306,8 +314,8 @@ final class EntryPageUITests: XCTestCase {
         XCTAssertTrue(opened.waitForExistence(timeout: 30), "The row opens \(title) again")
     }
 
-    /// Right after the back button's menu showed the list, a tap on the CV that was open opens it again, and it stays
-    /// open once the list has written its selection.
+    /// Once the back button's menu showed the list, a tap on the CV that was open opens it again, and it stays open:
+    /// no late write of the list's selection closes it.
     @MainActor
     func testTheSameCVOpensRightAfterTheList() throws {
         let app = try launchAndOpen()
@@ -325,8 +333,8 @@ final class EntryPageUITests: XCTestCase {
         XCTAssertTrue(opened.isHittable, "The form of \(title) still shows")
     }
 
-    /// Right after the back button's menu showed the list, a tap on another CV opens that one, and it stays open once
-    /// the list has written its selection.
+    /// Once the back button's menu showed the list, a tap on another CV opens that one, and it stays open: no late
+    /// write of the list's selection closes it.
     @MainActor
     func testAnotherCVOpensRightAfterTheList() throws {
         let app = try launchAndOpen(withAnother: true)

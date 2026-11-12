@@ -250,15 +250,36 @@ struct ShellNavigationModelTests {
         editor.addRow(to: .experiences)
         try #require(editor.openedEntry != nil)
 
-        // The pop to the root writes the column and closes the page at once: the column is read while the page is open
+        // On iOS 27.0 the pop to the root writes the column and closes the page at once: the column is read while the
+        // page is open
         shell.columnChanged(to: .sidebar, isCollapsed: true)
         editor.closeEntry()
         #expect(shell.selection == world.first.reference)
 
-        // The list's own write of its selection, a moment later
+        // The list's own write of its selection, about half a second later
         shell.deselect()
 
         #expect(shell.selection == nil)
+        #expect(shell.preferredColumn == .sidebar)
+    }
+
+    @Test("The back button's menu closes the open CV when the list clears it before the page closes")
+    func menuJumpClearingTheListBeforeThePageClosesTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        // On iOS 26.5 the pop to the root writes the column, then the list's selection, then closes the page, at once
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        shell.deselect()
+        editor.closeEntry()
+
+        #expect(shell.selection == nil)
+        #expect(shell.editor == nil)
         #expect(shell.preferredColumn == .sidebar)
     }
 
