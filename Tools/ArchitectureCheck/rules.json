@@ -1344,6 +1344,15 @@
    "rules": []
   },
   {
+   "name": "JSONEdit",
+   "path": "Tools/ArchitectureCheck/Sources/JSONEdit",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation"
+   ],
+   "rules": []
+  },
+  {
    "name": "SourceChecksTests",
    "path": "Tools/SourceChecks/Tests/SourceChecksTests",
    "kind": "tool",

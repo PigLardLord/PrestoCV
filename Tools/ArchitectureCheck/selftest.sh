@@ -4,6 +4,8 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # The same build directory check.sh uses (ARCHITECTURE_CHECK_SCRATCH), so CI can keep it outside the checkout.
 CHECK="${ARCHITECTURE_CHECK_SCRATCH:-$HERE/.build}/release/ArchitectureCheck"
+# The fixtures' rules.json is edited with the package's own JSONEdit tool, so the self-test needs only the Swift toolchain (#438).
+EDIT="${ARCHITECTURE_CHECK_SCRATCH:-$HERE/.build}/release/JSONEdit"
 pass=0; fail=0; ROOTS=()
 trap 'rm -rf "${ROOTS[@]}"' EXIT
 
@@ -32,6 +34,7 @@ J
   echo '[]' > "$ROOT/baseline.json"
 }
 src() { printf '%s\n' "$1" > "$ROOT/Sources/Pure/P.swift"; }
+rules_edit() { "$EDIT" "$ROOT/rules.json" "$@" || { fail=$((fail+1)); echo "FAIL the fixture's rules.json could not be edited: $*"; }; }
 run() { "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" "$@" > "$ROOT/out.txt" 2>&1; echo $?; }
 expect() {
   local name="$1" want="$2" pat="$3"; shift 3
@@ -101,15 +104,11 @@ flag "R14: test double declared in production" 'struct MockExportRepository {}' 
 flag "R14: test double referenced in production" 'let r = TestPDFRenderer.self' "R14 testDouble"
 # --- R5: import access (the domain must not leak through a public API)
 for form in 'import Foundation' 'public import Foundation' 'package import Foundation' '@preconcurrency public import Foundation'; do
-  setup; python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":"internal"}; json.dump(r,open(p,"w"))
-PY
+  setup; rules_edit set targets.0.requiredImportAccess '{"Foundation":"internal"}'
   src "$form"; expect "R5: '$form' is refused where internal access is required" 1 "importAccess"
 done
 for form in 'internal import Foundation' 'private import Foundation' 'fileprivate import Foundation'; do
-  setup; python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["requiredImportAccess"]={"Foundation":"internal"}; json.dump(r,open(p,"w"))
-PY
+  setup; rules_edit set targets.0.requiredImportAccess '{"Foundation":"internal"}'
   src "$form"; expect "R5: '$form' is accepted" 0 ""
 done
 # --- inputs that cannot be read are problems, never a silent pass (#67)
@@ -122,12 +121,7 @@ expect "manifest: Swift 5 language mode" 1 "swift5Mode"
 # Swift 5 mode is exempt only inside the declaration of a legacy target (ADR 0012), not for the whole manifest.
 legacy_setup() {
   setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Old"; echo 'let old = 1' > "$ROOT/Sources/Old/Old.swift"
-  python3 - "$ROOT/rules.json" <<'PYJ'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p))
-r["targets"].append({"name": "Old", "path": "Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []})
-json.dump(r, open(p, "w"))
-PYJ
+  rules_edit append targets '{"name":"Old","path":"Sources/Old","kind":"legacy","allowedImports":[],"rules":[]}'
 }
 legacy_setup; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'var targets: [Target] = [.target(name: "Pure"), .target(name: "Other")]' \
@@ -149,16 +143,11 @@ two_packages() {
     'let package = Package(name: "A", targets: [.target(name: "Old", swiftSettings: [.swiftLanguageMode(.v5)])])' > "$ROOT/A/Package.swift"
   printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
     'let package = Package(name: "B", targets: [.target(name: "Old", swiftSettings: [.swiftLanguageMode(.v5)])])' > "$ROOT/B/Package.swift"
-  python3 - "$ROOT/rules.json" "$1" <<'PYJ'
-import json, sys
-p, bname = sys.argv[1], sys.argv[2]; r = json.load(open(p))
-r["targets"] = [t for t in r["targets"] if t["name"] != "Manifest"] + [
-  {"name": "Old", "path": "A/Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []},
-  {"name": bname, "path": "B/Sources/Old", "allowedImports": [], "rules": []},
-  {"name": "AManifest", "path": "A/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]},
-  {"name": "BManifest", "path": "B/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]}]
-json.dump(r, open(p, "w"))
-PYJ
+  rules_edit remove targets.name=Manifest
+  rules_edit extend targets '[{"name":"Old","path":"A/Sources/Old","kind":"legacy","allowedImports":[],"rules":[]},
+    {"name":"'"$1"'","path":"B/Sources/Old","allowedImports":[],"rules":[]},
+    {"name":"AManifest","path":"A/Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m"]},
+    {"name":"BManifest","path":"B/Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m"]}]'
 }
 two_packages "BOld"; expect "manifest: a legacy name does not exempt the same name in another package" 1 "B/Package.swift:3: R9m swift5Mode"
 two_packages "Old"; expect "rules: a target name used twice is a problem" 1 "target name Old appears 2 times"
@@ -169,14 +158,9 @@ printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other"), .target(name: "Old", swiftSettings: [.swiftLanguageMode(.v5)])])' > "$ROOT/Package.swift"
 printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
   'let package = Package(name: "N", targets: [.target(name: "Old", swiftSettings: [.swiftLanguageMode(.v5)])])' > "$ROOT/N/Package.swift"
-python3 - "$ROOT/rules.json" <<'PYJ'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p))
-r["targets"] += [{"name": "Old", "path": "N/Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []},
-  {"name": "RootOld", "path": "Sources/Old", "allowedImports": [], "rules": []},
-  {"name": "NManifest", "path": "N/Package.swift", "kind": "manifest", "allowedImports": ["PackageDescription"], "rules": ["R9m"]}]
-json.dump(r, open(p, "w"))
-PYJ
+rules_edit extend targets '[{"name":"Old","path":"N/Sources/Old","kind":"legacy","allowedImports":[],"rules":[]},
+  {"name":"RootOld","path":"Sources/Old","allowedImports":[],"rules":[]},
+  {"name":"NManifest","path":"N/Package.swift","kind":"manifest","allowedImports":["PackageDescription"],"rules":["R9m"]}]'
 expect "manifest: a root manifest cannot exempt a nested package's legacy name" 1 "error: new violation Package.swift:3: R9m swift5Mode"
 if grep -q "N/Package.swift" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL nested package's own legacy declaration was flagged"; else pass=$((pass+1)); echo "ok   the nested package's own legacy declaration stays exempt"; fi
 setup; src 'let x = 1'; printf '%s\n' '// swift-tools-version: 6.0' 'import PackageDescription' \
@@ -199,14 +183,10 @@ manifest_case "manifest: tools version 5.10 with new targets fails" 1 "swift-too
   'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other")])'
 legacy_only() {
   setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Old"; echo 'let old = 1' > "$ROOT/Sources/Old/Old.swift"
-  python3 - "$ROOT/rules.json" <<'PYJ'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p))
-r["targets"] = [{"name": "Pure", "path": "Sources/Pure", "kind": "legacy", "allowedImports": [], "rules": []},
-  {"name": "Other", "path": "Sources/Other", "kind": "legacy", "allowedImports": [], "rules": []},
-  {"name": "Old", "path": "Sources/Old", "kind": "legacy", "allowedImports": [], "rules": []}] + [t for t in r["targets"] if t.get("kind") == "manifest"]
-json.dump(r, open(p, "w"))
-PYJ
+  rules_edit keep targets kind=manifest
+  rules_edit insert targets 0 '[{"name":"Pure","path":"Sources/Pure","kind":"legacy","allowedImports":[],"rules":[]},
+    {"name":"Other","path":"Sources/Other","kind":"legacy","allowedImports":[],"rules":[]},
+    {"name":"Old","path":"Sources/Old","kind":"legacy","allowedImports":[],"rules":[]}]'
 }
 legacy_only; printf '%s\n' '// swift-tools-version: 5.10' 'import PackageDescription' \
   'let package = Package(name: "F", targets: [.target(name: "Pure"), .target(name: "Other"), .target(name: "Old")])' > "$ROOT/Package.swift"
@@ -263,18 +243,12 @@ expect "manifest: a legacy target's copied Resources is refused too, since its b
 # --- R16: a target a test plan runs reads no source tree, since the plan runs where only the built products are (#246)
 plan() {   # $1 = plan path under the root, $2... = the names of its test targets
   local file="$ROOT/$1"; shift; mkdir -p "$(dirname "$file")"
-  python3 - "$file" "$@" <<'PY'
-import json, sys
-json.dump({"testTargets": [{"target": {"containerPath": "container:F", "identifier": n, "name": n}} for n in sys.argv[2:]], "version": 1},
-          open(sys.argv[1], "w"))
-PY
+  local name targets=""
+  for name in "$@"; do targets+="${targets:+,}{\"target\":{\"containerPath\":\"container:F\",\"identifier\":\"$name\",\"name\":\"$name\"}}"; done
+  printf '{"testTargets":[%s],"version":1}\n' "$targets" > "$file"
 }
 with_rule() {   # $1 = target name, $2 = rule: adds the rule to the target's rules
-  python3 - "$ROOT/rules.json" "$1" "$2" <<'PY'
-import json, sys
-p, name, rule = sys.argv[1:]; r = json.load(open(p))
-next(t for t in r["targets"] if t["name"] == name)["rules"].append(rule); json.dump(r, open(p, "w"))
-PY
+  rules_edit append "targets.name=$1.rules" "\"$2\""
 }
 on_device() { setup; with_rule Pure R16; plan TestPlans/CI.xctestplan Pure; src "$2"; expect "$1" "$3" "${4:-}"; }
 for form in 'let here = URL(fileURLWithPath: #filePath)' 'let here = #file' 'let p = "at \(#filePath)"' \
@@ -310,22 +284,14 @@ expect "R16: a test plan that runs a target rules.json does not know is an error
 setup; src 'let x = 1'; mkdir -p "$ROOT/TestPlans"; echo 'not json' > "$ROOT/TestPlans/CI.xctestplan"
 expect "R16: a test plan that cannot be read is an error, never a silent pass" 1 "cannot read the test plan"
 setup; src 'let x = 1'; mkdir -p "$ROOT/Prototypes/P"; echo 'let p = 1' > "$ROOT/Prototypes/P/P.swift"
-python3 - "$ROOT/rules.json" <<'PY'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p)); r["targets"].append({"name": "Proto", "path": "Prototypes", "kind": "excluded", "allowedImports": [], "rules": []})
-json.dump(r, open(p, "w"))
-PY
+rules_edit append targets '{"name":"Proto","path":"Prototypes","kind":"excluded","allowedImports":[],"rules":[]}'
 plan Prototypes/P/Old.xctestplan Ghost
 expect "R16: a test plan in an excluded path is not the repository's" 0 ""
 legacy_tests() {   # a legacy test target with the given rules, whose code reads the source tree, breaks R1 and R2, and is in a plan
   setup; src 'let x = 1'; mkdir -p "$ROOT/Tests/Old"
   printf '%s\n' 'import Unlisted' 'let here = #filePath' 'let d = Date()' > "$ROOT/Tests/Old/OldTests.swift"
-  python3 - "$ROOT/rules.json" "$1" <<'PY'
-import json, sys
-p, rules = sys.argv[1], [x for x in sys.argv[2].split(",") if x]; r = json.load(open(p))
-r["targets"].append({"name": "OldTests", "path": "Tests/Old", "kind": "legacy", "allowedImports": [], "rules": rules})
-json.dump(r, open(p, "w"))
-PY
+  local rule rules=""; for rule in ${1//,/ }; do rules+="${rules:+,}\"$rule\""; done
+  rules_edit append targets "{\"name\":\"OldTests\",\"path\":\"Tests/Old\",\"kind\":\"legacy\",\"allowedImports\":[],\"rules\":[$rules]}"
 }
 legacy_tests "R16"; plan TestPlans/CI.xctestplan OldTests
 expect "R16: a legacy test target a test plan runs is checked for it" 1 "Tests/Old/OldTests.swift:2: R16 sourceTreePath"
@@ -333,20 +299,12 @@ if grep -qE "R1 import|wallClock" "$ROOT/out.txt"; then fail=$((fail+1)); echo "
 else pass=$((pass+1)); echo "ok   a legacy target is checked only for the rules listed for it, without its imports"; fi
 legacy_tests ""; expect "R16: a legacy target with no rules stays exempt (ADR 0012)" 0 ""
 setup; with_rule Pure R16; plan TestPlans/CI.xctestplan Pure; src 'let here = #filePath'
-python3 - "$ROOT/rules.json" <<'PY'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p))
-r["exceptions"] = [{"path": "Sources/Pure/P.swift", "detector": "sourceTreePath", "adr": "0011", "reason": "writes a golden file on request"}]
-json.dump(r, open(p, "w"))
-PY
+rules_edit set exceptions '[{"path":"Sources/Pure/P.swift","detector":"sourceTreePath","adr":"0011","reason":"writes a golden file on request"}]'
 expect "R16: an exception backed by an ADR allows a writer that needs the checkout" 0 ""
 # --- R5: a view renders and forwards intents; it holds no service and makes no view model, except in a DEBUG preview (#256)
 only_rule() {   # $1 = rule: the Pure target has only this rule, and may import the UI frameworks, so a case shows this rule alone
-  python3 - "$ROOT/rules.json" "$1" <<'PY'
-import json, sys
-p, rule = sys.argv[1:]; r = json.load(open(p)); t = next(t for t in r["targets"] if t["name"] == "Pure")
-t["rules"] = [rule]; t["allowedImports"] += ["SwiftUI", "UIKit", "AppKit", "Combine", "Observation"]; json.dump(r, open(p, "w"))
-PY
+  rules_edit set targets.name=Pure.rules "[\"$1\"]"
+  rules_edit extend targets.name=Pure.allowedImports '["SwiftUI","UIKit","AppKit","Combine","Observation"]'
 }
 view_case() { setup; only_rule R5; src "$2"; expect "$1" "$3" "${4:-}"; }
 for form in 'struct V: View { let service: ExportService; var body: some View { EmptyView() } }' \
@@ -485,12 +443,7 @@ for form in 'init(id: UUID = UUID()) {}' 'init(debounce: Duration = .millisecond
 done
 # --- ADR 0030: with the repository's own lists, a default logger is refused (R17) and the unified log adapter is made only in the composition root (R4)
 repository_lists() {   # the fixture takes the suffixes and the infrastructure types of the repository's rules.json
-  python3 - "$ROOT/rules.json" "$HERE/rules.json" <<'PY'
-import json, sys
-p, real = sys.argv[1], json.load(open(sys.argv[2])); r = json.load(open(p))
-for key in ("serviceSuffixes", "dependencySuffixes", "infrastructureTypes"): r[key] = real[key]
-json.dump(r, open(p, "w"))
-PY
+  local key; for key in serviceSuffixes dependencySuffixes infrastructureTypes; do rules_edit copy "$HERE/rules.json" "$key" "$key"; done
 }
 for form in 'init(logger: any DiagnosticLogger = SilentLogger()) {}' 'init(logger: (any DiagnosticLogger)? = .init()) {}' \
             'init(logger: some DiagnosticLogger = SilentLogger()) {}'; do
@@ -507,13 +460,8 @@ else pass=$((pass+1)); echo "ok   a legacy target with R17 is checked for nothin
 # --- the folders of the new app: the repository's own entry of a folder, applied to a fixture file
 real_folder() {   # the fixture's one source file is put under the repository's target named $1, with that target's imports and rules
   setup; mkdir -p "$ROOT/Folder"
-  python3 - "$ROOT/rules.json" "$HERE/rules.json" "$1" <<'PY'
-import json, sys
-p, real, name = sys.argv[1], json.load(open(sys.argv[2])), sys.argv[3]; r = json.load(open(p))
-t = next(t for t in real["targets"] if t["name"] == name)
-r["targets"].append({"name": name, "path": "Folder", "allowedImports": t["allowedImports"], "rules": t["rules"]})
-json.dump(r, open(p, "w"))
-PY
+  rules_edit append targets '{"name":"'"$1"'","path":"Folder","allowedImports":[],"rules":[]}'
+  local field; for field in allowedImports rules; do rules_edit copy "$HERE/rules.json" "targets.name=$1.$field" "targets.name=$1.$field"; done
   printf '%s\n' "$2" > "$ROOT/Folder/V.swift"
 }
 real_folder PrestoCVNextFeatures $'import SwiftUI\nstruct V: View {\n    var body: some View {\n        #if os(iOS)\n        Text("a")\n        #endif\n    }\n}'
@@ -530,14 +478,9 @@ composition_only() {   # a legacy app with a composition file and a screen, its 
   setup; src 'let x = 1'; mkdir -p "$ROOT/App" "$ROOT/AppTests"
   echo 'let root = 1' > "$ROOT/App/Root.swift"; echo 'let screen = 1' > "$ROOT/App/Screen.swift"; echo 'let t = 1' > "$ROOT/AppTests/T.swift"
   echo '# ADR' > "$ROOT/adr/0032-record-each-step.md"
-  python3 - "$ROOT/rules.json" "$1" "${2:-App/Root.swift}" <<'PY2'
-import json, sys
-p, adr, listed = sys.argv[1:]; r = json.load(open(p))
-r["targets"] += [{"name": "App", "path": "App", "kind": "legacy", "allowedImports": [], "rules": []},
-                 {"name": "AppTests", "path": "AppTests", "kind": "legacy", "allowedImports": [], "rules": []}]
-r["compositionOnly"] = {"adr": adr, "files": [listed], "modules": ["TraceFiles"], "types": ["GatedTracer", "TracingLogger"]}
-json.dump(r, open(p, "w"))
-PY2
+  rules_edit extend targets '[{"name":"App","path":"App","kind":"legacy","allowedImports":[],"rules":[]},
+    {"name":"AppTests","path":"AppTests","kind":"legacy","allowedImports":[],"rules":[]}]'
+  rules_edit set compositionOnly '{"adr":"'"$1"'","files":["'"${2:-App/Root.swift}"'"],"modules":["TraceFiles"],"types":["GatedTracer","TracingLogger"]}'
 }
 composition_only 0032; printf '%s\n' 'import TraceFiles' 'let s = TraceStore()' 'let g = GatedTracer(gate: gate, next: s)' > "$ROOT/App/Root.swift"
 expect "ADR 0032: the composition file imports the store's module and makes the chain" 0 ""
@@ -586,14 +529,9 @@ composition_only 0032 App/Gone.swift; expect "ADR 0032: every file the rule list
 # --- R18: a pure target stays portable to Android: no Apple-only module and no bundle; an API that needs the full
 # Foundation, with ICU, warns without failing (#267)
 only_portable() {   # the Pure target has only R18 and may import every module a case names, so a case shows R18 alone
-  python3 - "$ROOT/rules.json" <<'PY'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p)); t = next(t for t in r["targets"] if t["name"] == "Pure")
-t["rules"] = ["R18"]
-t["allowedImports"] += ["SwiftUI", "UIKit", "AppKit", "Combine", "CryptoKit", "os", "OSLog", "NaturalLanguage", "FoundationModels", "PDFKit",
-                        "WebKit", "Vision", "Darwin", "FoundationEssentials", "Observation", "Synchronization", "Other"]
-json.dump(r, open(p, "w"))
-PY
+  rules_edit set targets.name=Pure.rules '["R18"]'
+  rules_edit extend targets.name=Pure.allowedImports '["SwiftUI","UIKit","AppKit","Combine","CryptoKit","os","OSLog","NaturalLanguage","FoundationModels",
+    "PDFKit","WebKit","Vision","Darwin","FoundationEssentials","Observation","Synchronization","Other"]'
 }
 portable_case() { setup; only_portable; src "$2"; expect "$1" "$3" "${4:-}"; }
 for form in 'import SwiftUI' 'import UIKit' 'import AppKit' 'import Combine' 'import CryptoKit' 'import os' 'import os.log' 'import OSLog' \
@@ -632,9 +570,7 @@ setup; src 'let t = s.trimmingCharacters(in: .whitespaces)'; expect "R18: a targ
 if grep -q "fullFoundation" "$ROOT/out.txt"; then fail=$((fail+1)); echo "FAIL R18: a target without R18 warned"; else pass=$((pass+1)); echo "ok   R18: the warning belongs to R18 only"; fi
 # Android is the C library of the Swift SDK for Android, as Glibc is Linux's: modules.md names it like the others.
 setup; src 'let x = 1'
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["allowedImports"] += ["Glibc", "Darwin", "Android"]; json.dump(r,open(p,"w"))
-PY
+rules_edit extend targets.0.allowedImports '["Glibc","Darwin","Android"]'
 printf '| Target | Layer | Platforms | May import |\n|---|---|---|---|\n| `Pure` | adapter | all | Foundation, Glibc, Darwin, Android |\n| `Other` | x | all | Foundation |\n' > "$ROOT/modules.md"
 expect "modules.md: Android is a module name, as Glibc and Darwin are" 0 "" --modules "$ROOT/modules.md"
 # --- baseline: occurrences, stability, monotonicity
@@ -651,13 +587,9 @@ expect "adding a violation with its baseline entry fails in CI" 1 "baseline grew
 cp "$ROOT/baseline.json" "$ROOT/base.json"; expect "an unchanged baseline passes in CI" 0 "" --against "$ROOT/base.json"
 # --- exceptions need an existing ADR
 setup; src 'func a() { fatalError("x") }'
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["exceptions"]=[{"path":"Sources/Pure","detector":"escapeHatch","adr":"0011","reason":"test"}]; json.dump(r,open(p,"w"))
-PY
+rules_edit set exceptions '[{"path":"Sources/Pure","detector":"escapeHatch","adr":"0011","reason":"test"}]'
 expect "an exception backed by an ADR suppresses the finding" 0 ""
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["exceptions"][0]["adr"]="9999"; json.dump(r,open(p,"w"))
-PY
+rules_edit set exceptions.0.adr '"9999"'
 expect "an exception citing a missing ADR is an error" 1 "does not exist"
 # --- inventory
 setup; src 'let x = 1'; mkdir -p "$ROOT/Sources/Stray"; echo 'let s = 1' > "$ROOT/Sources/Stray/S.swift"
@@ -670,9 +602,7 @@ expect "inventory: the folder after a skipped file is still checked" 1 "Sources/
 setup; src 'let x = 1'; ln -s "$ROOT/Sources/Other" "$ROOT/Sources/Pure/Linked"
 expect "a symbolic link in the source tree is an error" 1 "symbolic link"
 setup; src 'let x = 1'
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"].append({"name":"Twin","path":"Sources/Pure","allowedImports":[],"rules":[]}); json.dump(r,open(p,"w"))
-PY
+rules_edit append targets '{"name":"Twin","path":"Sources/Pure","allowedImports":[],"rules":[]}'
 expect "two targets claiming one path is an error" 1 "claimed by"
 setup; mkdir -p "$ROOT/Sources/Pure" && echo 'let x = 1' > "$ROOT/Sources/Pure/P.swift"
 cp "$ROOT/baseline.json" /dev/null; rm "$ROOT/Sources/Other/O.swift"; mkdir -p "$ROOT/Sources/Stray"; echo 'x' > "$ROOT/Sources/Stray/S.swift"
@@ -684,13 +614,9 @@ printf '| Target | Layer | Platforms | May import |\n|---|---|---|---|\n| `Pure`
 expect "rules matching modules.md pass" 0 "" --modules "$ROOT/modules.md"
 printf '| `Extra` | x | all | Foundation |\n' >> "$ROOT/modules.md"
 expect "a documented target missing from rules.json fails" 1 "not in notYetImplemented" --modules "$ROOT/modules.md"
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["notYetImplemented"]=["Extra"]; json.dump(r,open(p,"w"))
-PY
+rules_edit set notYetImplemented '["Extra"]'
 expect "a documented target declared not yet implemented passes" 0 "" --modules "$ROOT/modules.md"
-python3 - "$ROOT/rules.json" <<'PY'
-import json,sys; p=sys.argv[1]; r=json.load(open(p)); r["targets"][0]["allowedImports"].append("Other"); json.dump(r,open(p,"w"))
-PY
+rules_edit append targets.0.allowedImports '"Other"'
 expect "rules looser than modules.md fail" 1 "modules.md does not" --modules "$ROOT/modules.md"
 # --- declared package dependencies
 setup; src 'let x = 1'
