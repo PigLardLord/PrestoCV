@@ -52,13 +52,16 @@ enum HeaderReader {
                         }
                     case .phone, .email, .web:
                         contactBlocks.insert(block.index)
+                        var labels: [Piece] = []
                         for value in values {
                             let contacts = ContactReader.read(value, label: label)
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
                             findings.cv.person.links += contacts.links
-                            for rest in contacts.rest + contacts.unknownLabels + contacts.labels { findings.unplace(rest, in: section) }
+                            for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
+                            labels += contacts.labels
                         }
+                        for shown in namingNoValue(labels, in: block, of: findings.document) { findings.unplace(shown, in: section) }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
                         // Personal details that the CV has no field for stay visible, with their label
                         findings.unplace(block, in: section)
@@ -75,11 +78,7 @@ enum HeaderReader {
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
                     labels += contacts.labels
                 }
-                if !labels.isEmpty {
-                    // A label that names no value of its line, nor of the line under it, is text of its own ("iOS Engineer · Mobile")
-                    let shown = SpanIndex(ContactReader.labelsWithoutAValue(in: block, of: findings.document).map(\.span))
-                    rest += labels.filter { shown.holds($0.span) }
-                }
+                rest += namingNoValue(labels, in: block, of: findings.document)
                 if line.hasContacts { contactBlocks.insert(block.index) }
                 rest.sort { $0.span < $1.span }
                 for (index, piece) in rest.enumerated() {
@@ -205,6 +204,14 @@ enum HeaderReader {
     // MARK: Labels
 
     /// A row whose first cell is the label of a personal detail, or a line that reads "Label: value".
+    /// The contact labels of a cell that name no value of their whole line, nor of the line under it, are text of their own
+    /// ("iOS Engineer · Mobile"); a label beside its value, in its cell or in the next one, names it and is dropped.
+    private static func namingNoValue(_ labels: [Piece], in block: SourceBlock, of document: SourceDocument) -> [Piece] {
+        guard !labels.isEmpty else { return [] }
+        let shown = SpanIndex(ContactReader.labelsWithoutAValue(in: block, of: document).map(\.span))
+        return labels.filter { shown.holds($0.span) }
+    }
+
     private static func labelled(_ cells: [Piece]) -> (EntryVocabulary.PersonalLabel, [Piece])? {
         guard let first = cells.first else { return nil }
         if cells.count >= 2, let label = EntryVocabulary.personalLabel(first.text) {

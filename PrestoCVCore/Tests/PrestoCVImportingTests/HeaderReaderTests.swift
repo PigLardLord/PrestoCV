@@ -843,7 +843,7 @@ struct HeaderReaderTests {
         #expect(Coverage.lost(result).isEmpty, "\(text): \(Coverage.lost(result).map(\.text))")
     }
 
-    @Test("A contact label beside its value is no content: before it, after it, in brackets, in the next cell, or on the line above it", arguments: [
+    @Test("A contact label beside its value is no content: before it, after it, in brackets, in the next cell, on the line above it, or in a labelled row", arguments: [
         "Tobias Renn\niOS Engineer\nMobile +49 170 1234567\ntobias.renn@example.com",
         "Tobias Renn\niOS Engineer\n+49 170 1234567 (mobile)\ntobias.renn@example.com",
         "Tobias Renn\niOS Engineer\n+49 170 1234567 · Mobile\ntobias.renn@example.com",
@@ -853,6 +853,10 @@ struct HeaderReaderTests {
         "Tobias Renn\niOS Engineer\nTelefon (privat)\n+49 170 1234567\ntobias.renn@example.com",
         "Tobias Renn\niOS Engineer\nMobile\t+49 170 1234567\ntobias.renn@example.com",
         "Tobias Renn\niOS Engineer\n+49 170 1234567\tMobile\ntobias.renn@example.com",
+        "Tobias Renn\niOS Engineer\nPhone\t+49 170 1234567\tMobile\ntobias.renn@example.com",
+        "Tobias Renn\niOS Engineer\nPhone\tMobile\t+49 170 1234567\ntobias.renn@example.com",
+        "Tobias Renn\niOS Engineer\nEmail\ttobias.renn@example.com\tPersonal\n+49 170 1234567",
+        "Tobias Renn\niOS Engineer\nPhone: +49 170 1234567 · Mobile\ntobias.renn@example.com",
     ])
     func labelBesideItsValue(text: String) throws {
         let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(text)
@@ -861,6 +865,15 @@ struct HeaderReaderTests {
         #expect(result.cv.person.email != nil, "\(text)")
         #expect(result.unplaced.map(\.text) == [], "\(text)")
         #expect(Coverage.lost(result).isEmpty, "\(text): \(Coverage.lost(result).map(\.text))")
+    }
+
+    @Test("A contact label with no value beside it in a labelled row stays visible")
+    func labelWithNoValueInALabelledRow() throws {
+        let text = "Tobias Renn\niOS Engineer\nPhone\t+49 170 1234567\tLeipzig\tMobile\ntobias.renn@example.com"
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(text)
+        #expect(result.cv.person.phone != nil)
+        #expect(result.unplaced.map(\.text) == ["Leipzig", "Mobile"])
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
     }
 
     @Test("The net under the readers counts a contact label as content when no value is beside it")
