@@ -4,13 +4,21 @@ import SwiftUI
 /// The list column: the CVs of the store in the view model's order, under the notices of the list. While the first read
 /// runs it waits; a store with no CV shows the ways to start. It reads the store when it appears, each time the app comes
 /// back to the front and on a pull; the view model reads it again after its own changes. A change of a row that did not
-/// work is said in a notice of its own that names the row and stays until the person hides it.
+/// work is said in a notice of its own that names the row and stays until the person hides it. An editor the person left
+/// whose text is not stored has a notice under its CV's row, or above the rows when the list does not have that CV
+/// (#402, decisions 16 and 17).
 struct CVListView: View {
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
     let selection: Binding<CVReference?>
     /// Opens the way to start the person chose in the empty list.
     let choose: (StartChoice) -> Void
+    /// The notices of the editors the shell kept, where the list shows them
+    let kept: KeptNotices
+    /// Writes a kept editor's text again, by its number.
+    let retryKept: (Int) -> Void
+    /// Opens a kept editor, by its number.
+    let openKept: (Int) -> Void
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -40,9 +48,13 @@ struct CVListView: View {
     private var rows: some View {
         List(selection: selection) {
             notices
+            keptAbove
             ForEach(list.rows) { row in
                 CVRowView(list: list, row: row)
                     .tag(row.reference)
+                if let notice = kept.under[row.reference] {
+                    keptNotice(notice)
+                }
             }
         }
         .refreshable { await list.load() }
@@ -54,6 +66,7 @@ struct CVListView: View {
         ScrollView {
             VStack(spacing: Spacing.medium) {
                 notices
+                keptAbove
                 ScreenTitle("shell.empty.title")
                 WholeWordsText("shell.empty.message")
                     .foregroundStyle(.secondary)
@@ -90,6 +103,16 @@ struct CVListView: View {
                     .accessibilityIdentifier("list.rowFailure")
             }
         }
+    }
+
+    private var keptAbove: some View {
+        ForEach(kept.above) { notice in
+            keptNotice(notice)
+        }
+    }
+
+    private func keptNotice(_ notice: KeptNotice) -> some View {
+        KeptNoticeView(notice: notice, retry: retryKept, open: openKept)
     }
 
     /// The name of the CV as the person wrote it, then what did not work.

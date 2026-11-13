@@ -1,6 +1,7 @@
 #if DEBUG
 import DiagnosticTrace
 import Foundation
+import PrestoCVApplication
 import PrestoCVWorkflowPorts
 
 /// What a UI test asks of a Debug build through its launch arguments, parsed once into a typed value (R13: codes, not
@@ -16,8 +17,16 @@ import PrestoCVWorkflowPorts
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
 ///   failures of two rows are pending at once. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
+///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
+
+    /// What another window does to the stored CV written first
+    enum OtherWindow: String, CaseIterable, Equatable, Sendable {
+        case conflict
+        case deleted
+    }
 
     enum Failure: Error, Equatable, Sendable {
         case conflictingStorage
@@ -28,6 +37,8 @@ struct LaunchFixtures: Equatable, Sendable {
         case seedWithoutFolder
         case samplesWithoutFolder
         case failuresWithoutFolder
+        case unreadableOtherWindow
+        case otherWindowWithoutFolder
         case seedUnwritable
         /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
         case unsafeFolder
@@ -39,6 +50,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let distributionArgument = "-PrestoCVNextDistribution"
     static let noSamplesArgument = "-PrestoCVNextNoSamples"
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
+    static let otherWindowArgument = "-PrestoCVNextOtherWindow"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -51,6 +63,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var withoutSamples = false
     /// The list's renames fail two at a time
     var failsRenamesInPairs = false
+    /// What another window does to the stored CV written first, nil when no other window changes it
+    var otherWindow: OtherWindow?
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -79,6 +93,11 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.withoutSamples = true
             case failRenamesInPairsArgument:
                 fixtures.failsRenamesInPairs = true
+            case otherWindowArgument:
+                guard let change = OtherWindow(rawValue: try value(after: argument, in: arguments, at: &index)) else {
+                    throw .unreadableOtherWindow
+                }
+                fixtures.otherWindow = change
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:
@@ -95,6 +114,7 @@ struct LaunchFixtures: Equatable, Sendable {
         if hasSeed && fixtures.storage == .device { throw .seedWithoutFolder }
         if fixtures.withoutSamples && fixtures.storage == .device { throw .samplesWithoutFolder }
         if fixtures.failsRenamesInPairs && fixtures.storage == .device { throw .failuresWithoutFolder }
+        if fixtures.otherWindow != nil && fixtures.storage == .device { throw .otherWindowWithoutFolder }
         return fixtures
     }
 
@@ -119,6 +139,11 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
     func listEditing(_ editing: any CVEditing) -> any CVEditing {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
+    }
+
+    /// What the app stores through: the store it is given, or with the fixture one that another window changes once.
+    func store(_ repository: any CVRepository) -> any CVRepository {
+        otherWindow.map { OtherWindowStore(inner: repository, change: $0) } ?? repository
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no

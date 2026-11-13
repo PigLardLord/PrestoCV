@@ -97,8 +97,6 @@ extension XCUIApplication {
     func scrollForm(until element: XCUIElement, named name: String, forward: Bool = true,
                     file: StaticString = #filePath, line: UInt = #line) {
         let form = openForm
-        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
         for _ in 0..<15 {
             let place = element.place(in: self)
             if place == .inside, element.isHittable { break }
@@ -109,10 +107,37 @@ extension XCUIApplication {
             case .inside: on = element.frame.midY > form.frame.midY
             case .missing, .beside: on = forward
             }
-            // Held at the end, so the form does not glide on
-            (on ? low : high).press(forDuration: 0.05, thenDragTo: on ? high : low, withVelocity: .slow,
-                                    thenHoldForDuration: 0.2)
+            dragForm(on: on)
         }
         XCTAssertTrue(element.canBeTapped(in: self), "\(name) comes into view", file: file, line: line)
+    }
+
+    /// Scrolls the open form in the same steps, on or back, until `shown` holds: for a place that "can be tapped" does
+    /// not say, such as a whole field lying on the form.
+    @MainActor
+    func scrollForm(until shown: () -> Bool, named name: String, forward: Bool = true,
+                    file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<15 {
+            if shown() { break }
+            dragForm(on: forward)
+        }
+        XCTAssertTrue(shown(), "\(name) comes into view", file: file, line: line)
+    }
+
+    /// The form whose rows the scrolls move.
+    @MainActor
+    private var openForm: XCUIElement {
+        descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+    }
+
+    /// One step of a scroll: a drag over three tenths of the form's height, up to go on, down to go back.
+    @MainActor
+    private func dragForm(on: Bool) {
+        let form = openForm
+        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        // Held at the end, so the form does not glide on
+        (on ? low : high).press(forDuration: 0.05, thenDragTo: on ? high : low, withVelocity: .slow,
+                                thenHoldForDuration: 0.2)
     }
 }

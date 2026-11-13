@@ -2,19 +2,26 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
-/// where the text stands. It waits while the CV is read, and says so when it cannot be. VoiceOver is told of each change
-/// in one announcement, queued after what it is saying: where the status settled, then the problems met that it does not
-/// name. A row the person adds comes into view, and its first field takes the focus; while the focus stays in it, it
-/// stays in view when the keyboard rises. On a narrow screen a job, a study, a language, a certification and a profile
-/// open on a page of their own.
+/// where the text stands. While the text cannot be stored as it is, a notice above the form says what to do and offers
+/// the ways out (#402, decision 8). It waits while the CV is read, and says so when it cannot be, with a way to close
+/// it. VoiceOver is told of each change in one announcement, queued after what it is saying: where the status settled
+/// and, while the person cannot leave, what to do and the ways on (`SaveStatus.spoken(in:)`), then the problems met that
+/// the status does not name. A row the person adds comes into view, and its first field takes the focus; while the focus
+/// stays in it, it stays in view when the keyboard rises. On a narrow screen a job, a study, a language, a certification
+/// and a profile open on a page of their own.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
     let title: Text
+    /// Closes the editor without storing its text.
+    let discard: () -> Void
     @FocusState private var focus: EditorField?
     @FocusState private var rowFocus: RowFocus?
     /// The row just added, while the focus is in it: the only row the form brings back into view when its room shrinks.
     @State private var newRow: RowID?
+    /// The editor's height, for the notice's cap where the form is short of room.
+    @State private var height: Double = 0
+    @Environment(\.locale) private var locale
 
     var body: some View {
         content
@@ -25,7 +32,7 @@ struct EditorView: View {
             .task { await editor.load() }
             // A narrow screen opens a job, a study and the like on a page of its own
             .onNarrowScreen { editor.layoutChanged(isNarrow: $0) }
-            .announce(editor.announcement, sentences: \.sentences) { editor.announcementWasTold($0) }
+            .announce(editor.announcement, sentences: { $0.sentences(in: locale) }) { editor.announcementWasTold($0) }
     }
 
     @ViewBuilder
@@ -34,11 +41,35 @@ struct EditorView: View {
         case .opening:
             LoadingView("editor.opening")
         case .missing:
-            EmptyStateView(symbol: "doc.questionmark", title: "editor.missing.title", message: "editor.missing.message")
+            EmptyStateView(
+                symbol: "doc.questionmark",
+                title: "editor.missing.title",
+                message: "editor.missing.message",
+                actions: [close]
+            )
         case .failed:
-            EmptyStateView(symbol: "exclamationmark.triangle", title: "editor.failed.title", message: "editor.failed.message")
+            EmptyStateView(
+                symbol: "exclamationmark.triangle",
+                title: "editor.failed.title",
+                message: "editor.failed.message",
+                actions: [tryAgain, close]
+            )
         case .open:
-            form
+            VStack(spacing: 0) {
+                StatusNotice(editor: editor, editorHeight: height, discard: discard)
+                form
+            }
+            .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { height = $0 }
+        }
+    }
+
+    private var close: NoticeAction {
+        NoticeAction("editor.action.close", actionIdentifier: "editor.close", perform: discard)
+    }
+
+    private var tryAgain: NoticeAction {
+        NoticeAction("editor.action.retry", actionIdentifier: "editor.retryOpening") {
+            Task { await editor.load() }
         }
     }
 

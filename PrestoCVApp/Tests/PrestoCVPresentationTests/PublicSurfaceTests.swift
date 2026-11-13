@@ -13,6 +13,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: SaveStatus = editor.saveStatus
     let _: EditorAnnouncement? = editor.announcement
     let _: Bool = editor.isSavedOnThisDevice
+    let _: Bool = editor.isReplacing
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
     let rows: [ExperienceRow] = content.experiences
@@ -78,6 +79,11 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         let _: FieldProblem.Code? = editor.problem(of: .experiencePeriod, row: row.id)
     }
     let _: FieldInput = EditorField.email.input
+    let _: EditorField? = EditorField.title.nextDetail
+    switch FieldEntry("a", after: "", in: .title) {
+    case .text(let text): _ = text
+    case .returnKey(let next): let _: EditorField? = next
+    }
     editor.addRow(to: .skills)
     let _: RowID? = editor.addedRow
     editor.rowWasShown()

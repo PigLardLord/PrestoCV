@@ -35,8 +35,10 @@ extension EditorViewModel {
     /// nothing. It waits for the write the old autosave still runs before it reads the store, and the old autosave writes
     /// nothing once the stored CV is taken. If the person types while the store is read, the stored CV is not taken: the
     /// form keeps every character, the editor stays on its writer, and the conflict stays to be reloaded again or saved as
-    /// a copy.
+    /// a copy. While a reload, a copy or a change of the look runs (`isReplacing`) it returns at once: the person asked
+    /// before seeing where that one leads.
     public func reload() async {
+        guard replacing == nil else { return }
         await replace { [self] in
             guard saveStatus == .conflict, let base, autosave?.isStored == true else { return }
             let edits = formEdits
@@ -51,13 +53,16 @@ extension EditorViewModel {
                 openedEntry = nil
                 standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
             } catch {
-                failure = SaveStatus(error)
+                failed(with: SaveStatus(error))
             }
         }
     }
 
     /// After a conflict or a deletion elsewhere: the form's text is stored as a new CV, and the editor goes on with it.
+    /// While a reload, a copy or a change of the look runs (`isReplacing`) it returns at once and stores nothing, so that
+    /// a second tap makes no second copy.
     public func saveAsCopy() async {
+        guard replacing == nil else { return }
         await replace { [self] in
             guard let held else { return }
             let current = form.applied(to: held)
@@ -67,8 +72,9 @@ extension EditorViewModel {
                 // A title typed while the copy was stored stays, and goes to the autosave once this ends
                 if titleEdits == titleEdited { form.title = EditorContent(copy).title }
                 standOn(copy, unchangedFrom: copy, writer: editing.autosaveWriter(startingFrom: copy), isStored: true)
+                storeChanged()
             } catch {
-                failure = SaveStatus(error)
+                failed(with: SaveStatus(error))
             }
         }
     }
