@@ -3,7 +3,8 @@ import XCTest
 /// The rows of the open CV's sections. A row the person adds comes into view with the cursor in its first field. A row
 /// with something in it goes only once the person confirms, in a dialog that names it; a blank row goes at once. Delete is
 /// behind a swipe, in the row's context menu and among its VoiceOver actions. The level of a skill and of a language are
-/// menus, and every field stays tall enough to tap at the largest text size.
+/// menus, and every field stays tall enough to tap at the largest text size. On a narrow screen a new job, study,
+/// language, certification or profile opens on a page of its own, and its row in the form names what was typed.
 final class EditorRowsUITests: XCTestCase {
 
     private let identity = "8D3A8E3A-3DAE-4E3D-9F77-3B5D4EAD9C03"
@@ -59,13 +60,28 @@ final class EditorRowsUITests: XCTestCase {
 
     // MARK: Rows
 
-    /// Adds a row to the section and waits for the keyboard of its first field.
+    /// Adds a row to the section from the CV's form, leaving the page of a row first where one is open, and waits for
+    /// the keyboard of its first field. On a narrow screen the new row's page opens.
     @MainActor
     private func addRow(to section: String, in app: XCUIApplication) {
+        if app.entryPage.exists { app.leaveEntryPage() }
         let add = app.buttons["editor.add.\(section)"]
         app.scrollForm(until: add, named: "The add button of \(section)")
         add.tap()
+        if app.opensOnAPage(section) {
+            XCTAssertTrue(app.entryPage.waitForExistence(timeout: 30), "A new row of \(section) opens its page")
+        }
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of \(section) takes the keyboard")
+    }
+
+    /// Goes back from the page of a row, where one is open, and checks that the row in the form names `text`.
+    @MainActor
+    private func leavePage(of section: String, naming text: String, in app: XCUIApplication) {
+        guard app.entryPage.exists else { return }
+        app.leaveEntryPage()
+        let row = app.buttons["editor.entry.\(section)"]
+        app.scrollForm(until: row, named: "The row of \(section)", forward: false)
+        XCTAssertTrue(row.label.contains(text), "\(row.label) names \(text)")
     }
 
     /// Adds a row, types in its first field, and puts the keyboard away.
@@ -91,17 +107,6 @@ final class EditorRowsUITests: XCTestCase {
         delete?.tap()
     }
 
-    /// Closes the dialog without deleting: its Cancel where it has one, else a tap outside the popover it is.
-    @MainActor
-    private func cancelDialog(in app: XCUIApplication) {
-        let cancel = app.buttons["Cancel"]
-        if cancel.exists {
-            cancel.tap()
-        } else {
-            app.otherElements["PopoverDismissRegion"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
-        }
-    }
-
     // MARK: Waiting and moving
 
     @MainActor
@@ -119,7 +124,8 @@ final class EditorRowsUITests: XCTestCase {
     // MARK: Adding
 
     /// Each section adds a row whose first field takes the cursor: what the person types lands there. VoiceOver reads
-    /// the field by its label. A new study shows its description and a new certification its year, which is empty.
+    /// the field by its label. A new study shows its description and a new certification its year, which is empty. Where
+    /// the row opened on a page, back shows it in the form under what was typed.
     @MainActor
     func testAddRowFocusesItsFirstField() throws {
         let app = try launchAndOpen()
@@ -142,23 +148,25 @@ final class EditorRowsUITests: XCTestCase {
                 XCTAssertEqual(year.value as? String ?? "", "", "An empty year is empty, never 0")
             default: break
             }
+            leavePage(of: section.name, naming: section.text, in: app)
         }
     }
 
     /// Rows added one after another to a long section: the add button sits at the foot of the screen, and each new row
-    /// still comes into view above the keyboard, with the cursor in its first field.
+    /// still comes into view above the keyboard, with the cursor in its first field. Skills stay in the form on every
+    /// screen.
     @MainActor
     func testAddedRowsOfALongSectionComeIntoView() throws {
         let app = try launchAndOpen()
 
         for number in 1...4 {
-            addRow(to: "experiences", in: app)
-            let text = "Foreman \(number)"
+            addRow(to: "skills", in: app)
+            let text = "Welding \(number)"
             app.typeText(text)
-            let role = app.textFields.matching(identifier: "editor.field.experienceRole")
+            let skill = app.textFields.matching(identifier: "editor.field.skillName")
                 .matching(NSPredicate(format: "value == %@", text)).firstMatch
-            XCTAssertTrue(role.waitForExistence(timeout: 30), "Row \(number) has the cursor")
-            let inView = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: role)
+            XCTAssertTrue(skill.waitForExistence(timeout: 30), "Row \(number) has the cursor")
+            let inView = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: skill)
             XCTAssertEqual(XCTWaiter().wait(for: [inView], timeout: 30), .completed, "Row \(number) is in view")
             putKeyboardAway(in: app)
         }
@@ -179,7 +187,7 @@ final class EditorRowsUITests: XCTestCase {
         app.buttons["Delete"].tap()
         XCTAssertTrue(question.waitForExistence(timeout: 30), "The dialog names the row")
         XCTAssertTrue(app.staticTexts["This cannot be undone."].exists)
-        cancelDialog(in: app)
+        app.cancelDialog(showing: question)
         XCTAssertTrue(waitUntilGone(question))
         XCTAssertEqual(skill.value as? String, "Welding", "Cancel keeps the row")
 
@@ -206,21 +214,22 @@ final class EditorRowsUITests: XCTestCase {
     }
 
     /// VoiceOver's action "Delete <name>" is the context menu's button, which a UI test can reach: XCUITest has no call
-    /// for a custom action. The long press lands on the label above the field, away from its text.
+    /// for a custom action. The long press lands on the label above the field, away from its text. A skill stays in the
+    /// form on every screen; the menu of a row on a page is in `EntryPageUITests`.
     @MainActor
     func testRowDeleteByAccessibilityAction() throws {
         let app = try launchAndOpen()
-        addRow(to: "languages", typing: "German", in: app)
-        let language = app.textFields["editor.field.language"]
+        addRow(to: "skills", typing: "Welding", in: app)
+        let skill = app.textFields["editor.field.skillName"]
 
-        language.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -0.3)).press(forDuration: 1.2)
-        let delete = app.buttons["Delete German"]
+        skill.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -0.3)).press(forDuration: 1.2)
+        let delete = app.buttons["Delete Welding"]
         XCTAssertTrue(delete.waitForExistence(timeout: 30), "The menu names the row")
         delete.tap()
 
-        XCTAssertTrue(app.staticTexts["Delete “German”?"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Delete “Welding”?"].waitForExistence(timeout: 30))
         confirmDelete(in: app)
-        XCTAssertTrue(waitUntilGone(language), "The row goes once the person confirms")
+        XCTAssertTrue(waitUntilGone(skill), "The row goes once the person confirms")
     }
 
     // MARK: Choosing
@@ -256,7 +265,8 @@ final class EditorRowsUITests: XCTestCase {
     // MARK: Accessibility
 
     /// At the largest text size the first field of each new row, its menu and its section's add button can be reached,
-    /// and are at least as tall as the smallest tap target.
+    /// and are at least as tall as the smallest tap target; so is the row in the form, where the new row opened on a
+    /// page.
     @MainActor
     func testRowsAtTheLargestTextSize() throws {
         let app = try launchAndOpen(largestText: true)
@@ -264,17 +274,31 @@ final class EditorRowsUITests: XCTestCase {
         for section in sections {
             addRow(to: section.name, in: app)
             putKeyboardAway(in: app)
-            // In the order of the form, since the form only scrolls on
+            // In the order of the form or the page, since the form only scrolls on
             var targets = [(section.first, app.textFields[section.first])]
             if let menu = menus[section.name] {
                 targets.append((menu, app.buttons.matching(identifier: menu).firstMatch))
             }
-            targets.append(("editor.add.\(section.name)", app.buttons["editor.add.\(section.name)"]))
-            for (name, target) in targets {
-                app.scrollForm(until: target, named: name)
-                // A frame comes as a float: 44 points read 43.99…
-                XCTAssertGreaterThan(target.frame.height, 43.99, "\(name) is tall enough to tap")
+            checkTall(targets, in: app)
+            targets = []
+            if app.entryPage.exists {
+                app.leaveEntryPage()
+                let row = "editor.entry.\(section.name)"
+                app.scrollForm(until: app.buttons[row], named: row, forward: false)
+                targets.append((row, app.buttons[row]))
             }
+            targets.append(("editor.add.\(section.name)", app.buttons["editor.add.\(section.name)"]))
+            checkTall(targets, in: app)
+        }
+    }
+
+    /// Scrolls to each target in turn and checks that it is at least as tall as the smallest tap target.
+    @MainActor
+    private func checkTall(_ targets: [(String, XCUIElement)], in app: XCUIApplication) {
+        for (name, target) in targets {
+            app.scrollForm(until: target, named: name)
+            // A frame comes as a float: 44 points read 43.99…
+            XCTAssertGreaterThan(target.frame.height, 43.99, "\(name) is tall enough to tap")
         }
     }
 }

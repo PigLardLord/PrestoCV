@@ -1,4 +1,5 @@
 // This file imports nothing of the domain or the application layer, and not `@testable`: what it uses is what a view sees.
+import Foundation
 import Testing
 import PrestoCVPresentation
 
@@ -12,6 +13,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: SaveStatus = editor.saveStatus
     let _: EditorAnnouncement? = editor.announcement
     let _: Bool = editor.isSavedOnThisDevice
+    let _: Bool = editor.isReplacing
     let _: String? = editor.documentLanguage
     let _: EditorLook? = editor.look
     let rows: [ExperienceRow] = content.experiences
@@ -30,11 +32,23 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     let _: [RowName] = content.experiences.map(\.rowName) + content.education.map(\.rowName)
         + content.skills.map(\.rowName) + content.languages.map(\.rowName) + content.certifications.map(\.rowName)
         + content.profiles.map(\.rowName) + content.interests.map(\.rowName)
+    let summaries: [EntrySummary] = content.experiences.map(\.summary) + content.education.map(\.summary)
+        + content.languages.map(\.summary) + content.certifications.map(\.summary) + content.profiles.map(\.summary)
+    let _: [[String]] = summaries.map(\.title) + summaries.map(\.details)
+    let _: [String?] = summaries.map(\.level)
+    for years in summaries.compactMap(\.years) {
+        switch years {
+        case .span(let from, let to): _ = [from, to]
+        case .ongoing(let since): _ = since
+        case .year(let year): _ = year
+        }
+    }
     let _: [RowID] = ids(content.experiences) + ids(content.education) + ids(content.skills) + ids(content.languages)
         + ids(content.certifications) + ids(content.profiles) + ids(content.interests)
     if let shown = content.interests.first {
         let row: InterestRow = editor.content.interests[row: shown.id, or: shown]
         editor.content.interests[row: shown.id, or: shown] = row
+        let _: InterestRow? = editor.content.interests[row: shown.id]
     }
     if let removal: RowRemoval = editor.pendingRemoval {
         switch removal.name {
@@ -65,6 +79,11 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
         let _: FieldProblem.Code? = editor.problem(of: .experiencePeriod, row: row.id)
     }
     let _: FieldInput = EditorField.email.input
+    let _: EditorField? = EditorField.title.nextDetail
+    switch FieldEntry("a", after: "", in: .title) {
+    case .text(let text): _ = text
+    case .returnKey(let next): let _: EditorField? = next
+    }
     editor.addRow(to: .skills)
     let _: RowID? = editor.addedRow
     editor.rowWasShown()
@@ -72,6 +91,21 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     editor.removeRow(in: .skills, id: added)
     editor.confirmRemoval()
     editor.cancelRemoval()
+    let _: Bool = editor.canMoveRow(in: .skills, id: added, by: -1)
+    let _: Bool = editor.canReorderRows(in: .skills)
+    let _: Bool = editor.reordersRows
+    editor.moveRow(in: .skills, id: added, by: 1)
+    editor.moveRows(in: .skills, from: IndexSet(integer: 0), to: 1)
+    editor.layoutChanged(isNarrow: true)
+    let _: Bool = editor.showsOnAPage(.experiences)
+    let _: Bool = editor.showsMoveHint(in: .experiences)
+    editor.openEntry(in: .skills, id: added)
+    if let entry: EditorEntry = editor.openedEntry {
+        let _: EditorSection = entry.section
+        let _: RowID = entry.row
+    }
+    let _: Bool = editor.asksToRemove(row: added, onItsPage: true)
+    editor.closeEntry()
     await editor.load()
     await editor.saveNow()
     await editor.reload()

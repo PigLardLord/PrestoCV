@@ -35,6 +35,60 @@ extension XCUIElement {
 }
 
 extension XCUIApplication {
+    /// The page of a row, while one is open: on a narrow screen a job, a study, a language, a certification and a
+    /// profile open on a page of their own.
+    @MainActor
+    var entryPage: XCUIElement {
+        descendants(matching: .any).matching(identifier: "editor.entry.page").firstMatch
+    }
+
+    /// The form on the screen: the page of a row while one is open, else the CV's form.
+    @MainActor
+    var openForm: XCUIElement {
+        entryPage.exists ? entryPage : descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+    }
+
+    /// Whether the rows of `section` open on a page of their own here: a job, a study, a language, a certification and a
+    /// profile do on a narrow screen. A skill and an interest stay in the form.
+    @MainActor
+    func opensOnAPage(_ section: String) -> Bool {
+        ["experiences", "education", "languages", "certifications", "profiles"].contains(section)
+            && windows.firstMatch.horizontalSizeClass == .compact
+    }
+
+    /// Closes a confirmation dialog without its action: by its Cancel where it has one, else by a tap outside it. On an
+    /// iPhone a dialog asked from a button shows as a popover from that button, with no Cancel. The tap goes to the
+    /// middle of the larger room above or below the popover, so the popover never covers it wherever its button sits.
+    /// `question` is a text of the dialog, which stands for the popover when the tree does not show one.
+    @MainActor
+    func cancelDialog(showing question: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        let cancel = buttons["Cancel"]
+        if cancel.exists {
+            cancel.tap()
+            return
+        }
+        let outside = otherElements["PopoverDismissRegion"]
+        XCTAssertTrue(outside.waitForExistence(timeout: 5), "The dialog closes with a tap outside it", file: file,
+                      line: line)
+        let popover = popovers.firstMatch
+        let dialog = popover.exists ? popover.frame : question.frame
+        let region = outside.frame
+        let above = dialog.minY - region.minY
+        let below = region.maxY - dialog.maxY
+        XCTAssertGreaterThan(max(above, below), 44, "The dialog leaves room for a tap", file: file, line: line)
+        let y = above > below ? region.minY + above / 2 : dialog.maxY + below / 2
+        outside.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: region.width / 2, dy: y - region.minY)).tap()
+    }
+
+    /// Goes back from the page of a row to the CV's form, by the back button of the bar.
+    @MainActor
+    func leaveEntryPage(file: StaticString = #filePath, line: UInt = #line) {
+        let page = entryPage
+        backButton.tap()
+        XCTAssertTrue(page.waitForNonExistence(timeout: 30), "Back closes the page", file: file, line: line)
+    }
+
     /// Scrolls the open form in steps shorter than the screen, so that no field is passed over, until the element can
     /// be tapped: on while it lies below, back while above, towards the middle while a bar or the keyboard covers it.
     /// One the form has not built is looked for `forward`, or back. The drag stays in the form, away from the list
@@ -42,9 +96,7 @@ extension XCUIApplication {
     @MainActor
     func scrollForm(until element: XCUIElement, named name: String, forward: Bool = true,
                     file: StaticString = #filePath, line: UInt = #line) {
-        let form = descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        let form = openForm
         for _ in 0..<15 {
             let place = element.place(in: self)
             if place == .inside, element.isHittable { break }
@@ -55,10 +107,31 @@ extension XCUIApplication {
             case .inside: on = element.frame.midY > form.frame.midY
             case .missing, .beside: on = forward
             }
-            // Held at the end, so the form does not glide on
-            (on ? low : high).press(forDuration: 0.05, thenDragTo: on ? high : low, withVelocity: .slow,
-                                    thenHoldForDuration: 0.2)
+            dragForm(on: on)
         }
         XCTAssertTrue(element.canBeTapped(in: self), "\(name) comes into view", file: file, line: line)
+    }
+
+    /// Scrolls the open form in the same steps, on or back, until `shown` holds: for a place that "can be tapped" does
+    /// not say, such as a whole field lying on the form.
+    @MainActor
+    func scrollForm(until shown: () -> Bool, named name: String, forward: Bool = true,
+                    file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<15 {
+            if shown() { break }
+            dragForm(on: forward)
+        }
+        XCTAssertTrue(shown(), "\(name) comes into view", file: file, line: line)
+    }
+
+    /// One step of a scroll: a drag over three tenths of the form's height, up to go on, down to go back.
+    @MainActor
+    private func dragForm(on: Bool) {
+        let form = openForm
+        let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        // Held at the end, so the form does not glide on
+        (on ? low : high).press(forDuration: 0.05, thenDragTo: on ? high : low, withVelocity: .slow,
+                                thenHoldForDuration: 0.2)
     }
 }
