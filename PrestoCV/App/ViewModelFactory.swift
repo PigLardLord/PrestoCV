@@ -65,7 +65,7 @@ final class ViewModelFactory {
         self.cvManagementUseCase = cvManagementUseCase
         self.environment = environment
         self.makeExportService = makeExportService
-        self.editorNotices = FileEditorNoticeStore(fileURL: environment.importNoticesFile)
+        self.editorNotices = FileEditorNoticeStore(directoryURL: environment.importNoticesDirectory)
     }
     
     @MainActor

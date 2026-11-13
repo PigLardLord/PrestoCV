@@ -113,10 +113,32 @@ struct ImportedCVMapperTests {
         let review = ImportedCVMapper().map(try importedText(text)).review
 
         #expect(review.passages == [
+            ImportReview.Passage(place: .section("Sprachen"), text: "Englisch — verhandlungssicher", isWholeSection: false),
             ImportReview.Passage(place: .section("Ehrenamt"), text: "Trainerin im Kletterverein", isWholeSection: true),
-            ImportReview.Passage(place: .elsewhere, text: "Englisch — verhandlungssicher", isWholeSection: false),
         ])
         #expect(review.sectionsNotImported == ["Ehrenamt"])
+    }
+
+    @Test("A language the CV cannot take stands where the CV wrote it, under its heading, before a later section left out (#452)")
+    func languageLeftOutInTheOrderOfTheCV() throws {
+        let review = ImportedCVMapper().map(try importedText("""
+        # Tobias Renn
+        **Mobile Developer**
+
+        ## Languages
+        - German: native
+        - Italian – fluent
+
+        ## OWN VENTURES
+        **Tidepool Notes** | 2021 – today
+        - A note app for divers
+        """)).review
+
+        #expect(review.passages == [
+            ImportReview.Passage(place: .section("Languages"), text: "Italian — fluent", isWholeSection: false),
+            ImportReview.Passage(place: .section("OWN VENTURES"), text: "Tidepool Notes | 2021 – today\nA note app for divers", isWholeSection: true),
+        ])
+        #expect(review.notImported == "Italian — fluent\nTidepool Notes | 2021 – today\nA note app for divers")
     }
 
     @Test("A section with an unknown heading, a combined heading and the header lines left out are each named to check (#452)")
@@ -137,8 +159,8 @@ struct ImportedCVMapperTests {
         **Harbor Timer** | 2018 – 2020
         - A tide timer for sailors
 
-        ## STUDIES AND CERTIFICATES
-        2010 – 2014: BSc Computer Science, University of Lucca
+        ## VOLUNTEERING
+        2015 – 2017: Rowing coach, Hamburg Rowing Club
         """)).review
 
         #expect(review.passages == [
@@ -148,9 +170,9 @@ struct ImportedCVMapperTests {
                 text: "Tidepool Notes | 2021 – today\nA note app for divers\nHarbor Timer | 2018 – 2020\nA tide timer for sailors",
                 isWholeSection: true
             ),
-            ImportReview.Passage(place: .section("STUDIES AND CERTIFICATES"), text: "2010 – 2014: BSc Computer Science, University of Lucca", isWholeSection: true),
+            ImportReview.Passage(place: .section("VOLUNTEERING"), text: "2015 – 2017: Rowing coach, Hamburg Rowing Club", isWholeSection: true),
         ])
-        #expect(review.sectionsNotImported == ["OWN VENTURES", "STUDIES AND CERTIFICATES"])
+        #expect(review.sectionsNotImported == ["OWN VENTURES", "VOLUNTEERING"])
     }
 
     @Test("A review keeps its passages through the file it is kept in")

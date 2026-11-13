@@ -102,8 +102,8 @@ struct ImportReviewSheet: View {
         ],
         passages: [
             ImportReview.Passage(place: .top, text: "Geburtsdatum: 14.05.1992", isWholeSection: false),
+            ImportReview.Passage(place: .section("Sprachen"), text: "Englisch — verhandlungssicher", isWholeSection: false),
             ImportReview.Passage(place: .section("Ehrenamt"), text: "Trainerin im Kletterverein", isWholeSection: true),
-            ImportReview.Passage(place: .elsewhere, text: "Englisch — verhandlungssicher", isWholeSection: false),
         ]
     ))
 }

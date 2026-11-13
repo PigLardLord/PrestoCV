@@ -19,7 +19,7 @@ struct ImportedCVMapper {
     func map(_ result: ImportResult) -> ImportedDraft {
         let imported = result.cv
         let person = imported.person
-        var languagesLeftOut: [String] = []
+        var languagesLeftOut: [TextLeftOut] = []
         var items: [ImportReview.Item] = reviewItems(of: result)
 
         var languages: [Language] = []
@@ -31,7 +31,10 @@ struct ImportedCVMapper {
                 let text = [language.name.value, language.levelWords?.value].compactMap { $0 }.joined(separator: " — ")
                 let reason: ImportReview.Item.Reason = language.levelWords?.check == .levelsDiffer ? .languageLevels : .languageNotAdded
                 items.append(ImportReview.Item(field: .language, reason: reason, text: text))
-                languagesLeftOut.append(text)
+                let spans = language.name.spans + (language.levelWords?.spans ?? [])
+                languagesLeftOut.append(TextLeftOut(
+                    section: .languages, heading: language.heading, text: text, position: spans.map(\.lowerBound).min()
+                ))
             }
         }
 
@@ -66,11 +69,10 @@ struct ImportedCVMapper {
             social: person.links.compactMap(social),
             documentLanguage: result.language?.rawValue
         )
-        var passages = passages(of: result.unplaced)
-        if !languagesLeftOut.isEmpty {
-            passages.append(ImportReview.Passage(place: .elsewhere, text: languagesLeftOut.joined(separator: "\n"), isWholeSection: false))
+        let unplaced = result.unplaced.map {
+            TextLeftOut(section: $0.section, heading: $0.heading, text: $0.text, position: $0.span.lowerBound)
         }
-        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages))
+        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages(of: inCVOrder(unplaced + languagesLeftOut))))
     }
 
     // MARK: Text not imported
@@ -78,16 +80,32 @@ struct ImportedCVMapper {
     /// The sections the CV has no field for: their text is left out with its heading.
     private static let sectionsWithoutField: Set<SectionKind> = [.projects, .volunteering, .references, .drivingLicence, .additional, .unknown]
 
-    /// The text not imported, one passage for each run of text from the same place, in the order of the CV: the import
-    /// gives it in that order, each piece with the section it stood in and that section's heading.
-    private func passages(of unplaced: [UnplacedText]) -> [ImportReview.Passage] {
+    /// A piece of text not imported: the text the import did not place, or a language the CV cannot take; with the
+    /// section it stood in, that section's heading, and where it starts in the CV (nil when the import gives no place).
+    private struct TextLeftOut {
+        let section: SectionKind
+        let heading: String?
+        let text: String
+        let position: Int?
+    }
+
+    /// The pieces in the order of the CV; a piece with no place keeps its order, after the others.
+    private func inCVOrder(_ pieces: [TextLeftOut]) -> [TextLeftOut] {
+        pieces.enumerated()
+            .sorted { ($0.element.position ?? .max, $0.offset) < ($1.element.position ?? .max, $1.offset) }
+            .map(\.element)
+    }
+
+    /// The text not imported, one passage for each run of text from the same place, in the order of the CV, each piece
+    /// with the section it stood in and that section's heading.
+    private func passages(of pieces: [TextLeftOut]) -> [ImportReview.Passage] {
         var passages: [ImportReview.Passage] = []
         var run: (section: SectionKind, heading: String?, texts: [String])?
         func close() {
             guard let current = run else { return }
             passages.append(passage(section: current.section, heading: current.heading, text: current.texts.joined(separator: "\n")))
         }
-        for piece in unplaced {
+        for piece in pieces {
             if let current = run, current.section == piece.section, current.heading == piece.heading {
                 run?.texts.append(piece.text)
             } else {

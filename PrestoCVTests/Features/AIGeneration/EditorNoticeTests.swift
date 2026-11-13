@@ -68,11 +68,11 @@ struct ImportEditorNoticeTests {
         let review = ImportReview(items: [], passages: [
             ImportReview.Passage(place: .section("OWN VENTURES"), text: "Tidepool Notes", isWholeSection: true),
             ImportReview.Passage(place: .section("Experience"), text: "Lucca", isWholeSection: false),
-            ImportReview.Passage(place: .section("STUDIES AND CERTIFICATES"), text: "Harbor Timer course", isWholeSection: true),
+            ImportReview.Passage(place: .section("VOLUNTEERING"), text: "Rowing coach", isWholeSection: true),
         ])
 
         #expect(EditorNotice.imported(review).sectionsLine == EditorNotice.SectionsLine(
-            key: "editor.notice.imported.sections", headings: "OWN VENTURES, STUDIES AND CERTIFICATES"
+            key: "editor.notice.imported.sections", headings: "OWN VENTURES, VOLUNTEERING"
         ))
     }
 

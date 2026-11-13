@@ -41,7 +41,7 @@ extension AppEnvironment {
             clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
-            importNoticesFile: FileManager.default.temporaryDirectory.appendingPathComponent("import-notices-\(UUID().uuidString).json"),
+            importNoticesDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("import-notices-\(UUID().uuidString)", isDirectory: true),
             container: container,
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: arguments,

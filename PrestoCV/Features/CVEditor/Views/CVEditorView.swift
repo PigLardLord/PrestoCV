@@ -91,10 +91,11 @@ struct CVEditorView: View {
         .onDisappear {
             router.editorDisappeared(viewModel)
         }
-        // VoiceOver hears that a change could not be saved, each time, and that it is saved once a write succeeds again
+        // VoiceOver hears that a change could not be saved, each time, that it is saved once a write succeeds again, and
+        // that the import's notice is dismissed
         .onChange(of: viewModel.saveAnnouncement) { _, announcement in
             if let announcement {
-                AccessibilityNotification.Announcement(announcement.text).post()
+                AccessibilityNotification.Announcement(spoken(announcement)).post()
             }
         }
         .environment(\.rowDeletionAnchor, deletionAnchor)
@@ -200,6 +201,15 @@ struct CVEditorView: View {
             EditorNoticeBanner(notice: notice, onDismiss: noticeDismissal)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { noticeFullHeight = $0 }
         }
+    }
+
+    /// The announcement as VoiceOver speaks it: over its reading of the element it moves to, when the announcement asks.
+    private func spoken(_ announcement: SaveAnnouncement) -> AttributedString {
+        var spoken = AttributedString(announcement.text)
+        if announcement.speaksOverFocusChange {
+            spoken.accessibilitySpeechAnnouncementPriority = .high
+        }
+        return spoken
     }
 
     /// What dismissing the notice does, when the notice offers it.

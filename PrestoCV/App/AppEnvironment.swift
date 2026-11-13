@@ -29,8 +29,8 @@ struct AppEnvironment {
     /// Where earlier versions kept the design chosen last for the whole app. Nothing writes the file any more: it is read
     /// for a CV that has no look of its own. A file and not `UserDefaults`, which would need a privacy manifest entry
     let exportPreferencesFile: URL
-    /// Where the notice of each imported CV is kept, beside the CVs, until the person dismisses it (ADR 0027)
-    let importNoticesFile: URL
+    /// The folder where the notice of each imported CV is kept, beside the CVs, until the person dismisses it (ADR 0027)
+    let importNoticesDirectory: URL
     /// The app's own folder on the device. The system copies a PDF opened in the app ("Open in PrestoCV") into it, and the
     /// import deletes each copy once read
     let container: URL
@@ -79,7 +79,7 @@ extension AppEnvironment {
             clock: ContinuousClock(),
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/export-preferences.json"),
-            importNoticesFile: URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/import-notices.json"),
+            importNoticesDirectory: URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/import-notices", isDirectory: true),
             container: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true),
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: arguments,

@@ -13,64 +13,91 @@ protocol EditorNoticeStore: Sendable {
     func keep(_ notice: EditorNotice, forCVWithId id: UUID) async
     /// Forgets the notice of the CV, if one is kept.
     func forget(cvWithId id: UUID) async
+    /// The CVs that have a notice kept, so that the notice of a CV that is gone can be forgotten.
+    func keptCVIds() async -> [UUID]
 }
 
-/// Keeps the notices in one small JSON file in Application Support, protected as the CVs are. A missing file holds no
-/// notice; a file that cannot be read or written is logged, and the notices it held are lost, never the CVs.
+/// Keeps each CV's notice in a small JSON file of its own, named after the CV's id, in a folder of Application Support,
+/// protected as the CVs are. Forgetting a notice removes its file, so the person's text leaves the device with it; a damaged
+/// file affects one notice only, and is removed when it is read. A file that cannot be read, written or removed is logged:
+/// the notice is lost, never the CV.
 actor FileEditorNoticeStore: EditorNoticeStore {
-    private let fileURL: URL
+    private let directoryURL: URL
 
-    init(fileURL: URL) {
-        self.fileURL = fileURL
+    init(directoryURL: URL) {
+        self.directoryURL = directoryURL
     }
 
     func notice(ofCVWithId id: UUID) -> EditorNotice? {
-        notices()[id.uuidString]
+        let file = fileURL(of: id)
+        let data: Data
+        do {
+            data = try Data(contentsOf: file)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return nil
+        } catch {
+            noticeLogger.error("A kept import notice could not be read: \(error.localizedDescription, privacy: .private)")
+            return nil
+        }
+        do {
+            return try JSONDecoder().decode(EditorNotice.self, from: data)
+        } catch {
+            noticeLogger.error("A kept import notice is damaged, and is removed: \(error.localizedDescription, privacy: .private)")
+            remove(file)
+            return nil
+        }
     }
 
     func keep(_ notice: EditorNotice, forCVWithId id: UUID) {
-        var notices = notices()
-        notices[id.uuidString] = notice
-        write(notices)
-    }
-
-    func forget(cvWithId id: UUID) {
-        var notices = notices()
-        guard notices.removeValue(forKey: id.uuidString) != nil else { return }
-        write(notices)
-    }
-
-    // MARK: The file
-
-    private func notices() -> [String: EditorNotice] {
-        let data: Data
-        do {
-            data = try Data(contentsOf: fileURL)
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return [:]
-        } catch {
-            noticeLogger.error("The kept import notices could not be read: \(error.localizedDescription, privacy: .private)")
-            return [:]
-        }
-        do {
-            return try JSONDecoder().decode([String: EditorNotice].self, from: data)
-        } catch {
-            noticeLogger.error("The kept import notices are damaged: \(error.localizedDescription, privacy: .private)")
-            return [:]
-        }
-    }
-
-    private func write(_ notices: [String: EditorNotice]) {
         do {
             try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
+                at: directoryURL,
                 withIntermediateDirectories: true,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
-            let data = try JSONEncoder().encode(notices)
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            let data = try JSONEncoder().encode(notice)
+            try data.write(to: fileURL(of: id), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
-            noticeLogger.error("The import notices could not be kept: \(error.localizedDescription, privacy: .private)")
+            noticeLogger.error("An import notice could not be kept: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    func forget(cvWithId id: UUID) {
+        remove(fileURL(of: id))
+    }
+
+    func keptCVIds() -> [UUID] {
+        let names: [String]
+        do {
+            names = try FileManager.default.contentsOfDirectory(atPath: directoryURL.path)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return []
+        } catch {
+            noticeLogger.error("The kept import notices could not be listed: \(error.localizedDescription, privacy: .private)")
+            return []
+        }
+        // Only the notices: a file another write left behind, or any other file, is not one
+        return names.compactMap { name in
+            guard name.hasSuffix(Self.fileExtension) else { return nil }
+            return UUID(uuidString: String(name.dropLast(Self.fileExtension.count)))
+        }
+    }
+
+    // MARK: The files
+
+    private static let fileExtension = ".json"
+
+    private func fileURL(of id: UUID) -> URL {
+        directoryURL.appendingPathComponent(id.uuidString + Self.fileExtension)
+    }
+
+    private func remove(_ file: URL) {
+        do {
+            try FileManager.default.removeItem(at: file)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+            return
+        } catch {
+            noticeLogger.error("An import notice could not be removed: \(error.localizedDescription, privacy: .private)")
         }
     }
 }
@@ -93,5 +120,9 @@ actor InMemoryEditorNoticeStore: EditorNoticeStore {
 
     func forget(cvWithId id: UUID) {
         notices[id] = nil
+    }
+
+    func keptCVIds() -> [UUID] {
+        Array(notices.keys)
     }
 }

@@ -142,8 +142,8 @@ final class ImportUITests: XCTestCase {
         **Harbor Timer** | 2018 – 2020
         - A tide timer for sailors
 
-        ## STUDIES AND CERTIFICATES
-        2010 – 2014: BSc Computer Science, University of Lucca
+        ## VOLUNTEERING
+        2015 – 2017: Rowing coach, Hamburg Rowing Club
         """
         openTheImport()
         XCTAssertTrue(pasteButton.waitForExistence(timeout: 10))
@@ -156,7 +156,7 @@ final class ImportUITests: XCTestCase {
 
         let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Imported from your text'")).firstMatch
         XCTAssertTrue(notice.exists, "The editor should say the CV was imported")
-        XCTAssertTrue(notice.label.contains("Sections not imported: OWN VENTURES, STUDIES AND CERTIFICATES."),
+        XCTAssertTrue(notice.label.contains("Sections not imported: OWN VENTURES, VOLUNTEERING."),
                       "The notice should name the sections left out: \(notice.label)")
         add(app.keptScreenshot(named: "Import - sections not imported"))
 

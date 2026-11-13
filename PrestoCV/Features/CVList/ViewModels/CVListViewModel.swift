@@ -5,6 +5,9 @@ import struct PrestoCVApplication.ChangeStoredCV
 import enum PrestoCVDomain.CVTitle
 import struct PrestoCVApplication.LookChange
 import enum PrestoCVApplication.StoredCVChangeError
+import os
+
+private let listLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "list")
 
 @MainActor
 final class CVListViewModel: ObservableObject {
@@ -208,6 +211,7 @@ final class CVListViewModel: ObservableObject {
             let listing = try await cvManagementUseCase.getCVListing()
             guard thisRead == readSequence else { return }
             show(listing)
+            await forgetNoticesOfDeletedCVs()
         } catch {
             // A read that was overtaken has nothing to report, and neither has one that the screen cancelled
             guard thisRead == readSequence, !(error is CancellationError) else { return }
@@ -215,6 +219,20 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Forgets the notices kept for CVs that are gone: a CV deleted while its notice could not be forgotten, or before a crash
+    /// let it be, leaves no text of the person's behind. A CV that cannot be read is still stored, and keeps its notice.
+    private func forgetNoticesOfDeletedCVs() async {
+        for id in await noticeStore.keptCVIds() {
+            do {
+                guard try await cvManagementUseCase.getCV(by: id) == nil else { continue }
+            } catch {
+                listLogger.error("A CV with a kept import notice could not be read; its notice stays: \(error.localizedDescription, privacy: .private)")
+                continue
+            }
+            await noticeStore.forget(cvWithId: id)
+        }
+    }
+
     /// The user has seen the notice about the CVs that could not be opened: record it, so that it goes away.
     func dismissUnreadableNotice() async {
         await perform {

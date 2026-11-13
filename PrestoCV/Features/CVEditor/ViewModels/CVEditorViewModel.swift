@@ -45,6 +45,9 @@ final class CVEditorViewModel: ObservableObject {
     /// A failure has been announced, and the CV has not been saved since.
     private var failureIsAnnounced = false
     private var announcements = 0
+    /// A load of the stored CV runs: a second one returns at once, so that its later read of the notice cannot bring back
+    /// a notice the person dismissed in between, nor show the CV again over the edits made since.
+    private var isLoading = false
     
     // MARK: - Computed Properties
     
@@ -144,9 +147,11 @@ final class CVEditorViewModel: ObservableObject {
     // MARK: - Public Methods
     @MainActor
     func loadCV() async {
-        // A new CV is shown from the start; a CV that is already loaded stays as it is: reading it again would drop
-        // the edits made since
-        guard case .stored(let cvId) = request, viewState.data == nil else { return }
+        // A new CV is shown from the start; a CV that is already loaded, or being loaded, stays as it is: reading it
+        // again would drop the edits made since
+        guard case .stored(let cvId) = request, viewState.data == nil, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
         guard let uuid = UUID(uuidString: cvId) else {
             viewState = .error(AppError.notFound("error.subject.cv".localized).localizedDescription)
             return
@@ -173,10 +178,15 @@ final class CVEditorViewModel: ObservableObject {
     /// dismisses it (#452); the AI's reminder goes with the session.
     var noticeIsDismissible: Bool { notice?.isKept == true }
 
-    /// The person dismissed the message above the CV: it goes, and the import's is no longer kept with the CV.
+    /// The person dismissed the message above the CV: it goes, VoiceOver hears that it went, and the import's is no longer
+    /// kept with the CV.
     @MainActor
     func dismissNotice() async {
+        let wasShown = notice != nil
         notice = nil
+        if wasShown {
+            announce(.noticeDismissed)
+        }
         await noticeKeeper.dismiss()
     }
 
