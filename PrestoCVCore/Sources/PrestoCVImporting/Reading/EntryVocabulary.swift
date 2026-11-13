@@ -93,13 +93,31 @@ enum EntryVocabulary {
         return words.contains { degreeWords.contains($0) || degreeStems.contains(where: $0.hasPrefix) }
     }
 
-    /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik".
+    /// Whether a piece names a certification by its word: "Certified Scrum Developer", "Certificazione ITIL Foundation",
+    /// "Zertifizierung". The nouns of a document ("certificate", "certificato", "certificado", "certificat") are not among them: they name
+    /// degrees too ("Graduate Certificate in Data Science").
+    static func isCertification(_ text: String) -> Bool {
+        text.words.contains { certificationWords.contains($0.folded) }
+    }
+
+    private static let certificationWords: Set<String> = Set([
+        "certified", "certification", "certifications", "certificazione", "certificazioni", "zertifizierung",
+        "zertifizierungen", "zertifiziert", "zertifizierte", "zertifizierter", "zertifikat", "zertifikate", "certificación",
+        "certificaciones", "certifié", "certifiée", "certificação", "certificações",
+    ].map(\.folded))
+
+    /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik", "MSc Data
+    /// Science". The codes of two letters ("BA", "MA", "MS") are not among the openers: they are also a state, or a name
+    /// ("MS Office Specialist").
     static func startsWithDegree(_ text: String) -> Bool {
         guard let first = text.words.first?.folded else { return false }
         return degreeStems.contains(where: first.hasPrefix) || degreeOpeners.contains(first)
     }
 
-    private static let degreeOpeners: Set<String> = ["phd", "ph.d", "mba", "doctor", "doctorate", "doctorado", "doctorat", "doutorado", "mestrado", "grado", "licence"]
+    private static let degreeOpeners: Set<String> = [
+        "phd", "ph.d", "mba", "bsc", "msc", "beng", "meng", "llb", "llm", "doctor", "doctorate", "doctorado", "doctorat", "doutorado",
+        "mestrado", "grado", "licence",
+    ]
 
     private static let legalForms: Set<String> = [
         "gmbh", "ag", "kg", "ohg", "ug", "ev", "spa", "srl", "srls", "sas", "snc", "ltd", "limited", "inc", "llc", "llp", "plc", "corp",
