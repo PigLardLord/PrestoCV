@@ -34,6 +34,7 @@ enum SectionSegmenter {
         var sections: [Section] = [Section(kind: .header, heading: nil, blocks: [], languages: [])]
         var column = document.blocks.first?.column
         var readings = HeaderReader.HeadReadings()
+        let look = try HeadingLook(of: document, work: &work)
         for (position, block) in document.blocks.enumerated() {
             // A second column starts with its own head: a sidebar that opens with the contacts
             if block.column != column {
@@ -79,6 +80,12 @@ enum SectionSegmenter {
                     kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
                     headingCouldBeTheName: opening.couldBeTheName
                 ))
+                continue
+            }
+            // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454)
+            if !headKinds.contains(sections[sections.count - 1].kind),
+               try look.opensSection(block, at: position, after: sections[sections.count - 1], in: document, work: &work) {
+                sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
                 continue
             }
             sections[sections.count - 1].blocks.append(block)
@@ -161,9 +168,8 @@ enum SectionSegmenter {
     /// a short line in capitals that the PDF draws bold or large.
     private static func isMarkedAsHeading(_ block: SourceBlock, text: String) -> Bool {
         if case .heading(let level) = block.kind, level <= 2 { return true }
-        let letters = text.filter(\.isLetter)
-        let isCapitals = !letters.isEmpty && letters.allSatisfy(\.isUppercase)
-        return block.isEmphasized && block.frame != nil && isCapitals && text.words.count <= 4 && !text.contains(where: \.isNumber)
+        return block.isEmphasized && block.frame != nil && HeadingLook.isCapitals(text) && text.words.count <= 4
+            && !text.contains(where: \.isNumber)
             && DateReader.periods(in: text).isEmpty
     }
 
