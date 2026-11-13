@@ -341,6 +341,92 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
+    // MARK: Conflicting evidence
+
+    /// A line whose name has a certification word, with the certification it must give, or nil when the line holds two or
+    /// more pieces of evidence of a study (a degree in its name, a school, a period with an end) and stays in the text not
+    /// imported.
+    struct ConflictLine: Sendable, CustomTestStringConvertible {
+        let line: String
+        let certification: CertificationLine?
+        var testDescription: String { line }
+
+        static func unplaced(_ line: String) -> ConflictLine { ConflictLine(line: line, certification: nil) }
+
+        static func certification(_ line: String, name: String, issuer: String, year: Int) -> ConflictLine {
+            ConflictLine(line: line, certification: CertificationLine(line: line, name: name, issuer: issuer, year: year))
+        }
+    }
+
+    static let conflictingEvidence = [
+        ConflictLine.unplaced("Certified Nursing Assistant Diploma — University of Northbridge, 2020–2022"),
+        ConflictLine.unplaced("Certified Nursing Assistant Diploma - University of Northbridge - 2020 - 2022"),
+        ConflictLine.unplaced("Certified Nursing Assistant Diploma, University of Northbridge, 2020–2022"),
+        ConflictLine.unplaced("Certified Cloud Practitioner — University of Northbridge, 2022–2025"),
+        ConflictLine.unplaced("Certified Diploma in Nursing — Meridian Board, 2018–2020"),
+        ConflictLine.unplaced("Master Certified Coach — Kestrel Coaching Federation, 2020–2023"),
+        ConflictLine.unplaced("Master Certified Coach — University of Northbridge, 2020"),
+        ConflictLine.unplaced("Certification Programme in Data Analysis — University of Leipzig, 2015 – 2017"),
+        ConflictLine.unplaced("Laurea in Certificazione dei Bilanci — Università di Lucca, 2010–2014"),
+        ConflictLine.certification(
+            "Certified Diploma in Nursing — Meridian Board, 2019", name: "Certified Diploma in Nursing", issuer: "Meridian Board", year: 2019
+        ),
+        ConflictLine.certification(
+            "Certified Scrum Master — Scrum Alliance, 2019", name: "Certified Scrum Master", issuer: "Scrum Alliance", year: 2019
+        ),
+        ConflictLine.certification(
+            "Master Certified Coach — Kestrel Coaching Federation, 2020", name: "Master Certified Coach",
+            issuer: "Kestrel Coaching Federation", year: 2020
+        ),
+    ]
+
+    @Test(
+        "A certification word in the name against two pieces of evidence of a study leaves the line in the text not imported",
+        arguments: StudiesAndCertificatesTests.conflictingEvidence, ["Education & Certifications", "EDUCATION & TRAINING"]
+    )
+    func conflictingEvidenceStaysVisible(conflict: ConflictLine, heading: String) throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            \(conflict.line)
+            """
+        let found = try importText(cv(heading: heading, body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science"])
+        if let certification = conflict.certification {
+            #expect(found.cv.certifications.map(\.name.value) == [certification.name])
+            #expect(found.cv.certifications.map { $0.issuer?.value } == [certification.issuer])
+            #expect(found.cv.certifications.map { $0.year?.value } == [certification.year])
+            #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        } else {
+            #expect(found.cv.certifications.isEmpty, "\(found.cv.certifications.map(\.name.value))")
+            #expect(found.unplaced.map(\.text) == [conflict.line])
+            let section: SectionKind = heading == "EDUCATION & TRAINING" ? .education : .additional
+            #expect(found.unplaced.map(\.section) == [section], "the text not imported stays under the section it was in")
+            #expect(found.unplaced.map(\.heading) == [heading])
+        }
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    /// The line above a school's line is the name of a study there only when it shows nothing else: a line left in doubt
+    /// keeps its doubt, and the school's line is a study of its own.
+    @Test("A line left in doubt over a line of a school and a year stays in the text not imported")
+    func lineInDoubtOverASchoolLine() throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            Master Certified Coach, University of Northbridge
+            Hamburg Hospitality Institute, 2022
+            """
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.unplaced.map(\.text) == ["Master Certified Coach, University of Northbridge"])
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science", nil])
+        #expect(found.cv.education.map { $0.school?.value } == ["University of Leipzig", "Hamburg Hospitality Institute"])
+        #expect(found.cv.certifications.isEmpty)
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
     // MARK: A heading of one kind
 
     @Test("Under an education heading, an entry with a certification word is a certification, not a second study")

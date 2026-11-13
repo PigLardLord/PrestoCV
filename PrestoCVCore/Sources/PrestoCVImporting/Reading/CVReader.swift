@@ -86,7 +86,8 @@ enum CVReader {
     }
 
     /// A section of studies, or one that joins the studies and the certifications: each run of lines of one kind by its own
-    /// reader, in the order of the CV (#453). A joined section whose lines show neither kind stays visible, with its heading.
+    /// reader, in the order of the CV (#453). A joined section whose lines show neither kind stays visible, with its heading,
+    /// and so does a line whose kind the reading cannot tell.
     private static func readStudies(_ section: Section, into findings: inout Findings) throws {
         for run in StudiesAndCertifications.runs(of: section, in: findings.document, consumed: findings.consumedBlocks) {
             switch run.kind {
@@ -95,8 +96,10 @@ enum CVReader {
             case .education:
                 try EntryReader.read(run, kind: .education, into: &findings)
             default:
+                // A line whose kind the reading cannot tell, or a section that shows neither kind: visible under its own
+                // heading and the kind of its section
                 for block in run.blocks where !findings.consumedBlocks.contains(block.index) {
-                    findings.unplace(block, in: run)
+                    findings.unplace(block, in: section)
                 }
             }
         }

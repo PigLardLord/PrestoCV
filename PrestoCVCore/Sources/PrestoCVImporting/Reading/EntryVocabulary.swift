@@ -136,6 +136,22 @@ enum EntryVocabulary {
     /// The French words that follow "Licence" in the name of a degree.
     private static let licenceContinuations: Set<String> = ["en", "de", "du", "des", "es", "professionnelle", "pro"]
 
+    /// Whether the name of a line names a degree by one of its words, wherever it stands ("Certified Nursing Assistant
+    /// Diploma", "Certified Diploma in Nursing"), or by "Master" before "of" or "in" ("Master of Science"). Whole words
+    /// only, unlike `isDegree`: "Scrum Master" and "LLM Applications" name no degree.
+    static func namesADegree(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        if words.contains(where: degreeNames.contains) { return true }
+        return zip(words, words.dropFirst()).contains { $0 == "master" && ($1 == "of" || $1 == "in") }
+    }
+
+    /// The words that name a degree wherever they stand in a name.
+    private static let degreeNames: Set<String> = Set([
+        "diploma", "diplom", "diplôme", "diplomado", "diplomatura", "degree", "bachelor", "bachelor's", "master's", "laurea",
+        "licenciatura", "doctorate", "doctorado", "doctorat", "dottorato", "doutorado", "mestrado", "maestría", "phd", "mba",
+        "bsc", "msc", "beng", "meng", "llb", "abitur", "maturità", "baccalauréat", "bachillerato", "ausbildung", "studium",
+    ].map(\.folded))
+
     private static let legalForms: Set<String> = [
         "gmbh", "ag", "kg", "ohg", "ug", "ev", "spa", "srl", "srls", "sas", "snc", "ltd", "limited", "inc", "llc", "llp", "plc", "corp",
         "sa", "sl", "slu", "sarl", "sasu", "lda", "ltda", "bv", "nv", "gbr", "kgaa", "co", "group", "gruppo", "gruppe", "grupo",
