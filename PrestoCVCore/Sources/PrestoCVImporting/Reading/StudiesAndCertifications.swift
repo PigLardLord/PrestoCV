@@ -3,8 +3,11 @@
 /// a heading of studies alone may still list a certification.
 ///
 /// Each line is sorted by its own shape, in this order:
-/// 1. A study: a school ("University of Leipzig", "Liceo Scientifico"), a first word of a degree ("Laurea", "Diplom",
-///    "MBA") or a period with an end ("2010 – 2014").
+/// 1. A study: a period with an end ("2010 – 2014"), a school ("University of Leipzig", "Liceo Scientifico") or a first
+///    word of a degree ("Laurea", "Diplom", "MBA"). A first word of a degree is not enough when the line names a
+///    certification by its word and no school ("Master Certified Coach — Kestrel Coaching Federation, 2020"): the word
+///    of the certification says what the line is. "Licence" is a degree only with a French word after it ("Licence en
+///    Droit"); "Licence to Practise" is a permission to work.
 /// 2. A certification, with no evidence of a study: under a heading that joins the two kinds, a word of a certification
 ///    ("Certified", "Certificazione", "Zertifizierung") or an issuer after a separator with a single date that is not a
 ///    period ("Professional Scrum Master I — Scrum.org, 2020"); under a heading of studies, the word together with an
@@ -70,13 +73,17 @@ enum StudiesAndCertifications {
             part.text.contains(where: \.isLetter)
         }
         let bare = !hasIssuer && dates.isEmpty
-        if EntryVocabulary.startsWithDegree(text) || dates.contains(where: { $0.period.end != nil }) {
+        if dates.contains(where: { $0.period.end != nil }) {
             return Shape(kind: .education, bare: bare)
         }
-        if EntryVocabulary.isSchool(text) {
+        let school = EntryVocabulary.isSchool(text)
+        let hasWord = EntryVocabulary.isCertification(text)
+        if EntryVocabulary.opensAStudy(text) && (school || !hasWord) {
+            return Shape(kind: .education, bare: bare)
+        }
+        if school {
             return Shape(kind: .education, schoolOnly: true, bare: bare)
         }
-        let hasWord = EntryVocabulary.isCertification(text)
         let hasSingleDate = dates.count == 1
         let certification = joined ? hasWord || (hasIssuer && hasSingleDate) : hasWord && (hasIssuer || hasSingleDate)
         return Shape(kind: certification ? .certifications : nil, bare: bare)

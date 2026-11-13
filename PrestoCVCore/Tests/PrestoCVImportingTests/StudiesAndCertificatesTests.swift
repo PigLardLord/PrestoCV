@@ -184,6 +184,76 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
+    // MARK: A first word that is not always a degree
+
+    @Test("A licence to practise is a certification under a joined heading, not a second study")
+    func licenceToPractise() throws {
+        let body = """
+            MBBS Medicine — University of Leipzig
+            2009 – 2015
+            Licence to Practise — General Medical Council, 2015
+            """
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["MBBS Medicine"])
+        #expect(found.cv.certifications.map(\.name.value) == ["Licence to Practise"])
+        #expect(found.cv.certifications.map { $0.issuer?.value } == ["General Medical Council"])
+        #expect(found.cv.certifications.map { $0.year?.value } == [2015])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    @Test("A French licence stays a study after a certification, by the word that follows it", arguments: [
+        "Licence en Droit", "Licence professionnelle Logistique", "Licence d'Économie", "Licence ès Lettres",
+    ])
+    func frenchLicence(degree: String) throws {
+        let body = """
+            Certified Scrum Developer — Scrum Alliance, 2019
+            \(degree), 2011
+            """
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == [degree])
+        #expect(found.cv.certifications.map(\.name.value) == ["Certified Scrum Developer"])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    @Test("A course on large language models is a certification by its issuer and year, not a master of laws")
+    func languageModelCourse() throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            LLM Fine-Tuning — Northwind Labs, 2024
+            """
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science"])
+        #expect(found.cv.certifications.map(\.name.value) == ["LLM Fine-Tuning"])
+        #expect(found.cv.certifications.map { $0.issuer?.value } == ["Northwind Labs"])
+        #expect(found.cv.certifications.map { $0.year?.value } == [2024])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+    }
+
+    @Test("A certification whose first word is also a degree's is a certification by its word, with no school", arguments: [
+        "LLM Applications Certification — Northwind Labs, 2024", "Master Certified Coach — Kestrel Coaching Federation, 2020",
+    ], ["Education & Certifications", "EDUCATION & TRAINING"])
+    func certificationOpeningLikeADegree(line: String, heading: String) throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            \(line)
+            """
+        let found = try importText(cv(heading: heading, body: body))
+
+        let name = String(line.prefix { $0 != "—" }).trimmingCharacters(in: .whitespaces)
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science"])
+        #expect(found.cv.certifications.map(\.name.value) == [name])
+        #expect(found.cv.certifications.count == 1)
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
     // MARK: A heading of one kind
 
     @Test("Under an education heading, an entry with a certification word is a certification, not a second study")

@@ -114,10 +114,27 @@ enum EntryVocabulary {
         return degreeStems.contains(where: first.hasPrefix) || degreeOpeners.contains(first)
     }
 
+    /// The codes and words that open a degree besides its stems. "LLM" is not among them: it is also the large language
+    /// model a course is named after ("LLM Fine-Tuning"), so it is a degree only where `degreeWords` reads it.
     private static let degreeOpeners: Set<String> = [
-        "phd", "ph.d", "mba", "bsc", "msc", "beng", "meng", "llb", "llm", "doctor", "doctorate", "doctorado", "doctorat", "doutorado",
+        "phd", "ph.d", "mba", "bsc", "msc", "beng", "meng", "llb", "doctor", "doctorate", "doctorado", "doctorat", "doutorado",
         "mestrado", "grado", "licence",
     ]
+
+    /// Whether a line of a section of studies opens with the word of a degree, as `startsWithDegree` reads it, with one
+    /// difference: "Licence" opens a study only when a French word follows it ("Licence en Droit", "Licence professionnelle
+    /// Logistique", "Licence d'Économie", "Licence ès Lettres"). In English it is a permission to work, a certification
+    /// ("Licence to Practise — General Medical Council, 2015").
+    static func opensAStudy(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        guard let first = words.first else { return false }
+        guard first == "licence" else { return startsWithDegree(text) }
+        guard let next = words.dropFirst().first else { return false }
+        return licenceContinuations.contains(next) || next.hasPrefix("d'")
+    }
+
+    /// The French words that follow "Licence" in the name of a degree.
+    private static let licenceContinuations: Set<String> = ["en", "de", "du", "des", "es", "professionnelle", "pro"]
 
     private static let legalForms: Set<String> = [
         "gmbh", "ag", "kg", "ohg", "ug", "ev", "spa", "srl", "srls", "sas", "snc", "ltd", "limited", "inc", "llc", "llp", "plc", "corp",

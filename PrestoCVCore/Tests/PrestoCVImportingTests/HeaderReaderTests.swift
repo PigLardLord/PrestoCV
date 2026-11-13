@@ -220,7 +220,7 @@ struct HeaderReaderTests {
         ("Tessa Marlowe, MSN", "Tessa Marlowe"), ("John Smith, CPA", "John Smith"), ("Sam Carter, MBA, PMP", "Sam Carter"),
         ("Priya Nair, PhD", "Priya Nair"), ("Lena Hartmann, Dipl.-Ing.", "Lena Hartmann"), ("Luca Neri, M.Sc.", "Luca Neri"),
         ("Rosa Vidal, MSN, RN, CCRN", "Rosa Vidal"), ("Jane Rowe, Bachelor of Science in Nursing", "Jane Rowe"),
-        ("Tobias Renn, MSc Data Science", "Tobias Renn"),
+        ("Tobias Renn, MSc Data Science", "Tobias Renn"), ("Tobias Renn, Licence to Practise Medicine", "Tobias Renn"),
     ])
     func credentialsOfEveryKind(line: String, name: String) {
         let found = header(line + "\nProject manager\nTorino, Italia\nperson@example.com")
