@@ -44,6 +44,8 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"editor.notice.textTooLong.named \(name)"#: ValueTypes(["%@"], "StatusNotice resolves the field's label to a String"),
                 #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.moveUp.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
             ],

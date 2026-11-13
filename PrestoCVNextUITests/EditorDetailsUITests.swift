@@ -214,7 +214,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         append(" Lead", to: app.textFields["editor.field.title"])
         if isCompact(app) {
-            app.navigationBars.buttons.firstMatch.tap()
+            app.backButton.tap()
         } else {
             row(titled: dataAnalyst.title, in: app).tap()
         }
@@ -245,7 +245,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
         if isCompact(app) {
-            app.navigationBars.buttons.firstMatch.tap()
+            app.backButton.tap()
         }
         XCTAssertTrue(row(titled: "Night Shift Nurse", in: app).waitForExistence(timeout: 30), "The new CV is in the list")
     }

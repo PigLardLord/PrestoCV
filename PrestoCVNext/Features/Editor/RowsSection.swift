@@ -8,8 +8,9 @@ struct RowFocus: Hashable {
     var isEnd = false
 }
 
-/// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one at the end. The editor adds
-/// and removes the rows; the section only shows them.
+/// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one, below them. A row
+/// moves by a drag (on iOS once the person taps Edit), which the editor takes as a move of the section's rows; a
+/// section with one row shows no handle. The editor adds, moves and removes the rows; the section only shows them.
 struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID {
     let editor: EditorViewModel
     let section: EditorSection
@@ -29,6 +30,10 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
                 ) {
                     fields(row, RowFields(row: row.id, focus: focus))
                 }
+                .moveDisabled(!editor.canReorderRows(in: section))
+            }
+            .onMove { offsets, destination in
+                editor.moveRows(in: section, from: offsets, to: destination)
             }
             Button {
                 editor.addRow(to: section)
@@ -51,9 +56,9 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
     }
 }
 
-/// One row, its fields together. Delete is in its context menu, behind a swipe and among the actions of VoiceOver,
-/// named after the row; a row with something in it goes only once the person confirms. The row just added takes the
-/// focus in its first field.
+/// One row, its fields together. Move up, Move down and Delete are in its context menu and among the actions of
+/// VoiceOver, named after the row; a move shows only where the row can go. Delete is behind a swipe too, and a row with
+/// something in it goes only once the person confirms. The row just added takes the focus in its first field.
 struct EditorRowView<Fields: View>: View {
     let editor: EditorViewModel
     let section: EditorSection
@@ -67,6 +72,12 @@ struct EditorRowView<Fields: View>: View {
         VStack(alignment: .leading, spacing: Spacing.medium) { fields }
             .padding(.vertical, Spacing.small)
             .contextMenu {
+                if canMove(by: -1) {
+                    Button("editor.row.moveUp.named \(name)", systemImage: "arrow.up") { move(by: -1) }
+                }
+                if canMove(by: 1) {
+                    Button("editor.row.moveDown.named \(name)", systemImage: "arrow.down") { move(by: 1) }
+                }
                 Button("editor.row.delete.named \(name)", systemImage: "trash", role: .destructive, action: remove)
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -76,7 +87,15 @@ struct EditorRowView<Fields: View>: View {
             }
             // The row is not an accessibility element of its own, so SwiftUI gives this action to each field and menu of
             // the row, where VoiceOver lands. A containing element (`.accessibilityElement(children: .contain)`) would keep
-            // the action on the row and take it off the fields.
+            // the action on the row and take it off the fields. A move the row cannot make is no action at all.
+            .accessibilityActions {
+                if canMove(by: -1) {
+                    Button("editor.row.moveUp.named \(name)") { move(by: -1) }
+                }
+                if canMove(by: 1) {
+                    Button("editor.row.moveDown.named \(name)") { move(by: 1) }
+                }
+            }
             .accessibilityAction(named: Text("editor.row.delete.named \(name)"), remove)
             .confirmationDialog(Text("editor.row.delete.title \(name)"), isPresented: asksToRemove, titleVisibility: .visible) {
                 Button("editor.row.delete", role: .destructive) { editor.confirmRemoval() }
@@ -93,6 +112,15 @@ struct EditorRowView<Fields: View>: View {
 
     private func remove() {
         editor.removeRow(in: section, id: id)
+    }
+
+    /// Whether the row can move `offset` places, up for a negative offset: the editor decides.
+    private func canMove(by offset: Int) -> Bool {
+        editor.canMoveRow(in: section, id: id, by: offset)
+    }
+
+    private func move(by offset: Int) {
+        editor.moveRow(in: section, id: id, by: offset)
     }
 
     /// Whether the editor waits for the person to confirm the removal of this row.
