@@ -124,12 +124,6 @@ extension XCUIApplication {
         XCTAssertTrue(shown(), "\(name) comes into view", file: file, line: line)
     }
 
-    /// The form whose rows the scrolls move.
-    @MainActor
-    private var openForm: XCUIElement {
-        descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
-    }
-
     /// One step of a scroll: a drag over three tenths of the form's height, up to go on, down to go back.
     @MainActor
     private func dragForm(on: Bool) {
