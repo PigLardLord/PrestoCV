@@ -411,7 +411,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
 
-**Until the switch to the new stack**, these folders live under `PrestoCVNext/`, in a second app target, `PrestoCVNext`, with the same platforms; the legacy target below keeps shipping and its scheme keeps archiving. The `PrestoCVNext` scheme builds the second target and runs its test plan, `TestPlans/Next.xctestplan`; its UI test target, `PrestoCVNextUITests`, and its unit test target, `PrestoCVNextTests`, hosted in the app, are held to R16. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
+**Until the switch to the new stack**, these folders live under `PrestoCVNext/`, in a second app target, `PrestoCVNext`, with the same platforms; the legacy target below keeps shipping and its scheme keeps archiving. The `PrestoCVNext` scheme builds the second target and runs its test plan, `TestPlans/Next.xctestplan`; its UI test target, `PrestoCVNextUITests`, and its unit test target, `PrestoCVNextTests`, hosted in the app, are held to R16. The unit tests may import Testing, SwiftUI, UIKit and the app: UIKit only to put a view in a window of the app, where a form lays its rows out as on the screen, which `ImageRenderer` does not draw. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
 
 | Folder | Contents | May import |
 |---|---|---|
