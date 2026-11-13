@@ -203,7 +203,9 @@ final class FirstRunUITests: XCTestCase {
     @MainActor
     func testTheWelcomeIsCentredAndReadableOnARegularScreen() throws {
         let app = try launch()
-        let title = element("firstRun.title", in: app)
+        // Read by type: on iOS 26.5 XCUITest also lists the hidden words that WholeWordsText measures, as Other
+        // elements with the title's identifier and no frame
+        let title = app.staticTexts["firstRun.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         try XCTSkipIf(isCompact(app), "A compact screen is narrower than the readable width")
 

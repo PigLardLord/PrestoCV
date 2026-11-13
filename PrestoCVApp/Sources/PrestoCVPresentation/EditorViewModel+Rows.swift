@@ -30,13 +30,14 @@ extension EditorViewModel {
 
     /// Adds an empty row as the row to show (`addedRow`): a job, a study or a certification first, as a CV lists the
     /// newest first; a skill, a language, a profile or an interest last. It is an edit like typing: the autosave stores
-    /// the CV with it.
+    /// the CV with it. Where the row shows on a page of its own, its page opens.
     public func addRow(to section: EditorSection) {
         var changed = form
         let id = rowIDs.make()
         changed.addRow(to: section, id: id)
         edit(changed)
         addedRow = id
+        if showsOnAPage(section) { openedEntry = EditorEntry(section: section, row: id) }
     }
 
     /// The view has focused the added row and scrolled it into view: no row waits to be shown.

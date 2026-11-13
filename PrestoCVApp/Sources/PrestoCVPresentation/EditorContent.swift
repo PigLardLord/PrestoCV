@@ -85,6 +85,11 @@ extension Array where Element: Identifiable, Element.ID == RowID {
             self[index] = newValue
         }
     }
+
+    /// The row with this id, or nil once it went: the page of an entry shows its fields only while the row is there.
+    public subscript(row id: RowID) -> Element? {
+        first { $0.id == id }
+    }
 }
 
 /// A row of a section: it has an id and a name, and it can have nothing in it.

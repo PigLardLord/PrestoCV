@@ -100,19 +100,21 @@ final class EditorReorderUITests: XCTestCase {
         XCTAssertTrue(waitForOrder(moved, in: app), "Research moves one place up: \(order(in: app))")
     }
 
-    /// Once the person taps Edit, a drag of the last skill's handle onto the first one's puts it first.
+    /// Once the person taps Edit, a drag of the last skill's handle onto the first one's puts it first. The skills are
+    /// brought clear of the form's edges first: the last one added stays in view above the keyboard, which leaves the
+    /// first above the screen, and a drag that ends near an edge scrolls the form instead of moving the row.
     @MainActor
     func testDragReorders() throws {
         let app = try launchWithSkills()
+        bringClearOfTheEdges(from: field("Sketching", in: app), to: field("Research", in: app), in: app)
         let edit = app.buttons["editor.edit"]
         XCTAssertTrue(edit.waitForExistence(timeout: 30), "The bar has Edit")
         edit.tap()
 
         let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder"))
         XCTAssertTrue(handles.firstMatch.waitForExistence(timeout: 30), "Edit shows the handles of the rows")
-        let rows = handles.allElementsBoundByIndex.filter(\.isHittable).sorted { $0.frame.minY < $1.frame.minY }
-        let first = try XCTUnwrap(rows.first, "A handle can be dragged")
-        let last = try XCTUnwrap(rows.last, "A handle can be dragged")
+        let first = try handle(of: "Sketching", among: handles, in: app)
+        let last = try handle(of: "Research", among: handles, in: app)
         last.press(forDuration: 1, thenDragTo: first, withVelocity: .slow, thenHoldForDuration: 0.5)
 
         let moved = ["Research", "Sketching", "Prototyping"]
@@ -134,6 +136,16 @@ final class EditorReorderUITests: XCTestCase {
         app.textFields.matching(identifier: "editor.field.skillName").allElementsBoundByIndex
             .sorted { $0.frame.minY < $1.frame.minY }
             .map { $0.value as? String ?? "" }
+    }
+
+    /// The handle on the row of the skill: the one whose middle is nearest the middle of its field.
+    @MainActor
+    private func handle(of name: String, among handles: XCUIElementQuery,
+                        in app: XCUIApplication) throws -> XCUIElement {
+        let middle = field(name, in: app).frame.midY
+        let onScreen = handles.allElementsBoundByIndex.filter(\.isHittable)
+        return try XCTUnwrap(onScreen.min { abs($0.frame.midY - middle) < abs($1.frame.midY - middle) },
+                             "The row of \(name) has a handle")
     }
 
     @MainActor
@@ -162,5 +174,25 @@ final class EditorReorderUITests: XCTestCase {
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTAssertTrue(element.exists && element.isHittable, "The add button of the skills comes into view")
+    }
+
+    /// Scrolls the form in short steps until the rows from `top` to `bottom` stand clear of the bar and of the form's
+    /// bottom edge, back while `top` is above the room and on while `bottom` is below it.
+    @MainActor
+    private func bringClearOfTheEdges(from top: XCUIElement, to bottom: XCUIElement, in app: XCUIApplication) {
+        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+        let margin: CGFloat = 88
+        let upper = app.navigationBars.firstMatch.frame.maxY + margin
+        let lower = form.frame.maxY - margin
+        let higher = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        let deeper = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+        let topIsClear = { top.exists && top.isHittable && top.frame.minY > upper }
+        let bottomIsClear = { bottom.exists && bottom.isHittable && bottom.frame.maxY < lower }
+        for _ in 0..<20 where !(topIsClear() && bottomIsClear()) {
+            // Back moves the rows down, on moves them up; held at the end, so the form does not glide on
+            let (from, to) = topIsClear() ? (deeper, higher) : (higher, deeper)
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        XCTAssertTrue(topIsClear() && bottomIsClear(), "The skills stand clear of the form's edges")
     }
 }

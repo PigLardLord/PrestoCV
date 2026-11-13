@@ -10,7 +10,7 @@ struct ProficiencyPicker: View {
         Picker(selection: $proficiency) {
             Text("editor.choice.none").tag("")
             ForEach(EditorChoices.proficiencies, id: \.self) { code in
-                words(of: code).tag(code)
+                Self.words(of: code).tag(code)
             }
         } label: {
             Text("editor.field.proficiency")
@@ -19,8 +19,9 @@ struct ProficiencyPicker: View {
         .frame(minHeight: TapTarget.minimumHeight)
     }
 
-    /// The words of a level by its code; a code the editor does not offer shows as it is.
-    private func words(of code: String) -> Text {
+    /// The words of a level by its code; a code the editor does not offer shows as it is. The row of a language on a
+    /// narrow screen shows its level in the same words.
+    static func words(of code: String) -> Text {
         switch code {
         case "a1": Text("editor.proficiency.a1")
         case "a2": Text("editor.proficiency.a2")

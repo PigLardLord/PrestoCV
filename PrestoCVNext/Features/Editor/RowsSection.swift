@@ -8,27 +8,37 @@ struct RowFocus: Hashable {
     var isEnd = false
 }
 
-/// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one, below them. A row
-/// moves by a drag (on iOS once the person taps Edit), which the editor takes as a move of the section's rows; a
-/// section with one row shows no handle. The editor adds, moves and removes the rows; the section only shows them.
+/// A section of rows: its rows, each in a `ForEach` over its id, and the button that adds one, below them. A row shows its
+/// fields in place, or, where the editor says the section's rows open on a page of their own, a line that opens it, and
+/// then the section says under its rows how to move one. A row moves by a drag (on iOS once the person taps Edit), which
+/// the editor takes as a move of the section's rows; a section with one row shows no handle. The editor adds, opens,
+/// moves and removes the rows; the section only shows them.
 struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID {
     let editor: EditorViewModel
     let section: EditorSection
     let rows: [Row]
     /// What the row is called where the person must tell it from the others.
     let name: (Row) -> RowName
-    /// The field that takes the focus when the row is added.
-    let first: EditorField
+    /// What the line of a row that opens on a page shows; nil for a section whose rows always show in place.
+    let summary: ((Row) -> EntrySummary)?
     let focus: FocusState<RowFocus?>.Binding
     @ViewBuilder let fields: (Row, RowFields) -> Fields
 
     var body: some View {
         Section {
             ForEach(rows) { row in
-                EditorRowView(
-                    editor: editor, section: section, id: row.id, name: words(of: name(row)), first: first, focus: focus
-                ) {
-                    fields(row, RowFields(row: row.id, focus: focus))
+                let rowName = name(row).words
+                EditorRowView(editor: editor, section: section, id: row.id, name: rowName, focus: focus) {
+                    if editor.showsOnAPage(section), let summary {
+                        EntryRow(section: section, summary: summary(row), name: rowName) {
+                            editor.openEntry(in: section, id: row.id)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: Spacing.medium) {
+                            fields(row, RowFields(row: row.id, focus: focus))
+                        }
+                        .padding(.vertical, Spacing.small)
+                    }
                 }
                 .moveDisabled(!editor.canReorderRows(in: section))
             }
@@ -44,33 +54,29 @@ struct RowsSection<Row: Identifiable, Fields: View>: View where Row.ID == RowID 
             .accessibilityIdentifier("editor.add.\(section)")
         } header: {
             Text(section.words.title)
-        }
-    }
-
-    /// The row's name as the person reads it: its text, or what a row of its section with none is called (R13).
-    private func words(of name: RowName) -> String {
-        switch name {
-        case .text(let text): text
-        case .placeholder(let section): String(localized: section.words.unnamed)
+        } footer: {
+            if editor.showsMoveHint(in: section) {
+                Text("editor.rows.hint")
+                    .accessibilityIdentifier("editor.rows.hint.\(section)")
+            }
         }
     }
 }
 
-/// One row, its fields together. Move up, Move down and Delete are in its context menu and among the actions of
-/// VoiceOver, named after the row; a move shows only where the row can go. Delete is behind a swipe too, and a row with
-/// something in it goes only once the person confirms. The row just added takes the focus in its first field.
-struct EditorRowView<Fields: View>: View {
+/// One row: its fields together, or the line that opens its page. Move up, Move down and Delete are in its context menu
+/// and among the actions of VoiceOver, named after the row; a move shows only where the row can go. Delete is behind a
+/// swipe too, and a row with something in it goes only once the person confirms, here unless its page is open. The row
+/// just added takes the focus in its first field, where its fields show in place.
+struct EditorRowView<Content: View>: View {
     let editor: EditorViewModel
     let section: EditorSection
     let id: RowID
     let name: String
-    let first: EditorField
     let focus: FocusState<RowFocus?>.Binding
-    @ViewBuilder let fields: Fields
+    @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.medium) { fields }
-            .padding(.vertical, Spacing.small)
+        content
             .contextMenu {
                 if canMove(by: -1) {
                     Button("editor.row.moveUp.named \(name)", systemImage: "arrow.up") { move(by: -1) }
@@ -104,8 +110,8 @@ struct EditorRowView<Fields: View>: View {
                 Text("editor.row.delete.message")
             }
             .task(id: editor.addedRow) {
-                guard editor.addedRow == id else { return }
-                focus.wrappedValue = RowFocus(row: id, field: first)
+                guard editor.addedRow == id, !editor.showsOnAPage(section) else { return }
+                focus.wrappedValue = RowFocus(row: id, field: section.firstField)
                 editor.rowWasShown()
             }
     }
@@ -123,10 +129,10 @@ struct EditorRowView<Fields: View>: View {
         editor.moveRow(in: section, id: id, by: offset)
     }
 
-    /// Whether the editor waits for the person to confirm the removal of this row.
+    /// Whether the editor waits for the person to confirm the removal of this row here, not on its page.
     private var asksToRemove: Binding<Bool> {
         Binding {
-            editor.pendingRemoval?.row == id
+            editor.asksToRemove(row: id, onItsPage: false)
         } set: { shown in
             if !shown { editor.cancelRemoval() }
         }
@@ -153,6 +159,31 @@ struct RowFields {
         ParagraphField(label, text: text, focus: focus, as: RowFocus(row: row, field: field))
             .fieldInput(field.input)
             .accessibilityIdentifier("editor.field.\(field)")
+    }
+}
+
+extension RowName {
+    /// The row's name as the person reads it: its text, or what a row of its section with none is called (R13).
+    var words: String {
+        switch self {
+        case .text(let text): text
+        case .placeholder(let section): String(localized: section.words.unnamed)
+        }
+    }
+}
+
+extension EditorSection {
+    /// The field that takes the focus when a row of the section is added.
+    var firstField: EditorField {
+        switch self {
+        case .experiences: .experienceRole
+        case .education: .educationDegree
+        case .skills: .skillName
+        case .languages: .language
+        case .certifications: .certificationName
+        case .profiles: .profilePlatform
+        case .interests: .interest
+        }
     }
 }
 
