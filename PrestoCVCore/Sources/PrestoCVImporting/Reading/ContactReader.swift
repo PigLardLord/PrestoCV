@@ -219,13 +219,25 @@ enum ContactReader {
         } else {
             return nil
         }
-        let host = lowered.split(separator: "/").first { $0.contains(".") } ?? Substring(lowered)
-        let kind: ImportedLink.Kind
-        if host.contains("linkedin.") { kind = .linkedIn }
-        else if host.contains("github.") { kind = .gitHub }
-        else if host.contains("xing.") { kind = .xing }
-        else { kind = .website }
-        return ImportedLink(address: address, kind: kind)
+        return ImportedLink(address: address, kind: kind(of: address.value))
+    }
+
+    /// The platforms whose profile a link can be, each by its own domain. A link is a profile only when its host is that
+    /// domain or a subdomain of it ("www.github.com", "de.linkedin.com"); any other host is a website: a site on GitHub
+    /// Pages ("tobiasrenn.github.io") and a host that only holds the word ("linkedin.example.org") too (#457).
+    private static let profileDomains: [(domain: String, kind: ImportedLink.Kind)] = [
+        ("linkedin.com", .linkedIn), ("github.com", .gitHub), ("xing.com", .xing),
+    ]
+
+    /// The kind of a link by its host: the host stands between the scheme and the first "/", "?" or "#", without the
+    /// port and without a final dot.
+    private static func kind(of link: WebLink) -> ImportedLink.Kind {
+        let value = link.value.lowercased()
+        guard let scheme = value.firstRange(of: "://") else { return .website }
+        var host = value[scheme.upperBound...].prefix { !"/?#".contains($0) }
+        if let colon = host.firstIndex(of: ":") { host = host[..<colon] }
+        while host.hasSuffix(".") { host = host.dropLast() }
+        return profileDomains.first { host == $0.domain || host.hasSuffix("." + $0.domain) }?.kind ?? .website
     }
 
     /// A domain in lower case with a known top-level domain, such as "linkedin.com/in/…" or "example.dev".
