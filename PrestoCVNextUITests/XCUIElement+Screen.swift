@@ -85,7 +85,7 @@ extension XCUIApplication {
     @MainActor
     func leaveEntryPage(file: StaticString = #filePath, line: UInt = #line) {
         let page = entryPage
-        navigationBars.buttons.firstMatch.tap()
+        backButton.tap()
         XCTAssertTrue(page.waitForNonExistence(timeout: 30), "Back closes the page", file: file, line: line)
     }
 

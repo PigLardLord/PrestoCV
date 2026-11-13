@@ -154,7 +154,7 @@ final class EntryPageUITests: XCTestCase {
     /// "My CVs" once the page has gone.
     @MainActor
     private func backToTheList(in app: XCUIApplication) {
-        let back = app.navigationBars.buttons.firstMatch
+        let back = app.backButton
         back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(forDuration: 1.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)))
         let list = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "My CVs", "BackButton"))
