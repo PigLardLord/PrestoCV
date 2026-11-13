@@ -31,6 +31,8 @@ enum EntryReader {
     /// An entry being read: its lines by role.
     struct Draft {
         var head: [Line] = []
+        /// The line right above the date's line in the section, whichever entry it belongs to.
+        var above: Line?
         var anchor: Line?
         var tail: [Line] = []
         var body: [Line] = []
@@ -62,14 +64,18 @@ enum EntryReader {
 
     // MARK: Lines
 
+    /// How many words start in lower case: a description has several ("app for a hotel group"), a name few.
+    static func lowerCaseWords(_ words: [Substring]) -> Int {
+        words.filter { $0.first?.isLowercase == true }.count
+    }
+
     static func line(_ block: SourceBlock, cells: [Piece]) -> Line {
         let text = cells.map(\.text).joined(separator: " ")
         let words = text.words
         let isBullet = block.kind == .listItem
         // A sentence: long, or ended by a full stop with words in lower case, as a description is
-        let lowerCaseWords = words.filter { $0.first?.isLowercase == true }.count
         let isProse = !isBullet && !block.isEmphasized
-            && (words.count > 16 || (text.hasSuffix(".") && words.count >= 4 && lowerCaseWords >= 2))
+            && (words.count > 16 || (text.hasSuffix(".") && words.count >= 4 && lowerCaseWords(words) >= 2))
         var line = Line(block: block, cells: cells, isBullet: isBullet, isProse: isProse)
         line.isDurationOnly = DurationReader.isDurationOnly(text)
         if !isProse {
@@ -147,6 +153,7 @@ enum EntryReader {
         for line in usable[..<shown] {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
+        let headsAbove = headsAboveDates(usable, anchors: anchors, kind: kind)
         var drafts: [Draft] = []
         var group: Piece?
         for position in anchors.indices.dropFirst(firstEntry) {
@@ -161,6 +168,7 @@ enum EntryReader {
                 group = nil
             }
             draft.anchor = usable[anchor]
+            draft.above = headsAbove && anchor > 0 ? usable[anchor - 1] : nil
             var index = anchor + 1
             while index < entry.upperBound, !usable[index].isBody, usable[index].period == nil {
                 draft.tail.append(usable[index])
@@ -248,32 +256,73 @@ enum EntryReader {
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
+    ///
+    /// What follows the dates on their line, under a head line (`namedParts(ofHead:)`), is the entry's own text (#458): it is split
+    /// at a connector only when the words before it are a role the vocabulary knows, so a description such as "Field
+    /// service app for retail teams" stays one text and the line above stays the entry's head. When that head names
+    /// two parts besides its place, by their words or by their order ("Developer — Kestrel, Leeds"), and the text after
+    /// the dates has words in lower case as a description has ("Booking tool for a hotel group"), that text names no
+    /// role or employer by an organisation's word either; a name ("Northwind Labs") and a role the vocabulary knows
+    /// still read as what they are.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
         var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
         for line in lines {
             var removed = line.durations
             if let period = line.period?.piece { removed.append(period) }
+            let headAbove = line.period == nil ? nil : draft.above.flatMap { namedParts(ofHead: $0, kind: kind) }
             for cell in line.cells {
                 let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
                 for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
-                    segments += split(piece, kind: kind)
+                    let afterTheDates = line.period.map { piece.span.lowerBound >= $0.piece.span.upperBound } == true
+                    guard afterTheDates, let named = headAbove else {
+                        segments += split(piece, kind: kind, onlyAtAKnownRole: false)
+                        continue
+                    }
+                    let parts = split(piece, kind: kind, onlyAtAKnownRole: true)
+                    let knownRole = parts.contains { $0.isMarked && $0.part == .primary && EntryVocabulary.isRole($0.piece.text) }
+                    segments += named < 2 || knownRole || lowerCaseWords(piece.words) < 2 ? parts : parts.map { part in
+                        part.part == .primary || part.part == .secondary ? Segment(piece: part.piece, part: .unknown, isMarked: false) : part
+                    }
                 }
             }
         }
         return segments
     }
 
+    /// Whether the section puts its first entry's head above its dates: the section does not open with a date, and
+    /// the line right above its first date is no description and names at least two parts, as a head does ("Developer —
+    /// Acme, Leeds"); a lone line there ("Selected roles") introduces the section. Only then is a complete head above a
+    /// date read as that date's own head; in a section that opens with a date, that line ends the entry before (#458).
+    static func headsAboveDates(_ lines: [Line], anchors: [Int], kind: Kind) -> Bool {
+        guard let first = anchors.first, first > 0, !lines[first - 1].isBody else { return false }
+        return segments(of: Draft(head: [lines[first - 1]]), kind: kind).count >= 2
+    }
+
+    /// How many parts besides its place a head line names, or nil when the line is no head. A head is no description
+    /// and no date, holds at least two parts, and names a role or an employer by its words: "Developer — Acme Labs,
+    /// Leeds" and "Developer — Kestrel, Leeds" name two, "Acme Labs, Leeds" names one.
+    private static func namedParts(ofHead line: Line, kind: Kind) -> Int? {
+        guard !line.isBody, line.period == nil else { return nil }
+        let segments = segments(of: Draft(head: [line]), kind: kind)
+        guard segments.count >= 2, segments.contains(where: { $0.isMarked && ($0.part == .primary || $0.part == .secondary) })
+        else { return nil }
+        return segments.filter { $0.part != .location && $0.part != .address }.count
+    }
+
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
-    /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own.
-    private static func split(_ piece: Piece, kind: Kind) -> [Segment] {
+    /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own. A short segment splits at a connector
+    /// by its length alone, unless `onlyAtAKnownRole`: then the words before the connector must be a role the vocabulary
+    /// knows, as an organisation's word also ends a description of the work ("App for a logistics company").
+    private static func split(_ piece: Piece, kind: Kind, onlyAtAKnownRole: Bool) -> [Segment] {
         if piece.text.hasSuffix(")"), let open = piece.text.lastIndex(of: "("), open > piece.text.startIndex {
             let inside = piece.sub(piece.text.index(after: open)..<piece.text.index(before: piece.text.endIndex)).trimmed()
             let before = piece.sub(piece.text.startIndex..<open).trimmed()
             let looksLikePlace = (1...3).contains(inside.words.count) && inside.text.first?.isUppercase == true
                 && !inside.text.contains(where: \.isNumber) && EntryVocabulary.isOrganisation(before.text)
             if !before.isEmpty, Places.isKnownPlace(inside.text) || Places.isCountryOrRegion(inside.text) || looksLikePlace {
-                return split(before, kind: kind) + [Segment(piece: inside, part: .location, isMarked: true)]
+                return split(before, kind: kind, onlyAtAKnownRole: onlyAtAKnownRole)
+                    + [Segment(piece: inside, part: .location, isMarked: true)]
             }
         }
         if kind == .experience {
@@ -281,8 +330,9 @@ enum EntryReader {
                 guard let range = piece.text.firstRange(of: connector) else { continue }
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
-                guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
-                        || role.words.count <= 4 && employer.words.count <= 5 else { continue }
+                guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || !onlyAtAKnownRole
+                        && (EntryVocabulary.isOrganisation(employer.text) || role.words.count <= 4 && employer.words.count <= 5)
+                else { continue }
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
                         index == 0 ? Segment(piece: part, part: .secondary, isMarked: true) : classify(part, kind: kind)

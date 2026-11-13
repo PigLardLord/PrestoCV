@@ -717,4 +717,248 @@ struct EntryReaderTests {
         #expect(result.reviewList.contains(ReviewItem(field: .experience(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
         #expect(result.reviewList.contains(ReviewItem(field: .education(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
     }
+
+    // MARK: What the work was about, after the dates
+
+    /// A job named by its head line, then its dates followed by what the work was about. `{sep}` stands for the mark
+    /// between the dates and that description.
+    struct DescribedJob: Sendable, CustomTestStringConvertible {
+        let name: String
+        let text: String
+        let role: String
+        let employer: String
+        let place: String
+        let description: String
+        let ownBullets: [String]
+        let firstBullets: [String]
+        var testDescription: String { name }
+    }
+
+    static let describedJobs = [
+        DescribedJob(name: "for", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}Field service app for retail teams
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "Field service app for retail teams", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "at", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}Field service app at a retail chain
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "Field service app at a retail chain", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "lowercase", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}field service app for retail teams
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "field service app for retail teams", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "German", text: """
+            BERUFSERFAHRUNG
+            Senior iOS-Entwickler — Kestrel Cloud, Hamburg
+            März 2020 – heute
+            - Aufnahme nach SwiftUI umgestellt.
+            Mobile-Entwickler — Northwind Labs, Lucca, Italien
+            Mai 2014 – Juni 2017{sep}Außendienst-App für Handelsteams
+            - Offline-Bestellungen gebaut.
+            """, role: "Mobile-Entwickler", employer: "Northwind Labs", place: "Lucca, Italien",
+            description: "Außendienst-App für Handelsteams", ownBullets: ["Offline-Bestellungen gebaut."],
+            firstBullets: ["Aufnahme nach SwiftUI umgestellt."]),
+        DescribedJob(name: "Italian", text: """
+            ESPERIENZA
+            Senior iOS Engineer — Kestrel Cloud, Amburgo
+            Marzo 2020 – oggi
+            - Portato la cattura su SwiftUI.
+            Sviluppatore mobile — Northwind Labs, Lucca
+            Maggio 2014 – Giugno 2017{sep}App per i tecnici sul campo
+            - Costruito gli ordini offline.
+            """, role: "Sviluppatore mobile", employer: "Northwind Labs", place: "Lucca",
+            description: "App per i tecnici sul campo", ownBullets: ["Costruito gli ordini offline."],
+            firstBullets: ["Portato la cattura su SwiftUI."]),
+        DescribedJob(name: "company", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}App for a logistics company
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "App for a logistics company", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "firm", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}Portal for an insurance firm
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "Portal for an insurance firm", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "group", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}Booking tool for a hotel group
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "Booking tool for a hotel group", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "engineers", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}App for field engineers
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "App for field engineers", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+        DescribedJob(name: "agency", text: """
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Hamburg
+            March 2020 – Present
+            - Led the move of the capture flow to SwiftUI.
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017{sep}Work for a public agency
+            - Built the offline order screens.
+            """, role: "Mobile Developer", employer: "Northwind Labs", place: "Lucca, Italy",
+            description: "Work for a public agency", ownBullets: ["Built the offline order screens."],
+            firstBullets: ["Led the move of the capture flow to SwiftUI."]),
+    ]
+
+    @Test("A line after the dates that says what the work was about stays with its job, under a head that names the role and the employer",
+          arguments: describedJobs, [" · ", " | ", " — "])
+    func descriptionAfterTheDates(job: DescribedJob, separator: String) throws {
+        let text = job.text.replacingOccurrences(of: "{sep}", with: separator)
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\n" + text)
+        let jobs = result.cv.experience
+        try #require(jobs.count == 2, "\(jobs.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")" })")
+        #expect(jobs[0].details.map(\.value) == job.firstBullets)
+        #expect(jobs[1].role?.value == job.role)
+        #expect(jobs[1].employer?.value == job.employer)
+        #expect(jobs[1].location?.value == job.place)
+        #expect(jobs[1].check == nil)
+        #expect(jobs[1].details.map(\.value) == [job.description] + job.ownBullets)
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
+
+    @Test("What follows the dates is still read as a place, or as the role and the employer of an entry whose dates come first", arguments: [
+        ("Senior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n"
+            + "Developer — Acme Ltd\n2020 – 2025 · Lucca\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg", "Developer|Acme Ltd|Lucca"]),
+        ("Senior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n"
+            + "Developer — Acme Ltd\n2020 – 2025 · London\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg", "Developer|Acme Ltd|London"]),
+        ("2020 – Present · Senior iOS Engineer at Kestrel Cloud\nTrained an engineer at Client Ltd\n"
+            + "2015 – 2019 · Analyst at Example Ltd\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|-", "Analyst|Example Ltd|-"]),
+        ("March 2020 – Present · Senior iOS Engineer at Kestrel Cloud\n- Led the move of the capture flow to SwiftUI.\n"
+            + "May 2014 – June 2017 · Mobile Developer at Northwind Labs\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|-", "Mobile Developer|Northwind Labs|-"]),
+        ("Senior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n"
+            + "May 2014 – June 2017 · Mobile Developer at Northwind Labs\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg", "Mobile Developer|Northwind Labs|-"]),
+    ] as [(String, [String])])
+    func afterTheDatesUnchanged(text: String, jobs: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEXPERIENCE\n" + text)
+        #expect(result.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")|\($0.location?.value ?? "-")" } == jobs)
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
+
+    /// The first job of the sections below: its head line names the role, an employer no list knows and the place.
+    static let headedJob = "Senior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n"
+
+    @Test("Under head lines, every job keeps its head and the line after its dates is its own text", arguments: [
+        ("three jobs", headedJob + "Mobile Developer — Northwind Labs, Lucca, Italy\nMay 2014 – June 2017 · App for a logistics company\n"
+            + "- Built the offline order screens.\nJunior Developer — Cedar Labs, Leipzig\n2012 – 2014 · Booking tool for a hotel group\n"
+            + "- Built the stage rigs.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Northwind Labs|Lucca, Italy: App for a logistics company / Built the offline order screens.",
+          "Junior Developer|Cedar Labs|Leipzig: Booking tool for a hotel group / Built the stage rigs."]),
+        ("every job described", "Senior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present · Capture app for a hotel group\n"
+            + "- Led the move of the capture flow to SwiftUI.\nMobile Developer — Northwind Labs, Lucca, Italy\n"
+            + "May 2014 – June 2017 · App for a logistics company\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Capture app for a hotel group / Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Northwind Labs|Lucca, Italy: App for a logistics company / Built the offline order screens."]),
+        ("blank lines", "\nSenior iOS Engineer — Kestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n\n"
+            + "Mobile Developer — Northwind Labs, Lucca, Italy\nMay 2014 – June 2017 · App for a logistics company\n"
+            + "- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Northwind Labs|Lucca, Italy: App for a logistics company / Built the offline order screens."]),
+        ("head on two lines", "Senior iOS Engineer\nKestrel Cloud, Hamburg\nMarch 2020 – Present\n- Led the move of the capture flow to SwiftUI.\n"
+            + "Mobile Developer\nNorthwind Labs, Lucca, Italy\nMay 2014 – June 2017 · App for a logistics company\n"
+            + "- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Northwind Labs|Lucca, Italy: App for a logistics company / Built the offline order screens."]),
+    ] as [(String, String, [String])])
+    func headsAboveDescribedDates(name: String, text: String, jobs: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEXPERIENCE\n" + text)
+        let read = result.cv.experience.map { job in
+            "\(job.role?.value ?? "-")|\(job.employer?.value ?? "-")|\(job.location?.value ?? "-"): "
+                + job.details.map(\.value).joined(separator: " / ")
+        }
+        #expect(read == jobs, "\(name)")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
+
+    @Test("A section whose dates come first, or whose head line names one part, cuts and names its jobs as before", arguments: [
+        ("dates first", "2020 – Present · Tinkerer at Harbor Mill\nTrained an engineer at Client Ltd\n"
+            + "2015 – 2019 · Puppeteer at Lantern Orbit\nBuilt the offline order screens",
+         ["Tinkerer|Harbor Mill", "Puppeteer|Lantern Orbit"]),
+        ("dates first, known role", "2020 – Present · Senior iOS Engineer at Kestrel Cloud\nTrained an engineer at Client Ltd\n"
+            + "2015 – 2019 · Puppeteer at Lantern Orbit\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Puppeteer|Lantern Orbit"]),
+        ("dates first, for", "2020 – Present · Tinkerer at Harbor Mill\nWorked for a retail chain\n"
+            + "2015 – 2019 · Puppeteer at Lantern Orbit\nBuilt the offline order screens",
+         ["Tinkerer|Harbor Mill", "Puppeteer|Lantern Orbit"]),
+        ("dates first, three jobs", "2020 – Present · Tinkerer at Harbor Mill\nTrained an engineer at Client Ltd\n"
+            + "2015 – 2019 · Puppeteer at Lantern Orbit\nWorked for a retail chain\n2012 – 2015 · Juggler at Cedar Labs\nBuilt the stage rigs",
+         ["Tinkerer|Harbor Mill", "Puppeteer|Lantern Orbit", "Juggler|Cedar Labs"]),
+        ("dates first, after a line that introduces them", "Selected roles\n2020 – Present · Tinkerer at Harbor Mill\n"
+            + "Trained an engineer at Client Ltd\n2015 – 2019 · Puppeteer at Lantern Orbit\nBuilt the offline order screens",
+         ["Tinkerer|Harbor Mill", "Puppeteer|Lantern Orbit"]),
+        ("dates first, known role, after a line that introduces them", "Selected roles\n"
+            + "2020 – Present · Senior iOS Engineer at Kestrel Cloud\nTrained an engineer at Client Ltd\n"
+            + "2015 – 2019 · Puppeteer at Lantern Orbit\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Puppeteer|Lantern Orbit"]),
+        ("employer above, role after the dates", headedJob + "Northwind Labs, Lucca\nMay 2014 – June 2017 · Mobile Developer\n"
+            + "- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Mobile Developer|Northwind Labs"]),
+        ("unknown employer above, role after the dates", headedJob + "Harbor Mill, Lucca\nMay 2014 – June 2017 · Mobile Developer\n"
+            + "- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Mobile Developer|Harbor Mill"]),
+        ("role and place above, employer after the dates", headedJob + "Mobile Developer — Lucca\n"
+            + "May 2014 – June 2017 · Northwind Labs\n- Built the offline order screens.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Mobile Developer|Northwind Labs"]),
+    ] as [(String, String, [String])])
+    func jobsCutAsBefore(name: String, text: String, jobs: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEXPERIENCE\n" + text)
+        #expect(result.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")" } == jobs, "\(name)")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
 }
