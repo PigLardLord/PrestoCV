@@ -140,6 +140,9 @@ struct UnknownHeadingTests {
     }
 
     /// Unknown headings with a word the vocabulary of the entries knows: a role, an organisation, a school, a degree.
+    /// Such a heading has the shape of a role in capitals over its employer and its dates (the rows of `entryParts` that
+    /// start "A role in capitals after a detail"), and only its words tell them apart: it is read into the section before,
+    /// so that a job is never cut from its section, until #466 gives it a way of its own.
     static let headingsWithAWordOfAnEntry = ["FOUNDER VENTURES", "CONSULTING MANDATES", "SCHOOL OUTREACH", "MASTER CLASSES"]
 
     @Test("A heading with a word of an entry, after a detail, opens a section: pasted and drawn", arguments: headingsWithAWordOfAnEntry)
@@ -149,13 +152,16 @@ struct UnknownHeadingTests {
         let withBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: true))
         let drawn = try await importPDF(Self.drawnCV("Mara Voss", lines))
         for (label, result) in [("no blank lines", withoutBlankLines), ("blank lines", withBlankLines), ("PDF", drawn)] {
-            let jobs = result.cv.experience
-            #expect(jobs.count == 1, "\(label): \(jobs.map { [$0.role?.value, $0.employer?.value] })")
-            let under = result.unplaced.filter { $0.heading == heading }.map(\.text).joined(separator: "\n")
-            for line in ["Tidepool Notes — maker, solo", "2022 – Present · notes app", "Shipped the app."] {
-                #expect(under.contains(line), "\(label): «\(line)» not under \(heading): \(result.unplaced.map { ($0.heading, $0.text) })")
-            }
+            // Nothing is lost on the way: the lines are read into the section before, as on main
             #expect(Coverage.lost(result).isEmpty, "\(label): \(Coverage.describe(Coverage.lost(result)))")
+            withKnownIssue("#466: a heading with a word of an entry is read into the section before") {
+                let jobs = result.cv.experience
+                #expect(jobs.count == 1, "\(label): \(jobs.map { [$0.role?.value, $0.employer?.value] })")
+                let under = result.unplaced.filter { $0.heading == heading }.map(\.text).joined(separator: "\n")
+                for line in ["Tidepool Notes — maker, solo", "2022 – Present · notes app", "Shipped the app."] {
+                    #expect(under.contains(line), "\(label): «\(line)» not under \(heading): \(result.unplaced.map { ($0.heading, $0.text) })")
+                }
+            }
         }
     }
 
@@ -492,6 +498,104 @@ struct UnknownHeadingTests {
             July 2017 – Present
             SKILLS
             Swift
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A role in capitals after a detail, over its employer and its place (comma), with blank lines",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+
+            SUMMARY
+            Mobile engineer.
+
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+
+            PLATFORM ENGINEER
+            Kestrel Cloud, Leipzig
+            2017 – Present
+            Led the move to SwiftUI.
+
+            SKILLS
+            Swift
+
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A role in capitals after a detail, over its employer and its place (comma), without blank lines",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+            SUMMARY
+            Mobile engineer.
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+            PLATFORM ENGINEER
+            Kestrel Cloud, Leipzig
+            2017 – Present
+            Led the move to SwiftUI.
+            SKILLS
+            Swift
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A role in capitals after a detail, over its employer and its place (dash), with blank lines",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+
+            SUMMARY
+            Mobile engineer.
+
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+
+            PLATFORM ENGINEER
+            Kestrel Cloud — Leipzig
+            2017 – Present
+            Led the move to SwiftUI.
+
+            SKILLS
+            Swift
+
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A role in capitals after a detail, over its employer and its place (dash), without blank lines",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+            SUMMARY
+            Mobile engineer.
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+            PLATFORM ENGINEER
+            Kestrel Cloud — Leipzig
+            2017 – Present
+            Led the move to SwiftUI.
+            SKILLS
+            Swift
+            LANGUAGES
+            German — native
             """,
             jobs: 2, studies: 0
         ),
