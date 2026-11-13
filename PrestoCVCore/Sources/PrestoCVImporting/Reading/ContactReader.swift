@@ -224,7 +224,7 @@ enum ContactReader {
 
     /// The platforms whose profile a link can be, each by its own domain. A link is a profile only when its host is that
     /// domain or a subdomain of it ("www.github.com", "de.linkedin.com"); any other host is a website: a site on GitHub
-    /// Pages ("tobiasrenn.github.io") and a host that only holds the word ("linkedin.example.org") too (#457).
+    /// Pages ("tobiasrenn.github.io") and a host that only holds the word ("linkedin.example.org") too.
     private static let profileDomains: [(domain: String, kind: ImportedLink.Kind)] = [
         ("linkedin.com", .linkedIn), ("github.com", .gitHub), ("xing.com", .xing),
     ]
@@ -233,6 +233,7 @@ enum ContactReader {
     /// port and without a final dot.
     private static func kind(of link: WebLink) -> ImportedLink.Kind {
         let value = link.value.lowercased()
+        // A WebLink always holds its scheme; a value without one is no profile.
         guard let scheme = value.firstRange(of: "://") else { return .website }
         var host = value[scheme.upperBound...].prefix { !"/?#".contains($0) }
         if let colon = host.firstIndex(of: ":") { host = host[..<colon] }
