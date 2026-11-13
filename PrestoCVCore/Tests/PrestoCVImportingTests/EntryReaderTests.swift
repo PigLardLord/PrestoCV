@@ -961,4 +961,56 @@ struct EntryReaderTests {
         #expect(result.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")" } == jobs, "\(name)")
         #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
     }
+
+    @Test("A name after the dates, whose only words in lower case join it, stays the job's employer", arguments: [
+        ("English", "Analyst — Risk team, London\n2014 – 2017 · Bank of the West of England\n- Built the risk reports.",
+         ["Analyst|Bank of the West of England"]),
+        ("English, second job", headedJob + "Analyst — Risk team, London\n2014 – 2017 · Bank of the West of England\n"
+            + "- Built the risk reports.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Analyst|Bank of the West of England"]),
+        ("German", headedJob + "Analyst — Risikoteam, Leipzig\n2014 – 2017 · Bank für Wirtschaft und Handel\n"
+            + "- Built the risk reports.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Analyst|Bank für Wirtschaft und Handel"]),
+        ("French", headedJob + "Analyst — Risk team, Lyon\n2014 – 2017 · Banque de la Ville de Lyon\n- Built the risk reports.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Analyst|Banque de la Ville de Lyon"]),
+        ("Italian", headedJob + "Mobile Developer — Platform team, Lucca\n2014 – 2017 · Ministero della Salute\n"
+            + "- Built the branch app.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Mobile Developer|Ministero della Salute"]),
+    ] as [(String, String, [String])])
+    func nameAfterTheDates(name: String, text: String, jobs: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEXPERIENCE\n" + text)
+        let read = result.cv.experience.map { "\($0.role?.value ?? "-")|\($0.employer?.value ?? "-")" }
+        #expect(read == jobs, "\(name)")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
+
+    @Test("Education under head lines reads its date lines as before: a degree or a school after the dates keeps its part", arguments: [
+        ("degree after the dates", "Alder University — Department of Physics\n2018 – 2020 · Bachelor of science in physics\n"
+            + "- Studied autonomous navigation.",
+         ["Bachelor of science in physics|Alder University|Department of Physics: Studied autonomous navigation."]),
+        ("degree after the dates, second entry", "Leipzig Vocational Institute — School of Design, Leipzig\n2014 – 2016 · Diploma in graphic design\n"
+            + "- Drew the posters of the school fair.\nAlder University — Department of Physics\n"
+            + "2018 – 2020 · Bachelor of science in physics\n- Studied autonomous navigation.",
+         ["Diploma in graphic design|Leipzig Vocational Institute|Leipzig: School of Design / Drew the posters of the school fair.",
+          "Bachelor of science in physics|Alder University|Department of Physics: Studied autonomous navigation."]),
+        ("school after the dates", "Laurea in Fisica — Ottica quantistica, Torino\n2018 – 2020 · Università degli Studi di Torino\n"
+            + "- Tesi sui laser.",
+         ["Laurea in Fisica|Università degli Studi di Torino|Torino: Ottica quantistica / Tesi sui laser."]),
+        ("school after the dates, second entry", "Diploma di perito — Elettronica, Torino\n2012 – 2017 · Istituto tecnico di Torino\n"
+            + "- Progetto sui sensori.\nLaurea in Fisica — Ottica quantistica, Torino\n2018 – 2020 · Università degli Studi di Torino\n"
+            + "- Tesi sui laser.",
+         ["Diploma di perito|Istituto tecnico di Torino|Torino: Elettronica / Progetto sui sensori.",
+          "Laurea in Fisica|Università degli Studi di Torino|Torino: Ottica quantistica / Tesi sui laser."]),
+    ] as [(String, String, [String])])
+    func educationUnderHeadLines(name: String, text: String, studies: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEDUCATION\n" + text)
+        let read = result.cv.education.map { study in
+            "\(study.degree?.value ?? "-")|\(study.school?.value ?? "-")|\(study.location?.value ?? "-"): "
+                + study.details.map(\.value).joined(separator: " / ")
+        }
+        #expect(read == studies, "\(name)")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
 }

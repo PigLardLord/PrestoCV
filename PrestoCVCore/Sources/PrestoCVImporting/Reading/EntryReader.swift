@@ -69,6 +69,28 @@ enum EntryReader {
         words.filter { $0.first?.isLowercase == true }.count
     }
 
+    /// How many words in lower case are not an article, a preposition or a conjunction: a description has several
+    /// ("Booking tool for a hotel group": tool, hotel, group), a name none ("Bank of the West of England", "Università
+    /// degli Studi di Torino"). A word after an elided article counts by what follows it ("dell'Università" none).
+    static func describingWords(_ words: [Substring]) -> Int {
+        words.filter { word in
+            let rest = word.lastIndex(where: { $0 == "'" || $0 == "’" }).map { word[word.index(after: $0)...] } ?? word
+            return rest.first?.isLowercase == true && !linkingWords.contains(rest.lowercased())
+        }.count
+    }
+
+    /// Articles, prepositions and conjunctions that join the words of a name, in the six languages of the import.
+    private static let linkingWords: Set<String> = [
+        "a", "an", "the", "of", "for", "and", "at", "in", "on", "to", "by", "with", "from", "or",
+        "der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "eines", "einem", "einen", "für", "und",
+        "von", "vom", "zu", "zum", "zur", "im", "am", "bei", "mit", "aus",
+        "le", "la", "les", "de", "du", "un", "une", "et", "à", "au", "aux", "pour", "en", "chez", "sur", "par",
+        "il", "lo", "i", "gli", "uno", "una", "di", "del", "dello", "della", "dei", "degli", "delle", "da", "dal",
+        "dalla", "nel", "nella", "al", "alla", "e", "per", "con", "su", "sul", "sulla", "presso",
+        "el", "los", "las", "y", "para", "por", "o", "os", "as", "um", "uma", "do", "dos", "em", "no", "na",
+        "nos", "nas", "com", "ao", "van", "ten", "ter",
+    ]
+
     static func line(_ block: SourceBlock, cells: [Piece]) -> Line {
         let text = cells.map(\.text).joined(separator: " ")
         let words = text.words
@@ -261,9 +283,9 @@ enum EntryReader {
     /// at a connector only when the words before it are a role the vocabulary knows, so a description such as "Field
     /// service app for retail teams" stays one text and the line above stays the entry's head. When that head names
     /// two parts besides its place, by their words or by their order ("Developer — Kestrel, Leeds"), and the text after
-    /// the dates has words in lower case as a description has ("Booking tool for a hotel group"), that text names no
-    /// role or employer by an organisation's word either; a name ("Northwind Labs") and a role the vocabulary knows
-    /// still read as what they are.
+    /// the dates describes, as "Booking tool for a hotel group" does (`describingWords`), that text names no role or
+    /// employer by an organisation's word either; a name ("Northwind Labs", "Bank of the West of England") and a role
+    /// the vocabulary knows still read as what they are.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
         var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
@@ -281,7 +303,7 @@ enum EntryReader {
                     }
                     let parts = split(piece, kind: kind, onlyAtAKnownRole: true)
                     let knownRole = parts.contains { $0.isMarked && $0.part == .primary && EntryVocabulary.isRole($0.piece.text) }
-                    segments += named < 2 || knownRole || lowerCaseWords(piece.words) < 2 ? parts : parts.map { part in
+                    segments += named < 2 || knownRole || describingWords(piece.words) < 2 ? parts : parts.map { part in
                         part.part == .primary || part.part == .secondary ? Segment(piece: part.piece, part: .unknown, isMarked: false) : part
                     }
                 }
@@ -290,12 +312,14 @@ enum EntryReader {
         return segments
     }
 
-    /// Whether the section puts its first entry's head above its dates: the section does not open with a date, and
-    /// the line right above its first date is no description and names at least two parts, as a head does ("Developer —
-    /// Acme, Leeds"); a lone line there ("Selected roles") introduces the section. Only then is a complete head above a
-    /// date read as that date's own head; in a section that opens with a date, that line ends the entry before (#458).
+    /// Whether the section puts its first entry's head above its dates: a section of jobs that does not open with a
+    /// date, where the line right above its first date is no description and names at least two parts, as a head does
+    /// ("Developer — Acme, Leeds"); a lone line there ("Selected roles") introduces the section. Only then is a complete
+    /// head above a date read as that date's own head; in a section that opens with a date, that line ends the entry
+    /// before (#458). A section of studies reads its date lines as before: a degree or a school after the dates
+    /// ("2018 – 2020 · Bachelor of science in physics" under "Alder University — Department of Physics") is the study's.
     static func headsAboveDates(_ lines: [Line], anchors: [Int], kind: Kind) -> Bool {
-        guard let first = anchors.first, first > 0, !lines[first - 1].isBody else { return false }
+        guard kind == .experience, let first = anchors.first, first > 0, !lines[first - 1].isBody else { return false }
         return segments(of: Draft(head: [lines[first - 1]]), kind: kind).count >= 2
     }
 
