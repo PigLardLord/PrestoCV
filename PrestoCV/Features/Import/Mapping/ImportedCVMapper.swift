@@ -35,6 +35,14 @@ struct ImportedCVMapper {
             }
         }
 
+        // The CV has one website and no place for a study: the rest stays visible, never dropped
+        notImported += person.links.filter { $0.kind == .website }.dropFirst().map(\.address.value.value)
+        for (index, entry) in imported.education.enumerated() {
+            guard let place = entry.location?.value else { continue }
+            items.append(ImportReview.Item(field: .education(index + 1), reason: .placeNotKept, text: place))
+            notImported.append(place)
+        }
+
         let cv = CVModel(
             personalInfo: PersonalInfo(
                 name: person.name?.value ?? "",
