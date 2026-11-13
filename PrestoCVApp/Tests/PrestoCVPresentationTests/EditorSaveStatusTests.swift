@@ -256,6 +256,57 @@ struct EditorSaveStatusTests {
         #expect(editor.saveStatus == .saved)
     }
 
+    @Test("a second Save as a Copy while the first runs returns at once, and one copy is stored")
+    func secondCopyWhileTheFirstRunsMakesNone() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.duplicateGate.close()
+        let first = Task { await editor.saveAsCopy() }
+        await waitUntil("the first copy to wait at the store") { await world.editing.duplicateGate.waiting == 1 }
+        #expect(editor.isReplacing)
+
+        let returned = Returned()
+        let second = Task {
+            await editor.saveAsCopy()
+            returned.value = true
+        }
+        await waitUntil("the second copy returns while the first still waits") { returned.value }
+        #expect(await world.editing.duplicateGate.waiting == 1, "only the first copy reached the store")
+
+        await world.editing.duplicateGate.open()
+        await first.value
+        await second.value
+        await settle()
+        #expect(world.editing.copies.withLock { $0.count } == 1)
+        #expect(editor.saveStatus == .saved)
+        #expect(!editor.isReplacing)
+    }
+
+    @Test("a copy asked for while a reload runs makes none: the reload ends the conflict")
+    func copyWhileAReloadRunsMakesNone() async throws {
+        let world = Editing()
+        let (editor, _) = try await inConflict(world)
+        await world.editing.loadGate.close()
+        let reloading = Task { await editor.reload() }
+        await waitUntil("the read to start") { await world.editing.loadGate.waiting == 1 }
+        #expect(editor.isReplacing)
+
+        let returned = Returned()
+        let copying = Task {
+            await editor.saveAsCopy()
+            returned.value = true
+        }
+        await waitUntil("the copy returns while the reload still reads") { returned.value }
+
+        await world.editing.loadGate.open()
+        await reloading.value
+        await copying.value
+        await settle()
+        #expect(world.editing.copies.withLock { $0.isEmpty })
+        #expect(editor.content.fullName == "Tobias Renn")
+        #expect(editor.saveStatus == .saved)
+    }
+
     @Test("a CV deleted elsewhere says so, and save as copy keeps the text as a new CV")
     func deletedElsewhereOffersSaveAsCopy() async throws {
         let world = Editing()

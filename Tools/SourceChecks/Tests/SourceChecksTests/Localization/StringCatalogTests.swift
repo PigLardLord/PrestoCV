@@ -30,12 +30,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
+                "editor.entry.title.certification": ["fr"],
             ],
             nonKeyLiterals: ["native": "the code of a language level, which ProficiencyPicker words (R13)"],
             valueTypes: [
                 #"shell.numbered \(title) \(number)"#: ValueTypes(["%@", "%lld"], "makeCVList's numbered takes a String and an Int"),
                 #"failed.code \(failure.rawValue)"#: ValueTypes(["%@"], "CompositionFailure's raw value is a String"),
                 #"list.row.saved \(saved)"#: ValueTypes(["%@"], "RelativeDateTimeFormatter gives a String"),
+                #"editor.entry.since \(since)"#: ValueTypes(["%@"], "EntryYears' first year is a String"),
                 #"list.delete.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(row.label)"#: ValueTypes(["%@"], "CVRow's label is a String"),
                 #"list.copy.title \(title)"#: ValueTypes(["%@"], "makeShell's copyTitle takes a String"),
@@ -46,8 +48,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"export.error.too_many_pages \(required) \(pages)"#: ValueTypes(["%lld", "%lld"], "ExportStatus.truncated holds two Ints"),
                 #"export.status.incomplete \(missing)"#: ValueTypes(["%lld"], "ExportStatus.incomplete holds an Int"),
                 #"export.status.text_not_visible \(lines)"#: ValueTypes(["%lld"], "ExportStatus.textNotVisible holds an Int"),
+                #"list.kept.open.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
+                #"list.kept.retry.label \(notice.label)"#: ValueTypes(["%@"], "KeptNotice's label is a String"),
+                #"editor.notice.textTooLong.named \(name)"#: ValueTypes(["%@"], "StatusNotice resolves the field's label to a String"),
                 #"editor.row.delete.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.delete.title \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.delete.title \(removalName)"#: ValueTypes(["%@"], "EntryPage's removalName is a String"),
+                #"editor.row.moveUp.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
             ],
@@ -56,7 +64,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             extraViews: ["PrimaryButton", "ScreenTitle", "LoadingView", "WholeWordsText", "BarButtonLabel"],
             extraArguments: ["title", "message", "code", "retryTitle"],
             // Deny by default: English written anywhere in a view (a ternary, a local, a multiline literal) is not translated.
-            everyLiteralInViews: true))
+            everyLiteralInViews: true,
+            // French typography: the texts of the new app write a space that cannot break before : ; ? ! and inside « ».
+            frenchNoBreakSpaces: true))
 
     static let all = [legacy, next]
 
@@ -103,6 +113,13 @@ struct StringCatalogTests {
         let titleCase = try pair.findings().titleCase
 
         #expect(titleCase.isEmpty, "Texts with capitals of an English title: \(titleCase)")
+    }
+
+    @Test("French texts have a space that cannot break before : ; ? ! » and after «, where the catalog asks for it", arguments: CatalogUnderCheck.all)
+    func frenchSpacesCannotBreak(_ pair: CatalogUnderCheck) throws {
+        let breaking = try pair.findings().breakingSpacesInFrench
+
+        #expect(breaking.isEmpty, "French texts with a space that can break before a mark (write U+00A0): \(breaking)")
     }
 
     @Test("The texts promise no future availability or readiness, in any language", arguments: CatalogUnderCheck.all)

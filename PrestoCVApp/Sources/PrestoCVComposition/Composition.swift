@@ -48,6 +48,9 @@ public final class Composition {
     /// Gives the editing the list uses from the one the screens share. A launch gives it back as it is; in a Debug build a UI
     /// test's fixture wraps it.
     typealias WrapListEditing = @MainActor (any CVEditing) -> any CVEditing
+    /// Gives the store the screens write through from the composition's own. A launch gives it back as it is; in a Debug
+    /// build a UI test's fixture wraps it.
+    typealias WrapStore = @MainActor (any CVRepository) -> any CVRepository
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -80,6 +83,7 @@ public final class Composition {
         /// What a launch does before the folders are made, such as writing the seed of a UI test. It fails with a code.
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
+        let wrapStore: WrapStore
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
@@ -142,7 +146,7 @@ public final class Composition {
             maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
         )
         screens = ScreenFactory(
-            repository: repository, samples: samples, ids: inputs.ids, clock: inputs.clock,
+            repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
             wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
@@ -266,6 +270,7 @@ public final class Composition {
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
         let sharesWithStandIn: Bool
+        let wrapStore: WrapStore
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         #if DEBUG
@@ -300,6 +305,7 @@ public final class Composition {
         }
         wrapListEditing = { fixtures.listEditing($0) }
         sharesWithStandIn = fixtures.sharesWithStandIn
+        wrapStore = { fixtures.store($0) }
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
@@ -308,6 +314,7 @@ public final class Composition {
         prepare = {}
         wrapListEditing = { $0 }
         sharesWithStandIn = false
+        wrapStore = { $0 }
         #endif
         return await make(Inputs(
             paths: paths,
@@ -337,6 +344,7 @@ public final class Composition {
             check: check,
             prepare: prepare,
             wrapListEditing: wrapListEditing,
+            wrapStore: wrapStore,
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn

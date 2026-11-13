@@ -112,6 +112,7 @@ struct ShellEditorOwnershipTests {
         await shell.flushAll()
 
         #expect(shell.editor == nil)
+        #expect(shell.keptEditors.isEmpty, "nothing typed, so nothing to keep")
         #expect(world.editing.writeCount == 0)
     }
 
@@ -137,6 +138,7 @@ struct ShellEditorOwnershipTests {
         #expect(try await world.editing.inStore(cv.id).title == "Design roles")
         await world.editing.gate.open()
         await waitUntil("the editor goes once its write ended") { left == nil }
+        #expect(shell.keptEditors.isEmpty, "a stored editor is not kept")
         let list = await Browsing(editing: world.editing).loadedList()
         #expect(list.rows.map(\.label) == ["Teaching roles"])
     }
@@ -307,5 +309,303 @@ struct ShellEditorOwnershipTests {
         let stored = try await world.editing.inStore(id)
         #expect(stored.personal.fullName == "Tobias Renn-Okafor")
         #expect(stored.personal.professionalTitle == "Teacher")
+    }
+
+    // MARK: Kept after leaving
+
+    @Test("a write that fails after the person left keeps the editor, and opening the CV again gets it back with the text")
+    func failedLeaveWriteKeepsTheEditor() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let reference = CVReference(id: cv.id)
+        let shell = world.shell()
+        shell.open(.stored(reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        editor.type(\.fullName, "Mara Ellison-Reyes")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        #expect(shell.deselect() == .left, "leaving never waits for the store")
+        await waitUntil("the failed editor is kept") { shell.keptEditors.count == 1 }
+
+        let kept = try #require(shell.keptEditors.first)
+        #expect(kept.reference == reference)
+        #expect(kept.status == .failed)
+        #expect(kept.canRetry)
+        #expect(shell.open(.stored(reference)) == .left)
+        #expect(shell.editor === editor, "the kept editor opens, with nothing typed dropped")
+        #expect(editor.content.fullName == "Mara Ellison-Reyes")
+        #expect(shell.keptEditors.isEmpty, "an editor open again is no longer kept")
+    }
+
+    @Test("the scene going to the background tries the kept editors again, and an editor stored then is no longer kept")
+    func flushAllRetriesTheKeptEditors() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        editor.type(\.fullName, "Mara Ellison-Reyes")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+        shell.deselect()
+        await waitUntil("the failed editor is kept") { shell.keptEditors.count == 1 }
+
+        await shell.flushAll()
+
+        #expect(await world.storedName(of: cv) == "Mara Ellison-Reyes")
+        #expect(shell.keptEditors.isEmpty)
+    }
+
+    @Test("Retry on a kept editor stores its text, and the editor is no longer kept")
+    func retryKeptStoresTheText() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        editor.type(\.fullName, "Mara Ellison-Reyes")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+        shell.deselect()
+        await waitUntil("the failed editor is kept") { shell.keptEditors.count == 1 }
+        let kept = try #require(shell.keptEditors.first)
+
+        await shell.retryKept(kept.id)
+
+        #expect(await world.storedName(of: cv) == "Mara Ellison-Reyes")
+        #expect(shell.keptEditors.isEmpty)
+        #expect(shell.editor == nil, "Retry stores the text without opening the CV")
+    }
+
+    @Test("a field that cannot be read keeps the editor once left, because its text exists only there; the notice names the field")
+    func unreadableFieldKeepsTheEditor() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let reference = CVReference(id: cv.id)
+        let shell = world.shell()
+        shell.open(.stored(reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        editor.type(\.email, "mara at example")
+
+        #expect(shell.deselect() == .left)
+        await waitUntil("the editor with the unreadable field is kept") { shell.keptEditors.count == 1 }
+
+        let kept = try #require(shell.keptEditors.first)
+        #expect(kept.reference == reference)
+        #expect(kept.status == .unreadable(.email))
+        #expect(!kept.canRetry, "no write stores a field that cannot be read: the person corrects it in the editor")
+        shell.open(.stored(reference))
+        #expect(shell.editor === editor)
+        #expect(editor.content.email == "mara at example")
+    }
+
+    @Test("a draft whose first write failed is kept with no row, and opening it brings the draft back as it was")
+    func openKeptDraft() async throws {
+        let world = Editing()
+        let shell = world.shell()
+        shell.open(.blank)
+        let draft = try #require(shell.editor)
+        await draft.load()
+        draft.type(\.fullName, "Tobias Renn")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        shell.deselect()
+        await waitUntil("the failed draft is kept") { shell.keptEditors.count == 1 }
+
+        let kept = try #require(shell.keptEditors.first)
+        #expect(kept.reference == nil, "the draft stored no CV")
+        #expect(shell.openKept(kept.id) == .left)
+        #expect(shell.editor === draft)
+        if case .blank? = shell.detail {} else { Issue.record("the detail shows the draft again, not \(String(describing: shell.detail))") }
+        #expect(shell.selection == nil)
+        #expect(shell.keptEditors.isEmpty)
+    }
+
+    @Test("on a first run, a draft whose first write failed shows the split view, where its notice and Open and Retry are")
+    func keptFirstRunDraftShowsTheSplit() async throws {
+        let world = Editing()
+        let shell = world.shell()
+        shell.open(.blank)
+        let draft = try #require(shell.editor)
+        await draft.load()
+        draft.type(\.fullName, "Tobias Renn")
+        world.editing.writeErrors.withLock { $0 = [EditFailure.unavailable] }
+
+        shell.deselect()
+        await waitUntil("the failed draft is kept") { shell.keptEditors.count == 1 }
+
+        #expect(shell.detail == nil, "the draft is closed")
+        #expect(shell.screen(for: .firstRun) == .split, "the welcome has no notice: the draft would look lost")
+        #expect(shell.screen(for: .loading) == .split, "a reload of the first run does not hide the notice either")
+    }
+
+    @Test("opening a kept editor while the open one cannot be left stays, and keeps both")
+    func openKeptStaysWhileBlocked() async throws {
+        let world = Editing()
+        let first = try await world.storedCV()
+        let second = try await world.editing.stored(title: "Teaching roles", fullName: "Tobias Renn", language: "en")
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: first.id)))
+        let left = try #require(shell.editor)
+        await left.load()
+        left.type(\.email, "mara at example")
+        shell.open(.stored(CVReference(id: second.id)))
+        await waitUntil("the first editor is kept") { shell.keptEditors.count == 1 }
+        let open = try #require(shell.editor)
+        await open.load()
+        open.type(\.summary, String(repeating: "a", count: CVLimits.maxTextCharacters + 1))
+        let kept = try #require(shell.keptEditors.first)
+
+        #expect(shell.openKept(kept.id) == .stayed(.textTooLong(.summary)))
+        #expect(shell.editor === open)
+        #expect(shell.keptEditors.map(\.id) == [kept.id])
+    }
+
+    // MARK: Discarding
+
+    @Test("a CV deleted elsewhere is discarded on the person's word: the detail shows nothing, and nothing is written")
+    func discardAfterDeletedElsewhereClearsTheEditor() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+        let writes = world.editing.writeCount
+
+        shell.discardEditor()
+        await shell.flushAll()
+
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+        #expect(shell.preferredColumn == .sidebar)
+        #expect(shell.canLeave)
+        #expect(world.editing.writeCount == writes, "nothing the person discarded is written")
+        #expect(await world.storedName(of: cv) == nil, "the CV stays deleted")
+    }
+
+    @Test("Discard is refused while a copy runs: the editor stays, and its copy is stored once")
+    func discardWhileACopyRunsIsRefused() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+        await world.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy is held at the store's door") { await world.editing.duplicateGate.waiting == 1 }
+        #expect(editor.isReplacing)
+
+        shell.discardEditor()
+
+        #expect(shell.editor === editor, "the editor whose copy runs stays")
+        #expect(shell.detail != nil)
+        await world.editing.duplicateGate.open()
+        await copying.value
+        #expect(editor.saveStatus == .saved)
+        #expect(!editor.isReplacing)
+        #expect(world.editing.copies.withLock { $0.count } == 1)
+    }
+
+    @Test("Discard does nothing unless the CV was deleted elsewhere: the editor and its text stay", arguments: LeaveVerdictTests.Case.allCases.filter { $0 != .deletedElsewhere })
+    func discardIsRefusedUnlessDeletedElsewhere(_ given: LeaveVerdictTests.Case) async throws {
+        let world = Editing()
+        let shell = world.shell()
+        let editor = try await given.reach(in: world, shell)
+        #expect(editor.saveStatus == given.status)
+
+        shell.discardEditor()
+
+        #expect(shell.editor === editor, "only a CV deleted elsewhere, or one that could not be opened, is discarded")
+        #expect(shell.detail != nil)
+        await world.editing.gate.open()
+    }
+
+    @Test("a CV that is gone, or could not be opened, is closed on the person's word: the detail shows nothing")
+    func discardClosesAnOpeningThatFailed() async throws {
+        let world = Editing()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: world.editing.ids.next())))
+        let missing = try #require(shell.editor)
+        await missing.load()
+        #expect(missing.opening == .missing)
+        shell.discardEditor()
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+
+        let cv = try await world.storedCV()
+        world.editing.loadErrors.withLock { $0 = [.unavailable] }
+        shell.open(.stored(CVReference(id: cv.id)))
+        let failed = try #require(shell.editor)
+        await failed.load()
+        #expect(failed.opening == .failed)
+        shell.discardEditor()
+        #expect(shell.editor == nil)
+        #expect(shell.detail == nil)
+        #expect(world.editing.writeCount == 0)
+    }
+
+    // MARK: Saving as a copy
+
+    @Test("after a copy of a CV deleted elsewhere, the shell holds the copy: the list's reload keeps it open and selected")
+    func copyOfADeletedCVStaysOpen() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        shell.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.store.delete(cv.id, revision: cv.revision)
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .deletedElsewhere)
+
+        await editor.saveAsCopy()
+        let copy = try #require(editor.storedReference)
+        let list = await Browsing(editing: world.editing).loadedList()
+        shell.reconcile(with: list.rows)
+
+        #expect(copy != CVReference(id: cv.id))
+        #expect(list.rows.map(\.reference) == [copy])
+        #expect(shell.editor === editor, "the copy stays open")
+        #expect(shell.selection == copy)
+        #expect(shell.selectedRow(in: list.rows)?.reference == copy)
+        #expect(shell.canLeave)
+    }
+
+    @Test("after a copy of a CV changed elsewhere, the copy is selected, and opening the CV it was copied from opens that CV")
+    func copyOfAConflictingCVIsSelected() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let shell = world.shell()
+        let original = CVReference(id: cv.id)
+        shell.open(.stored(original))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        try await world.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+        editor.type(\.fullName, "Mara Ellison-Renn")
+        await editor.saveNow()
+        #expect(editor.saveStatus == .conflict)
+
+        await editor.saveAsCopy()
+        let copy = try #require(editor.storedReference)
+
+        #expect(shell.selection == copy)
+        #expect(shell.open(.stored(copy)) == .left)
+        #expect(shell.editor === editor, "opening the copy that is open changes nothing")
+        #expect(shell.open(.stored(original)) == .left)
+        #expect(shell.editor !== editor, "the CV copied from opens in an editor of its own")
+        #expect(shell.selection == original)
     }
 }

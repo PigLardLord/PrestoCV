@@ -218,6 +218,71 @@ struct ShellNavigationModelTests {
         #expect(shell.selection == nil)
     }
 
+    @Test("Going back from a row's page keeps the open CV: the sidebar comes before the page closes")
+    func backFromARowsPageKeepsTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        editor.closeEntry()
+
+        #expect(shell.selection == world.first.reference)
+        #expect(shell.editor === editor)
+        #expect(shell.preferredColumn == .detail)
+
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+
+        #expect(shell.selection == nil, "once the page is closed, the sidebar is the person going back to the list")
+    }
+
+    @Test("Going to the list from a row's page by the back button's menu closes the open CV once the list clears it")
+    func menuJumpFromARowsPageClosesTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        // On iOS 27.0 the pop to the root writes the column and closes the page at once: the column is read while the
+        // page is open
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        editor.closeEntry()
+        #expect(shell.selection == world.first.reference)
+
+        // The list's own write of its selection, about half a second later
+        shell.deselect()
+
+        #expect(shell.selection == nil)
+        #expect(shell.preferredColumn == .sidebar)
+    }
+
+    @Test("The back button's menu closes the open CV when the list clears it before the page closes")
+    func menuJumpClearingTheListBeforeThePageClosesTheCV() async throws {
+        let world = try await Self.world()
+        let shell = Self.shell()
+        shell.open(.stored(world.first.reference))
+        let editor = try #require(shell.editor)
+        editor.layoutChanged(isNarrow: true)
+        editor.addRow(to: .experiences)
+        try #require(editor.openedEntry != nil)
+
+        // On iOS 26.5 the pop to the root writes the column, then the list's selection, then closes the page, at once
+        shell.columnChanged(to: .sidebar, isCollapsed: true)
+        shell.deselect()
+        editor.closeEntry()
+
+        #expect(shell.selection == nil)
+        #expect(shell.editor == nil)
+        #expect(shell.preferredColumn == .sidebar)
+    }
+
     @Test("The sidebar the system writes while the split view changes its size class keeps the open CV")
     func sidebarWhileNotCollapsedKeepsTheSelection() async throws {
         let world = try await Self.world()

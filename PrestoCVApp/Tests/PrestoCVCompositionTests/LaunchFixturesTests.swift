@@ -141,6 +141,30 @@ struct LaunchFixturesTests {
         #expect(!(try LaunchFixtures.parse([Self.program])).sharesWithStandIn)
     }
 
+    @Test("What the other window does to the open CV is read, with a folder of its own", arguments: LaunchFixtures.OtherWindow.allCases)
+    func otherWindow(_ change: LaunchFixtures.OtherWindow) throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextOtherWindow", change.rawValue])
+        #expect(fixtures.otherWindow == change)
+        #expect(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage"]).otherWindow == nil)
+    }
+
+    @Test("A change of the other window that is none, or is missing, is a failure of the launch")
+    func unreadableOtherWindow() {
+        #expect(throws: LaunchFixtures.Failure.unreadableOtherWindow) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextOtherWindow", "elsewhere"])
+        }
+        #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextOtherWindow")) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextOtherWindow"])
+        }
+    }
+
+    @Test("The other window changes a CV only in a folder of the fixture: never on the device storage")
+    func otherWindowWithoutFolder() {
+        #expect(throws: LaunchFixtures.Failure.otherWindowWithoutFolder) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextOtherWindow", "conflict"])
+        }
+    }
+
     // MARK: Where the fixtures put the files
 
     private static let device = AppPaths(

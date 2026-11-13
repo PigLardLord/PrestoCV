@@ -15,7 +15,7 @@ public enum FieldInput: Hashable, Sendable, CaseIterable {
     case phone
     /// A web address: no capitals, no correction.
     case webAddress
-    /// A year or a period, such as "2019 - 2023".
+    /// The year of a date, such as "2019": digits only.
     case year
     /// Text written as it is, with no correction and no capitals: tools, skills, platforms.
     case plain

@@ -174,8 +174,8 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
 
         XCTAssertEqual(firstOf("firstRun.title", "start.examples", in: app), "start.examples")
-        XCTAssertTrue(examples.isHittable)
-        XCTAssertTrue(app.buttons["start.blank"].isHittable)
+        XCTAssertTrue(examples.canBeTapped(in: app))
+        XCTAssertTrue(app.buttons["start.blank"].canBeTapped(in: app))
     }
 
     /// In compact height, an iPhone turned on its side, the ways to start come first and can be tapped without scrolling.
@@ -186,13 +186,14 @@ final class FirstRunUITests: XCTestCase {
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
         try XCTSkipUnless(isCompact(app), "Only an iPhone has a compact height on its side")
 
-        XCUIDevice.shared.orientation = .landscapeLeft
+        let turned = try app.turnsToLandscape()
+        XCTAssertTrue(turned, "The first run turns with the device, as Safari does")
 
         XCTAssertTrue(examples.waitForExistence(timeout: 30))
         XCTAssertEqual(app.windows.firstMatch.verticalSizeClass, .compact, "The iPhone turned")
         XCTAssertEqual(firstOf("firstRun.title", "start.examples", in: app), "start.examples")
-        XCTAssertTrue(examples.isHittable)
-        XCTAssertTrue(app.buttons["start.blank"].isHittable)
+        XCTAssertTrue(examples.canBeTapped(in: app))
+        XCTAssertTrue(app.buttons["start.blank"].canBeTapped(in: app))
     }
 
     // MARK: A regular screen
@@ -202,7 +203,9 @@ final class FirstRunUITests: XCTestCase {
     @MainActor
     func testTheWelcomeIsCentredAndReadableOnARegularScreen() throws {
         let app = try launch()
-        let title = element("firstRun.title", in: app)
+        // Read by type: on iOS 26.5 XCUITest also lists the hidden words that WholeWordsText measures, as Other
+        // elements with the title's identifier and no frame
+        let title = app.staticTexts["firstRun.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 30))
         try XCTSkipIf(isCompact(app), "A compact screen is narrower than the readable width")
 

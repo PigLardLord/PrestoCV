@@ -51,7 +51,8 @@ extension EditorContent {
         return cv
     }
 
-    /// The fields whose text is not blank and cannot be read as its kind, each with its row, in the form's order.
+    /// The fields that cannot be stored, each with its row and why, in the form's order: text that is not blank and
+    /// cannot be read as its kind, a period whose end comes before its start.
     var unreadable: [FieldProblem] {
         let readings: [(EditorField, String, Bool)] = [
             (.email, email, EmailAddress(email) != nil),
@@ -60,13 +61,20 @@ extension EditorContent {
         ]
         let personal = readings.filter { _, text, isRead in !isRead && !text.isBlank }
             .map { field, _, _ in FieldProblem(row: nil, field: field, code: .unreadable) }
-        return personal + unreadable(on: experiences, \.unreadableFields) + unreadable(on: education, \.unreadableFields)
+        return personal
+            + problems(on: experiences, \.period, .experiencePeriod) + problems(on: education, \.period, .educationPeriod)
             + unreadable(on: skills, \.unreadableFields) + unreadable(on: languages, \.unreadableFields)
             + unreadable(on: certifications, \.unreadableFields) + unreadable(on: profiles, \.unreadableFields)
     }
 
     private func unreadable<Row: EditorRow>(on rows: [Row], _ fields: (Row) -> [EditorField]) -> [FieldProblem] {
         rows.flatMap { row in fields(row).map { FieldProblem(row: row.id, field: $0, code: .unreadable) } }
+    }
+
+    private func problems<Row: EditorRow>(
+        on rows: [Row], _ period: (Row) -> PeriodParts, _ field: EditorField
+    ) -> [FieldProblem] {
+        rows.compactMap { row in period(row).problem.map { FieldProblem(row: row.id, field: field, code: $0) } }
     }
 
     /// Whether the row of `section` with `id` has nothing in it. A row that is not there has nothing either.
@@ -104,13 +112,15 @@ extension EditorContent {
         }
     }
 
+    /// Adds an empty row with `id`: a job, a study or a certification first, as a CV lists the newest first (#32); any
+    /// other row last.
     mutating func addRow(to section: EditorSection, id: RowID) {
         switch section {
-        case .experiences: experiences.append(ExperienceRow.blank(id: id))
-        case .education: education.append(EducationRow.blank(id: id))
+        case .experiences: experiences.insert(ExperienceRow.blank(id: id), at: 0)
+        case .education: education.insert(EducationRow.blank(id: id), at: 0)
         case .skills: skills.append(SkillRow.blank(id: id))
         case .languages: languages.append(LanguageRow.blank(id: id))
-        case .certifications: certifications.append(CertificationRow.blank(id: id))
+        case .certifications: certifications.insert(CertificationRow.blank(id: id), at: 0)
         case .profiles: profiles.append(ProfileRow.blank(id: id))
         case .interests: interests.append(InterestRow(id: id, text: ""))
         }
@@ -146,61 +156,39 @@ extension InterestRow: EditorRow {
 
 extension ExperienceRow: EditorRow {
     static func blank(id: RowID) -> ExperienceRow {
-        ExperienceRow(id: id, role: "", company: "", location: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+        ExperienceRow(id: id, role: "", company: "", location: "", period: .none, description: "")
     }
 
     init(_ entry: Experience, id: RowID) {
         self.init(
-            id: id, role: entry.role, company: entry.company, location: entry.location, periodStart: entry.period?.startText ?? "",
-            periodEnd: entry.period?.endText ?? "", isCurrent: entry.period?.isCurrent ?? false, description: entry.description
+            id: id, role: entry.role, company: entry.company, location: entry.location, period: PeriodParts(entry.period),
+            description: entry.description
         )
     }
 
     var entry: Experience {
-        Experience(role: role, company: company, location: location,
-                   period: readPeriod(periodStart, periodEnd, isCurrent), description: description)
+        Experience(role: role, company: company, location: location, period: period.stored, description: description)
     }
 
-    var isBlank: Bool {
-        [role, company, location, periodStart, periodEnd, description].allSatisfy(\.isBlank) && !isCurrent
-    }
-
-    var unreadableFields: [EditorField] { periodIsReadable(periodStart, periodEnd, isCurrent) ? [] : [.experiencePeriod] }
+    var isBlank: Bool { [role, company, location, description].allSatisfy(\.isBlank) && period.isBlank }
 }
 
 extension EducationRow: EditorRow {
     static func blank(id: RowID) -> EducationRow {
-        EducationRow(id: id, degree: "", school: "", periodStart: "", periodEnd: "", isCurrent: false, description: "")
+        EducationRow(id: id, degree: "", school: "", period: .none, description: "")
     }
 
     init(_ entry: Education, id: RowID) {
         self.init(
-            id: id, degree: entry.degree, school: entry.school, periodStart: entry.period?.startText ?? "",
-            periodEnd: entry.period?.endText ?? "", isCurrent: entry.period?.isCurrent ?? false, description: entry.description
+            id: id, degree: entry.degree, school: entry.school, period: PeriodParts(entry.period), description: entry.description
         )
     }
 
     var entry: Education {
-        Education(degree: degree, school: school, period: readPeriod(periodStart, periodEnd, isCurrent), description: description)
+        Education(degree: degree, school: school, period: period.stored, description: description)
     }
 
-    var isBlank: Bool { [degree, school, periodStart, periodEnd, description].allSatisfy(\.isBlank) && !isCurrent }
-
-    var unreadableFields: [EditorField] { periodIsReadable(periodStart, periodEnd, isCurrent) ? [] : [.educationPeriod] }
-}
-
-/// The period the domain reads from the text, or nil when there is none or it cannot read it (`periodIsReadable` tells which).
-private func readPeriod(_ start: String, _ end: String, _ current: Bool) -> Period? {
-    do {
-        return try Period.reading(start: start, end: end, current: current)
-    } catch {
-        return nil
-    }
-}
-
-/// Whether the domain can read the period, or there is none to read.
-private func periodIsReadable(_ start: String, _ end: String, _ current: Bool) -> Bool {
-    readPeriod(start, end, current) != nil || (start.isBlank && end.isBlank && !current)
+    var isBlank: Bool { [degree, school, description].allSatisfy(\.isBlank) && period.isBlank }
 }
 
 extension SkillRow: EditorRow {
@@ -234,24 +222,27 @@ extension LanguageRow: EditorRow {
 
 extension CertificationRow: EditorRow {
     static func blank(id: RowID) -> CertificationRow {
-        CertificationRow(id: id, name: "", issuer: "", issued: "", link: "", description: "")
+        CertificationRow(id: id, name: "", issuer: "", issued: .none, link: "", description: "")
     }
 
     init(_ entry: Certification, id: RowID) {
         self.init(
-            id: id, name: entry.name, issuer: entry.issuer, issued: entry.issued?.text ?? "", link: entry.link?.value ?? "",
-            description: entry.description
+            id: id, name: entry.name, issuer: entry.issuer, issued: DateParts(text: entry.issued?.text ?? ""),
+            link: entry.link?.value ?? "", description: entry.description
         )
     }
 
     var entry: Certification {
-        Certification(name: name, issuer: issuer, issued: PartialDate(reading: issued), link: WebLink(link), description: description)
+        Certification(
+            name: name, issuer: issuer, issued: issued.text.flatMap(PartialDate.init(reading:)), link: WebLink(link),
+            description: description
+        )
     }
 
-    var isBlank: Bool { [name, issuer, issued, link, description].allSatisfy(\.isBlank) }
+    var isBlank: Bool { [name, issuer, link, description].allSatisfy(\.isBlank) && issued.isBlank }
 
     var unreadableFields: [EditorField] {
-        (PartialDate(reading: issued) == nil && !issued.isBlank ? [.certificationIssued] : [])
+        (issued.text == nil ? [.certificationIssued] : [])
             + (WebLink(link) == nil && !link.isBlank ? [.certificationLink] : [])
     }
 }

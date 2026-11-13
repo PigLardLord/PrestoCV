@@ -36,7 +36,12 @@ struct ShellView: View {
 
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
-            CVListView(list: list, firstRun: firstRun, selection: selection, choose: start)
+            CVListView(
+                list: list, firstRun: firstRun, selection: selection, choose: start,
+                kept: list.keptNotices(shell.keptEditors),
+                retryKept: { id in Task { await shell.retryKept(id) } },
+                openKept: { id in _ = shell.openKept(id) }
+            )
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
@@ -44,7 +49,10 @@ struct ShellView: View {
                     }
                 }
         } detail: {
-            detail
+            // A destination pushes only inside a stack: in a detail column without one, it replaces the column
+            NavigationStack {
+                detail
+            }
         }
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
@@ -69,12 +77,14 @@ struct ShellView: View {
         )
     }
 
-    /// The open CV's editor, a new one for each CV opened. While its text cannot be stored, Back is hidden (which also
-    /// stops the swipe), so the person answers the status first.
+    /// The open CV's editor, a new one for each CV opened, at the root of the detail's stack, so the page of a row opens
+    /// on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person answers
+    /// the status first: the notice above the form offers the ways out, and "Discard" closes the editor without storing
+    /// its text.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor), export: { shell.openExport() })
+            EditorView(editor: editor, title: title(of: editor), export: { shell.openExport() }, discard: { shell.discardEditor() })
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
         } else {

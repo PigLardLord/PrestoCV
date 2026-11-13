@@ -23,19 +23,39 @@ public final class EditorViewModel {
     public internal(set) var pendingRemoval: RowRemoval?
     /// The row just added, which the view focuses and scrolls into view, then reports with `rowWasShown()`.
     public internal(set) var addedRow: RowID?
+    /// The row open on a page of its own where the screen is narrow, which the view shows over the form; nil while the
+    /// form shows every row in place.
+    public internal(set) var openedEntry: EditorEntry?
+    /// Whether the screen is narrow (an iPhone), where a row with several fields opens on a page of its own.
+    var isNarrow = false
 
     public private(set) var opening: OpeningStatus = .opening
+    /// A reload, a copy or a change of the look runs, which replaces the CV the form stands on: the notice's ways on wait
+    /// until it ends.
+    public private(set) var isReplacing = false
     /// Nothing is open yet: the store is being read.
     public internal(set) var saveStatus: SaveStatus = .saving
 
-    /// The status the person is told of as it changes (VoiceOver), in words the view picks from the code: nil until the
-    /// status settles somewhere other than where it stood when the CV opened. Typing and the autosave's writes
-    /// (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure, and the save
-    /// after one or the first save of a new CV, each change it.
-    public private(set) var statusChange: SaveStatus?
+    /// What VoiceOver is still to tell of the changes (`EditorAnnouncement`): nil until the status settles somewhere other
+    /// than where it stood when the CV opened, or a problem is met, and again once the view told it all. Typing and the
+    /// autosave's writes (`pending`, `saving`) settle nowhere, so a save that went well tells nothing; a problem, a failure,
+    /// and the save after one or the first save of a new CV, each do. The status names only the first problem, so every
+    /// other one met at the same moment (a store attempt meets every problem at once), and one met while the status names
+    /// another, is told after it by its note. Each problem met is told once.
+    public internal(set) var announcement: EditorAnnouncement?
 
     /// "Saved on this device": the store holds what the form shows, and nothing waits.
     public var isSavedOnThisDevice: Bool { saveStatus == .saved }
+
+    /// Whether the editor may be dropped with its text on the person's word (`ShellNavigationModel.discardEditor()`): the CV
+    /// could not be opened, or another window deleted it and no copy runs, which could store the text meanwhile.
+    var canBeDiscarded: Bool {
+        switch opening {
+        case .missing, .failed: true
+        case .opening: false
+        case .open: saveStatus == .deletedElsewhere && !isReplacing
+        }
+    }
 
     /// The tag of the language the document is written in, or nil when the CV says none.
     public var documentLanguage: String? { held?.language?.tag }
@@ -50,7 +70,7 @@ public final class EditorViewModel {
     let clock: any Clock<Duration>
     let pause: Duration
     let copyTitle: @MainActor (String) -> String
-    let didStore: @MainActor () -> Void
+    let storeChanged: @MainActor () -> Void
 
     /// The form as typed.
     var form = EditorContent.empty {
@@ -85,8 +105,10 @@ public final class EditorViewModel {
     @ObservationIgnored var changeFailure: SaveStatus?
     /// The last replacement queued: a reload or a copy, which replaces the CV the form stands on, or a change of the
     /// look or the language. Each one runs after the one asked for before it. Edits made meanwhile wait for the last
-    /// one, and are written after it.
-    @ObservationIgnored var replacing: Task<Void, Never>?
+    /// one, and are written after it. `isReplacing` follows it.
+    @ObservationIgnored var replacing: Task<Void, Never>? {
+        didSet { isReplacing = replacing != nil }
+    }
     /// Counts the replacements asked for, so that only the last one queued clears the way (`replacing`).
     @ObservationIgnored var replacements = 0
     /// Counts the autosaves, so that one replaced cannot change the status any more.
@@ -98,26 +120,37 @@ public final class EditorViewModel {
     @ObservationIgnored var formEdits = 0
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
-    /// Where the status last settled (`statusChange`), nil until the CV opened.
+    /// The change elsewhere the maker was last told of (`storeChanged`), nil since the form stood on its CV: it is told
+    /// once each time the editor learns it, not again while it stays.
+    @ObservationIgnored var toldChangedElsewhere: SaveStatus?
+    /// Where the status last settled, nil until the CV opened.
     @ObservationIgnored var settled: SaveStatus?
+    /// Where the status settled that the view has not told yet.
+    @ObservationIgnored var statusToTell: SaveStatus?
+    /// The problems met that the view has not told yet.
+    @ObservationIgnored var problemsToTell = Set<FieldProblem>()
+    /// Counts the announcements, so that the view's report of an older one is told apart.
+    @ObservationIgnored var announcements = 0
 
     /// - Parameters:
     ///   - start: What to open. Nothing is read until `load()`.
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
-    ///   - didStore: Called after each write the store took, never for one that failed, so that what shows the stored
-    ///     CVs can read them again. It is called even when the editor is gone by then.
+    ///   - storeChanged: Called when the store changed, so that what shows the stored CVs can read them again: after each
+    ///     write the store took, a copy saved included, and when a write, a reload or a copy found that another save or a
+    ///     deletion changed the CV, once each time the editor learns it. Never for a write that failed otherwise. It is
+    ///     called even when the editor is gone by then.
     public init(
         start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
-        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, didStore: @escaping @MainActor () -> Void
+        pause: Duration, copyTitle: @escaping @MainActor (String) -> String, storeChanged: @escaping @MainActor () -> Void
     ) {
         self.start = start
         self.editing = editing
         self.clock = clock
         self.pause = pause
         self.copyTitle = copyTitle
-        self.didStore = didStore
+        self.storeChanged = storeChanged
     }
 
     /// Opens the CV. The view calls it from its `.task`; once the CV is open, it does nothing.
@@ -144,6 +177,7 @@ public final class EditorViewModel {
         guard autosave == nil else { return }
         form = admit(EditorContent(cv, ids: &rowIDs))
         pendingRemoval = nil
+        openedEntry = nil
         standOn(cv, unchangedFrom: unchanged, writer: editing.autosaveWriter(startingFrom: stored), isStored: stored != nil)
         opening = .open
     }
@@ -161,9 +195,11 @@ public final class EditorViewModel {
 
     /// `content` with unique row ids, the one place every entry of rows into the form passes through. The row waiting for its
     /// removal is named by its id: if that id arrives on more than one row, or on none, the rows cannot be told apart, so the
-    /// request is withdrawn and nothing is removed.
+    /// request is withdrawn and nothing is removed. The row open on its page is named by its id too: the page closes
+    /// when its row goes, leaves its section, or cannot be told apart from another.
     func admit(_ content: EditorContent) -> EditorContent {
         if let request = pendingRemoval, content.rowCount(withID: request.row) != 1 { pendingRemoval = nil }
+        if let entry = openedEntry, !content.holdsOnce(entry) { openedEntry = nil }
         return rowIDs.unique(content)
     }
 
@@ -182,7 +218,7 @@ public final class EditorViewModel {
         let mine = generation
         writes.replace()
         let mineWrites = WritesInFlight()
-        let didStore = self.didStore
+        let storeChanged = self.storeChanged
         let autosave = Autosave<CV>(
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
@@ -191,7 +227,7 @@ public final class EditorViewModel {
             // and still tells it
             write: { content, _ in
                 try await mineWrites.run { try await writer.write(content) }
-                didStore()
+                storeChanged()
             }
         )
         autosave.onStatusChange = { [weak self] status in self?.autosaveChanged(to: status, generation: mine) }
@@ -203,6 +239,7 @@ public final class EditorViewModel {
         given = cv
         failure = nil
         changeFailure = nil
+        toldChangedElsewhere = nil
         refreshSaveStatus()
     }
 
@@ -210,22 +247,43 @@ public final class EditorViewModel {
 
     private func writeFailed(_ error: any Error, generation: Int) {
         guard generation == self.generation else { return }
-        failure = (error as? EditFailure).map { SaveStatus($0) } ?? .failed
+        failed(with: (error as? EditFailure).map { SaveStatus($0) } ?? .failed)
         refreshSaveStatus()
+    }
+
+    /// A write, a reload or a copy failed with `status`, which the editor shows until a write succeeds. When it says that
+    /// another save or a deletion changed the CV, the maker is told the store changed, unless it was told so already.
+    func failed(with status: SaveStatus) {
+        failure = status
+        guard status.saysTheCVChangedElsewhere, status != toldChangedElsewhere else { return }
+        toldChangedElsewhere = status
+        storeChanged()
     }
 
     private func autosaveChanged(to status: Autosave<CV>.Status, generation: Int) {
         guard generation == self.generation else { return }
-        if !status.hasUnresolvedFailure { failure = nil }
+        if !status.hasUnresolvedFailure {
+            // Nothing is left to retry: a change elsewhere found by a later write is news again
+            failure = nil
+            toldChangedElsewhere = nil
+        }
         refreshSaveStatus()
     }
 
+    /// Brings the status up to date, and tells the person where it settled when it moved (`announcement`).
     func refreshSaveStatus() {
+        tell(status: settleSaveStatus())
+    }
+
+    /// Brings `saveStatus` up to date. Returns the status it settled on when that is news: not typing or the autosave's
+    /// writes (`pending`, `saving`), which settle nowhere, nor where it stood when the CV opened.
+    func settleSaveStatus() -> SaveStatus? {
         let status = currentSaveStatus()
         if status != saveStatus { saveStatus = status }
-        guard status != .pending, status != .saving, status != settled else { return }
-        if settled != nil { statusChange = status }
+        guard status != .pending, status != .saving, status != settled else { return nil }
+        let isNews = settled != nil
         settled = status
+        return isNews ? status : nil
     }
 
     private func currentSaveStatus() -> SaveStatus {

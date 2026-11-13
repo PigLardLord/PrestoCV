@@ -44,7 +44,7 @@ struct ScreenFactoryTests {
     }
 
     private static func editor(_ fixture: Fixture, _ start: EditorStart) -> EditorViewModel {
-        fixture.composition.screens.makeEditor(start: start, copyTitle: { "Copy of \($0)" }, didStore: {})
+        fixture.composition.screens.makeEditor(start: start, copyTitle: { "Copy of \($0)" }, storeChanged: {})
     }
 
     private static func store(_ fixture: Fixture) -> [String] {
@@ -348,13 +348,13 @@ struct ScreenFactoryTests {
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
-        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
         Self.typed(first, title: "First")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
-        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await second.load()
         Self.typed(second, title: "Second")
 
@@ -375,10 +375,10 @@ struct ScreenFactoryTests {
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
-        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
         Self.typed(first, title: "First")
-        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await second.load()
         Self.typed(second, title: "Second")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
@@ -408,7 +408,7 @@ struct ScreenFactoryTests {
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
         )
-        let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
         Self.typed(editor, title: "First")
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
@@ -446,7 +446,7 @@ struct ScreenFactoryTests {
         let first = try #require(shell.editor)
         await first.load()
         Self.typed(first, title: "First")
-        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, didStore: {})
+        let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await second.load()
         Self.typed(second, title: "Second")
         let loading = Task { @MainActor in await list.load() }
