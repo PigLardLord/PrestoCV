@@ -57,7 +57,7 @@ enum HeaderReader {
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
                             findings.cv.person.links += contacts.links
-                            for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
+                            for rest in contacts.rest + contacts.unknownLabels + contacts.labels { findings.unplace(rest, in: section) }
                         }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
                         // Personal details that the CV has no field for stay visible, with their label
@@ -67,11 +67,18 @@ enum HeaderReader {
                 }
                 let line = LineContacts(cells)
                 var rest: [Piece] = []
+                var labels: [Piece] = []
                 for contacts in line.cells {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
                     findings.cv.person.links += contacts.links
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
+                    labels += contacts.labels
+                }
+                if !labels.isEmpty {
+                    // A label that names no value of its line, nor of the line under it, is text of its own ("iOS Engineer · Mobile")
+                    let shown = SpanIndex(ContactReader.labelsWithoutAValue(in: block, of: findings.document).map(\.span))
+                    rest += labels.filter { shown.holds($0.span) }
                 }
                 if line.hasContacts { contactBlocks.insert(block.index) }
                 rest.sort { $0.span < $1.span }
@@ -587,6 +594,7 @@ enum HeaderReader {
         let words = candidate.piece.words
         guard (1...maxTitleWords).contains(words.count), text.contains(where: \.isLetter), candidate.isFirstInBlock else { return false }
         if !DateReader.periods(in: text).isEmpty || SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         // The line under the name is a title unless it is a place or a street, whatever follows it
         if looksLikePlace(candidate, beside: []) && !EntryVocabulary.isRole(text) { return false }
         return true
@@ -595,10 +603,12 @@ enum HeaderReader {
     private static let maxTitleWords = 14
 
     /// A later part of the title line that goes on with the title: words with a letter, and neither a place nor the form
-    /// of one, a period, a heading or a bare label.
+    /// of one, a period, a heading or a bare label. The label of a contact with no contact beside it goes on with the title
+    /// ("iOS Engineer · Mobile"): it is shown, not read as a place.
     private static func goesOnWithTitle(_ candidate: Candidate) -> Bool {
         let text = candidate.piece.text
         guard text.contains(where: \.isLetter), DateReader.periods(in: text).isEmpty else { return false }
+        if ContactReader.isContactLabel(text) { return true }
         if SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) || hasPlaceForm(text) { return false }
         return !looksLikePlace(candidate, beside: [])
     }
@@ -611,6 +621,7 @@ enum HeaderReader {
         guard (1...8).contains(words.count), !text.contains("@"), text.contains(where: \.isLetter) else { return false }
         if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || text.hasSuffix(".") { return false }
         if SectionVocabulary.kind(ofHeading: text) != nil || !DateReader.periods(in: text).isEmpty || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         if Places.isKnownPlace(text) || Places.isAddress(text) { return true }
         if candidate.blockHasContacts && (text.contains(",") || words.count <= 3) { return true }
         return isLoneCity(candidate, beside: contactBlocks)
