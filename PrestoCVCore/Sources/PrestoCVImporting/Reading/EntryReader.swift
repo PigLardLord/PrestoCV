@@ -69,9 +69,10 @@ enum EntryReader {
         words.filter { $0.first?.isLowercase == true }.count
     }
 
-    /// How many words in lower case are not an article, a preposition or a conjunction: a description has several
-    /// ("Booking tool for a hotel group": tool, hotel, group), a name none ("Bank of the West of England", "Università
-    /// degli Studi di Torino"). A word after an elided article counts by what follows it ("dell'Università" none).
+    /// How many words in lower case are not an article, a preposition or a conjunction: a description has at least one
+    /// ("Booking tool for a hotel group": tool, hotel, group; "Bank for the community": community), a name none ("Bank of
+    /// the West of England", "Università degli Studi di Torino"). A word after an elided article counts by what follows
+    /// it ("dell'Università" none).
     static func describingWords(_ words: [Substring]) -> Int {
         words.filter { word in
             let rest = word.lastIndex(where: { $0 == "'" || $0 == "’" }).map { word[word.index(after: $0)...] } ?? word
@@ -283,9 +284,11 @@ enum EntryReader {
     /// at a connector only when the words before it are a role the vocabulary knows, so a description such as "Field
     /// service app for retail teams" stays one text and the line above stays the entry's head. When that head names
     /// two parts besides its place, by their words or by their order ("Developer — Kestrel, Leeds"), and the text after
-    /// the dates describes, as "Booking tool for a hotel group" does (`describingWords`), that text names no role or
-    /// employer by an organisation's word either; a name ("Northwind Labs", "Bank of the West of England") and a role
-    /// the vocabulary knows still read as what they are.
+    /// the dates has a word in lower case that does not join a name (`describingWords`), as "Booking tool for a hotel
+    /// group" and "Bank for the community" do, that text names no role or employer by an organisation's word either: it
+    /// stays a detail and the head keeps its parts, the side that fails visibly. A name whose only words in lower case
+    /// join it ("Northwind Labs", "Bank of the West of England") and a role the vocabulary knows still read as what they
+    /// are.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
         var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
@@ -303,7 +306,7 @@ enum EntryReader {
                     }
                     let parts = split(piece, kind: kind, onlyAtAKnownRole: true)
                     let knownRole = parts.contains { $0.isMarked && $0.part == .primary && EntryVocabulary.isRole($0.piece.text) }
-                    segments += named < 2 || knownRole || describingWords(piece.words) < 2 ? parts : parts.map { part in
+                    segments += named < 2 || knownRole || describingWords(piece.words) == 0 ? parts : parts.map { part in
                         part.part == .primary || part.part == .secondary ? Segment(piece: part.piece, part: .unknown, isMarked: false) : part
                     }
                 }

@@ -985,6 +985,37 @@ struct EntryReaderTests {
         #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
     }
 
+    @Test("A description after the dates with one word in lower case that joins no name stays a detail, under the head's employer", arguments: [
+        ("English", "Mobile Developer — Harbor Mill, Lucca\n2014 – 2017 · Bank for the community\n- Built the account app.",
+         ["Mobile Developer|Harbor Mill|Lucca: Bank for the community / Built the account app."]),
+        ("English, second job", headedJob + "Mobile Developer — Harbor Mill, Lucca\n2014 – 2017 · Bank for the community\n"
+            + "- Built the account app.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Harbor Mill|Lucca: Bank for the community / Built the account app."]),
+        ("no linking word", "Mobile Developer — Harbor Mill, Lucca\n2014 – 2017 · Bank software\n- Built the account app.",
+         ["Mobile Developer|Harbor Mill|Lucca: Bank software / Built the account app."]),
+        ("an organisation's two words", headedJob + "Mobile Developer — Harbor Mill, Lucca\n2014 – 2017 · Insurance Group for farmers\n"
+            + "- Built the claims app.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Harbor Mill|Lucca: Insurance Group for farmers / Built the claims app."]),
+        ("Italian", headedJob + "Mobile Developer — Harbor Mill, Lucca\n2014 – 2017 · Banca per la comunità\n- Built the account app.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Harbor Mill|Lucca: Banca per la comunità / Built the account app."]),
+        ("French", headedJob + "Mobile Developer — Harbor Mill, Lyon\n2014 – 2017 · Banque pour les artisans\n- Built the account app.",
+         ["Senior iOS Engineer|Kestrel Cloud|Hamburg: Led the move of the capture flow to SwiftUI.",
+          "Mobile Developer|Harbor Mill|Lyon: Banque pour les artisans / Built the account app."]),
+    ] as [(String, String, [String])])
+    func describedOrganisationAfterTheDates(name: String, text: String, jobs: [String]) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
+            .importText("Tobias Renn\ntobias@example.com\n\nEXPERIENCE\n" + text)
+        let read = result.cv.experience.map { job in
+            "\(job.role?.value ?? "-")|\(job.employer?.value ?? "-")|\(job.location?.value ?? "-"): "
+                + job.details.map(\.value).joined(separator: " / ")
+        }
+        #expect(read == jobs, "\(name)")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
+
     @Test("Education under head lines reads its date lines as before: a degree or a school after the dates keeps its part", arguments: [
         ("degree after the dates", "Alder University — Department of Physics\n2018 – 2020 · Bachelor of science in physics\n"
             + "- Studied autonomous navigation.",
