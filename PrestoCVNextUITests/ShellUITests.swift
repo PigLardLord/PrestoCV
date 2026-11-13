@@ -69,7 +69,7 @@ final class ShellUITests: XCTestCase {
         XCTAssertEqual(heading.label, title)
         if isCompact(app) {
             XCTAssertFalse(row.isHittable, "One column at a time")
-            app.navigationBars.buttons.firstMatch.tap()
+            app.backButton.tap()
             XCTAssertTrue(row.waitForExistence(timeout: 30))
             XCTAssertTrue(row.isHittable)
             XCTAssertFalse(heading.exists)
