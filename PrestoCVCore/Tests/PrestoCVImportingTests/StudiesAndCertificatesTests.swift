@@ -563,6 +563,110 @@ struct StudiesAndCertificatesTests {
         }
     }
 
+    // MARK: A certificate named after a degree
+
+    /// A line that names a degree together with the noun of a certificate ("Certificate", "Certificato"), with an issuer
+    /// that is not a school, a single year and no period with an end, and the degree it gives under a heading of studies:
+    /// with each separator, with the year first, and with the noun in a note after the degree.
+    static let certificatesNamedAfterADegree = [
+        DegreeLine(line: "MBA Exam Preparation Certificate — Meridian Board, 2021", degree: "MBA Exam Preparation Certificate"),
+        DegreeLine(
+            line: "Master's Certificate in Project Management — Meridian Board, 2021",
+            degree: "Master's Certificate in Project Management"
+        ),
+        DegreeLine(line: "Diploma Certificate — Meridian Board, 2020", degree: "Diploma Certificate"),
+        DegreeLine(line: "Certificato di Laurea — Meridian Board, 2014", degree: "Certificato di Laurea"),
+        DegreeLine(line: "MBA Exam Preparation Certificate, Meridian Board, 2021", degree: "MBA Exam Preparation Certificate"),
+        DegreeLine(line: "MBA Exam Preparation Certificate - Meridian Board, 2021", degree: "MBA Exam Preparation Certificate"),
+        DegreeLine(line: "2021 — MBA Exam Preparation Certificate — Meridian Board", degree: "MBA Exam Preparation Certificate"),
+        DegreeLine(line: "MBA — Meridian Board, 2021 (exam preparation certificate)", degree: "MBA"),
+    ]
+
+    /// A certificate is what a course and a study both give, so a degree named beside it does not tell the kind: under a
+    /// heading that joins the two kinds the line stays in the text not imported, alone, after a study and after a
+    /// certification, rather than move silently to Education or to Certifications.
+    @Test(
+        "A degree named with the noun of a certificate, with no school and no period, stays in the text not imported under a joined heading",
+        arguments: StudiesAndCertificatesTests.certificatesNamedAfterADegree
+    )
+    func certificateNamedAfterADegree(certificate: DegreeLine) throws {
+        let heading = "Education & Certifications"
+        for body in Self.bodies {
+            let found = try importText(cv(heading: heading, body: (body.before + [certificate.line]).joined(separator: "\n")))
+
+            #expect(found.cv.education.map { $0.degree?.value } == body.studies)
+            #expect(found.cv.certifications.map(\.name.value) == body.certifications)
+            #expect(found.unplaced.map(\.text) == [certificate.line])
+            #expect(found.unplaced.map(\.section) == [.additional], "the text not imported stays under the section it was in")
+            #expect(found.unplaced.map(\.heading) == [heading])
+            #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+        }
+    }
+
+    /// Under a heading of studies the heading says what the line is: the noun of a certificate is no word of a
+    /// certification, and the degree makes the line a study, alone, after a study and after a certification.
+    @Test(
+        "A degree named with the noun of a certificate is a study under a heading of studies",
+        arguments: StudiesAndCertificatesTests.certificatesNamedAfterADegree
+    )
+    func certificateNamedAfterADegreeUnderStudies(certificate: DegreeLine) throws {
+        for body in Self.bodies {
+            let found = try importText(
+                cv(heading: "EDUCATION & TRAINING", body: (body.before + [certificate.line]).joined(separator: "\n"))
+            )
+
+            #expect(found.cv.education.map { $0.degree?.value } == body.studies + [certificate.degree])
+            #expect(found.cv.education.last?.school?.value == "Meridian Board")
+            #expect(found.cv.certifications.map(\.name.value) == body.certifications)
+            #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+            #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+        }
+    }
+
+    /// The lines of a degree named with the noun of a certificate at a school, with the study they must give.
+    struct CertificateAtASchool: Sendable, CustomTestStringConvertible {
+        let lines: String
+        let degree: String
+        var testDescription: String { lines }
+    }
+
+    static let certificatesAtASchool = [
+        CertificateAtASchool(lines: "MBA Certificate\nUniversity of Northbridge, 2021", degree: "MBA Certificate"),
+        CertificateAtASchool(
+            lines: "MBA Exam Preparation Certificate — University of Northbridge, 2021", degree: "MBA Exam Preparation Certificate"
+        ),
+    ]
+
+    /// A school settles the doubt, on the same line or on the line below (rule 3): the degree, the school and the year are
+    /// one study.
+    @Test(
+        "A degree named with the noun of a certificate at a school is a study under a joined heading",
+        arguments: StudiesAndCertificatesTests.certificatesAtASchool
+    )
+    func certificateNamedAfterADegreeAtASchool(certificate: CertificateAtASchool) throws {
+        for body in Self.bodies {
+            let text = (body.before + [certificate.lines]).joined(separator: "\n")
+            let found = try importText(cv(heading: "Education & Certifications", body: text))
+
+            #expect(found.cv.education.map { $0.degree?.value } == body.studies + [certificate.degree])
+            #expect(found.cv.education.last?.school?.value == "University of Northbridge")
+            #expect(found.cv.education.last?.period?.value == ImportedPeriod(start: ym(2021), end: nil))
+            #expect(found.cv.certifications.map(\.name.value) == body.certifications)
+            #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+            #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+        }
+    }
+
+    /// The lines before the line under test: none, a study, a study and a certification; with what they give.
+    static let bodies: [(before: [String], studies: [String?], certifications: [String])] = [
+        ([], [], []),
+        (["BSc Computer Science — University of Leipzig\n2010 – 2014"], ["BSc Computer Science"], []),
+        (
+            ["BSc Computer Science — University of Leipzig\n2010 – 2014", "Certified Scrum Developer — Scrum Alliance, 2019"],
+            ["BSc Computer Science"], ["Certified Scrum Developer"]
+        ),
+    ]
+
     // MARK: Other joined headings
 
     @Test("A heading that joins two other kinds is still additional information", arguments: [

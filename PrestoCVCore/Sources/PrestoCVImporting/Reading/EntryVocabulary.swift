@@ -106,6 +106,17 @@ enum EntryVocabulary {
         "certificaciones", "certifié", "certifiée", "certificação", "certificações",
     ].map(\.folded))
 
+    /// Whether a piece holds the noun of a certificate: "MBA Exam Preparation Certificate", "Certificato di Laurea". A
+    /// certificate is the document a course and a study both give, so the noun tells neither kind.
+    static func namesACertificate(_ text: String) -> Bool {
+        text.words.contains { certificateNouns.contains($0.folded) }
+    }
+
+    private static let certificateNouns: Set<String> = Set([
+        "certificate", "certificates", "certificato", "certificati", "certificado", "certificados", "certificat",
+        "certificats",
+    ].map(\.folded))
+
     /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik", "MSc Data
     /// Science". The codes of two letters ("BA", "MA", "MS") are not among the openers: they are also a state, or a name
     /// ("MS Office Specialist").

@@ -22,6 +22,12 @@
 ///    what the line is.
 ///    "Licence" is a degree only with a French word after it ("Licence en Droit"); "Licence to Practise" is a permission
 ///    to work.
+///    Under a heading that joins the two kinds, a degree named with the noun of a certificate anywhere on the line ("MBA
+///    Exam Preparation Certificate — Meridian Board, 2021", "MBA — Meridian Board, 2021 (exam preparation certificate)",
+///    "Certificato di Laurea") with no school and no period with an end is of no kind the reading can tell: a certificate
+///    is what a course and a study both give, and an issuer with a year is what both show. The line stays in the text not
+///    imported, unless a school's line below settles it (rule 3). Under a heading of studies the heading says what it is:
+///    a study.
 /// 2. A certification, with no evidence of a study: under a heading that joins the two kinds, a word of a certification
 ///    ("Certified", "Certificazione", "Zertifizierung") or an issuer after a separator with a single date that is not a
 ///    period ("Professional Scrum Master I — Scrum.org, 2020"); under a heading of studies, the word together with an
@@ -33,7 +39,9 @@
 ///    Hospitality Institute, 2022"), even when it names a certification by its word ("Certified Cloud Practitioner" over
 ///    "University of Northbridge, 2022"): the name, the school and the year stay one entry. Read as a certification, the
 ///    school's line would be a certification of its own, named after the school. A line above of no kind the reading can
-///    tell (rule 0) stays so: the school's line below is a study of its own.
+///    tell (rule 0) stays so: the school's line below is a study of its own. A line above that doubts only between a
+///    study and a certificate (rule 1: "MBA Certificate" over "University of Northbridge, 2021") is a study at that
+///    school.
 /// 4. Anything else goes with the line before it, a line already taken as noise too; the lines before the first line
 ///    with evidence go with that line. A section with no evidence at all keeps the kind of its heading, as before: read
 ///    as studies under a heading of studies, left in the text not imported under a heading that joins the two kinds.
@@ -53,7 +61,7 @@ enum StudiesAndCertifications {
         }
         var evidence = shapes.map { $0?.kind }
         for index in shapes.indices.dropFirst() where shapes[index]?.schoolOnly == true && shapes[index - 1]?.bare == true
-            && shapes[index - 1]?.kind != .unknown {
+            && (shapes[index - 1]?.kind != .unknown || shapes[index - 1]?.schoolDecides == true) {
             evidence[index - 1] = .education
         }
         guard let first = evidence.compactMap({ $0 }).first else { return [section] }
@@ -82,6 +90,9 @@ enum StudiesAndCertifications {
         var schoolOnly = false
         /// The line states no issuer and no date.
         var bare = false
+        /// The line is of no kind the reading can tell only between a study and a certificate (rule 1): a school's line
+        /// just below settles it as a study (rule 3).
+        var schoolDecides = false
     }
 
     private static func shape(of cells: [Piece], joined: Bool) -> Shape? {
@@ -106,6 +117,9 @@ enum StudiesAndCertifications {
         }
         let hasWord = EntryVocabulary.isCertification(text)
         let namesAStudy = EntryVocabulary.opensAStudy(text) || name.map { EntryVocabulary.namesADegree($0.text) } == true
+        if joined, namesAStudy, !school, EntryVocabulary.namesACertificate(text) {
+            return Shape(kind: .unknown, bare: bare, schoolDecides: true)
+        }
         if namesAStudy && (school || !hasWord) {
             return Shape(kind: .education, bare: bare)
         }
