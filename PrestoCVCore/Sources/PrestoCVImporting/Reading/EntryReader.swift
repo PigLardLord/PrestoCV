@@ -288,7 +288,9 @@ enum EntryReader {
     /// group" and "Bank for the community" do, that text names no role or employer by an organisation's word either: it
     /// stays a detail and the head keeps its parts, the side that fails visibly. A name whose only words in lower case
     /// join it ("Northwind Labs", "Bank of the West of England") and a role the vocabulary knows still read as what they
-    /// are.
+    /// are. Under a head that names one part ("Silver Lantern Ltd, London"), a text after the dates with no describing
+    /// word names the rest and is split as in a section that opens with a date ("Puppeteer at Silver Lantern Ltd"); one
+    /// that describes the work stays one text ("App for a logistics company" under a head on two lines).
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
         var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
@@ -304,9 +306,14 @@ enum EntryReader {
                         segments += split(piece, kind: kind, onlyAtAKnownRole: false)
                         continue
                     }
+                    let describing = describingWords(piece.words)
+                    guard named >= 2 || describing > 0 else {
+                        segments += split(piece, kind: kind, onlyAtAKnownRole: false)
+                        continue
+                    }
                     let parts = split(piece, kind: kind, onlyAtAKnownRole: true)
                     let knownRole = parts.contains { $0.isMarked && $0.part == .primary && EntryVocabulary.isRole($0.piece.text) }
-                    segments += named < 2 || knownRole || describingWords(piece.words) == 0 ? parts : parts.map { part in
+                    segments += named < 2 || knownRole || describing == 0 ? parts : parts.map { part in
                         part.part == .primary || part.part == .secondary ? Segment(piece: part.piece, part: .unknown, isMarked: false) : part
                     }
                 }

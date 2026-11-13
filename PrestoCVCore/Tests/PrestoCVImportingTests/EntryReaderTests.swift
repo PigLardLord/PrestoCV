@@ -954,6 +954,15 @@ struct EntryReaderTests {
         ("role and place above, employer after the dates", headedJob + "Mobile Developer — Lucca\n"
             + "May 2014 – June 2017 · Northwind Labs\n- Built the offline order screens.",
          ["Senior iOS Engineer|Kestrel Cloud", "Mobile Developer|Northwind Labs"]),
+        ("employer above, unknown role at it after the dates", "Silver Lantern Ltd, London\n"
+            + "May 2014 – June 2017 · Puppeteer at Silver Lantern Ltd\n- Performed touring shows.",
+         ["Puppeteer|Silver Lantern Ltd"]),
+        ("employer above, unknown role at it after the dates, second job", headedJob + "Silver Lantern Ltd, London\n"
+            + "May 2014 – June 2017 · Puppeteer at Silver Lantern Ltd\n- Performed touring shows.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Puppeteer|Silver Lantern Ltd"]),
+        ("employer above, unknown role for it after the dates", headedJob + "Silver Lantern Ltd, London\n"
+            + "2014 – 2017 · Juggler for Silver Lantern Ltd\n- Performed touring shows.",
+         ["Senior iOS Engineer|Kestrel Cloud", "Juggler|Silver Lantern Ltd"]),
     ] as [(String, String, [String])])
     func jobsCutAsBefore(name: String, text: String, jobs: [String]) throws {
         let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard)
