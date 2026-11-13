@@ -7,7 +7,9 @@
 /// Only the known headings vouch for a line, never the lines that could be headings themselves. A line that reads as a
 /// part of an entry opens nothing, so that an entry is never cut from its section:
 /// - one with a digit, a period, a separator of an entry or no word of five letters (an acronym);
-/// - one the vocabulary of the entries knows as a role, an organisation, a school or a degree;
+/// - one the vocabulary of the entries knows as a part of an entry, right after a short bare line it knows as the other
+///   part of the same entry (a school under its degree, a role under its employer, and back). A word of the vocabulary
+///   alone vouches for nothing: a heading may hold one ("FOUNDER VENTURES");
 /// - one before a period (a role before its dates), or before a short bare line and then a period (a role, its employer,
 ///   its dates), or between a period and a detail (an employer and its dates, then the role and its bullets);
 /// - the first line of its section, and one drawn as a line the section already holds (an employer or a sub-heading).
@@ -33,7 +35,7 @@ struct HeadingLook {
         _ block: SourceBlock, at position: Int, after section: Section, in document: SourceDocument, work: inout AnalysisWork
     ) throws -> Bool {
         guard !section.blocks.isEmpty, Self.isCandidate(block, in: document), Self.contentFollows(position, in: document),
-              !Self.sitsInAnEntryHead(position, in: document) else {
+              !Self.sitsInAnEntryHead(position, in: document), !Self.completesAnEntry(position, in: document) else {
             return false
         }
         try work.count(section.blocks.count + known.count)
@@ -64,8 +66,43 @@ struct HeadingLook {
         return isCapitals(text) && words.count <= 4 && words.contains { $0.count(where: \.isLetter) >= 5 }
             && !text.contains(where: \.isNumber) && DateReader.periods(in: text).isEmpty
             && !entrySeparators.contains { text.contains($0) }
-            && !(EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text)
-                || EntryVocabulary.isSchool(text) || EntryVocabulary.isDegree(text))
+    }
+
+    /// The parts of an entry that are written on lines of their own, each beside its partner.
+    private enum EntryPart: CaseIterable {
+        case role, organisation, school, degree
+
+        /// The part an entry writes on the line next to this one.
+        var partner: EntryPart {
+            switch self {
+            case .role: .organisation
+            case .organisation: .role
+            case .school: .degree
+            case .degree: .school
+            }
+        }
+
+        /// Whether the vocabulary of the entries knows `text` as this part.
+        func names(_ text: String) -> Bool {
+            switch self {
+            case .role: EntryVocabulary.isRole(text)
+            case .organisation: EntryVocabulary.isOrganisation(text)
+            case .school: EntryVocabulary.isSchool(text)
+            case .degree: EntryVocabulary.isDegree(text)
+            }
+        }
+    }
+
+    /// Whether the line at `position` completes the entry of the short bare line before it, in the same column: the
+    /// vocabulary of the entries knows the line as a part (a school) and the line before as its partner (a degree).
+    private static func completesAnEntry(_ position: Int, in document: SourceDocument) -> Bool {
+        guard position > 0 else { return false }
+        let block = document.blocks[position]
+        let previous = document.blocks[position - 1]
+        guard previous.column == block.column, isBare(previous, in: document) else { return false }
+        let text = document.text(of: block.span)
+        let previousText = document.text(of: previous.span)
+        return EntryPart.allCases.contains { $0.names(text) && $0.partner.names(previousText) }
     }
 
     /// Whether the block after `position` is content of the same column for the heading: no period (a role in capitals

@@ -57,9 +57,9 @@ struct UnknownHeadingTests {
         "Wrote the watch app.",
     ]
 
-    /// The CV as pasted text; with `blankLines`, a blank line before each heading.
-    private static func pastedCV(blankLines: Bool) -> String {
-        var text = ["Tobias Renn"]
+    /// A CV as pasted text, its name first; with `blankLines`, a blank line before each heading.
+    private static func pastedCV(_ name: String, _ lines: [(text: String, isHeading: Bool)], blankLines: Bool) -> String {
+        var text = [name]
         for line in lines {
             if line.isHeading, blankLines { text.append("") }
             text.append(line.text)
@@ -67,11 +67,11 @@ struct UnknownHeadingTests {
         return text.joined(separator: "\n")
     }
 
-    /// The CV drawn on a page: every line at the same x, the headings at 11 pt over a body of 10 pt (not emphasized),
-    /// not bold, after a wider gap.
-    private static func drawnCV() -> PageSketch {
+    /// A CV drawn on a page, its name first: every line at the same x, the headings at 11 pt over a body of 10 pt (not
+    /// emphasized), not bold, after a wider gap.
+    private static func drawnCV(_ name: String, _ lines: [(text: String, isHeading: Bool)]) -> PageSketch {
         var sketch = PageSketch()
-        sketch.put("Tobias Renn", x: 50, y: 50, size: 20, bold: true)
+        sketch.put(name, x: 50, y: 50, size: 20, bold: true)
         var y = 80.0
         for line in lines {
             if line.isHeading { y += 18 }
@@ -103,17 +103,60 @@ struct UnknownHeadingTests {
 
     @Test("Pasted without blank lines, as in the issue: the ventures are a section of their own, not jobs")
     func pastedWithoutBlankLines() throws {
-        expectTheVenturesStayVisible(try importText(Self.pastedCV(blankLines: false)), "no blank lines")
+        expectTheVenturesStayVisible(try importText(Self.pastedCV("Tobias Renn", Self.lines, blankLines: false)), "no blank lines")
     }
 
     @Test("Pasted with a blank line before each heading: the ventures are a section of their own, not jobs")
     func pastedWithBlankLines() throws {
-        expectTheVenturesStayVisible(try importText(Self.pastedCV(blankLines: true)), "blank lines")
+        expectTheVenturesStayVisible(try importText(Self.pastedCV("Tobias Renn", Self.lines, blankLines: true)), "blank lines")
     }
 
     @Test("Drawn in a PDF, the headings a size larger than the text but not emphasized: the ventures are a section of their own")
     func drawnInAPDF() async throws {
-        expectTheVenturesStayVisible(try await importPDF(Self.drawnCV()), "PDF")
+        expectTheVenturesStayVisible(try await importPDF(Self.drawnCV("Tobias Renn", Self.lines)), "PDF")
+    }
+
+    // MARK: A heading with a word of an entry
+
+    /// A CV whose third heading the vocabulary of the sections does not know, after an entry that ends with a detail, as
+    /// the ventures of the issue.
+    private static func lines(under heading: String) -> [(text: String, isHeading: Bool)] {
+        [
+            ("SUMMARY", true),
+            ("Mobile engineer.", false),
+            ("EXPERIENCE", true),
+            ("Developer — Cedar Labs", false),
+            ("2018 – 2021", false),
+            ("Built mobile tools.", false),
+            (heading, true),
+            ("Tidepool Notes — maker, solo", false),
+            ("2022 – Present · notes app", false),
+            ("• Shipped the app.", false),
+            ("SKILLS", true),
+            ("Swift", false),
+            ("LANGUAGES", true),
+            ("German — native", false),
+        ]
+    }
+
+    /// Unknown headings with a word the vocabulary of the entries knows: a role, an organisation, a school, a degree.
+    static let headingsWithAWordOfAnEntry = ["FOUNDER VENTURES", "CONSULTING MANDATES", "SCHOOL OUTREACH", "MASTER CLASSES"]
+
+    @Test("A heading with a word of an entry, after a detail, opens a section: pasted and drawn", arguments: headingsWithAWordOfAnEntry)
+    func headingWithAWordOfAnEntry(_ heading: String) async throws {
+        let lines = Self.lines(under: heading)
+        let withoutBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: false))
+        let withBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: true))
+        let drawn = try await importPDF(Self.drawnCV("Mara Voss", lines))
+        for (label, result) in [("no blank lines", withoutBlankLines), ("blank lines", withBlankLines), ("PDF", drawn)] {
+            let jobs = result.cv.experience
+            #expect(jobs.count == 1, "\(label): \(jobs.map { [$0.role?.value, $0.employer?.value] })")
+            let under = result.unplaced.filter { $0.heading == heading }.map(\.text).joined(separator: "\n")
+            for line in ["Tidepool Notes — maker, solo", "2022 – Present · notes app", "Shipped the app."] {
+                #expect(under.contains(line), "\(label): «\(line)» not under \(heading): \(result.unplaced.map { ($0.heading, $0.text) })")
+            }
+            #expect(Coverage.lost(result).isEmpty, "\(label): \(Coverage.describe(Coverage.lost(result)))")
+        }
     }
 
     // MARK: What does not open a section
@@ -400,6 +443,57 @@ struct UnknownHeadingTests {
             """,
             jobs: 1, studies: 1,
             schools: ["UNIVERSITY OF NORTHBRIDGE"]
+        ),
+        EntryPart(
+            testDescription: "A degree in capitals under its school",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Leipzig, Germany
+            July 2017 – Present
+            EDUCATION
+            University of Northbridge
+            BSC COMPUTER SCIENCE
+            Leipzig, Germany
+            SKILLS
+            Swift
+            """,
+            jobs: 1, studies: 1
+        ),
+        EntryPart(
+            testDescription: "An employer in capitals under its role, then its place",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            EXPERIENCE
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017
+            Senior iOS Engineer
+            KESTREL CLOUD GMBH
+            Leipzig, Germany
+            July 2017 – Present
+            SKILLS
+            Swift
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A role in capitals under its employer, then its place",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            EXPERIENCE
+            Mobile Developer — Northwind Labs, Lucca, Italy
+            May 2014 – June 2017
+            Kestrel Labs
+            SENIOR DEVELOPER
+            Leipzig, Germany
+            July 2017 – Present
+            SKILLS
+            Swift
+            """,
+            jobs: 2, studies: 0
         ),
     ]
 
