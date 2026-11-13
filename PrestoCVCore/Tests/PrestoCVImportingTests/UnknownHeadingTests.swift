@@ -266,6 +266,192 @@ struct UnknownHeadingTests {
         #expect(!kinds(text).contains(.unknown), "\(kinds(text))")
     }
 
+    // MARK: A part of an entry in capitals
+
+    /// A CV with a role, an employer or a school in capitals, where only one entry of its section writes it so, and
+    /// what the import reads of it: as on main, with no section opened.
+    struct EntryPart: Sendable, CustomTestStringConvertible {
+        let testDescription: String
+        let text: String
+        let jobs: Int
+        let studies: Int
+        /// The roles, the employers and the schools the import reads, in order; empty when the entry reader does not tell
+        /// them apart on main either (a role it does not know, before its employer).
+        var roles: [String] = []
+        var employers: [String] = []
+        var schools: [String] = []
+    }
+
+    static let entryParts = [
+        EntryPart(
+            testDescription: "A role in capitals, then its employer and its dates",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+
+            SUMMARY
+            Mobile engineer.
+
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+
+            PLATFORM ENGINEER
+            Kestrel Cloud
+            2017 – Present
+            Led the move to SwiftUI.
+
+            SKILLS
+            Swift
+
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0,
+            roles: ["Developer", "PLATFORM ENGINEER"], employers: ["Northwind Labs", "Kestrel Cloud"]
+        ),
+        EntryPart(
+            testDescription: "A role the vocabulary does not know, in capitals, then its employer and its dates",
+            text: """
+            Tobias Renn
+            tobias.renn@example.com
+
+            SUMMARY
+            Mobile engineer.
+
+            EXPERIENCE
+            Developer — Northwind Labs
+            2014 – 2017
+            Built the offline order screens.
+
+            CHIEF WIZARD
+            Kestrel Cloud
+            2017 – Present
+            Led the move to SwiftUI.
+
+            SKILLS
+            Swift
+
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "Roles in capitals after the employer and the dates of each job",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            tobias.renn@example.com
+            SUMMARY
+            iOS engineer with ten years of apps for field teams.
+            EXPERIENCE
+            Kestrel Cloud, Leipzig — July 2017 – Present
+            PLATFORM ENGINEER
+            • Led the move to SwiftUI.
+            Northwind Labs, Lucca — May 2014 – June 2017
+            MOBILE DEVELOPER
+            • Built the offline order screens.
+            SKILLS
+            Swift, SwiftUI
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0,
+            roles: ["PLATFORM ENGINEER", "MOBILE DEVELOPER"], employers: ["Kestrel Cloud", "Northwind Labs"]
+        ),
+        EntryPart(
+            testDescription: "Roles the vocabulary does not know, in capitals, after the employer and the dates of each job",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            tobias.renn@example.com
+            SUMMARY
+            iOS engineer with ten years of apps for field teams.
+            EXPERIENCE
+            Kestrel Cloud, Leipzig — July 2017 – Present
+            CHIEF WIZARD
+            • Led the move to SwiftUI.
+            Northwind Labs, Lucca — May 2014 – June 2017
+            GROWTH HACKER
+            • Built the offline order screens.
+            SKILLS
+            Swift, SwiftUI
+            LANGUAGES
+            German — native
+            """,
+            jobs: 2, studies: 0
+        ),
+        EntryPart(
+            testDescription: "A school in capitals under its degree",
+            text: """
+            Tobias Renn
+            iOS Engineer
+            EXPERIENCE
+            Senior iOS Engineer — Kestrel Cloud, Leipzig, Germany
+            July 2017 – Present
+            EDUCATION
+            BSc Computer Science
+            UNIVERSITY OF NORTHBRIDGE
+            Leipzig, Germany
+            SKILLS
+            Swift
+            """,
+            jobs: 1, studies: 1,
+            schools: ["UNIVERSITY OF NORTHBRIDGE"]
+        ),
+    ]
+
+    @Test("A part of an entry in capitals opens no section: its entry is read, nothing is left out", arguments: entryParts)
+    func entryPartInCapitals(_ example: EntryPart) throws {
+        #expect(!kinds(example.text).contains(.unknown), "\(kinds(example.text))")
+        let result = try importText(example.text)
+        let jobs = result.cv.experience
+        let studies = result.cv.education
+        #expect(jobs.count == example.jobs, "\(jobs.map { [$0.role?.value, $0.employer?.value] })")
+        #expect(studies.count == example.studies, "\(studies.map { [$0.degree?.value, $0.school?.value] })")
+        if !example.roles.isEmpty {
+            #expect(jobs.map { $0.role?.value ?? "" } == example.roles)
+        }
+        if !example.employers.isEmpty {
+            #expect(jobs.map { $0.employer?.value ?? "" } == example.employers)
+        }
+        if !example.schools.isEmpty {
+            #expect(studies.map { $0.school?.value ?? "" } == example.schools)
+        }
+        #expect(result.unplaced.isEmpty, "\(result.unplaced.map { ($0.heading, $0.text) })")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
+
+    @Test("An unknown heading after an entry that ends with its dates still opens a section")
+    func afterAnEntryEndingWithItsDates() throws {
+        let text = """
+        Tobias Renn
+        iOS Engineer
+        SUMMARY
+        iOS engineer with ten years of apps for field teams.
+        EXPERIENCE
+        Senior iOS Engineer — Kestrel Cloud, Leipzig, Germany
+        July 2017 – Present
+        OWN VENTURES
+        Tidepool Notes — maker, solo
+        2022 – Present · a markdown notes app for iPad
+        • Designed and shipped the app on the App Store.
+        SKILLS
+        Swift, SwiftUI
+        LANGUAGES
+        German — native
+        """
+        let result = try importText(text)
+        #expect(result.cv.experience.count == 1, "\(result.cv.experience.map { [$0.role?.value, $0.employer?.value] })")
+        let underVentures = result.unplaced.filter { $0.heading == "OWN VENTURES" }.map(\.text).joined(separator: "\n")
+        for line in Self.ventures.prefix(3) {
+            #expect(underVentures.contains(line), "«\(line)» not under OWN VENTURES: \(result.unplaced.map { ($0.heading, $0.text) })")
+        }
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
+
     @Test("A line in capitals without the gap the known headings have opens no section")
     func gapDiffers() {
         let text = """

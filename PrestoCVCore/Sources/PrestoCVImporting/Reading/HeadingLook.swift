@@ -5,9 +5,12 @@
 /// so that its lines stay visible as text not imported (ADR 0027) instead of being read into the section before it.
 ///
 /// Only the known headings vouch for a line, never the lines that could be headings themselves. A line that reads as a
-/// part of an entry opens nothing: one with a digit, a period, a separator of an entry or no word of five letters (an
-/// acronym), one before a period (a role), the first line of its section and one drawn as a line the section already
-/// holds (an employer or a sub-heading in capitals).
+/// part of an entry opens nothing, so that an entry is never cut from its section:
+/// - one with a digit, a period, a separator of an entry or no word of five letters (an acronym);
+/// - one the vocabulary of the entries knows as a role, an organisation, a school or a degree;
+/// - one before a period (a role before its dates), or before a short bare line and then a period (a role, its employer,
+///   its dates), or between a period and a detail (an employer and its dates, then the role and its bullets);
+/// - the first line of its section, and one drawn as a line the section already holds (an employer or a sub-heading).
 struct HeadingLook {
 
     /// The known headings in capitals: alone on their line and in the vocabulary.
@@ -29,7 +32,8 @@ struct HeadingLook {
     func opensSection(
         _ block: SourceBlock, at position: Int, after section: Section, in document: SourceDocument, work: inout AnalysisWork
     ) throws -> Bool {
-        guard !section.blocks.isEmpty, Self.isCandidate(block, in: document), Self.contentFollows(position, in: document) else {
+        guard !section.blocks.isEmpty, Self.isCandidate(block, in: document), Self.contentFollows(position, in: document),
+              !Self.sitsInAnEntryHead(position, in: document) else {
             return false
         }
         try work.count(section.blocks.count + known.count)
@@ -60,6 +64,8 @@ struct HeadingLook {
         return isCapitals(text) && words.count <= 4 && words.contains { $0.count(where: \.isLetter) >= 5 }
             && !text.contains(where: \.isNumber) && DateReader.periods(in: text).isEmpty
             && !entrySeparators.contains { text.contains($0) }
+            && !(EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text)
+                || EntryVocabulary.isSchool(text) || EntryVocabulary.isDegree(text))
     }
 
     /// Whether the block after `position` is content of the same column for the heading: no period (a role in capitals
@@ -71,6 +77,40 @@ struct HeadingLook {
         let text = document.text(of: next.span)
         let isHeading = text.words.count <= SectionVocabulary.maximumWords && SectionVocabulary.kind(ofHeading: text) != nil
         return next.column == block.column && DateReader.periods(in: text).isEmpty && !isHeading
+    }
+
+    /// Whether the line at `position` sits where an entry has its role, whatever its words: between a line with a period
+    /// and a detail (the employer and its dates, then the role and its bullets), or before a short bare line followed by
+    /// a period (the role, its employer, its dates). An unknown heading after an entry that ends with its dates is still
+    /// told, as long as an entry, not a detail, opens under it.
+    private static func sitsInAnEntryHead(_ position: Int, in document: SourceDocument) -> Bool {
+        let blocks = document.blocks
+        let column = blocks[position].column
+        let next = position + 1 < blocks.count ? blocks[position + 1] : nil
+        if position > 0, let next, holdsAPeriod(blocks[position - 1], in: document), isADetail(next, in: document) {
+            return true
+        }
+        guard let next, isBare(next, in: document), position + 2 < blocks.count else { return false }
+        let after = blocks[position + 2]
+        return after.column == column && holdsAPeriod(after, in: document)
+    }
+
+    /// Whether the text of a block holds a period ("2017 – Present", "July 2017 – June 2019").
+    private static func holdsAPeriod(_ block: SourceBlock, in document: SourceDocument) -> Bool {
+        !DateReader.periods(in: document.text(of: block.span)).isEmpty
+    }
+
+    /// A detail of an entry: a bullet, or a line that ends as a sentence.
+    private static func isADetail(_ block: SourceBlock, in document: SourceDocument) -> Bool {
+        block.kind == .listItem || document.text(of: block.span).hasSuffix(".")
+    }
+
+    /// A short line alone in its block, with no separator of an entry and no end of a sentence: the name of an employer
+    /// or of a school.
+    private static func isBare(_ block: SourceBlock, in document: SourceDocument) -> Bool {
+        guard block.kind == .line, block.cells.count == 1 else { return false }
+        let text = document.text(of: block.span)
+        return text.words.count <= 6 && !text.hasSuffix(".") && !entrySeparators.contains { text.contains($0) }
     }
 
     /// Drawn alike: the same emphasis and column and, in a PDF, the same size and left edge.
