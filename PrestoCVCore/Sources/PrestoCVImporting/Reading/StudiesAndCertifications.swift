@@ -14,14 +14,19 @@
 ///    Assistant Diploma — University of Northbridge, 2020–2022") leave both readings open: the line is of no kind the
 ///    reading can tell, and stays in the text not imported, with the lines of no kind after it, rather than move silently
 ///    to one of the two.
-/// 1. A study: a period with an end ("2010 – 2014"), a school ("University of Leipzig", "Liceo Scientifico") or a first
-///    word of a degree ("Laurea", "Diplom", "MBA"). A first word of a degree is not enough when the line names a
-///    certification by its word and no school: the word of the certification says what the line is. "Licence" is a
-///    degree only with a French word after it ("Licence en Droit"); "Licence to Practise" is a permission to work.
+/// 1. A study: a period with an end ("2010 – 2014"), a school ("University of Leipzig", "Liceo Scientifico"), a first
+///    word of a degree ("Laurea", "Diplom", "MBA") or a degree named in the name, wherever it stands ("Postgraduate
+///    Diploma in Robotics — NIT, 2020", "Executive Master of Business Administration"). "Degree" after a number or an
+///    ordinal is a grade or an angle, not a study ("2nd Degree Black Belt", "360 Degree Feedback Practitioner"). A degree
+///    is not enough when the line names a certification by its word and no school: the word of the certification says
+///    what the line is.
+///    "Licence" is a degree only with a French word after it ("Licence en Droit"); "Licence to Practise" is a permission
+///    to work.
 /// 2. A certification, with no evidence of a study: under a heading that joins the two kinds, a word of a certification
 ///    ("Certified", "Certificazione", "Zertifizierung") or an issuer after a separator with a single date that is not a
 ///    period ("Professional Scrum Master I — Scrum.org, 2020"); under a heading of studies, the word together with an
-///    issuer or a single date, so that a study that mentions a certification stays a study.
+///    issuer or a single date, so that a study that mentions a certification stays a study. An issuer and a year alone
+///    are what a study shows too, so they count only when nothing on the line names a degree (rule 1).
 /// 3. A line whose only evidence of a study is its school ("Hamburg Hospitality Institute, 2022": no degree, no period
 ///    with an end) is the second line of an entry whose name is on the line just above it. When that line states no
 ///    issuer and no date of its own, it is the name of a study at that school ("Food Safety Handler" over "Hamburg
@@ -100,7 +105,8 @@ enum StudiesAndCertifications {
             return Shape(kind: .education, bare: bare)
         }
         let hasWord = EntryVocabulary.isCertification(text)
-        if EntryVocabulary.opensAStudy(text) && (school || !hasWord) {
+        let namesAStudy = EntryVocabulary.opensAStudy(text) || name.map { EntryVocabulary.namesADegree($0.text) } == true
+        if namesAStudy && (school || !hasWord) {
             return Shape(kind: .education, bare: bare)
         }
         if school {

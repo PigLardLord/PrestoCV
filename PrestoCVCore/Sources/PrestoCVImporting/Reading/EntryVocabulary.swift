@@ -138,16 +138,35 @@ enum EntryVocabulary {
 
     /// Whether the name of a line names a degree by one of its words, wherever it stands ("Certified Nursing Assistant
     /// Diploma", "Certified Diploma in Nursing"), or by "Master" before "of" or "in" ("Master of Science"). Whole words
-    /// only, unlike `isDegree`: "Scrum Master" and "LLM Applications" name no degree.
+    /// only, unlike `isDegree`: "Scrum Master" and "LLM Applications" name no degree. "Degree" after a number or an
+    /// ordinal is a grade or an angle ("2nd Degree Black Belt", "360 Degree Feedback"), unless "of" or "in" follows it
+    /// ("Second Degree in Nursing").
     static func namesADegree(_ text: String) -> Bool {
         let words = text.words.map { $0.folded }
         if words.contains(where: degreeNames.contains) { return true }
-        return zip(words, words.dropFirst()).contains { $0 == "master" && ($1 == "of" || $1 == "in") }
+        return words.indices.contains { index in
+            let next = index + 1 < words.count ? words[index + 1] : nil
+            let namesTheSubject = next == "of" || next == "in"
+            switch words[index] {
+            case "master": return namesTheSubject
+            case "degree": return namesTheSubject || index == 0 || !countsAGrade(words[index - 1])
+            default: return false
+            }
+        }
     }
+
+    /// A number or an ordinal, which makes the "Degree" after it a grade or an angle.
+    private static func countsAGrade(_ word: String) -> Bool {
+        word.first?.isNumber == true || ordinals.contains(word)
+    }
+
+    private static let ordinals: Set<String> = [
+        "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+    ]
 
     /// The words that name a degree wherever they stand in a name.
     private static let degreeNames: Set<String> = Set([
-        "diploma", "diplom", "diplôme", "diplomado", "diplomatura", "degree", "bachelor", "bachelor's", "master's", "laurea",
+        "diploma", "diplom", "diplôme", "diplomado", "diplomatura", "bachelor", "bachelor's", "master's", "laurea",
         "licenciatura", "doctorate", "doctorado", "doctorat", "dottorato", "doutorado", "mestrado", "maestría", "phd", "mba",
         "bsc", "msc", "beng", "meng", "llb", "abitur", "maturità", "baccalauréat", "bachillerato", "ausbildung", "studium",
     ].map(\.folded))

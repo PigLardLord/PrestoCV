@@ -470,6 +470,99 @@ struct StudiesAndCertificatesTests {
         #expect(found.cv.certifications.isEmpty)
     }
 
+    // MARK: A degree named in the line
+
+    /// A line with no word of a certification whose name holds a degree away from its first word, with the degree it must
+    /// give.
+    struct DegreeLine: Sendable, CustomTestStringConvertible {
+        let line: String
+        let degree: String
+        var testDescription: String { line }
+    }
+
+    static let degreesNamedInTheLine = [
+        DegreeLine(line: "Postgraduate Diploma in Robotics — NIT, 2020", degree: "Postgraduate Diploma in Robotics"),
+        DegreeLine(line: "Postgraduate Diploma in Robotics - NIT - 2020", degree: "Postgraduate Diploma in Robotics"),
+        DegreeLine(line: "Postgraduate Diploma in Robotics, NIT, 2020", degree: "Postgraduate Diploma in Robotics"),
+        DegreeLine(line: "Executive Master of Business Administration — NIT, 2020", degree: "Executive Master of Business Administration"),
+        DegreeLine(line: "Associate Degree in Nursing — NIT, 2016", degree: "Associate Degree in Nursing"),
+        DegreeLine(line: "Second Degree in Nursing — NIT, 2018", degree: "Second Degree in Nursing"),
+        DegreeLine(line: "Honours Degree — NIT, 2015", degree: "Honours Degree"),
+    ]
+
+    /// An issuer and a single year are what a study shows too: the degree in the name says what the line is, alone under
+    /// the heading, after a study and after a certification.
+    @Test(
+        "A degree named in a line with an issuer and a single year is a study, not a certification",
+        arguments: StudiesAndCertificatesTests.degreesNamedInTheLine, ["Education & Certifications", "EDUCATION & TRAINING"]
+    )
+    func degreeNamedInTheLine(degree: DegreeLine, heading: String) throws {
+        let study = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            """
+        let certification = "Certified Scrum Developer — Scrum Alliance, 2019"
+        let bodies: [(before: [String], studies: [String], certifications: [String])] = [
+            ([], [], []),
+            ([study], ["BSc Computer Science"], []),
+            ([study, certification], ["BSc Computer Science"], ["Certified Scrum Developer"]),
+        ]
+        for body in bodies {
+            let found = try importText(cv(heading: heading, body: (body.before + [degree.line]).joined(separator: "\n")))
+            let studies: [String?] = body.studies + [degree.degree]
+
+            #expect(found.cv.education.map { $0.degree?.value } == studies)
+            #expect(found.cv.certifications.map(\.name.value) == body.certifications)
+            #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+            #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+        }
+    }
+
+    /// A line under a heading that joins the two kinds, with "Degree" as a grade or an angle, and the name it must give as a
+    /// certification.
+    static let gradesNamedDegree = [
+        DegreeLine(
+            line: "360 Degree Feedback Practitioner — Kestrel Coaching Federation, 2021", degree: "360 Degree Feedback Practitioner"
+        ),
+        DegreeLine(line: "2nd Degree Black Belt — Hamburg Rowing Club, 2019", degree: "2nd Degree Black Belt"),
+        DegreeLine(
+            line: "First Degree Reiki Practitioner — Kestrel Coaching Federation, 2018", degree: "First Degree Reiki Practitioner"
+        ),
+        DegreeLine(
+            line: "Certified 2nd Degree Reiki Practitioner — University of Northbridge, 2020",
+            degree: "Certified 2nd Degree Reiki Practitioner"
+        ),
+    ]
+
+    /// "Degree" after a number or an ordinal names no study: under a heading that joins the two kinds, the issuer and the
+    /// year make the line a certification, alone, after a study and after a certification. With a word of a certification
+    /// and a school as its issuer, the grade is no second piece of evidence of a study (rule 0).
+    @Test(
+        "Degree after a number or an ordinal is a grade, and the line stays a certification",
+        arguments: StudiesAndCertificatesTests.gradesNamedDegree
+    )
+    func gradeNamedDegree(grade: DegreeLine) throws {
+        let study = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            """
+        let certification = "Certified Scrum Developer — Scrum Alliance, 2019"
+        let bodies: [(before: [String], studies: [String?], certifications: [String])] = [
+            ([], [], []),
+            ([study], ["BSc Computer Science"], []),
+            ([study, certification], ["BSc Computer Science"], ["Certified Scrum Developer"]),
+        ]
+        for body in bodies {
+            let text = (body.before + [grade.line]).joined(separator: "\n")
+            let found = try importText(cv(heading: "Education & Certifications", body: text))
+
+            #expect(found.cv.education.map { $0.degree?.value } == body.studies)
+            #expect(found.cv.certifications.map(\.name.value) == body.certifications + [grade.degree])
+            #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+            #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+        }
+    }
+
     // MARK: Other joined headings
 
     @Test("A heading that joins two other kinds is still additional information", arguments: [
