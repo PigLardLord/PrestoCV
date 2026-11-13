@@ -254,6 +254,93 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
+    // MARK: The name decides the kind
+
+    /// A line of a certification, with the name, issuer and year the certification reader must find in it.
+    struct CertificationLine: Sendable, CustomTestStringConvertible {
+        let line: String
+        let name: String
+        let issuer: String
+        let year: Int
+        var testDescription: String { line }
+    }
+
+    static let certificationsAtASchoolOrOverAPeriod = [
+        CertificationLine(
+            line: "Certified Cloud Practitioner — University of Northbridge, 2022", name: "Certified Cloud Practitioner",
+            issuer: "University of Northbridge", year: 2022
+        ),
+        CertificationLine(
+            line: "Certified Cloud Practitioner - University of Northbridge - 2022", name: "Certified Cloud Practitioner",
+            issuer: "University of Northbridge", year: 2022
+        ),
+        CertificationLine(
+            line: "Certified Cloud Practitioner, University of Northbridge, 2022", name: "Certified Cloud Practitioner",
+            issuer: "University of Northbridge", year: 2022
+        ),
+        CertificationLine(
+            line: "Certified Safety Inspector — Meridian Board, 2021–2024", name: "Certified Safety Inspector", issuer: "Meridian Board",
+            year: 2024
+        ),
+        CertificationLine(
+            line: "Certified Safety Inspector, Meridian Board, 2021 - 2024", name: "Certified Safety Inspector", issuer: "Meridian Board",
+            year: 2024
+        ),
+    ]
+
+    @Test(
+        "A certification word in the name decides the kind: a school as the issuer or a period of validity does not make a study",
+        arguments: StudiesAndCertificatesTests.certificationsAtASchoolOrOverAPeriod, ["Education & Certifications", "EDUCATION & TRAINING"]
+    )
+    func certificationNameDecidesTheKind(certification: CertificationLine, heading: String) throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            \(certification.line)
+            """
+        let found = try importText(cv(heading: heading, body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science"])
+        #expect(found.cv.certifications.map(\.name.value) == [certification.name])
+        #expect(found.cv.certifications.map { $0.issuer?.value } == [certification.issuer])
+        #expect(found.cv.certifications.map { $0.year?.value } == [certification.year])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    @Test("A certificate degree at a school over two years stays a study on one line under a joined heading")
+    func certificateDegreeOnOneLine() throws {
+        let body = "Graduate Certificate in Data Science — University of Leipzig, 2015 – 2016"
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["Graduate Certificate in Data Science"])
+        #expect(found.cv.education.map { $0.school?.value } == ["University of Leipzig"])
+        #expect(found.cv.certifications.isEmpty)
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    /// Read as a certification, the school's line would be a certification of its own, named after the school: the name,
+    /// the school and the year stay one entry instead, flagged for the person to check.
+    @Test("A certification's name alone over a line of a school and a year is a study at that school under a joined heading")
+    func certificationNameOverASchoolLine() throws {
+        let body = """
+            BSc Computer Science — University of Leipzig
+            2010 – 2014
+            Certified Cloud Practitioner
+            University of Northbridge, 2022
+            """
+        let found = try importText(cv(heading: "Education & Certifications", body: body))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["BSc Computer Science", "Certified Cloud Practitioner"])
+        #expect(found.cv.education.map { $0.school?.value } == ["University of Leipzig", "University of Northbridge"])
+        #expect(found.cv.education.last?.period?.value == ImportedPeriod(start: ym(2022), end: nil))
+        #expect(found.cv.certifications.isEmpty)
+        #expect(found.reviewList.map(\.field) == [.education(1)], "the person checks the name and the school")
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
     // MARK: A heading of one kind
 
     @Test("Under an education heading, an entry with a certification word is a certification, not a second study")

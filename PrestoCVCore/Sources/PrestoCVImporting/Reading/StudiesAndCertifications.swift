@@ -3,6 +3,11 @@
 /// a heading of studies alone may still list a certification.
 ///
 /// Each line is sorted by its own shape, in this order:
+/// 0. A certification by its name: the name the certification reader finds on the line (its first part) holds a word of a
+///    certification ("Certified", "Certificazione", "Zertifizierung"), no first word of a degree and no school, and the
+///    line is more than that name (an issuer, a date) or stands under a heading that joins the two kinds. The rest of the
+///    line is then the issuer and the year: "Certified Cloud Practitioner — University of Northbridge, 2022" is issued by a
+///    school, and the period of "Certified Safety Inspector — Meridian Board, 2021–2024" is how long it is valid.
 /// 1. A study: a period with an end ("2010 – 2014"), a school ("University of Leipzig", "Liceo Scientifico") or a first
 ///    word of a degree ("Laurea", "Diplom", "MBA"). A first word of a degree is not enough when the line names a
 ///    certification by its word and no school ("Master Certified Coach — Kestrel Coaching Federation, 2020"): the word
@@ -14,9 +19,10 @@
 ///    issuer or a single date, so that a study that mentions a certification stays a study.
 /// 3. A line whose only evidence of a study is its school ("Hamburg Hospitality Institute, 2022": no degree, no period
 ///    with an end) is the second line of an entry whose name is on the line just above it. When that line states no
-///    issuer and no date of its own, it is the name of a study at that school, even with a word of a certification
-///    ("Certified Food Safety Handler"), as a certificate taken at a school is a study: the name, the school and the year
-///    stay one entry, and the school is never read as the start of the next one.
+///    issuer and no date of its own, it is the name of a study at that school ("Food Safety Handler" over "Hamburg
+///    Hospitality Institute, 2022"), even when it names a certification by its word ("Certified Cloud Practitioner" over
+///    "University of Northbridge, 2022"): the name, the school and the year stay one entry. Read as a certification, the
+///    school's line would be a certification of its own, named after the school.
 /// 4. Anything else goes with the line before it, a line already taken as noise too; the lines before the first line
 ///    with evidence go with that line. A section with no evidence at all keeps the kind of its heading, as before: read
 ///    as studies under a heading of studies, left in the text not imported under a heading that joins the two kinds.
@@ -73,6 +79,11 @@ enum StudiesAndCertifications {
             part.text.contains(where: \.isLetter)
         }
         let bare = !hasIssuer && dates.isEmpty
+        let (name, parts) = CertificationReader.nameAndParts(of: cells)
+        if let name, EntryVocabulary.isCertification(name.text), !EntryVocabulary.opensAStudy(name.text),
+            !EntryVocabulary.isSchool(name.text), joined || parts > 1 || !dates.isEmpty {
+            return Shape(kind: .certifications, bare: bare)
+        }
         if dates.contains(where: { $0.period.end != nil }) {
             return Shape(kind: .education, bare: bare)
         }
