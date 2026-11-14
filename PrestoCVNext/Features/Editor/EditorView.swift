@@ -106,9 +106,11 @@ struct EditorView: View {
             } action: { old, new in
                 if new < old, let row = newRow, rowFocus?.row == row { withAnimation { proxy.scrollTo(row) } }
             }
-            .keyboardDoneBar("editor.done", shown: focus != nil || rowFocus != nil) {
-                focus = nil
-                rowFocus = nil
+            .aboveTheKeyboard(shown: focus != nil || rowFocus != nil) {
+                KeyboardDoneBar("editor.done") {
+                    focus = nil
+                    rowFocus = nil
+                }
             }
             // A problem with a field's text is named once the person leaves it, never while they type
             .onChange(of: focus) { left, _ in

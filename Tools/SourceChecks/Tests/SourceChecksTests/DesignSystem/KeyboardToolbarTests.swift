@@ -6,8 +6,8 @@ import Foundation
 /// The new stack draws its own bar above the keyboard and never asks the system for one (#478). A toolbar item placed on the
 /// keyboard (`ToolbarItemPlacement.keyboard`) makes SwiftUI log "Invalid frame dimension (negative or non-finite)." as soon as
 /// the view that carries it appears, on iOS 26.5 and 27.0, with Apple's own example from the documentation of the placement as
-/// well. The warning hides the ones that matter, and nothing in the app needs the system's bar: `keyboardDoneBar` draws the same
-/// button at the bottom of the view while a field has the focus.
+/// well. The warning hides the ones that matter, and nothing in the app needs the system's bar: `KeyboardDoneBar` draws the same
+/// button, and `aboveTheKeyboard(shown:content:)` puts it at the bottom of the view while a field has the focus.
 ///
 /// The published app (`PrestoCV/`) keeps its keyboard bar: it gets fixes for published defects only (ADR 0022). The check reads
 /// the code of the files, not their comments (`SwiftCode`).
@@ -18,12 +18,13 @@ struct KeyboardToolbarTests {
 
     private static let folder = "PrestoCVNext/"
 
-    /// The ways to place a toolbar item on the keyboard: the placement passed to an item, with its type or without, and the
-    /// placement written with its type anywhere else, such as a constant handed to an item later.
+    /// The ways to place a toolbar item on the keyboard: the placement written with its type, and `.keyboard` where a value
+    /// goes (after a parenthesis, a comma, a colon, an equals sign, a bracket or a brace, after the `?` of a condition, or
+    /// after `return`), so that a placement a condition chooses or a property returns is found as well. The keyboard's
+    /// safe-area region (`ignoresSafeArea(.keyboard)`) and a property named keyboard (`input.keyboard`) are not placements.
     private static let keyboardPlacement = [
-        #"\bplacement\s*:\s*(?:ToolbarItemPlacement)?\s*\.\s*keyboard\b"#,
         #"\bToolbarItemPlacement\s*\.\s*keyboard\b"#,
-        #"\bToolbarItemPlacement\s*=\s*\.\s*keyboard\b"#,
+        #"(?:(?<!ignoresSafeArea)\(|[,:=\[{]|\?\s|\breturn\b)\s*\.\s*keyboard\b"#,
     ].map { try! NSRegularExpression(pattern: $0) }
 
     /// The lines of `source` that place a toolbar item on the keyboard, counted from 1
@@ -43,7 +44,8 @@ struct KeyboardToolbarTests {
         let files = try Self.swiftFiles()
 
         #expect(files.count >= 40, "Only \(files.count) Swift files under \(Self.folder)")
-        #expect(files.contains("PrestoCVNext/Platform/KeyboardDoneBar.swift"))
+        #expect(files.contains("PrestoCVNext/DesignSystem/KeyboardDoneBar.swift"))
+        #expect(files.contains("PrestoCVNext/Platform/AboveTheKeyboard.swift"))
         #expect(files.contains("PrestoCVNext/Features/Editor/EditorView.swift"))
     }
 
@@ -54,7 +56,7 @@ struct KeyboardToolbarTests {
             found += Self.problems(in: try Repository.text(path)).map { "\(path):\($0)" }
         }
 
-        #expect(found.isEmpty, "A toolbar item placed on the keyboard logs a frame warning; use keyboardDoneBar: \(found)")
+        #expect(found.isEmpty, "A toolbar item placed on the keyboard logs a frame warning; use KeyboardDoneBar with aboveTheKeyboard: \(found)")
     }
 
     // MARK: - The check itself
@@ -66,6 +68,11 @@ struct KeyboardToolbarTests {
         "ToolbarItem(placement:.keyboard) {",
         "let placement: ToolbarItemPlacement = .keyboard",
         "items(at: ToolbarItemPlacement.keyboard)",
+        "ToolbarItem(placement: compact ? .keyboard : .bottomBar) {",
+        "ToolbarItem(placement: compact ? .bottomBar : .keyboard) {",
+        "var placement: ToolbarItemPlacement { .keyboard }",
+        "return .keyboard",
+        "ToolbarItem(placement:\n    .keyboard) {",
     ])
     func findsAKeyboardPlacement(source: String) {
         #expect(Self.problems(in: source) == [1], "\(source)")
@@ -92,9 +99,14 @@ struct KeyboardToolbarTests {
         // ToolbarItemGroup(placement: .keyboard) logged a frame warning
         /* ToolbarItem(placement: .keyboard) */
         .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .keyboardType(input.keyboard)
+        let type = field?.keyboard
+        .keyboardShortcut(.defaultAction)
         ToolbarItem(placement: .bottomBar) {}
-        .keyboardDoneBar("editor.done", shown: focus != nil) {}
+        .aboveTheKeyboard(shown: focus != nil) {
+            KeyboardDoneBar("editor.done") {}
+        }
         """
 
         #expect(Self.problems(in: source).isEmpty, "\(Self.problems(in: source))")
