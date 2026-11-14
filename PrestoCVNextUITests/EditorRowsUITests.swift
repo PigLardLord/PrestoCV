@@ -5,7 +5,7 @@ import XCTest
 /// behind a swipe, in the row's context menu and among its VoiceOver actions. The level of a skill and of a language are
 /// menus, and every field stays tall enough to tap at the largest text size. On a narrow screen a new job, study,
 /// language, certification or profile opens on a page of its own, and its row in the form names what was typed.
-final class EditorRowsUITests: XCTestCase {
+final class EditorRowsUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "8D3A8E3A-3DAE-4E3D-9F77-3B5D4EAD9C03"
     private let title = "Site Foreman"

@@ -40,7 +40,7 @@ struct EntryPage: View {
         .navigationTitle(Text(entry.section.entryWords.title))
         .inlineNavigationTitle()
         .accessibilityIdentifier("editor.entry.page")
-        .keyboardDoneBar("editor.done") { focus = nil }
+        .keyboardDoneBar("editor.done", shown: focus != nil) { focus = nil }
         // A problem with a field's text is named once the person leaves it, as in the form
         .onChange(of: focus) { left, _ in
             if let left { editor.fieldWasLeft(left.field, row: left.row) }

@@ -63,6 +63,9 @@ private struct PeriodRow: View {
 @Suite("FieldNote in a form: the note under a field shows all its lines")
 @MainActor
 struct FieldNoteInFormTests {
+    /// The width in points of the narrowest iPhone the app runs on.
+    private static let narrowestPhoneWidth: CGFloat = 375
+
     private let words = LocalizedStringResource(
         stringLiteral: "Not saved: the end comes before the start. Change one of the two dates."
     )
@@ -82,7 +85,10 @@ struct FieldNoteInFormTests {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let sizes = NoteSizes()
         let window = UIWindow(windowScene: scene)
-        window.frame = scene.coordinateSpace.bounds
+        // As wide as the narrowest iPhone, so that the note takes two lines on every device the test runs on: on an
+        // iPad the row is wide enough for the note to take one, and there would be nothing for the form to cut
+        let height = scene.coordinateSpace.bounds.height
+        window.frame = CGRect(origin: .zero, size: CGSize(width: Self.narrowestPhoneWidth, height: height))
         window.rootViewController = UIHostingController(
             rootView: Form { Section { PeriodRow(note: words, sizes: sizes) } }.formStyle(.grouped)
         )
