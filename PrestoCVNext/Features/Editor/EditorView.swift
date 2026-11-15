@@ -95,9 +95,22 @@ struct EditorView: View {
             .formStyle(.grouped)
             .readableScrollContent()
             .editRowsButton(canReorder: editor.reordersRows)
-            .keyboardDoneBar("editor.done") {
-                focus = nil
-                rowFocus = nil
+            // The Done bar and the keyboard take their room only after the focus lands in a new row, so a new row
+            // near the bottom (a new skill goes last) would stay under them: once the room the form shows its rows in
+            // shrinks, that row comes into view. The room is read from the form's scroll view, after it has taken the
+            // bar and the keyboard into its insets: the view's own size changes first, and a scroll to the row from
+            // there still counts the old inset and does not move. A row the person taps is the system's to keep in
+            // view; a row taller than the room left would be scrolled to its top, away from the field being typed in
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+            } action: { old, new in
+                if new < old, let row = newRow, rowFocus?.row == row { withAnimation { proxy.scrollTo(row) } }
+            }
+            .aboveTheKeyboard(shown: focus != nil || rowFocus != nil) {
+                KeyboardDoneBar("editor.done") {
+                    focus = nil
+                    rowFocus = nil
+                }
             }
             // A problem with a field's text is named once the person leaves it, never while they type
             .onChange(of: focus) { left, _ in
@@ -114,13 +127,6 @@ struct EditorView: View {
                     newRow = added
                     withAnimation { proxy.scrollTo(added) }
                 }
-            }
-            // The keyboard takes its room only after the focus lands in a new row, so a new row near the bottom (a new
-            // skill goes last) would stay under it: once the room left for the form shrinks, that row comes into view.
-            // A row the person taps is the system's to keep in view; a row taller than the room left would be scrolled
-            // to its top, away from the field being typed in
-            .onGeometryChange(for: CGFloat.self) { $0.size.height - $0.safeAreaInsets.bottom } action: { old, new in
-                if new < old, let row = newRow, rowFocus?.row == row { withAnimation { proxy.scrollTo(row) } }
             }
             .navigationDestination(item: openedEntry) { entry in
                 EntryPage(editor: editor, entry: entry)
