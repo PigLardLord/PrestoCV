@@ -83,6 +83,8 @@ The Pull Request workflow exists in App Store Connect and is disabled. Keep it d
 
 A build from `main` is for the internal testers only. It cannot be submitted to App Review. Main has no Test action: a pull request merges only when its branch contains the latest `main` and `Mac mini · CI` is green on that exact head (a pull request that changes only `docs/` or `*.md` files needs only the `CI` workflow's checks), so the tree that reaches `main` has already been tested. Each merge to `main` starts a Main run of about 10 minutes of the 25 compute hours a month.
 
+A Main build takes the project's version (`MARKETING_VERSION`), and its build number is the run's number. Once App Review approves a version, App Store Connect closes that version to new builds: every later upload of it fails at "Preparing build for App Store Connect" with ITMS-90186 (the version's train is closed) and ITMS-90062 (the version must be higher than the approved one). So `main` always carries the next version to release, never one already released: see step 5 of [Cutting a release](#cutting-a-release).
+
 ### Release
 
 | Section | Setting |
@@ -123,6 +125,7 @@ Check once that a failing test stops a merge: open a draft pull request that bre
 2. Xcode Cloud starts the `Release` workflow. Follow it in Xcode (Report navigator, Cloud tab) or in App Store Connect under Xcode Cloud. If the build fails with a message from `ci_pre_xcodebuild`, the tag or branch does not name a version: fix the name and start again.
 3. Wait for the build in TestFlight. App Store Connect has to process it first, which takes a few minutes. Install it on a device and test it.
 4. In App Store Connect, open the app's version 1.2.3 (create it with + if it does not exist), choose the build, and click Add for Review, then submit it to App Review. The texts of the product page and the notes for App Review are in [store-listing.md](store-listing.md).
+5. Right after the tag or the release branch, raise the version on `main` to the next one (1.2.4 for fixes, 1.3 for new features), in a pull request that sets every `MARKETING_VERSION` of `PrestoCV.xcodeproj/project.xcproj`. The build number stays the one Xcode Cloud sets: it already tells the builds of a version apart (1.2.4 (180) in TestFlight), so the version keeps meaning a release.
 
 ## Reproducing a test build on a Mac
 
