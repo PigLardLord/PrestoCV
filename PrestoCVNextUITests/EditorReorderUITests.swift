@@ -3,7 +3,7 @@ import XCTest
 /// The order of a section's rows: a row moves up or down from its context menu, which stands in for its VoiceOver
 /// actions (XCUITest has no call for a custom action), or by a drag of its handle once the person taps Edit. A move the
 /// row cannot make is not offered, and Edit is off until a section has two rows.
-final class EditorReorderUITests: XCTestCase {
+final class EditorReorderUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "5B0C2F7E-91D4-4C6A-8E3B-2A7D9F1C4E60"
     private let title = "Site Foreman"
