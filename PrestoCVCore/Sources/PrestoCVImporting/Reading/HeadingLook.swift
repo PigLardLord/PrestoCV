@@ -14,7 +14,24 @@
 /// - one before a period (a role before its dates), or before a short bare line and then a period (a role, its employer,
 ///   its dates), or between a period and a detail (an employer and its dates, then the role and its bullets);
 /// - the first line of its section, and one drawn as a line the section already holds (an employer or a sub-heading).
+///
+/// The line below settles what is left. A line of an entry of its own, cut into parts that are neither roles nor places
+/// ("Hive Monitor Kit — maker, solo"), stands under a heading. A bullet, a line in one part ("Technician"), one with a
+/// role ("Technician — Hollowford", "Pump Division — Technician") or one whose later part is a place ("Night Shifts —
+/// Dresden") stands as well under the employer of a job: the line is doubtful. In the jobs and the studies a doubtful
+/// line stays where the entries read it, and the entry that takes it is to be checked; in any other section it opens a
+/// section of its own, as before.
 struct HeadingLook {
+
+    /// What a line in capitals is for the sections.
+    enum Reading: Equatable {
+        /// A part of the section before it.
+        case partOfTheSection
+        /// A heading the vocabulary does not know.
+        case heading
+        /// A heading or the employer of a job: the line below does not tell which.
+        case doubtful
+    }
 
     /// The known headings in capitals: alone on their line and in the vocabulary.
     private let known: [SourceBlock]
@@ -30,22 +47,25 @@ struct HeadingLook {
         }
     }
 
-    /// Whether `block`, at `position` in the document, opens a section of its own after the blocks of `section`.
+    /// What `block`, at `position` in the document, is after the blocks of `section`.
     /// - Throws: `LimitReached` past the budget of `work`; `CancellationError` once the task is cancelled.
-    func opensSection(
+    func reading(
         _ block: SourceBlock, at position: Int, after section: Section, in document: SourceDocument, work: inout AnalysisWork
-    ) throws -> Bool {
+    ) throws -> Reading {
         guard !section.blocks.isEmpty, Self.isCandidate(block, in: document), Self.contentFollows(position, in: document),
               !Self.sitsInAnEntryHead(position, in: document) else {
-            return false
+            return .partOfTheSection
         }
         try work.count(section.blocks.count + known.count)
         // A line drawn as one the section already holds is a part of its entries: an employer, a sub-heading
         let drawnAsAnEntry = section.blocks.contains { other in
             Self.isCapitals(document.text(of: other.span)) && Self.drawnAlike(other, block)
         }
-        guard !drawnAsAnEntry else { return false }
-        return known.count { Self.drawnAlike($0, block) && $0.followsGap == block.followsGap } >= 2
+        guard !drawnAsAnEntry,
+              known.count(where: { Self.drawnAlike($0, block) && $0.followsGap == block.followsGap }) >= 2 else {
+            return .partOfTheSection
+        }
+        return Self.opensAnEntry(document.blocks[position + 1], in: document) ? .heading : .doubtful
     }
 
     /// Whether a text has letters, all of them capitals.
@@ -96,6 +116,19 @@ struct HeadingLook {
         guard let next, isBare(next, in: document), position + 2 < blocks.count else { return false }
         let after = blocks[position + 2]
         return after.column == column && holdsAPeriod(after, in: document)
+    }
+
+    /// Whether a block reads as the first line of an entry of its own: a line cut by the separators of the entries into
+    /// two or more parts with letters, none of them a role and none past the first a place ("Hive Monitor Kit — maker,
+    /// solo"). Under the employer of a job stand a bullet, a role alone ("Technician"), a role with its place, known or
+    /// not ("Technician — Hollowford"), a team and its role ("Pump Division — Technician") and a line whose later part
+    /// is a known place.
+    private static func opensAnEntry(_ block: SourceBlock, in document: SourceDocument) -> Bool {
+        guard block.kind == .line else { return false }
+        let parts = Piece.cells(of: block, in: document).flatMap { $0.split(by: Separators.strong) }
+            .filter { $0.text.contains(where: \.isLetter) }
+        return parts.count >= 2 && !parts.contains { EntryVocabulary.isRole($0.text) }
+            && !parts.dropFirst().contains { Places.isKnownPlace($0.text) }
     }
 
     /// Whether the text of a block holds a period ("2017 – Present", "July 2017 – June 2019").

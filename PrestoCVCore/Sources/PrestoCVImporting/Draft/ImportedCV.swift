@@ -49,6 +49,9 @@ public enum CheckReason: String, Hashable, Sendable, CaseIterable {
     /// Nothing in the section told whether the lines next to the entry's dates are its own or the entry's beside it:
     /// the more common layout decided.
     case entryBoundsUnsure
+    /// A line in capitals in the entry may be a heading the vocabulary does not know: the lines stayed where they read
+    /// best, to be checked.
+    case headingUnsure
     /// A date the rules could not make a period of, such as an end before the start.
     case periodUnreadable
     /// A period without an end: "2019 –".

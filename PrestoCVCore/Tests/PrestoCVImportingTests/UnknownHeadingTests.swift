@@ -672,4 +672,149 @@ struct UnknownHeadingTests {
         """
         #expect(!kinds(text).contains(.unknown), "\(kinds(text))")
     }
+
+    // MARK: A doubtful heading
+
+    /// A field technician's CV with `experience` under its heading, a skill and a language after it.
+    private static func doubtfulCV(_ experience: [String], after tail: [String] = []) -> String {
+        (["Lena Okafor", "lena.okafor@example.com", "SUMMARY", "Field technician.", "EXPERIENCE"] + experience
+            + ["SKILLS", "Welding", "LANGUAGES", "Italian — native"] + tail).joined(separator: "\n")
+    }
+
+    /// Jobs with a line in capitals, drawn as the known headings, that the line below it does not settle: a bullet, a role
+    /// alone, a role with a place, known or not, a team and its role. It may be a heading the vocabulary does not know or
+    /// the employer of a job.
+    struct DoubtfulHeading: Sendable, CustomTestStringConvertible {
+        let testDescription: String
+        let experience: [String]
+        /// The roles, the employers and the places the import reads on main, in order.
+        let roles: [String?]
+        let employers: [String?]
+        let places: [String?]
+        let checks: [CheckReason?]
+    }
+
+    static let doubtful: [DoubtfulHeading] = [
+        DoubtfulHeading(
+            testDescription: "under a role, over a bullet",
+            experience: [
+                "2020 – Present", "Technician", "BRACKEN MILLS", "• Serviced pumps.",
+                "2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers.",
+            ],
+            roles: ["Technician", "Technician"], employers: ["BRACKEN MILLS", "Marlow Studio"], places: [nil, nil],
+            checks: [.headingUnsure, nil]
+        ),
+        DoubtfulHeading(
+            testDescription: "over a role alone",
+            experience: [
+                "2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers.",
+                "2020 – Present", "BRACKEN MILLS", "Technician", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Technician"], employers: ["Marlow Studio", "BRACKEN MILLS"], places: [nil, nil],
+            checks: [nil, .headingUnsure]
+        ),
+        DoubtfulHeading(
+            testDescription: "over a role and a place",
+            experience: [
+                "Technician — Marlow Studio, Bergamo", "2016 – 2020", "• Serviced boilers.",
+                "BRACKEN MILLS", "Technician — Dresden", "2020 – Present", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Technician"], employers: ["Marlow Studio", nil], places: ["Bergamo", "Dresden"],
+            checks: [.headingUnsure, nil]
+        ),
+        DoubtfulHeading(
+            testDescription: "over a role and a town the places do not know",
+            experience: [
+                "Technician — Marlow Studio, Bergamo", "2016 – 2020", "• Serviced boilers.",
+                "BRACKEN MILLS", "Technician — Hollowford", "2020 – Present", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Technician"], employers: ["Marlow Studio", "Hollowford"], places: ["Bergamo", nil],
+            checks: [.headingUnsure, .roleOrEmployerByOrder]
+        ),
+        DoubtfulHeading(
+            testDescription: "over a team and its role",
+            experience: [
+                "Technician — Marlow Studio", "2016 – 2020", "• Serviced boilers.",
+                "BRACKEN MILLS", "Pump Division — Technician", "2020 – Present", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Technician"], employers: ["Marlow Studio", "Pump Division"], places: [nil, nil],
+            checks: [.headingUnsure, .roleOrEmployerByOrder]
+        ),
+        DoubtfulHeading(
+            testDescription: "among labelled jobs",
+            experience: [
+                "Dates: 2016 – 2020", "Employer: Marlow Studio", "Role: Technician", "BRACKEN MILLS", "• Serviced pumps.",
+                "Dates: 2020 – Present", "Role: Technician",
+            ],
+            roles: ["Technician", "Technician"], employers: ["Marlow Studio", nil], places: [nil, nil],
+            checks: [.headingUnsure, nil]
+        ),
+    ]
+
+    @Test("A line in capitals the line below does not settle stays where main reads it, in a job to be checked", arguments: doubtful)
+    func doubtfulHeadingStaysInItsJob(_ row: DoubtfulHeading) throws {
+        let text = Self.doubtfulCV(row.experience)
+        #expect(!kinds(text).contains(.unknown), "\(kinds(text))")
+        let result = try importText(text)
+        let jobs = result.cv.experience
+        #expect(jobs.map(\.role?.value) == row.roles, "\(jobs.map { [$0.role?.value, $0.employer?.value] })")
+        #expect(jobs.map(\.employer?.value) == row.employers, "\(jobs.map { [$0.role?.value, $0.employer?.value] })")
+        #expect(jobs.map(\.location?.value) == row.places, "\(jobs.map(\.location?.value))")
+        #expect(jobs.map(\.check) == row.checks, "\(jobs.map(\.check))")
+        for (index, check) in row.checks.enumerated() {
+            let listed = result.reviewList.contains { $0.field == .experience(index) && $0.reason == .headingUnsure }
+            #expect(listed == (check == .headingUnsure), "job \(index): \(result.reviewList.map { ($0.field, $0.reason) })")
+        }
+        #expect(!result.unplaced.contains { $0.heading == "BRACKEN MILLS" }, "\(result.unplaced.map { ($0.heading, $0.text) })")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
+
+    @Test("A line in capitals under a degree, over a bullet, stays where main reads it, in a study to be checked")
+    func doubtfulHeadingStaysInItsStudy() throws {
+        let text = Self.doubtfulCV(
+            ["2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers."],
+            after: [
+                "EDUCATION", "2013 – 2016", "Diploma in Welding", "HOLLOWAY TRUST", "• Practical modules.",
+                "2009 – 2013", "BSc Geology — University of Northbridge",
+            ]
+        )
+        #expect(!kinds(text).contains(.unknown), "\(kinds(text))")
+        let result = try importText(text)
+        let studies = result.cv.education
+        #expect(studies.map(\.degree?.value) == ["Diploma in Welding", "BSc Geology"], "\(studies.map { [$0.degree?.value, $0.school?.value] })")
+        #expect(studies.map(\.school?.value) == ["HOLLOWAY TRUST", "University of Northbridge"], "\(studies.map { [$0.degree?.value, $0.school?.value] })")
+        #expect(studies.map(\.check) == [.headingUnsure, nil], "\(studies.map(\.check))")
+        #expect(result.reviewList.contains { $0.field == .education(0) && $0.reason == .headingUnsure }, "\(result.reviewList.map { ($0.field, $0.reason) })")
+        #expect(!result.reviewList.contains { $0.field == .education(1) && $0.reason == .headingUnsure }, "\(result.reviewList.map { ($0.field, $0.reason) })")
+        #expect(!result.unplaced.contains { $0.heading == "HOLLOWAY TRUST" }, "\(result.unplaced.map { ($0.heading, $0.text) })")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
+
+    @Test("A line in capitals after the studies, over an entry of its own, still opens a section")
+    func unknownHeadingAfterTheStudies() throws {
+        let text = [
+            "Lena Okafor", "lena.okafor@example.com", "SUMMARY", "Field technician.", "EXPERIENCE",
+            "2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers.",
+            "EDUCATION", "BSc Geology — University of Northbridge", "2009 – 2013",
+            "SIDE PROJECTS", "Hive Monitor Kit — maker, solo", "SKILLS", "Welding",
+        ].joined(separator: "\n")
+        #expect(kinds(text).contains(.unknown), "\(kinds(text))")
+        let result = try importText(text)
+        let under = result.unplaced.filter { $0.heading == "SIDE PROJECTS" }.map(\.text).joined(separator: "\n")
+        #expect(under.contains("Hive Monitor Kit — maker, solo"), "\(result.unplaced.map { ($0.heading, $0.text) })")
+        #expect(result.cv.education.first?.location == nil, "\(result.cv.education.map(\.location?.value))")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
+
+    @Test("A line in capitals after the languages, over a bullet, still opens a section")
+    func unknownHeadingAfterTheLanguages() throws {
+        let text = Self.doubtfulCV(
+            ["2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers."], after: ["SIDE PROJECTS", "• Hive monitor kit"]
+        )
+        #expect(kinds(text).contains(.unknown), "\(kinds(text))")
+        let result = try importText(text)
+        let under = result.unplaced.filter { $0.heading == "SIDE PROJECTS" }.map(\.text).joined(separator: "\n")
+        #expect(under.contains("Hive monitor kit"), "\(result.unplaced.map { ($0.heading, $0.text) })")
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
+    }
 }

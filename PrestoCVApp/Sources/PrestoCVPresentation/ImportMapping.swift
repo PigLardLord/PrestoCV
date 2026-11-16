@@ -65,6 +65,7 @@ extension ReviewReason {
         case .summaryWithoutHeading: self = .summaryWithoutHeading
         case .roleOrEmployerByOrder: self = .roleOrEmployerByOrder
         case .entryBoundsUnsure: self = .entryBoundsUnsure
+        case .headingUnsure: self = .headingUnsure
         case .periodUnreadable: self = .periodUnreadable
         case .periodOpenEnd: self = .periodOpenEnd
         case .periodNotARange: self = .periodNotARange

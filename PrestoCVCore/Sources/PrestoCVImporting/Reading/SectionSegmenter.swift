@@ -10,6 +10,9 @@ struct Section: Equatable {
     /// The heading is one of the first level in the shape of a name that closed the head: it could have been the name
     /// (#301), so the name the head gives is to be checked.
     var headingCouldBeTheName = false
+    /// The indices of the blocks that may be a heading the vocabulary does not know, left in the section (#454): the
+    /// entry that takes one is to be checked.
+    var doubtfulHeadings: Set<Int> = []
 
     /// What the heading is in the text: its block, or, when a row of cells opens the section, its first cell.
     var headingSpan: SourceSpan? {
@@ -82,11 +85,22 @@ enum SectionSegmenter {
                 ))
                 continue
             }
-            // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454)
-            if !headKinds.contains(sections[sections.count - 1].kind),
-               try look.opensSection(block, at: position, after: sections[sections.count - 1], in: document, work: &work) {
-                sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
-                continue
+            // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454). One that
+            // may as well be the employer of a job stays in the jobs and the studies, where its entry is to be checked
+            let current = sections[sections.count - 1]
+            if !headKinds.contains(current.kind) {
+                switch try look.reading(block, at: position, after: current, in: document, work: &work) {
+                case .heading:
+                    sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
+                    continue
+                case .doubtful where entryKinds.contains(current.kind):
+                    sections[sections.count - 1].doubtfulHeadings.insert(block.index)
+                case .doubtful:
+                    sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
+                    continue
+                case .partOfTheSection:
+                    break
+                }
             }
             sections[sections.count - 1].blocks.append(block)
         }
@@ -97,6 +111,9 @@ enum SectionSegmenter {
 
     /// The sections the head of the CV is read from.
     private static let headKinds: Set<SectionKind> = [.header, .personal]
+
+    /// The sections read as entries with an employer or a school, where a line in capitals may be either.
+    private static let entryKinds: Set<SectionKind> = [.experience, .education]
 
     /// Whether the contacts of the head follow a name, read from the head's `sections`: the head is read again for each
     /// heading of the first level that has the shape of a name, which the head grows by when it is no section's. A block of

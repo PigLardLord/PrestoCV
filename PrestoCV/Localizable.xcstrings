@@ -9780,6 +9780,47 @@
         }
       }
     },
+    "import.review.reason.heading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Zeile in Großbuchstaben hier ist vielleicht eine Abschnittsüberschrift: Prüfen Sie, ob sie zu diesem Eintrag gehört."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A line in capitals here may be a section heading: check that it belongs to this entry."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una línea en mayúsculas aquí puede ser el título de una sección: comprueba que pertenece a esta entrada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une ligne en majuscules ici est peut-être un titre de section : vérifiez qu'elle appartient à cette entrée."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una riga in maiuscolo qui potrebbe essere il titolo di una sezione: controlla che appartenga a questa voce."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma linha em maiúsculas aqui pode ser o título de uma seção: verifique se pertence a esta entrada."
+          }
+        }
+      }
+    },
     "import.review.reason.language" : {
       "extractionState" : "manual",
       "localizations" : {
