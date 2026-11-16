@@ -203,20 +203,53 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
-    @Test("A French licence stays a study after a certification, by the word that follows it", arguments: [
-        "Licence en Droit", "Licence professionnelle Logistique", "Licence d'Économie", "Licence ès Lettres",
-    ])
+    static let frenchLicences = ["Licence en Droit", "Licence professionnelle Logistique", "Licence d'Économie", "Licence ès Lettres"]
+
+    /// A French licence is a degree, not a permission to work: the word that follows it says so.
+    @Test(
+        "A French licence stays a study after a certification under a heading of studies, by the word that follows it",
+        arguments: StudiesAndCertificatesTests.frenchLicences
+    )
     func frenchLicence(degree: String) throws {
         let body = """
             Certified Scrum Developer — Scrum Alliance, 2019
             \(degree), 2011
             """
-        let found = try importText(cv(heading: "Education & Certifications", body: body))
+        let found = try importText(cv(heading: "EDUCATION & TRAINING", body: body))
 
         #expect(found.cv.education.map { $0.degree?.value } == [degree])
         #expect(found.cv.certifications.map(\.name.value) == ["Certified Scrum Developer"])
         #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    /// Under a heading that joins the two kinds, a degree with no school and no period with an end is of no kind the
+    /// reading can tell (rule 1): the licence stays in the text not imported, where the person sees it, and is a study when
+    /// the line just below names its school (rule 3).
+    @Test(
+        "A French licence stays in the text not imported under a joined heading, and is a study over the line of its school",
+        arguments: StudiesAndCertificatesTests.frenchLicences
+    )
+    func frenchLicenceUnderAJoinedHeading(degree: String) throws {
+        let heading = "Education & Certifications"
+        let certification = "Certified Scrum Developer — Scrum Alliance, 2019"
+        let alone = try importText(cv(heading: heading, body: "\(certification)\n\(degree), 2011"))
+
+        #expect(alone.cv.education.isEmpty)
+        #expect(alone.cv.certifications.map(\.name.value) == ["Certified Scrum Developer"])
+        #expect(alone.unplaced.map(\.text) == ["\(degree), 2011"])
+        #expect(alone.unplaced.map(\.section) == [.additional], "the text not imported stays under the section it was in")
+        #expect(alone.unplaced.map(\.heading) == [heading])
+        #expect(Coverage.lost(alone).isEmpty, "\(Coverage.describe(Coverage.lost(alone)))")
+
+        let atItsSchool = try importText(cv(heading: heading, body: "\(certification)\n\(degree), 2011\nUniversité de Lyon"))
+
+        #expect(atItsSchool.cv.education.map { $0.degree?.value } == [degree])
+        #expect(atItsSchool.cv.education.map { $0.school?.value } == ["Université de Lyon"])
+        #expect(atItsSchool.cv.education.map { $0.period?.value } == [ImportedPeriod(start: ym(2011), end: nil)])
+        #expect(atItsSchool.cv.certifications.map(\.name.value) == ["Certified Scrum Developer"])
+        #expect(atItsSchool.unplaced.isEmpty, "\(atItsSchool.unplaced.map(\.text))")
+        #expect(Coverage.lost(atItsSchool).isEmpty, "\(Coverage.describe(Coverage.lost(atItsSchool)))")
     }
 
     @Test("A course on large language models is a certification by its issuer and year, not a master of laws")
@@ -490,13 +523,15 @@ struct StudiesAndCertificatesTests {
         DegreeLine(line: "Honours Degree — NIT, 2015", degree: "Honours Degree"),
     ]
 
-    /// An issuer and a single year are what a study shows too: the degree in the name says what the line is, alone under
-    /// the heading, after a study and after a certification.
+    /// An issuer and a single year are what a study shows too: under a heading of studies the degree in the name says what
+    /// the line is, alone under the heading, after a study and after a certification. Under a heading that joins the two
+    /// kinds the same line stays in the text not imported (`degreeWithNoSchool`).
     @Test(
-        "A degree named in a line with an issuer and a single year is a study, not a certification",
-        arguments: StudiesAndCertificatesTests.degreesNamedInTheLine, ["Education & Certifications", "EDUCATION & TRAINING"]
+        "A degree named in a line with an issuer and a single year is a study under a heading of studies, not a certification",
+        arguments: StudiesAndCertificatesTests.degreesNamedInTheLine
     )
-    func degreeNamedInTheLine(degree: DegreeLine, heading: String) throws {
+    func degreeNamedInTheLine(degree: DegreeLine) throws {
+        let heading = "EDUCATION & TRAINING"
         let study = """
             BSc Computer Science — University of Leipzig
             2010 – 2014
@@ -565,9 +600,9 @@ struct StudiesAndCertificatesTests {
 
     // MARK: A certificate named after a degree
 
-    /// A line that names a degree together with the noun of a certificate ("Certificate", "Certificato"), with an issuer
-    /// that is not a school, a single year and no period with an end, and the degree it gives under a heading of studies:
-    /// with each separator, with the year first, and with the noun in a note after the degree.
+    /// A line that names a degree together with the noun of a certificate ("Certificate", "Certificato", "Bescheinigung"),
+    /// with an issuer that is not a school, a single year and no period with an end, and the degree it gives under a heading
+    /// of studies: with each separator, with the year first, and with the noun in a note after the degree.
     static let certificatesNamedAfterADegree = [
         DegreeLine(line: "MBA Exam Preparation Certificate — Meridian Board, 2021", degree: "MBA Exam Preparation Certificate"),
         DegreeLine(
@@ -580,23 +615,33 @@ struct StudiesAndCertificatesTests {
         DegreeLine(line: "MBA Exam Preparation Certificate - Meridian Board, 2021", degree: "MBA Exam Preparation Certificate"),
         DegreeLine(line: "2021 — MBA Exam Preparation Certificate — Meridian Board", degree: "MBA Exam Preparation Certificate"),
         DegreeLine(line: "MBA — Meridian Board, 2021 (exam preparation certificate)", degree: "MBA"),
+        DegreeLine(
+            line: "MBA Prüfungsvorbereitung Bescheinigung — Meridian Board, 2021", degree: "MBA Prüfungsvorbereitung Bescheinigung"
+        ),
     ]
 
-    /// A certificate is what a course and a study both give, so a degree named beside it does not tell the kind: under a
-    /// heading that joins the two kinds the line stays in the text not imported, alone, after a study and after a
-    /// certification, rather than move silently to Education or to Certifications.
+    /// The lines that name a degree with no school and no period with an end: the certificates named after a degree, the
+    /// degrees named in the line with an issuer and a single year, a degree with a single year, and a degree alone.
+    static let degreesWithNoSchool: [DegreeLine] = Self.certificatesNamedAfterADegree + Self.degreesNamedInTheLine + [
+        DegreeLine(line: "Bachelor of Arts, 2014", degree: "Bachelor of Arts"),
+        DegreeLine(line: "Master of Science in Physics", degree: "Master of Science in Physics"),
+    ]
+
+    /// A degree is what a course and a study can both name, so with no school and no period with an end it does not tell
+    /// the kind: under a heading that joins the two kinds the line stays in the text not imported, alone, after a study and
+    /// after a certification, rather than move silently to Education or to Certifications (rule 1).
     @Test(
-        "A degree named with the noun of a certificate, with no school and no period, stays in the text not imported under a joined heading",
-        arguments: StudiesAndCertificatesTests.certificatesNamedAfterADegree
+        "A degree with no school and no period stays in the text not imported under a joined heading",
+        arguments: StudiesAndCertificatesTests.degreesWithNoSchool
     )
-    func certificateNamedAfterADegree(certificate: DegreeLine) throws {
+    func degreeWithNoSchool(degree: DegreeLine) throws {
         let heading = "Education & Certifications"
         for body in Self.bodies {
-            let found = try importText(cv(heading: heading, body: (body.before + [certificate.line]).joined(separator: "\n")))
+            let found = try importText(cv(heading: heading, body: (body.before + [degree.line]).joined(separator: "\n")))
 
             #expect(found.cv.education.map { $0.degree?.value } == body.studies)
             #expect(found.cv.certifications.map(\.name.value) == body.certifications)
-            #expect(found.unplaced.map(\.text) == [certificate.line])
+            #expect(found.unplaced.map(\.text) == [degree.line])
             #expect(found.unplaced.map(\.section) == [.additional], "the text not imported stays under the section it was in")
             #expect(found.unplaced.map(\.heading) == [heading])
             #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
@@ -623,38 +668,121 @@ struct StudiesAndCertificatesTests {
         }
     }
 
-    /// The lines of a degree named with the noun of a certificate at a school, with the study they must give.
-    struct CertificateAtASchool: Sendable, CustomTestStringConvertible {
+    /// The lines of a degree at a school, with the study they must give.
+    struct DegreeAtASchool: Sendable, CustomTestStringConvertible {
         let lines: String
         let degree: String
+        let school: String
+        let period: ImportedPeriod?
         var testDescription: String { lines }
     }
 
-    static let certificatesAtASchool = [
-        CertificateAtASchool(lines: "MBA Certificate\nUniversity of Northbridge, 2021", degree: "MBA Certificate"),
-        CertificateAtASchool(
-            lines: "MBA Exam Preparation Certificate — University of Northbridge, 2021", degree: "MBA Exam Preparation Certificate"
+    /// The years from `start` to `end`, or a single year when `end` is nil.
+    private static func years(_ start: Int, _ end: Int?) -> ImportedPeriod {
+        ImportedPeriod(start: YearMonth(year: start, month: nil), end: end.map { .date(YearMonth(year: $0, month: nil)) })
+    }
+
+    static let degreesAtASchool = [
+        DegreeAtASchool(
+            lines: "MBA Certificate\nUniversity of Northbridge, 2021", degree: "MBA Certificate",
+            school: "University of Northbridge", period: years(2021, nil)
+        ),
+        DegreeAtASchool(
+            lines: "MBA Exam Preparation Certificate — University of Northbridge, 2021", degree: "MBA Exam Preparation Certificate",
+            school: "University of Northbridge", period: years(2021, nil)
+        ),
+        DegreeAtASchool(
+            lines: "MBA Certificate\nUniversity of Northbridge, 2019 – 2021", degree: "MBA Certificate",
+            school: "University of Northbridge", period: years(2019, 2021)
+        ),
+        DegreeAtASchool(
+            lines: "Executive Master of Business Administration\nUniversity of Northbridge, 2021",
+            degree: "Executive Master of Business Administration", school: "University of Northbridge", period: years(2021, nil)
+        ),
+        DegreeAtASchool(
+            lines: "Master of Science in Physics\nUniversity of Leipzig, 2010 – 2014", degree: "Master of Science in Physics",
+            school: "University of Leipzig", period: years(2010, 2014)
+        ),
+        DegreeAtASchool(
+            lines: "Bachelor of Arts, 2014\nUniversity of Leipzig", degree: "Bachelor of Arts",
+            school: "University of Leipzig", period: years(2014, nil)
         ),
     ]
 
-    /// A school settles the doubt, on the same line or on the line below (rule 3): the degree, the school and the year are
-    /// one study.
+    /// A school settles the doubt, on the same line or on the line just below (rule 3): the degree, the school and the
+    /// dates are one study.
     @Test(
-        "A degree named with the noun of a certificate at a school is a study under a joined heading",
-        arguments: StudiesAndCertificatesTests.certificatesAtASchool
+        "A degree at a school is a study under a joined heading, with its school on its line or on the line below",
+        arguments: StudiesAndCertificatesTests.degreesAtASchool
     )
-    func certificateNamedAfterADegreeAtASchool(certificate: CertificateAtASchool) throws {
+    func degreeAtASchool(degree: DegreeAtASchool) throws {
         for body in Self.bodies {
-            let text = (body.before + [certificate.lines]).joined(separator: "\n")
+            let text = (body.before + [degree.lines]).joined(separator: "\n")
             let found = try importText(cv(heading: "Education & Certifications", body: text))
 
-            #expect(found.cv.education.map { $0.degree?.value } == body.studies + [certificate.degree])
-            #expect(found.cv.education.last?.school?.value == "University of Northbridge")
-            #expect(found.cv.education.last?.period?.value == ImportedPeriod(start: ym(2021), end: nil))
+            #expect(found.cv.education.map { $0.degree?.value } == body.studies + [degree.degree])
+            #expect(found.cv.education.last?.school?.value == degree.school)
+            #expect(found.cv.education.last?.period?.value == degree.period)
             #expect(found.cv.certifications.map(\.name.value) == body.certifications)
             #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
             #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
         }
+    }
+
+    /// A degree with no dates over its school's line is a study too, alone or after a certification. After a dated study
+    /// the education reader keeps a dateless degree with the study above and flags it entryBoundsUnsure, as it does under
+    /// a heading of studies: that grouping is the reader's, not this rule's, so the case is not run after a study.
+    @Test(
+        "A dateless degree over its school's line is a study under a joined heading",
+        arguments: [
+            (before: [String](), certifications: [String]()),
+            (before: ["Certified Scrum Developer — Scrum Alliance, 2019"], certifications: ["Certified Scrum Developer"]),
+        ]
+    )
+    func datelessDegreeAtASchool(before: [String], certifications: [String]) throws {
+        let text = (before + ["Master of Science in Physics\nUniversity of Leipzig"]).joined(separator: "\n")
+        let found = try importText(cv(heading: "Education & Certifications", body: text))
+
+        #expect(found.cv.education.map { $0.degree?.value } == ["Master of Science in Physics"])
+        #expect(found.cv.education.last?.school?.value == "University of Leipzig")
+        #expect(found.cv.education.last?.period == nil)
+        #expect(found.cv.certifications.map(\.name.value) == certifications)
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    /// The lines of a degree that its school does not settle, with the line that stays in the text not imported.
+    struct DegreeOutOfReach: Sendable, CustomTestStringConvertible {
+        let lines: String
+        let unplaced: String
+        var testDescription: String { lines }
+    }
+
+    static let degreesOutOfReach = [
+        DegreeOutOfReach(lines: "Master of Science in Physics\n2010 – 2014\nUniversity of Leipzig", unplaced: "Master of Science in Physics"),
+        DegreeOutOfReach(lines: "University of Leipzig\nMaster of Science in Physics, 2014", unplaced: "Master of Science in Physics, 2014"),
+        DegreeOutOfReach(
+            lines: "Executive Master of Business Administration — Meridian Board, 2021\nUniversity of Northbridge",
+            unplaced: "Executive Master of Business Administration — Meridian Board, 2021"
+        ),
+    ]
+
+    /// Only the line just below settles a degree, and only a degree that names no issuer: a degree over its dates and then
+    /// its school, a degree under its school, and a degree with an issuer over a school's line stay in the text not
+    /// imported, where the person sees them; the school's line is a study of its own.
+    @Test(
+        "A degree its school's line does not settle stays in the text not imported under a joined heading",
+        arguments: StudiesAndCertificatesTests.degreesOutOfReach
+    )
+    func degreeOutOfReach(degree: DegreeOutOfReach) throws {
+        let heading = "Education & Certifications"
+        let found = try importText(cv(heading: heading, body: degree.lines))
+
+        #expect(found.unplaced.map(\.text) == [degree.unplaced])
+        #expect(found.unplaced.map(\.heading) == [heading])
+        #expect(found.cv.education.map { $0.degree?.value } == [nil])
+        #expect(found.cv.certifications.isEmpty)
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
     /// The lines before the line under test: none, a study, a study and a certification; with what they give.
