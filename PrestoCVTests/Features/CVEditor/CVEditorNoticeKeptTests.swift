@@ -180,6 +180,130 @@ struct CVEditorNoticeKeptTests {
             #expect(viewModel.noticeIsDismissible == dismissible, "\(String(describing: notice))")
         }
     }
+
+    // MARK: A notice that cannot be kept
+
+    @Test("When the CV is stored and its notice cannot be kept, the save fails as for the CV, and Retry keeps the notice without storing the CV twice")
+    func noticeNotKeptFailsTheSave() async throws {
+        let useCase = MockCVManagementUseCase()
+        let store = FailingNoticeStore(failures: 1)
+        let viewModel = CVEditorViewModel(
+            cvId: nil, initialCV: imported(), notice: .imported(review), cvManagementUseCase: useCase, noticeStore: store
+        )
+        let heard = Heard(of: viewModel)
+
+        let saved = await viewModel.saveNow()
+
+        #expect(!saved, "The notice is only in memory")
+        #expect(viewModel.showsSaveFailure)
+        #expect(!viewModel.showsSavedOnDevice)
+        #expect(!viewModel.storeHoldsWhatTheFormShows, "Leaving the editor would lose the notice")
+        #expect(heard.kinds == [.failed])
+        let stored = try #require(await useCase.createdCVs.first, "The CV itself is stored")
+
+        await viewModel.retrySaving()
+
+        #expect(await useCase.createdCVs.count == 1, "The CV is stored once")
+        #expect(await useCase.updatedCVs.map(\.id) == [stored.id], "The retry updates the CV the store holds")
+        #expect(!viewModel.showsSaveFailure)
+        #expect(viewModel.showsSavedOnDevice)
+        #expect(viewModel.storeHoldsWhatTheFormShows)
+        #expect(heard.kinds == [.failed, .saved])
+        #expect(await store.keepAttempts == 2)
+        let reopened = CVEditorViewModel(cvId: stored.id.uuidString, cvManagementUseCase: useCase, noticeStore: store)
+        await reopened.loadCV()
+        #expect(reopened.notice == .imported(review), "The CV opens again with its notice")
+    }
+
+    @Test("A notice that could not be kept is kept by the next save")
+    func nextSaveKeepsTheNotice() async throws {
+        let useCase = MockCVManagementUseCase()
+        let store = FailingNoticeStore(failures: 1)
+        let viewModel = CVEditorViewModel(
+            cvId: nil, initialCV: imported(), notice: .imported(review), cvManagementUseCase: useCase, noticeStore: store
+        )
+        await viewModel.saveNow()
+
+        let saved = await viewModel.saveNow()
+
+        let stored = try #require(await useCase.createdCVs.first)
+        #expect(saved)
+        #expect(await useCase.createdCVs.count == 1)
+        #expect(await store.notice(ofCVWithId: stored.id) == .imported(review))
+        #expect(viewModel.showsSavedOnDevice)
+    }
+
+    @Test("A notice dismissed while its keep waits for a retry is never kept, and the retry settles the failure")
+    func noticeDismissedWhileItsKeepWaits() async throws {
+        let useCase = MockCVManagementUseCase()
+        let store = FailingNoticeStore(failures: 1)
+        let viewModel = CVEditorViewModel(
+            cvId: nil, initialCV: imported(), notice: .imported(review), cvManagementUseCase: useCase, noticeStore: store
+        )
+        await viewModel.saveNow()
+
+        await viewModel.dismissNotice()
+        await viewModel.retrySaving()
+
+        let stored = try #require(await useCase.createdCVs.first)
+        #expect(!viewModel.showsSaveFailure)
+        #expect(viewModel.showsSavedOnDevice)
+        #expect(await store.notice(ofCVWithId: stored.id) == nil)
+        #expect(await store.keepAttempts == 1, "Nothing is left to keep")
+    }
+
+    @Test("A CV whose notice keeps failing stays unsaved, retry after retry, and is stored once")
+    func noticeThatKeepsFailing() async throws {
+        let useCase = MockCVManagementUseCase()
+        let store = FailingNoticeStore(failures: 3)
+        let viewModel = CVEditorViewModel(
+            cvId: nil, initialCV: imported(), notice: .imported(review), cvManagementUseCase: useCase, noticeStore: store
+        )
+        let heard = Heard(of: viewModel)
+
+        await viewModel.saveNow()
+        await viewModel.retrySaving()
+        await viewModel.retrySaving()
+
+        #expect(viewModel.showsSaveFailure)
+        #expect(await useCase.createdCVs.count == 1)
+        #expect(heard.kinds == [.failed, .failed, .failed], "Each failed write is heard")
+
+        await viewModel.retrySaving()
+
+        #expect(!viewModel.showsSaveFailure)
+        #expect(heard.kinds == [.failed, .failed, .failed, .saved])
+        let stored = try #require(await useCase.createdCVs.first)
+        #expect(await store.notice(ofCVWithId: stored.id) == .imported(review))
+    }
+
+    @Test("A CV the store holds while its notice waits to be kept stays to be written, even once it is emptied")
+    func emptiedCVWhoseNoticeWaits() async throws {
+        let useCase = MockCVManagementUseCase()
+        let store = FailingNoticeStore(failures: 1)
+        let viewModel = CVEditorViewModel(
+            cvId: nil, initialCV: imported(), notice: .imported(review), cvManagementUseCase: useCase, noticeStore: store
+        )
+        let heard = Heard(of: viewModel)
+        await viewModel.saveNow()
+
+        viewModel.cv.personalInfo = PersonalInfo()
+
+        #expect(viewModel.showsSaveFailure, "The store holds the CV as imported, without its notice")
+        #expect(!viewModel.storeHoldsWhatTheFormShows)
+        #expect(heard.kinds == [.failed])
+        #expect(viewModel.screenTitle == "cv.untitled".localized, "The store holds the CV: it is no longer a new one")
+
+        await viewModel.retrySaving()
+
+        let stored = try #require(await useCase.createdCVs.first)
+        #expect(await useCase.createdCVs.count == 1)
+        #expect(await useCase.updatedCVs.last?.personalInfo.name == "")
+        #expect(!viewModel.showsSaveFailure)
+        #expect(viewModel.storeHoldsWhatTheFormShows)
+        #expect(heard.kinds == [.failed, .saved])
+        #expect(await store.notice(ofCVWithId: stored.id) == .imported(review))
+    }
 }
 
 // MARK: - What VoiceOver hears
@@ -249,6 +373,42 @@ private actor HeldNoticeStore: EditorNoticeStore {
 
     private func hold(_ continuation: CheckedContinuation<Void, Never>) {
         held.append(continuation)
+    }
+}
+
+// MARK: - A notice that cannot be kept
+
+/// A store whose first `failures` keeps throw, as a full disk would; the keeps after them succeed.
+private actor FailingNoticeStore: EditorNoticeStore {
+    struct KeepFailed: Error {}
+
+    private var notices: [UUID: EditorNotice] = [:]
+    private var failuresLeft: Int
+    private(set) var keepAttempts = 0
+
+    init(failures: Int) {
+        failuresLeft = failures
+    }
+
+    func notice(ofCVWithId id: UUID) -> EditorNotice? {
+        notices[id]
+    }
+
+    func keep(_ notice: EditorNotice, forCVWithId id: UUID) throws {
+        keepAttempts += 1
+        if failuresLeft > 0 {
+            failuresLeft -= 1
+            throw KeepFailed()
+        }
+        notices[id] = notice
+    }
+
+    func forget(cvWithId id: UUID) {
+        notices[id] = nil
+    }
+
+    func keptCVIds() -> [UUID] {
+        Array(notices.keys)
     }
 }
 

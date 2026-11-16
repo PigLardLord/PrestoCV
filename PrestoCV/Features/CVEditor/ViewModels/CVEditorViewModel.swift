@@ -58,9 +58,10 @@ final class CVEditorViewModel: ObservableObject {
         cv.editorTitle(isStored: isStored)
     }
 
-    /// Whether the store holds the CV: it did when the editor opened, or a write has stored it.
+    /// Whether the store holds the CV: it did when the editor opened, or a write has stored it, even one that failed
+    /// afterwards because the CV's notice could not be kept.
     private var isStored: Bool {
-        autosave?.isStored ?? false
+        (autosave?.isStored ?? false) || noticeKeeper.storesCV(withId: cv.id)
     }
     
     /// Whether the CV has enough content to be saved, by the save rule of PrestoCVDomain
@@ -362,17 +363,20 @@ final class CVEditorViewModel: ObservableObject {
             content: cv,
             unchangedFrom: baseline,
             isStored: isStored,
-            isWorthStoring: { $0.allowsSaving },
+            // A CV the store holds is written whatever it holds, also while the keep of its notice waits for a retry
+            isWorthStoring: { cv in cv.allowsSaving || keeper.storesCV(withId: cv.id) },
             clock: clock,
             onWriteFailure: reportSaveFailure,
-            // The write needs nothing of this editor, so that one that ends after the editor is gone still stores the CV
+            // The write needs nothing of this editor, so that one that ends after the editor is gone still stores the CV.
+            // When the CV is stored and its notice cannot be kept, the write fails as for the CV itself: the next write
+            // updates the CV the store holds, never stores it a second time, and keeps the notice then
             write: { cv, isStored in
-                if isStored {
+                if isStored || keeper.storesCV(withId: cv.id) {
                     _ = try await cvs.updateCV(cv)
                 } else {
                     _ = try await cvs.storeNewCV(cv)
-                    await keeper.cvIsStored(withId: cv.id)
                 }
+                try await keeper.cvIsStored(withId: cv.id)
             }
         )
         autosave.onStatusChange = { [weak self] status in self?.saveStatusChanged(to: status) }

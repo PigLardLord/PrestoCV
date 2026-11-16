@@ -44,13 +44,13 @@ struct EditorNoticeStoreTests {
     }
 
     @Test("A kept notice is read back whole, by the CV's id, after the app starts again")
-    func keptNoticeIsReadBack() async {
+    func keptNoticeIsReadBack() async throws {
         let folder = makeTemporaryFolder()
         defer { removeParent(of: folder) }
         let id = UUID()
         let other = UUID()
 
-        await FileEditorNoticeStore(directoryURL: folder).keep(.imported(review), forCVWithId: id)
+        try await FileEditorNoticeStore(directoryURL: folder).keep(.imported(review), forCVWithId: id)
         let store = FileEditorNoticeStore(directoryURL: folder)
 
         #expect(await store.notice(ofCVWithId: id) == .imported(review))
@@ -66,10 +66,10 @@ struct EditorNoticeStoreTests {
         let dismissed = UUID()
         let kept = UUID()
         let privateText = "Harbor Timer | 2019 – 2020"
-        await store.keep(.imported(ImportReview(items: [], passages: [
+        try await store.keep(.imported(ImportReview(items: [], passages: [
             ImportReview.Passage(place: .section("OWN VENTURES"), text: privateText, isWholeSection: true),
         ])), forCVWithId: dismissed)
-        await store.keep(.importedDescription(review), forCVWithId: kept)
+        try await store.keep(.importedDescription(review), forCVWithId: kept)
 
         await store.forget(cvWithId: dismissed)
 
@@ -87,7 +87,7 @@ struct EditorNoticeStoreTests {
         let damaged = UUID()
         let kept = UUID()
         let store = FileEditorNoticeStore(directoryURL: folder)
-        await store.keep(.imported(review), forCVWithId: kept)
+        try await store.keep(.imported(review), forCVWithId: kept)
         let damagedFile = folder.appendingPathComponent("\(damaged.uuidString).json")
         try Data("{ not json".utf8).write(to: damagedFile)
 
@@ -95,7 +95,7 @@ struct EditorNoticeStoreTests {
 
         #expect(!FileManager.default.fileExists(atPath: damagedFile.path))
         #expect(await store.notice(ofCVWithId: kept) == .imported(review))
-        await store.keep(.imported(review), forCVWithId: damaged)
+        try await store.keep(.imported(review), forCVWithId: damaged)
         #expect(await FileEditorNoticeStore(directoryURL: folder).notice(ofCVWithId: damaged) == .imported(review))
     }
 
@@ -106,13 +106,26 @@ struct EditorNoticeStoreTests {
         let store = FileEditorNoticeStore(directoryURL: folder)
         let first = UUID()
         let second = UUID()
-        await store.keep(.imported(review), forCVWithId: first)
-        await store.keep(.importedDescription(review), forCVWithId: second)
+        try await store.keep(.imported(review), forCVWithId: first)
+        try await store.keep(.importedDescription(review), forCVWithId: second)
         for stray in ["notes.txt", "not-a-uuid.json", ".dat.nosync1234", "\(UUID().uuidString).tmp"] {
             try Data("x".utf8).write(to: folder.appendingPathComponent(stray))
         }
 
         #expect(Set(await store.keptCVIds()) == [first, second])
+    }
+
+    @Test("A notice that cannot be written is reported to the caller, so that the editor shows the save as failed (#452)")
+    func unwritableNoticeThrows() async throws {
+        let folder = makeTemporaryFolder()
+        defer { removeParent(of: folder) }
+        try FileManager.default.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: folder)
+        let store = FileEditorNoticeStore(directoryURL: folder)
+
+        await #expect(throws: (any Error).self) {
+            try await store.keep(.imported(review), forCVWithId: UUID())
+        }
     }
 
     @Test("The notices are kept in the app's own folder, beside the CVs")

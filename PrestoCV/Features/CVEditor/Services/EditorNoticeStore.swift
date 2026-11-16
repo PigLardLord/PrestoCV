@@ -9,8 +9,9 @@ private let noticeLogger = Logger(subsystem: "com.PigLardLord.prestocv", categor
 protocol EditorNoticeStore: Sendable {
     /// The notice kept for the CV, or nil when none is kept.
     func notice(ofCVWithId id: UUID) async -> EditorNotice?
-    /// Keeps `notice` for the CV, in place of the one kept before.
-    func keep(_ notice: EditorNotice, forCVWithId id: UUID) async
+    /// Keeps `notice` for the CV, in place of the one kept before. Throws when the notice could not be written, so that the
+    /// editor shows the save as failed and writes it again with the next save.
+    func keep(_ notice: EditorNotice, forCVWithId id: UUID) async throws
     /// Forgets the notice of the CV, if one is kept.
     func forget(cvWithId id: UUID) async
     /// The CVs that have a notice kept, so that the notice of a CV that is gone can be forgotten.
@@ -19,8 +20,8 @@ protocol EditorNoticeStore: Sendable {
 
 /// Keeps each CV's notice in a small JSON file of its own, named after the CV's id, in a folder of Application Support,
 /// protected as the CVs are. Forgetting a notice removes its file, so the person's text leaves the device with it; a damaged
-/// file affects one notice only, and is removed when it is read. A file that cannot be read, written or removed is logged:
-/// the notice is lost, never the CV.
+/// file affects one notice only, and is removed when it is read. A notice that cannot be written is logged and reported to
+/// the caller; a file that cannot be read or removed is logged, and the notice is lost, never the CV.
 actor FileEditorNoticeStore: EditorNoticeStore {
     private let directoryURL: URL
 
@@ -48,7 +49,7 @@ actor FileEditorNoticeStore: EditorNoticeStore {
         }
     }
 
-    func keep(_ notice: EditorNotice, forCVWithId id: UUID) {
+    func keep(_ notice: EditorNotice, forCVWithId id: UUID) throws {
         do {
             try FileManager.default.createDirectory(
                 at: directoryURL,
@@ -59,6 +60,7 @@ actor FileEditorNoticeStore: EditorNoticeStore {
             try data.write(to: fileURL(of: id), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
             noticeLogger.error("An import notice could not be kept: \(error.localizedDescription, privacy: .private)")
+            throw error
         }
     }
 
