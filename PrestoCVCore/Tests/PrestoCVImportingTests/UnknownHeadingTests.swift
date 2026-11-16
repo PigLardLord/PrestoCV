@@ -682,8 +682,8 @@ struct UnknownHeadingTests {
     }
 
     /// Jobs with a line in capitals, drawn as the known headings, that the line below it does not settle: a bullet, a role
-    /// alone, a role with a place, known or not, a team and its role. It may be a heading the vocabulary does not know or
-    /// the employer of a job.
+    /// alone, a role with a place, known or not, a team and its role, an organisation and its role. It may be a heading the
+    /// vocabulary does not know or the employer of a job.
     struct DoubtfulHeading: Sendable, CustomTestStringConvertible {
         let testDescription: String
         let experience: [String]
@@ -749,6 +749,24 @@ struct UnknownHeadingTests {
             roles: ["Technician", "Technician"], employers: ["Marlow Studio", nil], places: [nil, nil],
             checks: [.headingUnsure, nil]
         ),
+        DoubtfulHeading(
+            testDescription: "over an organisation and its role",
+            experience: [
+                "Technician — Marlow Studio", "2016 – 2020", "• Serviced boilers.",
+                "BRACKEN MILLS", "Hollow Pumps Ltd — Fitter", "2020 – Present", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Fitter"], employers: ["Marlow Studio", "Hollow Pumps Ltd"], places: [nil, nil],
+            checks: [.headingUnsure, .roleOrEmployerByOrder]
+        ),
+        DoubtfulHeading(
+            testDescription: "over a role and a word of an organisation",
+            experience: [
+                "Technician — Marlow Studio", "2016 – 2020", "• Serviced boilers.",
+                "BRACKEN MILLS", "Fitter — Hollow Pump Services", "2020 – Present", "• Serviced pumps.",
+            ],
+            roles: ["Technician", "Fitter"], employers: ["Marlow Studio", "Hollow Pump Services"], places: [nil, nil],
+            checks: [.headingUnsure, .roleOrEmployerByOrder]
+        ),
     ]
 
     @Test("A line in capitals the line below does not settle stays where main reads it, in a job to be checked", arguments: doubtful)
@@ -769,23 +787,73 @@ struct UnknownHeadingTests {
         #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
     }
 
-    @Test("A line in capitals under a degree, over a bullet, stays where main reads it, in a study to be checked")
-    func doubtfulHeadingStaysInItsStudy() throws {
-        let text = Self.doubtfulCV(
-            ["2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers."],
-            after: [
+    /// Studies with a line in capitals under a degree, drawn as the known headings, that the line below it does not settle:
+    /// a bullet, a degree and its school, a degree and a town, a school and its subject. It may be a heading the vocabulary
+    /// does not know or the school of a study.
+    struct DoubtfulStudy: Sendable, CustomTestStringConvertible {
+        let testDescription: String
+        /// The lines after the languages, from the heading of the studies on.
+        let tail: [String]
+        /// The degrees, the schools and the places the import reads on main, in order.
+        let degrees: [String?]
+        let schools: [String?]
+        let places: [String?]
+        let checks: [CheckReason?]
+    }
+
+    static let doubtfulStudies: [DoubtfulStudy] = [
+        DoubtfulStudy(
+            testDescription: "under a degree, over a bullet",
+            tail: [
                 "EDUCATION", "2013 – 2016", "Diploma in Welding", "HOLLOWAY TRUST", "• Practical modules.",
                 "2009 – 2013", "BSc Geology — University of Northbridge",
-            ]
-        )
+            ],
+            degrees: ["Diploma in Welding", "BSc Geology"], schools: ["HOLLOWAY TRUST", "University of Northbridge"],
+            places: [nil, nil], checks: [.headingUnsure, nil]
+        ),
+        DoubtfulStudy(
+            testDescription: "over a degree and its school",
+            tail: [
+                "EDUCATION", "2013 – 2016", "Diploma in Welding", "HOLLOWAY TRUST",
+                "BSc Geology — University of Northbridge", "• Completed fieldwork.",
+            ],
+            degrees: ["Diploma in Welding"], schools: ["University of Northbridge"], places: ["HOLLOWAY TRUST"],
+            checks: [.headingUnsure]
+        ),
+        DoubtfulStudy(
+            testDescription: "over a degree and a town",
+            tail: [
+                "EDUCATION", "2013 – 2016", "Diploma in Welding", "HOLLOWAY TRUST", "BSc Geology — Northbridge",
+                "2009 – 2013",
+            ],
+            degrees: ["Diploma in Welding", "BSc Geology"], schools: [nil, "HOLLOWAY TRUST"],
+            places: [nil, "Northbridge"], checks: [nil, .headingUnsure]
+        ),
+        DoubtfulStudy(
+            testDescription: "over a school and its subject",
+            tail: [
+                "EDUCATION", "2013 – 2016", "Diploma in Welding", "HOLLOWAY TRUST",
+                "University of Northbridge — Geology", "2009 – 2013",
+            ],
+            degrees: ["Diploma in Welding", nil], schools: ["University of Northbridge", nil],
+            places: ["HOLLOWAY TRUST", nil], checks: [.entryBoundsUnsure, .entryBoundsUnsure]
+        ),
+    ]
+
+    @Test("A line in capitals the line below does not settle stays where main reads it, in a study to be checked", arguments: doubtfulStudies)
+    func doubtfulHeadingStaysInItsStudy(_ row: DoubtfulStudy) throws {
+        let text = Self.doubtfulCV(["2016 – 2020", "Technician — Marlow Studio", "• Serviced boilers."], after: row.tail)
         #expect(!kinds(text).contains(.unknown), "\(kinds(text))")
         let result = try importText(text)
         let studies = result.cv.education
-        #expect(studies.map(\.degree?.value) == ["Diploma in Welding", "BSc Geology"], "\(studies.map { [$0.degree?.value, $0.school?.value] })")
-        #expect(studies.map(\.school?.value) == ["HOLLOWAY TRUST", "University of Northbridge"], "\(studies.map { [$0.degree?.value, $0.school?.value] })")
-        #expect(studies.map(\.check) == [.headingUnsure, nil], "\(studies.map(\.check))")
-        #expect(result.reviewList.contains { $0.field == .education(0) && $0.reason == .headingUnsure }, "\(result.reviewList.map { ($0.field, $0.reason) })")
-        #expect(!result.reviewList.contains { $0.field == .education(1) && $0.reason == .headingUnsure }, "\(result.reviewList.map { ($0.field, $0.reason) })")
+        #expect(studies.map(\.degree?.value) == row.degrees, "\(studies.map { [$0.degree?.value, $0.school?.value] })")
+        #expect(studies.map(\.school?.value) == row.schools, "\(studies.map { [$0.degree?.value, $0.school?.value] })")
+        #expect(studies.map(\.location?.value) == row.places, "\(studies.map(\.location?.value))")
+        #expect(studies.map(\.check) == row.checks, "\(studies.map(\.check))")
+        for (index, check) in row.checks.enumerated() {
+            let listed = result.reviewList.contains { $0.field == .education(index) && $0.reason == .headingUnsure }
+            #expect(listed == (check == .headingUnsure), "study \(index): \(result.reviewList.map { ($0.field, $0.reason) })")
+        }
         #expect(!result.unplaced.contains { $0.heading == "HOLLOWAY TRUST" }, "\(result.unplaced.map { ($0.heading, $0.text) })")
         #expect(Coverage.lost(result).isEmpty, "\(Coverage.describe(Coverage.lost(result)))")
     }
