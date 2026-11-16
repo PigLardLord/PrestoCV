@@ -83,4 +83,17 @@ struct SwiftCodeTests {
 
         #expect(SwiftCode(source).lines(matching: call) == lines)
     }
+
+    @Test("A pattern looked for in the skeleton is not found in the text of a string, and is in an interpolation")
+    func patternInTheSkeleton() throws {
+        let call = try NSRegularExpression(pattern: #"\bcall\s*\(\s*of\b"#)
+        let code = SwiftCode(#"""
+        let s = "call(of: 1)"
+        call(of: 2)
+        let t = "\(call(of: 3))"
+        """#)
+
+        #expect(code.lines(matching: call) == [0, 1, 2])
+        #expect(code.skeletonLines(matching: call) == [1, 2])
+    }
 }

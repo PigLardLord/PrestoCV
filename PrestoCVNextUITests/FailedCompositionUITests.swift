@@ -2,7 +2,7 @@ import XCTest
 
 /// A launch that cannot assemble the app shows one error screen with the failure's code and a retry. The launch argument
 /// the app cannot read is the failure: it fails the same way at every launch, so a retry shows the screen again.
-final class FailedCompositionUITests: XCTestCase {
+final class FailedCompositionUITests: RuntimeIssueFailingTestCase {
     private let failedIdentifier = "root.failed.launchFixturesRejected"
 
     override func setUpWithError() throws {
