@@ -785,6 +785,102 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
+    /// A line over a school's line that names a degree of its own, in a later part: what the import reads.
+    struct DegreeOverADegreeOfItsOwn: Sendable, CustomTestStringConvertible {
+        let testDescription: String
+        let lines: [String]
+        let unplaced: [String]
+        let degrees: [String?]
+        let school: String
+        let certifications: [String]
+    }
+
+    static let degreesOverADegreeOfItsOwn = [
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a dash, with a year",
+            lines: ["Bachelor of Arts", "University of Leipzig — Master of Science, 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Master of Science"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a dash, with a period",
+            lines: ["Bachelor of Arts", "University of Leipzig — Master of Science, 2010 – 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Master of Science"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a dash, with no date",
+            lines: ["Bachelor of Arts", "University of Leipzig — Master of Science"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Master of Science"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a hyphen",
+            lines: ["Bachelor of Arts", "University of Leipzig - Master of Science, 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Master of Science"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a comma, by its name",
+            lines: ["Bachelor of Arts", "University of Leipzig, Master of Science, 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Master of Science"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a comma, by its first word",
+            lines: ["Bachelor of Arts", "University of Leipzig, MSc Physics, 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["MSc Physics"], school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "in Italian",
+            lines: ["Bachelor of Arts", "Università di Bologna — Laurea in Fisica, 2014"], unplaced: ["Bachelor of Arts"],
+            degrees: ["Laurea in Fisica"], school: "Università di Bologna", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "named by the word degree",
+            lines: ["Bachelor of Arts", "University of Leipzig — Bachelor's Degree in History, 2014"],
+            unplaced: ["Bachelor of Arts"], degrees: ["Bachelor's Degree in History"], school: "University of Leipzig",
+            certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a study",
+            lines: [
+                "BSc Computer Science — University of Leipzig", "2010 – 2014",
+                "Bachelor of Arts", "University of Leipzig — Master of Science, 2014",
+            ],
+            unplaced: ["Bachelor of Arts"], degrees: ["BSc Computer Science", "Master of Science"],
+            school: "University of Leipzig", certifications: []
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "after a certification",
+            lines: [
+                "Certified Scrum Developer — Scrum Alliance, 2019",
+                "Bachelor of Arts", "University of Leipzig — Master of Science, 2014",
+            ],
+            unplaced: ["Bachelor of Arts"], degrees: ["Master of Science"], school: "University of Leipzig",
+            certifications: ["Certified Scrum Developer"]
+        ),
+        DegreeOverADegreeOfItsOwn(
+            testDescription: "under a certification with no issuer",
+            lines: ["Certified Cloud Practitioner", "University of Northbridge — Master of Science, 2022"], unplaced: [],
+            degrees: ["Master of Science"], school: "University of Northbridge",
+            certifications: ["Certified Cloud Practitioner"]
+        ),
+    ]
+
+    /// A school's line that names a degree in any of its parts settles no line above it: the line above is not that
+    /// school's degree, so it stays in the text not imported (or stays the certification it reads as), and the school's
+    /// line is a study of its own with its own degree.
+    @Test(
+        "A school's line with a degree of its own does not take the line above under a joined heading",
+        arguments: StudiesAndCertificatesTests.degreesOverADegreeOfItsOwn
+    )
+    func degreeOverADegreeOfItsOwn(row: DegreeOverADegreeOfItsOwn) throws {
+        let heading = "Education & Certifications"
+        let found = try importText(cv(heading: heading, body: row.lines.joined(separator: "\n")))
+
+        #expect(found.unplaced.map(\.text) == row.unplaced)
+        #expect(found.cv.education.map { $0.degree?.value } == row.degrees)
+        #expect(found.cv.education.last?.school?.value == row.school)
+        #expect(found.cv.certifications.map(\.name.value) == row.certifications)
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
     /// The lines before the line under test: none, a study, a study and a certification; with what they give.
     static let bodies: [(before: [String], studies: [String?], certifications: [String])] = [
         ([], [], []),
