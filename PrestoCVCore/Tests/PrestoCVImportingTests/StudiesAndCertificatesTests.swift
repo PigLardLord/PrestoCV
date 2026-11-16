@@ -881,6 +881,38 @@ struct StudiesAndCertificatesTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 
+    /// A school's line whose own degree is inside brackets, after a slash or a semicolon, or after the year.
+    static let schoolLinesWithADegreeAnywhere = [
+        "University of Leipzig (MSc Physics), 2014",
+        "University of Leipzig (Master of Science), 2014",
+        "University of Leipzig (MSc Physics), 2010 – 2014",
+        "University of Leipzig (MSc Physics)",
+        "University of Leipzig [MSc Physics], 2014",
+        "University of Leipzig / MSc Physics, 2014",
+        "University of Leipzig; MSc Physics; 2014",
+        "University of Leipzig, 2014 MSc Physics",
+        "University of Leipzig, 2014 Master of Science",
+    ]
+
+    /// Wherever the school's line names its degree, the degree above is not that school's: it stays in the text not
+    /// imported, and the school's line is one study of its own. Where the school's own degree goes (the degree or
+    /// the school) is not what this test pins.
+    @Test(
+        "A school's line with a degree anywhere on it does not take the degree above under a joined heading",
+        arguments: StudiesAndCertificatesTests.schoolLinesWithADegreeAnywhere
+    )
+    func degreeOverASchoolLineWithADegreeAnywhere(line: String) throws {
+        let heading = "Education & Certifications"
+        let found = try importText(cv(heading: heading, body: ["Bachelor of Arts", line].joined(separator: "\n")))
+
+        #expect(found.unplaced.map(\.text) == ["Bachelor of Arts"])
+        #expect(found.cv.education.count == 1)
+        #expect(found.cv.education.allSatisfy { $0.degree?.value != "Bachelor of Arts" })
+        #expect(found.cv.education.first?.school?.value.hasPrefix("University of Leipzig") == true)
+        #expect(found.cv.certifications.isEmpty)
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
     /// The lines before the line under test: none, a study, a study and a certification; with what they give.
     static let bodies: [(before: [String], studies: [String?], certifications: [String])] = [
         ([], [], []),
