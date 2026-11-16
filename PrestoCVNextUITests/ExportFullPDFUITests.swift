@@ -3,7 +3,7 @@ import XCTest
 /// The PDF of the export on the whole screen. The sheet's corner button, or a tap on its pages, shows it under the name
 /// of its file; there the PDF's text is read, as VoiceOver and XCUITest see it, and Done takes the person back to the
 /// sheet with its PDF. The sheet's own pages are for the eye only, so this is where the test reads what the PDF holds.
-final class ExportFullPDFUITests: XCTestCase {
+final class ExportFullPDFUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts, in English.
     private struct StoredCV {

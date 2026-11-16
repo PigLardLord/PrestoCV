@@ -5,7 +5,7 @@ import XCTest
 /// says what a recruiter will miss. Close takes the person back to the form. The sheet's pages are for the eye only, so
 /// XCUITest sees nothing of them: the page count says a PDF was made, PDFPagesTests checks the pages show it, and the
 /// screenshots keep how it looks.
-final class ExportSheetUITests: XCTestCase {
+final class ExportSheetUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts, in English.
     private struct StoredCV {

@@ -5,7 +5,7 @@ import XCTest
 /// place: the PDF's file name and the ways a share sheet ends. A save or a send is confirmed by a line under the pages,
 /// and Close then reads Done; a share closed without going through, or gone through to print or copy, says nothing; a
 /// share that fails says so. A CV without a name has no PDF, and Share stays off.
-final class ExportShareUITests: XCTestCase {
+final class ExportShareUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts, in English.
     private struct StoredCV {

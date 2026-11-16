@@ -7,7 +7,7 @@ import XCTest
 ///
 /// VoiceOver's announcement of a new status cannot be observed from a UI test; `testConflictReload` checks that the
 /// status line the announcement reads changes instead.
-final class EditorConflictUITests: XCTestCase {
+final class EditorConflictUITests: RuntimeIssueFailingTestCase {
     /// A CV the launch fixture stores before the app starts.
     private struct StoredCV {
         let identity: String
