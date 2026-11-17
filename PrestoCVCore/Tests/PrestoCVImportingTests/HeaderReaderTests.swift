@@ -686,4 +686,114 @@ struct HeaderReaderTests {
             #expect(found.cv.person.title?.value == title, "\(title)")
         }
     }
+
+    // MARK: A title in parts (#455)
+
+    @Test("A title line cut by separators is the title as written, to be checked, and no part of it is left out", arguments: [
+        "iOS Engineer · Platform Lead", "iOS Engineer | Platform Lead", "Senior iOS Engineer · Mobile Platform Lead · Swift",
+        "iOS Engineer — Platform Lead",
+    ])
+    func titleInParts(line: String) {
+        let found = header("Tobias Renn\n\(line)\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == line)
+        #expect(found.cv.person.title?.check == .titleByPosition)
+        #expect(found.cv.person.location == nil)
+        #expect(found.unplaced.map(\.text) == [])
+    }
+
+    @Test("A title in one part is not to be checked")
+    func titleInOnePart() {
+        let found = header("Tobias Renn\nSenior iOS Engineer\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == "Senior iOS Engineer")
+        #expect(found.cv.person.title?.check == nil)
+    }
+
+    @Test("A detail of the head after the title joins it and is to be checked, as nothing tells it from a part of the title", arguments: [
+        "iOS Engineer · Open to work", "iOS Engineer · German citizen",
+    ])
+    func detailAfterTheTitle(line: String) {
+        let found = header("Tobias Renn\n\(line)\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == line)
+        #expect(found.cv.person.title?.check == .titleByPosition)
+        #expect(found.unplaced.map(\.text) == [])
+    }
+
+    @Test("Parts of a title in cells of their own are joined by a comma, to be checked")
+    func titleInCells() {
+        let found = header("Tobias Renn\niOS Engineer\tPlatform Lead\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == "iOS Engineer, Platform Lead")
+        #expect(found.cv.person.title?.check == .titleByPosition)
+        #expect(found.unplaced.map(\.text) == [])
+    }
+
+    @Test("A part of the title line that names a place is the place, and the parts before it are the title")
+    func titleAndPlaceInOneLine() {
+        let found = header("Tobias Renn\niOS Engineer · Leipzig\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == "iOS Engineer")
+        #expect(found.cv.person.location?.value == "Leipzig")
+        #expect(found.unplaced.map(\.text) == [])
+        let longer = header("Tobias Renn\niOS Engineer · Platform Lead · Leipzig, Germany\ntobias.renn@example.com")
+        #expect(longer.cv.person.title?.value == "iOS Engineer · Platform Lead")
+        #expect(longer.cv.person.location?.value == "Leipzig, Germany")
+        #expect(longer.unplaced.map(\.text) == [])
+    }
+
+    @Test("A part of the title line with a date is no part of the title, and stays visible")
+    func dateAfterTheTitle() {
+        let found = header("Tobias Renn\niOS Engineer · 03/2019 - 05/2024\ntobias.renn@example.com")
+        #expect(found.cv.person.title?.value == "iOS Engineer")
+        #expect(found.unplaced.map(\.text) == ["03/2019 - 05/2024"])
+    }
+
+    @Test("The credentials of the name follow a title in parts")
+    func titleInPartsWithCredentials() {
+        let found = header("Tobias Renn, PhD\nData Scientist · Research Lead\ntobias.renn@example.com")
+        #expect(found.cv.person.name?.value == "Tobias Renn")
+        #expect(found.cv.person.title?.value == "Data Scientist · Research Lead, PhD")
+        #expect(found.unplaced.map(\.text) == [])
+    }
+
+    @Test("A head with a title in parts keeps the whole title, its place, and the details it has no field for")
+    func headWithATitleInParts() {
+        let found = header("""
+        Tobias Renn
+        iOS Engineer · Platform Lead
+        EU citizen · available from March 2027
+        Leipzig, Germany
+        tobias.renn@example.com · +49 151 2345 6789
+        """)
+        #expect(found.cv.person.name?.value == "Tobias Renn")
+        #expect(found.cv.person.title?.value == "iOS Engineer · Platform Lead")
+        #expect(found.cv.person.location?.value == "Leipzig, Germany")
+        #expect(found.unplaced.map(\.text) == ["EU citizen", "available from March 2027"])
+    }
+
+    // MARK: A title in parts through the whole import (#455)
+
+    @Test("Through the whole import, a title in parts is kept as written, to be checked, and no part of it is lost", arguments: [
+        ("Tobias Renn\niOS Engineer · Platform Lead\ntobias.renn@example.com", "iOS Engineer · Platform Lead"),
+        ("Tobias Renn\niOS Engineer · Open to work\ntobias.renn@example.com", "iOS Engineer · Open to work"),
+        ("Tobias Renn\nSenior iOS Engineer | Mobile Platform Lead | Swift\ntobias.renn@example.com", "Senior iOS Engineer | Mobile Platform Lead | Swift"),
+        ("Tobias Renn\niOS Engineer\tPlatform Lead\ntobias.renn@example.com", "iOS Engineer, Platform Lead"),
+        ("Tobias Renn\niOS Engineer · Platform Lead\tSwift\ntobias.renn@example.com", "iOS Engineer · Platform Lead, Swift"),
+        ("Tobias Renn, PhD\nData Scientist · Research Lead\ntobias.renn@example.com", "Data Scientist · Research Lead, PhD"),
+    ])
+    func titleInPartsThroughTheImport(text: String, title: String) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(text)
+        #expect(result.cv.person.title?.value == title, "\(text)")
+        #expect(result.cv.person.title?.check == .titleByPosition, "\(text)")
+        #expect(result.unplaced.map(\.text) == [], "\(text)")
+        #expect(Coverage.lost(result).isEmpty, "\(text): \(Coverage.lost(result).map(\.text))")
+    }
+
+    @Test("Through the whole import, a title in parts before a place keeps the title and the place")
+    func titleInPartsAndPlaceThroughTheImport() throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(
+            "Tobias Renn\niOS Engineer · Platform Lead · Leipzig, Germany\ntobias.renn@example.com"
+        )
+        #expect(result.cv.person.title?.value == "iOS Engineer · Platform Lead")
+        #expect(result.cv.person.location?.value == "Leipzig, Germany")
+        #expect(result.unplaced.map(\.text) == [])
+        #expect(Coverage.lost(result).isEmpty, "\(Coverage.lost(result).map(\.text))")
+    }
 }
