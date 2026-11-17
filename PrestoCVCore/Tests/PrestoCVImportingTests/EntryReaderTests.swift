@@ -156,6 +156,16 @@ struct EntryReaderTests {
         #expect(found.cv.education[1].location?.value == "Torino")
     }
 
+    @Test("A study is under the heading's own cell when the heading row also holds the section's first value")
+    func educationHeadingInARow() throws {
+        let found = read("""
+        Istruzione\t2016 – 2019: Laurea in Infermieristica, Università degli Studi di Torino
+        2011 – 2016: Diploma di liceo scientifico, Liceo Esempio, Torino
+        """, kind: .education)
+        try #require(found.cv.education.count == 2)
+        #expect(found.cv.education.map(\.heading) == ["Istruzione", "Istruzione"])
+    }
+
     @Test("The rows of the formato europeo, by their labels")
     func formatoEuropeo() throws {
         let found = read("""

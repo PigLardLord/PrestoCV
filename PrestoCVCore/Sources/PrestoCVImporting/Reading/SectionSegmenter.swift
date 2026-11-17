@@ -17,6 +17,11 @@ struct Section: Equatable {
         return heading.cells.count > 1 && blocks.first?.index == heading.index ? heading.cells[0] : heading.span
     }
 
+    /// The heading as the CV writes it, without the values a heading row also holds; nil when the section has none.
+    func headingText(in document: SourceDocument) -> String? {
+        headingSpan.map { document.text(of: $0) }
+    }
+
     /// The cells of a block of the section: a heading row that also holds the section's first value, as the formato
     /// europeo's "CAPACITÀ E COMPETENZE TECNICHE | …", gives only its value.
     func cells(of block: SourceBlock, in document: SourceDocument) -> [Piece] {
