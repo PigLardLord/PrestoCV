@@ -64,6 +64,8 @@ enum FullImport {
     Interests
     Chess
     Volunteering at the harbour clean-up.
+    Contact
+    https://blog.miravaldez.example.org
     """
 
     static let fixture = ImportFixture(text: text)
@@ -81,6 +83,8 @@ enum FullImport {
             f.link(.gitHub, f.sourced(link("https://github.com/miravaldez"), quoting: "github.com/miravaldez", reading: .webAddress)),
             f.link(.xing, f.sourced(link("https://xing.com/profile/Mira_Valdez"), quoting: "xing.com/profile/Mira_Valdez", reading: .webAddress)),
             f.link(.website, f.sourced(link("https://miravaldez.example.org"), quoting: "https://miravaldez.example.org")),
+            f.link(.website, f.sourced(link("https://blog.miravaldez.example.org"), quoting: "https://blog.miravaldez.example.org"),
+                   heading: "Contact"),
         ]
         cv.person.summary = f.quoted("Builds reliable platforms for small teams.", check: .summaryWithoutHeading)
         cv.experience = [
@@ -98,13 +102,13 @@ enum FullImport {
                 degree: f.quoted("MSc Computer Science"), school: f.quoted("Technical University of Aveiro"),
                 location: f.quoted("Aveiro, Portugal"),
                 period: f.sourced(ImportedPeriod(start: yearMonth(2012), end: .date(yearMonth(2014))), quoting: "2012 - 2014", reading: .period),
-                details: [f.quoted("Thesis on distributed caches")], check: .locationByPosition),
+                details: [f.quoted("Thesis on distributed caches")], check: .locationByPosition, heading: "Education"),
         ]
         cv.skills = [f.quoted("Go"), f.quoted("Kubernetes")]
         cv.languages = [
-            f.language(f.quoted("Portuguese"), level: f.sourced(.native, quoting: "native", reading: .languageLevel)),
-            f.language(f.quoted("English"), level: f.sourced(.b2, quoting: "B2", reading: .languageLevel)),
-            f.language(f.sourced("Spanish", quoting: "Spanish"), levelWords: f.quoted("fluent", check: .levelNotCEFR)),
+            f.language(f.quoted("Portuguese"), level: f.sourced(.native, quoting: "native", reading: .languageLevel), heading: "Languages"),
+            f.language(f.quoted("English"), level: f.sourced(.b2, quoting: "B2", reading: .languageLevel), heading: "Languages"),
+            f.language(f.sourced("Spanish", quoting: "Spanish"), levelWords: f.quoted("fluent", check: .levelNotCEFR), heading: "Languages"),
         ]
         cv.certifications = [
             f.certification(f.quoted("Certified Kubernetes Administrator"), issuer: f.quoted("Linux Foundation"),

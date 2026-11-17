@@ -110,6 +110,19 @@ struct HeaderReaderTests {
         #expect(found.unplaced.map(\.text) == ["lucas@example.net"])
     }
 
+    @Test("A link carries the heading of the section it stands in; in the head, before any heading, it has none (#456)")
+    func linkHeading() {
+        let found = header("""
+        Lena Hartmann
+        https://lenahartmann.example.org
+        Contact
+        https://blog.lenahartmann.example.org
+        """)
+        let links = found.cv.person.links
+        #expect(links.map(\.address.value.value) == ["https://lenahartmann.example.org", "https://blog.lenahartmann.example.org"])
+        #expect(links.map(\.heading) == [nil, "Contact"])
+    }
+
     @Test("Names have capitals or particles, and no role, organisation or place")
     func names() {
         #expect(HeaderReader.looksLikeName("Giulia Bianchi"))

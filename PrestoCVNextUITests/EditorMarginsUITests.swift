@@ -3,7 +3,7 @@ import XCTest
 /// The cards of an open CV keep the margins of the system and stay clear of what covers the screen's edges. On a wide
 /// screen the list beside the form lies over the form's leading edge: the cards start right of it, centred in the space
 /// it leaves and no wider than the readable width. On a narrow screen the cards keep a gap from both edges.
-final class EditorMarginsUITests: XCTestCase {
+final class EditorMarginsUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "6B1F6C1E-1B8C-4C1B-9D55-1F3B2C8B7A01"
     private let title = "Backend Engineer"

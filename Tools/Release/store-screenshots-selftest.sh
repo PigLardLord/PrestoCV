@@ -45,6 +45,11 @@ case "$1 $2" in
         esac ;;
     "simctl create") echo NEW-UDID ;;
     "simctl erase") [ "${FAKE_FAIL_ON:-}" != erase ] || exit 1 ;;
+    "simctl spawn")
+        # The keyboard's flag reads back as it was written, unless FAKE_FAIL_ON=intro: a write that did not take
+        case "$*" in
+            *" defaults read com.apple.keyboard.preferences DidShowContinuousPathIntroduction") [ "${FAKE_FAIL_ON:-}" = intro ] || echo 1 ;;
+        esac ;;
     "xcresulttool export")
         # The screenshots the test attached: six, or FAKE_ATTACHMENTS of them, named <language>-NN as the test names them
         while [ $# -gt 0 ]; do
@@ -163,6 +168,24 @@ DAY="$(sed -n 's/^let statusBarDay = "\([0-9-]*\)"$/\1/p' "$COMPOSER")"
 expect "  the composer names the day of the status bar" "no statusBarDay in $COMPOSER" [ -n "$DAY" ]
 fixed_clock() { grep -qE "^xcrun simctl status_bar OWN-UDID override --time ${DAY}T09:41:00\.000[+-][0-9]{2}:[0-9]{2} " "$LOG"; }
 expect "  sets the clock to the composer's day at 9:41 local time" "the override has no ISO date-time at 09:41 on ${DAY:-?}" fixed_clock
+# The keyboard's first-use intro covers its Done bar on an erased iOS 26 simulator. Its flag is written where the keyboard
+# reads it, once the simulator has booted (a write before the boot is lost with the erase), and before it boots again (the
+# keyboard reads it at boot); it is read back after that boot.
+INTRO="simctl spawn OWN-UDID defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool YES"
+INTRO_READ="simctl spawn OWN-UDID defaults read com.apple.keyboard.preferences DidShowContinuousPathIntroduction"
+intro_between_the_boots() {
+    awk -v intro="xcrun $INTRO" -v read_back="xcrun $INTRO_READ" '
+        $0 == "xcrun simctl bootstatus OWN-UDID -b" { booted++ }
+        $0 == intro && booted == 1 { written = 1 }
+        $0 == "xcrun simctl shutdown OWN-UDID" && written { shut = 1 }
+        $0 == read_back && shut && booted == 2 { checked = 1 }
+        END { exit !checked }' "$LOG"
+}
+expect "  marks the keyboard's first-use intro as seen where the keyboard reads it" "no $INTRO" called "$INTRO"
+expect "    after the first boot, before the simulator boots again, and reads it back after that boot" \
+    "the write is not between the two boots, or it is not read back after the second" intro_between_the_boots
+expect "    and in no domain the keyboard does not read" "com.apple.keyboard.ContinuousPath was written" \
+    not_called "com.apple.keyboard.ContinuousPath "
 
 # 2. The name of the simulators is reserved to the tool: another name is refused before anything is erased
 run -- --simulator-prefix "MyTests"
@@ -331,6 +354,9 @@ failed_early() {
 failed_early "a Mac with no runtime of the iOS asked for" -- --ios 26
 failed_early "a build that fails" FAKE_FAIL_ON=build --
 failed_early "a simulator that cannot be prepared" FAKE_FAIL_ON=erase --
+failed_early "a simulator whose keyboard intro is not marked as seen" FAKE_FAIL_ON=intro --
+run FAKE_FAIL_ON=intro --
+expect "  says why" "no mention of the keyboard's intro" says "the keyboard's first-use intro could not be marked as seen"
 # A run that only composes removes nothing
 rm -rf "$OUT_DIR"; put_captures iphone en 6
 run -- --compose-only

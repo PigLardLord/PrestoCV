@@ -7,7 +7,7 @@ import XCTest
 /// once the person leaves it, never while they type. A field of one line wraps onto more lines at the largest text
 /// size, so that its whole text can be read; a drag on it scrolls the form, and its return key moves to the next field
 /// and keeps no line break.
-final class EditorDetailsUITests: XCTestCase {
+final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts.
     private struct StoredCV {

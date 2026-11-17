@@ -2,7 +2,7 @@ import XCTest
 
 /// An empty store is a first run: the app shows the welcome and the ways to start in place of the list, and a choice
 /// opens a draft that nothing has stored. Once the store was used, "+" in the sidebar offers the same ways in a sheet.
-final class FirstRunUITests: XCTestCase {
+final class FirstRunUITests: RuntimeIssueFailingTestCase {
     private let identity = "0F6E2B7A-3C59-4D8E-A1B2-7C4D5E6F8091"
 
     override func setUpWithError() throws {

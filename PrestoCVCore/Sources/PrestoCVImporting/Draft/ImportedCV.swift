@@ -94,6 +94,9 @@ public struct ImportedLink: Hashable, Sendable {
 
     public let address: Sourced<WebLink>
     public let kind: Kind
+    /// The heading of the section the address stands in, as the CV writes it; nil in the head of the CV, before the first
+    /// heading. A second website, which the CV has no field for, is shown under it, where the CV wrote it (#456).
+    public var heading: String?
 }
 
 public struct ImportedExperience: Hashable, Sendable {
@@ -114,6 +117,9 @@ public struct ImportedEducation: Hashable, Sendable {
     public var period: Sourced<ImportedPeriod>?
     public var details: [Sourced<String>] = []
     public var check: CheckReason?
+    /// The heading of the section the study stands in, as the CV writes it; nil when the section has none. The study's
+    /// place, which the CV has no field for, is shown under it, where the CV wrote it (#456).
+    public var heading: String?
 }
 
 public struct ImportedLanguage: Hashable, Sendable {
@@ -123,6 +129,9 @@ public struct ImportedLanguage: Hashable, Sendable {
     /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working". Only
     /// when the language has no level: words beside a level are text not imported.
     public var levelWords: Sourced<String>?
+    /// The heading of the section the language stands in, as the CV writes it; nil when the section has none. A language
+    /// the CV cannot take is shown under it, where the CV wrote it (#452).
+    public var heading: String?
 }
 
 public struct ImportedCertification: Hashable, Sendable {
@@ -232,7 +241,9 @@ extension ImportedPeriod {
 // Inside the package only: a test support target builds imports that no reader read, so that the app's tests can script
 // one. Nothing outside the package can make a value without its evidence.
 extension ImportedLink {
-    package static func scripted(_ kind: Kind, _ address: Sourced<WebLink>) -> ImportedLink { ImportedLink(address: address, kind: kind) }
+    package static func scripted(_ kind: Kind, _ address: Sourced<WebLink>, heading: String? = nil) -> ImportedLink {
+        ImportedLink(address: address, kind: kind, heading: heading)
+    }
 }
 
 extension ImportedExperience {
@@ -244,14 +255,17 @@ extension ImportedExperience {
 
 extension ImportedEducation {
     package static func scripted(degree: Sourced<String>?, school: Sourced<String>?, location: Sourced<String>?,
-                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?) -> ImportedEducation {
-        ImportedEducation(degree: degree, school: school, location: location, period: period, details: details, check: check)
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?,
+                                 heading: String? = nil) -> ImportedEducation {
+        ImportedEducation(degree: degree, school: school, location: location, period: period, details: details, check: check, heading: heading)
     }
 }
 
 extension ImportedLanguage {
-    package static func scripted(_ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?) -> ImportedLanguage {
-        ImportedLanguage(name: name, level: level, levelWords: levelWords)
+    package static func scripted(
+        _ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?, heading: String? = nil
+    ) -> ImportedLanguage {
+        ImportedLanguage(name: name, level: level, levelWords: levelWords, heading: heading)
     }
 }
 

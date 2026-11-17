@@ -19,7 +19,7 @@ struct ImportedCVMapper {
     func map(_ result: ImportResult) -> ImportedDraft {
         let imported = result.cv
         let person = imported.person
-        var notImported = result.unplaced.map(\.text)
+        var languagesLeftOut: [TextLeftOut] = []
         var items: [ImportReview.Item] = reviewItems(of: result)
 
         var languages: [Language] = []
@@ -31,16 +31,27 @@ struct ImportedCVMapper {
                 let text = [language.name.value, language.levelWords?.value].compactMap { $0 }.joined(separator: " — ")
                 let reason: ImportReview.Item.Reason = language.levelWords?.check == .levelsDiffer ? .languageLevels : .languageNotAdded
                 items.append(ImportReview.Item(field: .language, reason: reason, text: text))
-                notImported.append(text)
+                let spans = language.name.spans + (language.levelWords?.spans ?? [])
+                languagesLeftOut.append(TextLeftOut(
+                    section: .languages, heading: language.heading, text: text, position: spans.map(\.lowerBound).min()
+                ))
             }
         }
 
-        // The CV has one website and no place for a study: the rest stays visible, never dropped
-        notImported += person.links.filter { $0.kind == .website }.dropFirst().map(\.address.value.value)
+        // The CV has one website and no place for a study: the rest stays visible, where the CV wrote it, never dropped
+        var withoutAField: [TextLeftOut] = person.links.filter { $0.kind == .website }.dropFirst().map { link in
+            // A link is read in the head, or in a contact section with its heading
+            TextLeftOut(
+                section: link.heading == nil ? .header : .personal, heading: link.heading, text: link.address.value.value,
+                position: link.address.spans.map(\.lowerBound).min()
+            )
+        }
         for (index, entry) in imported.education.enumerated() {
-            guard let place = entry.location?.value else { continue }
-            items.append(ImportReview.Item(field: .education(index + 1), reason: .placeNotKept, text: place))
-            notImported.append(place)
+            guard let place = entry.location else { continue }
+            items.append(ImportReview.Item(field: .education(index + 1), reason: .placeNotKept, text: place.value))
+            withoutAField.append(TextLeftOut(
+                section: .education, heading: entry.heading, text: place.value, position: place.spans.map(\.lowerBound).min()
+            ))
         }
 
         let cv = CVModel(
@@ -74,7 +85,62 @@ struct ImportedCVMapper {
             social: person.links.compactMap(social),
             documentLanguage: result.language?.rawValue
         )
-        return ImportedDraft(cv: cv, review: ImportReview(items: items, notImported: notImported.joined(separator: "\n")))
+        let unplaced = result.unplaced.map {
+            TextLeftOut(section: $0.section, heading: $0.heading, text: $0.text, position: $0.span.lowerBound)
+        }
+        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages(of: inCVOrder(unplaced + languagesLeftOut + withoutAField))))
+    }
+
+    // MARK: Text not imported
+
+    /// The sections the CV has no field for: their text is left out with its heading.
+    private static let sectionsWithoutField: Set<SectionKind> = [.projects, .volunteering, .references, .drivingLicence, .additional, .unknown]
+
+    /// A piece of text not imported: the text the import did not place, or a language the CV cannot take; with the
+    /// section it stood in, that section's heading, and where it starts in the CV (nil when the import gives no place).
+    private struct TextLeftOut {
+        let section: SectionKind
+        let heading: String?
+        let text: String
+        let position: Int?
+    }
+
+    /// The pieces in the order of the CV; a piece with no place keeps its order, after the others.
+    private func inCVOrder(_ pieces: [TextLeftOut]) -> [TextLeftOut] {
+        pieces.enumerated()
+            .sorted { ($0.element.position ?? .max, $0.offset) < ($1.element.position ?? .max, $1.offset) }
+            .map(\.element)
+    }
+
+    /// The text not imported, one passage for each run of text from the same place, in the order of the CV, each piece
+    /// with the section it stood in and that section's heading.
+    private func passages(of pieces: [TextLeftOut]) -> [ImportReview.Passage] {
+        var passages: [ImportReview.Passage] = []
+        var run: (section: SectionKind, heading: String?, texts: [String])?
+        func close() {
+            guard let current = run else { return }
+            passages.append(passage(section: current.section, heading: current.heading, text: current.texts.joined(separator: "\n")))
+        }
+        for piece in pieces {
+            if let current = run, current.section == piece.section, current.heading == piece.heading {
+                run?.texts.append(piece.text)
+            } else {
+                close()
+                run = (piece.section, piece.heading, [piece.text])
+            }
+        }
+        close()
+        return passages
+    }
+
+    private func passage(section: SectionKind, heading: String?, text: String) -> ImportReview.Passage {
+        if section == .header {
+            return ImportReview.Passage(place: .top, text: text, isWholeSection: false)
+        }
+        guard let heading, !heading.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return ImportReview.Passage(place: .elsewhere, text: text, isWholeSection: false)
+        }
+        return ImportReview.Passage(place: .section(heading), text: text, isWholeSection: Self.sectionsWithoutField.contains(section))
     }
 
     // MARK: Review
