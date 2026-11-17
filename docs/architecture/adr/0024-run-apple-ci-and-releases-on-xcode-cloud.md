@@ -32,7 +32,7 @@
 | The exporter's native renderer contract on the iOS simulator | the same action and plan, which holds the exporter's simulator test targets |
 | The archive checks of `Tools/Release/check-archive.sh` | `ci_scripts/ci_post_xcodebuild.sh`, after an archive; a failure stops the build before TestFlight |
 | The self-test of the archive checks, on fake archives | `ci_scripts/ci_post_xcodebuild.sh`, after `build-for-testing`, so a pull request finds a wrong rule before main's archive does |
-| The Linux checks | GitHub Actions, unchanged |
+| The Linux checks | GitHub Actions, unchanged (amended 2026-11-17 by [ADR 0029](0029-check-pull-requests-on-the-mac-mini.md): their steps run on a Linux computer, and the workflow only by hand) |
 
 The post script runs every step and fails at the end. The app is iOS only in version 1 (ADR 0022), so no job builds it for macOS, as the self-hosted job did not either.
 
