@@ -60,6 +60,42 @@ struct ContactReaderTests {
         #expect(contacts.links.first?.address.reading == nil)
     }
 
+    @Test("A link is a profile only on the platform's own domain or a subdomain of it; any other host is a website", arguments: [
+        ("tobiasrenn.github.io", ImportedLink.Kind.website),
+        ("https://tobiasrenn.github.io/blog", .website),
+        ("github.com/tobiasrenn", .gitHub),
+        ("www.github.com/tobiasrenn", .gitHub),
+        ("https://GitHub.com/tobiasrenn", .gitHub),
+        ("https://github.com:443/tobiasrenn", .gitHub),
+        ("https://github.com./tobiasrenn", .gitHub),
+        ("https://github.com?tab=repositories", .gitHub),
+        ("https://github.com#tobiasrenn", .gitHub),
+        ("https://tobiasrenn.github.io?ref=cv", .website),
+        ("linkedin.com/in/tobiasrenn", .linkedIn),
+        ("de.linkedin.com/in/tobiasrenn", .linkedIn),
+        ("https://www.linkedin.com/in/tobiasrenn", .linkedIn),
+        ("www.xing.com/profile/Tobias_Renn", .xing),
+        ("linkedin.example.org", .website),
+        ("github.example.dev/tobiasrenn", .website),
+        ("xing.tobiasrenn.dev", .website),
+        ("mygithub.com/tobiasrenn", .website),
+        ("github.com.example.org/tobiasrenn", .website),
+        ("tobiasrenn.dev/github.com", .website),
+    ])
+    func profileByDomain(link: String, kind: ImportedLink.Kind) {
+        let contacts = ContactReader.read(piece(link))
+        #expect(contacts.links.map(\.kind) == [kind])
+    }
+
+    @Test("A head with a LinkedIn profile, a GitHub profile and a site on GitHub Pages keeps the site as a website")
+    func gitHubPagesSiteInAHead() {
+        let contacts = ContactReader.read(piece("linkedin.com/in/tobiasrenn · github.com/tobiasrenn · tobiasrenn.github.io"))
+        #expect(contacts.links.map(\.address.value.value) == [
+            "https://linkedin.com/in/tobiasrenn", "https://github.com/tobiasrenn", "https://tobiasrenn.github.io",
+        ])
+        #expect(contacts.links.map(\.kind) == [.linkedIn, .gitHub, .website])
+    }
+
     @Test("An address cut short, a legal form and a domain inside an e-mail address are no contacts")
     func notContacts() {
         let contacts = ContactReader.read(piece("clara.weiss@ · Acme S.p.A. · Beispiel GmbH"))
