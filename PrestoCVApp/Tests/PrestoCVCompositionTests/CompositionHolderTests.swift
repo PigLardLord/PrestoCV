@@ -72,7 +72,7 @@ struct CompositionHolderTests {
     }
 
     /// A ready composition over `paths` and a fake gate: the holder needs a ready state, not a real render
-    /// (`Composition.launch` renders the bundled designs, and the platform renderer refuses a third print at once).
+    /// (`Composition.launch` renders the bundled designs, which a test may do only with the `.printsForReal` trait).
     private func readyState(_ paths: AppPaths) async throws -> CompositionState {
         let compile = CompositionTests.counting(CompositionTests.CompileCounter())
         let state = await Composition.make(CompositionTests.inputs(paths, compileRules: compile))

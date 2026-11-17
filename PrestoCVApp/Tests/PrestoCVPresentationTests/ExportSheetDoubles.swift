@@ -40,6 +40,55 @@ final class ExportingFake: CVExporting {
     }
 }
 
+/// The file port of the share: it records each file it wrote and each one it removed, holds its writes at a gate the
+/// test closes, and fails the next writes when the test says so. Its files are not on disk: a URL only names one,
+/// `/shared/<id>/<name>`.
+final class SharedFilesFake: ExportFileSharing {
+    struct Failure: Error, Equatable {}
+
+    private struct State {
+        var nextID = 1
+        /// How many writes reached the port, the failed ones included.
+        var asked = 0
+        var written: [SharedFile] = []
+        var names: [String] = []
+        var pdfs: [Data] = []
+        var removed: [SharedFile] = []
+        var failing = false
+    }
+
+    let gate = Gate()
+    private let state = Mutex(State())
+
+    /// The next writes fail, until the test says otherwise.
+    func fails(_ failing: Bool) { state.withLock { $0.failing = failing } }
+
+    var asked: Int { state.withLock { $0.asked } }
+    var written: [SharedFile] { state.withLock { $0.written } }
+    var names: [String] { state.withLock { $0.names } }
+    var pdfs: [Data] { state.withLock { $0.pdfs } }
+    var removed: [SharedFile] { state.withLock { $0.removed } }
+    /// The files written and not removed yet.
+    var left: [SharedFile] { state.withLock { state in state.written.filter { !state.removed.contains($0) } } }
+
+    func write(_ pdf: Data, named fileName: String) async throws -> SharedFile {
+        state.withLock { $0.asked += 1 }
+        await gate.pass()
+        return try state.withLock { state in
+            guard !state.failing else { throw Failure() }
+            let id = state.nextID
+            state.nextID += 1
+            let file = SharedFile(id: id, url: URL(fileURLWithPath: "/shared/\(id)/\(fileName)"))
+            state.written.append(file)
+            state.names.append(fileName)
+            state.pdfs.append(pdf)
+            return file
+        }
+    }
+
+    func remove(_ file: SharedFile) { state.withLock { $0.removed.append(file) } }
+}
+
 /// The export sheet on the gated port and a clock moved by hand, over a CV the test changes between exports, as the
 /// editor's form does. The pause is 250 ms, as in version 1.
 @MainActor
@@ -53,6 +102,7 @@ final class SheetWorld {
     nonisolated static let offered = ["en", "de", "it", "fr"].map { language($0) }
 
     let exporter = ExportingFake()
+    let files = SharedFilesFake()
     let clock = ManualClock()
     /// The CV the editor shows: what the next snapshot holds.
     var cv: CV
@@ -78,7 +128,7 @@ final class SheetWorld {
     func sheet(whenChosen: @escaping @MainActor (ExportLanguage?) -> Void = { _ in },
                whenRead: @escaping @MainActor () -> Void = {}) -> ExportSheetViewModel {
         ExportSheetViewModel(
-            exporter: exporter,
+            exporter: exporter, files: files,
             snapshot: { self.snapshotsTaken += 1; whenRead(); return ExportSnapshot(cv: self.cv) },
             offeredLanguages: Self.offered, appLanguage: Self.appLanguage,
             fileNamePattern: { Self.patterns[$0.tag] ?? "%@" },

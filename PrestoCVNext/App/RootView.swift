@@ -21,7 +21,13 @@ struct RootView: View {
             LoadingView("root.loading")
                 .accessibilityIdentifier("root.loading")
         case .ready(let composition):
+            #if DEBUG
+            // A Debug build launched for the UI tests shares through a stand-in they can read
             ReadyShell(screens: composition.screens)
+                .environment(\.sharesWithStandIn, composition.sharesWithStandIn)
+            #else
+            ReadyShell(screens: composition.screens)
+            #endif
         case .failed(let failure):
             CompositionFailedView(failure: failure, retry: holder.retry)
         }
@@ -43,9 +49,11 @@ private final class ShellModels: ObservableObject {
             // The order and the punctuation of a title and its number are the translation's
             numbered: { title, number in String(localized: "shell.numbered \(title) \(number)") }
         )
-        // A copy is named as the list names one, in the language the app shows (R13)
+        // A copy is named as the list names one, in the language the app shows; a PDF's file in the language of its
+        // document (R13)
         shell = screens.makeShell(
-            list: list, firstRun: firstRun, copyTitle: { title in String(localized: "list.copy.title \(title)") }
+            list: list, firstRun: firstRun, copyTitle: { title in String(localized: "list.copy.title \(title)") },
+            fileNamePattern: { language in ExportTitlePattern.pattern(in: language) }
         )
     }
 }

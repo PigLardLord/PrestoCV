@@ -30,11 +30,27 @@ struct ReleaseHygieneTests {
         "PrestoCVPresentation": "PrestoCVApp/Sources/PrestoCVPresentation",
     ]
 
-    /// The sources whose code ships with the app: the shipped target, the second one that becomes it at the switch
-    /// (docs/architecture/modules.md), and the products they link.
-    static let shippedFolders = ["PrestoCV", "PrestoCVNext"] + linkedProducts.values.sorted()
+    /// The targets that ship only as a dependency of a linked product and that the scans read: the composition's, which
+    /// the second app target takes in through `PrestoCVComposition`. The project file does not name them, so
+    /// `scansCoverTheLinkedProducts` cannot see them; `scansCoverTheComposition` reads them from the package's manifest.
+    static let transitiveProducts = [
+        "PrestoCVExportFiles": "PrestoCVApp/Sources/PrestoCVExportFiles",
+    ]
 
-    private struct Line {
+    /// The composition's other targets, which the scans do not read yet (#430): they are scanned when the scans follow
+    /// the package manifests and each app has its own privacy manifest. This list may only shrink.
+    static let notYetScanned: Set<String> = [
+        "CVBundledDesigns", "CVDesignCatalog", "CVDesignCatalogFileStore", "CVDocumentModel", "CVRendering",
+        "CVRenderingIOS", "CVRenderingWebKitSupport", "PrestoCVImportFiles", "PrestoCVIntegration", "PrestoCVPersistence",
+        "PrestoCVWorkflowPorts",
+    ]
+
+    /// The sources whose code ships with the app: the shipped target, the second one that becomes it at the switch
+    /// (docs/architecture/modules.md), the products they link, and those products' targets in `transitiveProducts`.
+    static let shippedFolders = ["PrestoCV", "PrestoCVNext"]
+        + linkedProducts.merging(transitiveProducts) { linked, _ in linked }.values.sorted()
+
+    struct Line {
         let file: String
         let number: Int
         let code: String
@@ -43,7 +59,7 @@ struct ReleaseHygieneTests {
     }
 
     /// The code lines of the shipped sources, without comments and without the previews at the end of a file.
-    private static func shippedLines() -> [Line] {
+    static func shippedLines() -> [Line] {
         var lines: [Line] = []
         for folder in shippedFolders {
             let url = root.appendingPathComponent(folder)
@@ -81,6 +97,38 @@ struct ReleaseHygieneTests {
         }
 
         #expect(Set(linked) == Set(Self.linkedProducts.keys), "Add the sources of a newly linked product to the scans")
+    }
+
+    @Test("The scans read the sources of every target and product the composition takes in")
+    func scansCoverTheComposition() throws {
+        let manifest = try String(
+            contentsOf: Self.root.appendingPathComponent("PrestoCVApp/Package.swift"), encoding: .utf8
+        )
+        let start = try #require(manifest.range(of: #".target(name: "PrestoCVComposition", dependencies: ["#))
+        let end = try #require(manifest.range(of: "]))", range: start.upperBound..<manifest.endIndex))
+        let block = String(manifest[start.upperBound..<end.lowerBound])
+        let name = try NSRegularExpression(pattern: #"(?:^|[\s,\[])"([A-Za-z]+)"|\.product\(name: "([A-Za-z]+)""#)
+        let taken = name.matches(in: block, range: NSRange(block.startIndex..., in: block)).compactMap { match in
+            (Range(match.range(at: 1), in: block) ?? Range(match.range(at: 2), in: block)).map { String(block[$0]) }
+        }
+        let scanned = Set(Self.linkedProducts.keys).union(Self.transitiveProducts.keys)
+        let unread = Set(taken).subtracting(scanned).subtracting(Self.notYetScanned)
+
+        #expect(taken.count > 20, "The scan no longer reads the composition's dependencies: update it with the manifest")
+        #expect(unread.isEmpty, "Add the sources of \(unread.sorted()) to the scans")
+        #expect(Self.notYetScanned.isDisjoint(with: scanned), "A target the scans read is still listed as not scanned")
+        #expect(Self.notYetScanned.subtracting(taken).isEmpty, "Take \(Self.notYetScanned.subtracting(taken).sorted()) off the list")
+    }
+
+    @Test("Every folder the scans read is there")
+    func scannedFoldersExist() {
+        let missing = Self.shippedFolders.filter { folder in
+            var isFolder: ObjCBool = false
+            return !FileManager.default.fileExists(atPath: Self.root.appendingPathComponent(folder).path, isDirectory: &isFolder)
+                || !isFolder.boolValue
+        }
+
+        #expect(missing.isEmpty, "The scans read no folder at \(missing)")
     }
 
     // MARK: Debug output
@@ -153,6 +201,42 @@ struct ReleaseHygieneTests {
 
         #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
         #expect(offenders.isEmpty, "The fixture that fails renames outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
+    /// carries the composition's flag, always false, and has no code that sets it, passes it on or shows the stand-in.
+    @Test("The stand-in of the share sheet is set, passed on and shown only by Debug builds")
+    func theShareStandInIsReachedOnlyInDebugBuilds() {
+        let names = [
+            "shareStandInArgument", "fixtures.sharesWithStandIn", "composition.sharesWithStandIn", "\\.sharesWithStandIn",
+            "ShareStandIn",
+        ]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reaches the stand-in: update it with the code")
+        #expect(offenders.isEmpty, "The stand-in of the share sheet outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// The composition's flag reaches a Release build, which must only declare it, set it to false and hand it on as it
+    /// is: a Release line that sets it from anything else would let a Release build reach the stand-in.
+    @Test("A Release build sets the stand-in's flag only to false, and hands it on unchanged")
+    func aReleaseBuildSetsTheStandInFlagOnlyToFalse() throws {
+        let allowed = try NSRegularExpression(
+            pattern: #"^(?:(?:public |@Entry )?(?:let|var) )?sharesWithStandIn(?:: Bool)?"#
+                + #"(?:\s*[=:]\s*(?:false|(?:inputs\.)?sharesWithStandIn))?,?$"#
+        )
+        let release = Self.shippedLines().filter { !$0.isDebugOnly && $0.code.contains("sharesWithStandIn") }
+        let code = release.map { $0.code.trimmingCharacters(in: .whitespaces) }
+
+        let offenders = release.filter { line in
+            let code = line.code.trimmingCharacters(in: .whitespaces)
+            return allowed.firstMatch(in: code, range: NSRange(code.startIndex..., in: code)) == nil
+        }
+
+        #expect(code.contains("sharesWithStandIn = false"), "The scan no longer finds where a Release build sets the flag")
+        #expect(offenders.isEmpty, "The stand-in's flag set in a Release build: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
     /// A UI test lets another window change or delete the open CV, to see the editor's conflict and deletion; no Release
