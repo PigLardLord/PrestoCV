@@ -164,7 +164,7 @@ struct ImportedCVMapperTests {
         """)).review
 
         #expect(review.passages == [
-            ImportReview.Passage(place: .top, text: "Swift and Kotlin\nEU citizen\navailable from March 2026", isWholeSection: false),
+            ImportReview.Passage(place: .top, text: "EU citizen\navailable from March 2026", isWholeSection: false),
             ImportReview.Passage(
                 place: .section("OWN VENTURES"),
                 text: "Tidepool Notes | 2021 – today\nA note app for divers\nHarbor Timer | 2018 – 2020\nA tide timer for sailors",
