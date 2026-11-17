@@ -45,6 +45,16 @@ final class ExportFullPDFUITests: XCTestCase {
         assertTheSheetIsBackWithItsPDF(send: send, offer: offer)
     }
 
+    func testThePagesInTheSheetAreForTheEyeOnly() throws {
+        launch(language: "en", locale: "en_US")
+        startACV(named: "Maria Rossi", create: "Create My First CV", nameField: "Full Name", saved: "Saved on this device")
+        openTheExportSheet("Preview & export", sendButton: "Send or save PDF")
+        XCTAssertTrue(waitUntil(app.buttons["Send or save PDF"], isEnabled: true, timeout: 60), "The button should be ready once the PDF is made")
+        XCTAssertTrue(app.buttons["Show the full PDF, 1 page"].waitForExistence(timeout: 10), "The preview should show the PDF")
+
+        XCTAssertEqual(pagesOfThePDF.count, 0, "The pages in the sheet are for the eye only: the button over them stands for them")
+    }
+
     func testEveryPageOfALongCVIsInTheFullPDF() throws {
         executionTimeAllowance = 900
         launch(language: "en", locale: "en_US")
@@ -171,10 +181,9 @@ final class ExportFullPDFUITests: XCTestCase {
         app.textViews.matching(NSPredicate(format: "value BEGINSWITH %@", "Maria Rossi"))
     }
 
-    /// The text of the pages in the viewer. The pages in the preview under it are listed too, because XCUITest lists what
-    /// VoiceOver is kept from (FullPDFViewTests checks that the preview hides them): the viewer's are the second.
+    /// The text of the pages in the viewer: the pages in the preview under it give none
     private var pagesOfTheViewer: XCUIElement {
-        pagesOfThePDF.element(boundBy: 1)
+        pagesOfThePDF.firstMatch
     }
 
     /// How many elements say the last word of the summary: the summary in the editor, and the pages of the PDF where
