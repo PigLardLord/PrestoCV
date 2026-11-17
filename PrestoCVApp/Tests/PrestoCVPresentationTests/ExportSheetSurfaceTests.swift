@@ -1,17 +1,19 @@
 // This file imports nothing of the domain, the application layer or the ports, and not `@testable`: what it uses is what a
 // view sees.
+import Foundation
 import Testing
 import PrestoCVPresentation
 
 /// Every public member of the export sheet and of the values it shows, each with its type spelled out. It compiles only
 /// while each type is the presentation's own: a domain type in the public surface breaks it.
 @MainActor
-func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: ExportID) {
+func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShare) {
     let _: ExportLanguage? = sheet.selectedLanguage
     let _: ExportLanguage? = sheet.automaticLanguage
     let _: ExportLanguage? = sheet.effectiveLanguage
     let offered: [ExportLanguage] = sheet.offeredLanguages
     let _: [String] = offered.map(\.tag)
+    let _: ExportLanguage = ExportLanguage.preferred(["de"])
     let _: ExportStatus = sheet.status
     let _: ExportedDocument? = sheet.document
     let _: ExportID? = sheet.documentID
@@ -20,12 +22,25 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing shared: Export
     let _: [ExportMissing.Field] = missing.blockers + missing.warnings
     let _: ShareOutcome? = sheet.shareOutcome
     let _: ExportSnapshot.Type = ExportSnapshot.self
+    sheet.showFullPDF()
+    let full: FullPDF? = sheet.fullPDF
+    let _: ExportID? = full?.id
+    let _: ExportedDocument? = full?.document
+    let _: String? = full?.fileName
+    sheet.closeFullPDF()
     sheet.start()
     sheet.select(language: ExportLanguage("de"))
     sheet.select(language: nil)
+    sheet.share()
+    let _: PDFShare? = sheet.openShare
+    let _: URL = share.url
+    let _: String = share.fileName
+    let _: ObjectIdentifier = share.id
+    let _: ShareOutcome? = sheet.shareOutcome
+    let _: ShareFailure? = sheet.shareFailure
+    let result = ShareResult(activity: nil, completed: false, failed: false)
+    share.end(result)
     sheet.refresh()
-    let result: ShareResult = .saved
-    sheet.shareEnded(result, of: shared)
     sheet.stop()
 }
 
@@ -40,9 +55,11 @@ struct ExportSheetSurfaceTests {
         sheet.start()
         await world.passThePause(thenExports: 1)
         await waitUntil("the PDF") { sheet.documentID != nil }
-        let shared = try #require(sheet.documentID)
+        sheet.share()
+        await waitUntil("the share") { sheet.openShare != nil }
+        let share = try #require(sheet.openShare)
 
-        useEveryPublicMember(of: sheet, sharing: shared)
+        useEveryPublicMember(of: sheet, sharing: share)
 
         #expect(sheet.status == .idle)
         #expect(sheet.selectedLanguage == nil)

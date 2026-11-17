@@ -135,6 +135,9 @@ public struct WebLink: Hashable, Sendable {
 /// ("it", "pt-BR", "zh-Hant-TW"). Stored in canonical case.
 public struct DocumentLanguage: Hashable, Sendable {
     public let tag: String
+    /// English, the language the app is developed in: it stands in where a language is needed and none can be read.
+    public static let english = DocumentLanguage(canonical: "en")
+    private init(canonical tag: String) { self.tag = tag }
     public init?(_ raw: String) {
         let parts = raw.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "-", omittingEmptySubsequences: false).map(String.init)
         guard let first = parts.first, (2...3).contains(first.count), first.allSatisfy(\.isASCIILetter), parts.count <= 3 else { return nil }

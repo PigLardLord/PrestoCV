@@ -128,7 +128,8 @@ struct ExportSheetStatusTests {
         editor.type(\.fullName, "Mara Ellison-Renn")
         let world = SheetWorld()
         let sheet = ExportSheetViewModel(
-            exporter: world.exporter, snapshot: { editor.exportSnapshot()! }, offeredLanguages: SheetWorld.offered,
+            exporter: world.exporter, files: world.files, snapshot: { editor.exportSnapshot()! },
+            offeredLanguages: SheetWorld.offered,
             appLanguage: SheetWorld.appLanguage, fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" },
             onLanguageChosen: { _ in }, clock: world.clock, pause: SheetWorld.pause)
 
