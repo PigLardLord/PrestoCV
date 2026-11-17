@@ -126,6 +126,9 @@ public struct ImportedLanguage: Hashable, Sendable {
     /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working". Only
     /// when the language has no level: words beside a level are text not imported.
     public var levelWords: Sourced<String>?
+    /// The heading of the section the language stands in, as the CV writes it; nil when the section has none. A language
+    /// the CV cannot take is shown under it, where the CV wrote it (#452).
+    public var heading: String?
 }
 
 public struct ImportedCertification: Hashable, Sendable {
@@ -253,8 +256,10 @@ extension ImportedEducation {
 }
 
 extension ImportedLanguage {
-    package static func scripted(_ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?) -> ImportedLanguage {
-        ImportedLanguage(name: name, level: level, levelWords: levelWords)
+    package static func scripted(
+        _ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?, heading: String? = nil
+    ) -> ImportedLanguage {
+        ImportedLanguage(name: name, level: level, levelWords: levelWords, heading: heading)
     }
 }
 

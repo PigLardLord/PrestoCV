@@ -4,7 +4,7 @@ import XCTest
 /// number pad; "currently here" hides the end and clears it. An end before the start is named once the person leaves the
 /// period, and no longer once it is right. Every control stays tall enough to tap, and inside the screen, at the largest
 /// text size and in landscape. On a narrow screen the dates are on the page of the row, and so is the status line.
-final class EditorDatesUITests: XCTestCase {
+final class EditorDatesUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "5B1F3C2E-7A4D-4F0B-9C6E-2D8A1E4B7C05"
     private let title = "Crane Operator"

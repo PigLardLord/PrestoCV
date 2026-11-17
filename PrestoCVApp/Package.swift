@@ -9,6 +9,7 @@ var products: [Product] = [
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
     .library(name: "PrestoCVPresentation", targets: ["PrestoCVPresentation"]),
     .library(name: "PrestoCVImportFiles", targets: ["PrestoCVImportFiles"]),
+    .library(name: "PrestoCVExportFiles", targets: ["PrestoCVExportFiles"]),
 ]
 var targets: [Target] = [
     .target(name: "PrestoCVWorkflowPorts", dependencies: [
@@ -36,6 +37,11 @@ var targets: [Target] = [
         .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
         .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
+    // The file of an export's share: a portable outbound adapter, tested on Linux against the real file system
+    .target(name: "PrestoCVExportFiles", dependencies: [
+        "PrestoCVWorkflowPorts",
+        .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    ]),
 ]
 
 targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
@@ -57,6 +63,11 @@ targets.append(.testTarget(name: "PrestoCVImportFilesTests", dependencies: [
     .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
 ]))
+targets.append(.testTarget(name: "PrestoCVExportFilesTests", dependencies: [
+    "PrestoCVExportFiles", "PrestoCVWorkflowPorts",
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+]))
 targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
     "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
@@ -68,7 +79,7 @@ targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
 #if !os(Linux)
 products.append(.library(name: "PrestoCVComposition", targets: ["PrestoCVComposition"]))
 targets.append(.target(name: "PrestoCVComposition", dependencies: [
-    "PrestoCVImportFiles", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVImportFiles", "PrestoCVExportFiles", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),

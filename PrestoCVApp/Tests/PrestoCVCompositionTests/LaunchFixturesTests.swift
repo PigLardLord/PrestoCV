@@ -132,6 +132,15 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The argument that opens a stand-in of the share sheet is read, and needs no folder: it writes nothing")
+    func sharesWithStandIn() throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextShareStandIn"])
+        #expect(fixtures.sharesWithStandIn)
+        #expect(fixtures.storage == .device)
+        #expect(fixtures.unknownArguments.isEmpty)
+        #expect(!(try LaunchFixtures.parse([Self.program])).sharesWithStandIn)
+    }
+
     @Test("What the other window does to the open CV is read, with a folder of its own", arguments: LaunchFixtures.OtherWindow.allCases)
     func otherWindow(_ change: LaunchFixtures.OtherWindow) throws {
         let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextOtherWindow", change.rawValue])
@@ -246,7 +255,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a link to another folder fails the launch, and nothing is written there")
+    @Test("A fixture folder that is a link to another folder fails the launch, and nothing is written there", .printsForReal)
     func linkedRoot() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -269,7 +278,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A store folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    @Test("A store folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal)
     func linkedStore() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -293,7 +302,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there")
+    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal)
     func linkedDesigns() async throws {
         let target = try Self.target()
         let name = Self.unique()
@@ -317,7 +326,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone")
+    @Test("A fixture folder that is a link, on a launch that may not record, leaves the traces of the folder it leads to alone", .printsForReal)
     func linkedRootOnAClosedLaunch() async throws {
         let target = try Self.target()
         let traces = target.appendingPathComponent("Diagnostics", isDirectory: true)
@@ -345,7 +354,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A fixture folder that is a plain folder still launches with its seed")
+    @Test("A fixture folder that is a plain folder still launches with its seed", .printsForReal)
     func plainFolderLaunches() async throws {
         let name = Self.unique()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
@@ -355,11 +364,31 @@ struct LaunchFixturesTests {
             arguments: try Self.arguments(storage: name), settlement: TraceSettlement(), backgroundTime: NoBackgroundTime()
         )
 
-        guard case .ready = state else {
+        guard case .ready(let composition) = state else {
             Issue.record("expected ready, got \(state)")
             return
         }
         #expect(try Self.entries(root.appendingPathComponent("Store")) == ["planted.cv.json"])
+        #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
+    }
+
+    @MainActor
+    @Test("A launch with the argument of the stand-in gives a composition whose shares open the stand-in", .printsForReal)
+    func launchSharesWithStandIn() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let state = await Composition.launch(
+            arguments: try Self.arguments(storage: name) + ["-PrestoCVNextShareStandIn"], settlement: TraceSettlement(),
+            backgroundTime: NoBackgroundTime()
+        )
+
+        guard case .ready(let composition) = state else {
+            Issue.record("expected ready, got \(state)")
+            return
+        }
+        #expect(composition.sharesWithStandIn)
     }
 }
 #endif

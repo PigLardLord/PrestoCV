@@ -254,9 +254,10 @@ struct Editing {
         await waitUntil("\(expected) writes") { editing.writeCount >= expected }
     }
 
-    /// The navigation of the shell, opening its editors over this store, with the system's background time seen by `time`.
-    func shell(time: BackgroundTimeSpy = BackgroundTimeSpy()) -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { editor($0) }, backgroundTime: time)
+    /// The navigation of the shell, opening its editors over this store and its export sheets with `exports`, with the
+    /// system's background time seen by `time`.
+    func shell(time: BackgroundTimeSpy = BackgroundTimeSpy(), exports: ShellExports = ShellExports()) -> ShellNavigationModel {
+        ShellNavigationModel(makeEditor: { editor($0) }, makeExportSheet: { exports.sheet(for: $0) }, backgroundTime: time)
     }
 }
 
