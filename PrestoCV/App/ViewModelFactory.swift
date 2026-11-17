@@ -23,6 +23,9 @@ final class ViewModelFactory {
     private let leftEditorSaves = LeftEditorSaves()
     /// The changes to stored CVs that the list makes, one CV at a time, which the editor of the CV waits for.
     private let storedCVChanges = StoredCVChangeQueue()
+    /// The notices of the imported CVs, kept until the person dismisses them (ADR 0027): one store for the app, so that the
+    /// editors and the list write one file in turn.
+    private let editorNotices: any EditorNoticeStore
     /// The copies the system makes of the PDFs opened in the app, which the import and the router let go.
     private var openedFileCopies: OpenedFileCopies {
         OpenedFileCopies(container: environment.container, removeFile: environment.removeFile)
@@ -62,6 +65,7 @@ final class ViewModelFactory {
         self.cvManagementUseCase = cvManagementUseCase
         self.environment = environment
         self.makeExportService = makeExportService
+        self.editorNotices = FileEditorNoticeStore(directoryURL: environment.importNoticesDirectory)
     }
     
     @MainActor
@@ -82,6 +86,7 @@ final class ViewModelFactory {
             cvManagementUseCase: cvManagementUseCase,
             storedCVChanges: ChangeStoredCV(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
             changeQueue: storedCVChanges,
+            noticeStore: editorNotices,
             locale: environment.appLocale,
             now: environment.now,
             calendar: environment.calendar,
@@ -97,6 +102,7 @@ final class ViewModelFactory {
         CVEditorViewModel(
             request: request,
             cvManagementUseCase: cvManagementUseCase,
+            noticeStore: editorNotices,
             documentLanguageDetector: makeDocumentLanguageDetector(),
             clock: environment.clock,
             awaitLeftEditors: leftEditorSaves.allEnded,

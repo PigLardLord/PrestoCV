@@ -24,6 +24,7 @@ enum PreviewDependencies {
         CVEditorViewModel(
             request: .new(template: CVModel(), notice: nil),
             cvManagementUseCase: cvManagement(),
+            noticeStore: InMemoryEditorNoticeStore(),
             documentLanguageDetector: documentLanguageDetector,
             clock: ContinuousClock(),
             awaitLeftEditors: {},
@@ -73,6 +74,7 @@ enum PreviewDependencies {
             cvManagementUseCase: management,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: management)),
             changeQueue: StoredCVChangeQueue(),
+            noticeStore: InMemoryEditorNoticeStore(),
             locale: Locale(identifier: "en"),
             now: { Date(timeIntervalSinceReferenceDate: 800_000_000) },
             calendar: { Calendar(identifier: .gregorian) },

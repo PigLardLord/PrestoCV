@@ -181,4 +181,27 @@ struct LanguageLevelTests {
         let lower = read("Languages\nnative speaker of the group: C1")
         #expect(lower.cv.languages.isEmpty)
     }
+
+    // MARK: The heading a language stands under
+
+    /// A language the CV cannot take is shown with the heading of its section, where the CV wrote it (#452).
+    @Test("A language keeps the heading of its section, as the CV writes it", arguments: ownLine)
+    func languageKeepsItsHeading(heading: String, name: String, native: String, other: String) {
+        let found = read("\(heading)\n\(name)\n\(native)\n\(other)\nB2")
+        #expect(found.cv.languages.map(\.heading) == [heading, heading])
+    }
+
+    @Test("The import keeps the heading of a language through the grounding")
+    func importKeepsTheHeading() throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""
+        Tobias Renn
+        Mobile Developer
+
+        LANGUAGES
+        German – fluent
+        English: C1
+        """)
+        #expect(result.cv.languages.map(\.name.value) == ["German", "English"])
+        #expect(result.cv.languages.map(\.heading) == ["LANGUAGES", "LANGUAGES"])
+    }
 }

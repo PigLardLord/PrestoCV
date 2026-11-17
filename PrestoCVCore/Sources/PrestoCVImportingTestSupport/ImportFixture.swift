@@ -55,9 +55,9 @@ public struct ImportFixture: Sendable {
     }
 
     public func language(
-        _ name: Sourced<String>, level: Sourced<LanguageProficiency>? = nil, levelWords: Sourced<String>? = nil
+        _ name: Sourced<String>, level: Sourced<LanguageProficiency>? = nil, levelWords: Sourced<String>? = nil, heading: String? = nil
     ) -> ImportedLanguage {
-        ImportedLanguage.scripted(name, level: level, levelWords: levelWords)
+        ImportedLanguage.scripted(name, level: level, levelWords: levelWords, heading: heading)
     }
 
     public func certification(_ name: Sourced<String>, issuer: Sourced<String>? = nil, year: Sourced<Int>? = nil) -> ImportedCertification {

@@ -17,9 +17,12 @@ struct Findings {
 
     mutating func unplace(_ piece: Piece, in section: Section) {
         guard !piece.isEmpty else { return }
-        unplaced.append(UnplacedText(
-            section: section.kind, heading: section.heading.map { document.text(of: $0.span) }, text: piece.text, span: piece.span
-        ))
+        unplaced.append(UnplacedText(section: section.kind, heading: heading(of: section), text: piece.text, span: piece.span))
+    }
+
+    /// The heading of the section as the CV writes it; nil when the section has none.
+    func heading(of section: Section) -> String? {
+        section.heading.map { document.text(of: $0.span) }
     }
 
     /// A value that was read and is not used, as text not imported: the text of each of its spans.

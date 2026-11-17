@@ -41,6 +41,7 @@ extension AppEnvironment {
             clock: clock,
             temporaryDirectory: FileManager.default.temporaryDirectory,
             exportPreferencesFile: FileManager.default.temporaryDirectory.appendingPathComponent("export-preferences-\(UUID().uuidString).json"),
+            importNoticesDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("import-notices-\(UUID().uuidString)", isDirectory: true),
             container: container,
             removeFile: { try FileManager.default.removeItem(at: $0) },
             arguments: arguments,
@@ -71,12 +72,14 @@ extension CVEditorViewModel {
     /// An editor as the tests open it: `cvId` opens a stored CV; otherwise `initialCV`, or a blank CV, opens as a new
     /// CV with `notice`: stored as it is with the AI or the import notice, and once it is changed without one. Its
     /// Automatic document language falls back to English. Its pause before a save ends only when the test moves `clock`,
-    /// so a test that does not move it sees what `saveNow()` and leaving store.
+    /// so a test that does not move it sees what `saveNow()` and leaving store. The import notice is kept in memory, in
+    /// `noticeStore`.
     convenience init(
         cvId: String?,
         initialCV: CVModel? = nil,
         notice: EditorNotice? = nil,
         cvManagementUseCase: CVManagementUseCaseProtocol,
+        noticeStore: any EditorNoticeStore = InMemoryEditorNoticeStore(),
         documentLanguageDetector: DocumentLanguageDetector = englishDocumentLanguageDetector,
         clock: any Clock<Duration> = ManualClock(),
         awaitLeftEditors: @escaping @MainActor () async -> Void = {},
@@ -92,6 +95,7 @@ extension CVEditorViewModel {
         self.init(
             request: request,
             cvManagementUseCase: cvManagementUseCase,
+            noticeStore: noticeStore,
             documentLanguageDetector: documentLanguageDetector,
             clock: clock,
             awaitLeftEditors: awaitLeftEditors,
@@ -102,9 +106,11 @@ extension CVEditorViewModel {
 }
 
 extension CVListViewModel {
-    /// A list whose stored CVs change through `cvManagementUseCase`, as the app's do, told in English
+    /// A list whose stored CVs change through `cvManagementUseCase`, as the app's do, told in English. The notices of the
+    /// imported CVs are kept in `noticeStore`, in memory by default.
     convenience init(
         cvManagementUseCase: CVManagementUseCaseProtocol,
+        noticeStore: any EditorNoticeStore = InMemoryEditorNoticeStore(),
         now: @escaping () -> Date = { testDay },
         calendar: @escaping () -> Calendar = { gregorianUTC },
         sleep: @escaping (Duration) async throws -> Void = waitUntilCancelled,
@@ -116,6 +122,7 @@ extension CVListViewModel {
             cvManagementUseCase: cvManagementUseCase,
             storedCVChanges: .init(cvs: ManagedStoredCVs(cvs: cvManagementUseCase)),
             changeQueue: changeQueue,
+            noticeStore: noticeStore,
             locale: Locale(identifier: "en"),
             now: now,
             calendar: calendar,
