@@ -5,6 +5,9 @@ import struct PrestoCVApplication.ChangeStoredCV
 import enum PrestoCVDomain.CVTitle
 import struct PrestoCVApplication.LookChange
 import enum PrestoCVApplication.StoredCVChangeError
+import os
+
+private let listLogger = Logger(subsystem: "com.PigLardLord.prestocv", category: "list")
 
 @MainActor
 final class CVListViewModel: ObservableObject {
@@ -36,6 +39,8 @@ final class CVListViewModel: ObservableObject {
     private let storedCVChanges: ChangeStoredCV<CVModel>
     /// The changes to the stored CVs, one CV at a time, which the editors wait for.
     private let changeQueue: StoredCVChangeQueue
+    /// The notices of the imported CVs: a deleted CV's goes with it.
+    private let noticeStore: any EditorNoticeStore
     private let locale: Locale
     private let now: () -> Date
     private let waitBetweenTicks: (Duration) async throws -> Void
@@ -93,6 +98,8 @@ final class CVListViewModel: ObservableObject {
     ///   - storedCVChanges: Renames a stored CV, or sets the language or the look of its PDF.
     ///   - changeQueue: Where the changes to a stored CV wait for the ones before them for the same CV; the editor of the CV
     ///     waits there too.
+    ///   - noticeStore: Where the notice of an imported CV is kept until the person dismisses it; a deleted CV's goes with
+    ///     it.
     ///   - locale: The language of the words that say when a CV was saved: the language of the app.
     ///   - now: The clock of the app.
     ///   - calendar: What counts as a day when a save is told in days. It is asked for each time a text is made, so
@@ -105,6 +112,7 @@ final class CVListViewModel: ObservableObject {
         cvManagementUseCase: CVManagementUseCaseProtocol,
         storedCVChanges: ChangeStoredCV<CVModel>,
         changeQueue: StoredCVChangeQueue,
+        noticeStore: any EditorNoticeStore,
         locale: Locale,
         now: @escaping () -> Date,
         calendar: @escaping () -> Calendar,
@@ -116,6 +124,7 @@ final class CVListViewModel: ObservableObject {
         self.cvManagementUseCase = cvManagementUseCase
         self.storedCVChanges = storedCVChanges
         self.changeQueue = changeQueue
+        self.noticeStore = noticeStore
         self.locale = locale
         self.now = now
         self.waitBetweenTicks = sleep
@@ -202,6 +211,7 @@ final class CVListViewModel: ObservableObject {
             let listing = try await cvManagementUseCase.getCVListing()
             guard thisRead == readSequence else { return }
             show(listing)
+            await forgetNoticesOfDeletedCVs()
         } catch {
             // A read that was overtaken has nothing to report, and neither has one that the screen cancelled
             guard thisRead == readSequence, !(error is CancellationError) else { return }
@@ -209,6 +219,20 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Forgets the notices kept for CVs that are gone: a CV deleted while its notice could not be forgotten, or before a crash
+    /// let it be, leaves no text of the person's behind. A CV that cannot be read is still stored, and keeps its notice.
+    private func forgetNoticesOfDeletedCVs() async {
+        for id in await noticeStore.keptCVIds() {
+            do {
+                guard try await cvManagementUseCase.getCV(by: id) == nil else { continue }
+            } catch {
+                listLogger.error("A CV with a kept import notice could not be read; its notice stays: \(error.localizedDescription, privacy: .private)")
+                continue
+            }
+            await noticeStore.forget(cvWithId: id)
+        }
+    }
+
     /// The user has seen the notice about the CVs that could not be opened: record it, so that it goes away.
     func dismissUnreadableNotice() async {
         await perform {
@@ -217,10 +241,12 @@ final class CVListViewModel: ObservableObject {
         }
     }
     
+    /// Deletes a CV, and the notice of its import with it.
     func deleteCV(withId id: UUID) async {
         await changeQueue.enqueue(id) { [self] in
             await perform {
                 try await self.cvManagementUseCase.deleteCV(id: id)
+                await self.noticeStore.forget(cvWithId: id)
                 return .removed(id)
             }
         }.value
