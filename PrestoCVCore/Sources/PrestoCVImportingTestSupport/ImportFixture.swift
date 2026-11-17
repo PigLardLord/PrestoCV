@@ -36,8 +36,8 @@ public struct ImportFixture: Sendable {
         sourced(piece, quoting: piece, check: check)
     }
 
-    public func link(_ kind: ImportedLink.Kind, _ address: Sourced<WebLink>) -> ImportedLink {
-        ImportedLink.scripted(kind, address)
+    public func link(_ kind: ImportedLink.Kind, _ address: Sourced<WebLink>, heading: String? = nil) -> ImportedLink {
+        ImportedLink.scripted(kind, address, heading: heading)
     }
 
     public func experience(
@@ -49,9 +49,11 @@ public struct ImportFixture: Sendable {
 
     public func education(
         degree: Sourced<String>? = nil, school: Sourced<String>? = nil, location: Sourced<String>? = nil,
-        period: Sourced<ImportedPeriod>? = nil, details: [Sourced<String>] = [], check: CheckReason? = nil
+        period: Sourced<ImportedPeriod>? = nil, details: [Sourced<String>] = [], check: CheckReason? = nil, heading: String? = nil
     ) -> ImportedEducation {
-        ImportedEducation.scripted(degree: degree, school: school, location: location, period: period, details: details, check: check)
+        ImportedEducation.scripted(
+            degree: degree, school: school, location: location, period: period, details: details, check: check, heading: heading
+        )
     }
 
     public func language(

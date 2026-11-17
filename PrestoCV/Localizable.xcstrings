@@ -10354,6 +10354,47 @@
         }
       }
     },
+    "import.review.reason.place" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Lebenslauf hat kein Feld für den Ort der Ausbildung, daher wurde er nicht übernommen. Ergänzen Sie ihn bei Bedarf beim Namen der Schule."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The CV has no field for where you studied, so the place wasn't added. Add it to the school if you need it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El CV no tiene un campo para el lugar de la formación, así que el lugar no se añadió. Añádelo al nombre del centro si hace falta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le CV n'a pas de champ pour le lieu de la formation, le lieu n'a donc pas été ajouté. Ajoutez-le au nom de l'établissement si besoin."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il CV non ha un campo per il luogo della formazione, quindi il luogo non è stato aggiunto. Aggiungilo al nome della scuola se serve."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O currículo não tem um campo para o local da formação, por isso o local não foi adicionado. Adicione-o ao nome da escola se for preciso."
+          }
+        }
+      }
+    },
     "import.review.reason.position" : {
       "extractionState" : "manual",
       "localizations" : {

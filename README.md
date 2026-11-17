@@ -46,7 +46,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 | `PrestoCV.xcodeproj/` | The Xcode project, in its JSON format (`project.xcproj`), and the shared schemes. |
 | `.agents/` | The branch policy that the git hooks follow: the protected branches, and the paths that are not code. |
-| `.github/` | The GitHub Actions workflow that runs the Linux checks, and the code owners of the architecture rules. |
+| `.github/` | The GitHub Actions workflow of the Linux checks and the Android build, which runs only when started by hand, and the code owners of the architecture rules. |
 
 ## Building and testing
 
@@ -85,7 +85,7 @@ Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests
 
 Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
 
-Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
+Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. The Linux checks and the Android build run on a Linux computer, through a script outside the repository that writes the commit statuses `Linux (local) · CI` and `Android (local) · CI`; the GitHub Actions workflow with the same jobs runs only when started by hand. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
 The repository side is `ci_scripts/` (it stops a build whose Swift is not the one `.swift-version` pins, sets an archive's version from its tag or branch, checks the archive with `Tools/Release/check-archive.sh` before the upload, and runs the architecture check, the package tests, the source checks and the package builds, in a Release build and in the pull request check), `TestPlans/`, and the `DEVELOPMENT_TEAM` of the project. Xcode Cloud signs the build itself, so the repository holds no key and no secret. `docs/release/xcode-cloud.md` has the exact settings of the two workflows, why the Pull Request workflow stays disabled, the one-time setup, and the steps to cut a release.
 

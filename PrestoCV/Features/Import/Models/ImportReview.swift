@@ -30,6 +30,8 @@ struct ImportReview: Hashable, Sendable, Codable {
             case languageNotAdded
             /// A Europass grid that gives a language several levels.
             case languageLevels
+            /// The place of a study: the CV has no field for it, so it is kept in the text not imported.
+            case placeNotKept
         }
 
         let field: Field
@@ -58,6 +60,7 @@ struct ImportReview: Hashable, Sendable, Codable {
             case .period: return "import.review.reason.period"
             case .languageNotAdded: return "import.review.reason.language"
             case .languageLevels: return "import.review.reason.levels"
+            case .placeNotKept: return "import.review.reason.place"
             }
         }
     }

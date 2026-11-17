@@ -17,7 +17,7 @@ enum Remainder {
         for piece in lost(in: result.document, by: spans) {
             let section = holders.firstHolding(piece.span).map { sections[blocks[$0].section] }
             swept.unplaced.append(UnplacedText(
-                section: section?.kind ?? .unknown, heading: section?.heading.map { result.document.text(of: $0.span) },
+                section: section?.kind ?? .unknown, heading: section?.headingText(in: result.document),
                 text: piece.text, span: piece.span
             ))
         }
@@ -45,9 +45,36 @@ enum Remainder {
     }
 
     /// What the person wrote that the spans do not cover, line by line, and that is no structure: the labels and the
-    /// connectors of a layout are not content, a line of text is.
+    /// connectors of a layout are not content, a line of text is. The label of a contact that names no contact, beside it
+    /// or on the line under it, is text of its own ("iOS Engineer · Mobile").
     static func lost(in document: SourceDocument, by spans: [SourceSpan]) -> [Piece] {
-        uncovered(document, by: spans).flatMap { $0.split(by: ["\n", "\t"]) }.filter { !isStructural($0.text) }
+        var labels = LabelsWithoutAValue(document)
+        return uncovered(document, by: spans).flatMap { $0.split(by: ["\n", "\t"]) }.filter { piece in
+            !isStructural(piece.text) || labels.hold(piece)
+        }
+    }
+
+    /// The labels of a contact that name no contact, read once for each line that has one (R8).
+    private struct LabelsWithoutAValue {
+        private let document: SourceDocument
+        /// The lines of the document, built at the first contact label.
+        private var lines: SpanIndex?
+        private var labels: [Int: SpanIndex] = [:]
+
+        init(_ document: SourceDocument) {
+            self.document = document
+        }
+
+        /// Whether the piece is the label of a contact that names no contact.
+        mutating func hold(_ piece: Piece) -> Bool {
+            guard ContactReader.isContactLabel(piece.text) else { return false }
+            let lines = lines ?? SpanIndex(document.blocks.map(\.span))
+            self.lines = lines
+            guard let index = lines.firstHolding(piece.span) else { return false }
+            let found = labels[index] ?? SpanIndex(ContactReader.labelsWithoutAValue(in: document.blocks[index], of: document).map(\.span))
+            labels[index] = found
+            return found.holds(piece.span)
+        }
     }
 
     /// The runs of the text that no span covers and that hold a letter or a digit.
