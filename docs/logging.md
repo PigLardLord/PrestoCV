@@ -139,6 +139,17 @@ Every launch brings the designs that ship with the app into the design store bef
 | `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read were left out of the launch; the launch goes on with the others. |
 | `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The store gives no default design, so the launch fails with this code. |
 
+### The share of an export (category `export`)
+
+The export sheet writes the PDF to a file of its own for the system's share sheet, and removes it when the share sheet closes. When the app starts, it removes what an earlier launch left.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `export.share.notWritten` | error | `error` (`notAName`, `noSpace`, `noPermission`, `readOnly`, `notFound` or `other`) | The file of a share could not be written, so the share sheet does not open. |
+| `export.share.notRemoved` | error | `of` (`share` or `leftover`), `error` | The folder of a share, or one an earlier launch left, could not be removed; the next launch tries again. |
+
+The `export.share.*` events name no path and no file name: the file's name holds the person's name.
+
 ## The trace of a test build
 
 A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.

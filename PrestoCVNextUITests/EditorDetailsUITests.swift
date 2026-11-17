@@ -7,7 +7,7 @@ import XCTest
 /// once the person leaves it, never while they type. A field of one line wraps onto more lines at the largest text
 /// size, so that its whole text can be read; a drag on it scrolls the form, and its return key moves to the next field
 /// and keeps no line break.
-final class EditorDetailsUITests: XCTestCase {
+final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts.
     private struct StoredCV {
@@ -214,7 +214,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         append(" Lead", to: app.textFields["editor.field.title"])
         if isCompact(app) {
-            app.navigationBars.buttons.firstMatch.tap()
+            app.backButton.tap()
         } else {
             row(titled: dataAnalyst.title, in: app).tap()
         }
@@ -245,7 +245,7 @@ final class EditorDetailsUITests: XCTestCase {
 
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
         if isCompact(app) {
-            app.navigationBars.buttons.firstMatch.tap()
+            app.backButton.tap()
         }
         XCTAssertTrue(row(titled: "Night Shift Nurse", in: app).waitForExistence(timeout: 30), "The new CV is in the list")
     }

@@ -85,6 +85,11 @@ extension Array where Element: Identifiable, Element.ID == RowID {
             self[index] = newValue
         }
     }
+
+    /// The row with this id, or nil once it went: the page of an entry shows its fields only while the row is there.
+    public subscript(row id: RowID) -> Element? {
+        first { $0.id == id }
+    }
 }
 
 /// A row of a section: it has an id and a name, and it can have nothing in it.
@@ -176,4 +181,13 @@ public struct ExportID: Hashable, Sendable {
     let generation: Int
 
     init(generation: Int) { self.generation = generation }
+}
+
+/// The PDF of an export, shown on the whole screen.
+public struct FullPDF: Identifiable, Hashable, Sendable {
+    /// The export that made the PDF.
+    public let id: ExportID
+    public let document: ExportedDocument
+    /// The title of the screen: the name of the PDF's file.
+    public let fileName: String
 }

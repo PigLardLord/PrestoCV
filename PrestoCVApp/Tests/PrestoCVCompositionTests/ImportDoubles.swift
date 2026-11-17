@@ -18,6 +18,14 @@ struct NoImportFiles: ImportFileReading {
     func release(_ file: ReceivedFile) {}
 }
 
+/// A share file port for the tests that never share: a write fails, and a remove has nothing to remove.
+struct NoExportFiles: ExportFileSharing {
+    struct NotWritten: Error {}
+
+    func write(_ pdf: Data, named fileName: String) async throws -> SharedFile { throw NotWritten() }
+    func remove(_ file: SharedFile) {}
+}
+
 /// An exporter for the tests that never export.
 struct NoExporter: CVExporting {
     func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome { throw ExportFailure.renderingFailed }

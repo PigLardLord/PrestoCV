@@ -3,8 +3,8 @@ import XCTest
 /// The dates of the rows. A period is a start and an end, each a month menu, with no month too, and a year typed on the
 /// number pad; "currently here" hides the end and clears it. An end before the start is named once the person leaves the
 /// period, and no longer once it is right. Every control stays tall enough to tap, and inside the screen, at the largest
-/// text size and in landscape.
-final class EditorDatesUITests: XCTestCase {
+/// text size and in landscape. On a narrow screen the dates are on the page of the row, and so is the status line.
+final class EditorDatesUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "5B1F3C2E-7A4D-4F0B-9C6E-2D8A1E4B7C05"
     private let title = "Crane Operator"
@@ -53,11 +53,17 @@ final class EditorDatesUITests: XCTestCase {
         return app
     }
 
+    /// Adds a row from the CV's form, leaving the page of a row first where one is open, and types in its first field. On
+    /// a narrow screen the new row's page opens.
     @MainActor
     private func addRow(to section: String, typing text: String, in app: XCUIApplication) {
+        if app.entryPage.exists { app.leaveEntryPage() }
         let add = app.buttons["editor.add.\(section)"]
         app.scrollForm(until: add, named: "The add button of \(section)")
         add.tap()
+        if app.opensOnAPage(section) {
+            XCTAssertTrue(app.entryPage.waitForExistence(timeout: 30), "A new row of \(section) opens its page")
+        }
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of \(section) takes the keyboard")
         app.typeText(text)
         putKeyboardAway(in: app)
@@ -191,7 +197,7 @@ final class EditorDatesUITests: XCTestCase {
     /// hit may still sit at the very edge, where a tap takes no focus. The form is moved on in steps like `scroll`.
     @MainActor
     private func tapTheEnd(of field: XCUIElement, in app: XCUIApplication) {
-        let form = app.descendants(matching: .any).matching(identifier: "shell.detail.opened").firstMatch
+        let form = app.openForm
         let low = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
         let high = form.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
         let screen = app.windows.firstMatch.frame

@@ -7,7 +7,7 @@ import XCTest
 ///
 /// VoiceOver's announcement of a new status cannot be observed from a UI test; `testConflictReload` checks that the
 /// status line the announcement reads changes instead.
-final class EditorConflictUITests: XCTestCase {
+final class EditorConflictUITests: RuntimeIssueFailingTestCase {
     /// A CV the launch fixture stores before the app starts.
     private struct StoredCV {
         let identity: String
@@ -134,7 +134,8 @@ final class EditorConflictUITests: XCTestCase {
         try blocked(by: changedElsewhere, in: app)
 
         if isCompact(app) {
-            XCTAssertFalse(app.navigationBars.buttons.firstMatch.exists, "No Back while the text cannot be stored")
+            XCTAssertFalse(
+                app.backButton.exists, "No Back while the text cannot be stored: the bar holds \(app.barButtonIdentifiers)")
             let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
             edge.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
             XCTAssertTrue(element("editor.notice", in: app).exists, "The swipe from the edge does not leave the editor")
@@ -150,8 +151,10 @@ final class EditorConflictUITests: XCTestCase {
         app.buttons["editor.notice.reload"].tap()
         XCTAssertTrue(waitUntil(status(of: app), reads: saved), "The stored version is saved and shown")
         if isCompact(app) {
-            let back = app.navigationBars.buttons.firstMatch
-            XCTAssertTrue(back.waitForExistence(timeout: 30), "Back comes back once the text is stored")
+            let back = app.backButton
+            XCTAssertTrue(
+                back.waitForExistence(timeout: 30),
+                "Back comes back once the text is stored: the bar holds \(app.barButtonIdentifiers)")
             back.tap()
         }
         open(dataAnalyst, in: app)
@@ -245,8 +248,9 @@ final class EditorConflictUITests: XCTestCase {
     /// The list, from the editor: a compact screen goes back to it, a regular one shows it beside the editor.
     private func showList(in app: XCUIApplication) {
         guard isCompact(app) else { return }
-        let back = app.navigationBars.buttons.firstMatch
-        XCTAssertTrue(back.waitForExistence(timeout: 30), "Back shows once the text is stored")
+        let back = app.backButton
+        XCTAssertTrue(
+            back.waitForExistence(timeout: 30), "Back shows once the text is stored: the bar holds \(app.barButtonIdentifiers)")
         back.tap()
     }
 

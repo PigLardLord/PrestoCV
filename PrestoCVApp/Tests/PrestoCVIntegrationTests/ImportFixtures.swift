@@ -102,9 +102,9 @@ enum FullImport {
         ]
         cv.skills = [f.quoted("Go"), f.quoted("Kubernetes")]
         cv.languages = [
-            f.language(f.quoted("Portuguese"), level: f.sourced(.native, quoting: "native", reading: .languageLevel)),
-            f.language(f.quoted("English"), level: f.sourced(.b2, quoting: "B2", reading: .languageLevel)),
-            f.language(f.sourced("Spanish", quoting: "Spanish"), levelWords: f.quoted("fluent", check: .levelNotCEFR)),
+            f.language(f.quoted("Portuguese"), level: f.sourced(.native, quoting: "native", reading: .languageLevel), heading: "Languages"),
+            f.language(f.quoted("English"), level: f.sourced(.b2, quoting: "B2", reading: .languageLevel), heading: "Languages"),
+            f.language(f.sourced("Spanish", quoting: "Spanish"), levelWords: f.quoted("fluent", check: .levelNotCEFR), heading: "Languages"),
         ]
         cv.certifications = [
             f.certification(f.quoted("Certified Kubernetes Administrator"), issuer: f.quoted("Linux Foundation"),

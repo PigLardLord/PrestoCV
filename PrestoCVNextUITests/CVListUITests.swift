@@ -3,7 +3,7 @@ import XCTest
 /// The list column shows the stored CVs, most recently saved first, each with its label, the person and role, and the time
 /// since its last save. A row is renamed, duplicated or deleted from its menu, a swipe or the actions of VoiceOver; files
 /// the store could not open are counted in a notice that names no file.
-final class CVListUITests: XCTestCase {
+final class CVListUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts.
     private struct StoredCV {

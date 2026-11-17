@@ -44,7 +44,11 @@ public final class ShellNavigationModel {
     /// The editor of what the detail shows, nil when nothing is open.
     public private(set) var editor: EditorViewModel?
 
+    /// The export sheet over the open CV, nil when none is open. It goes with the editor it was opened over.
+    public private(set) var exportSheet: ExportSheetViewModel?
+
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart) -> EditorViewModel
+    @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -91,9 +95,14 @@ public final class ShellNavigationModel {
 
     /// - Parameters:
     ///   - makeEditor: Makes the editor of what the detail opens.
+    ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
-    public init(makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel, backgroundTime: any BackgroundTime) {
+    public init(
+        makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel,
+        makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?, backgroundTime: any BackgroundTime
+    ) {
         self.makeEditor = makeEditor
+        self.makeExportSheet = makeExportSheet
         self.backgroundTime = backgroundTime
     }
 
@@ -131,6 +140,22 @@ public final class ShellNavigationModel {
         letGo()
         detail = nil
         return .left
+    }
+
+    // MARK: Export
+
+    /// Opens the export sheet over the open CV and starts its export of the form as it stands, saved or not. Nothing opens
+    /// while no CV is open or its editor has not read it yet; while the sheet is open, the same sheet stays.
+    public func openExport() {
+        guard exportSheet == nil, let editor, let sheet = makeExportSheet(editor) else { return }
+        exportSheet = sheet
+        sheet.start()
+    }
+
+    /// Closes the export sheet: its running export stops and its PDF is dropped.
+    public func closeExport() {
+        exportSheet?.stop()
+        exportSheet = nil
     }
 
     /// Stores the open editor, which stays open, waits for the editors left before it to end their writes, and writes
@@ -191,9 +216,12 @@ public final class ShellNavigationModel {
 
     /// The system moved to `column`. Going back to the list closes what is open only while the split view shows one
     /// column at a time: the sidebar the system writes while the split view changes between one column and two (a
-    /// rotation, a resized window) is not the person going back.
+    /// rotation, a resized window) is not the person going back. Nor is the sidebar it writes while the person goes
+    /// back from a row's page to the CV's form: it writes it before it closes the page, so the CV stays open while a
+    /// page is.
     public func columnChanged(to column: ShellColumn, isCollapsed: Bool) {
-        if column == .sidebar, isCollapsed { _ = deselect() }
+        guard column == .sidebar, isCollapsed, editor?.openedEntry == nil else { return }
+        _ = deselect()
     }
 
     /// Closes the open CV when the list no longer has it, such as after it was deleted or the store lost it, unless its
@@ -224,9 +252,11 @@ public final class ShellNavigationModel {
         return status
     }
 
-    /// Hands the open editor to its `saveNow()` and keeps it alive until that ended; when that did not store its text,
-    /// the editor is kept (`landed(_:)`). Every caller reads what the detail opened before it changes the detail.
+    /// Closes the export sheet of the open editor, then hands the editor to its `saveNow()` and keeps it alive until that
+    /// ended; when that did not store its text, the editor is kept (`landed(_:)`). Every caller reads what the detail
+    /// opened before it changes the detail.
     private func letGo() {
+        closeExport()
         guard let left = editor else { return }
         let start = detail ?? .blank
         editor = nil

@@ -9,7 +9,7 @@ struct AppPathsTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("AppPathsTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    @Test("The store, the designs, the trace and its copies are derived from the root and the temporary folder")
+    @Test("The store, the designs, the trace, its copies and the export's share are derived from the root and the temporary folder")
     func derived() {
         let root = URL(filePath: "/base/PrestoCVNext", directoryHint: .isDirectory)
         let temporary = URL(filePath: "/tmp/x", directoryHint: .isDirectory)
@@ -18,13 +18,15 @@ struct AppPathsTests {
         #expect(paths.designs.path == "/base/PrestoCVNext/Designs")
         #expect(paths.trace.path == "/base/PrestoCVNext/Diagnostics")
         #expect(paths.traceShare.path == "/tmp/x/DiagnosticsShare")
+        #expect(paths.exportShare.path == "/tmp/x/ExportShare")
     }
 
-    @Test("The four folders are distinct, and none is the legacy store, Application Support/PrestoCV/CVs")
+    @Test("The five folders are distinct, and none is the legacy store, Application Support/PrestoCV/CVs")
     func distinctFromTheLegacyStore() {
         let paths = AppPaths.onDevice()
-        let folders = [paths.store, paths.designs, paths.trace, paths.traceShare].map(\.standardizedFileURL.path)
-        #expect(Set(folders).count == 4)
+        let folders = [paths.store, paths.designs, paths.trace, paths.traceShare, paths.exportShare]
+            .map(\.standardizedFileURL.path)
+        #expect(Set(folders).count == 5)
         let legacy = URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/CVs").standardizedFileURL.path
         for folder in folders {
             #expect(folder != legacy)
