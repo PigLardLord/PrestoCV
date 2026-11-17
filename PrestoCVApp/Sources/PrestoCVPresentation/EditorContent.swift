@@ -182,3 +182,12 @@ public struct ExportID: Hashable, Sendable {
 
     init(generation: Int) { self.generation = generation }
 }
+
+/// The PDF of an export, shown on the whole screen.
+public struct FullPDF: Identifiable, Hashable, Sendable {
+    /// The export that made the PDF.
+    public let id: ExportID
+    public let document: ExportedDocument
+    /// The title of the screen: the name of the PDF's file.
+    public let fileName: String
+}

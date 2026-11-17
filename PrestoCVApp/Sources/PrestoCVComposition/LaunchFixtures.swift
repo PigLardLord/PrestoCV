@@ -17,6 +17,8 @@ import PrestoCVWorkflowPorts
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
 ///   failures of two rows are pending at once. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextShareStandIn`: a share opens a stand-in of the system's share sheet, which a UI test can read and
+///   answer (save, send, cancel), and never the system's own. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {
@@ -50,6 +52,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let distributionArgument = "-PrestoCVNextDistribution"
     static let noSamplesArgument = "-PrestoCVNextNoSamples"
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
+    static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
     private static let prefix = "-PrestoCVNext"
 
@@ -63,6 +66,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var withoutSamples = false
     /// The list's renames fail two at a time
     var failsRenamesInPairs = false
+    /// A share opens the stand-in of the share sheet
+    var sharesWithStandIn = false
     /// What another window does to the stored CV written first, nil when no other window changes it
     var otherWindow: OtherWindow?
 
@@ -93,6 +98,8 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.withoutSamples = true
             case failRenamesInPairsArgument:
                 fixtures.failsRenamesInPairs = true
+            case shareStandInArgument:
+                fixtures.sharesWithStandIn = true
             case otherWindowArgument:
                 guard let change = OtherWindow(rawValue: try value(after: argument, in: arguments, at: &index)) else {
                     throw .unreadableOtherWindow
