@@ -50,10 +50,10 @@ The check does not run the tests without the repository (see above), nor the iOS
 
 A pull request merges when:
 - its branch contains the latest `main`;
-- every check of the `CI` GitHub workflow is green (`Linux · architecture check`, `Android · build of the portable targets`);
+- `Linux (local) · CI` and `Android (local) · CI` are green on that exact head commit. A script run on a Linux computer, outside the repository, runs the steps of the `CI` GitHub workflow's two jobs (`Linux · architecture check`, `Android · build of the portable targets`) on the head and writes them. The workflow itself runs only when started by hand, so that the repository stays on GitHub's free plan; when it runs, the local status of each job decides, not the job's own check;
 - `Mac mini · CI` is green on that exact head commit. A push moves the head, so the status of an earlier commit counts for nothing.
 
-A pull request whose changed files are all in `docs/` or match `*.md` needs only the `CI` workflow's checks. The old status `PrestoCV | Pull Request` of the disabled Xcode Cloud workflow is ignored, red or green. The merge step reads the statuses of the head commit and refuses to merge when one is not green: the repository's plan has no rulesets and no branch protection, so GitHub enforces nothing here (see "Enforce the checks" below).
+A pull request whose changed files are all in `docs/` or match `*.md` needs only the two Linux statuses. The old status `PrestoCV | Pull Request` of the disabled Xcode Cloud workflow is ignored, red or green. The merge step reads the statuses of the head commit and refuses to merge when one is not green: the repository's plan has no rulesets and no branch protection, so GitHub enforces nothing here (see "Enforce the checks" below).
 
 ## Workflows
 
@@ -81,7 +81,7 @@ The Pull Request workflow exists in App Store Connect and is disabled. Keep it d
 | Action 1 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight (Internal Testing Only). |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
-A build from `main` is for the internal testers only. It cannot be submitted to App Review. Main has no Test action: a pull request merges only when its branch contains the latest `main` and `Mac mini · CI` is green on that exact head (a pull request that changes only `docs/` or `*.md` files needs only the `CI` workflow's checks), so the tree that reaches `main` has already been tested. Each merge to `main` starts a Main run of about 10 minutes of the 25 compute hours a month.
+A build from `main` is for the internal testers only. It cannot be submitted to App Review. Main has no Test action: a pull request merges only when its branch contains the latest `main` and `Mac mini · CI` is green on that exact head (a pull request that changes only `docs/` or `*.md` files needs only `Linux (local) · CI` and `Android (local) · CI`), so the tree that reaches `main` has already been tested. Each merge to `main` starts a Main run of about 10 minutes of the 25 compute hours a month.
 
 A Main build takes the project's version (`MARKETING_VERSION`), and its build number is the run's number. Once App Review approves a version, App Store Connect closes that version to new builds: every later upload of it fails at "Preparing build for App Store Connect" with ITMS-90186 (the version's train is closed) and ITMS-90062 (the version must be higher than the approved one). So `main` always carries the next version to release, never one already released: see step 5 of [Cutting a release](#cutting-a-release).
 
@@ -102,9 +102,9 @@ The Release workflow tests the exact commit it archives. Its Test action is requ
 
 The repository's plan has no rulesets and no branch protection, so GitHub lets a pull request merge whatever its checks say. The merge step is what enforces them: before it merges, it reads the statuses of the pull request's head commit, and it refuses unless the rule in "The pull request check" holds. A check it cannot read counts as not green.
 
-To merge a pull request, bring the latest `main` onto its branch locally (merge `origin/main` into it), resolve the conflicts, run the tests again on a Mac, push the branch, run the pull request check on that head, and merge when `Mac mini · CI` is green. The check runs on the Mac mini, not on Xcode Cloud, so a push to an open pull request spends no compute hours.
+To merge a pull request, bring the latest `main` onto its branch locally (merge `origin/main` into it), resolve the conflicts, run the tests again on a Mac, push the branch, run the Linux check and the pull request check on that head, and merge when `Linux (local) · CI`, `Android (local) · CI` and `Mac mini · CI` are green. The check runs on the Mac mini, not on Xcode Cloud, so a push to an open pull request spends no compute hours.
 
-If the plan gains rulesets, add `Linux · architecture check`, `Android · build of the portable targets` and `Mac mini · CI` as required status checks of a ruleset on `main` (GitHub offers a status in the ruleset after it has been reported once). A docs-only pull request never gets `Mac mini · CI`, so the script that writes it would have to write `success` for it too.
+If the plan gains rulesets, add `Linux (local) · CI`, `Android (local) · CI` and `Mac mini · CI` as required status checks of a ruleset on `main` (GitHub offers a status in the ruleset after it has been reported once). A docs-only pull request never gets `Mac mini · CI`, so the script that writes it would have to write `success` for it too.
 
 Check once that a failing test stops a merge: open a draft pull request that breaks one test, run the check on it, and confirm that it ends `failure` and that the merge step refuses. In the Release workflow, the Test action must show Required to pass in the workflow editor; then the archive is never distributed after a failed test.
 
