@@ -139,29 +139,45 @@ struct UnknownHeadingTests {
         ]
     }
 
-    /// Unknown headings with a word the vocabulary of the entries knows: a role, an organisation, a school, a degree.
-    /// Such a heading has the shape of a role in capitals over its employer and its dates (the rows of `entryParts` that
-    /// start "A role in capitals after a detail"), and only its words tell them apart: it is read into the section before,
-    /// so that a job is never cut from its section, until #466 gives it a way of its own.
-    static let headingsWithAWordOfAnEntry = ["FOUNDER VENTURES", "CONSULTING MANDATES", "SCHOOL OUTREACH", "MASTER CLASSES"]
+    /// An unknown heading with a word the vocabulary of the entries knows (a role, an organisation, a school, a degree),
+    /// and the checks the jobs get.
+    struct HeadingWithAWordOfAnEntry: Sendable, CustomTestStringConvertible {
+        let heading: String
+        let checks: [CheckReason?]
+        var testDescription: String { heading }
+    }
 
-    @Test("A heading with a word of an entry, after a detail, opens a section: pasted and drawn", arguments: headingsWithAWordOfAnEntry)
-    func headingWithAWordOfAnEntry(_ heading: String) async throws {
-        let lines = Self.lines(under: heading)
+    /// Such a heading has the shape of a role in capitals over its employer and its dates (the rows of `entryParts` that
+    /// start "A role in capitals after a detail"), and only its words tell them apart. So the line stays where the entries
+    /// read it, a job is never cut from its section, and the job that takes the line is to be checked (#466): the job it
+    /// heads for a role or an organisation, the job before it for a school or a degree, as with the other doubtful lines.
+    static let headingsWithAWordOfAnEntry = [
+        HeadingWithAWordOfAnEntry(heading: "FOUNDER VENTURES", checks: [nil, .headingUnsure]),
+        HeadingWithAWordOfAnEntry(heading: "CONSULTING MANDATES", checks: [nil, .headingUnsure]),
+        HeadingWithAWordOfAnEntry(heading: "SCHOOL OUTREACH", checks: [.headingUnsure, .roleOrEmployerByOrder]),
+        HeadingWithAWordOfAnEntry(heading: "MASTER CLASSES", checks: [.headingUnsure, .roleOrEmployerByOrder]),
+    ]
+
+    @Test("A heading with a word of an entry, after a detail, stays in its section and the job that takes it is to be checked: pasted and drawn", arguments: headingsWithAWordOfAnEntry)
+    func headingWithAWordOfAnEntry(_ row: HeadingWithAWordOfAnEntry) async throws {
+        let lines = Self.lines(under: row.heading)
         let withoutBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: false))
         let withBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: true))
         let drawn = try await importPDF(Self.drawnCV("Mara Voss", lines))
         for (label, result) in [("no blank lines", withoutBlankLines), ("blank lines", withBlankLines), ("PDF", drawn)] {
-            // Nothing is lost on the way: the lines are read into the section before, as on main
             #expect(Coverage.lost(result).isEmpty, "\(label): \(Coverage.describe(Coverage.lost(result)))")
-            withKnownIssue("#466: a heading with a word of an entry is read into the section before") {
-                let jobs = result.cv.experience
-                #expect(jobs.count == 1, "\(label): \(jobs.map { [$0.role?.value, $0.employer?.value] })")
-                let under = result.unplaced.filter { $0.heading == heading }.map(\.text).joined(separator: "\n")
-                for line in ["Tidepool Notes — maker, solo", "2022 – Present · notes app", "Shipped the app."] {
-                    #expect(under.contains(line), "\(label): «\(line)» not under \(heading): \(result.unplaced.map { ($0.heading, $0.text) })")
-                }
+            let jobs = result.cv.experience
+            try #require(jobs.count == 2, "\(label): \(jobs.map { [$0.role?.value, $0.employer?.value] })")
+            #expect(jobs.map(\.check) == row.checks, "\(label): \(jobs.map(\.check))")
+            for (index, check) in row.checks.enumerated() {
+                let listed = result.reviewList.contains { $0.field == .experience(index) && $0.reason == .headingUnsure }
+                #expect(listed == (check == .headingUnsure), "\(label), job \(index): \(result.reviewList.map { ($0.field, $0.reason) })")
+                let holdsTheLine = [jobs[index].role?.value, jobs[index].employer?.value].contains(row.heading)
+                    || jobs[index].details.contains { $0.value.contains(row.heading) }
+                #expect(holdsTheLine == (check == .headingUnsure), "\(label), job \(index): the job to be checked is the one that took the line")
             }
+            let under = result.unplaced.filter { $0.heading == row.heading }
+            #expect(under.isEmpty, "\(label): no section of its own: \(under.map(\.text))")
         }
     }
 

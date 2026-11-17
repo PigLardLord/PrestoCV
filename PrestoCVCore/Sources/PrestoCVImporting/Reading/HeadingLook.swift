@@ -7,13 +7,15 @@
 /// Only the known headings vouch for a line, never the lines that could be headings themselves. A line that reads as a
 /// part of an entry opens nothing, so that an entry is never cut from its section:
 /// - one with a digit, a period, a separator of an entry or no word of five letters (an acronym);
-/// - one the vocabulary of the entries knows as a role, an organisation, a school or a degree, wherever the word stands:
-///   a role in capitals over its employer and its dates has the shape of a heading over a name and its dates, and only
-///   the words tell them apart. A heading that holds such a word ("FOUNDER VENTURES") is read into the section before
-///   (#466), so that a job is never cut from its section;
 /// - one before a period (a role before its dates), or before a short bare line and then a period (a role, its employer,
 ///   its dates), or between a period and a detail (an employer and its dates, then the role and its bullets);
 /// - the first line of its section, and one drawn as a line the section already holds (an employer or a sub-heading).
+///
+/// A line with a word the vocabulary of the entries knows as a role, an organisation, a school or a degree, wherever the
+/// word stands, is doubtful whatever the line below: a role in capitals over its employer and its dates has the shape of
+/// a heading over a name and its dates, and only the words tell them apart (#466). So a heading that holds such a word
+/// ("FOUNDER VENTURES") stays where the entries read it in the jobs and the studies, and the entry that takes it is to
+/// be checked.
 ///
 /// The line below settles what is left. A line of an entry of its own, cut into parts that are neither roles,
 /// organisations, schools, degrees nor places ("Hive Monitor Kit — maker, solo"), stands under a heading. A bullet, a
@@ -66,6 +68,8 @@ struct HeadingLook {
               known.count(where: { Self.drawnAlike($0, block) && $0.followsGap == block.followsGap }) >= 2 else {
             return .partOfTheSection
         }
+        // A word of an entry: a role, its employer or a heading, which only the person can tell
+        if Self.isAWordOfAnEntry(document.text(of: block.span)) { return .doubtful }
         return Self.opensAnEntry(document.blocks[position + 1], in: document) ? .heading : .doubtful
     }
 
@@ -80,14 +84,14 @@ struct HeadingLook {
     /// What sets the parts of an entry apart on one line ("ROLE — EMPLOYER", "CITY, COUNTRY").
     private static let entrySeparators = [" — ", " – ", " - ", "|", "·", "•", ","]
 
-    /// A short line in capitals, alone in its block, that reads as no part of an entry.
+    /// A short line in capitals, alone in its block, whose shape is no part of an entry: no digit, date or separator.
     private static func isCandidate(_ block: SourceBlock, in document: SourceDocument) -> Bool {
         guard block.kind == .line, block.cells.count == 1 else { return false }
         let text = document.text(of: block.span)
         let words = text.words
         return isCapitals(text) && words.count <= 4 && words.contains { $0.count(where: \.isLetter) >= 5 }
             && !text.contains(where: \.isNumber) && DateReader.periods(in: text).isEmpty
-            && !entrySeparators.contains { text.contains($0) } && !isAWordOfAnEntry(text)
+            && !entrySeparators.contains { text.contains($0) }
     }
 
     /// Whether the block after `position` is content of the same column for the heading: no period (a role in capitals
