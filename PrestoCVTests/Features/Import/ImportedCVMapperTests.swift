@@ -217,6 +217,79 @@ struct ImportedCVMapperTests {
         #expect(draft.review.items.allSatisfy { $0.reason == .entryBounds })
     }
 
+    @Test("A website after the first is kept in the text not imported, at the top where the CV wrote it, never dropped")
+    func websiteAfterTheFirst() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · +49 151 2345 6789
+        linkedin.com/in/tobiasrenn · github.com/tobiasrenn · tobiasrenn.dev · tobiasrenn.example.org
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.cv.social.map(\.platform) == ["LinkedIn", "GitHub"])
+        #expect(draft.review.passages == [
+            ImportReview.Passage(place: .top, text: "https://tobiasrenn.example.org", isWholeSection: false),
+        ])
+    }
+
+    @Test("A website after the first, in a section of contacts, is kept in the text not imported under that section's heading")
+    func websiteInAContactSection() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+
+        Contact
+        https://blog.tobiasrenn.example.org
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.review.passages == [
+            ImportReview.Passage(place: .section("Contact"), text: "https://blog.tobiasrenn.example.org", isWholeSection: false),
+        ])
+    }
+
+    @Test("A study's place has no field in the CV: it is listed to check with the study's number and kept in the text not imported")
+    func placeOfAStudy() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        MSc Software Engineering — University of Northbridge
+        2017 – 2019
+        BSc Computer Science — Leipzig Vocational Institute, Leipzig
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.education.map(\.school) == ["University of Northbridge", "Leipzig Vocational Institute"])
+        #expect(draft.review.items == [ImportReview.Item(field: .education(2), reason: .placeNotKept, text: "Leipzig")])
+        #expect(draft.review.passages == [ImportReview.Passage(place: .section("Education"), text: "Leipzig", isWholeSection: false)])
+    }
+
+    @Test("One website and a study without a place leave nothing to check and nothing in the text not imported")
+    func oneWebsiteAndAStudyWithoutAPlace() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.review.items.isEmpty)
+        #expect(draft.review.passages.isEmpty)
+    }
+
     @Test("Every reason and field of the review has a text in the string catalog")
     func reviewIsWorded() {
         let items = [
@@ -224,6 +297,7 @@ struct ImportedCVMapperTests {
             ImportReview.Item(field: .location, reason: .period, text: ""), ImportReview.Item(field: .summary, reason: .languageNotAdded, text: ""),
             ImportReview.Item(field: .experience(1), reason: .languageLevels, text: ""), ImportReview.Item(field: .education(1), reason: .byPosition, text: ""),
             ImportReview.Item(field: .language, reason: .byPosition, text: ""), ImportReview.Item(field: .experience(2), reason: .entryBounds, text: ""),
+            ImportReview.Item(field: .education(2), reason: .placeNotKept, text: ""),
         ]
         for item in items {
             #expect(item.fieldKey.localized != item.fieldKey, "\(item.fieldKey) is missing from the string catalog")

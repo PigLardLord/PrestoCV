@@ -17,7 +17,7 @@ enum Remainder {
         for piece in lost(in: result.document, by: spans) {
             let section = holders.firstHolding(piece.span).map { sections[blocks[$0].section] }
             swept.unplaced.append(UnplacedText(
-                section: section?.kind ?? .unknown, heading: section?.heading.map { result.document.text(of: $0.span) },
+                section: section?.kind ?? .unknown, heading: section?.headingText(in: result.document),
                 text: piece.text, span: piece.span
             ))
         }
