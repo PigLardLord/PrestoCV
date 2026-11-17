@@ -12,10 +12,11 @@
 /// - the first line of its section, and one drawn as a line the section already holds (an employer or a sub-heading).
 ///
 /// A line with a word the vocabulary of the entries knows as a role, an organisation, a school or a degree, wherever the
-/// word stands, is doubtful whatever the line below: a role in capitals over its employer and its dates has the shape of
-/// a heading over a name and its dates, and only the words tell them apart (#466). So a heading that holds such a word
-/// ("FOUNDER VENTURES") stays where the entries read it in the jobs and the studies, and the entry that takes it is to
-/// be checked.
+/// word stands, is a word of an entry whatever the line below: a role in capitals over its employer and its dates has the
+/// shape of a heading over a name and its dates, and only the words tell them apart (#466). In the jobs and the studies
+/// such a line ("FOUNDER VENTURES") stays where the entries read it, and the entry that takes it is to be checked; in any
+/// other section, where no entry has a role or an employer, it stays a part of the section ("PROJECT MANAGEMENT" among
+/// the skills).
 ///
 /// The line below settles what is left. A line of an entry of its own, cut into parts that are neither roles,
 /// organisations, schools, degrees nor places ("Hive Monitor Kit — maker, solo"), stands under a heading. A bullet, a
@@ -34,6 +35,8 @@ struct HeadingLook {
         case heading
         /// A heading or the employer of a job: the line below does not tell which.
         case doubtful
+        /// A line with a word of an entry: a role, an employer, a school or a heading, which only the person can tell.
+        case wordOfAnEntry
     }
 
     /// The known headings in capitals: alone on their line and in the vocabulary.
@@ -69,7 +72,7 @@ struct HeadingLook {
             return .partOfTheSection
         }
         // A word of an entry: a role, its employer or a heading, which only the person can tell
-        if Self.isAWordOfAnEntry(document.text(of: block.span)) { return .doubtful }
+        if Self.isAWordOfAnEntry(document.text(of: block.span)) { return .wordOfAnEntry }
         return Self.opensAnEntry(document.blocks[position + 1], in: document) ? .heading : .doubtful
     }
 

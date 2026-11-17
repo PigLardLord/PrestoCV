@@ -181,6 +181,54 @@ struct UnknownHeadingTests {
         }
     }
 
+    // MARK: A line with a word of an entry, outside the jobs and the studies
+
+    /// A line in capitals with a word of an entry, under a heading of a section without employers or schools, drawn as
+    /// the known headings: the items of that section before it and after it.
+    struct LineInAListSection: Sendable, CustomTestStringConvertible {
+        let heading: String
+        let before: [String]
+        let line: String
+        let after: [String]
+        var testDescription: String { "\(line) under \(heading)" }
+    }
+
+    /// Only an entry with an employer or a school can take such a line as its role or its employer: in any other section
+    /// the line was never a heading candidate, and it stays a part of the section (#466).
+    static let linesInAListSection = [
+        LineInAListSection(heading: "SKILLS", before: ["Swift", "Go"], line: "PROJECT MANAGEMENT", after: ["Scrum", "Kanban"]),
+        LineInAListSection(heading: "INTERESTS", before: ["Chess", "Cycling"], line: "SCHOOL OUTREACH", after: ["Mentoring", "Robotics"]),
+    ]
+
+    @Test("Outside the jobs and the studies, a line in capitals with a word of an entry stays in its section: pasted and drawn", arguments: linesInAListSection)
+    func lineWithAWordOfAnEntryInAListSection(_ row: LineInAListSection) async throws {
+        let lines: [(text: String, isHeading: Bool)] = [
+            ("SUMMARY", true),
+            ("Mobile engineer.", false),
+            ("EXPERIENCE", true),
+            ("Developer — Cedar Labs", false),
+            ("2018 – 2021", false),
+            ("Built mobile tools.", false),
+            (row.heading, true),
+        ] + row.before.map { ($0, false) } + [(row.line, true)] + row.after.map { ($0, false) } + [
+            ("LANGUAGES", true),
+            ("German — native", false),
+        ]
+        let withoutBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: false))
+        let withBlankLines = try importText(Self.pastedCV("Mara Voss", lines, blankLines: true))
+        let drawn = try await importPDF(Self.drawnCV("Mara Voss", lines))
+        for (label, result) in [("no blank lines", withoutBlankLines), ("blank lines", withBlankLines), ("PDF", drawn)] {
+            #expect(Coverage.lost(result).isEmpty, "\(label): \(Coverage.describe(Coverage.lost(result)))")
+            let read = (row.heading == "SKILLS" ? result.cv.skills : result.cv.interests).map(\.value)
+            for item in row.before + row.after {
+                #expect(read.contains(item), "\(label): \(item) not read in \(row.heading): \(read)")
+            }
+            let under = result.unplaced.filter { $0.heading == row.line }
+            #expect(under.isEmpty, "\(label): no section of its own: \(under.map(\.text))")
+            #expect(result.cv.experience.count == 1, "\(label): \(result.cv.experience.map { [$0.role?.value, $0.employer?.value] })")
+        }
+    }
+
     // MARK: What does not open a section
 
     private func kinds(_ text: String) -> [SectionKind] {

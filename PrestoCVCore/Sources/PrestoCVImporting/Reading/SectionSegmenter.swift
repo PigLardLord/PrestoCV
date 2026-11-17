@@ -86,19 +86,20 @@ enum SectionSegmenter {
                 continue
             }
             // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454). One that
-            // may as well be the employer of a job stays in the jobs and the studies, where its entry is to be checked
+            // may as well be the employer of a job stays in the jobs and the studies, where its entry is to be checked; one
+            // with a word of an entry opens nothing elsewhere either, as no other section reads roles or employers (#466)
             let current = sections[sections.count - 1]
             if !headKinds.contains(current.kind) {
                 switch try look.reading(block, at: position, after: current, in: document, work: &work) {
                 case .heading:
                     sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
                     continue
-                case .doubtful where entryKinds.contains(current.kind):
+                case .doubtful where entryKinds.contains(current.kind), .wordOfAnEntry where entryKinds.contains(current.kind):
                     sections[sections.count - 1].doubtfulHeadings.insert(block.index)
                 case .doubtful:
                     sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
                     continue
-                case .partOfTheSection:
+                case .wordOfAnEntry, .partOfTheSection:
                     break
                 }
             }
