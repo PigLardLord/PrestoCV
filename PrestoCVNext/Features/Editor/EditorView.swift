@@ -2,17 +2,19 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
-/// where the text stands. While the text cannot be stored as it is, a notice above the form says what to do and offers
-/// the ways out (#402, decision 8). It waits while the CV is read, and says so when it cannot be, with a way to close
-/// it. VoiceOver is told of each change in one announcement, queued after what it is saying: where the status settled
-/// and, while the person cannot leave, what to do and the ways on (`SaveStatus.spoken(in:)`), then the problems met that
-/// the status does not name. A row the person adds comes into view, and its first field takes the focus; while the focus
-/// stays in it, it stays in view when the keyboard rises. On a narrow screen a job, a study, a language, a certification
-/// and a profile open on a page of their own.
+/// where the text stands, and Export once the CV is open. While the text cannot be stored as it is, a notice above the
+/// form says what to do and offers the ways out (#402, decision 8). It waits while the CV is read, and says so when it
+/// cannot be, with a way to close it. VoiceOver is told of each change in one announcement, queued after what it is
+/// saying: where the status settled and, while the person cannot leave, what to do and the ways on
+/// (`SaveStatus.spoken(in:)`), then the problems met that the status does not name. A row the person adds comes into
+/// view, and its first field takes the focus; while the focus stays in it, it stays in view when the keyboard rises. On
+/// a narrow screen a job, a study, a language, a certification and a profile open on a page of their own.
 struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
     let title: Text
+    /// Opens the export of this CV.
+    let export: () -> Void
     /// Closes the editor without storing its text.
     let discard: () -> Void
     @FocusState private var focus: EditorField?
@@ -94,6 +96,14 @@ struct EditorView: View {
             }
             .formStyle(.grouped)
             .readableScrollContent()
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: export) {
+                        Label("editor.export", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityIdentifier("editor.export")
+                }
+            }
             .editRowsButton(canReorder: editor.reordersRows)
             // The Done bar and the keyboard take their room only after the focus lands in a new row, so a new row
             // near the bottom (a new skill goes last) would stay under them: once the room the form shows its rows in

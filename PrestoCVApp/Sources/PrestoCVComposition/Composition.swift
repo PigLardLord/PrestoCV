@@ -12,6 +12,7 @@ import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
 import PrestoCVDomain
+import PrestoCVExportFiles
 import PrestoCVImportFiles
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
@@ -86,6 +87,11 @@ public final class Composition {
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
+        /// The language of the app, which the export sheets offer first when a CV holds none.
+        let appLanguage: ExportLanguage
+        /// True when a share opens the stand-in of the system's share sheet: only a Debug build's launch argument sets it
+        /// (`LaunchFixtures`), for the UI tests.
+        let sharesWithStandIn: Bool
     }
 
     let paths: AppPaths
@@ -103,6 +109,9 @@ public final class Composition {
     let traceAccess: TraceAccess
     /// Makes the view models of the screens over this composition's repository, clock and ids.
     public let screens: ScreenFactory
+    /// True when a share should open the stand-in of the system's share sheet, which a UI test can read and answer. It is
+    /// true only in a Debug build launched with `-PrestoCVNextShareStandIn`; a Release build has no code that sets it.
+    public let sharesWithStandIn: Bool
 
     /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
     private struct Parts {
@@ -126,19 +135,22 @@ public final class Composition {
         logger = trace.logger
         tracer = trace.tracer
         traceAccess = trace.access
+        sharesWithStandIn = inputs.sharesWithStandIn
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
         )
+        let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
         let importFiles = ImportFileAdapter(
             files: SystemImportFiles(), copyFolders: inputs.copyFolders,
             maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
         )
         screens = ScreenFactory(
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exporter: parts.exporter,
-            lookOptions: parts.lookOptions, languages: parts.languages,
-            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
+            exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
+            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
+            appLanguage: inputs.appLanguage
         )
     }
 
@@ -257,6 +269,7 @@ public final class Composition {
         let check: @MainActor () throws(CompositionFailure) -> Void
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
+        let sharesWithStandIn: Bool
         let wrapStore: WrapStore
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
@@ -291,6 +304,7 @@ public final class Composition {
             }
         }
         wrapListEditing = { fixtures.listEditing($0) }
+        sharesWithStandIn = fixtures.sharesWithStandIn
         wrapStore = { fixtures.store($0) }
         #else
         paths = device
@@ -299,6 +313,7 @@ public final class Composition {
         check = {}
         prepare = {}
         wrapListEditing = { $0 }
+        sharesWithStandIn = false
         wrapStore = { $0 }
         #endif
         return await make(Inputs(
@@ -330,7 +345,9 @@ public final class Composition {
             prepare: prepare,
             wrapListEditing: wrapListEditing,
             wrapStore: wrapStore,
-            backgroundTime: backgroundTime
+            backgroundTime: backgroundTime,
+            appLanguage: .preferred(Bundle.main.preferredLocalizations),
+            sharesWithStandIn: sharesWithStandIn
         ))
     }
 }
