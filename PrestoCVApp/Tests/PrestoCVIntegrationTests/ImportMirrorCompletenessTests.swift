@@ -43,7 +43,7 @@ private typealias Destination = @Sendable (ImportedField, ImportOutcome) -> Bool
 /// neither makes the test fail, so a field added to `ImportedCV` cannot go unseen.
 private let mapped: [String: Destination] = [
     "person.name": inCV, "person.title": inCV, "person.email": inCV, "person.phone": inCV, "person.location": inCV,
-    "person.summary": inCV, "person.links[].address": inCV,
+    "person.summary": inCV, "person.links[].address": inCVOrListed,
     "experience[].role": inCV, "experience[].employer": inCV, "experience[].location": inCV, "experience[].details[]": inCV,
     "education[].degree": inCV, "education[].school": inCV, "education[].details[]": inCV,
     "skills[]": inCV, "languages[].name": inCVOrListed, "languages[].level": inCV,
@@ -52,7 +52,9 @@ private let mapped: [String: Destination] = [
 
 private let reported: [String: Destination] = [
     "person.links[].kind": { _, _ in true },   // the kind decides where the address goes: the address is checked
+    "person.links[].heading": { _, _ in true },   // the heading a second website is listed under: the address is checked
     "languages[].heading": { _, _ in true },   // the heading a language the CV cannot take is listed under: its name is checked
+    "education[].heading": { _, _ in true },   // the heading a study's place is listed under: the place is checked
     "experience[].check": checkReported, "education[].check": checkReported,
     "experience[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .experience) },
     "education[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .education) },
@@ -109,8 +111,10 @@ struct ImportMirrorCompletenessTests {
         let filled = Set(inventory.filter { $0.value != "<nil>" && $0.value != "<empty>" }.map(\.path))
         #expect(Set(inventory.map(\.path)).subtracting(filled) == [], "a field the fixture leaves empty in every entry")
         let fieldPaths = Set(FullImport.result.cv.fields.map(inventoryPath))
-        // The kind of a link and the heading of a language name where a value goes; they are not values of the person
-        #expect(Set(inventory.map(\.path)).subtracting(fieldPaths).subtracting(["person.links[].kind", "languages[].heading"]) == [],
+        // The kind of a link and the heading of a link, a language or a study name where a value goes; they are not values
+        // of the person
+        #expect(Set(inventory.map(\.path)).subtracting(fieldPaths)
+                    .subtracting(["person.links[].kind", "person.links[].heading", "languages[].heading", "education[].heading"]) == [],
                 "a field of ImportedCV that `fields` does not list")
         #expect(fieldPaths.subtracting(Set(inventory.map(\.path))) == [])
         let values = FullImport.result.cv.fields.map(\.value)

@@ -33,6 +33,7 @@ enum HeaderReader {
         let closing = contactsAfterAName(blocks, in: findings.document)?.index
 
         for section in sections {
+            let heading = findings.heading(of: section)
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
                 let cells = Piece.cells(of: block, in: findings.document)
                 if let (label, values) = labelled(cells) {
@@ -56,7 +57,7 @@ enum HeaderReader {
                             let contacts = ContactReader.read(value, label: label)
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
-                            findings.cv.person.links += contacts.links
+                            findings.cv.person.links += contacts.links.map { $0.under(heading) }
                             for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
                         }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
@@ -70,7 +71,7 @@ enum HeaderReader {
                 for contacts in line.cells {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
-                    findings.cv.person.links += contacts.links
+                    findings.cv.person.links += contacts.links.map { $0.under(heading) }
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
                 }
                 if line.hasContacts { contactBlocks.insert(block.index) }
@@ -673,5 +674,14 @@ enum HeaderReader {
         guard let size = block.fontSize else { return false }
         let sizes = document.blocks.filter { $0.page == block.page }.compactMap(\.fontSize)
         return size >= (sizes.max() ?? 0) - 0.1
+    }
+}
+
+private extension ImportedLink {
+    /// The link, under the heading of the section it stands in.
+    func under(_ heading: String?) -> ImportedLink {
+        var link = self
+        link.heading = heading
+        return link
     }
 }
