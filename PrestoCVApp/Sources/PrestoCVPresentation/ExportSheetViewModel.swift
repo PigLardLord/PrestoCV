@@ -128,11 +128,13 @@ public final class ExportSheetViewModel {
     public func start() { begin() }
 
     /// Exports in `language`, and takes the choice to the CV; nil is automatic. The export begins before the choice goes
-    /// out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is the later intent.
+    /// out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is the later intent. The
+    /// language of the PDF on screen, or of the one being made, keeps that PDF: the choice still goes to the CV.
     public func select(language: ExportLanguage?) {
+        let keepsThePDF = language != nil && language == effectiveLanguage && (status == .exporting || document != nil)
         selectedLanguage = language
         if language == nil { found = nil }
-        begin()
+        if !keepsThePDF { begin() }
         onLanguageChosen(language)
     }
 
