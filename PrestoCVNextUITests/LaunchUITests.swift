@@ -2,7 +2,7 @@ import XCTest
 
 /// The new app makes its one composition from the arguments it was launched with, and its first screen names the state the
 /// composition reached: ready, or failed with the failure's code.
-final class LaunchUITests: XCTestCase {
+final class LaunchUITests: RuntimeIssueFailingTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
     }

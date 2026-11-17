@@ -63,7 +63,7 @@ enum LanguageReader {
         for (offset, item) in items.enumerated() {
             let levelNext = offset + 1 < items.count ? LanguageEvidence.level(of: items[offset + 1]) != nil : items.count == 1 && row.levelFollows
             if let start = start(ofLanguageIn: item, levelNext: levelNext) {
-                var language = ImportedLanguage(name: start.name.quote())
+                var language = ImportedLanguage(name: start.name.quote(), heading: findings.heading(of: section))
                 language.level = start.level ?? row.nativeLabel.map { Sourced(value: .native, spans: [$0.span], reading: .languageLevel) }
                 findings.cv.languages.append(language)
                 let index = findings.cv.languages.count - 1

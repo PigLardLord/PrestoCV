@@ -84,6 +84,8 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     case .text(let text): _ = text
     case .returnKey(let next): let _: EditorField? = next
     }
+    var entries = FieldEntries()
+    let _: FieldEntry = entries.entry("a", after: "", in: .title)
     editor.addRow(to: .skills)
     let _: RowID? = editor.addedRow
     editor.rowWasShown()

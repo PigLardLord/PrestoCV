@@ -10,6 +10,8 @@ struct DetailsSection: View {
     let focus: FocusState<EditorField?>.Binding
     /// How many times the return key made each field anew, since a field that wraps shows its line break until then.
     @State private var refreshed: [EditorField: Int] = [:]
+    /// What each field was handed last, since a field can hand the same text over twice.
+    @State private var entries = FieldEntries()
 
     var body: some View {
         Section("editor.details") {
@@ -55,13 +57,13 @@ struct DetailsSection: View {
         .onSubmit { focus.wrappedValue = field.nextDetail }
     }
 
-    /// The field's text, through `FieldEntry`: the return key moves the focus on and leaves the text as it was, and the
+    /// The field's text, through `FieldEntries`: the return key moves the focus on and leaves the text as it was, and the
     /// field is made anew, since it still shows the line break.
     private func entry(_ field: EditorField, _ path: WritableKeyPath<EditorContent, String>) -> Binding<String> {
         Binding {
             editor.content[keyPath: path]
         } set: { new in
-            switch FieldEntry(new, after: editor.content[keyPath: path], in: field) {
+            switch entries.entry(new, after: editor.content[keyPath: path], in: field) {
             case .text(let text):
                 editor.content[keyPath: path] = text
             case .returnKey(let next):
