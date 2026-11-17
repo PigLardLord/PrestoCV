@@ -1,9 +1,16 @@
 name: CI
 
+# Started by hand only (Actions, CI, Run workflow; or `gh workflow run ci.yml -f base=main --ref <branch>`): the repository
+# stays on GitHub's free plan, so its Actions minutes go only where they are needed. A pull request is checked by a script on
+# a Linux computer that runs these two jobs' own steps on its head and writes the statuses `Linux (local) · CI` and
+# `Android (local) · CI` (ADR 0029, amended on 2026-11-17). Run the workflow when that computer cannot, or to compare with it.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: The branch whose architecture baseline the run compares with; empty for none
+        required: false
+        default: main
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,9 +39,10 @@ jobs:
         # The script a computer runs too (ADR 0026): the toolchain against .swift-version, the architecture check against
         # the base branch's baseline, which may only shrink (ADR 0006), the checker's self-test, the source checks, and the
         # build and tests of the new targets, the only ones that exist on Linux (ADR 0012). The source checks also run in
-        # ci_scripts/ci_post_xcodebuild.sh (the Mac mini check, the Release build), not in the test plans.
+        # ci_scripts/ci_post_xcodebuild.sh (the Mac mini check, the Release build), not in the test plans. A run started by
+        # hand has no base branch of its own: the input names it, and the full history fetched above holds it.
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_REF: ${{ inputs.base }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           Tools/check-linux.sh ${BASE_REF:+"origin/$BASE_REF"}
