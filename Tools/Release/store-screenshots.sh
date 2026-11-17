@@ -254,9 +254,18 @@ prepare() {
     for key in KeyboardPrediction KeyboardInlineCompletion; do
         xcrun simctl spawn "$udid" defaults write com.apple.keyboard.predictive "$key" -bool NO
     done
-    xcrun simctl spawn "$udid" defaults write com.apple.keyboard.ContinuousPath DidShowContinuousPathIntroduction -bool YES
+    # The keyboard's first-use intro ("Speed up your typing by sliding your finger across the letters...", with Continue)
+    # can cover the keyboard and its Done bar on an erased simulator, and a tap on Done then misses. The keyboard of iOS 26
+    # and 27 keeps the flag that it has shown the intro in com.apple.keyboard.preferences (it writes it there itself once
+    # it has shown it) and reads it at boot. A flag that did not reach the simulator's disk would let the intro come back,
+    # so it is read back after that boot.
+    xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool YES
     xcrun simctl shutdown "$udid"
     boot "$udid"
+    [ "$(xcrun simctl spawn "$udid" defaults read com.apple.keyboard.preferences DidShowContinuousPathIntroduction)" = 1 ] || {
+        echo "store-screenshots: the keyboard's first-use intro could not be marked as seen on $udid" >&2
+        return 1
+    }
     xcrun simctl ui "$udid" appearance light
     xcrun simctl status_bar "$udid" override --time "$(status_bar_time)" --dataNetwork wifi --wifiMode active --wifiBars 3 \
         --cellularMode active --cellularBars 4 --operatorName "" --batteryState charged --batteryLevel 100

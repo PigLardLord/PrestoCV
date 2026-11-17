@@ -8,7 +8,7 @@ struct AppPaths: Equatable, Sendable {
 
     /// The folder of everything the app keeps
     let root: URL
-    /// The folder of what may be lost with the app: the copies of a trace made to share
+    /// The folder of what may be lost with the app: the copies of a trace and the PDFs of an export made to share
     let temporary: URL
 
     /// The CVs, one file each
@@ -19,6 +19,8 @@ struct AppPaths: Equatable, Sendable {
     var trace: URL { root.appendingPathComponent("Diagnostics", isDirectory: true) }
     /// The copies of a run made to share
     var traceShare: URL { temporary.appendingPathComponent("DiagnosticsShare", isDirectory: true) }
+    /// The PDFs written for an export's share, each in a folder of its own; the next launch removes what is left
+    var exportShare: URL { temporary.appendingPathComponent("ExportShare", isDirectory: true) }
 
     /// Makes the root and the store; making them again changes nothing.
     func create() throws(Failure) {

@@ -2,7 +2,7 @@ import XCTest
 
 /// The shell lists the CVs of the store in its sidebar and shows the open CV in its detail. On a compact screen it shows
 /// one column at a time, the list first; on a regular one both.
-final class ShellUITests: XCTestCase {
+final class ShellUITests: RuntimeIssueFailingTestCase {
     private let title = "Backend Engineer"
     private let identity = "6B1F6C1E-1B8C-4C1B-9D55-1F3B2C8B7A01"
 

@@ -411,15 +411,20 @@ enum StringChecks {
     // MARK: Availability
 
     /// Words that promise future availability or readiness, by language: that a feature, a model or its data will be
-    /// there soon, in a moment, later, or not yet. Nothing tells when they will be ready, and the owner decided that the
-    /// texts promise no availability the app cannot deliver now (#255, #270). The expected duration of a task that is
-    /// already running is not such a promise.
+    /// there soon, in a moment, later, not yet, or that there is still none. Nothing tells when they will be ready, and
+    /// the owner decided that the texts promise no availability the app cannot deliver now (#255, #270). The expected
+    /// duration of a task that is already running is not such a promise.
     static let availabilityPromiseWords: [String: [String]] = [
         "en": ["soon", "shortly", "in a moment", "coming", "yet", "later"],
-        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht", "später"],
+        "de": [
+            "bald", "gleich", "demnächst", "in Kürze", "noch nicht", "noch kein", "noch keine", "noch keinen", "später",
+        ],
         "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no", "más tarde"],
         "fr": ["bientôt", "dans un instant", "sous peu", "pas encore", "plus tard"],
-        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora", "più tardi"],
+        "it": [
+            "presto", "tra un attimo", "fra poco", "a breve", "non ancora", "ancora nessun", "ancora nessuna",
+            "ancora nessuno", "più tardi",
+        ],
         "pt": ["em breve", "em instantes", "logo", "ainda não", "mais tarde"],
     ]
 

@@ -14,4 +14,13 @@ public struct ExportLanguage: Hashable, Sendable {
     }
 
     init(language: DocumentLanguage) { self.language = language }
+
+    /// The first of `tags` that is a language tag, English when none is: the app's language, from the languages of the
+    /// app in the order the system prefers them, which the sheet offers first.
+    public static func preferred(_ tags: [String]) -> ExportLanguage {
+        for tag in tags {
+            if let language = ExportLanguage(tag) { return language }
+        }
+        return ExportLanguage(language: .english)
+    }
 }

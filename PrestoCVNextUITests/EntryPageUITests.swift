@@ -6,7 +6,7 @@ import XCTest
 /// A language's line shows its level, and its context menu names it. The menu of the back button goes from a page
 /// straight to the list, and a CV tapped right after it opens and stays open. The edge swipe goes back from a page as
 /// Back does, and the CV stays open. On a wide screen the rows stay in the form, so these tests are skipped there.
-final class EntryPageUITests: XCTestCase {
+final class EntryPageUITests: RuntimeIssueFailingTestCase {
 
     private let identity = "3F6B9D2A-7C41-4E8B-A5D0-6E2C8B1F9A47"
     private let title = "Crane Operator"

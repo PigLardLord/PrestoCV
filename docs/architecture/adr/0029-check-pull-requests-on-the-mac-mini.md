@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-25
+- **Amended:** 2026-11-17: the `CI` workflow runs only when started by hand, and the Linux checks and the Android build of a pull request write commit statuses of their own (Decision, "The merge rule"; Consequences, "The Linux checks")
 - **Related:** [ADR 0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) (amended), [ADR 0022](0022-ship-legacy-app-as-v1.md), issue #337
 
 ## Context
@@ -23,6 +24,8 @@
 
 **The merge rule.** A pull request merges when its branch contains the latest `main`, every check of the `CI` GitHub workflow is green, and `Mac mini · CI` is `success` on the exact head commit. A pull request whose changed files are all in `docs/` or match `*.md` does not need the Mac status. The retired Xcode Cloud status `PrestoCV | Pull Request` is ignored by name. The merge step enforces the rule, because the repository's plan has no rulesets and no branch protection.
 
+**Amended 2026-11-17 (owner's decision):** the `CI` workflow runs only when someone starts it by hand, so that the repository stays on GitHub's free plan and its Actions minutes go only where they are needed. On a pull request, a script run on a Linux computer, outside the repository, runs the steps of the workflow's two jobs on the head commit and writes the commit statuses `Linux (local) · CI` (`Tools/check-linux.sh`) and `Android (local) · CI` (the Android build). A pull request merges when its branch contains the latest `main`, both statuses are `success` on its exact head commit, a docs-only pull request included, and `Mac mini · CI` is `success` there too unless every changed file is in `docs/` or matches `*.md`. When someone runs the workflow on that head, the local status of each job decides, not the job's own check. The text above stays as it was decided.
+
 **Xcode Cloud** keeps the Main workflow (archive and TestFlight after a merge) and the Release workflow (tests, archive and TestFlight for a tag). Its hours go only to those.
 
 ## Consequences
@@ -33,7 +36,7 @@
 - **R16 is no longer exercised by the pull request check.** The tests that run without the repository (the Release workflow's Test action, `docs/release/xcode-cloud.md`) exist to find a test that reads a file of the repository. Those tests now run when a release is tagged, not on each pull request, and the checker's own R16 rule stays. A failure found at release time points to the commits since the last release.
 - **The check does not run on the iOS 26.5 simulators.** It runs on the newest runtime. The oldest supported release runs separately, once per pull request.
 - **Nothing is signed or uploaded from the Mac mini.** Signing and TestFlight stay on Xcode Cloud, so no key or certificate goes to GitHub or to the Mac, as in ADR 0024.
-- **The Linux checks do not change.** They stay GitHub Actions, and their result still counts in the merge rule.
+- **The Linux checks do not change.** They stay GitHub Actions, and their result still counts in the merge rule (amended 2026-11-17: their steps run on a Linux computer and write `Linux (local) · CI` and `Android (local) · CI`, which the merge rule requires; the workflow runs only by hand).
 
 ## Alternatives considered
 
