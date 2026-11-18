@@ -80,7 +80,7 @@ struct ImportTrace {
             step += [
                 .count("lineCount", section.blocks.count),
                 .text("lines", section.blocks.map { document.text(of: $0.span) }.joined(separator: "\n")),
-                .token("reader", CVReader.readerName(of: section.kind)),
+                .token("reader", CVReader.readerName(of: section)),
                 .count("values", kept.count),
             ]
             step += kept.map { .text("kept", describe($0)) }

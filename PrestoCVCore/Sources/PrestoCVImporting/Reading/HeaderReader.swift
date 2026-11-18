@@ -53,13 +53,16 @@ enum HeaderReader {
                         }
                     case .phone, .email, .web:
                         contactBlocks.insert(block.index)
+                        var labels: [Piece] = []
                         for value in values {
                             let contacts = ContactReader.read(value, label: label)
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
                             findings.cv.person.links += contacts.links.map { $0.under(heading) }
                             for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
+                            labels += contacts.labels
                         }
+                        for shown in namingNoValue(labels, in: block, of: findings.document) { findings.unplace(shown, in: section) }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
                         // Personal details that the CV has no field for stay visible, with their label
                         findings.unplace(block, in: section)
@@ -68,12 +71,15 @@ enum HeaderReader {
                 }
                 let line = LineContacts(cells)
                 var rest: [Piece] = []
+                var labels: [Piece] = []
                 for contacts in line.cells {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
                     findings.cv.person.links += contacts.links.map { $0.under(heading) }
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
+                    labels += contacts.labels
                 }
+                rest += namingNoValue(labels, in: block, of: findings.document)
                 if line.hasContacts { contactBlocks.insert(block.index) }
                 rest.sort { $0.span < $1.span }
                 for (index, piece) in rest.enumerated() {
@@ -199,6 +205,14 @@ enum HeaderReader {
     // MARK: Labels
 
     /// A row whose first cell is the label of a personal detail, or a line that reads "Label: value".
+    /// The contact labels of a cell that name no value of their whole line, nor of the line under it, are text of their own
+    /// ("iOS Engineer · Mobile"); a label beside its value, in its cell or in the next one, names it and is dropped.
+    private static func namingNoValue(_ labels: [Piece], in block: SourceBlock, of document: SourceDocument) -> [Piece] {
+        guard !labels.isEmpty else { return [] }
+        let shown = SpanIndex(ContactReader.labelsWithoutAValue(in: block, of: document).map(\.span))
+        return labels.filter { shown.holds($0.span) }
+    }
+
     private static func labelled(_ cells: [Piece]) -> (EntryVocabulary.PersonalLabel, [Piece])? {
         guard let first = cells.first else { return nil }
         if cells.count >= 2, let label = EntryVocabulary.personalLabel(first.text) {
@@ -588,6 +602,7 @@ enum HeaderReader {
         let words = candidate.piece.words
         guard (1...maxTitleWords).contains(words.count), text.contains(where: \.isLetter), candidate.isFirstInBlock else { return false }
         if !DateReader.periods(in: text).isEmpty || SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         // The line under the name is a title unless it is a place or a street, whatever follows it
         if looksLikePlace(candidate, beside: []) && !EntryVocabulary.isRole(text) { return false }
         return true
@@ -596,10 +611,12 @@ enum HeaderReader {
     private static let maxTitleWords = 14
 
     /// A later part of the title line that goes on with the title: words with a letter, and neither a place nor the form
-    /// of one, a period, a heading or a bare label.
+    /// of one, a period, a heading or a bare label. The label of a contact with no contact beside it goes on with the title
+    /// ("iOS Engineer · Mobile"): it is shown, not read as a place.
     private static func goesOnWithTitle(_ candidate: Candidate) -> Bool {
         let text = candidate.piece.text
         guard text.contains(where: \.isLetter), DateReader.periods(in: text).isEmpty else { return false }
+        if ContactReader.isContactLabel(text) { return true }
         if SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) || hasPlaceForm(text) { return false }
         return !looksLikePlace(candidate, beside: [])
     }
@@ -612,6 +629,7 @@ enum HeaderReader {
         guard (1...8).contains(words.count), !text.contains("@"), text.contains(where: \.isLetter) else { return false }
         if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || text.hasSuffix(".") { return false }
         if SectionVocabulary.kind(ofHeading: text) != nil || !DateReader.periods(in: text).isEmpty || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         if Places.isKnownPlace(text) || Places.isAddress(text) { return true }
         if candidate.blockHasContacts && (text.contains(",") || words.count <= 3) { return true }
         return isLoneCity(candidate, beside: contactBlocks)

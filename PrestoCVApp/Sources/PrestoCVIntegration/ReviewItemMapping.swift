@@ -14,6 +14,7 @@ public enum ReviewItemMapping {
         case .summaryWithoutHeading: .summaryWithoutHeading
         case .roleOrEmployerByOrder: .roleOrEmployerByOrder
         case .entryBoundsUnsure: .entryBoundsUnsure
+        case .headingUnsure: .headingUnsure
         case .periodUnreadable: .periodUnreadable
         case .periodOpenEnd: .periodOpenEnd
         case .levelNotCEFR: .levelNotCEFR
