@@ -17,7 +17,7 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 | Secondary category | Productivity (already set) |
 | Age rating | 4+ (already set) |
 | App Privacy | Data Not Collected (already set) |
-| Support URL | `https://prestocv.app` (already set). Apple requires the support page to show contact information: it gives `support@prestocv.app`, which must deliver to the owner before the app is submitted. |
+| Support URL | `https://prestocv.app` (already set). Apple requires the support page to show contact information: it gives `support@prestocv.app`, which must deliver to the maintainer before the app is submitted. |
 | Marketing URL | `https://prestocv.app` (already set). |
 | Privacy Policy URL | `https://prestocv.app/privacy.html`, in every localization (already set). |
 | Sign-in required (App Review Information) | No |

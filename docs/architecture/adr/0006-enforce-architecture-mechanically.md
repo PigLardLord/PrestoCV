@@ -56,9 +56,9 @@ The git guards read their policy from `.agents/harness/guards.json`, which count
    - CI runs on GitHub Actions for every pull request, with `fetch-depth: 0` for `--against`:
      - **Linux** (Swift 6.3 container): the checker with `--modules` and `--packages`, then build and test of every Linux ✓ target.
      - **macOS** (macOS 26 runner, Xcode 26): the checker with `--modules` and `--packages`, which sees the Apple-only manifest branches; package tests; `xcodebuild test` of the package schemes on the iOS simulator (iPhone 17 Pro, iOS 26.5) for the native renderer contract; the app on iOS and macOS.
-     - **Amended by [ADR 0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) and [ADR 0029](0029-check-pull-requests-on-the-mac-mini.md):** the Apple checks run on the Mac mini, and since 2026-11-17 the `CI` workflow runs only when started by hand: on a pull request its Linux and Android steps run on a Linux computer and write commit statuses of their own. The text above stays as it was decided.
+     - **Amended by [ADR 0024](0024-run-apple-ci-and-releases-on-xcode-cloud.md) and [ADR 0029](0029-check-pull-requests-on-the-mac-mini.md):** the Apple checks run on a maintainer's Mac, and since 2026-11-17 the `CI` workflow runs only when started by hand: on a pull request its Linux and Android steps run on a Linux computer and write commit statuses of their own. The text above stays as it was decided.
    - The ticket-loop harness runs the checker as its `lint` step.
-5. **Governance** (proposed; this changes the owner's guard policy, so the owner decides it separately, in #69 and #70; accepting this ADR does not decide it):
+5. **Governance** (proposed; this changes the maintainer's guard policy, so the maintainer decides it separately, in #69 and #70; accepting this ADR does not decide it):
    - treat `docs/architecture/` and `Tools/ArchitectureCheck/` as code in `guards.json`;
    - add CODEOWNERS for both.
 6. **Review-only rules.** Some things no detector can prove: whether a view contains a business rule, whether a continuation resumes exactly once, whether a port leaks infrastructure types. These are listed as "review" in [rules.md](../rules.md), not claimed as checked.

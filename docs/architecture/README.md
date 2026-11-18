@@ -122,11 +122,11 @@ The current code is not refactored in place. The new structure is built next to 
 6. **AI Drafting.** Port with its own draft model, availability port, validation on every path (#16, #17, #18, #35).
 7. **Delete the old code** and close the issues the refactor made obsolete.
 
-Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks and the Android build run the steps of the GitHub Actions workflow on a Linux computer (the workflow itself runs only when started by hand) and the Apple checks run on the Mac mini ([ADR 0029](adr/0029-check-pull-requests-on-the-mac-mini.md)); Xcode Cloud tests, archives and uploads the releases ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
+Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks and the Android build run the steps of the GitHub Actions workflow on a Linux computer (the workflow itself runs only when started by hand) and the Apple checks run on a maintainer's Mac ([ADR 0029](adr/0029-check-pull-requests-on-the-mac-mini.md)); Xcode Cloud tests, archives and uploads the releases ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
 
 ### Porting from the validation prototype
 
-The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (owner decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
+The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (maintainer decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
 
 Code ported from the prototype into the real targets, in step 1 (the checker) and in steps 3 to 6, is treated as new code:
 - it is reviewed in full in the pull request that ports it, including the final adversarial review;

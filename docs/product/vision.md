@@ -56,7 +56,7 @@ This is the target. Version 1 offers a blank CV, an example, or, on devices with
 
 ## Sources
 
-- The owner's decisions of 2026-10-16, 2026-10-17 and 2026-10-18, and of 2026-11-06 on the ways in ([ADR 0036](../architecture/adr/0036-build-the-draft-from-prepared-lines-of-each-trade.md)).
+- The maintainer's decisions of 2026-10-16, 2026-10-17 and 2026-10-18, and of 2026-11-06 on the ways in ([ADR 0036](../architecture/adr/0036-build-the-draft-from-prepared-lines-of-each-trade.md)).
 - The product review of 2026-10-16.
 - The market analysis of 2026-10-17.
 - The ESCO spike (#229).
