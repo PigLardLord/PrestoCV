@@ -14,6 +14,9 @@ struct Section: Equatable {
     /// entry that takes one is to be checked.
     var doubtfulHeadings: Set<Int> = []
 
+    /// The kinds the heading joins ("Education & Certifications"), when it joins two or more; empty otherwise.
+    var parts: Set<SectionKind> = []
+
     /// What the heading is in the text: its block, or, when a row of cells opens the section, its first cell.
     var headingSpan: SourceSpan? {
         guard let heading else { return nil }
@@ -77,7 +80,7 @@ enum SectionSegmenter {
             if block.cells.count > 1, block.kind != .listItem, block.kind != .tableHeader,
                let match = SectionVocabulary.kind(ofHeading: firstCell), firstCell.words.count <= SectionVocabulary.maximumWords {
                 // A heading in the first cell of a row, its section's first value in the others
-                sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
+                sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages, parts: match.parts))
                 continue
             }
             if let opening = try heading(
@@ -86,7 +89,7 @@ enum SectionSegmenter {
             ) {
                 sections.append(Section(
                     kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
-                    headingCouldBeTheName: opening.couldBeTheName
+                    headingCouldBeTheName: opening.couldBeTheName, parts: opening.match.parts
                 ))
                 continue
             }
