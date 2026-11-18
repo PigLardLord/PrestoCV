@@ -4,6 +4,13 @@ enum CertificationReader {
     /// The separators a line of a certification is cut at.
     static let lineSeparators = Separators.strong + [" - ", ", "]
 
+    /// The name this reader finds on a line, and how many parts it cuts the line into (#453): a section that joins the
+    /// studies and the certifications sorts each line by the name this reader would give it.
+    static func nameAndParts(of cells: [Piece]) -> (name: Piece?, parts: Int) {
+        let line = Line(cells)
+        return (line.parts.first, line.parts.count)
+    }
+
     /// A line of a section: its parts, cut at the separators, and the year its last date states.
     private struct Line {
         var parts: [Piece] = []
