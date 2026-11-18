@@ -7,12 +7,12 @@
 ## Context
 
 - **The plan.** The migration plan (#98, ADR 0001) fixed the app's P0 bugs by switching it to the new stack at the end of migration step 5. Until then, the legacy targets would be "never modified except to delete it or to keep the app building" (ADR 0012).
-- **The deadline.** On 2026-10-12 the owner set it: version 1 is on the App Store by the end of that week.
+- **The deadline.** On 2026-10-12 the maintainer set it: version 1 is on the App Store by the end of that week.
 - **The new stack is not ready.** Its domain, persistence and exporter are on `main`. The app shell, the editor and the iOS renderer are not, and building them is more than a week of work.
 
 ## Decision
 
-**The owner's decisions:**
+**The maintainer's decisions:**
 - **Base:** version 1 is the **legacy app, fixed**: the `PrestoCV` app target and the legacy targets of `PrestoCVCore`, `CVPDFExporter` and `CVGeneratorAI`.
 - **Platform:** iOS only.
 - **Scope:** the CV list, the editor, the bundled designs, PDF export and sharing, sample CVs on first run, the document language, duplicate and rename, and a draft written on the device by Apple's Foundation Models, offered only where the device supports it.
@@ -36,5 +36,5 @@
 
 ## Alternatives considered
 
-- **Finish migration step 5 first.** Rejected by the owner: it does not fit the deadline.
-- **Release without the AI draft.** Rejected by the owner. It stays, behind a constant that can turn it off, if it is not reliable in time.
+- **Finish migration step 5 first.** Rejected by the maintainer: it does not fit the deadline.
+- **Release without the AI draft.** Rejected by the maintainer. It stays, behind a constant that can turn it off, if it is not reliable in time.

@@ -6,18 +6,18 @@
 
 ## Context
 
-- **The direction.** PrestoCV will need an Android app, after version 1 for iOS and its first updates. The owner's direction for it (2026-10-20, #267): one shared core and two native interfaces, SwiftUI on iOS and Jetpack Compose with Material on Android. The core stays in Swift, compiled for Android with the Swift SDK for Android, official since Swift 6.3, and called from Kotlin. Kotlin Multiplatform is only the fallback, if that hits a blocking problem.
+- **The direction.** PrestoCV will need an Android app, after version 1 for iOS and its first updates. The maintainer's direction for it (2026-10-20, #267): one shared core and two native interfaces, SwiftUI on iOS and Jetpack Compose with Material on Android. The core stays in Swift, compiled for Android with the Swift SDK for Android, official since Swift 6.3, and called from Kotlin. Kotlin Multiplatform is only the fallback, if that hits a blocking problem.
 - **The analysis for #267** found that the new targets, which already build and test on Linux, are close to building for Android, and that nothing keeps them there while the migration fills them. Cross-compiling them on 2026-10-20 with Swift 6.4.0, its SDK for Android and the NDK r30, for `aarch64-unknown-linux-android28`, showed:
   - **The file stores do not compile.** `PrestoCVPersistence` and `CVDesignCatalogFileStore` lock with `flock`, and import the C library as `Glibc` or `Darwin`. On Android the module is called `Android`, and Foundation does not re-export it there, so `open`, `fstat`, `flock` and `errno` are not in scope.
   - **The headings read a bundle.** `HeadingsCatalog`, in `CVRendering`, reads its tables through `Bundle.module`. An Android app ships no SwiftPM resource bundle. The accessor SwiftPM generates for Android looks for the bundle next to the main bundle and the executable, and stops the process with `fatalError` when it is not there.
   - **Every other target builds.**
 - **Only the import allow-lists keep an Apple-only framework out of a pure target**, and a pull request can widen one. Nothing refuses `Bundle.module` there: R2 allows it.
-- **About thirty calls in the core need the full Foundation**, the one with ICU, which weighs tens of megabytes for each ABI of an app: regular expressions, `trimmingCharacters`, `folding`, `replacingOccurrences`, `JSONSerialization`. They build for Android with the full Foundation, not with `FoundationEssentials` alone. Whether the app should drop ICU is an open question for the owner, which the spike of #267 answers with measurements.
+- **About thirty calls in the core need the full Foundation**, the one with ICU, which weighs tens of megabytes for each ABI of an app: regular expressions, `trimmingCharacters`, `folding`, `replacingOccurrences`, `JSONSerialization`. They build for Android with the full Foundation, not with `FoundationEssentials` alone. Whether the app should drop ICU is an open question for the maintainer, which the spike of #267 answers with measurements.
 - **The SDK for Android must match the host toolchain exactly.** Xcode 27, which Xcode Cloud builds with, ships Swift 6.4.0. The Linux job ran Swift 6.3.
 
 ## Decision
 
-**The owner decided on 2026-10-20** to adopt the cheap guardrails now ("Sì, adesso": yes, now). The bigger ones the analysis lists are follow-ups (below).
+**The maintainer decided on 2026-10-20** to adopt the cheap guardrails now ("Sì, adesso": yes, now). The bigger ones the analysis lists are follow-ups (below).
 
 1. **CI builds the portable targets for Android.** A job on GitHub Actions, next to the Linux job, cross-compiles for `aarch64-unknown-linux-android28` every target that builds on Linux: the packages `PrestoCVCore`, `CVPDFExporter`, `CVGeneratorAI` and `PrestoCVApp`, whose manifests leave out the Apple-only and legacy targets on a Linux host ([ADR 0012](0012-legacy-targets-during-migration.md)). It builds, without the tests; the tests do not run on an emulator yet.
    - **Every version is pinned:** Swift 6.4.0, the toolchain of Xcode 27.0, and its SDK for Android, each checked against its checksum; the NDK r30 (30.0.16248370) of the `ubuntu-24.04` runner image; and the actions, by commit.
@@ -30,7 +30,7 @@
 2. **R18: pure targets stay portable to Android.** It applies to the targets that R2 calls pure: domain, application, published language, integration, presentation and workflow ports. The checker:
    - **refuses** an import of a module that only Apple platforms have (SwiftUI, UIKit, AppKit, Combine, CryptoKit, `os`, NaturalLanguage, FoundationModels, PDFKit, WebKit, Vision and others), in any form;
    - **refuses** `Bundle` in any form, `Bundle.module` and `#bundle` included;
-   - **warns** on the APIs that need the full Foundation: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. A warning does not fail the check and never enters the baseline: the warnings are the list of what `FoundationEssentials` alone would need, until the owner decides.
+   - **warns** on the APIs that need the full Foundation: `NSRegularExpression`, `NSRange`, `.regularExpression`, `folding`, `replacingOccurrences`, `trimmingCharacters`, `JSONSerialization`, `NSString`, `String(format:)`, Foundation's formatters and the localised comparisons. A warning does not fail the check and never enters the baseline: the warnings are the list of what `FoundationEssentials` alone would need, until the maintainer decides.
 3. **Resources reach the core through a port.** `HeadingsCatalog` reads its tables through `HeadingTableSource`, as raw bytes, and decodes them itself, as the catalog does with `BundledDesignSource`. The tables move into a new adapter target, `CVBundledHeadings`, which reads them from its own bundle on Apple platforms and Linux. On Android the app's edge reads the same files from its assets and passes them through the same port. The package still owns its translations (R13).
 4. **The file stores lock on Android too.** They import `Android` in a `canImport(Android)` branch, next to `Glibc` and `Darwin`. Their allow-lists and [modules.md](../modules.md) name it.
 
@@ -38,7 +38,7 @@
 
 - **An Apple-only import or a bundle in a pure target fails the checker**, on GitHub Actions and on Xcode Cloud. A target that stops building for Android fails the Android job, on every pull request.
 - **The Android job takes a few minutes** on a public repository's free runners. Its steps, run on a Linux machine from an empty home, took 97 seconds with the toolchain to download and 39 seconds with it cached. The job caches the host toolchain; the SDK and the build are not cached, because the SDK downloads in seconds and a build restored on fresh sources is rebuilt anyway.
-- **The warnings stay visible** in every run of the checker, until the owner decides whether the core keeps the full Foundation. There are 29 in the pure targets today: 18 `trimmingCharacters`, 6 regular expressions, 2 `replacingOccurrences`, 2 `JSONSerialization` and 1 `folding`. The file stores and the legacy grounding, which R18 does not cover, have more.
+- **The warnings stay visible** in every run of the checker, until the maintainer decides whether the core keeps the full Foundation. There are 29 in the pure targets today: 18 `trimmingCharacters`, 6 regular expressions, 2 `replacingOccurrences`, 2 `JSONSerialization` and 1 `folding`. The file stores and the legacy grounding, which R18 does not cover, have more.
 - **No R18 finding is in the baseline.** The only errors on the tree were the two reads of `Bundle.module` in `HeadingsCatalog`, which the port removed.
 - **`Bundle.module` stays allowed in adapters**, such as `CVBundledDesigns` and `CVBundledHeadings`: they are the edges that read the platform's resources. R2 keeps its rule for the other ambient state.
 - **A new platform condition is allowed only in an adapter** (R11). The `canImport(Android)` branches are in the file stores, which are adapters.
@@ -55,7 +55,7 @@
 ## Alternatives considered
 
 - **Wait for the spike.** The guardrails cost little, and without them the core drifts from Android while the migration fills it: one more Apple-only import or one more `Bundle.module` is enough.
-- **Rewrite the calls that need the full Foundation now.** About thirty replacements, but whether ICU's weight matters is what the spike measures, and the owner has not decided. A warning keeps the list visible without deciding.
+- **Rewrite the calls that need the full Foundation now.** About thirty replacements, but whether ICU's weight matters is what the spike measures, and the maintainer has not decided. A warning keeps the list visible without deciding.
 - **Refuse those calls, with a baseline.** The baseline may only shrink, so a new regular expression would need an exception or a rewrite, for a call that is not a defect while the core keeps the full Foundation.
 - **A `portable` flag per target in `rules.json`**, as the analysis proposed. A rule mapped to targets is the mechanism the checker already has, with the same effect.
 - **Build only `PrestoCVDomain` and `PrestoCVApplication` for Android.** It saves seconds, but the targets that failed were the file stores, and the targets that build on Linux are the ones the Android app reuses.

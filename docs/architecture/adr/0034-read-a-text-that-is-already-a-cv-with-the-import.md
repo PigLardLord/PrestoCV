@@ -7,14 +7,14 @@
 ## Context
 
 - **The AI draft is built for a free description.** The person writes a few sentences about their work, and the on-device model writes a CV from them, under the grounding rules of [ADR 0023](0023-ground-the-ai-draft-in-the-description.md): nothing invented, nothing of the person's lost.
-- **People also paste a CV they already have.** The owner did so on their phone on 2026-11-05, with version 1.0. The draft was not credible: duties rewritten in other words, an internship shown before the current job, languages and years lost. The model shortens and rewrites what it is given, and the grounding rules then cut what they cannot trace back to the text. Both steps are right for a description of a few sentences, and both lose data on a CV.
+- **People also paste a CV they already have.** The maintainer did so on their phone on 2026-11-05, with version 1.0. The draft was not credible: duties rewritten in other words, an internship shown before the current job, languages and years lost. The model shortens and rewrites what it is given, and the grounding rules then cut what they cannot trace back to the text. Both steps are right for a description of a few sentences, and both lose data on a CV.
 - **The import already reads a pasted CV** ([ADR 0027](0027-import-a-cv-from-its-text-with-rules.md)). It keeps every job with its duties as written, invents nothing, and lists for the person what it could not place. On invented CVs in English, Italian and German it kept every job, every duty and every language, in under a fifth of a second for 8,000 characters.
 - **The AI draft refuses more than 2000 characters** (`CVGenerationLimits.maximumDescriptionLength`), and the Generate button is off above it, so a whole CV can only reach the model shortened.
 - **Version 1 is submitted,** so a change to the legacy app must fix a bug of the published version ([ADR 0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md)). A pasted CV that comes back with fewer facts than it had is a loss of data. Pasted text is a way in that version 1 already offers, in the AI draft and in the import.
 
 ## Decision
 
-**The owner decided on 2026-11-05** that a text that is already a CV is read by the import, not the AI. The AI draft stays for free descriptions.
+**The maintainer decided on 2026-11-05** that a text that is already a CV is read by the import, not the AI. The AI draft stays for free descriptions.
 
 - **When the text given to the AI draft is already a CV,** the app reads it with the import of [ADR 0027](0027-import-a-cv-from-its-text-with-rules.md) and opens the editor with the import's review list, as the import screen does. The text is not sent to the model.
 - **"Already a CV" is one rule in `PrestoCVImporting`:** the import fills at least two of the seven sections (summary under a heading, experience, education, skills, languages, certifications, interests) from headings it recognises, and at least one experience or education entry has a period. The two numbers are named constants with one test table.

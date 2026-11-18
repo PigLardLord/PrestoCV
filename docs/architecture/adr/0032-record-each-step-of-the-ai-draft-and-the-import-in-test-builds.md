@@ -6,9 +6,9 @@
 
 ## Context
 
-- **A tester's empty draft cannot be explained.** On 2026-10-28 the owner tried build 121.2: from an eight-line description the AI draft kept one job with no title and no duties, and wrote no summary and no skills. The logs of [ADR 0030](0030-log-through-one-interface-that-carries-no-cv-content.md) carry counts and names only, by design, and reading them needs Console on a Mac. So the same empty draft could come from an unavailable model, missing language data, a refusal, an answer that was already empty, a grounding that removed everything, or a claim check that withdrew everything.
-- **The evaluation does not cover it.** It runs the model on our own examples on the Mac mini, not on what a tester typed.
-- **The owner's direction (2026-10-28):** we must see what happens under the hood on a real device and where the mechanism breaks. The trace is on in TestFlight builds only; it goes through one central chain, built in the composition root with the decorators each environment needs; and in an App Store install it must be certain that no CV content leaks.
+- **A tester's empty draft cannot be explained.** On 2026-10-28 the maintainer tried build 121.2: from an eight-line description the AI draft kept one job with no title and no duties, and wrote no summary and no skills. The logs of [ADR 0030](0030-log-through-one-interface-that-carries-no-cv-content.md) carry counts and names only, by design, and reading them needs Console on a Mac. So the same empty draft could come from an unavailable model, missing language data, a refusal, an answer that was already empty, a grounding that removed everything, or a claim check that withdrew everything.
+- **The evaluation does not cover it.** It runs the model on our own examples on a Mac, not on what a tester typed.
+- **The maintainer's direction (2026-10-28):** we must see what happens under the hood on a real device and where the mechanism breaks. The trace is on in TestFlight builds only; it goes through one central chain, built in the composition root with the decorators each environment needs; and in an App Store install it must be certain that no CV content leaks.
 - **The App Store binary is the TestFlight binary.** A build setting cannot tell them apart: only the system's record of how the app was installed can, at run time.
 
 ## Decision
@@ -62,12 +62,12 @@ The text of ADR 0030 stays as it was decided.
 - **One more local package**, its entries in `docs/architecture/modules.md` and the checker's `rules.json`, and a file-scoped rule in the checker.
 - **CV text sits in plain files on a test device.** Mitigated by the protection class, the backup exclusion, the retention, the notice, and the share being the person's own act.
 - **The gate fails closed.** An offline first launch hides the entry until a later launch. A tester must open the app online once.
-- **No test can run a real App Store binary.** The production case rests on the gate's unit tests, the wiring test, the folder that is never made, and a UI test that forces each answer. The owner's TestFlight build shows the sandbox case.
+- **No test can run a real App Store binary.** The production case rests on the gate's unit tests, the wiring test, the folder that is never made, and a UI test that forces each answer. The maintainer's TestFlight build shows the sandbox case.
 - **What waits:** the trace points of the PDF import (it adds only the layout stage); the individual grounding rule that removed a value. The steps of the new draft pipeline of #355 (a request and an answer per section, what the sections wrote, the second grounding) are recorded through `DraftTrace` in the pull request that brings the pipeline. Diagnostics for every user (#269) may reuse the share plumbing and the session events, never the trace itself.
 
 ## Alternatives considered
 
-- **A content field kind on `DiagnosticLogger`, dropped by every other logger.** The owner's first direction. Lost: a redacting decorator and adapters that drop the field are a promise each adapter must keep, while a logger with no text field cannot leak text at all. The central chain is kept: the composition root builds the logger and the tracer together and picks the decorators by environment.
+- **A content field kind on `DiagnosticLogger`, dropped by every other logger.** The maintainer's first direction. Lost: a redacting decorator and adapters that drop the field are a promise each adapter must keep, while a logger with no text field cannot leak text at all. The central chain is kept: the composition root builds the logger and the tracer together and picks the decorators by environment.
 - **The trace in `DiagnosticLogging`.** Lost: the package would no longer be unable to carry CV content, which is ADR 0030's whole point.
 - **A build setting or a separate TestFlight scheme.** Lost: the App Store binary is the TestFlight binary.
 - **The receipt's file name (`sandboxReceipt`).** Lost: deprecated since iOS 18.

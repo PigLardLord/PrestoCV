@@ -1,6 +1,6 @@
 # Releasing with Xcode Cloud
 
-Xcode Cloud tests version 1 before a store build, archives it, signs it and uploads it to TestFlight (ADR 0022, ADR 0024). It does not check pull requests: the Mac mini does, with the check described below (ADR 0029). The workflows are set up in Xcode and App Store Connect with the owner's Apple ID, so they are not in the repository. This page holds the settings to enter, the pull request check, the one-time setup, and the steps of a release. The repository holds the rest:
+Xcode Cloud tests version 1 before a store build, archives it, signs it and uploads it to TestFlight (ADR 0022, ADR 0024). It does not check pull requests: a maintainer's Mac does, with the check described below (ADR 0029). The workflows are set up in Xcode and App Store Connect with the maintainer's Apple ID, so they are not in the repository. This page holds the settings to enter, the pull request check, the one-time setup, and the steps of a release. The repository holds the rest:
 
 | Path | What it does |
 |---|---|
@@ -37,10 +37,10 @@ A test that read the source tree passed on a Mac, next to the sources, and faile
 
 ## The pull request check
 
-A pull request to `main` is checked on the Mac mini ([ADR 0029](../architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)). The result is a GitHub commit status on the pull request's head commit, with the context `Mac mini · CI` (the separator is U+00B7, a middle dot). A script writes it; it lives with the owner's other tooling for the Mac mini, outside the repository, and does this:
+A pull request to `main` is checked on a maintainer's Mac ([ADR 0029](../architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)). The result is a GitHub commit status on the pull request's head commit, with the context `Mac mini · CI` (the separator is U+00B7, a middle dot). A script writes it; it lives with the maintainer's other tooling for that Mac, outside the repository, and does this:
 
 1. It refuses, and writes no status, when the head commit does not contain the latest `origin/main`: bring `main` onto the branch locally first.
-2. It writes `pending` on the head commit, then runs on the Mac mini:
+2. It writes `pending` on the head commit, then runs on the Mac:
    - the `CI` test plan on the iPhone 17 Pro and the iPad Pro 13-inch simulators of the newest iOS runtime, the two destinations the Test action had;
    - `ci_scripts/ci_post_xcodebuild.sh` of the head commit, with `CI_XCODEBUILD_ACTION=build-for-testing` and `CI_PULL_REQUEST_TARGET_BRANCH=main`: the package tests, the source checks, the architecture check against the baseline of the latest `origin/main`, its self-test, the self-tests of the release scripts in `Tools/Release/` with the check of the store listing, and the builds of `PrestoCVApp` and `CVPDFExporterExamples`. It is the head commit's own script, so a step that a pull request adds runs in that pull request's check. The check therefore trusts the script: a pull request that changes `ci_scripts/`, or a check the script runs, changes what its own `success` proves, and the review of that change is what covers it, not the status;
    - once the `CI` plan has passed on both devices, `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`.
@@ -61,7 +61,7 @@ Create the Main and Release workflows with these settings. Anything not listed k
 
 ### Pull Request (disabled)
 
-The Pull Request workflow exists in App Store Connect and is disabled. Keep it disabled: the Mac mini checks pull requests. A run took about 14 minutes, 75 runs used 80% of a month's 25 compute hours, and each one repeated what the Mac mini runs before every push. Main and Release are what the hours are for. Turning the workflow on again, with the settings below, spends them on pull requests again, which changes ADR 0029.
+The Pull Request workflow exists in App Store Connect and is disabled. Keep it disabled: a maintainer's Mac checks pull requests. A run took about 14 minutes, 75 runs used 80% of a month's 25 compute hours, and each one repeated what that Mac runs before every push. Main and Release are what the hours are for. Turning the workflow on again, with the settings below, spends them on pull requests again, which changes ADR 0029.
 
 | Section | Setting |
 |---|---|
@@ -96,13 +96,13 @@ A Main build takes the project's version (`MARKETING_VERSION`), and its build nu
 | Action 2 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight and App Store. |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
-The Release workflow tests the exact commit it archives. Its Test action is required to pass, so a failing test, package test or architecture check fails the build, and nothing reaches TestFlight, even for a tag on a commit that never went through a pull request. This is the one Xcode Cloud run that tests the tree on machines without the repository. It archives the version the tag or branch names, so a tag `v1.2.3` or a branch `release/1.2.3` gives version 1.2.3. Nothing submits a build for App Review: the owner does it by hand.
+The Release workflow tests the exact commit it archives. Its Test action is required to pass, so a failing test, package test or architecture check fails the build, and nothing reaches TestFlight, even for a tag on a commit that never went through a pull request. This is the one Xcode Cloud run that tests the tree on machines without the repository. It archives the version the tag or branch names, so a tag `v1.2.3` or a branch `release/1.2.3` gives version 1.2.3. Nothing submits a build for App Review: the maintainer does it by hand.
 
 ## Enforce the checks
 
 The repository's plan has no rulesets and no branch protection, so GitHub lets a pull request merge whatever its checks say. The merge step is what enforces them: before it merges, it reads the statuses of the pull request's head commit, and it refuses unless the rule in "The pull request check" holds. A check it cannot read counts as not green.
 
-To merge a pull request, bring the latest `main` onto its branch locally (merge `origin/main` into it), resolve the conflicts, run the tests again on a Mac, push the branch, run the Linux check and the pull request check on that head, and merge when `Linux (local) · CI`, `Android (local) · CI` and `Mac mini · CI` are green. The check runs on the Mac mini, not on Xcode Cloud, so a push to an open pull request spends no compute hours.
+To merge a pull request, bring the latest `main` onto its branch locally (merge `origin/main` into it), resolve the conflicts, run the tests again on a Mac, push the branch, run the Linux check and the pull request check on that head, and merge when `Linux (local) · CI`, `Android (local) · CI` and `Mac mini · CI` are green. The check runs on a maintainer's Mac, not on Xcode Cloud, so a push to an open pull request spends no compute hours.
 
 If the plan gains rulesets, add `Linux (local) · CI`, `Android (local) · CI` and `Mac mini · CI` as required status checks of a ruleset on `main` (GitHub offers a status in the ruleset after it has been reported once). A docs-only pull request never gets `Mac mini · CI`, so the script that writes it would have to write `success` for it too.
 
