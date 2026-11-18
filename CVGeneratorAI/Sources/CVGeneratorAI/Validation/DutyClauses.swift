@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: The duties a job's text says
 
-/// The duty clauses of a job's text (#354, round 15): a sentence of 2 words or more is one clause, and one more after each ";" and
+/// The duty clauses of a job's text (#354): a sentence of 2 words or more is one clause, and one more after each ";" and
 /// after each "," or "and" (und, e, ed, y, et) whose next word, past a subject pronoun or "also", is a verb: a CV verb of the
 /// language (`Vocabulary.Words.verbs`), an English word in -ing or -ed of 5 letters or more, or a word that is no function word
 /// followed by an article. Read by its sentences, a job of two sentences of two duties each ("I plan the sound design and train

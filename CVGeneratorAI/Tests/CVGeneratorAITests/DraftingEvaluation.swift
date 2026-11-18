@@ -246,7 +246,7 @@ struct DraftingEvaluation {
         }
 
         /// What `work` answers, with its time; a request that throws is logged with its error and its time, so that a draft stopped
-        /// by a failed or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no
+        /// by a failed or timed-out request shows which one stopped it and why (#354: the stops on macOS 26 left no
         /// trace).
         private func recorded<Value>(_ step: String, _ work: () async throws -> Value) async throws -> Value {
             let start = ContinuousClock.now

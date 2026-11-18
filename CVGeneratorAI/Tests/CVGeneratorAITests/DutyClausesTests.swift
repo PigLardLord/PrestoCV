@@ -1,7 +1,7 @@
 import Testing
 @testable import CVGeneratorAI
 
-/// The duties a job's text says, by clause (#354, round 15); the evaluation's reader counts them the same way.
+/// The duties a job's text says, by clause (#354); the evaluation's reader counts them the same way.
 @Suite(.plainDraft)
 struct DutyClausesTests {
     @Test("A sentence is one duty, and one more after a semicolon and after a comma or an \"and\" that a verb follows",

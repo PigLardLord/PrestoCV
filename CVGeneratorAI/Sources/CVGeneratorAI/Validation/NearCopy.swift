@@ -3,13 +3,13 @@ import Foundation
 // MARK: A summary sentence that says a duty again
 
 extension CVDataSanitizer {
-    /// Whether `sentence` says one of the `duties` again (#354, probe round 7): past the words of the job's `title`, it shares more
+    /// Whether `sentence` says one of the `duties` again (#354): past the words of the job's `title`, it shares more
     /// content words with a single duty sentence than it adds, and adds fewer than two. Words compare by their first five letters,
     /// so "installiere" and "Installation" are one, and a content word has four letters or more and is no function word
     /// (`functionWords`). A sentence that joins two duties, or says one with how or what for, adds to it and stays: the summary is
     /// a draft, which the person edits (O1). "Ich installiere elektrische Anlagen in Neubauten" as an electrician, after "Ich
     /// installiere Anlagen in Neubauten", still goes. A sentence that names one of `skills`, the kept tools and qualities, that the
-    /// duty does not name adds to it too (probe round 6): "Preparo i piatti principali … con la padella e il coltello".
+    /// duty does not name adds to it too: "Preparo i piatti principali … con la padella e il coltello".
     static func copiesADuty(_ sentence: String, duties: [String], title: String?, skills: [String]) -> Bool {
         let titled = contentStems(of: title ?? "")
         let own = contentStems(of: sentence).subtracting(titled)
@@ -28,9 +28,9 @@ extension CVDataSanitizer {
         words.indices.contains { words[$0...].prefix(run.count).elementsEqual(run) }
     }
 
-    /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354, round 17): it has 60% or more of the
+    /// Whether `sentence` says one of the `earlier` sentences of its summary again (#354): it has 60% or more of the
     /// content words of one of two content words or more, as `copiesADuty` compares them, or four of them, and adds fewer than
-    /// two to it past the words of the kept `qualities` (probe round 14). "Agisco come capoturno della manutenzione" after
+    /// two to it past the words of the kept `qualities`. "Agisco come capoturno della manutenzione" after
     /// "Lavoro come capoturno della manutenzione" says the opening again; "Genero los informes mensuales y mantengo los registros
     /// de inventario con Balance y Cuentas." after a sentence on the inventory with the same tools adds four words and stays.
     static func repeats(_ sentence: String, earlier: [String], besides qualities: [String]) -> Bool {
@@ -43,8 +43,8 @@ extension CVDataSanitizer {
         }
     }
 
-    /// How many content words `sentence` adds to `other`, as `copiesADuty` compares them, past the words of `besides` (#354,
-    /// probe round 14): the kept qualities, which a sentence on work said before joins to it.
+    /// How many content words `sentence` adds to `other`, as `copiesADuty` compares them, past the words of `besides` (#354):
+    /// the kept qualities, which a sentence on work said before joins to it.
     static func addedStems(_ sentence: String, to other: String, besides: [String]) -> Int {
         let skipped = contentStems(of: besides.joined(separator: " "))
         return contentStems(of: sentence).subtracting(contentStems(of: other)).subtracting(skipped).count

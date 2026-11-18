@@ -48,165 +48,162 @@ enum ReaderClass: String, Codable, CaseIterable, Sendable {
     /// ("Contable gestiona los registros.", "Si occupa della contabilità."): the person spoken of, not speaking.
     case thirdPersonSummary
     /// An interest of one noun that the description says after a verb in its infinitive form ("football" of "I play football"): the
-    /// pastime's phrase without its verb (#354, round 1).
+    /// pastime's phrase without its verb (#354).
     case bareInterest
     /// A duty or a quality the person states that no skill of the draft holds and, for a duty the person states in the sentence of a
     /// job, no description of that job: the same words under another job are lost, and a duty stated for several jobs is expected
     /// under each of them (`ExpectedFact.duty`, `.quality`): "I mix on digital consoles", "mi piace lavorare in squadra"
-    /// (#354, round 1; #362).
+    /// (#354; #362).
     case unwrittenStatement
     /// A summary sentence whose subject is the person's work, not the person: a bare word of a title or of the field followed by a
-    /// verb "to be" ("Manutenzione è la mia attività principale."; #354, round 1), or a word of the work after an article, with any
-    /// verb ("O trabalho exige…", "La manutenzione è…"; #354, round 3).
+    /// verb "to be" ("Manutenzione è la mia attività principale."; #354), or a word of the work after an article, with any
+    /// verb ("O trabalho exige…", "La manutenzione è…"; #354).
     case bareSubjectSummary
     /// A technology with a word in neither the description nor the reader's tools of the input's trade (`DraftingInputs.vocabularies`):
-    /// a tool of another trade, an activity, or jargon ("frequency calibration", "software di tracciamento"; #354, round 1).
+    /// a tool of another trade, an activity, or jargon ("frequency calibration", "software di tracciamento"; #354).
     case offTradeTechnology
     /// A technology that names a kind of tool and no tool of it: its head noun is a category ("software", "plataforma de
-    /// desenvolvimento", "digital sound workstation") and none of its words is a name or an acronym (#354, round 2).
+    /// desenvolvimento", "digital sound workstation") and none of its words is a name or an acronym (#354).
     case categoryAsTechnology
-    /// Two soft skills of one quality ("precisione" and "attenzione"; "teamwork" and "collaboration"; #354, round 2).
+    /// Two soft skills of one quality ("precisione" and "attenzione"; "teamwork" and "collaboration"; #354).
     case sameQuality
     /// A summary sentence whose subject is a quality: it starts with a soft skill of the draft or a word for a quality at work
-    /// ("Precisione e attenzione sono le mie qualità."; #354, round 2).
+    /// ("Precisione e attenzione sono le mie qualità."; #354).
     case qualitySubjectSummary
-    /// Two summary sentences that end with the same three words ("..., con enfoque práctico." twice; #354, round 2).
+    /// Two summary sentences that end with the same three words ("..., con enfoque práctico." twice; #354).
     case repeatedEnding
-    /// A job description with three sentences or more that start with the same two words ("Je préparais ..." three times; #354,
-    /// round 2).
+    /// A job description with three sentences or more that start with the same two words ("Je préparais ..." three times; #354).
     case sameOpening
     /// A summary sentence with no verb that starts with a bare word of a title or of the field ("Contable con gran capacidad de
-    /// análisis."; #354, round 3).
+    /// análisis."; #354).
     case fragmentSummary
-    /// A summary sentence that lists three skills of the draft or more ("… terminal, scanner, codec e sensor."; #354, round 3).
+    /// A summary sentence that lists three skills of the draft or more ("… terminal, scanner, codec e sensor."; #354).
     case listySummary
     /// A soft skill that is an empty word, of experience or of being a professional, and names no quality ("professional",
-    /// "Erfahrung"; #354, round 3).
+    /// "Erfahrung"; #354).
     case emptySoftSkill
     /// A job whose final description does not hold a duty the step that writes the job pins, a duty the person said: the final
-    /// check moved it out (#354, round 3). The typical duties beside it count for nothing (O1, round 13).
+    /// check moved it out (#354). The typical duties beside it count for nothing (O1).
     case stepVsFinalPinned
-    /// A summary sentence of three clauses or more joined by semicolons ("I manage the flow; I ensure …; I adapt …."; #354, round
-    /// 3, at 0608938b).
+    /// A summary sentence of three clauses or more joined by semicolons ("I manage the flow; I ensure …; I adapt …."; #354).
     case chainedSummary
     /// A summary sentence past the opening with no word of five letters or more in common with the description, the kept titles,
     /// the duties or the skills: a sentence of the person's work that says none of it ("I guarantee every action follows the
-    /// established pattern"; #354, round 4, at d1d09c81).
+    /// established pattern"; #354).
     case unanchoredSummary
     /// A German separable verb written apart at the end of a subordinate clause, where it is one word ("dass ich … sicher stelle";
-    /// #354, round 4, at d1d09c81), in the summary or a job's description.
+    /// #354), in the summary or a job's description.
     case splitVerb
     /// A technology that names a person, an activity or a document, and no tool: a role ("intérprete", "analista"), the noun of an
-    /// activity ("Escaneo", "análisis de datos") or what the work produces ("fatture"; #354, round 5, at 0a135a4b).
+    /// activity ("Escaneo", "análisis de datos") or what the work produces ("fatture"; #354).
     case nonToolTechnology
     /// A technology of one word that the description writes as the second of two modifiers of another technology's noun: the
-    /// adjective cut from its noun ("pneumatici" of "schemi elettrici e pneumatici"; #354, round 5).
+    /// adjective cut from its noun ("pneumatici" of "schemi elettrici e pneumatici"; #354).
     case clippedModifier
     /// An Italian, Spanish or Portuguese summary sentence with no verb of the first person and no word of the person: the work
-    /// spoken of, not the person speaking ("Ogni azione è guidata dalla cura…"; #354, round 5).
+    /// spoken of, not the person speaking ("Ogni azione è guidata dalla cura…"; #354).
     case impersonalSummary
     /// An Italian, Spanish or Portuguese summary sentence that opens with a past participle, as a note, and has no verb or word of
-    /// the person: the participle's "-o" read as the first person ("Mantenido un enfoque preciso…"; #354, round 6).
+    /// the person: the participle's "-o" read as the first person ("Mantenido un enfoque preciso…"; #354).
     case participleSummary
     /// Stationery as a technology, named alone or with a word after or before its noun ("cahiers d'exercices"); a pen that is a
-    /// device ("penna ottica") is none (#354, round 6).
+    /// device ("penna ottica") is none (#354).
     case stationeryTechnology
     /// A German subordinate clause after "dass", "weil", "sodass" or "ob" whose finite verb is not its last word: the clause ends
-    /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354, round 5).
+    /// with a noun after the verb ("…, dass alle Anlagen funktionieren einwandfrei durch die Prüfung."; #354).
     case germanVerbPosition
     /// A summary sentence that says the person works or worked as something no title of the draft and not its headline is
-    /// ("In passato ho lavorato come contabile" of the employer "Studio Contabile Merlini"; #354, round 7). A sentence that says
+    /// ("In passato ho lavorato come contabile" of the employer "Studio Contabile Merlini"; #354). A sentence that says
     /// the person is something counts only when it holds a word of a name, an employer or a school, a trap or a title not kept.
     case inventedSummaryTitle
     /// A technology the description does not state that holds a word of the name of an employer, a school or a person
-    /// ("Kestrel forklift" of the employer "Kestrel Foods"; #354, round 7).
+    /// ("Kestrel forklift" of the employer "Kestrel Foods"; #354).
     case employerWordTechnology
     /// A technology whose head noun is a part, a material or a work object the person handles (`DraftingInputs.parts`), and not
-    /// the object of a verb of use in the description ("quadri elettrici" of "controllando i quadri elettrici"; #354, round 7).
+    /// the object of a verb of use in the description ("quadri elettrici" of "controllando i quadri elettrici"; #354).
     case workObjectTechnology
     /// Two summary sentences that open with one verb, one of them the opening code writes ("Lavoro come capoturno." and "Lavoro
-    /// da sedici anni…"; #354, round 7).
+    /// da sedici anni…"; #354).
     case floorVerbCollision
     /// A word of the final draft that is two adjacent words of a raw answer, the first with a capital: a noun joined to the word
-    /// after it as if it were a particle ("Teilachte" of "jedes Teil achte"; #354, round 8). Counted by `gluedWords`, which needs the
+    /// after it as if it were a particle ("Teilachte" of "jedes Teil achte"; #354). Counted by `gluedWords`, which needs the
     /// answers.
     case gluedWord
     /// A job whose two sentences name one duty with one noun and two adjectives ("comunicazioni ufficiali" and "comunicazioni
-    /// formali"; #354, round 8): the same duty said twice.
+    /// formali"; #354): the same duty said twice.
     case rewordedDuty
     /// Two summary sentences whose last clause after a comma opens and ends with one word ("…, was meine Verlässlichkeit beweist."
-    /// and "…, was meine Konzentration beweist."; #354, round 8).
+    /// and "…, was meine Konzentration beweist."; #354).
     case repeatedTail
     /// A technology the description does not state, nor the reader's list of the trade names as it is, whose head noun is a
     /// generic system, software, machine, set of tools or equipment, with only words of a work object or an activity around it
-    /// and no product, name or device ("sistema di tracciamento dati", "máquina de escaneo de registros", "Montagesystem"; #354,
-    /// round 9). A bare head is a category (`categoryAsTechnology`).
+    /// and no product, name or device ("sistema di tracciamento dati", "máquina de escaneo de registros", "Montagesystem"; #354).
+    /// A bare head is a category (`categoryAsTechnology`).
     case genericSystemTechnology
     /// A summary sentence in the present tense, after the opening, whose words of the work come mostly from the duties of an ended
-    /// job and from no current one, while a job is current ("I maintain the machinery…" of an ended forklift driver; #354, round 10).
+    /// job and from no current one, while a job is current ("I maintain the machinery…" of an ended forklift driver; #354).
     case endedDutyInSummary
     /// A summary clause after a comma that praises the person's own quality ("…, was meine Präzision zeigt", "…, which shows my
-    /// care"), after the first one of the summary (#354, round 10).
+    /// care"), after the first one of the summary (#354).
     case selfPraiseTail
     /// A soft skill of three words or more that opens with a gerund, a clause of the description ("working closely with directors";
-    /// #354, round 10).
+    /// #354).
     case gerundSoftSkill
     /// A fact: a summary sentence that names a product, a word with a capital past the sentence's first or an acronym, that the
-    /// description does not hold ("con SAP"; #354, rounds 11 and 13). A kind of tool of the trade is draft content (O1).
+    /// description does not hold ("con SAP"; #354). A kind of tool of the trade is draft content (O1).
     case unstatedProductInSummary
     /// A summary sentence that copies a kept duty: five words of it in a row, or all of a shorter one ("Rispondo alle comunicazioni
-    /// con i corrieri"; #354, rounds 11 and 13).
+    /// con i corrieri"; #354).
     case copiedDutyInSummary
-    /// A summary sentence that guarantees an outcome ("Ich garantiere, dass jede Verbindung funktioniert"; #354, round 13).
+    /// A summary sentence that guarantees an outcome ("Ich garantiere, dass jede Verbindung funktioniert"; #354).
     case overclaimSummary
     /// A word of a job's description, in lower case, that the description writes only inside the name of an employer
-    /// ("transporte" of "Transportes Ebro Norte"; #354, round 11).
+    /// ("transporte" of "Transportes Ebro Norte"; #354).
     case employerWordInDuty
-    /// A duty of a vague phrase that names no task ("Ho svolto compiti legati alla gestione dei documenti"; #354, round 11).
+    /// A duty of a vague phrase that names no task ("Ho svolto compiti legati alla gestione dei documenti"; #354).
     case vagueDuty
-    /// A job's description that only says the person worked, with no word of the job ("Trabajé."; #354, round 11).
+    /// A job's description that only says the person worked, with no word of the job ("Trabajé."; #354).
     case bareWorkDescription
     /// A job's sentence that opens with a relative word, a clause cut from the sentence before it ("Où j'ai formé 3 nouveaux
-    /// enseignants."; #354, round 12).
+    /// enseignants."; #354).
     case relativeDuty
-    /// A verb with the noun of its own action ("Gestisco la gestione delle fatture"; #354, round 12).
+    /// A verb with the noun of its own action ("Gestisco la gestione delle fatture"; #354).
     case ownNounDuty
     /// An ended job whose duties use a compound past and an imperfect ("Ho gestito le comunicazioni. Verificavo i documenti.";
-    /// #354, round 12).
+    /// #354).
     case twoPastForms
-    /// A summary or job sentence about the person's own contact ("Gestisco la mia email con attenzione."; #354, round 14).
+    /// A summary or job sentence about the person's own contact ("Gestisco la mia email con attenzione."; #354).
     case contactInDraft
     /// A duty whose words past its verb are all abstract, with no work object ("I maintained the structural balance at all
-    /// times."; #354, round 14). The reader's own list, partial.
+    /// times."; #354). The reader's own list, partial.
     case abstractDuty
     /// A summary sentence that holds every word of a duty of the draft, with words added between them, which
-    /// copiedDutyInSummary does not count ("Ich installiere elektrische Anlagen in Neubauten mit Sorgfalt"; #354, round 14).
+    /// copiedDutyInSummary does not count ("Ich installiere elektrische Anlagen in Neubauten mit Sorgfalt"; #354).
     case restatedDutyInSummary
     /// A technology the request for the tools of a past title wrote, which the headline title's request did not, that is no tool of
     /// the trade's list (`DraftingInputs.vocabularies`) nor of the description and names no product ("trailer" of the forklift
-    /// driver beside the warehouse supervisor; #354, round 15). Read from the requests' steps (`ReaderRules.requestFindings`).
+    /// driver beside the warehouse supervisor; #354). Read from the requests' steps (`ReaderRules.requestFindings`).
     case pastGroupPadding
     /// A generic system (`genericSystemTechnology`) that the request for more skills wrote ("sistema de gestión de documentos";
-    /// #354, round 15).
+    /// #354).
     case repairGenericSystem
     /// A topic of the second summary slot that is the words of a duty the description states, already written in the job
-    /// ("Anlagen in Neubauten"; #354, round 15): the sentence then restates it.
+    /// ("Anlagen in Neubauten"; #354): the sentence then restates it.
     case statedDutyAsSlotTopic
     /// A phrase of two words of four letters or more that the duties of three jobs or more write and the description does not
-    /// ("audio flow" in three jobs; #354, round 16).
+    /// ("audio flow" in three jobs; #354).
     case repeatedPhraseAcrossJobs
     /// A duty whose verb is a general one (manage, maintain, ensure) and whose object is the noun of an activity or a state
-    /// ("I managed the movement of heavy equipment", "Mantenevo l'integrità dei cavi"; #354, round 16).
+    /// ("I managed the movement of heavy equipment", "Mantenevo l'integrità dei cavi"; #354).
     case nominalDuty
-    /// A duty that ends with a phrase of care that says nothing of the work ("Pulivo le superfici interne con attenzione."; #354,
-    /// round 16).
+    /// A duty that ends with a phrase of care that says nothing of the work ("Pulivo le superfici interne con attenzione."; #354).
     case fillerTail
-    /// A container of tools as a technology ("Werkzeugkasten", "toolbox"; #354, round 16).
+    /// A container of tools as a technology ("Werkzeugkasten", "toolbox"; #354).
     case containerTechnology
     /// A summary sentence that says the person works as a title that an earlier sentence already says with the same words
-    /// ("Ich arbeite als Elektriker. … Als Elektriker arbeite ich mit Präzision"; #354, round 16).
+    /// ("Ich arbeite als Elektriker. … Als Elektriker arbeite ich mit Präzision"; #354).
     case repeatedTitleClause
-    /// A duty of a verb and a bare general object only ("Ich habe Geräte montiert.", "I installed the components."; #354, round 16).
+    /// A duty of a verb and a bare general object only ("Ich habe Geräte montiert.", "I installed the components."; #354).
     case bareObjectDuty
 
     /// The words of the class in the line of summary.txt.
@@ -585,7 +582,7 @@ enum ReaderRules {
             if ["habe", "hatte", "war", "bin"].contains(verb) || verb.hasSuffix("te") { return .past }
             return .present
         case "fr":
-            // The verb follows its object and reflexive pronouns: "je m'occupais" is in the past (#354, round 11).
+            // The verb follows its object and reflexive pronouns: "je m'occupais" is in the past (#354).
             guard first == "je" || first == "j",
                   let verb = words.dropFirst().first(where: { !Self.frenchPronounsBeforeTheVerb.contains($0) }) else { return nil }
             if ["ai", "avais", "étais"].contains(verb) || verb.hasSuffix("ais") { return .past }
@@ -611,7 +608,7 @@ enum ReaderRules {
 
     /// A technology whose head noun, by its stem, an earlier technology has: the last word in English and German, the first in the
     /// other languages ("cahier d'exercices" after "cahiers"). A generic head (`genericHeads`) is no kind: "software di diagnostica"
-    /// and "software di gestione flussi" are two tools (probe round 12).
+    /// and "software di gestione flussi" are two tools.
     static func sharedHeads(in cv: CVData, language: String) -> [ReaderFinding] {
         var heads: Set<String> = []
         var found: [ReaderFinding] = []
@@ -628,7 +625,7 @@ enum ReaderRules {
     }
 
     /// The stems of head nouns that name one tool, by the stem that stands for them: a console, a mixer and a desk are one
-    /// mixing console (#354, round 2).
+    /// mixing console (#354).
     static let headGroups: [String: String] = ["mixer": "consol", "desk": "consol"]
 
     /// A word without the ending of its plural and its last vowel ("consoles" and "console" are "consol").
@@ -702,7 +699,7 @@ enum ReaderRules {
         found += sentences.filter { hasQualitySubject($0, qualities: qualities) }
             .map { ReaderFinding(kind: .qualitySubjectSummary, path: "summary", value: $0) }
         // The anchors are the work itself: the titles, the duties the draft keeps and its tools, not the whole description (whose
-        // "lavoro" anchored any sentence) and not the qualities (#354, round 5).
+        // "lavoro" anchored any sentence) and not the qualities (#354).
         let anchors = anchorStems(of: [cv.personalInfo.title ?? "", input.field ?? ""] + cv.experience.map(\.title)
             + input.facts.filter { $0.kind == .title }.flatMap(\.forms) + cv.experience.map { $0.description ?? "" }
             + cv.skills.filter { $0.kind == .technology }.map(\.name))
@@ -748,7 +745,7 @@ enum ReaderRules {
     }
 
     /// The stems of the words for work of any trade ("lavoro", "tâche", "Aufgabe", "element", "process"): a sentence that shares
-    /// only one of them with the work names none of it (#354, round 5).
+    /// only one of them with the work names none of it (#354).
     static let workStopStems: Set<String> = [
         "lavor", "attiv", "compi", "traba", "tarea", "taref", "trava", "tache", "arbei", "aufga", "eleme", "proce", "activ", "tasks",
         "teams",
@@ -765,7 +762,7 @@ enum ReaderRules {
         }
         return firsts.contains { word in
             let folded = fold(word)
-            // A third person of the simple past ("controló", "controllò") folds to "-o" and speaks as no one (#354, round 13).
+            // A third person of the simple past ("controló", "controllò") folds to "-o" and speaks as no one (#354).
             guard !word.hasSuffix("ó"), !word.hasSuffix("ò") else { return false }
             if isFirstPersonPast(word, language: language) { return true }
             return folded.count >= 3 && folded.hasSuffix("o") && !determiners.contains(folded) && !isGerund(folded, language: language)
@@ -774,7 +771,7 @@ enum ReaderRules {
 
     /// Whether a lowercased word, as written, is a first person of the simple past: "-é" or "-í" in Spanish ("controlé", "atendí"),
     /// "-i" or "-í" in Portuguese ("gerenciei", "construí"), "-ai" or "-ii" in Italian ("lavorai", "gestii"). A rough rule, read
-    /// only first in a sentence or after a comma (#354, round 13; probe round 6).
+    /// only first in a sentence or after a comma (#354).
     static func isFirstPersonPast(_ word: String, language: String) -> Bool {
         guard word.count >= 5 else { return false }
         switch language {
@@ -868,7 +865,7 @@ enum ReaderRules {
 
     /// The clauses of German `text` after "dass", "weil", "sodass" or "ob" that end with a noun, a word with a capital, while
     /// a word in lower case in "-en" or "-t" before it is the verb: the finite verb stands before the end ("dass alle Anlagen funktionieren
-    /// einwandfrei durch die Prüfung"; #354, round 5). A clause of fewer than three words is not read.
+    /// einwandfrei durch die Prüfung"; #354). A clause of fewer than three words is not read.
     static func verbsBeforeTheEnd(in text: String) -> [String] {
         text.split { ",;.!?".contains($0) }.compactMap { clause in
             let words = clause.split { !$0.isLetter }.map(String.init)
@@ -877,7 +874,7 @@ enum ReaderRules {
             guard rest.count >= 3, let last = rest.last else { return nil }
             let isVerb = { (word: String) in word.count >= 4 && word.first?.isLowercase == true && (word.hasSuffix("en") || word.hasSuffix("t")) }
             // After its verb, a noun ends the clause, or an adverb right after the verb ("dass die Anlagen funktionieren
-            // zuverlässig"; #354, round 12).
+            // zuverlässig"; #354).
             let afterTheVerb = last.first?.isUppercase == true ? rest.dropLast().contains(where: isVerb)
                 : isGermanAdverb(last) && isVerb(rest[rest.endIndex - 2])
             return afterTheVerb ? clause.trimmingCharacters(in: .whitespaces) : nil
@@ -944,7 +941,7 @@ enum ReaderRules {
 
     /// The technologies of one word that the description writes as the second of two modifiers of another technology's noun, cut
     /// from it: after "and" and the other's last word, with the same ending, in the languages that put the modifier after its noun
-    /// ("pneumatici" of "schemi elettrici e pneumatici", with "schemi elettrici" listed; #354, round 5); before "and" and the
+    /// ("pneumatici" of "schemi elettrici e pneumatici", with "schemi elettrici" listed; #354); before "and" and the
     /// other's first word in English (an adjective: "hydraulic" of "hydraulic and electric diagrams") and German (in lower case).
     /// A noun joined to another technology ("tubi flessibili e valvole", "valves and flexible hoses") is not one.
     static func clippedModifiers(in cv: CVData, of input: DraftingInput) -> [ReaderFinding] {
@@ -988,7 +985,7 @@ enum ReaderRules {
     static func splitVerbs(in text: String) -> [String] {
         text.split { ",;.!?".contains($0) }.compactMap { clause in
             let words = letterWords(of: String(clause))
-            // A particle is in lower case: "jedes Teil achte" is a noun before the verb (#354, round 8).
+            // A particle is in lower case: "jedes Teil achte" is a noun before the verb (#354).
             let particle = clause.split { !$0.isLetter }.dropLast().last
             guard words.count >= 3, !subordinators.isDisjoint(with: words), let verb = words.last, verb.count >= 4,
                   particle?.first?.isLowercase == true,
@@ -1218,7 +1215,7 @@ enum ReaderRules {
         "des", "les", "pour", "avec", "los", "las", "para", "com", "dos",
     ]
 
-    /// A skill of more than four words, unless it is three words joined by prepositions ("logiciel de suivi de lecture", #354, round 6).
+    /// A skill of more than four words, unless it is three words joined by prepositions ("logiciel de suivi de lecture", #354).
     static func isClause(_ name: String, language: String) -> Bool {
         let words = letterWords(of: name)
         guard words.count > 4 else { return false }
@@ -1341,7 +1338,7 @@ enum ReaderRules {
                 || word.contains(where: \.isNumber)
         }
         // A kind with a word of its trade names what it is for ("software de contabilidad", "editor de código"); a bare kind, or one
-        // with only a word of any trade ("editor de texto", "development platform"), names none (#354, round 5).
+        // with only a word of any trade ("editor de texto", "development platform"), names none (#354).
         let modifiers = folded.filter { $0 != head && !linkWords.contains($0) && !shortLinkWords.contains($0) }
         return !named && modifiers.allSatisfy(genericModifiers.contains)
     }
@@ -1512,7 +1509,7 @@ enum ReaderRules {
     ]
 
     /// The classes read from the requests' steps (`RequestRecord.step`) as well as from the final draft: `pastGroupPadding`,
-    /// `repairGenericSystem` and `statedDutyAsSlotTopic` (#354, round 15).
+    /// `repairGenericSystem` and `statedDutyAsSlotTopic` (#354).
     static func requestFindings(in cv: CVData, for input: DraftingInput, requests: [RequestRecord]) -> [ReaderFinding] {
         var found: [ReaderFinding] = []
         let tools = requests.filter { $0.step.hasPrefix("tools ") }.map { request in
@@ -1652,7 +1649,7 @@ enum ReaderRules {
         }
     }
 
-    // MARK: Round 11
+    // MARK: Products, copied duties, promises and contacts
 
     /// The summary sentences that name a product the description does not hold: a word with a capital past the sentence's first,
     /// or with a capital past its own first letter ("SAP", "AutoCAD"), that is no word of the description, of a title or of the
@@ -1843,7 +1840,7 @@ enum ReaderRules {
     }
 
     /// The jobs whose final description does not hold a duty the step that writes a job pins (`dutyCheck`), whatever its length:
-    /// the typical duties beside the stated ones count for nothing (O1, #354, round 13).
+    /// the typical duties beside the stated ones count for nothing (O1, #354).
     static func shortDescribedJobs(in cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
         let language = input.language
         let sanitizer = CVDataSanitizer(languageOfText: { _ in language })
@@ -1866,10 +1863,10 @@ enum ReaderRules {
     }
 }
 
-// MARK: - Round 16
+// MARK: - Repeats, care tails and general objects
 
 extension ReaderRules {
-    /// The classes of round 16: a phrase repeated across jobs, a general verb with an activity noun, a care tail, a container as a
+    /// The classes that follow: a phrase repeated across jobs, a general verb with an activity noun, a care tail, a container as a
     /// technology, a title clause said twice in the summary and a duty of a bare general object.
     static func roundSixteen(in cv: CVData, for input: DraftingInput) -> [ReaderFinding] {
         let language = input.language

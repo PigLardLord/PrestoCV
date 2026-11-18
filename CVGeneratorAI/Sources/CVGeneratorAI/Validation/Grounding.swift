@@ -218,7 +218,7 @@ struct Grounding {
         }
 
         /// Whether the clause at `place` is about a contact field of the person ("La mia email è ...", "Meu e-mail é"), or asks to be
-        /// contacted, whoever it is read as giving: with or without an address, it says nothing of the person's work (#354, round 14).
+        /// contacted, whoever it is read as giving: with or without an address, it says nothing of the person's work (#354).
         func offersAContact(at place: Place) -> Bool {
             Statement(clause: clauses.clause(at: place), quotes: all, language: language).offersAContact
         }
@@ -837,7 +837,7 @@ extension Grounding {
         return String(head).uppercased() + text.dropFirst() + "."
     }
 
-    /// The sentences in which the person says what they do and what they are like at work, with no job (#354, round 1): "I mix on
+    /// The sentences in which the person says what they do and what they are like at work, with no job (#354): "I mix on
     /// digital consoles and edit the sound effects for the shows.", "Sono preciso e mi piace lavorare in squadra." Each clause of
     /// them speaks for the person, belongs to no job, names no entry and gives no link or capitalised word of the person's name,
     /// place or title, one of them claims something, and the sentence holds no number and no word of wish, doubt, future or search
@@ -913,7 +913,7 @@ extension Grounding {
             return clause.isAnchored && reading.speaks(at: place) && !reading.claimedWords(at: place).isEmpty
                 && attribution.jobsOf[place] == nil && !mentioning.contains { $0.contains(place) }
                 && !clause.words.contains(where: \.isNumber) && clause.words.count >= 4
-                // A clause that gives the person's contacts, or is about one ("La mia email è ..."), is no field (#354, round 14).
+                // A clause that gives the person's contacts, or is about one ("La mia email è ..."), is no field (#354).
                 && !reading.givesContacts(at: place) && !reading.offersAContact(at: place)
                 // A clause that names the person ("Je suis Maria Rossi") is no field.
                 && !clause.words.indices.dropFirst().contains { i in

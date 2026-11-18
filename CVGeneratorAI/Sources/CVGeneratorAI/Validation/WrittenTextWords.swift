@@ -199,7 +199,7 @@ extension WrittenTextWords {
     }
 
     /// `sentence` with each count from two to twelve it writes in words written in digits: "J'ai formé trois enseignants" is
-    /// "J'ai formé 3 enseignants". How a count the person gave in digits is matched when the model spells it (#354, round 6).
+    /// "J'ai formé 3 enseignants". How a count the person gave in digits is matched when the model spells it (#354).
     static func inDigits(_ sentence: String, language: Vocabulary.Language?) -> String {
         guard let language, let counts = counts[language] else { return sentence }
         var characters = Array(Digits.ascii(sentence))

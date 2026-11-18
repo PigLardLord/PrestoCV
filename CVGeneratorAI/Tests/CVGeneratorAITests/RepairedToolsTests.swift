@@ -1,7 +1,7 @@
 import Testing
 @testable import CVGeneratorAI
 
-/// The check of the tools a request for more tools writes (#354, round 15).
+/// The check of the tools a request for more tools writes (#354).
 struct RepairedToolsTests {
     private static func checker(_ language: String) -> CVDataSanitizer {
         CVDataSanitizer(languageOfText: { _ in language }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
@@ -14,9 +14,9 @@ struct RepairedToolsTests {
               ("es", ["máquina de escaneo de registros", "sistema de gestión de documentos", "escáner"], ["escáner"]),
               ("en", ["document management system", "PA system", "venue management software"], ["PA system", "venue management software"]),
               ("it", ["archivio digitale", "archivio di gestione documenti"], ["archivio digitale"]),
-              // A German word that ends in a kind of tool is a kind too (#354, round 16, de-plain).
+              // A German word that ends in a kind of tool is a kind too (#354, de-plain).
               ("de", ["Sicherungssystem", "KNX", "Spannungsprüfer", "Messgeräte"], ["KNX", "Spannungsprüfer"]),
-              // A kind that monitors data is a kind too (#354, round 16, jobs-it); one that monitors a thing of the trade stays.
+              // A kind that monitors data is a kind too (#354, jobs-it); one that monitors a thing of the trade stays.
               ("it", ["sistemi di monitoraggio dati", "sensori di vibrazione"], ["sensori di vibrazione"]),
               ("en", ["data monitoring system", "vibration monitoring software"], ["vibration monitoring software"]),
           ])
@@ -24,7 +24,7 @@ struct RepairedToolsTests {
         #expect(Self.checker(language).repairedTools(tools, against: "Lavoro a Lecce dal 2019.") == kept)
     }
 
-    @Test("A tool ends in a kind of tool when it names one, or is a German compound that ends in one (#354, round 15)",
+    @Test("A tool ends in a kind of tool when it names one, or is a German compound that ends in one (#354)",
           arguments: [
               ("de", "Montagesystem", true), ("de", "Messgeräte", true), ("de", "Werkzeugkasten", false), ("de", "KNX", false),
               ("de", "System", true), ("en", "truck loading equipment", true), ("en", "PA system", false),

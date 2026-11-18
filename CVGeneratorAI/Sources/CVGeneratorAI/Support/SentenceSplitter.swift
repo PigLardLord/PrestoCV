@@ -10,7 +10,7 @@ enum SentenceSplitter {
     }
 
     /// `text` with each semicolon that a clause of the person's own follows ("; I train the crew", "; j'accompagne…") as a full stop,
-    /// and that clause with a capital: the model wrote a summary's sentences as one, joined by semicolons (#354, round 4). A
+    /// and that clause with a capital: the model wrote a summary's sentences as one, joined by semicolons (#354). A
     /// semicolon before anything else stays.
     static func unchained(_ text: String) -> String {
         var result = ""

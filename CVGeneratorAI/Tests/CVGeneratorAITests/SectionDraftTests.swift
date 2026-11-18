@@ -97,15 +97,15 @@ struct SectionDraftTests {
 
         #expect(service.generateRequests.count == 1)
         #expect(service.sectionCalls == ["job 0", "job 1", "job 2", "job 3", "tools", "tools", "tools", "softSkills", "summary"])
-        // The two jobs of sound technician ask for their tools once (#354, round 6).
-        // The headline title's first: the current job's (#354, round 15).
+        // The two jobs of sound technician ask for their tools once (#354).
+        // The headline title's first: the current job's (#354).
         #expect(service.toolsRequests == [[3], [0], [1, 2]])
         #expect(service.toolsCounts == [2...3, 2...3, 2...3])
         let brief = try #require(service.sectionBriefs.first)
         #expect(service.sectionBriefs.dropLast().allSatisfy { $0 == brief })
         var summaryBrief = try #require(service.sectionBriefs.last)
         summaryBrief.opening = nil
-        // The summary reads a job as ended by the years its own request read (#354, round 10).
+        // The summary reads a job as ended by the years its own request read (#354).
         #expect(summaryBrief.roles.map(\.hasEnded) == [true, true, true, false])
         for number in summaryBrief.roles.indices {
             summaryBrief.roles[number].hasEnded = brief.roles[number].hasEnded
@@ -140,7 +140,7 @@ struct SectionDraftTests {
         #expect(service.toolsCounts == Array(repeating: 2...3, count: SectionDraft.writtenJobs))
     }
 
-    @Test("A job whose clauses only say where the person worked is marked so, and its request asks for typical duties alone (#354, round 11)")
+    @Test("A job whose clauses only say where the person worked is marked so, and its request asks for typical duties alone (#354)")
     func jobThatNamesNoWork() async throws {
         let service = service()
         service.generateResult = .success(CVData(experience: [
@@ -163,7 +163,7 @@ struct SectionDraftTests {
         #expect(brief.roles.map(\.clausesNameWork) == [false, true])
     }
 
-    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354, round 6), but a rich draft's headline title (probe round 4)",
+    @Test("A single title asks its tools all at once, as many as the CV needs and one more; titles among others ask 2 or 3 each (#354), but a rich draft's headline title",
           arguments: [
               (0, 1, false, 4...5, 10...11), (0, 1, true, 3...4, 6...7), (0, 2, false, 2...3, 10...11), (1, 2, false, 2...3, 2...3),
               (2, 3, false, 2...3, 2...3),
@@ -174,7 +174,7 @@ struct SectionDraftTests {
         DraftDepth.$pinned.withValue(true) { #expect(SectionDraft.toolCount(group: group, groups: groups, sparse: sparse) == rich) }
     }
 
-    @Test("A past title's answer adds only its first kept tool, and only while the CV is short of tools of the trade (#354, round 15)")
+    @Test("A past title's answer adds only its first kept tool, and only while the CV is short of tools of the trade (#354)")
     func mergedTools() {
         // Each tool counts as one of the trade but "trailer", which the check drops.
         let count = { (tools: [String]) in tools.filter { $0 != "trailer" }.count }
@@ -202,7 +202,7 @@ struct SectionDraftTests {
         #expect(SectionDraft.mergedTools([["KNX"], ["Montagesystem"]], fewest: 4, isKind: kind, tradeTools: count) == ["KNX", "Montagesystem"])
     }
 
-    @Test("The headline title's tools are asked first: the job of the headline title, else the latest job (#354, round 15)")
+    @Test("The headline title's tools are asked first: the job of the headline title, else the latest job (#354)")
     func headlineFirst() {
         let roles: [DraftBrief.Role] = [
             .init(title: "stagehand", hasEnded: true), .init(title: "sound technician", hasEnded: true),
@@ -219,7 +219,7 @@ struct SectionDraftTests {
         #expect(SectionDraft.headlineFirst([[0]], headline: 0) == [[0]])
     }
 
-    @Test("o1: each summary request reads the opening code wrote, the sentences kept so far and one slot: the role, the current job's work, two qualities, then the ended jobs (#354, round 13)")
+    @Test("o1: each summary request reads the opening code wrote, the sentences kept so far and one slot: the role, the current job's work, two qualities, then the ended jobs (#354)")
     func summaryInputs() async throws {
         let service = service()
         // No sentence kept: the summary asks a slot each time, up to its most requests.
@@ -242,7 +242,7 @@ struct SectionDraftTests {
         #expect(topics.dropFirst(3).allSatisfy { $0.hasEnded && $0.work.count == 1 })
     }
 
-    @Test("o1: the summary's slots are the current job's role and field, the topics of its first two kept duties, two qualities, then the first kept duty of each other job (#354, round 13)")
+    @Test("o1: the summary's slots are the current job's role and field, the topics of its first two kept duties, two qualities, then the first kept duty of each other job (#354)")
     func summaryTopics() {
         let brief = DraftBrief(
             language: "English", headline: "head of sound",
@@ -265,7 +265,7 @@ struct SectionDraftTests {
             SummaryTopic(title: "head of sound", qualities: ["teamwork", "calm"], hasEnded: false),
             SummaryTopic(title: "stagehand", work: ["the lights"], hasEnded: true),
         ])
-        // Round 15: with typical duties, the work slot reads them, never the duty the person said and the job already shows.
+        // With typical duties, the work slot reads them, never the duty the person said and the job already shows.
         let typical = SectionDraft.summaryTopics(
             of: brief, duties: duties, typical: [[], [], ["I plan the rehearsals.", "I mix the shows."]], qualities: [],
             field: nil, order: [2, 1, 0]
@@ -334,7 +334,7 @@ struct SectionDraftTests {
         #expect(job("Orchard Lane Theatre", in: draft)?.description?.contains("I look after the mixing desks.") == true)
     }
 
-    // MARK: O1, three to four duties a job (#354, round 13; D6 withdrawn)
+    // MARK: O1, three to four duties a job (#354; D6 withdrawn)
 
     @Test("o1: a job whose stated duties run to 40 characters keeps them first, then the typical duties that reach three")
     func describedJobsGetTypicalDuties() async throws {
@@ -370,7 +370,7 @@ struct SectionDraftTests {
         #expect(job("Orchard Lane Theatre", in: draft)?.current == true)
     }
 
-    @Test("o1: a job keeps its stated duty and the typical duties it needs to reach three, no more (#354, rounds 10 and 13)")
+    @Test("o1: a job keeps its stated duty and the typical duties it needs to reach three, no more (#354)")
     func shortJobsKeepTypicalDutiesToThree() async throws {
         let service = service()
         service.jobResults[0] = RoleWriting(
@@ -435,13 +435,13 @@ struct SectionDraftTests {
         let repair = try #require(service.jobRepairs.first)
         // The duty in -ing is put in the person's own form first, so the repair reads the sentence as the draft would have it.
         #expect(repair.rejected == ["\"I was mixing at 3 festivals.\": it holds a number"])
-        // The job needs typical duties to reach three, and the repair asked for exactly those missing: both stay (O1, round 13).
+        // The job needs typical duties to reach three, and the repair asked for exactly those missing: both stay (O1).
         let duties = try #require(job("Brightwater Events", in: draft)?.description)
         #expect(duties.contains("I ran the sound checks with each band."))
         #expect(duties.contains("I looked after the microphones and cables."))
     }
 
-    @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354, round 8)")
+    @Test("Too few skills kept ask for those missing and one more, the tools apart from the qualities, none of the kept ones, with those dropped and why (#354)")
     func moreSkills() async throws {
         let service = service()
         service.toolsResult = [[], [], [], ["mixing desks", "equipment"]]
@@ -455,7 +455,7 @@ struct SectionDraftTests {
 
         #expect(service.sectionCalls.filter { $0 == "moreSkills" }.count == 2)
         // One more of each kind short than missing, as a rule may drop one of them; asked with the qualities, the tools came back as
-        // a bare kind and a bare record, asked alone as a system (a method is a technical skill since probe round 12).
+        // a bare kind and a bare record, asked alone as a system (a method is a technical skill).
         #expect(service.moreSkillsRequests.map { [$0.tools, $0.qualities] } == [[4, 0], [0, 3]])
         for request in service.moreSkillsRequests {
             #expect(request.listedTools == ["mixing desks"] && request.listedQualities == ["teamwork"])
@@ -463,16 +463,16 @@ struct SectionDraftTests {
         }
         #expect(draft.skills.contains(Skill(name: "PA systems", kind: .technology)))
         #expect(draft.skills.contains(Skill(name: "patience", kind: .softSkill)))
-        // The tools of the headline title, the latest job's here; a general kind of the work they wrote goes (#354, round 15).
+        // The tools of the headline title, the latest job's here; a general kind of the work they wrote goes (#354).
         #expect(service.moreSkillsRequests.map(\.title) == ["head of sound", "head of sound"])
         #expect(!draft.skills.contains { $0.name == "document management system" })
     }
 
-    @Test("A written tool of the kind of a tool the person names goes; the named one stays, and so does one of a generic kind (#354, round 2; probe round 12)")
+    @Test("A written tool of the kind of a tool the person names goes; the named one stays, and so does one of a generic kind (#354)")
     func toolOfAStatedKind() async throws {
         let service = service()
         service.generateResult = .success(CVData(experience: Self.extracted.experience, skills: [Skill(name: "digital consoles", kind: .technology)]))
-        // The headline title's answer: a past title's adds only one while the CV is short (#354, round 15).
+        // The headline title's answer: a past title's adds only one while the CV is short (#354).
         service.toolsResult = [["scenery flats"], ["stage monitors"], [], ["audio mixing console", "microphones", "line array systems"]]
 
         let draft = try await draft(service, of: description + "\nI mix on digital consoles.")
@@ -484,7 +484,7 @@ struct SectionDraftTests {
         #expect(draft.skills.contains { $0.name == "line array systems" })
     }
 
-    @Test("A kind of tool with a word of its trade stays though the CV lists enough tools; a bare kind goes (#354, round 4)")
+    @Test("A kind of tool with a word of its trade stays though the CV lists enough tools; a bare kind goes (#354)")
     func tradeKindStays() async throws {
         let service = service()
         service.toolsResult = [
@@ -498,7 +498,7 @@ struct SectionDraftTests {
         #expect(!draft.skills.contains { $0.name == "software" })
     }
 
-    @Test("A summary sentence of clauses each opened by the person, joined by semicolons, is cut into sentences, at most four with the opening (#354, round 4)")
+    @Test("A summary sentence of clauses each opened by the person, joined by semicolons, is cut into sentences, at most four with the opening (#354)")
     func chainedSummaryIsCut() async throws {
         let service = service()
         service.summaryResult = """
@@ -514,7 +514,7 @@ struct SectionDraftTests {
         #expect(SentenceSplitter.sentences(in: summary).count == 4)
     }
 
-    @Test("A semicolon the person's own clause does not follow stays in its sentence (#354, round 4)", arguments: [
+    @Test("A semicolon the person's own clause does not follow stays in its sentence (#354)", arguments: [
         ("I look after the mixing desks; cables, stands and cases too.", "I look after the mixing desks; cables, stands and cases too."),
         ("I run the sound checks; I train the crew.", "I run the sound checks. I train the crew."),
         ("Je règle les consoles ; j'accompagne les tournées.", "Je règle les consoles. J'accompagne les tournées."),
@@ -525,7 +525,7 @@ struct SectionDraftTests {
         #expect(SentenceSplitter.unchained(text) == cut)
     }
 
-    @Test("A request's text is cut at each semicolon the person's clause follows, a German separable verb split at a clause's end is joined, a sentence loses the relative word it opens with, and a verb loses the noun of its own action before its object (#354, rounds 4 and 12)", arguments: [
+    @Test("A request's text is cut at each semicolon the person's clause follows, a German separable verb split at a clause's end is joined, a sentence loses the relative word it opens with, and a verb loses the noun of its own action before its object (#354)", arguments: [
         ("Ich prüfe die Pulte; ich schule das Team, damit es die Mikrofone richtig an schließt.", "Ich prüfe die Pulte. Ich schule das Team, damit es die Mikrofone richtig anschließt."),
         ("Ich schule das Team und stelle die Pulte ein.", "Ich schule das Team und stelle die Pulte ein."),
         ("Je soigne les chevaux du haras. Où j'ai dressé 4 poulains.", "Je soigne les chevaux du haras. J'ai dressé 4 poulains."),
@@ -543,7 +543,7 @@ struct SectionDraftTests {
         #expect(SectionDraft.mended(text) == expected)
     }
 
-    @Test("A job's duties written as clauses joined by semicolons are cut into sentences (#354, round 4)")
+    @Test("A job's duties written as clauses joined by semicolons are cut into sentences (#354)")
     func chainedDutiesAreCut() async throws {
         let service = service()
         service.jobResults[1] = RoleWriting(
@@ -557,7 +557,7 @@ struct SectionDraftTests {
         #expect(duties.contains("I ran the sound checks with each band."))
     }
 
-    @Test("A summary whose every sentence and repair went is written by code from the titles and two qualities after its most requests, and the draft keeps it (#354, rounds 6 and 13)")
+    @Test("A summary whose every sentence and repair went is written by code from the titles and two qualities after its most requests, and the draft keeps it (#354)")
     func summaryFloor() async throws {
         let service = service()
         service.summaryResult = "He is a sound engineer."
@@ -566,12 +566,12 @@ struct SectionDraftTests {
         let draft = try await draft(service)
 
         #expect(service.sectionCalls.filter { $0.hasSuffix("ummary") } == ["summary", "repairSummary", "summary", "repairSummary"])
-        // O1: a floor still short ends with the person's strengths, from the title and two qualities (#354, round 13).
+        // O1: a floor still short ends with the person's strengths, from the title and two qualities (#354).
         #expect(draft.summary == "I work as a head of sound. Before that, I worked as a sound technician and a stagehand. "
             + "As a head of sound, I work with teamwork and calm under pressure.")
     }
 
-    @Test("A rejected summary sentence gets one repair on the same topic that reads it and why it went, and the repair is kept (#354, round 13)")
+    @Test("A rejected summary sentence gets one repair on the same topic that reads it and why it went, and the repair is kept (#354)")
     func summaryRepair() async throws {
         let service = service()
         service.summaryResults = ["He is a sound engineer."]
@@ -587,7 +587,7 @@ struct SectionDraftTests {
         #expect(draft.summary == Self.opening + " " + Self.summary)
     }
 
-    @Test("The current job's work slot reads its typical duties, and a sentence on it that says a duty again gets one repair (#354, round 15)")
+    @Test("The current job's work slot reads its typical duties, and a sentence on it that says a duty again gets one repair (#354)")
     func summaryNearCopy() async throws {
         let service = service()
         let first = "I keep the sound of every show clear and balanced."
@@ -605,7 +605,7 @@ struct SectionDraftTests {
         #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 
-    @Test("The summary asks one sentence at a time, each after those kept, until it has 2 sentences and 120 characters (#354, round 13)")
+    @Test("The summary asks one sentence at a time, each after those kept, until it has 2 sentences and 120 characters (#354)")
     func summaryOneSentenceAtATime() async throws {
         let service = service()
         let first = "I keep the sound of every show clear and balanced."
@@ -619,7 +619,7 @@ struct SectionDraftTests {
         #expect(draft.summary == [Self.opening, first, Self.summary].joined(separator: " "))
     }
 
-    @Test("A rich summary sentence written with no full stop gets one, and stays a sentence of its own (probe round 26)")
+    @Test("A rich summary sentence written with no full stop gets one, and stays a sentence of its own")
     func richSentenceEnded() async throws {
         let service = service()
         let first = "I keep the sound of every show clear and balanced"
@@ -758,7 +758,7 @@ struct SectionDraftTests {
 
         _ = try await draft(service(), logger: logger)
 
-        // The headline title's 2 tools, then a past title's first while the CV is short of 4 (#354, round 15).
+        // The headline title's 2 tools, then a past title's first while the CV is short of 4 (#354).
         #expect(logger.entry("draft.written")?.line == "draft.written summary=true roles=4 technologies=4 softSkills=3")
         #expect(logger.entry("draft.written")?.level == .info)
         #expect(logger.entry("draft.unwritten") == nil)
@@ -846,7 +846,7 @@ struct SectionDraftTests {
         #expect(!names.contains { $0.contains("voice tracks") }, "\(names)")
     }
 
-    @Test("D8: the work the person says they like doing is a soft skill in their own words; a pastime they like is none (#354, round 3)",
+    @Test("D8: the work the person says they like doing is a soft skill in their own words; a pastime they like is none (#354)",
           arguments: [
               ("I stay calm under pressure and I like working closely with choreographers.", "working closely with choreographers"),
               ("I stay calm under pressure and I like baking rye bread.", nil),

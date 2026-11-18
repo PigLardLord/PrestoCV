@@ -70,13 +70,13 @@ struct CatalogTests {
     ])
     func hidingRejected(css: String) { #expect(rejected(css)) }
 
-    @Test("huge numbers are rejected, never a crash (review round 2)", arguments: [
+    @Test("huge numbers are rejected, never a crash", arguments: [
         ".cv-skill[data-rating=99999999999999999999]{color:var(--color-text)}", ".cv{margin:1234567890pt}",
         ".cv{flex:1.00000000000000000001}", ".cv-skill[data-rating=1e400]{color:var(--color-text)}",
     ])
     func hugeNumbers(css: String) { #expect(rejected(css)) }
 
-    @Test("flex and grid containers keep inline entries apart with a column gap (review round 5)", arguments: [
+    @Test("flex and grid containers keep inline entries apart with a column gap", arguments: [
         ".cv-section{display:flex}", ".cv-profile{display:inline-flex}", ".cv-section{display:grid;grid-template-columns:1fr 1fr}",
         ".cv-section{display:flex;gap:0}", ".cv-section{display:flex;gap:4pt 0}", ".cv-section{display:flex;column-gap:2pt}",
         ".cv-section{display:flex;column-gap:0.2em}", ".cv-section{display:flex;row-gap:8pt}", ".cv-section{display:flex;gap:4pt 2px}",

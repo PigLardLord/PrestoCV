@@ -301,7 +301,7 @@ struct TwoPassDraftTests {
         #expect(unwritten.experience.first?.description == stub.quote)
     }
 
-    @Test("A role's quote that only says the person worked, with no word of the job, goes even as the only text (#354, round 11)")
+    @Test("A role's quote that only says the person worked, with no word of the job, goes even as the only text (#354)")
     func bareWorkQuoteGoes() throws {
         let description = "De 2014 a 2018 trabajé en la gestoría Aranda y Molina."
         let draft = CVData(experience: [Experience(

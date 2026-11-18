@@ -1,11 +1,11 @@
 import Testing
 @testable import CVGeneratorAI
 
-/// The draft of iOS 27's model (`DraftDepth`; #354, probe rounds 3 and 4): more duties, tools and summary sentences, a summary slot
+/// The draft of iOS 27's model (`DraftDepth`; #354): more duties, tools and summary sentences, a summary slot
 /// for the tools, and rules that ask for the tools by name. iOS 26's model keeps the plain draft, which the other suites pin. Every
 /// name and trade is invented.
 @MainActor
-@Suite("A rich draft, of iOS 27's model (probe rounds 3 and 4)", .richDraft)
+@Suite("A rich draft, of iOS 27's model", .richDraft)
 struct RichDraftTests {
     private static let brief = DraftBrief(
         language: "English", headline: "head of sound",
@@ -26,7 +26,7 @@ struct RichDraftTests {
         #expect(DraftBrief.Role.mostDuties == 6)
         #expect([0, 1, 4, 5, 6, 8].map(DraftBrief.Role.adding(said:)) == [5, 4, 1, 1, 0, 0])
         #expect(DraftBrief.Role(title: "stagehand", hasEnded: true).adding == 5)
-        // Probe round 13: capped at 8 and 5, the draft kept 8 of the 10 or more technologies its requests wrote.
+        // Capped at 8 and 5, the draft kept 8 of the 10 or more technologies its requests wrote.
         #expect(SectionDraft.technologies == 12)
         #expect(SectionDraft.softSkills == 6)
         #expect(InferredSkills.caps == [.technology: 12, .softSkill: 6])
@@ -43,7 +43,7 @@ struct RichDraftTests {
 
     // MARK: The summary's slots
 
-    @Test("The summary's slots: the role, the first work, three tools, the next work with two qualities, the latest ended job, then the rest of the tools and qualities for a summary still short (probe rounds 15 and 17)")
+    @Test("The summary's slots: the role, the first work, three tools, the next work with two qualities, the latest ended job, then the rest of the tools and qualities for a summary still short")
     func summaryTopics() {
         let topics = SectionDraft.summaryTopics(
             of: Self.brief, duties: Self.duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: "live sound",
@@ -60,7 +60,7 @@ struct RichDraftTests {
             SummaryTopic(title: "head of sound", tools: ["XLR cables", "Dante"], hasEnded: false),
             SummaryTopic(title: "head of sound", qualities: ["care"], hasEnded: false),
         ])
-        // The opening says the title: the role slot comes last, for a summary still short (probe round 17).
+        // The opening says the title: the role slot comes last, for a summary still short.
         let opened = SectionDraft.summaryTopics(
             of: Self.brief, duties: Self.duties, typical: [[], [], []], qualities: ["teamwork", "calm", "care"], field: "live sound",
             order: [2, 1, 0], tools: Self.tools, hasOpening: true
@@ -68,7 +68,7 @@ struct RichDraftTests {
         #expect(opened == Array(topics.dropFirst()) + [topics[0]])
     }
 
-    @Test("The first qualities slot says them with the second pair of work, and that work gets no slot of its own (probe rounds 10 and 15)")
+    @Test("The first qualities slot says them with the second pair of work, and that work gets no slot of its own")
     func qualitiesWithWork() {
         let duties = [[], [], [
             "I train the junior technicians.", "I plan the rehearsals.", "I mix the shows.", "I tune the rooms.", "I patch the stage boxes.",
@@ -92,7 +92,7 @@ struct RichDraftTests {
         ).dropLast().last == SummaryTopic(title: "head of sound", work: ["the stage boxes"], hasEnded: false))
     }
 
-    @Test("An ended job's slot asks a topic of its work no earlier slot asks, the job's work no slot asks gets a slot, and with no second pair the first qualities slot asks it (probe rounds 14 and 15)")
+    @Test("An ended job's slot asks a topic of its work no earlier slot asks, the job's work no slot asks gets a slot, and with no second pair the first qualities slot asks it")
     func spareWork() {
         let typical = [[], [], [
             "I train the junior technicians and plan the rehearsals.", "I mix the shows.", "I tune the rooms.", "I patch the stage boxes.",
@@ -155,9 +155,9 @@ struct RichDraftTests {
         #expect(topics.map(\.work) == [["the junior technicians", "the rehearsals"], ["the shows"]])
     }
 
-    // MARK: The tools slots (probe round 13)
+    // MARK: The tools slots
 
-    @Test("The tools slots read the products, standards and systems first, then the tools in capitals, the others, and last the fields of the work (probe round 13)")
+    @Test("The tools slots read the products, standards and systems first, then the tools in capitals, the others, and last the fields of the work")
     func specificFirst() {
         let tools = ["contabilità", "Facturación", "matita", "Excel", "HACCP", "Wartung", "manutenzione", "Balance sheets"]
 
@@ -168,7 +168,7 @@ struct RichDraftTests {
                 == ["SPS-Steuerung", "Werkzeugkoffer", "Messgerät", "Wartung"])
     }
 
-    @Test("A tools slot asks the tools the summary does not name yet, as many as it holds, and none when it names them all; other slots stay (probe round 13)")
+    @Test("A tools slot asks the tools the summary does not name yet, as many as it holds, and none when it names them all; other slots stay")
     func unsaidTools() {
         let tools = ["Pro Tools", "DiGiCo SD7", "in-ear monitors", "XLR cables", "Dante"]
         let slot = SummaryTopic(title: "head of sound", tools: ["Pro Tools", "DiGiCo SD7", "in-ear monitors"], hasEnded: false)
@@ -188,9 +188,9 @@ struct RichDraftTests {
         #expect(SectionDraft.unsaid(qualities, tools: tools, written: said) == qualities)
     }
 
-    // MARK: The summary's repeats (probe round 14)
+    // MARK: The summary's repeats
 
-    @Test("A summary sentence repeats an earlier one when it shares most of its content words and adds fewer than two past the kept qualities (probe round 14)")
+    @Test("A summary sentence repeats an earlier one when it shares most of its content words and adds fewer than two past the kept qualities")
     func repeatsAnEarlierSentence() {
         #expect(CVDataSanitizer.repeats(
             "Agisco come capoturno della manutenzione.", earlier: ["Lavoro come capoturno della manutenzione."], besides: []
@@ -205,9 +205,9 @@ struct RichDraftTests {
         #expect(!CVDataSanitizer.repeats(sentence, earlier: earlier, besides: []))
     }
 
-    @Test("A summary sentence that ends as an earlier one stays when it adds three content words or more to it, and goes with fewer (probe round 14)",
+    @Test("A summary sentence that ends as an earlier one stays when it adds three content words or more to it, and goes with fewer",
           arguments: [
-              // Not after "with": a tail of tools said before is cut instead (`withoutARepeatedTail`, probe round 15).
+              // Not after "with": a tail of tools said before is cut instead (`withoutARepeatedTail`).
               ("I check every invoice before it is paid and record it in a ledger and an invoicing program.", true),
               ("I check it with a ledger and an invoicing program.", false),
           ])
@@ -229,9 +229,9 @@ struct RichDraftTests {
         }
     }
 
-    // MARK: probe round 15
+    // MARK: The rich summary's length, closing phrases and verbs
 
-    @Test("A rich summary keeps up to 6 sentences, a plain one 4 (probe rounds 15 and 17)")
+    @Test("A rich summary keeps up to 6 sentences, a plain one 4")
     func summaryMost() {
         #expect(CVDataSanitizer.summaryMost == 6)
         #expect(SectionDraft.summarySentences == 6)
@@ -243,7 +243,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A closing phrase that says again what the earlier sentences say goes, and one that adds two content words stays (probe round 15)",
+    @Test("A closing phrase that says again what the earlier sentences say goes, and one that adds two content words stays",
           arguments: [
               ("de", "Ich warte die Kältetechnik der Gebäude, indem ich die Heizungsanlage und die Lüftungsanlage prüfe.",
                ["Ich prüfe die Heizungsanlage und die Lüftungsanlage."], "Ich warte die Kältetechnik der Gebäude."),
@@ -265,7 +265,7 @@ struct RichDraftTests {
         #expect(tail == kept)
     }
 
-    @Test("A rich summary keeps a sentence without its tail of tools said before, and a plain one drops it (probe round 15)")
+    @Test("A rich summary keeps a sentence without its tail of tools said before, and a plain one drops it")
     func summaryWithoutARepeatedTail() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Experience(title: "accountant", company: "Brembo Furniture", startDate: "2017", endDate: nil, current: true)])
@@ -282,7 +282,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A verb of the person after \"o que\", \"lo que\" or \"ciò che\" speaks as the person in a rich draft, and a plural does not (probe round 15)",
+    @Test("A verb of the person after \"o que\", \"lo que\" or \"ciò che\" speaks as the person in a rich draft, and a plural does not",
           arguments: [
               ("pt", "contabilista", "Móveis Cávado",
                "Moro em Braga. Desde 2017 trabalho como contabilista na Móveis Cávado, onde faço a contabilidade e analiso os movimentos de caixa.",
@@ -308,9 +308,9 @@ struct RichDraftTests {
         }
     }
 
-    // MARK: probe round 16
+    // MARK: The rich summary's closing clauses, verbs and names
 
-    @Test("A closing clause of time or purpose that says again an earlier sentence goes, a tail of three repeats goes against two added, and a tail of tools said before goes with what they are for (probe round 16)",
+    @Test("A closing clause of time or purpose that says again an earlier sentence goes, a tail of three repeats goes against two added, and a tail of tools said before goes with what they are for",
           arguments: [
               ("it", "Uso il registro elettronico per annotare le presenze mentre correggo i compiti degli alunni.",
                ["Correggo i compiti degli alunni ogni settimana."], [], "Uso il registro elettronico per annotare le presenze."),
@@ -335,7 +335,7 @@ struct RichDraftTests {
         #expect(tail == kept)
     }
 
-    @Test("A first word in the imperfect of a verb in \"-ar\" speaks as the person in a rich draft, and not in a plain one (probe round 16)",
+    @Test("A first word in the imperfect of a verb in \"-ar\" speaks as the person in a rich draft, and not in a plain one",
           arguments: [
               ("pt", "contabilista", "Móveis Cávado",
                "Moro em Braga. Desde 2017 trabalho como contabilista na Móveis Cávado, onde faço a contabilidade e analiso os movimentos de caixa.",
@@ -358,7 +358,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich summary keeps the head of a sentence whose closing phrase holds a name, and a plain one drops it (probe round 16)")
+    @Test("A rich summary keeps the head of a sentence whose closing phrase holds a name, and a plain one drops it")
     func headBeforeAName() throws {
         let portuguese = CVDataSanitizer(languageOfText: { _ in "pt" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Experience(title: "programador", company: "Lojas Minho", startDate: "2017", endDate: nil, current: true)])
@@ -376,7 +376,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich summary keeps an acronym the person's work writes, and a plain one reads it as a name (probe round 16)")
+    @Test("A rich summary keeps an acronym the person's work writes, and a plain one reads it as a name")
     func acronymOfTheWork() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let facts = CVData(experience: [Experience(title: "sound technician", company: "Teatro Lario", startDate: "2017", endDate: nil, current: true)])
@@ -393,9 +393,9 @@ struct RichDraftTests {
         }
     }
 
-    // MARK: probe round 17
+    // MARK: The final pass and an acronym of a duty
 
-    @Test("The final pass keeps a rich summary sentence with an acronym of a kept duty, as the summary check does, and a plain one drops it (probe round 17)")
+    @Test("The final pass keeps a rich summary sentence with an acronym of a kept duty, as the summary check does, and a plain one drops it")
     func acronymOfAKeptDuty() throws {
         let french = CVDataSanitizer(languageOfText: { _ in "fr" })
         let description = """
@@ -416,9 +416,9 @@ struct RichDraftTests {
         #expect(plain.summary?.contains("PA") != true, "\(plain.summary ?? "")")
     }
 
-    // MARK: probe rounds 18 and 20
+    // MARK: The tools a workplace has
 
-    @Test("A rich draft asks the trade's tools a workplace of it has, with no job ad and no example; a plain one asks as before (probe rounds 18 and 20)")
+    @Test("A rich draft asks the trade's tools a workplace of it has, with no job ad and no example; a plain one asks as before")
     func toolsOfAWorkplace() {
         let rich = SectionPrompts.toolsInstructions(count: 4...5)
         let plain = DraftDepth.$pinned.withValue(false) { SectionPrompts.toolsInstructions(count: 4...5) }
@@ -430,9 +430,9 @@ struct RichDraftTests {
         #expect(rich.replacingOccurrences(of: ": " + SectionPrompts.workplaceTools, with: "") == plain)
     }
 
-    // MARK: probe round 19
+    // MARK: The soft skills request: adjective and noun
 
-    @Test("A rich draft's soft skills request shows a quality's adjective and its noun in the CV's language; a plain one does not (probe round 19)")
+    @Test("A rich draft's soft skills request shows a quality's adjective and its noun in the CV's language; a plain one does not")
     func qualityAsANoun() {
         let italian = DraftBrief(language: "Italian", headline: "cuoco", roles: [.init(title: "cuoco", hasEnded: false)], studies: [], namedSkills: [])
         let line = "A quality said as an adjective goes as its noun: \"affidabile\" → \"affidabilità\"."
@@ -446,7 +446,7 @@ struct RichDraftTests {
         }
     }
 
-    // MARK: probe round 21
+    // MARK: The summary sentence on studies and languages
 
     private static let schooled = DraftBrief(
         language: "English", headline: "warehouse operative",
@@ -456,7 +456,7 @@ struct RichDraftTests {
 
     private static let logistics = SummaryStudy(course: "logistics", school: "Harlow City College")
 
-    @Test("A rich summary asks of the person's studies and languages after the latest ended job; a plain one does not (probe round 21)")
+    @Test("A rich summary asks of the person's studies and languages after the latest ended job; a plain one does not")
     func studiesSlot() {
         let duties = [["I moved the pallets."], ["I load the lorries.", "I check the deliveries."]]
         let rich = SectionDraft.summaryTopics(
@@ -481,7 +481,7 @@ struct RichDraftTests {
         #expect(!plain.contains(studies), "\(plain)")
     }
 
-    @Test("The studies slot reads the degree and school and the language names, with no level and no job (probe rounds 21, 22, 24 and 26)")
+    @Test("The studies slot reads the degree and school and the language names, with no level and no job")
     func studiesPrompt() {
         let facts = CVData(
             education: [Education(degree: "logistics", institution: "Harlow City College"), Education(institution: "Arlen School")],
@@ -514,7 +514,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich summary keeps a sentence of the person's own studies and languages, and a plain one drops it (probe round 21)",
+    @Test("A rich summary keeps a sentence of the person's own studies and languages, and a plain one drops it",
           arguments: [
             "I studied logistics at Harlow City College.",
             "I hold a diploma in logistics from Harlow City College.",
@@ -543,7 +543,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich summary still drops a qualification the person did not write, and one the person only wishes for (probe round 21)",
+    @Test("A rich summary still drops a qualification the person did not write, and one the person only wishes for",
           arguments: [
             ("I am a certified logistics manager from Harlow City College.", "certified"),
             ("I studied for a master in logistics at Harlow City College.", "master"),
@@ -593,9 +593,9 @@ struct RichDraftTests {
         logistics at Harlow City College.
         """
 
-    // MARK: probe round 22
+    // MARK: The final pass on the studies sentence
 
-    @Test("The final pass keeps a rich summary sentence of the person's studies and languages, and a plain one drops it (probe round 22)",
+    @Test("The final pass keeps a rich summary sentence of the person's studies and languages, and a plain one drops it",
           arguments: [
             "I hold a diploma in logistics from Harlow City College.",
             "I speak Polish and English at work.",
@@ -621,7 +621,7 @@ struct RichDraftTests {
         #expect(plain.summary?.contains(sentence) != true, "\(plain.summary ?? "")")
     }
 
-    @Test("The final pass still drops a rich summary sentence of a qualification the person only wishes for (probe round 22)")
+    @Test("The final pass still drops a rich summary sentence of a qualification the person only wishes for")
     func wishedQualificationDropped() throws {
         let english = CVDataSanitizer(languageOfText: { _ in "en" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
         let description = """
@@ -682,9 +682,9 @@ struct RichDraftTests {
         #expect(!kept.contains(where: HiddenCharacters.occur(in:)))
     }
 
-    // MARK: probe round 23
+    // MARK: The studies slot's own rule
 
-    @Test("The studies slot asks with its own rule, of the studies and languages alone; a job's slot keeps the job's rule (probe round 23)")
+    @Test("The studies slot asks with its own rule, of the studies and languages alone; a job's slot keeps the job's rule")
     func studiesRule() {
         let studies = SummaryTopic(
             title: "warehouse operative", studies: [Self.logistics], languages: ["Polish"], hasEnded: false
@@ -717,7 +717,7 @@ struct RichDraftTests {
         }
     }
 
-    @Test("A rich summary long enough still asks its studies slot, then no slot; a plain one asks no more (probe round 23)")
+    @Test("A rich summary long enough still asks its studies slot, then no slot; a plain one asks no more")
     func studiesAfterEnough() {
         let role = SummaryTopic(title: "warehouse operative", hasEnded: false)
         let ended = SummaryTopic(title: "forklift driver", work: ["the pallets"], hasEnded: true)
@@ -738,9 +738,9 @@ struct RichDraftTests {
         #expect(plain.count == 2)
     }
 
-    // MARK: probe round 24
+    // MARK: The studies slot's lines and its rule
 
-    @Test("The studies slot gives each study as its own Course and School lines and the languages as a list (probe rounds 24 and 26)")
+    @Test("The studies slot gives each study as its own Course and School lines and the languages as a list")
     func studiesLines() {
         let topic = SummaryTopic(
             title: "warehouse operative", studies: [Self.logistics, SummaryStudy(course: "first aid", school: nil)],
@@ -759,7 +759,7 @@ struct RichDraftTests {
         #expect(!text.contains("Studies:"), "\(text)")
     }
 
-    @Test("The studies rule asks for a sentence of the language, its names joined by its words, never by a semicolon (probe round 24)")
+    @Test("The studies rule asks for a sentence of the language, its names joined by its words, never by a semicolon")
     func studiesJoinRule() {
         let topic = SummaryTopic(title: "warehouse operative", studies: [Self.logistics], languages: ["Polish"], hasEnded: false)
         for instructions in [
@@ -770,7 +770,7 @@ struct RichDraftTests {
         #expect(!SectionPrompts.summarySentenceInstructions.contains("never with \";\""))
     }
 
-    @Test("A study keeps its degree and school apart, and one with neither is left out (probe round 24)")
+    @Test("A study keeps its degree and school apart, and one with neither is left out")
     func studiesOfFacts() {
         let facts = CVData(education: [
             Education(degree: "logistics", institution: "Harlow City College"), Education(degree: " forklift licence "),
@@ -783,9 +783,9 @@ struct RichDraftTests {
         #expect(SectionDraft.studies(of: CVData()).isEmpty)
     }
 
-    // MARK: probe round 25
+    // MARK: The studies rule names only the slot's lines
 
-    @Test("The studies rule names only the lines its slot gives: no course for a study with only a school (probe round 25)")
+    @Test("The studies rule names only the lines its slot gives: no course for a study with only a school")
     func studiesRuleOfLines() {
         let school = SummaryStudy(course: nil, school: "Arlen School"), course = SummaryStudy(course: "first aid", school: nil)
         func rule(_ studies: [SummaryStudy], _ languages: [String]) -> String {
@@ -807,9 +807,9 @@ struct RichDraftTests {
         #expect(rule([school, Self.logistics], []).contains("what the person studied and where, by the names of the Course and School"))
     }
 
-    // MARK: probe round 26
+    // MARK: The languages list
 
-    @Test("The languages are a list of the brief's language, its last two joined by its own \"and\" (probe round 26)", arguments: [
+    @Test("The languages are a list of the brief's language, its last two joined by its own \"and\"", arguments: [
         (["English", "Polish", "German"], "English", "English, Polish and German"),
         (["italiano", "inglese"], "Italian", "italiano e inglese"),
         (["Deutsch", "Englisch"], "German", "Deutsch und Englisch"),
