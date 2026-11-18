@@ -84,6 +84,7 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
     .product(name: "PrestoCVImportingPDFKit", package: "PrestoCVCore"),
+    .product(name: "PrestoCVApplicationNaturalLanguage", package: "PrestoCVCore"),
     .product(name: "PrestoCVPersistence", package: "PrestoCVCore"),
     .product(name: "CVDocumentModel", package: "CVPDFExporter"),
     .product(name: "CVDesignCatalog", package: "CVPDFExporter"),

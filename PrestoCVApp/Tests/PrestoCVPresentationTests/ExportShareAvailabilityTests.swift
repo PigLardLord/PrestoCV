@@ -1,15 +1,17 @@
 import Foundation
 import Testing
 @testable import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 
 /// When the sheet's Share can be used, and how the sheet closes after a share.
 @MainActor
 @Suite("Export sheet share availability")
 struct ExportShareAvailabilityTests {
 
-    /// The ways an export ends without a PDF: what the CV lacks, and a failure of the export.
+    /// The ways an export ends without a PDF: what the CV lacks, a language with no headings, and a failure of the
+    /// export. A CV with no language is exported: its words or the app's language stand in (#407).
     enum NoPDF: CaseIterable {
-        case nameMissing, languageMissing, exportFailed
+        case nameMissing, languageWithoutHeadings, exportFailed
     }
 
     struct NotAnExportFailure: Error {}
@@ -48,7 +50,7 @@ struct ExportShareAvailabilityTests {
         let world = SheetWorld()
         switch `case` {
         case .nameMissing: world.cv = SheetWorld.cv(fullName: "")
-        case .languageMissing: world.cv = SheetWorld.cv(language: nil)
+        case .languageWithoutHeadings: world.exporter.returns(.failure(ExportFailure.unsupportedLanguage))
         case .exportFailed: world.exporter.returns(.failure(NotAnExportFailure()))
         }
         let sheet = world.sheet()

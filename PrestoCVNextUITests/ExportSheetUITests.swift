@@ -2,7 +2,8 @@ import XCTest
 
 /// Export opens a sheet over the open CV with its PDF, as the person will send it, and the number of its pages. A CV
 /// without a name makes no PDF, and the sheet says why; a CV without an email or a phone makes its PDF, and the sheet
-/// says what a recruiter will miss. Close takes the person back to the form. The sheet's pages are for the eye only, so
+/// says what a recruiter will miss. The sheet names the language of the PDF's headings, and Change picks another one,
+/// which the CV keeps (#407). Close takes the person back to the form. The sheet's pages are for the eye only, so
 /// XCUITest sees nothing of them: the page count says a PDF was made, PDFPagesTests checks the pages show it, and the
 /// screenshots keep how it looks.
 final class ExportSheetUITests: RuntimeIssueFailingTestCase {
@@ -77,6 +78,39 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
     }
 
     @MainActor
+    func testHeadingsLanguageIsChangedAndKeptInTheCV() throws {
+        let app = try launch(complete, largestText: false)
+        open(complete, in: app)
+        app.buttons["editor.export"].tap()
+
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
+        let headings = app.staticTexts["export.headings"]
+        XCTAssertEqual(headings.label, "Headings in English", "The CV keeps English")
+        XCTAssertEqual(
+            app.staticTexts["export.headings.notTranslated"].label, "Your text is not translated.",
+            "The sheet says the person's own text stays as written")
+        let change = app.buttons["export.headings.change"]
+        XCTAssertEqual(change.label, "Change headings language", "VoiceOver reads what Change changes")
+        XCTAssertEqual(change.value as? String, "English", "VoiceOver reads the language in use")
+
+        change.tap()
+        let italian = app.buttons["Italian"]
+        XCTAssertTrue(italian.waitForExistence(timeout: 10), "Change lists the languages by their names")
+        keepScreenshot("The languages of the headings", of: app)
+        italian.tap()
+        XCTAssertTrue(wait(for: headings, toRead: "Headings in Italian"), "The sheet names the language chosen")
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The PDF is made again")
+        keepScreenshot("The headings in Italian", of: app)
+
+        let close = app.buttons["export.close"]
+        close.tap()
+        XCTAssertTrue(waitUntilGone(close), "Close takes the sheet away")
+        app.buttons["editor.export"].tap()
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages again")
+        XCTAssertEqual(app.staticTexts["export.headings"].label, "Headings in Italian", "The CV keeps the language chosen")
+    }
+
+    @MainActor
     func testSheetAtTheLargestTextSize() throws {
         let app = try launch(withoutEmail, largestText: true)
         open(withoutEmail, in: app)
@@ -84,6 +118,9 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
 
         XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
         XCTAssertTrue(app.buttons["export.close"].isHittable, "Close can be tapped at the largest text size")
+        // The pages fill the screen at this size: the lines under them are reached by scrolling, from the page count
+        app.staticTexts["export.pages"].swipeUp()
+        XCTAssertTrue(app.buttons["export.headings.change"].isHittable, "Change can be tapped at the largest text size")
         keepScreenshot("The sheet at the largest text size", of: app)
     }
 
@@ -134,6 +171,12 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    @MainActor
+    private func wait(for element: XCUIElement, toRead label: String) -> Bool {
+        let reads = expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: element)
+        return XCTWaiter().wait(for: [reads], timeout: 30) == .completed
     }
 
     @MainActor
