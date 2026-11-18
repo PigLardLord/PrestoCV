@@ -56,7 +56,7 @@ enum CVReader {
             case .projects, .volunteering, .references, .drivingLicence, .additional, .unknown:
                 // The CV has no field for these: they stay visible, with their heading
                 for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
-                    findings.unplace(block, in: section)
+                    findings.unplaceValues(of: block, in: section)
                 }
             }
         }

@@ -164,7 +164,7 @@ struct ImportedCVMapperTests {
         """)).review
 
         #expect(review.passages == [
-            ImportReview.Passage(place: .top, text: "Swift and Kotlin\nEU citizen\navailable from March 2026", isWholeSection: false),
+            ImportReview.Passage(place: .top, text: "EU citizen\navailable from March 2026", isWholeSection: false),
             ImportReview.Passage(
                 place: .section("OWN VENTURES"),
                 text: "Tidepool Notes | 2021 – today\nA note app for divers\nHarbor Timer | 2018 – 2020\nA tide timer for sailors",
@@ -217,6 +217,101 @@ struct ImportedCVMapperTests {
         #expect(draft.review.items.allSatisfy { $0.reason == .entryBounds })
     }
 
+    @Test("A website after the first is kept in the text not imported, at the top where the CV wrote it, never dropped")
+    func websiteAfterTheFirst() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · +49 151 2345 6789
+        linkedin.com/in/tobiasrenn · github.com/tobiasrenn · tobiasrenn.dev · tobiasrenn.example.org
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.cv.social.map(\.platform) == ["LinkedIn", "GitHub"])
+        #expect(draft.review.passages == [
+            ImportReview.Passage(place: .top, text: "https://tobiasrenn.example.org", isWholeSection: false),
+        ])
+    }
+
+    @Test("A website after the first, in a section of contacts, is kept in the text not imported under that section's heading")
+    func websiteInAContactSection() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+
+        Contact
+        https://blog.tobiasrenn.example.org
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.review.passages == [
+            ImportReview.Passage(place: .section("Contact"), text: "https://blog.tobiasrenn.example.org", isWholeSection: false),
+        ])
+    }
+
+    @Test("A study's place has no field in the CV: it is listed to check with the study's number and kept in the text not imported")
+    func placeOfAStudy() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        MSc Software Engineering — University of Northbridge
+        2017 – 2019
+        BSc Computer Science — Leipzig Vocational Institute, Leipzig
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.education.map(\.school) == ["University of Northbridge", "Leipzig Vocational Institute"])
+        #expect(draft.review.items == [ImportReview.Item(field: .education(2), reason: .placeNotKept, text: "Leipzig")])
+        #expect(draft.review.passages == [ImportReview.Passage(place: .section("Education"), text: "Leipzig", isWholeSection: false)])
+    }
+
+    @Test("One website and a study without a place leave nothing to check and nothing in the text not imported")
+    func oneWebsiteAndAStudyWithoutAPlace() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com · tobiasrenn.dev
+
+        Education
+        BSc Computer Science — University of Northbridge
+        2014 – 2017
+        """))
+
+        #expect(draft.cv.personalInfo.portfolio == "https://tobiasrenn.dev")
+        #expect(draft.review.items.isEmpty)
+        #expect(draft.review.passages.isEmpty)
+    }
+
+    @Test("A job that may have taken a heading the import does not know is listed to check")
+    func headingToCheck() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Lena Okafor
+        lena.okafor@example.com
+        SUMMARY
+        Field technician.
+        EXPERIENCE
+        2020 – Present
+        Technician
+        BRACKEN MILLS
+        • Serviced pumps.
+        2016 – 2020
+        Technician — Marlow Studio
+        • Serviced boilers.
+        SKILLS
+        Welding
+        """))
+
+        #expect(draft.review.items.filter { $0.reason == .heading }.map(\.field) == [.experience(1)], "\(draft.review.items)")
+    }
+
     @Test("Every reason and field of the review has a text in the string catalog")
     func reviewIsWorded() {
         let items = [
@@ -224,6 +319,8 @@ struct ImportedCVMapperTests {
             ImportReview.Item(field: .location, reason: .period, text: ""), ImportReview.Item(field: .summary, reason: .languageNotAdded, text: ""),
             ImportReview.Item(field: .experience(1), reason: .languageLevels, text: ""), ImportReview.Item(field: .education(1), reason: .byPosition, text: ""),
             ImportReview.Item(field: .language, reason: .byPosition, text: ""), ImportReview.Item(field: .experience(2), reason: .entryBounds, text: ""),
+            ImportReview.Item(field: .education(2), reason: .placeNotKept, text: ""),
+            ImportReview.Item(field: .experience(3), reason: .heading, text: ""),
         ]
         for item in items {
             #expect(item.fieldKey.localized != item.fieldKey, "\(item.fieldKey) is missing from the string catalog")

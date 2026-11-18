@@ -154,6 +154,17 @@ struct SilentLossTests {
         #expect(Coverage.overlaps(merged).isEmpty)
     }
 
+    @Test("A line nothing placed is under the heading's own cell when the heading row also holds the section's first value")
+    func sweptUnderAHeadingRow() {
+        let text = "Volontariato\tCroce Rossa, dal 2015\nAssistenza durante gli eventi"
+        let (document, leftOut) = DocumentBuilder.build(lines: PlainTextReader.lines(of: text).map { RawLine(text: $0) }, format: .pastedText)
+        let sections = SectionSegmenter.sections(of: document)
+        let result = ImportResult(document: document, cv: ImportedCV(), language: nil, unplaced: [], leftOut: leftOut)
+        let swept = Remainder.swept(result, sections: sections)
+        #expect(!swept.unplaced.isEmpty)
+        #expect(swept.unplaced.allSatisfy { $0.heading == "Volontariato" }, "\(swept.unplaced.map(\.heading))")
+    }
+
     // MARK: A second place of an entry
 
     @Test("A second place line of an experience or an education is text not imported; the first stays its place")

@@ -50,6 +50,8 @@ public enum ImportReviewField: Sendable, Hashable {
 public enum ImportReviewReason: String, Sendable, Hashable, CaseIterable {
     case nameByPosition, titleByPosition, locationByPosition, summaryWithoutHeading
     case roleOrEmployerByOrder, entryBoundsUnsure
+    /// A line in capitals in the entry may be a section heading the import does not know.
+    case headingUnsure
     /// The dates could not be made a period, such as an end before the start.
     case periodUnreadable
     /// The period has no end; the CV does not call it current.

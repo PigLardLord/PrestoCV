@@ -35,6 +35,9 @@ enum EntryReader {
         var tail: [Line] = []
         var body: [Line] = []
         var inheritedEmployer: Piece?
+        /// The employer the entry shares with the roles before it is a line that may be a heading the vocabulary does not
+        /// know (#454).
+        var inheritsADoubtfulHeading = false
         /// The section's two readings part the lines next to this entry's date differently, and neither fits better.
         var boundsUnsure = false
     }
@@ -148,15 +151,16 @@ enum EntryReader {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         var drafts: [Draft] = []
-        var group: Piece?
+        var group: (employer: Piece, block: Int)?
         for position in anchors.indices.dropFirst(firstEntry) {
             let anchor = anchors[position]
             let entry = layout.range(of: position, lineCount: usable.count)
             var draft = Draft()
             draft.head = Array(usable[entry.lowerBound..<anchor])
             // A group's roles share its company until a role names a company of its own
-            if let employer = draft.head.lazy.compactMap({ groupStarts[$0.block.index] }).first {
-                group = employer
+            if let start = draft.head.first(where: { groupStarts[$0.block.index] != nil }),
+               let employer = groupStarts[start.block.index] {
+                group = (employer, start.block.index)
             } else if draft.head.count >= 2 {
                 group = nil
             }
@@ -167,7 +171,10 @@ enum EntryReader {
                 index += 1
             }
             draft.body = Array(usable[index..<entry.upperBound])
-            if let employer = group, draft.head.count < 2 { draft.inheritedEmployer = employer }
+            if let group, draft.head.count < 2 {
+                draft.inheritedEmployer = group.employer
+                draft.inheritsADoubtfulHeading = section.doubtfulHeadings.contains(group.block)
+            }
             draft.boundsUnsure = layout.unsure.contains(position)
             drafts.append(draft)
         }
@@ -427,8 +434,13 @@ enum EntryReader {
         let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
         let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
-        // Lines that may be another entry's come first: they may also be why the parts were read by their order
+        // Lines that may be another entry's come first, then a line that may be a heading: either may also be why the parts
+        // were read by their order
+        let takesADoubtfulHeading = (draft.head + [draft.anchor].compactMap { $0 } + draft.tail + draft.body)
+            .contains { section.doubtfulHeadings.contains($0.block.index) }
+            || (draft.inheritsADoubtfulHeading && secondary?.piece == draft.inheritedEmployer)
         let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
+            : takesADoubtfulHeading ? .headingUnsure
             : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
@@ -450,6 +462,7 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
+            entry.heading = findings.heading(of: section)
             guard entry.degree != nil || entry.school != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.education.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
@@ -520,30 +533,44 @@ enum EntryReader {
         let leftOut = SpanIndex(findings.leftOut.compactMap(\.span))
         var entries: [[(EntryVocabulary.EntryLabel?, [Piece])]] = []
         var current: [(EntryVocabulary.EntryLabel?, [Piece])] = []
+        // The entries that hold a line that may be a heading the vocabulary does not know (#454), by their place
+        var doubtful: Set<Int> = []
+        var currentIsDoubtful = false
         var pendingLabel: EntryVocabulary.EntryLabel?
+        var pendingIsDoubtful = false
         for line in lines {
             var label = line.label
             var values = line.label == nil ? line.cells : line.labelValue
+            let isDoubtful = section.doubtfulHeadings.contains(line.block.index)
             if label != nil && values.isEmpty {
                 pendingLabel = label
+                pendingIsDoubtful = isDoubtful
                 continue
             }
             if label == nil, let pending = pendingLabel {
                 label = pending
                 values = line.cells
             }
+            let rowIsDoubtful = isDoubtful || (pendingLabel != nil && pendingIsDoubtful)
             pendingLabel = nil
+            pendingIsDoubtful = false
             let opensEntry = label == .period || (label == .employer && current.contains { $0.0 == .employer })
                 || (label == .school && current.contains { $0.0 == .school })
             if opensEntry && !current.isEmpty {
+                if currentIsDoubtful { doubtful.insert(entries.count) }
                 entries.append(current)
                 current = []
+                currentIsDoubtful = false
             }
             current.append((label, values))
+            currentIsDoubtful = currentIsDoubtful || rowIsDoubtful
         }
-        if !current.isEmpty { entries.append(current) }
+        if !current.isEmpty {
+            if currentIsDoubtful { doubtful.insert(entries.count) }
+            entries.append(current)
+        }
 
-        for rows in entries {
+        for (place, rows) in entries.enumerated() {
             var period: Sourced<ImportedPeriod>?
             var primary: Piece?
             var secondary: Piece?
@@ -593,6 +620,7 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
+                entry.check = doubtful.contains(place) ? .headingUnsure : nil
                 findings.cv.experience.append(entry)
             case .education:
                 var entry = ImportedEducation()
@@ -601,6 +629,8 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
+                entry.heading = findings.heading(of: section)
+                entry.check = doubtful.contains(place) ? .headingUnsure : nil
                 findings.cv.education.append(entry)
             }
         }

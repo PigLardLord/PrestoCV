@@ -54,6 +54,22 @@ struct ImportCVTests {
         #expect(result.ungrounded.isEmpty)
     }
 
+    @Test("Text not imported is under the heading's own cell when the heading row also holds the section's first value")
+    func unplacedUnderAHeadingRow() throws {
+        let result = try importer().importText("""
+        Giulia Bianchi
+        Torino, Italia · giulia.bianchi@example.com
+
+        ## Esperienza
+        **Infermiera** | Ospedale Esempio | Torino | 03/2019 – oggi
+        - Assistenza ai pazienti
+
+        Volontariato\tCroce Rossa, dal 2015
+        """)
+        #expect(result.unplaced.map(\.text) == ["Croce Rossa, dal 2015"], "the heading's own cell is the heading, not text")
+        #expect(result.unplaced.map(\.heading) == ["Volontariato"])
+    }
+
     @Test("An empty text, a text over the limit and a text without letters are typed errors")
     func textErrors() {
         #expect(throws: ImportError.empty) { try importer().importText("  \n\n ") }

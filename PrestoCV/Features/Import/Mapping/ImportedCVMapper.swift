@@ -38,6 +38,22 @@ struct ImportedCVMapper {
             }
         }
 
+        // The CV has one website and no place for a study: the rest stays visible, where the CV wrote it, never dropped
+        var withoutAField: [TextLeftOut] = person.links.filter { $0.kind == .website }.dropFirst().map { link in
+            // A link is read in the head, or in a contact section with its heading
+            TextLeftOut(
+                section: link.heading == nil ? .header : .personal, heading: link.heading, text: link.address.value.value,
+                position: link.address.spans.map(\.lowerBound).min()
+            )
+        }
+        for (index, entry) in imported.education.enumerated() {
+            guard let place = entry.location else { continue }
+            items.append(ImportReview.Item(field: .education(index + 1), reason: .placeNotKept, text: place.value))
+            withoutAField.append(TextLeftOut(
+                section: .education, heading: entry.heading, text: place.value, position: place.spans.map(\.lowerBound).min()
+            ))
+        }
+
         let cv = CVModel(
             personalInfo: PersonalInfo(
                 name: person.name?.value ?? "",
@@ -72,7 +88,7 @@ struct ImportedCVMapper {
         let unplaced = result.unplaced.map {
             TextLeftOut(section: $0.section, heading: $0.heading, text: $0.text, position: $0.span.lowerBound)
         }
-        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages(of: inCVOrder(unplaced + languagesLeftOut))))
+        return ImportedDraft(cv: cv, review: ImportReview(items: items, passages: passages(of: inCVOrder(unplaced + languagesLeftOut + withoutAField))))
     }
 
     // MARK: Text not imported
@@ -146,6 +162,7 @@ struct ImportedCVMapper {
             case .nameByPosition, .titleByPosition, .locationByPosition, .summaryWithoutHeading: reason = .byPosition
             case .roleOrEmployerByOrder: reason = .partsByOrder
             case .entryBoundsUnsure: reason = .entryBounds
+            case .headingUnsure: reason = .heading
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels

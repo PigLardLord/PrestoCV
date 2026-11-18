@@ -22,12 +22,16 @@ struct ImportReview: Hashable, Sendable, Codable {
             case partsByOrder
             /// The lines next to the entry's dates may be the entry's beside it: the more common layout decided.
             case entryBounds
+            /// A line in capitals in the entry may be a section heading the import does not know.
+            case heading
             /// A date that could not be read as a period, or a period with no end.
             case period
             /// A language whose level the text gives in words, or not at all: the CV needs a level, so it was not added.
             case languageNotAdded
             /// A Europass grid that gives a language several levels.
             case languageLevels
+            /// The place of a study: the CV has no field for it, so it is kept in the text not imported.
+            case placeNotKept
         }
 
         let field: Field
@@ -52,9 +56,11 @@ struct ImportReview: Hashable, Sendable, Codable {
             case .byPosition: return "import.review.reason.position"
             case .partsByOrder: return "import.review.reason.order"
             case .entryBounds: return "import.review.reason.bounds"
+            case .heading: return "import.review.reason.heading"
             case .period: return "import.review.reason.period"
             case .languageNotAdded: return "import.review.reason.language"
             case .languageLevels: return "import.review.reason.levels"
+            case .placeNotKept: return "import.review.reason.place"
             }
         }
     }

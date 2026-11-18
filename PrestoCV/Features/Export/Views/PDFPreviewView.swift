@@ -86,13 +86,30 @@ struct PDFPreviewView: UIViewRepresentable {
     func makeUIView(context: Context) -> PDFPagesView {
         let view = PDFPagesView()
         view.document = PDFDocument(url: url)
-        view.accessibilityElementsHidden = isForTheEyeOnly
+        hide(view)
         return view
     }
 
+    /// The document is shown first and the pages hidden after it, so that a new document cannot bring PDFKit's elements
+    /// back to pages for the eye only
     func updateUIView(_ view: PDFPagesView, context: Context) {
-        view.accessibilityElementsHidden = isForTheEyeOnly
-        guard view.document?.documentURL != url else { return }
-        view.document = PDFDocument(url: url)
+        if view.document?.documentURL != url {
+            view.document = PDFDocument(url: url)
+        }
+        hide(view)
+    }
+
+    /// PDFKit gives the text of the pages to assistive technology as elements of the view. On iOS 27 the hidden flag alone
+    /// no longer keeps them out of the tree that the system's automation reads, so pages for the eye only also list no
+    /// element, and nil gives PDFKit's own elements back. The flag tells that the list was emptied here: PDFKit's elements
+    /// are never read to find it out.
+    private func hide(_ view: PDFPagesView) {
+        if isForTheEyeOnly {
+            view.accessibilityElementsHidden = true
+            view.accessibilityElements = []
+        } else if view.accessibilityElementsHidden {
+            view.accessibilityElementsHidden = false
+            view.accessibilityElements = nil
+        }
     }
 }
