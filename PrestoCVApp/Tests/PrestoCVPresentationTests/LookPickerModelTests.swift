@@ -94,6 +94,21 @@ struct LookPickerModelTests {
         #expect(try Self.item(.designsOwn, of: .fonts, in: sheet).kind == .designsOwn(.typeface(.system)))
     }
 
+    @Test("The chosen items are the chosen one of each group, in the groups' order")
+    func chosenItems() {
+        let (_, sheet) = Self.sheet()
+
+        #expect(sheet.lookPicker.chosen.map(\.id) == [.offered("modern"), .offered("serif"), .offered("ocean")])
+    }
+
+    @Test("The chosen items name the design's own and a kept choice where the CV keeps them")
+    func chosenItemsWithTheDesignsOwnAndAKeptOne() {
+        let (_, sheet) = Self.sheet(palette: "sunset", fonts: nil)
+
+        #expect(sheet.lookPicker.chosen.map(\.id) == [.offered("modern"), .designsOwn, .kept])
+        #expect(sheet.lookPicker.chosen.map(\.part) == [.design, .fonts, .palette])
+    }
+
     // MARK: - A look from an earlier version
 
     @Test("A colour the app no longer offers is one more item, last and chosen, and only its group says so")

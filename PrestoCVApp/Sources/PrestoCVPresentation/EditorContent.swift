@@ -194,6 +194,29 @@ public enum ExportPreview: Hashable, Sendable {
     case none
 }
 
+extension ExportPreview {
+    /// The PDF on screen, whether it is the sheet's or one being replaced.
+    public var shownPDF: ExportedDocument? {
+        switch self {
+        case .pdf(let document, _), .replaced(let document, _): document
+        case .none: nil
+        }
+    }
+
+    /// The export that made the PDF on screen.
+    public var shownID: ExportID? {
+        switch self {
+        case .pdf(_, let id), .replaced(_, let id): id
+        case .none: nil
+        }
+    }
+
+    /// Whether the PDF on screen is one a running export replaces: the view dims it, and it neither opens nor is shared.
+    public var isReplaced: Bool {
+        if case .replaced = self { true } else { false }
+    }
+}
+
 /// The PDF of an export, shown on the whole screen.
 public struct FullPDF: Identifiable, Hashable, Sendable {
     /// The export that made the PDF.

@@ -52,6 +52,25 @@ struct ExportSheetPreviewTests {
         #expect(sheet.preview == .pdf(ExportingFake.onePageDocument, first))
     }
 
+    @Test("The preview names the PDF on screen and its id, and whether a running export replaces it")
+    func thePreviewNamesWhatIsOnScreen() async throws {
+        let (world, sheet, first) = try await Self.sheetWithAPDF()
+
+        #expect(sheet.preview.shownPDF == ExportingFake.onePageDocument)
+        #expect(sheet.preview.shownID == first)
+        #expect(!sheet.preview.isReplaced)
+
+        sheet.choose(palette: "forest")
+
+        #expect(sheet.preview.shownPDF == ExportingFake.onePageDocument)
+        #expect(sheet.preview.shownID == first)
+        #expect(sheet.preview.isReplaced)
+        #expect(ExportPreview.none.shownPDF == nil)
+        #expect(ExportPreview.none.shownID == nil)
+        #expect(!ExportPreview.none.isReplaced)
+        await world.exporter.gate.open()
+    }
+
     // MARK: - While a new PDF is made
 
     @Test("A look chosen after a PDF keeps that PDF on screen, as replaced, until the new one comes")

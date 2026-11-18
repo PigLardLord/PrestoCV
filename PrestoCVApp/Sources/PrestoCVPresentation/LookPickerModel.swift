@@ -6,6 +6,9 @@ public struct LookPickerModel: Hashable, Sendable {
     /// The design first, then the fonts, then the colours.
     public let groups: [Group]
 
+    /// The chosen item of each group, in the groups' order: what the row that opens the picker names.
+    public var chosen: [Item] { groups.compactMap { $0.items.first(where: \.isSelected) } }
+
     /// The items of one part of the look.
     public struct Group: Hashable, Sendable {
         public let part: LookPart

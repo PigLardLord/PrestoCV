@@ -10,7 +10,7 @@ public struct LookChoice: Hashable, Sendable {
 
     /// What the view draws a choice with, so that the person sees it before choosing it.
     public enum Sample: Hashable, Sendable {
-        /// Nothing to draw: the view shows the name alone.
+        /// No picture of its own, such as a design without one: the view draws a plain page.
         case none
         /// A picture of a page in the design, as PNG data.
         case page(png: Data)
