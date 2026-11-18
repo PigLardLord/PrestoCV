@@ -12,6 +12,17 @@ extension EditorViewModel {
         await restyle { writer, content in try await writer.setDocumentLanguage(language, of: content) }
     }
 
+    /// Keeps the language the words were found in, by its tag, only if the CV still keeps none once the changes asked
+    /// for before this one have run: a language found or chosen before it stays, as the app never changes a language
+    /// once it is fixed (#407). A tag that names no language changes nothing.
+    public func keepFoundLanguage(_ tag: String) async {
+        guard let language = DocumentLanguage(tag) else { return }
+        await restyle { [self] writer, content in
+            guard held?.language == nil else { return nil }
+            return try await writer.setDocumentLanguage(language, of: content)
+        }
+    }
+
     /// Changes the `parts` of the look to the ones of `shown`. A look whose ids no design may have changes nothing. The
     /// writer of the open CV stores it, or keeps it for the first write; the text is not written.
     public func changeLook(to shown: EditorLook, parts: Set<LookPart>) async {
@@ -19,13 +30,15 @@ extension EditorViewModel {
         await restyle { writer, content in try await writer.changeLook(change, of: content) }
     }
 
-    /// Runs `change` on the writer of the open CV, after any replacement that runs, and holds the CV it gives back. The CV
-    /// passed is the one the form stands on: the writer takes the look and the language it keeps, never this one's.
-    private func restyle(_ change: @escaping @MainActor (any CVAutosaveWriting, CV) async throws -> CV) async {
+    /// Runs `change` on the writer of the open CV, after any replacement that runs, and holds the CV it gives back; a
+    /// change that gives back nil changed nothing, and leaves a failure shown as it is. The CV passed is the one the
+    /// form stands on: the writer takes the look and the language it keeps, never this one's.
+    private func restyle(_ change: @escaping @MainActor (any CVAutosaveWriting, CV) async throws -> CV?) async {
         await replace { [self] in
             guard let writer, let base else { return }
             do {
-                restyled = try await change(writer, form.applied(to: base))
+                guard let changed = try await change(writer, form.applied(to: base)) else { return }
+                restyled = changed
                 changeFailure = nil
             } catch {
                 changeFailed(error)

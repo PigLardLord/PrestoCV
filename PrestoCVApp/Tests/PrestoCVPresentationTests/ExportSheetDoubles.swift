@@ -89,6 +89,30 @@ final class SharedFilesFake: ExportFileSharing {
     func remove(_ file: SharedFile) { state.withLock { $0.removed.append(file) } }
 }
 
+/// The reader of a CV's language: it gives the language the test set, nil by default, and records the languages it
+/// was offered at each reading.
+final class LanguageDetectorStub: CVLanguageDetecting {
+    private struct State {
+        var answer: DocumentLanguage?
+        var asked: [[DocumentLanguage]] = []
+    }
+
+    private let state = Mutex(State())
+
+    /// The language the next readings give: the one the CV's words tell, or nil when they tell none.
+    func answers(_ language: DocumentLanguage?) { state.withLock { $0.answer = language } }
+
+    /// The languages offered at each reading, in order.
+    var asked: [[DocumentLanguage]] { state.withLock { $0.asked } }
+
+    func language(of cv: CV, among languages: [DocumentLanguage]) -> DocumentLanguage? {
+        state.withLock { state in
+            state.asked.append(languages)
+            return state.answer
+        }
+    }
+}
+
 /// The export sheet on the gated port and a clock moved by hand, over a CV the test changes between exports, as the
 /// editor's form does. The pause is 250 ms, as in version 1.
 @MainActor
@@ -97,19 +121,23 @@ final class SheetWorld {
     /// The patterns of the PDF's title, as the view gives them (invented words).
     nonisolated static let patterns = ["en": "%@ – CV", "de": "%@ – Lebenslauf", "it": "%@ – Curriculum"]
     nonisolated static let english = language("en")
-    /// The app's language, last of the languages offered, so that a test sees it moved first.
+    /// The app's language, last of the languages offered: the PDF's when the CV keeps none and its words tell none.
     nonisolated static let appLanguage = language("fr")
     nonisolated static let offered = ["en", "de", "it", "fr"].map { language($0) }
 
     let exporter = ExportingFake()
     let files = SharedFilesFake()
     let clock = ManualClock()
+    /// Reads the language of the CV's words: none until the test says.
+    let detector = LanguageDetectorStub()
     /// The CV the editor shows: what the next snapshot holds.
     var cv: CV
     /// How many snapshots the sheet asked for.
     private(set) var snapshotsTaken = 0
     /// Each language the sheet took to the CV.
-    private(set) var chosen: [ExportLanguage?] = []
+    private(set) var chosen: [ExportLanguage] = []
+    /// Each language the sheet kept in the CV because its words told it.
+    private(set) var kept: [ExportLanguage] = []
 
     init() { cv = Self.cv() }
 
@@ -125,7 +153,7 @@ final class SheetWorld {
     /// - Parameters:
     ///   - whenChosen: Runs inside the callback that takes a chosen language to the CV, as a caller's code can.
     ///   - whenRead: Runs inside the snapshot closure, as a caller's code can.
-    func sheet(whenChosen: @escaping @MainActor (ExportLanguage?) -> Void = { _ in },
+    func sheet(whenChosen: @escaping @MainActor (ExportLanguage) -> Void = { _ in },
                whenRead: @escaping @MainActor () -> Void = {}) -> ExportSheetViewModel {
         ExportSheetViewModel(
             exporter: exporter, files: files,
@@ -133,6 +161,7 @@ final class SheetWorld {
             offeredLanguages: Self.offered, appLanguage: Self.appLanguage,
             fileNamePattern: { Self.patterns[$0.tag] ?? "%@" },
             onLanguageChosen: { self.chosen.append($0); whenChosen($0) },
+            languageDetector: detector, onLanguageFound: { self.kept.append($0) },
             clock: self.clock, pause: Self.pause)
     }
 

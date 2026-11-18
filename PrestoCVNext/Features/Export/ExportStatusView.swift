@@ -28,7 +28,6 @@ extension ExportStatus {
         case .idle, .done, .notReady: nil
         case .exporting: "export.loading"
         case .truncated(let pages, let required): "export.error.too_many_pages \(required) \(pages)"
-        case .languageNeeded: "export.status.language_needed"
         case .unsupportedLanguage: "export.status.unsupported_language"
         case .invalid: "export.status.invalid"
         case .incomplete(let missing): "export.status.incomplete \(missing)"
