@@ -251,7 +251,7 @@ public struct HexColor: Sendable, Equatable {
     /// A colour written in the source, known to be `#RRGGBB`. Only `NamedPalette` uses it; everything else goes
     /// through the checked initialiser.
     fileprivate init(known value: String) { self.value = value }
-    /// The red, green and blue of the colour, each from 0 to 1: what a picker draws a palette with.
+    /// The red, green and blue of the colour, each from 0 to 1.
     public var channels: (red: Double, green: Double, blue: Double) {
         let hex = Array(value.dropFirst())
         func channel(_ k: Int) -> Double { Double(Int(String(hex[k...k + 1]), radix: 16) ?? 0) / 255 }

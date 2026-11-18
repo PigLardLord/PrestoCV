@@ -2,8 +2,8 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// What an item of the look picker is drawn with (#407): a design its page, a palette its two colours, fonts the letters
-/// "Aa" in their face. A choice the CV keeps from an earlier version has no sample, so it is drawn by its part: a plain
-/// page, the letters in the system's face, or a dashed circle. VoiceOver skips the sample: the item's name says it.
+/// "Aa" in their face. A choice with no sample, or one the CV keeps from an earlier version, is drawn by its part: a
+/// plain page, the letters in the system's face, or a dashed circle. VoiceOver skips the sample: the item's name says it.
 struct LookSample: View {
     let item: LookPickerModel.Item
     @ScaledMetric(relativeTo: .title2) private var letterSize: CGFloat = 24
@@ -18,23 +18,23 @@ struct LookSample: View {
         switch item.kind {
         case .offered(let choice): sample(choice.sample)
         case .designsOwn(let sample): self.sample(sample)
-        case .kept: kept
+        case .kept: byPart
         }
     }
 
     @ViewBuilder
     private func sample(_ sample: LookChoice.Sample) -> some View {
         switch sample {
-        case .none: page(nil)
+        case .none: byPart
         case .page(let png): page(PagePicture.image(png: png))
         case .colors(let primary, let background): swatch(primary: primary, background: background)
         case .typeface(let typeface): letters(in: typeface)
         }
     }
 
-    /// The kept choice of each part, which the app can no longer draw as the PDF does
+    /// A choice the app cannot draw as the PDF does, drawn by its part
     @ViewBuilder
-    private var kept: some View {
+    private var byPart: some View {
         switch item.part {
         case .design: page(nil)
         case .fonts: letters(in: .system)
