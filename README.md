@@ -31,6 +31,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 |---|---|
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R18, modules and allowed imports, glossary, ADRs. |
+| `docs/maintainers/` | How the maintainer works: how pull requests are reviewed. |
 | `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). The app icon is `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)). |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
 | `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
@@ -86,7 +87,8 @@ Xcode Cloud checks no pull request: [CONTRIBUTING.md](CONTRIBUTING.md#pull-reque
 ## Contributing
 
 - **How to contribute:** [CONTRIBUTING.md](CONTRIBUTING.md): building and testing, the architecture rules and the checker, commits, and what a pull request needs.
-- **Conventions and reviews:** [AGENTS.md](AGENTS.md).
+- **Reviews:** [docs/maintainers/reviews.md](docs/maintainers/reviews.md): how a pull request is reviewed, in rounds by reviewer agents, before the maintainer merges it.
+- **Coding agents:** [AGENTS.md](AGENTS.md) points them to the same documents.
 - **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - **Vulnerabilities:** report them privately, as [SECURITY.md](SECURITY.md) says, never in a public issue.
 

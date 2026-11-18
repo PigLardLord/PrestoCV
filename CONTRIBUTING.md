@@ -1,6 +1,6 @@
 # Contributing to PrestoCV
 
-This file says how to build and test PrestoCV, which rules a change follows, and what a pull request needs. The full conventions are in [AGENTS.md](AGENTS.md), and the architecture is in [docs/architecture/](docs/architecture/README.md).
+This file says how to build and test PrestoCV, which rules a change follows, and what a pull request needs. The architecture is in [docs/architecture/](docs/architecture/README.md), and how pull requests are reviewed is in [docs/maintainers/reviews.md](docs/maintainers/reviews.md).
 
 Taking part means following the [Code of Conduct](CODE_OF_CONDUCT.md). A vulnerability is never reported in an issue: see [SECURITY.md](SECURITY.md).
 
@@ -81,7 +81,8 @@ The rules are strict, and a change that breaks one does not merge ([ADR 0006](do
 - **Before opening one,** run the full test suite and the architecture check. Report any flaky test or simulator prerequisite in the description.
 - **Documentation** is part of the change. A pull request that changes behaviour, a command or a path updates the documents that describe it, in the same pull request, and in English.
 - **CI** runs on every pull request: on Linux (`Tools/check-linux.sh`: the Swift against `.swift-version`, the architecture check with its self-test, the source checks, the packages' new targets; and their build for Android), through a script run on a Linux computer, outside the repository, that writes the commit statuses `Linux (local) · CI` and `Android (local) · CI` (the GitHub Actions workflow with the same two jobs runs only when started by hand, so that the repository stays on GitHub's free plan), and on macOS on a maintainer's Mac ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md): the Swift against `.swift-version`, the `CI` test plan on an iPhone and an iPad simulator, the package tests and builds, the source checks, the architecture check and the self-tests of the release scripts in `Tools/Release/`, then `PrestoCVUITests` on the iPhone unless every changed file is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`). Xcode Cloud checks no pull request; it builds the releases.
-- **Reviews** follow the process in [AGENTS.md](AGENTS.md#reviews).
+- **Merging:** a pull request merges when its branch contains the latest `main` and its checks are green on its head: `Linux (local) · CI` and `Android (local) · CI` always, and `Mac mini · CI` unless it changes only files in `docs/` and `*.md` files.
+- **Reviews** run in rounds, as [docs/maintainers/reviews.md](docs/maintainers/reviews.md) says. The maintainer decides the merge.
 
 ## Licence
 
