@@ -4,7 +4,7 @@ The texts of PrestoCV's App Store product page for version 1.0, one section per 
 
 - **Where they go.** In App Store Connect, the name and the subtitle are under App Information. The keywords, the promotional text, the description and the screenshots are under the version (1.0), for each localization. The notes for App Review are under App Review Information, at the bottom of the version page.
 - **Limits.** Name and subtitle: 30 characters. Keywords: 100 bytes of UTF-8, each keyword longer than two characters, separated by commas without spaces. Promotional text: 170 characters. Description, What's New and review notes: 4,000 characters. App Review Guideline 2.3.7 rules out prices and "free" claims in the name, the subtitle and the screenshots, and competitors' names in the keywords; guideline 2.3.1 asks for review notes that say specifically how to reach every feature.
-- **What's New.** App Store Connect has no What's New field for an app's first version, so the 1.0 texts are not entered there. They serve as TestFlight's What to Test, and as the start of the next version's notes.
+- **What's New.** App Store Connect has no What's New field for an app's first version, so version 1.0 has none. The texts below are those of version 1.0.1, which has the field.
 - **Counts.** `Tools/Release/check-store-listing.py` counts every text of this file, checks it against those limits, and checks that the table under [Character counts](#character-counts) is current. Run it after changing a text; `--write` rewrites the table.
 - **What each claim rests on.** Every feature named here is in the app as it ships (the legacy app of ADR 0022). In the AI draft, the facts (the name, the contacts, the employers, the schools, the dates, the figures and the languages) occur in the person's description; the summary, the role descriptions and the skills are written by the model from it and may be wrong, so no text promises a correct draft ([ADR 0031](../architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md), with [ADR 0023](../architecture/adr/0023-ground-the-ai-draft-in-the-description.md)). The device list is Apple's, from "How to get Apple Intelligence" (support.apple.com/en-us/121115), read on 2026-10-18.
 - **The copy is written for each market, not translated.** The register follows the app's own texts: "Sie" in German, "vous" in French, "tu" in Italian and Spanish, "você" in Brazilian Portuguese. The French texts put a no-break space (U+00A0) before a colon and inside « », as French typography does: keep it when copying them.
@@ -70,15 +70,15 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 184 |
-| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 184 |
-| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 230 |
-| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 209 |
-| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 213 |
-| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 210 |
-| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 220 |
-| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 215 |
-| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 205 |
+| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 1326 |
+| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 1326 |
+| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 1616 |
+| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 1434 |
+| es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 1422 |
+| es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 1422 |
+| fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 1546 |
+| pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 1476 |
+| pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 1444 |
 
 Notes for App Review: 3997 characters (4000).
 <!-- counts:end -->
@@ -188,7 +188,11 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The first version of PrestoCV. Write your CV on your iPhone or iPad, draft it with Apple Intelligence on supported devices, and export it as a PDF in three designs. No account, no ads.
+When the app recognizes the text you paste in as a CV, with its sections and dates, the AI draft now keeps your own words, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+
+Importing a CV now loses less. The notice in the editor names each section that was not imported, and it stays with the CV until you dismiss it; "What to check" now groups the text not imported by where it stood in the CV. A heading that joins studies and certifications now fills both. The title under your name is now read whole when it is written in parts. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two. A second website and the place of a study now stay in view as text not imported, and a contact label with nothing beside it is no longer dropped. More of the headings the app does not know are now read as headings when they are drawn like the CV's others: the lines under them stay apart as text not imported instead of joining the section above. A website on GitHub Pages is now your website, not a GitHub profile.
+
+A swipe back right after an edit no longer leaves the editor on screen with no way back.
 ```
 
 ## English (U.K.), en-GB
@@ -267,7 +271,11 @@ Ready to send. | A polished PDF, with headings in your CV's language.
 ### What's New
 
 ```text
-The first version of PrestoCV. Write your CV on your iPhone or iPad, draft it with Apple Intelligence on supported devices, and export it as a PDF in three designs. No account, no ads.
+When the app recognizes the text you paste in as a CV, with its sections and dates, the AI draft now keeps your own words, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+
+Importing a CV now loses less. The notice in the editor names each section that was not imported, and it stays with the CV until you dismiss it; "What to check" now groups the text not imported by where it stood in the CV. A heading that joins studies and certifications now fills both. The title under your name is now read whole when it is written in parts. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two. A second website and the place of a study now stay in view as text not imported, and a contact label with nothing beside it is no longer dropped. More of the headings the app does not know are now read as headings when they are drawn like the CV's others: the lines under them stay apart as text not imported instead of joining the section above. A website on GitHub Pages is now your website, not a GitHub profile.
+
+A swipe back right after an edit no longer leaves the editor on screen with no way back.
 ```
 
 ## German, de-DE
@@ -346,7 +354,11 @@ Bereit zum Versenden. | Ein sauberes PDF, mit Überschriften in der Sprache des 
 ### What's New
 
 ```text
-Die erste Version von PrestoCV. Schreiben Sie Ihren Lebenslauf auf dem iPhone oder iPad, entwerfen Sie ihn auf unterstützten Geräten mit Apple Intelligence und exportieren Sie ihn als PDF in drei Designs. Ohne Konto, ohne Werbung.
+Wenn die App den eingefügten Text als Lebenslauf erkennt, mit seinen Abschnitten und Daten, übernimmt der KI-Entwurf jetzt Ihre eigenen Worte und liest ihn wie einen Import. Eine Stelle, die Sie noch innehaben, endet jetzt mit dem Wort, das Ihr Lebenslauf für „heute“ verwendet. Eine Aufgabe steht nicht mehr doppelt da oder unter der falschen Stelle, und eine beendete Stelle steht nicht mehr in der Gegenwart.
+
+Beim Import eines Lebenslaufs geht jetzt weniger verloren. Der Hinweis im Editor nennt jeden Abschnitt, der nicht übernommen wurde, und bleibt beim Lebenslauf, bis Sie ihn ausblenden; „Was zu prüfen ist“ ordnet den nicht übernommenen Text jetzt danach, wo er im Lebenslauf stand. Eine Überschrift, die Ausbildung und Zertifikate verbindet, füllt jetzt beide. Der Titel unter Ihrem Namen wird jetzt ganz gelesen, wenn er in Teilen geschrieben ist. Ein importiertes Zertifikat mit einer Zeile „Ausgestellt von“ darunter ist jetzt ein Zertifikat mit seinem Aussteller, nicht zwei. Eine zweite Website und der Ort einer Ausbildung bleiben jetzt als nicht übernommener Text sichtbar, und eine Kontaktbezeichnung ohne Angabe daneben fällt nicht mehr weg. Mehr Überschriften, die die App nicht kennt, werden jetzt als Überschriften gelesen, wenn sie wie die anderen Überschriften des Lebenslaufs gesetzt sind: Die Zeilen darunter bleiben als nicht übernommener Text für sich, statt in den Abschnitt darüber zu geraten. Eine Website auf GitHub Pages ist jetzt Ihre Website, kein GitHub-Profil.
+
+Ein Wischen zurück direkt nach einer Änderung lässt den Editor nicht mehr ohne Weg zurück auf dem Bildschirm stehen.
 ```
 
 ## Italian, it
@@ -425,7 +437,11 @@ Pronto da inviare. | Un PDF curato, con i titoli nella lingua del tuo CV.
 ### What's New
 
 ```text
-La prima versione di PrestoCV. Scrivi il tuo CV su iPhone o iPad, fatti preparare una bozza da Apple Intelligence sui dispositivi compatibili ed esportalo in PDF in tre design. Senza account, senza pubblicità.
+Quando l'app riconosce come CV il testo che incolli, con sezioni e date, la bozza con l'IA ora mantiene le tue parole: lo legge come un'importazione. Un lavoro in corso finisce con la parola che usa il tuo CV per dire «oggi». Un compito non viene più scritto due volte né messo sotto il lavoro sbagliato, e un lavoro concluso non è più al presente.
+
+L'importazione di un CV ora perde meno. L'avviso nell'editor nomina ogni sezione non importata e resta con il CV finché non lo chiudi; «Cosa controllare» ora raggruppa il testo non importato secondo il punto del CV in cui si trovava. Un'intestazione che unisce istruzione e certificazioni ora riempie entrambe le sezioni. Il titolo sotto il tuo nome ora viene letto per intero quando è scritto in più parti. Una certificazione importata con sotto una riga «Rilasciato da» ora è una sola certificazione con il suo ente, non due. Un secondo sito web e il luogo di uno studio ora restano visibili come testo non importato, e un'etichetta di contatto senza nulla accanto non va più persa. Più intestazioni che l'app non conosce ora vengono lette come intestazioni, se sono impaginate come le altre del CV: le righe sotto restano a parte come testo non importato invece di finire nella sezione sopra. Un sito su GitHub Pages ora è il tuo sito web, non un profilo GitHub.
+
+Uno swipe indietro subito dopo una modifica non lascia più l'editor sullo schermo senza un modo per tornare indietro.
 ```
 
 ## Spanish (Spain), es-ES
@@ -504,7 +520,11 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-La primera versión de PrestoCV. Escribe tu CV en el iPhone o el iPad, deja que Apple Intelligence redacte un borrador en los dispositivos compatibles y expórtalo en PDF con tres diseños. Sin cuenta y sin anuncios.
+Cuando la app reconoce como CV el texto que pegas, con sus secciones y fechas, el borrador con IA ahora conserva tus propias palabras, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
+
+Importar un CV ahora pierde menos. El aviso del editor nombra cada sección que no se importó y se queda con el CV hasta que lo cierras; «Qué revisar» ahora agrupa el texto no importado según el lugar del CV donde estaba. Un encabezado que une formación y certificaciones ahora llena las dos secciones. El título bajo tu nombre ahora se lee entero cuando está escrito en partes. Una certificación importada con una línea «Expedido por» debajo ahora es una sola certificación con su emisor, no dos. Un segundo sitio web y el lugar de una formación ahora quedan a la vista como texto no importado, y una etiqueta de contacto sin nada al lado ya no se pierde. Más encabezados que la app no conoce se leen ahora como encabezados cuando tienen el mismo aspecto que los demás del CV: las líneas de debajo quedan aparte como texto no importado en vez de pasar a la sección de arriba. Un sitio en GitHub Pages ahora es tu sitio web, no un perfil de GitHub.
+
+Deslizar hacia atrás justo después de un cambio ya no deja el editor en pantalla sin forma de volver.
 ```
 
 ## Spanish (Mexico), es-MX
@@ -583,7 +603,11 @@ Listo para enviar. | Un PDF cuidado, con los títulos en el idioma de tu CV.
 ### What's New
 
 ```text
-La primera versión de PrestoCV. Escribe tu CV en tu iPhone o iPad, deja que Apple Intelligence redacte un borrador en los dispositivos compatibles y expórtalo en PDF con tres diseños. Sin cuenta y sin anuncios.
+Cuando la app reconoce como CV el texto que pegas, con sus secciones y fechas, el borrador con IA ahora conserva tus propias palabras, porque lo lee como una importación. Un empleo actual termina con la palabra que usa tu CV para decir «actualidad». Una tarea ya no se escribe dos veces ni aparece bajo el empleo equivocado, y un empleo terminado ya no está en presente.
+
+Importar un CV ahora pierde menos. El aviso del editor nombra cada sección que no se importó y se queda con el CV hasta que lo cierras; «Qué revisar» ahora agrupa el texto no importado según el lugar del CV donde estaba. Un encabezado que une formación y certificaciones ahora llena las dos secciones. El título bajo tu nombre ahora se lee entero cuando está escrito en partes. Una certificación importada con una línea «Expedido por» debajo ahora es una sola certificación con su emisor, no dos. Un segundo sitio web y el lugar de una formación ahora quedan a la vista como texto no importado, y una etiqueta de contacto sin nada al lado ya no se pierde. Más encabezados que la app no conoce se leen ahora como encabezados cuando tienen el mismo aspecto que los demás del CV: las líneas de debajo quedan aparte como texto no importado en vez de pasar a la sección de arriba. Un sitio en GitHub Pages ahora es tu sitio web, no un perfil de GitHub.
+
+Deslizar hacia atrás justo después de un cambio ya no deja el editor en pantalla sin forma de volver.
 ```
 
 ## French, fr-FR
@@ -662,7 +686,11 @@ Prêt à envoyer. | Un PDF soigné, avec des titres dans la langue du CV.
 ### What's New
 
 ```text
-La première version de PrestoCV. Rédigez votre CV sur iPhone ou iPad, laissez Apple Intelligence en écrire un brouillon sur les appareils compatibles et exportez-le en PDF avec trois mises en page. Sans compte, sans pub.
+Quand l’app reconnaît comme un CV le texte que vous collez, avec ses sections et ses dates, le brouillon par IA garde désormais vos propres mots : il le lit comme un import. Un poste en cours se termine par le mot que votre CV emploie pour « aujourd’hui ». Une tâche n’est plus écrite deux fois ni placée sous le mauvais poste, et un poste terminé n’est plus au présent.
+
+L’import d’un CV perd moins de choses. L’avis de l’éditeur nomme chaque section non importée et reste avec le CV jusqu’à ce que vous le fermiez ; « À vérifier » regroupe maintenant le texte non importé selon l’endroit du CV où il se trouvait. Un titre de section qui réunit formation et certifications remplit désormais les deux sections. Le titre sous votre nom est maintenant lu en entier quand il est écrit en plusieurs parties. Une certification importée suivie d’une ligne « Délivré par » est désormais une seule certification avec son organisme, et non deux. Un deuxième site web et le lieu d’une formation restent maintenant visibles comme texte non importé, et un libellé de contact sans rien à côté n’est plus perdu. Davantage de titres de section que l’app ne connaît pas sont maintenant lus comme des titres quand ils sont présentés comme les autres titres du CV : les lignes en dessous restent à part comme texte non importé au lieu de rejoindre la section au-dessus. Un site sur GitHub Pages est désormais votre site web, et non un profil GitHub.
+
+Un balayage vers l’arrière juste après une modification ne laisse plus l’éditeur à l’écran sans moyen de revenir.
 ```
 
 ## Portuguese (Portugal), pt-PT
@@ -741,7 +769,11 @@ Pronto a enviar. | Um PDF cuidado, com os títulos na língua do seu currículo.
 ### What's New
 
 ```text
-A primeira versão do PrestoCV. Escreva o seu currículo no iPhone ou no iPad, deixe o Apple Intelligence escrever um rascunho nos dispositivos compatíveis e exporte-o em PDF com três designs. Sem conta, sem anúncios.
+Quando a app reconhece como currículo o texto que cola, com as suas secções e datas, o rascunho com IA passa a manter as suas palavras, porque o lê como uma importação. Um emprego atual termina com a palavra que o seu currículo usa para «atualidade». Uma tarefa já não é escrita duas vezes nem colocada no emprego errado, e um emprego terminado já não está no presente.
+
+A importação de um currículo passa a perder menos. O aviso no editor indica cada secção que não foi importada e fica com o currículo até o fechar; a lista do que há para verificar passa a agrupar o texto não importado pelo sítio do currículo onde estava. Um título que junta formação e certificações passa a preencher as duas secções. O título por baixo do seu nome passa a ser lido por inteiro quando está escrito em partes. Uma certificação importada com uma linha «Emitido por» por baixo passa a ser uma só certificação com a sua entidade, e não duas. Um segundo site e o local de uma formação passam a ficar visíveis como texto não importado, e uma etiqueta de contacto sem nada ao lado já não se perde. Mais títulos que a app não conhece passam a ser lidos como títulos quando têm o mesmo aspeto dos outros títulos do currículo: as linhas por baixo ficam à parte como texto não importado em vez de irem para a secção de cima. Um site no GitHub Pages passa a ser o seu site, e não um perfil do GitHub.
+
+Deslizar para trás logo depois de uma alteração já não deixa o editor no ecrã sem forma de voltar.
 ```
 
 ## Portuguese (Brazil), pt-BR
@@ -820,5 +852,9 @@ Pronto para enviar. | Um PDF caprichado, com os títulos no idioma do seu currí
 ### What's New
 
 ```text
-A primeira versão do PrestoCV. Escreva seu currículo no iPhone ou iPad, deixe o Apple Intelligence escrever um rascunho nos aparelhos compatíveis e exporte em PDF com três designs. Sem conta, sem anúncios.
+Quando o app reconhece como currículo o texto que você cola, com suas seções e datas, o rascunho com IA agora mantém suas palavras, porque o lê como uma importação. Um emprego atual termina com a palavra que seu currículo usa para “atualidade”. Uma tarefa não é mais escrita duas vezes nem colocada no emprego errado, e um emprego encerrado não fica mais no presente.
+
+A importação de um currículo agora perde menos. O aviso no editor mostra cada seção que não foi importada e fica com o currículo até você fechá-lo; “O que conferir” agora agrupa o texto não importado pelo lugar do currículo onde ele estava. Um título que junta formação e certificações agora preenche as duas seções. O cargo abaixo do seu nome agora é lido por inteiro quando está escrito em partes. Uma certificação importada com uma linha “Emitido por” embaixo agora é uma só certificação com a entidade emissora, e não duas. Um segundo site e o local de uma formação agora ficam visíveis como texto não importado, e um rótulo de contato sem nada ao lado não se perde mais. Mais títulos que o app não conhece agora são lidos como títulos quando têm a mesma aparência dos outros títulos do currículo: as linhas abaixo deles ficam à parte como texto não importado em vez de irem para a seção de cima. Um site no GitHub Pages agora é o seu site, e não um perfil do GitHub.
+
+Deslizar para voltar logo depois de uma alteração não deixa mais o editor na tela sem jeito de voltar.
 ```
