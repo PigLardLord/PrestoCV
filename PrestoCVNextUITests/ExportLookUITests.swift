@@ -50,6 +50,7 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(reveal("look.palette.ocean", in: app).isSelected, "The colours in use are chosen")
         XCTAssertFalse(app.buttons["look.palette.plum"].isSelected, "Only one palette is chosen")
         XCTAssertFalse(element("look.footer.kept", in: app).exists, "Every choice of the CV is one the app offers")
+        XCTAssertTrue(staysAtHalfTheHeight(app), "Scrolling to the colours leaves the sheet at half the height")
         keepScreenshot("The picker over the PDF", of: app)
     }
 
@@ -65,6 +66,7 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         plum.tap()
         XCTAssertTrue(wait(for: plum, toBeSelected: true), "The colour tapped is chosen at once")
         XCTAssertFalse(app.buttons["look.palette.ocean"].isSelected, "It replaces the colour chosen before")
+        XCTAssertTrue(staysAtHalfTheHeight(app), "The PDF made again stays in view above the picker")
         keepScreenshot("Plum chosen", of: app)
 
         app.buttons["look.done"].tap()
@@ -222,6 +224,13 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
 
     private func isCompact(_ app: XCUIApplication) -> Bool {
         app.windows.firstMatch.horizontalSizeClass != .regular
+    }
+
+    /// The picker's sheet stops at half the height, so the PDF above it stays in view (the owner's D1): its Done, at
+    /// the top of the sheet, sits in the lower part of the window. At the full height it would sit near the top.
+    private func staysAtHalfTheHeight(_ app: XCUIApplication) -> Bool {
+        let window = app.windows.firstMatch.frame
+        return app.buttons["look.done"].frame.minY > window.minY + window.height * 0.4
     }
 
     // MARK: Elements and waiting

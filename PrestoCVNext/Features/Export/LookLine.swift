@@ -70,6 +70,9 @@ struct LookLine: View {
             }
         }
         .presentationDetents(textSize.isAccessibilitySize ? [.large] : [.medium, .large])
+        // A scroll moves the choices, not the sheet: without it the first scroll to the colours opens the sheet to
+        // the whole height and covers the PDF. A drag on the grabber still opens it.
+        .presentationContentInteraction(.scrolls)
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
 }
