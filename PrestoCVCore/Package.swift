@@ -34,15 +34,22 @@ var targets: [Target] = [
     ),
 ]
 
-// Apple-only adapter (the platform column of docs/architecture/modules.md): not part of a Linux build.
+// Apple-only adapters (the platform column of docs/architecture/modules.md): not part of a Linux build.
 #if !os(Linux)
 products.append(.library(name: "PrestoCVImportingPDFKit", targets: ["PrestoCVImportingPDFKit"]))
+products.append(.library(name: "PrestoCVApplicationNaturalLanguage", targets: ["PrestoCVApplicationNaturalLanguage"]))
 targets += [
     .target(name: "PrestoCVImportingPDFKit", dependencies: ["PrestoCVImporting", logging]),
     .testTarget(
         name: "PrestoCVImportingPDFKitTests",
         dependencies: ["PrestoCVImportingPDFKit", "PrestoCVImporting", logging, loggingTestSupport, trace],
         resources: [.copy("../ImportFixtures")]
+    ),
+    // Reads which language a text is written in with the system's recognizer (#407).
+    .target(name: "PrestoCVApplicationNaturalLanguage", dependencies: ["PrestoCVApplication", "PrestoCVDomain"]),
+    .testTarget(
+        name: "PrestoCVApplicationNaturalLanguageTests",
+        dependencies: ["PrestoCVApplicationNaturalLanguage", "PrestoCVApplication", "PrestoCVDomain"]
     ),
 ]
 #endif

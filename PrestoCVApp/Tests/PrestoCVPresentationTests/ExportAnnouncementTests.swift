@@ -43,19 +43,18 @@ struct ExportAnnouncementTests {
         #expect(sheet.statusToAnnounce == .truncated(pages: 2, required: 3))
     }
 
-    @Test("A CV with no language is told it needs one, and nothing is exported")
-    func aMissingLanguageIsTold() async {
+    @Test("A CV with no language is exported and not told: its words or the app's language stand in (#407)")
+    func aMissingLanguageIsNotTold() async {
         let world = SheetWorld()
         world.cv = SheetWorld.cv(language: nil)
         let sheet = world.sheet()
 
         sheet.start()
-        world.passThePause()
-        await waitUntil("the sheet to read the CV") { sheet.status != .exporting }
+        await world.passThePause(thenExports: 1)
+        await waitUntil("the export to end") { sheet.status != .exporting }
 
-        #expect(sheet.status == .languageNeeded)
-        #expect(sheet.statusToAnnounce == .languageNeeded)
-        #expect(world.exporter.calls == 0)
+        #expect(sheet.status == .done(pages: 1))
+        #expect(sheet.statusToAnnounce == nil)
     }
 
     @Test("A CV with no name is not told: the list under the pages says what it lacks, and Share's value points to it")

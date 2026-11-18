@@ -11,6 +11,7 @@ import DiagnosticTrace
 import DiagnosticTraceDistribution
 import Foundation
 import PrestoCVApplication
+import PrestoCVApplicationNaturalLanguage
 import PrestoCVDomain
 import PrestoCVExportFiles
 import PrestoCVImportFiles
@@ -37,7 +38,7 @@ public enum CompositionState: Sendable {
 
 /// The one place that creates infrastructure (R4, ADR 0008): the paths, the repository, the platform renderer over the
 /// content rules compiled once, the design store with the bundled designs synced into it, the import's PDF reader and
-/// file port, the clock, the ids, the log and the trace.
+/// file port, the reader of a text's language, the clock, the ids, the log and the trace.
 @MainActor
 public final class Composition {
     /// Compiles the content rules of every web view. The composition calls it once, so a test counts the calls.
@@ -149,6 +150,7 @@ public final class Composition {
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
+            languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
             wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
             appLanguage: inputs.appLanguage
         )
