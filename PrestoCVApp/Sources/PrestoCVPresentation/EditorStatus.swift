@@ -47,6 +47,14 @@ public enum ExportStatus: Hashable, Sendable {
     case failed
 }
 
+/// A PDF made again in full after a pick in the export sheet, a look or a language, for VoiceOver to tell with its
+/// pages: each one is a new value, so that two in a row with the same pages are both told.
+public struct RemadePDF: Hashable, Sendable {
+    public let pages: Int
+    /// Which PDF made again of the sheet this is, counted from one.
+    let ordinal: Int
+}
+
 /// A field of the editor's form, named by a status so that the view can mark it.
 public enum EditorField: Hashable, Sendable, CaseIterable {
     case title, fullName, professionalTitle, email, phone, location, website, summary

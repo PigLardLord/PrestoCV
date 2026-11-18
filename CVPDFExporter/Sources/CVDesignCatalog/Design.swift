@@ -251,14 +251,17 @@ public struct HexColor: Sendable, Equatable {
     /// A colour written in the source, known to be `#RRGGBB`. Only `NamedPalette` uses it; everything else goes
     /// through the checked initialiser.
     fileprivate init(known value: String) { self.value = value }
+    /// The red, green and blue of the colour, each from 0 to 1.
+    public var channels: (red: Double, green: Double, blue: Double) {
+        let hex = Array(value.dropFirst())
+        func channel(_ k: Int) -> Double { Double(Int(String(hex[k...k + 1]), radix: 16) ?? 0) / 255 }
+        return (channel(0), channel(2), channel(4))
+    }
     /// WCAG relative luminance.
     var luminance: Double {
-        let hex = Array(value.dropFirst())
-        func channel(_ k: Int) -> Double {
-            let v = Double(Int(String(hex[k...k + 1]), radix: 16) ?? 0) / 255
-            return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4)
+        func linear(_ v: Double) -> Double { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        let c = channels
+        return 0.2126 * linear(c.red) + 0.7152 * linear(c.green) + 0.0722 * linear(c.blue)
     }
     public func contrast(with other: HexColor) -> Double {
         let (a, b) = (luminance, other.luminance)

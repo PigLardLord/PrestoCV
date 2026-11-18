@@ -14,6 +14,8 @@ enum Spacing {
 /// The rounding of controls
 enum CornerRadius {
     static let control: CGFloat = 12
+    /// The corner of a small page, such as a design's sample in the look picker
+    static let page: CGFloat = 4
 }
 
 /// The size of the symbol that opens a screen
@@ -50,4 +52,26 @@ enum ParagraphHeight {
 /// The shape of a page of the PDF, its width over its height (A4)
 enum PageShape {
     static let a4: CGFloat = 210.0 / 297.0
+}
+
+/// The narrowest a tile of the look picker may be: a design or a font scheme, and a colour
+enum LookTile {
+    static let minimumWidth: CGFloat = 96
+    static let colorMinimumWidth: CGFloat = 72
+}
+
+/// The round sample of a colour in the look picker, as wide as a tap target
+enum Swatch {
+    static let diameter: CGFloat = 44
+}
+
+/// The width of a sample beside its name in a row of the look picker, at the accessibility text sizes
+enum LookThumbnail {
+    static let width: CGFloat = 84
+}
+
+/// The ring around the chosen item of the look picker, and the room between it and the sample
+enum SelectionRing {
+    static let width: CGFloat = 2
+    static let gap: CGFloat = 3
 }

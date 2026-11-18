@@ -25,8 +25,8 @@ struct DesignBootstrap: Sendable {
 
     /// What the launch reads from the store once the sync is over.
     struct Designs: Sendable {
-        /// The installed designs, in the store's order
-        let installed: [DesignManifest]
+        /// The installed designs, in the store's order, each with the preview the look picker shows (#407)
+        let installed: [ValidatedDesign]
         let defaultDesign: DesignManifest
     }
 
@@ -40,16 +40,16 @@ struct DesignBootstrap: Sendable {
     func run() async throws(CompositionFailure) -> Designs {
         let stopwatch = Stopwatch(started: clock)
         let missing = try await sync(stopwatch)
-        let defaultDesign: DesignManifest, listed: [DesignManifest]
+        let defaultDesign: ValidatedDesign, listed: [DesignManifest]
         do {
-            defaultDesign = try await GetDesign(store: store)(id: Self.defaultDesign).manifest
+            defaultDesign = try await GetDesign(store: store)(id: Self.defaultDesign)
             listed = try await ListDesigns(store: store)()
         } catch {
             throw failure(error, missing, stopwatch)
         }
         let installed = try await readable(listed, defaultDesign: defaultDesign, stopwatch)
         guard !Task.isCancelled else { throw interrupted(stopwatch) }
-        return Designs(installed: installed, defaultDesign: defaultDesign)
+        return Designs(installed: installed, defaultDesign: defaultDesign.manifest)
     }
 
     /// What a launch fails with when the store does not give the default design or the list of the installed designs.
@@ -62,16 +62,16 @@ struct DesignBootstrap: Sendable {
     /// The listed designs the store can read, in the store's order. A design it cannot read is left out and counted in the
     /// log, so one damaged package does not stop the launch; the default design was read already.
     private func readable(
-        _ listed: [DesignManifest], defaultDesign: DesignManifest, _ stopwatch: Stopwatch
-    ) async throws(CompositionFailure) -> [DesignManifest] {
-        var readable: [DesignManifest] = []
+        _ listed: [DesignManifest], defaultDesign: ValidatedDesign, _ stopwatch: Stopwatch
+    ) async throws(CompositionFailure) -> [ValidatedDesign] {
+        var readable: [ValidatedDesign] = []
         for manifest in listed {
-            guard manifest.id != defaultDesign.id else {
+            guard manifest.id != defaultDesign.manifest.id else {
                 readable.append(defaultDesign)
                 continue
             }
             do {
-                readable.append(try await GetDesign(store: store)(id: manifest.id).manifest)
+                readable.append(try await GetDesign(store: store)(id: manifest.id))
             } catch {
                 if error is CancellationError || Task.isCancelled { throw interrupted(stopwatch) }
             }

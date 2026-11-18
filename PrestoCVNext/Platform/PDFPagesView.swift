@@ -19,6 +19,12 @@ final class PDFPagesView: PDFView {
     /// The fit of the last layout with a document, nil before it.
     private var fittedScale: CGFloat?
 
+    /// The PDF to show once the update under way is done, nil when none waits.
+    private var waitingPDF: Data?
+
+    /// The step that shows the waiting PDF once the update is done, nil when none is due.
+    private(set) var showing: Task<Void, Never>?
+
     /// Whether assistive technologies skip the pages, because the screen tells what they hold in another way.
     var isForTheEyeOnly = false {
         didSet { applyHiding() }
@@ -42,6 +48,23 @@ final class PDFPagesView: PDFView {
         document = shown
         fittedScale = nil
         askForLayout()
+    }
+
+    /// Shows a PDF once the update under way is done; of several given meanwhile, the last.
+    ///
+    /// A new document takes PDFKit's old pages out of the window, and one of them may hold the focus. Given up inside
+    /// SwiftUI's update, the focus makes SwiftUI read its graph again in the middle of that update, and the update never
+    /// ends: the app stops answering (#407). After the update, it is an ordinary change of focus.
+    func showAfterTheUpdate(_ pdf: Data) {
+        waitingPDF = pdf
+        guard showing == nil else { return }
+        showing = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.showing = nil
+            guard let pdf = self.waitingPDF else { return }
+            self.waitingPDF = nil
+            self.show(PDFDocument(data: pdf))
+        }
     }
 
     /// Keeps the fit and the zoom limits after a layout.
@@ -129,7 +152,7 @@ final class PDFPagesView: PDFView {
 }
 
 /// A PDF's pages in SwiftUI (`PDFPagesView`). The document is read again only when `id` changes, so that a redraw keeps
-/// the person's zoom and scroll.
+/// the person's zoom and scroll; a new one is shown once SwiftUI's update is done (`showAfterTheUpdate`).
 #if os(iOS)
 struct PDFPages<ID: Hashable>: UIViewRepresentable {
     let pdf: Data
@@ -157,9 +180,12 @@ struct PDFPages<ID: Hashable>: NSViewRepresentable {
 #endif
 
 extension PDFPages {
+    /// The first document is shown at once: the view is in no window yet, so nothing in it holds the focus.
     private func make(_ shown: ShownDocument<ID>) -> PDFPagesView {
         let view = PDFPagesView(frame: .zero)
-        update(view, shown)
+        view.isForTheEyeOnly = isForTheEyeOnly
+        shown.id = id
+        view.show(PDFDocument(data: pdf))
         return view
     }
 
@@ -168,7 +194,7 @@ extension PDFPages {
         view.isForTheEyeOnly = isForTheEyeOnly
         guard shown.id != id else { return }
         shown.id = id
-        view.show(PDFDocument(data: pdf))
+        view.showAfterTheUpdate(pdf)
     }
 }
 

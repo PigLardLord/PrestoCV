@@ -36,3 +36,8 @@ extension ExportStatus {
         }
     }
 }
+
+extension RemadePDF {
+    /// The words that tell the PDF was made again after a pick, with its pages.
+    var words: LocalizedStringResource { "export.updated \(pages)" }
+}

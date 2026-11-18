@@ -595,7 +595,7 @@ struct ScreenFactoryTests {
     private static func sheet(_ fixture: Fixture, _ editor: EditorViewModel) throws -> ExportSheetViewModel? {
         fixture.composition.screens.makeExportSheet(
             for: editor, appLanguage: try english(), fileNamePattern: { _ in "CV %@" }, onLanguageChosen: { _ in },
-            onLanguageFound: { _ in }
+            onLanguageFound: { _ in }, onLookChosen: { _, _ in }
         )
     }
 
@@ -738,6 +738,33 @@ struct ScreenFactoryTests {
         #expect(sheet.effectiveLanguage?.tag == "de")
         #expect(sheet.document != nil, "the export ended with \(sheet.status)")
         shell.closeExport()
+    }
+
+    @Test("The shell's export sheet exports with a design chosen in it, and the design is stored with the CV (#407)",
+          .timeLimit(.minutes(1)), .printsForReal)
+    func shellSheetTakesTheLookToTheCV() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let reference = try await Self.storedCV(fixture, design: nil)
+        let list = Self.list(fixture)
+        let shell = Self.shell(fixture, list: list, firstRun: fixture.composition.screens.makeFirstRun())
+        shell.open(.stored(reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+
+        shell.openExport()
+        let sheet = try #require(shell.exportSheet)
+        #expect(sheet.shownLook.design == "professional")
+        sheet.choose(design: "minimal")
+
+        for await look in Observations({ editor.look }) where look?.design == "minimal" { break }
+        #expect(try await fixture.composition.repository.load(FixtureCV.full().id).design?.design == "minimal")
+        for await exporting in Observations({ sheet.status == .exporting }) where !exporting { break }
+        let pdf = try #require(sheet.document?.pdf, "the export ended with \(sheet.status)")
+        let shown = try #require(fixture.composition.inspector.layout(of: pdf))
+        #expect(sheet.shownLook.design == "minimal")
+        shell.closeExport()
+        #expect(try await Self.exported(fixture, reference) == shown, "the sheet's PDF has the design stored with the CV")
     }
 
     @Test("The export sheet waits 250 ms after the last change, as in version 1")

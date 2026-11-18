@@ -138,16 +138,19 @@ final class SheetWorld {
     private(set) var chosen: [ExportLanguage] = []
     /// Each language the sheet kept in the CV because its words told it.
     private(set) var kept: [ExportLanguage] = []
+    /// Each look the sheet took to the CV, with the part the person chose.
+    private(set) var looks: [ChosenLook] = []
 
     init() { cv = Self.cv() }
 
     /// A CV with invented values, by default with a name and in Italian. Every CV of a world has the same identity.
     nonisolated static func cv(fullName: String = "Mara Ellison", email: String? = nil, phone: String? = nil, language: String? = "it",
-                   design: String? = nil) -> CV {
+                   design: String? = nil, palette: String? = nil, fonts: String? = nil) -> CV {
         CV(id: CVID(UUID(uuidString: "00000000-0000-0000-0000-000000000001")!), title: "Design roles",
            personal: PersonalDetails(fullName: fullName, email: email.flatMap(EmailAddress.init),
                                      phone: phone.flatMap(PhoneNumber.init)),
-           design: design.flatMap { DesignChoice(design: $0) }, language: language.flatMap(DocumentLanguage.init))
+           design: design.flatMap { DesignChoice(design: $0, palette: palette, fonts: fonts) },
+           language: language.flatMap(DocumentLanguage.init))
     }
 
     /// - Parameters:
@@ -162,6 +165,8 @@ final class SheetWorld {
             fileNamePattern: { Self.patterns[$0.tag] ?? "%@" },
             onLanguageChosen: { self.chosen.append($0); whenChosen($0) },
             languageDetector: detector, onLanguageFound: { self.kept.append($0) },
+            lookOptions: LookOptionsFake(), look: cv.design.map { EditorLook($0) },
+            onLookChosen: { self.looks.append(ChosenLook(look: $0, parts: $1)) },
             clock: self.clock, pause: Self.pause)
     }
 
@@ -182,4 +187,10 @@ final class SheetWorld {
         guard let language = ExportLanguage(tag) else { preconditionFailure("\(tag) is a language tag") }
         return language
     }
+}
+
+/// A look the sheet took to the CV, and the part of it the person chose.
+struct ChosenLook: Equatable {
+    let look: EditorLook
+    let parts: Set<LookPart>
 }

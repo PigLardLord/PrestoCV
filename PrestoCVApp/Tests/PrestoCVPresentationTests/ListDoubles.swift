@@ -50,14 +50,35 @@ final class BrowsingFake: CVBrowsing {
     func startFromSample(_ sample: CV) -> CV { sample.duplicated(as: editing.ids.next(), title: sample.title) }
 }
 
-/// A look picker that offers fixed choices.
+/// A look picker that offers fixed choices, each with what the view draws it with; the classic design has no preview.
 struct LookOptionsFake: LookOptionsProviding {
+    static let modernPreview = Data([0x89, 0x50, 0x4E, 0x47, 0x01])
+    static let ocean = LookSample.colors(
+        primary: LookColor(red: 0.1, green: 0.2, blue: 0.7), background: LookColor(red: 0.9, green: 0.9, blue: 1)
+    )
+    static let forest = LookSample.colors(
+        primary: LookColor(red: 0.1, green: 0.4, blue: 0.2), background: LookColor(red: 1, green: 1, blue: 1)
+    )
+
     func options() -> LookOptions {
         LookOptions(
-            designs: [LookOption(id: "classic", nameCode: "design.classic"), LookOption(id: "modern", nameCode: "design.modern")],
-            palettes: [LookOption(id: "ocean", nameCode: "palette.ocean"), LookOption(id: "forest", nameCode: "palette.forest")],
-            fontSchemes: [LookOption(id: "sans", nameCode: "fonts.sans"), LookOption(id: "serif", nameCode: "fonts.serif")],
-            defaultDesign: "classic", defaultPalette: "ocean", defaultFonts: "sans"
+            designs: [
+                LookOption(id: "classic", nameCode: "design.classic"),
+                LookOption(id: "modern", nameCode: "design.modern", sample: .page(png: Self.modernPreview))
+            ],
+            palettes: [
+                LookOption(id: "ocean", nameCode: "palette.ocean", sample: Self.ocean),
+                LookOption(id: "forest", nameCode: "palette.forest", sample: Self.forest)
+            ],
+            fontSchemes: [
+                LookOption(id: "sans", nameCode: "fonts.sans", sample: .typeface(.system)),
+                LookOption(id: "serif", nameCode: "fonts.serif", sample: .typeface(.serif))
+            ],
+            defaultDesign: "classic",
+            ownLooks: [
+                "classic": DesignOwnLook(palette: "ocean", fonts: "sans"),
+                "modern": DesignOwnLook(palette: "forest", fonts: "serif")
+            ]
         )
     }
 }

@@ -23,6 +23,11 @@ public final class ExportSheetViewModel {
     /// without its PDF or with a PDF shorter than the CV needs. It is nil while one runs, after one that made the PDF
     /// in full, and when the CV lacks a field: the list under the pages says which, and Share's value points to it.
     public private(set) var statusToAnnounce: ExportStatus?
+    /// The PDF made in full again after a pick in the sheet, a look or a language, for VoiceOver to tell with its pages:
+    /// the picker covers the PDF, and a pick changes nothing else that VoiceOver reads. Each one is a new value. It is
+    /// nil while an export runs, after the opening export and a refresh, after an export that ends with a problem
+    /// (`statusToAnnounce` tells it) or without a PDF, and once the sheet stops.
+    public private(set) var remadeToAnnounce: RemadePDF?
     /// The PDF of the last export, or nil while one runs or when it failed.
     public private(set) var document: ExportedDocument?
     /// The identity of the export that made `document`: set and cleared together with it. A share names the PDF by it.
@@ -50,12 +55,26 @@ public final class ExportSheetViewModel {
     /// The languages the sheet offers.
     public let offeredLanguages: [ExportLanguage]
 
+    /// The designs, palettes and font schemes the sheet offers.
+    public let lookChoices: LookChoices
+    /// The look of the PDF: the CV's as the last export read it, with the parts chosen in the sheet on top; before the
+    /// first export, the look the editor showed, else the app's default one (#407).
+    public private(set) var shownLook: EditorLook
+
     /// Whether Share can be used now: it waits for the export and for the file of a share, and needs the PDF. The share
     /// sheet itself is not counted: it covers the sheet until it ends.
     public var shareAvailability: ShareAvailability {
         if status == .exporting || writing { return .preparing }
         guard document != nil, documentID != nil, suggestedFileName != nil else { return .unavailable }
         return .ready
+    }
+
+    /// What the sheet shows above its lines: its PDF; while an export runs, the PDF that was on screen when it began, as
+    /// replaced; else none.
+    public var preview: ExportPreview {
+        if let document, let documentID { return .pdf(document, documentID) }
+        if let replaced { return .replaced(replaced.document, replaced.id) }
+        return .none
     }
 
     /// True when the sheet closes as Done: a share of its PDF went through.
@@ -71,6 +90,10 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private let onLanguageChosen: @MainActor (ExportLanguage) -> Void
     @ObservationIgnored private let detector: any CVLanguageDetecting
     @ObservationIgnored private let onLanguageFound: @MainActor (ExportLanguage) -> Void
+    @ObservationIgnored private let onLookChosen: @MainActor (EditorLook, Set<LookPart>) -> Void
+    /// The parts of the look chosen in the sheet, put on the CV each export reads: the CV the editor shows may not hold
+    /// them yet, and the other parts follow it.
+    @ObservationIgnored private var chosenLook: LookChange?
     /// The language the sheet found in the words of a CV that keeps none: the words are read until they tell one, and
     /// then no more.
     @ObservationIgnored private var found: DocumentLanguage?
@@ -81,10 +104,17 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var generation = 0
     /// True while the file of a share is being written: a second tap writes nothing, and Share shows it is preparing.
     private var writing = false
+    /// The PDF that was on screen when the export that runs began, kept until that export ends; nil otherwise. It is
+    /// shown only: it is not the PDF of the look or language the sheet shows now.
+    private var replaced: (document: ExportedDocument, id: ExportID)?
     /// Counts the failed shares, so that each one is a new value.
     @ObservationIgnored private var failures = 0
     /// Counts the languages picked, so that each pick is a new value.
     @ObservationIgnored private var picks = 0
+    /// The generation of the export a pick started, nil when the latest export began otherwise.
+    @ObservationIgnored private var pickedExport: Int?
+    /// Counts the PDFs made again after a pick, so that each one is a new value.
+    @ObservationIgnored private var remakes = 0
 
     /// - Parameters:
     ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.
@@ -98,6 +128,10 @@ public final class ExportSheetViewModel {
     ///   - onLanguageFound: Keeps in the CV the language its words were found in, unless the person chose one in the
     ///     sheet: the headings then stay in that language. It must never replace a language the CV keeps by the time it
     ///     is stored, found by another sheet or chosen (#407).
+    ///   - lookOptions: The designs, palettes and font schemes the sheet offers, and the look of a CV that keeps none.
+    ///   - look: The look the editor shows, nil for a CV that keeps none.
+    ///   - onLookChosen: Takes a look chosen in the sheet to the CV, with the part the person chose: the others are what
+    ///     the sheet showed. Called after the export begins, as `onLanguageChosen` is.
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last intent the export starts, so that several quick changes make one export.
     public init(
@@ -105,7 +139,10 @@ public final class ExportSheetViewModel {
         offeredLanguages: [ExportLanguage],
         appLanguage: ExportLanguage, fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
         onLanguageChosen: @escaping @MainActor (ExportLanguage) -> Void, languageDetector: any CVLanguageDetecting,
-        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void, clock: any Clock<Duration>, pause: Duration
+        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void,
+        lookOptions: any LookOptionsProviding, look: EditorLook?,
+        onLookChosen: @escaping @MainActor (EditorLook, Set<LookPart>) -> Void,
+        clock: any Clock<Duration>, pause: Duration
     ) {
         self.exporter = exporter
         self.files = files
@@ -116,6 +153,11 @@ public final class ExportSheetViewModel {
         self.onLanguageChosen = onLanguageChosen
         self.detector = languageDetector
         self.onLanguageFound = onLanguageFound
+        let options = lookOptions.options()
+        self.lookChoices = LookChoices(options)
+        self.shownLook = look
+            ?? EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
+        self.onLookChosen = onLookChosen
         self.pauseFromNow = Self.pause(pause, on: clock)
     }
 
@@ -130,7 +172,7 @@ public final class ExportSheetViewModel {
     // MARK: - Intents
 
     /// Starts the export of the CV as it stands. The shell calls it when it opens the sheet.
-    public func start() { begin() }
+    public func start() { begin(afterAPick: false) }
 
     /// Exports in `language`, announces the pick and takes it to the CV. The export begins and the pick is announced
     /// before the choice goes out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is
@@ -139,14 +181,48 @@ public final class ExportSheetViewModel {
     public func select(language: ExportLanguage) {
         let keepsThePDF = language == effectiveLanguage && (status == .exporting || document != nil)
         selectedLanguage = language
-        if !keepsThePDF { begin() }
+        if !keepsThePDF { begin(afterAPick: true) }
         picks += 1
         languageToAnnounce = LanguageChoice(language: language, ordinal: picks)
         onLanguageChosen(language)
     }
 
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
-    public func refresh() { begin() }
+    public func refresh() { begin(afterAPick: false) }
+
+    /// Exports with `design`, shows it and takes it to the CV; the palette and fonts stay as shown.
+    public func choose(design: String) {
+        choose(.design, EditorLook(design: design, palette: shownLook.palette, fonts: shownLook.fonts))
+    }
+
+    /// Exports with `palette`, shows it and takes it to the CV; the design and fonts stay as shown.
+    public func choose(palette: String?) {
+        choose(.palette, EditorLook(design: shownLook.design, palette: palette, fonts: shownLook.fonts))
+    }
+
+    /// Exports with `fonts`, shows them and takes them to the CV; the design and palette stay as shown.
+    public func choose(fonts: String?) {
+        choose(.fonts, EditorLook(design: shownLook.design, palette: shownLook.palette, fonts: fonts))
+    }
+
+    /// The look picker for the look shown: its groups, their items and the one chosen in each.
+    public var lookPicker: LookPickerModel { LookPickerModel(choices: lookChoices, shown: shownLook) }
+
+    /// A tap on an item of the look picker: a choice the app offers chooses that part, the design's own leaves the part
+    /// to the design, and the kept choice, already the look of the PDF, changes nothing.
+    public func pick(_ item: LookPickerModel.Item) {
+        let id: String?
+        switch item.kind {
+        case .offered(let choice): id = choice.id
+        case .designsOwn: id = nil
+        case .kept: return
+        }
+        switch item.part {
+        case .design: if let id { choose(design: id) }
+        case .palette: choose(palette: id)
+        case .fonts: choose(fonts: id)
+        }
+    }
 
     /// Shows the PDF on the whole screen, under the name of its file. Without a PDF there is nothing to show.
     public func showFullPDF() {
@@ -163,9 +239,12 @@ public final class ExportSheetViewModel {
         generation += 1
         status = .idle
         statusToAnnounce = nil
+        remadeToAnnounce = nil
+        pickedExport = nil
         languageToAnnounce = nil
         document = nil
         documentID = nil
+        replaced = nil
         suggestedFileName = nil
         fullPDF = nil
         openShare = nil
@@ -247,14 +326,34 @@ public final class ExportSheetViewModel {
         shareFailure = ShareFailure(ordinal: failures)
     }
 
+    // MARK: - The look
+
+    /// The person chose `part` of the look, and `look` is the whole look shown with it. The choice stays on the CV of
+    /// every later export of this sheet, and goes to the CV after the export begins, so a call into the sheet from
+    /// `onLookChosen` is the later intent. The look of the PDF on screen, or of the one being made, keeps that PDF: the
+    /// choice still goes to the CV. A look with an id no design may have changes nothing.
+    private func choose(_ part: LookPart, _ look: EditorLook) {
+        guard let step = LookChange(shown: look, parts: [part]) else { return }
+        let keepsThePDF = look == shownLook && (status == .exporting || document != nil)
+        chosenLook = chosenLook.map { $0.followed(by: step) } ?? step
+        shownLook = look
+        if !keepsThePDF { begin(afterAPick: true) }
+        onLookChosen(look, [part])
+    }
+
     // MARK: - The export
 
-    private func begin() {
+    /// Starts an export; `afterAPick` says a pick in the sheet asked for it, so that its PDF is told once made.
+    private func begin(afterAPick: Bool) {
         running?.cancel()
         generation += 1
         let mine = generation
+        pickedExport = afterAPick ? mine : nil
         status = .exporting
         statusToAnnounce = nil
+        remadeToAnnounce = nil
+        // A second intent while an export runs keeps the PDF the first one replaced: the one stopped made none
+        if let document, let documentID { replaced = (document, documentID) }
         document = nil
         documentID = nil
         suggestedFileName = nil
@@ -295,14 +394,21 @@ public final class ExportSheetViewModel {
         publish(mine) {
             self.document = document
             self.documentID = document.map { _ in ExportID(generation: mine) }
+            self.replaced = nil
             self.settle(status)
         }
     }
 
-    /// The export ended with `ended`: the status line shows it, and VoiceOver is told it when it is a problem.
+    /// The export ended with `ended`: the status line shows it, and VoiceOver is told it when it is a problem, or the
+    /// pages of the PDF when a pick made it again in full.
     private func settle(_ ended: ExportStatus) {
         status = ended
         statusToAnnounce = ended.isTold ? ended : nil
+        remadeToAnnounce = nil
+        if case .done(let pages) = ended, pickedExport == generation {
+            remakes += 1
+            remadeToAnnounce = RemadePDF(pages: pages, ordinal: remakes)
+        }
     }
 
     /// Reads the CV, publishes what the sheet knows of it before the export, and gives it with the language of the PDF;
@@ -331,10 +437,15 @@ public final class ExportSheetViewModel {
         return found
     }
 
-    private func prepare(_ cv: CV, automatic: ExportLanguage) -> (CV, DocumentLanguage)? {
+    /// Publishes what the sheet knows of the CV before the export, and gives the CV to export, with the look chosen in the
+    /// sheet on top, in the language of the PDF; nil when the CV lacks a field the PDF needs.
+    private func prepare(_ read: CV, automatic: ExportLanguage) -> (CV, DocumentLanguage)? {
+        let cv = chosenLook.map { ChangeCV.applying($0, to: read) } ?? read
+        shownLook = cv.design.map { EditorLook($0) } ?? shownLook
         automaticLanguage = automatic
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {
+            replaced = nil
             settle(.notReady)
             return nil
         }

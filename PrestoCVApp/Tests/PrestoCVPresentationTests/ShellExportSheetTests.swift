@@ -133,6 +133,7 @@ final class ShellExports {
             exporter: exporter, files: files, snapshot: { editor.exportSnapshot() ?? loaded },
             offeredLanguages: SheetWorld.offered, appLanguage: SheetWorld.appLanguage,
             fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" }, onLanguageChosen: { _ in },
-            languageDetector: detector, onLanguageFound: { _ in }, clock: clock, pause: SheetWorld.pause)
+            languageDetector: detector, onLanguageFound: { _ in }, lookOptions: LookOptionsFake(), look: editor.look,
+            onLookChosen: { _, _ in }, clock: clock, pause: SheetWorld.pause)
     }
 }

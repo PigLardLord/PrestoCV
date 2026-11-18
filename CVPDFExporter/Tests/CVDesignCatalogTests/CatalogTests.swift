@@ -156,4 +156,20 @@ struct CatalogTests {
     func primaryContrast(primary: String, exists: Bool) {
         #expect((Palette(primary: HexColor(primary)!, text: HexColor("#111111")!, background: HexColor("#FFFFFF")!) != nil) == exists)
     }
+
+    /// A picker draws a palette with its own colours: the red, green and blue come from the colour's digits, each
+    /// channel from its own pair, upper or lower case alike.
+    @Test("a colour gives its red, green and blue, each from 0 to 1")
+    func channels() throws {
+        let ocean = try #require(HexColor("#1E40AF")).channels
+        #expect(ocean.red == 30.0 / 255)
+        #expect(ocean.green == 64.0 / 255)
+        #expect(ocean.blue == 175.0 / 255)
+        let lower = try #require(HexColor("#fef3c7")).channels
+        #expect(lower.red == 254.0 / 255 && lower.green == 243.0 / 255 && lower.blue == 199.0 / 255)
+        let black = try #require(HexColor("#000000")).channels
+        let white = try #require(HexColor("#FFFFFF")).channels
+        #expect(black.red == 0 && black.green == 0 && black.blue == 0)
+        #expect(white.red == 1 && white.green == 1 && white.blue == 1)
+    }
 }
