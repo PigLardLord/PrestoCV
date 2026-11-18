@@ -34,6 +34,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "editor.entry.title.certification": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
             ],
+            // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
+            // composition's LookNamesTests checks that those codes and these keys are the same set.
+            dynamicKeyPrefixes: ["design.", "fonts.", "palette."],
             nonKeyLiterals: [
                 "native": "the code of a language level, which ProficiencyPicker words (R13)",
                 "designsOwn": "the end of the accessibility identifier of the look picker's item for the design's own (LookName)",

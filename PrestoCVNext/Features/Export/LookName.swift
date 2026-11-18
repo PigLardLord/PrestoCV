@@ -2,28 +2,24 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The names of the look picker in the app's language (#407). A choice the app offers is named by the code it comes
-/// with, which is its key in the string catalog; the design's own, a kept choice and the groups have keys of their own.
+/// with, which is its key in the string catalog (the owner's D2: the names of the installed designs, until a design
+/// catalog brings its own); the design's own, a kept choice and the groups have keys of their own. The composition's
+/// LookNamesTests checks that the codes the launch offers and the catalog's design, fonts and palette keys are the
+/// same set.
 enum LookName {
-    /// The names of the choices the app offers, each looked up by its code.
-    private static let offered: [LocalizedStringResource] = [
-        "design.minimal", "design.modern", "design.professional",
-        "fonts.system", "fonts.serif", "fonts.rounded",
-        "palette.ink", "palette.slate", "palette.ocean", "palette.plum"
-    ]
-
-    /// The name of an offered choice's code, or nil for a code the app has no name for.
-    static func named(_ code: String) -> LocalizedStringResource? {
-        offered.first { $0.key == code }
-    }
-
-    /// The name of an item. A choice the app has no name for reads as one from an earlier version: the PDF keeps it,
-    /// and the person can choose another.
+    /// The name of an item. A kept choice is one the app no longer offers: the PDF keeps it, and the person can choose
+    /// another.
     static func of(_ item: LookPickerModel.Item) -> LocalizedStringResource {
         switch item.kind {
-        case .offered(let choice): named(choice.nameCode) ?? "look.kept"
+        case .offered(let choice): offered(choice.nameCode)
         case .designsOwn: "look.designsOwn"
         case .kept: "look.kept"
         }
+    }
+
+    /// The name of a choice the app offers: the catalog's text under the choice's code.
+    static func offered(_ code: String) -> LocalizedStringResource {
+        LocalizedStringResource(String.LocalizationValue(code))
     }
 
     /// The title of a group.
