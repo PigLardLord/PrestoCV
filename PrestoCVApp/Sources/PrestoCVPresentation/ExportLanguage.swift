@@ -24,3 +24,10 @@ public struct ExportLanguage: Hashable, Sendable {
         return ExportLanguage(language: .english)
     }
 }
+
+/// A language the person picked in the export sheet, for VoiceOver to tell: each pick is a new value, so a pick of the
+/// language already shown is told again.
+public struct LanguageChoice: Hashable, Sendable {
+    public let language: ExportLanguage
+    let ordinal: Int
+}
