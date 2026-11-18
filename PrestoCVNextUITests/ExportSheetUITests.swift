@@ -118,9 +118,15 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
 
         XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
         XCTAssertTrue(app.buttons["export.close"].isHittable, "Close can be tapped at the largest text size")
-        // The pages fill the screen at this size: the lines under them are reached by scrolling, from the page count
-        app.staticTexts["export.pages"].swipeUp()
-        XCTAssertTrue(app.buttons["export.headings.change"].isHittable, "Change can be tapped at the largest text size")
+        // The pages fill the screen at this size: the lines under them are reached by scrolling. On a wide screen the
+        // look's picker lies between the page count and the headings, its items in rows, so it takes more than one
+        // swipe; slow ones, so that none passes over the line.
+        let change = app.buttons["export.headings.change"]
+        let lines = app.scrollViews.containing(.staticText, identifier: "export.pages").firstMatch
+        for _ in 0..<8 where !(change.exists && change.isHittable) {
+            lines.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(change.exists && change.isHittable, "Change can be tapped at the largest text size")
         keepScreenshot("The sheet at the largest text size", of: app)
     }
 
