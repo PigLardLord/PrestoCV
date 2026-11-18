@@ -64,6 +64,14 @@ public final class ExportSheetViewModel {
         return .ready
     }
 
+    /// What the sheet shows above its lines: its PDF; while an export runs, the PDF that was on screen when it began, as
+    /// replaced; else none.
+    public var preview: ExportPreview {
+        if let document, let documentID { return .pdf(document, documentID) }
+        if let replaced { return .replaced(replaced.document, replaced.id) }
+        return .none
+    }
+
     /// True when the sheet closes as Done: a share of its PDF went through.
     public var closesAsDone: Bool { shareOutcome != nil }
 
@@ -91,6 +99,9 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var generation = 0
     /// True while the file of a share is being written: a second tap writes nothing, and Share shows it is preparing.
     private var writing = false
+    /// The PDF that was on screen when the export that runs began, kept until that export ends; nil otherwise. It is
+    /// shown only: it is not the PDF of the look or language the sheet shows now.
+    private var replaced: (document: ExportedDocument, id: ExportID)?
     /// Counts the failed shares, so that each one is a new value.
     @ObservationIgnored private var failures = 0
     /// Counts the languages picked, so that each pick is a new value.
@@ -185,6 +196,25 @@ public final class ExportSheetViewModel {
         choose(.fonts, EditorLook(design: shownLook.design, palette: shownLook.palette, fonts: fonts))
     }
 
+    /// The look picker for the look shown: its groups, their items and the one chosen in each.
+    public var lookPicker: LookPickerModel { LookPickerModel(choices: lookChoices, shown: shownLook) }
+
+    /// A tap on an item of the look picker: a choice the app offers chooses that part, the design's own leaves the part
+    /// to the design, and the kept choice, already the look of the PDF, changes nothing.
+    public func pick(_ item: LookPickerModel.Item) {
+        let id: String?
+        switch item.kind {
+        case .offered(let choice): id = choice.id
+        case .designsOwn: id = nil
+        case .kept: return
+        }
+        switch item.part {
+        case .design: if let id { choose(design: id) }
+        case .palette: choose(palette: id)
+        case .fonts: choose(fonts: id)
+        }
+    }
+
     /// Shows the PDF on the whole screen, under the name of its file. Without a PDF there is nothing to show.
     public func showFullPDF() {
         guard let document, let documentID, let suggestedFileName else { return }
@@ -203,6 +233,7 @@ public final class ExportSheetViewModel {
         languageToAnnounce = nil
         document = nil
         documentID = nil
+        replaced = nil
         suggestedFileName = nil
         fullPDF = nil
         openShare = nil
@@ -307,6 +338,8 @@ public final class ExportSheetViewModel {
         let mine = generation
         status = .exporting
         statusToAnnounce = nil
+        // A second intent while an export runs keeps the PDF the first one replaced: the one stopped made none
+        if let document, let documentID { replaced = (document, documentID) }
         document = nil
         documentID = nil
         suggestedFileName = nil
@@ -347,6 +380,7 @@ public final class ExportSheetViewModel {
         publish(mine) {
             self.document = document
             self.documentID = document.map { _ in ExportID(generation: mine) }
+            self.replaced = nil
             self.settle(status)
         }
     }
@@ -391,6 +425,7 @@ public final class ExportSheetViewModel {
         automaticLanguage = automatic
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {
+            replaced = nil
             settle(.notReady)
             return nil
         }

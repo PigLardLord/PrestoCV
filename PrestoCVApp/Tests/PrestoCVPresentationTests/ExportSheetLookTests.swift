@@ -27,6 +27,18 @@ struct ExportSheetLookTests {
         #expect(sheet.lookChoices.fontSchemes.map(\.id) == ["sans", "serif"])
     }
 
+    @Test("Each choice comes with what the picker draws it with: a design its page, a palette its colours, fonts their face")
+    func choicesCarryTheirSamples() {
+        let sheet = SheetWorld().sheet()
+
+        #expect(sheet.lookChoices.designs.map(\.sample) == [.none, .page(png: LookOptionsFake.modernPreview)])
+        #expect(sheet.lookChoices.palettes.map(\.sample) == [
+            .colors(primary: .init(red: 0.1, green: 0.2, blue: 0.7), background: .init(red: 0.9, green: 0.9, blue: 1)),
+            .colors(primary: .init(red: 0.1, green: 0.4, blue: 0.2), background: .init(red: 1, green: 1, blue: 1))
+        ])
+        #expect(sheet.lookChoices.fontSchemes.map(\.sample) == [.typeface(.system), .typeface(.serif)])
+    }
+
     @Test("A CV that keeps no look shows the app's default one")
     func showsTheDefaultLook() {
         let world = SheetWorld()

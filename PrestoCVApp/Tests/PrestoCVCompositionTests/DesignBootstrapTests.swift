@@ -41,10 +41,25 @@ struct DesignBootstrapTests {
         let again = try await Self.bootstrap(store: store, gate: second).run()
 
         #expect(await first.verified == Self.bundled)
-        #expect(installed.installed.map(\.id) == Self.bundled)
+        #expect(installed.installed.map(\.manifest.id) == Self.bundled)
         #expect(installed.defaultDesign.id == "professional")
         #expect(await second.verified.isEmpty)
-        #expect(again.installed.map(\.id) == Self.bundled)
+        #expect(again.installed.map(\.manifest.id) == Self.bundled)
+    }
+
+    @Test("The installed designs keep the preview each package brings, for the look picker")
+    func installedDesignsKeepTheirPreviews() async throws {
+        let store = InMemoryDesignStore()
+
+        let designs = try await Self.bootstrap(store: store, gate: FakeRenderingGate()).run()
+
+        let previews = designs.installed.compactMap(\.previewPNG)
+        #expect(previews.count == Self.bundled.count, "every bundled design has a preview")
+        #expect(Set(previews).count == previews.count, "no two designs share one")
+        for id in Self.bundled {
+            let stored = try await GetDesign(store: store)(id: id)
+            #expect(designs.installed.first { $0.manifest.id == id }?.previewPNG == stored.previewPNG)
+        }
     }
 
     @Test("A bundle that cannot be read, with no default design installed, fails with bundledDesignsUnavailable")
@@ -64,7 +79,7 @@ struct DesignBootstrapTests {
 
         let designs = try await Self.bootstrap(store: store, source: FixedBundledSource(packages: nil), gate: FakeRenderingGate(), logger: logger).run()
 
-        #expect(designs.installed.map(\.id) == Self.bundled)
+        #expect(designs.installed.map(\.manifest.id) == Self.bundled)
         let failed = try #require(logger.entry("designs.syncFailed"))
         #expect(failed.level == .notice)
         #expect(failed.value("reason") == .token("bundledDesignsUnavailable"))
@@ -124,7 +139,7 @@ struct DesignBootstrapTests {
         #expect(logger.entry("designs.interrupted")?.level == .info)
         #expect(logger.entry("designs.unavailable") == nil)
         #expect(await next.verified == ["modern", "professional"])
-        #expect(designs.installed.map(\.id) == Self.bundled)
+        #expect(designs.installed.map(\.manifest.id) == Self.bundled)
     }
 
     @Test("A launch cancelled while the store waits for its lock is designSyncInterrupted, whether the wait then lists or times out", arguments: [false, true])
@@ -147,7 +162,7 @@ struct DesignBootstrapTests {
 
         let designs = try await Self.bootstrap(store: SpyDesignStore(unreadable: ["modern"]), gate: FakeRenderingGate(), logger: logger).run()
 
-        #expect(designs.installed.map(\.id) == ["minimal", "professional"])
+        #expect(designs.installed.map(\.manifest.id) == ["minimal", "professional"])
         let unreadable = try #require(logger.entry("designs.unreadable"))
         #expect(unreadable.level == .notice)
         #expect(unreadable.category == .designs)
@@ -169,7 +184,7 @@ struct DesignBootstrapTests {
             store: InMemoryDesignStore(), gate: FakeRenderingGate(refusing: ["modern"]), logger: logger
         ).run()
 
-        #expect(designs.installed.map(\.id) == ["minimal", "professional"])
+        #expect(designs.installed.map(\.manifest.id) == ["minimal", "professional"])
         let synced = logger.entry("designs.synced")
         #expect(synced?.level == .notice)
         #expect(synced?.value("notRendered") == .count(1))
@@ -185,7 +200,7 @@ struct DesignBootstrapTests {
             store: InMemoryDesignStore(), source: FixedBundledSource(packages: packages), gate: FakeRenderingGate(), logger: logger
         ).run()
 
-        #expect(designs.installed.map(\.id) == Self.bundled)
+        #expect(designs.installed.map(\.manifest.id) == Self.bundled)
         #expect(logger.entry("designs.synced")?.value("rejected") == .count(1))
     }
 

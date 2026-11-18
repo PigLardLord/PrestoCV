@@ -183,6 +183,17 @@ public struct ExportID: Hashable, Sendable {
     init(generation: Int) { self.generation = generation }
 }
 
+/// What the export sheet shows above its lines (#407).
+public enum ExportPreview: Hashable, Sendable {
+    /// The PDF of the last export: it opens on the whole screen, and the share sends it.
+    case pdf(ExportedDocument, ExportID)
+    /// The PDF that was on screen when the export that runs began, shown until that export ends. It neither opens nor
+    /// is shared: it is not the PDF of what the sheet shows now.
+    case replaced(ExportedDocument, ExportID)
+    /// No PDF: before the first one, and after an export that made none.
+    case none
+}
+
 /// The PDF of an export, shown on the whole screen.
 public struct FullPDF: Identifiable, Hashable, Sendable {
     /// The export that made the PDF.
