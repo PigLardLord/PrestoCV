@@ -48,6 +48,8 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShar
     let _: ObjectIdentifier = share.id
     let _: ShareOutcome? = sheet.shareOutcome
     let _: ShareFailure? = sheet.shareFailure
+    let remade: RemadePDF? = sheet.remadeToAnnounce
+    let _: Int? = remade?.pages
     let result = ShareResult(activity: nil, completed: false, failed: false)
     share.end(result)
     sheet.refresh()

@@ -23,6 +23,11 @@ public final class ExportSheetViewModel {
     /// without its PDF or with a PDF shorter than the CV needs. It is nil while one runs, after one that made the PDF
     /// in full, and when the CV lacks a field: the list under the pages says which, and Share's value points to it.
     public private(set) var statusToAnnounce: ExportStatus?
+    /// The PDF made in full again after a pick in the sheet, a look or a language, for VoiceOver to tell with its pages:
+    /// the picker covers the PDF, and a pick changes nothing else that VoiceOver reads. Each one is a new value. It is
+    /// nil while an export runs, after the opening export and a refresh, after an export that ends with a problem
+    /// (`statusToAnnounce` tells it) or without a PDF, and once the sheet stops.
+    public private(set) var remadeToAnnounce: RemadePDF?
     /// The PDF of the last export, or nil while one runs or when it failed.
     public private(set) var document: ExportedDocument?
     /// The identity of the export that made `document`: set and cleared together with it. A share names the PDF by it.
@@ -106,6 +111,10 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var failures = 0
     /// Counts the languages picked, so that each pick is a new value.
     @ObservationIgnored private var picks = 0
+    /// The generation of the export a pick started, nil when the latest export began otherwise.
+    @ObservationIgnored private var pickedExport: Int?
+    /// Counts the PDFs made again after a pick, so that each one is a new value.
+    @ObservationIgnored private var remakes = 0
 
     /// - Parameters:
     ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.
@@ -163,7 +172,7 @@ public final class ExportSheetViewModel {
     // MARK: - Intents
 
     /// Starts the export of the CV as it stands. The shell calls it when it opens the sheet.
-    public func start() { begin() }
+    public func start() { begin(afterAPick: false) }
 
     /// Exports in `language`, announces the pick and takes it to the CV. The export begins and the pick is announced
     /// before the choice goes out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is
@@ -172,14 +181,14 @@ public final class ExportSheetViewModel {
     public func select(language: ExportLanguage) {
         let keepsThePDF = language == effectiveLanguage && (status == .exporting || document != nil)
         selectedLanguage = language
-        if !keepsThePDF { begin() }
+        if !keepsThePDF { begin(afterAPick: true) }
         picks += 1
         languageToAnnounce = LanguageChoice(language: language, ordinal: picks)
         onLanguageChosen(language)
     }
 
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
-    public func refresh() { begin() }
+    public func refresh() { begin(afterAPick: false) }
 
     /// Exports with `design`, shows it and takes it to the CV; the palette and fonts stay as shown.
     public func choose(design: String) {
@@ -230,6 +239,8 @@ public final class ExportSheetViewModel {
         generation += 1
         status = .idle
         statusToAnnounce = nil
+        remadeToAnnounce = nil
+        pickedExport = nil
         languageToAnnounce = nil
         document = nil
         documentID = nil
@@ -326,18 +337,21 @@ public final class ExportSheetViewModel {
         let keepsThePDF = look == shownLook && (status == .exporting || document != nil)
         chosenLook = chosenLook.map { $0.followed(by: step) } ?? step
         shownLook = look
-        if !keepsThePDF { begin() }
+        if !keepsThePDF { begin(afterAPick: true) }
         onLookChosen(look, [part])
     }
 
     // MARK: - The export
 
-    private func begin() {
+    /// Starts an export; `afterAPick` says a pick in the sheet asked for it, so that its PDF is told once made.
+    private func begin(afterAPick: Bool) {
         running?.cancel()
         generation += 1
         let mine = generation
+        pickedExport = afterAPick ? mine : nil
         status = .exporting
         statusToAnnounce = nil
+        remadeToAnnounce = nil
         // A second intent while an export runs keeps the PDF the first one replaced: the one stopped made none
         if let document, let documentID { replaced = (document, documentID) }
         document = nil
@@ -385,10 +399,16 @@ public final class ExportSheetViewModel {
         }
     }
 
-    /// The export ended with `ended`: the status line shows it, and VoiceOver is told it when it is a problem.
+    /// The export ended with `ended`: the status line shows it, and VoiceOver is told it when it is a problem, or the
+    /// pages of the PDF when a pick made it again in full.
     private func settle(_ ended: ExportStatus) {
         status = ended
         statusToAnnounce = ended.isTold ? ended : nil
+        remadeToAnnounce = nil
+        if case .done(let pages) = ended, pickedExport == generation {
+            remakes += 1
+            remadeToAnnounce = RemadePDF(pages: pages, ordinal: remakes)
+        }
     }
 
     /// Reads the CV, publishes what the sheet knows of it before the export, and gives it with the language of the PDF;

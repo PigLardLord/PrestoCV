@@ -37,6 +37,7 @@ struct ExportSheetView: View {
                 .announce(sheet.statusToAnnounce) { $0.words }
                 .announce(sheet.shareOutcome) { $0.words }
                 .announce(sheet.shareFailure) { $0.words }
+                .announce(sheet.remadeToAnnounce) { $0.words }
             }
             .scrollBounceBehavior(.basedOnSize)
             .onNarrowScreen { isNarrow = $0 }
