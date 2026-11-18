@@ -45,6 +45,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"list.notice \(notice.count)"#: ValueTypes(["%lld"], "StoreNotice's count is an Int"),
                 #"export.pages \(pages)"#: ValueTypes(["%lld"], "ExportedDocument's pages is an Int"),
                 #"export.preview.open \(pages)"#: ValueTypes(["%lld"], "ExportedDocument's pages is an Int"),
+                #"export.headings \(name)"#: ValueTypes(["%@"], "LanguageName gives the language's name as a String"),
                 #"export.error.too_many_pages \(required) \(pages)"#: ValueTypes(["%lld", "%lld"], "ExportStatus.truncated holds two Ints"),
                 #"export.status.incomplete \(missing)"#: ValueTypes(["%lld"], "ExportStatus.incomplete holds an Int"),
                 #"export.status.text_not_visible \(lines)"#: ValueTypes(["%lld"], "ExportStatus.textNotVisible holds an Int"),
