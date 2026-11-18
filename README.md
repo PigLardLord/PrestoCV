@@ -43,7 +43,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 | `Tools/ArchitectureCheck/`, `.githooks/` | The checker that enforces the rules, and the pre-commit hook that runs it. |
 | `Tools/SourceChecks/` | The checks of source text: the string catalog, the rules the app's views follow, how the tests render views off screen, release hygiene, the deployment targets, and the documents (they are in English, this table matches the repository, and the open-source files are there and linked). They read the repository, so they run with `swift test`, not in the test plans. |
 | `Tools/Localization/` | `l10n_manager.py`, which adds, reads, lists, checks and updates the texts of the string catalog. Run it from the repository root. |
-| `ci_scripts/`, `TestPlans/`, `docs/release/` | The releases and the Apple checks: the build scripts that Xcode Cloud and the pull request check run, the test plans, the settings of the workflows and of the check, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
+| `ci_scripts/`, `TestPlans/`, `docs/release/`, `docs/ci.md` | The releases and the Apple checks: the build scripts that Xcode Cloud and the pull request check run, the test plans, the settings of the workflows and of the check, and the App Store listing in every language with the notes for App Review (`docs/release/store-listing.md`, checked by `Tools/Release/check-store-listing.py`). |
 | `Prototypes/ADRValidation/` | The throwaway prototype that validated the ADRs. It is outside the app's build; its README says how to run it. |
 | `PrestoCV.xcodeproj/` | The Xcode project, in its JSON format (`project.xcproj`), and the shared schemes. |
 | `.agents/` | The branch policy that the git hooks follow: the protected branches, and the paths that are not code. |
@@ -82,7 +82,7 @@ Xcode Cloud archives version 1, signs it and uploads it to TestFlight ([ADR 0024
 
 Nothing submits a build for App Review: the maintainer does it in App Store Connect. Xcode Cloud signs the build itself, so the repository holds no key and no secret. [docs/release/xcode-cloud.md](docs/release/xcode-cloud.md) has the settings of the workflows, the one-time setup and the steps to cut a release.
 
-Xcode Cloud checks no pull request: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests) says how one is checked. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
+Xcode Cloud checks no pull request: [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests) says how one is checked, and [docs/ci.md](docs/ci.md) describes the checks. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 
 ## Contributing
 
