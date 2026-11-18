@@ -135,7 +135,7 @@ final class SheetWorld {
     /// How many snapshots the sheet asked for.
     private(set) var snapshotsTaken = 0
     /// Each language the sheet took to the CV.
-    private(set) var chosen: [ExportLanguage?] = []
+    private(set) var chosen: [ExportLanguage] = []
     /// Each language the sheet kept in the CV because its words told it.
     private(set) var kept: [ExportLanguage] = []
 
@@ -153,7 +153,7 @@ final class SheetWorld {
     /// - Parameters:
     ///   - whenChosen: Runs inside the callback that takes a chosen language to the CV, as a caller's code can.
     ///   - whenRead: Runs inside the snapshot closure, as a caller's code can.
-    func sheet(whenChosen: @escaping @MainActor (ExportLanguage?) -> Void = { _ in },
+    func sheet(whenChosen: @escaping @MainActor (ExportLanguage) -> Void = { _ in },
                whenRead: @escaping @MainActor () -> Void = {}) -> ExportSheetViewModel {
         ExportSheetViewModel(
             exporter: exporter, files: files,

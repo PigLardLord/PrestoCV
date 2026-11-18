@@ -22,6 +22,8 @@ public struct DetectDocumentLanguage: Sendable {
         let text = Self.words(of: cv)
         guard Self.wordCount(of: text) >= Self.minimumWords else { return nil }
         let reading = reader.reading(of: String(text.prefix(Self.maximumCharacters)), among: languages)
+        // The port promises nothing past its signature: a reader other than the system's, or a test double, may give a
+        // language outside `languages`, or two languages as likely, and such a reading tells none
         guard let found = reading.dominant, languages.contains(found),
               let likelihood = reading.likelihoods[found], likelihood >= Self.minimumLikelihood,
               !reading.likelihoods.contains(where: { $0.key != found && $0.value >= likelihood }) else { return nil }

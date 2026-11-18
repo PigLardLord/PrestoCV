@@ -9,11 +9,15 @@ import PrestoCVWorkflowPorts
 @Observable
 public final class ExportSheetViewModel {
 
-    /// The language the person chose in the sheet; nil is automatic.
+    /// The language the person chose in the sheet, nil until they choose one. A choice is the CV's language from then on,
+    /// as a language read from the words is: the sheet has no way back to automatic (#407).
     public private(set) var selectedLanguage: ExportLanguage?
-    /// The language automatic stands for: the one the CV holds, else the one its words are written in, else the app's
-    /// (#407). Nil until the sheet has read the CV.
+    /// The language of the PDF while none is chosen: the one the CV holds, else the one its words are written in, else
+    /// the app's (#407). Nil until the sheet has read the CV. Once a language is chosen the words are no longer read.
     public private(set) var automaticLanguage: ExportLanguage?
+    /// The last language the person picked, for VoiceOver to tell: each pick is a new value, a pick of the language
+    /// already shown too, as the menu then closes on an unchanged row. Nil before a pick and once the sheet stops.
+    public private(set) var languageToAnnounce: LanguageChoice?
     public private(set) var status: ExportStatus = .idle
     /// The end of the last export for VoiceOver to tell, when the status line says a problem: set as an export ends
     /// without its PDF or with a PDF shorter than the CV needs. It is nil while one runs, after one that made the PDF
@@ -44,7 +48,7 @@ public final class ExportSheetViewModel {
     public var effectiveLanguage: ExportLanguage? { selectedLanguage ?? automaticLanguage }
 
     /// The languages the sheet offers.
-    public var offeredLanguages: [ExportLanguage] { offered }
+    public let offeredLanguages: [ExportLanguage]
 
     /// Whether Share can be used now: it waits for the export and for the file of a share, and needs the PDF. The share
     /// sheet itself is not counted: it covers the sheet until it ends.
@@ -62,14 +66,13 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private let exporter: any CVExporting
     @ObservationIgnored private let files: any ExportFileSharing
     @ObservationIgnored private let snapshot: @MainActor () -> ExportSnapshot
-    @ObservationIgnored private let offered: [ExportLanguage]
     @ObservationIgnored private let appLanguage: ExportLanguage
     @ObservationIgnored private let fileNamePattern: @Sendable (ExportLanguage) -> String
-    @ObservationIgnored private let onLanguageChosen: @MainActor (ExportLanguage?) -> Void
+    @ObservationIgnored private let onLanguageChosen: @MainActor (ExportLanguage) -> Void
     @ObservationIgnored private let detector: any CVLanguageDetecting
     @ObservationIgnored private let onLanguageFound: @MainActor (ExportLanguage) -> Void
     /// The language the sheet found in the words of a CV that keeps none: the words are read until they tell one, and
-    /// then no more. Choosing automatic forgets it, as the CV then forgets its own.
+    /// then no more.
     @ObservationIgnored private var found: DocumentLanguage?
     /// Fixes the end of a pause now, and gives the wait for it.
     @ObservationIgnored private let pauseFromNow: () -> () async throws -> Void
@@ -80,6 +83,8 @@ public final class ExportSheetViewModel {
     private var writing = false
     /// Counts the failed shares, so that each one is a new value.
     @ObservationIgnored private var failures = 0
+    /// Counts the languages picked, so that each pick is a new value.
+    @ObservationIgnored private var picks = 0
 
     /// - Parameters:
     ///   - files: Writes the PDF as a file for the share sheet, and removes it when the share ends.
@@ -88,7 +93,7 @@ public final class ExportSheetViewModel {
     ///   - appLanguage: The language of the app: the PDF's when the CV keeps none and its words tell none, which is
     ///     then kept nowhere (#407).
     ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
-    ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV; nil is automatic.
+    ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV.
     ///   - languageDetector: Tells the language of the words of a CV that keeps none.
     ///   - onLanguageFound: Keeps in the CV the language its words were found in, unless the person chose one in the
     ///     sheet: the headings then stay in that language. It must never replace a language the CV keeps by the time it
@@ -99,13 +104,13 @@ public final class ExportSheetViewModel {
         exporter: any CVExporting, files: any ExportFileSharing, snapshot: @escaping @MainActor () -> ExportSnapshot,
         offeredLanguages: [ExportLanguage],
         appLanguage: ExportLanguage, fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
-        onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void, languageDetector: any CVLanguageDetecting,
+        onLanguageChosen: @escaping @MainActor (ExportLanguage) -> Void, languageDetector: any CVLanguageDetecting,
         onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void, clock: any Clock<Duration>, pause: Duration
     ) {
         self.exporter = exporter
         self.files = files
         self.snapshot = snapshot
-        self.offered = offeredLanguages
+        self.offeredLanguages = offeredLanguages
         self.appLanguage = appLanguage
         self.fileNamePattern = fileNamePattern
         self.onLanguageChosen = onLanguageChosen
@@ -127,14 +132,16 @@ public final class ExportSheetViewModel {
     /// Starts the export of the CV as it stands. The shell calls it when it opens the sheet.
     public func start() { begin() }
 
-    /// Exports in `language`, and takes the choice to the CV; nil is automatic. The export begins before the choice goes
-    /// out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is the later intent. The
-    /// language of the PDF on screen, or of the one being made, keeps that PDF: the choice still goes to the CV.
-    public func select(language: ExportLanguage?) {
-        let keepsThePDF = language != nil && language == effectiveLanguage && (status == .exporting || document != nil)
+    /// Exports in `language`, announces the pick and takes it to the CV. The export begins and the pick is announced
+    /// before the choice goes out, so a call into the sheet from `onLanguageChosen` (a `stop()`, another `select`) is
+    /// the later intent. The language of the PDF on screen, or of the one being made, keeps that PDF: the pick is still
+    /// announced, and still goes to the CV.
+    public func select(language: ExportLanguage) {
+        let keepsThePDF = language == effectiveLanguage && (status == .exporting || document != nil)
         selectedLanguage = language
-        if language == nil { found = nil }
         if !keepsThePDF { begin() }
+        picks += 1
+        languageToAnnounce = LanguageChoice(language: language, ordinal: picks)
         onLanguageChosen(language)
     }
 
@@ -156,6 +163,7 @@ public final class ExportSheetViewModel {
         generation += 1
         status = .idle
         statusToAnnounce = nil
+        languageToAnnounce = nil
         document = nil
         documentID = nil
         suggestedFileName = nil
@@ -268,7 +276,7 @@ public final class ExportSheetViewModel {
     }
 
     private func export(_ mine: Int) async {
-        guard let (cv, language) = readTheCV(mine) else { return }
+        guard let (cv, language) = readCVAndLanguage(mine) else { return }
         let status: ExportStatus
         var document: ExportedDocument?
         do {
@@ -298,9 +306,10 @@ public final class ExportSheetViewModel {
     }
 
     /// Reads the CV, publishes what the sheet knows of it before the export, and gives it with the language of the PDF;
-    /// nil when nothing is to be exported, or when `mine` is no longer the latest intent: the snapshot closure and
-    /// `onLanguageFound` can call into the sheet, so the generation is checked again after each.
-    private func readTheCV(_ mine: Int) -> (CV, DocumentLanguage)? {
+    /// nil when nothing is to be exported, or when `mine` is no longer the latest intent. On the way it can store in the
+    /// CV the language its words are written in (`wordsLanguage`). The snapshot closure and `onLanguageFound` can call
+    /// into the sheet, so the generation is checked again after each.
+    private func readCVAndLanguage(_ mine: Int) -> (CV, DocumentLanguage)? {
         guard mine == generation else { return nil }
         let cv = snapshot().cv
         guard mine == generation else { return nil }
@@ -310,14 +319,15 @@ public final class ExportSheetViewModel {
     }
 
     /// The language of the words of a CV that keeps none, or nil when they tell none. The first one found goes to the
-    /// CV, unless the person chose a language in the sheet: that choice goes to the CV instead. The CV keeps the found
-    /// one only if it keeps none by the time it is stored (`onLanguageFound`). A save that fails
-    /// leaves the CV without a language, as a failed choice does: the editor shows the failure, and the next sheet
-    /// reads the words again.
+    /// CV. Once the person chose a language the words are not read: that choice goes to the CV instead. The CV keeps
+    /// the found one only if it keeps none by the time it is stored (`onLanguageFound`). A save that fails leaves the CV
+    /// without a language, as a failed choice does: the editor shows the failure, and the next sheet reads the words
+    /// again.
     private func wordsLanguage(of cv: CV) -> DocumentLanguage? {
         if let found { return found }
-        found = detector.language(of: cv, among: offered.map(\.language))
-        if let found, selectedLanguage == nil { onLanguageFound(ExportLanguage(language: found)) }
+        guard selectedLanguage == nil else { return nil }
+        found = detector.language(of: cv, among: offeredLanguages.map(\.language))
+        if let found { onLanguageFound(ExportLanguage(language: found)) }
         return found
     }
 

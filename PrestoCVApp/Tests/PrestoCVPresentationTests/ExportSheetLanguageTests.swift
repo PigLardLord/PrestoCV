@@ -75,26 +75,7 @@ struct ExportSheetLanguageTests {
         #expect(world.exporter.languages.map(\.tag) == ["en"])
         #expect(world.chosen == [SheetWorld.language("en")])
         #expect(world.kept.isEmpty, "the CV keeps the person's choice, which reaches it later than this snapshot")
-        #expect(sheet.automaticLanguage == SheetWorld.language("de"), "automatic still names what it stands for")
-    }
-
-    @Test("Choosing automatic again reads the words again, and their language goes to the CV")
-    func automaticReadsTheWordsAgain() async {
-        let world = SheetWorld()
-        world.cv = SheetWorld.cv(language: nil)
-        world.detector.answers(DocumentLanguage("de"))
-        let sheet = world.sheet()
-
-        sheet.select(language: SheetWorld.language("en"))
-        await world.passThePause(thenExports: 1)
-        sheet.select(language: nil)
-        await world.passThePause(thenExports: 2)
-        await settle()
-
-        #expect(world.exporter.languages.map(\.tag) == ["en", "de"])
-        #expect(world.chosen == [SheetWorld.language("en"), nil])
-        #expect(world.kept == [SheetWorld.language("de")])
-        #expect(world.detector.asked.count == 2)
+        #expect(world.detector.asked.isEmpty, "a language chosen is the CV's from then on: its words no longer matter")
     }
 
     @Test("Once the words told a language, a new export neither reads them again nor keeps it twice")
@@ -145,29 +126,51 @@ struct ExportSheetLanguageTests {
         #expect(world.chosen == [SheetWorld.language("de")])
     }
 
-    @Test("Choosing automatic takes nil to the CV")
-    func choosingAutomaticCallsItWithNil() async {
+    @Test("Before a choice the sheet holds none, and the PDF is in the CV's language")
+    func noChoiceIsTheCVsLanguage() async {
         let world = SheetWorld()
         let sheet = world.sheet()
 
-        sheet.select(language: nil)
-
-        #expect(world.chosen == [nil])
-    }
-
-    @Test("Automatic is nil, and names the language it stands for: the CV's")
-    func automaticIsNilAndNamesTheLanguageItStandsFor() async {
-        let world = SheetWorld()
-        let sheet = world.sheet()
-
-        sheet.select(language: SheetWorld.language("de"))
-        sheet.select(language: nil)
+        sheet.start()
         await world.passThePause(thenExports: 1)
 
         #expect(sheet.selectedLanguage == nil)
         #expect(sheet.automaticLanguage == SheetWorld.language("it"), "the CV is in Italian")
         #expect(sheet.effectiveLanguage == SheetWorld.language("it"))
         #expect(world.exporter.languages.map(\.tag) == ["it"])
+    }
+
+    // MARK: - What is announced
+
+    @Test("Each language picked is announced, the one already shown too, and nothing once the sheet stops")
+    func eachPickIsAnnounced() async {
+        let world = SheetWorld()
+        let sheet = world.sheet()
+
+        sheet.start()
+        await world.passThePause(thenExports: 1)
+        #expect(sheet.languageToAnnounce == nil, "an export no one picked a language for announces none")
+        sheet.select(language: SheetWorld.language("de"))
+        let first = sheet.languageToAnnounce
+        sheet.select(language: SheetWorld.language("de"))
+        let second = sheet.languageToAnnounce
+
+        #expect(first?.language == SheetWorld.language("de"))
+        #expect(second?.language == SheetWorld.language("de"))
+        #expect(first != second, "the same language picked again is a new pick, and is announced again")
+        sheet.stop()
+        #expect(sheet.languageToAnnounce == nil)
+    }
+
+    @Test("A pick whose callback stops the sheet announces nothing")
+    func aPickStoppedFromItsCallbackIsNotAnnounced() async {
+        let world = SheetWorld()
+        var sheet: ExportSheetViewModel?
+        sheet = world.sheet(whenChosen: { _ in sheet?.stop() })
+
+        sheet?.select(language: SheetWorld.language("de"))
+
+        #expect(sheet?.languageToAnnounce == nil, "the stop is the later intent")
     }
 
     @Test("The file is named in the language of the PDF, not the app's, and only once the PDF's language is known")

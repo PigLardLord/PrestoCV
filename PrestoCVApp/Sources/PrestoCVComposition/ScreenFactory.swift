@@ -124,12 +124,17 @@ public final class ScreenFactory {
         }, makeExportSheet: { editor in
             self.makeExportSheet(
                 for: editor, appLanguage: self.appLanguage, fileNamePattern: fileNamePattern,
+                // Each task holds the editor until its change is queued, and takes its place in the editor's line as
+                // it starts: tasks made one after the other on the main actor start in that order (SE-0431), so a pick
+                // and a language found reach the CV in the order the sheet sent them
                 onLanguageChosen: { [weak editor] language in
-                    Task { await editor?.setDocumentLanguage(language?.tag) }
+                    guard let editor else { return }
+                    Task { await editor.setDocumentLanguage(language.tag) }
                 },
                 onLanguageFound: { [weak editor] language in
                     // Kept only if the CV still keeps none once the changes asked for before it have run (#407)
-                    Task { await editor?.keepFoundLanguage(language.tag) }
+                    guard let editor else { return }
+                    Task { await editor.keepFoundLanguage(language.tag) }
                 }
             )
         }, backgroundTime: backgroundTime)
@@ -177,13 +182,13 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - appLanguage: The language of the app: the PDF's when the CV keeps no language and its words tell none.
     ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
-    ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV; nil is automatic.
+    ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV.
     ///   - onLanguageFound: Keeps in a CV that keeps no language the one its words were found written in, once; never
     ///     over a language the CV keeps by then (#407).
     public func makeExportSheet(
         for editor: EditorViewModel, appLanguage: ExportLanguage,
         fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
-        onLanguageChosen: @escaping @MainActor (ExportLanguage?) -> Void,
+        onLanguageChosen: @escaping @MainActor (ExportLanguage) -> Void,
         onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void
     ) -> ExportSheetViewModel? {
         guard let loaded = editor.exportSnapshot() else { return nil }
