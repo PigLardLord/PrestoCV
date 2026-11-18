@@ -346,7 +346,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
+            appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -373,7 +374,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
+            appLanguage: .preferred(["en"])
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -406,7 +408,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
+            appLanguage: .preferred(["en"])
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
@@ -435,7 +438,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"])
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
+            appLanguage: .preferred(["en"])
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let shell = factory.makeShell(
@@ -590,7 +594,8 @@ struct ScreenFactoryTests {
 
     private static func sheet(_ fixture: Fixture, _ editor: EditorViewModel) throws -> ExportSheetViewModel? {
         fixture.composition.screens.makeExportSheet(
-            for: editor, appLanguage: try english(), fileNamePattern: { _ in "CV %@" }, onLanguageChosen: { _ in }
+            for: editor, appLanguage: try english(), fileNamePattern: { _ in "CV %@" }, onLanguageChosen: { _ in },
+            onLanguageFound: { _ in }
         )
     }
 
@@ -696,6 +701,41 @@ struct ScreenFactoryTests {
         for await language in Observations({ editor.documentLanguage }) where language == "de" { break }
         #expect(try await fixture.composition.repository.load(FixtureCV.full().id).language?.tag == "de")
         for await exporting in Observations({ sheet.status == .exporting }) where !exporting { break }
+        #expect(sheet.document != nil, "the export ended with \(sheet.status)")
+        shell.closeExport()
+    }
+
+    @Test("The shell's export sheet keeps in a CV with no language the language its words are written in (#407)",
+          .timeLimit(.minutes(1)), .printsForReal)
+    func shellSheetKeepsTheLanguageOfTheWords() async throws {
+        let fixture = try await Self.fixture()
+        defer { fixture.clean() }
+        let written = CV(
+            id: FixtureCV.full().id,
+            personal: PersonalDetails(
+                fullName: "Tobias Renn", professionalTitle: "Koch", email: nil, location: "Asti",
+                summary: "Ich koordiniere seit zehn Jahren die Schichten einer großen Küche und plane jeden Morgen "
+                    + "die Menüs für das Mittagessen."
+            ),
+            sections: CVSections(experiences: [], education: [])
+        )
+        _ = try await fixture.composition.repository.create(written)
+        let list = Self.list(fixture)
+        await list.load()
+        let reference = try #require(list.rows.first?.reference)
+        let shell = Self.shell(fixture, list: list, firstRun: fixture.composition.screens.makeFirstRun())
+        shell.open(.stored(reference))
+        let editor = try #require(shell.editor)
+        await editor.load()
+        #expect(editor.documentLanguage == nil)
+
+        shell.openExport()
+        let sheet = try #require(shell.exportSheet)
+
+        for await language in Observations({ editor.documentLanguage }) where language == "de" { break }
+        #expect(try await fixture.composition.repository.load(written.id).language?.tag == "de")
+        for await exporting in Observations({ sheet.status == .exporting }) where !exporting { break }
+        #expect(sheet.effectiveLanguage?.tag == "de")
         #expect(sheet.document != nil, "the export ended with \(sheet.status)")
         shell.closeExport()
     }

@@ -131,7 +131,8 @@ struct ExportSheetStatusTests {
             exporter: world.exporter, files: world.files, snapshot: { editor.exportSnapshot()! },
             offeredLanguages: SheetWorld.offered,
             appLanguage: SheetWorld.appLanguage, fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" },
-            onLanguageChosen: { _ in }, clock: world.clock, pause: SheetWorld.pause)
+            onLanguageChosen: { _ in }, languageDetector: world.detector, onLanguageFound: { _ in },
+            clock: world.clock, pause: SheetWorld.pause)
 
         sheet.start()
         await world.passThePause(thenExports: 1)

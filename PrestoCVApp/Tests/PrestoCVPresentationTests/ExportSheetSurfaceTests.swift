@@ -29,8 +29,9 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShar
     let _: String? = full?.fileName
     sheet.closeFullPDF()
     sheet.start()
-    sheet.select(language: ExportLanguage("de"))
-    sheet.select(language: nil)
+    sheet.select(language: ExportLanguage.preferred(["de"]))
+    let announced: LanguageChoice? = sheet.languageToAnnounce
+    let _: ExportLanguage? = announced?.language
     sheet.share()
     let _: PDFShare? = sheet.openShare
     let _: URL = share.url
@@ -62,7 +63,7 @@ struct ExportSheetSurfaceTests {
         useEveryPublicMember(of: sheet, sharing: share)
 
         #expect(sheet.status == .idle)
-        #expect(sheet.selectedLanguage == nil)
+        #expect(sheet.selectedLanguage == ExportLanguage("de"), "a choice stays: the sheet has no way back to automatic")
     }
 
     @Test("What the sheet shows of an export, of the CV and of a share are codes: none carries a text")

@@ -5,6 +5,11 @@ import PrestoCVIntegration
 import PrestoCVPresentation
 import PrestoCVWorkflowPorts
 
+/// A reader of a CV's language that never finds one, for the tests that never export.
+struct NoDetectedLanguage: CVLanguageDetecting {
+    func language(of cv: CV, among languages: [DocumentLanguage]) -> DocumentLanguage? { nil }
+}
+
 /// An importer for the tests that never import.
 struct NoImporter: CVTextImporting {
     func importText(_ text: String) throws -> ImportResult { throw ImportError.unreadable }
