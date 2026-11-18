@@ -11,11 +11,18 @@ struct PDFPagesTests {
     #if os(iOS)
     /// A PDF of one A4 page with a dark bar on it.
     private func onePagePDF() -> Data {
+        pdf(pages: 1)
+    }
+
+    /// A PDF of A4 pages, each with a dark bar on it.
+    private func pdf(pages: Int) -> Data {
         let page = CGRect(x: 0, y: 0, width: 595, height: 842)
         return UIGraphicsPDFRenderer(bounds: page).pdfData { context in
-            context.beginPage()
-            UIColor.black.setFill()
-            context.fill(CGRect(x: 40, y: 40, width: 200, height: 30))
+            for _ in 0..<pages {
+                context.beginPage()
+                UIColor.black.setFill()
+                context.fill(CGRect(x: 40, y: 40, width: 200, height: 30))
+            }
         }
     }
 
@@ -28,6 +35,13 @@ struct PDFPagesTests {
         host.view.layoutIfNeeded()
         defer { window.isHidden = true }
         return find(in: host.view)
+    }
+
+    /// Makes SwiftUI run its update of a hosted view now: `layoutIfNeeded` alone finds no layout due and leaves the new
+    /// root view waiting.
+    private func runTheUpdate(of host: UIHostingController<PDFPages<Int>>) {
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
     }
 
     private func find(in view: UIView) -> PDFPagesView? {
@@ -55,6 +69,34 @@ struct PDFPagesTests {
         #expect(abs(pages.scaleFactor - fit) < 0.001, "The pages open at the fit")
         #expect(abs(pages.minScaleFactor - fit) < 0.001, "The person cannot zoom out of the fit")
         #expect(abs(pages.maxScaleFactor - fit * PDFPagesView.zoomLimit) < 0.001, "The person zooms in up to four times")
+    }
+
+    /// A new document takes PDFKit's old pages out of the window, and one of them may hold the focus: given up inside
+    /// SwiftUI's update, the focus made the update start again without end, and the app stopped answering when a look
+    /// was picked (#407). So the update leaves the shown document in place, and the new one comes once it is done.
+    @Test("A new PDF is shown once SwiftUI's update is done, the last of those given meanwhile")
+    func newPDFIsShownAfterTheUpdate() async throws {
+        let host = UIHostingController(rootView: PDFPages(pdf: pdf(pages: 1), id: 1, isForTheEyeOnly: true))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.layoutIfNeeded()
+        let pages = try #require(find(in: host.view), "The PDF is shown")
+
+        host.rootView = PDFPages(pdf: pdf(pages: 2), id: 2, isForTheEyeOnly: true)
+        runTheUpdate(of: host)
+        let showing = try #require(pages.showing, "The update asks for the new PDF")
+        #expect(pages.document?.pageCount == 1, "The update leaves the shown document in place")
+        host.rootView = PDFPages(pdf: pdf(pages: 3), id: 3, isForTheEyeOnly: true)
+        runTheUpdate(of: host)
+        #expect(pages.showing == showing, "A PDF given while one waits takes its place, with no second step")
+        #expect(pages.document?.pageCount == 1, "The second update leaves the shown document in place too")
+
+        await showing.value
+        #expect(pages.document?.pageCount == 3, "Once the update is done, the view shows the last PDF it was given")
+        #expect(pages.showing == nil, "Nothing waits once it is shown")
+        #expect(find(in: host.view) === pages, "The same view shows the new PDF, so the person's place is kept")
     }
 
     /// PDFKit's page analyzer, which looks for form fields as pages come into view, reads the view's document on a queue
