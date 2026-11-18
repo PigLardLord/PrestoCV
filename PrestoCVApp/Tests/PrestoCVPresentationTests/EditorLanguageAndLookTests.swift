@@ -90,6 +90,89 @@ struct EditorLanguageAndLookTests {
         #expect(editor.saveStatus == .saved)
     }
 
+    @Test("a language found in the words never replaces one found before it while that one was being written")
+    func aFoundLanguageNeverReplacesOneFoundBeforeIt() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        await editor.setDocumentLanguage(nil)
+        await world.editing.gate.close()
+
+        // A sheet found German and its write waits; a sheet opened meanwhile on words in Italian finds Italian
+        let first = Task { await editor.keepFoundLanguage("de") }
+        await waitUntil("the first language at the writer") { await world.editing.gate.waiting == 1 }
+        let second = Task { await editor.keepFoundLanguage("it") }
+        await settle()
+        await world.editing.gate.open()
+        await first.value
+        await second.value
+
+        #expect(world.editing.languages.withLock { $0.map { $0?.tag } } == [nil, "de"])
+        #expect(editor.documentLanguage == "de")
+        #expect(try await world.editing.inStore(cv.id).language?.tag == "de")
+        #expect(editor.saveStatus == .saved)
+    }
+
+    @Test("a language found in the words never replaces a chosen one, and is kept on a CV that keeps none")
+    func aFoundLanguageNeverReplacesAChosenOne() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        await editor.setDocumentLanguage(nil)
+        await world.editing.gate.close()
+
+        let chosen = Task { await editor.setDocumentLanguage("fr") }
+        await waitUntil("the chosen language at the writer") { await world.editing.gate.waiting == 1 }
+        let found = Task { await editor.keepFoundLanguage("de") }
+        await settle()
+        await world.editing.gate.open()
+        await chosen.value
+        await found.value
+
+        #expect(world.editing.languages.withLock { $0.map { $0?.tag } } == [nil, "fr"])
+        #expect(editor.documentLanguage == "fr")
+        #expect(try await world.editing.inStore(cv.id).language?.tag == "fr")
+        #expect(editor.saveStatus == .saved)
+
+        // Once the person goes back to automatic, the language the words tell is kept
+        await editor.setDocumentLanguage(nil)
+        await editor.keepFoundLanguage("de")
+        #expect(editor.documentLanguage == "de")
+        #expect(try await world.editing.inStore(cv.id).language?.tag == "de")
+
+        await editor.setDocumentLanguage(nil)
+        await editor.keepFoundLanguage("not a tag!")
+        #expect(world.editing.languages.withLock { $0.map { $0?.tag } } == [nil, "fr", nil, "de", nil])
+        #expect(editor.documentLanguage == nil)
+    }
+
+    @Test("a language found after a failed write of one is kept, and a skipped one leaves the failure shown")
+    func aFoundLanguageAfterAFailedOneIsKept() async throws {
+        let world = Editing()
+        let cv = try await world.storedCV()
+        let editor = await world.editor(on: cv)
+        await editor.setDocumentLanguage(nil)
+
+        world.editing.restyleErrors.withLock { $0 = [EditFailure.unavailable] }
+        await editor.keepFoundLanguage("de")
+        #expect(editor.documentLanguage == nil)
+        #expect(editor.saveStatus == .failed)
+
+        await editor.keepFoundLanguage("de")
+        #expect(editor.documentLanguage == "de")
+        #expect(try await world.editing.inStore(cv.id).language?.tag == "de")
+        #expect(editor.saveStatus == .saved)
+
+        // A failed change of the look, then a language found on a CV that keeps one already: the failure stays
+        world.editing.restyleErrors.withLock { $0 = [EditFailure.unavailable] }
+        await editor.changeLook(to: classicOcean, parts: [.design])
+        #expect(editor.saveStatus == .failed)
+        await editor.keepFoundLanguage("it")
+        #expect(editor.documentLanguage == "de")
+        #expect(editor.saveStatus == .failed)
+        #expect(world.editing.languages.withLock { $0.map { $0?.tag } } == [nil, "de", "de"])
+    }
+
     @Test("a look and a language chosen before the first write are shown at once and stored by that write")
     func changesBeforeTheFirstWriteAreStoredByIt() async throws {
         let world = Editing()

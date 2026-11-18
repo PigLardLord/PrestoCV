@@ -35,8 +35,6 @@ public enum ExportStatus: Hashable, Sendable {
     case done(pages: Int)
     /// The document needs more pages than it got.
     case truncated(pages: Int, required: Int)
-    /// The CV says no document language, and the app has no detector yet.
-    case languageNeeded
     /// The CV lacks what an export needs.
     case notReady
     /// The document language has no bundled headings; nothing is exported in another language.

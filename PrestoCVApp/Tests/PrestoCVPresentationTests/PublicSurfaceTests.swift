@@ -114,6 +114,7 @@ func useEveryPublicMember(of editor: EditorViewModel) async {
     await editor.saveAsCopy()
     let tag: String? = nil
     await editor.setDocumentLanguage(tag)
+    await editor.keepFoundLanguage("de")
     let parts: Set<LookPart> = [.design]
     await editor.changeLook(to: EditorLook(design: "classic", palette: nil, fonts: nil), parts: parts)
     let _: ExportSnapshot? = editor.exportSnapshot()
@@ -141,12 +142,12 @@ func everySaveStatus() -> [SaveStatus] {
 }
 
 func everyExportStatus() -> [ExportStatus] {
-    let all: [ExportStatus] = [.idle, .exporting, .done(pages: 1), .truncated(pages: 1, required: 2), .languageNeeded,
+    let all: [ExportStatus] = [.idle, .exporting, .done(pages: 1), .truncated(pages: 1, required: 2),
                                .notReady, .unsupportedLanguage, .invalid, .incomplete(missing: 1),
                                .textNotVisible(lines: 1), .failed]
     for status in all {
         switch status {
-        case .idle, .exporting, .done, .truncated, .languageNeeded, .notReady, .unsupportedLanguage, .invalid, .incomplete,
+        case .idle, .exporting, .done, .truncated, .notReady, .unsupportedLanguage, .invalid, .incomplete,
              .textNotVisible, .failed:
             break
         }

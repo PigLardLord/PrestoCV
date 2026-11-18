@@ -326,6 +326,40 @@
    ]
   },
   {
+   "name": "PrestoCVApplicationNaturalLanguage",
+   "path": "PrestoCVCore/Sources/PrestoCVApplicationNaturalLanguage",
+   "allowedImports": [
+    "PrestoCVApplication",
+    "PrestoCVDomain",
+    "NaturalLanguage",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVApplicationNaturalLanguageTests",
+   "path": "PrestoCVCore/Tests/PrestoCVApplicationNaturalLanguageTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "NaturalLanguage",
+    "PrestoCVApplication",
+    "PrestoCVApplicationNaturalLanguage",
+    "PrestoCVDomain"
+   ],
+   "rules": [
+    "R16"
+   ]
+  },
+  {
    "name": "CVDocumentModel",
    "path": "CVPDFExporter/Sources/CVDocumentModel",
    "allowedImports": [
@@ -913,6 +947,7 @@
     "PrestoCVDomain",
     "PrestoCVImporting",
     "PrestoCVImportingPDFKit",
+    "PrestoCVApplicationNaturalLanguage",
     "PrestoCVPersistence",
     "CVDocumentModel",
     "CVDesignCatalog",
