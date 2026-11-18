@@ -36,7 +36,7 @@ struct LookItemButton: View {
             } else {
                 VStack(spacing: Spacing.small) {
                     ringed
-                    Text(LookName.of(item))
+                    WholeWordsText(LookName.of(item))
                         .font(.footnote)
                         .multilineTextAlignment(.center)
                 }

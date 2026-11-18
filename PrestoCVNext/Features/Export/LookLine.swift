@@ -19,6 +19,7 @@ struct LookLine: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("look.title"))
+        .accessibilityInputLabels([Text("look.title"), Text("look.change")])
         .accessibilityValue(Text(verbatim: LookName.chosen(sheet.lookPicker, in: locale)))
         .accessibilityHint(Text("look.row.hint"))
         .accessibilityIdentifier("export.look")

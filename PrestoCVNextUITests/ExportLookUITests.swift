@@ -86,13 +86,13 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         try XCTSkipUnless(isCompact(app), "Only a narrow screen shows the look as one line")
         let line = try openExport(designsOwn, in: app)
 
-        XCTAssertEqual(line.value as? String, "Modern, Design’s own, Design’s own", "The design sets the fonts and colours")
+        XCTAssertEqual(line.value as? String, "Modern, Template’s own, Template’s own", "The design sets the fonts and colours")
         line.tap()
         XCTAssertTrue(app.buttons["look.done"].waitForExistence(timeout: 10), "A tap opens the picker")
         XCTAssertTrue(app.buttons["look.fonts.designsOwn"].isSelected, "The design's own fonts are chosen")
         let colours = reveal("look.palette.designsOwn", in: app)
         XCTAssertTrue(colours.isSelected, "The design's own colours are chosen")
-        XCTAssertEqual(colours.label, "Design’s own", "VoiceOver reads the item's name")
+        XCTAssertEqual(colours.label, "Template’s own", "VoiceOver reads the item's name")
         keepScreenshot("The design's own fonts and colours", of: app)
     }
 

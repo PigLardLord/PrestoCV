@@ -8850,7 +8850,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Design’s own"
+            "value" : "Template’s own"
           }
         },
         "es" : {
@@ -8973,7 +8973,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Design"
+            "value" : "Template"
           }
         },
         "es" : {
@@ -9137,7 +9137,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose the design, the fonts and the colours of the PDF."
+            "value" : "Choose the template, the fonts and the colours of the PDF."
           }
         },
         "es" : {
