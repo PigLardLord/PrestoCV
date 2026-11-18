@@ -15,7 +15,7 @@ import Foundation
 struct InferredSkills {
     /// The most skills of each kind a draft keeps: the instructions ask for 4 to 8 technologies and 3 to 5 soft skills, and a rich
     /// draft (`DraftDepth`) keeps 12 and 6, a CV typical of the trade under O1: capped at 8, it kept 8 of the 10 or more technologies
-    /// its requests wrote (probe round 13).
+    /// its requests wrote.
     static var caps: [SkillKind: Int] { DraftDepth.isRich ? [.technology: 12, .softSkill: 6] : [.technology: 8, .softSkill: 5] }
 
     private let language: Vocabulary.Language?
@@ -57,7 +57,7 @@ struct InferredSkills {
     }
 
     /// Whether the words are a name of at most three words joined by the prepositions of the language, with none at either end:
-    /// "plateforme de partage de documents", "System zur Erfassung von Arbeitszeiten" (#354, round 6). A clause of the same length
+    /// "plateforme de partage de documents", "System zur Erfassung von Arbeitszeiten" (#354). A clause of the same length
     /// holds a fourth word, a verb or an article ("j'ai animé des ateliers de lecture"), and still goes.
     private func isAJoinedName(_ words: [Word]) -> Bool {
         guard let language, let joining = Self.joiningWords[language], words.count <= 6, let first = words.first, let last = words.last,

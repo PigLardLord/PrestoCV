@@ -1,7 +1,7 @@
 import Foundation
 
 /// The German separable verbs a request wrote apart at the end of a subordinate clause, joined: "dass ich die Leitungen sicher
-/// stelle" becomes "dass ich die Leitungen sicherstelle" (#354, round 4). In a main clause the particle ends the clause on its own
+/// stelle" becomes "dass ich die Leitungen sicherstelle" (#354). In a main clause the particle ends the clause on its own
 /// ("Ich stelle die Funktion sicher") and stays. Every word the rule reads is German, so a text of another language comes back as
 /// it was.
 enum SeparableVerbs {
@@ -21,7 +21,7 @@ enum SeparableVerbs {
 
     /// `clause` with its last two words joined when a subordinating word opens it into a subordinate clause and they are a particle
     /// and a finite verb, both written lower case, with only spaces between them. A word with a capital is a noun, and no particle
-    /// ("jedes Teil achte"; #354, round 8).
+    /// ("jedes Teil achte"; #354).
     private static func joinedAtItsEnd(_ clause: String) -> String {
         let words = clause.split { !$0.isLetter }
         guard words.count >= 3, let verb = words.last else { return clause }

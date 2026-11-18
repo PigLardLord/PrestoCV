@@ -5,7 +5,7 @@ import Foundation
 extension CVDataSanitizer {
     /// The tools a request for more tools wrote (`writeMoreSkills`) that name a tool: a general kind of the work, a kind of tool
     /// with a purpose and its object alone ("sistema di tracciamento dati", "système de suivi des progrès", "máquina de escaneo de
-    /// registros"; #354, round 15), or a German word that ends in a kind of tool ("Sicherungssystem"; #354, round 16), goes unless
+    /// registros"; #354), or a German word that ends in a kind of tool ("Sicherungssystem"; #354), goes unless
     /// the description writes it. Only these answers are checked so: the first answers' kinds with a word of their trade stay
     /// ("software di rilievo").
     func repairedTools(_ tools: [String], against description: String) -> [String] {
@@ -45,7 +45,7 @@ extension CVDataSanitizer {
 
     /// Whether a tool names a kind of tool (`namesAKindOfTool`: "truck loading equipment", "software di controllo") or, in German,
     /// is one word that ends in a kind of tool with a word before it ("Montagesystem", "Messgeräte"): a past title's answer adds a
-    /// tool before such a kind (`SectionDraft.mergedTools`; #354, round 15).
+    /// tool before such a kind (`SectionDraft.mergedTools`; #354).
     static func endsInAKindOfTool(_ item: String, language: String?) -> Bool {
         namesAKindOfTool(item, language: language) || isAKindCompound(item, language: language)
     }

@@ -191,7 +191,7 @@ struct BuilderTests {
         #expect(html == (try String(contentsOf: url, encoding: .utf8)))
     }
 
-    @Test("contact fields, certifications and links are rendered in their contract classes; links print their destination (review rounds 2, 3)")
+    @Test("contact fields, certifications and links are rendered in their contract classes; links print their destination")
     func contactAndCertifications() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         for needle in [#"<p class="cv-phone">+39 06 1234567</p>"#, #"<p class="cv-location">Roma</p>"#, #"<a class="cv-website" href="https://ada.example">https://ada.example</a>"#,
@@ -203,7 +203,7 @@ struct BuilderTests {
         }
     }
 
-    @Test("completeness counts occurrences: repeated, contained and duplicated values, and dates (review round 2)")
+    @Test("completeness counts occurrences: repeated, contained and duplicated values, and dates")
     func completenessOccurrences() throws {
         let doc = CVDocument(language: "en", person: Person(name: "Ada"), sections: [
             .summary("I write Swift every day"),
@@ -257,7 +257,7 @@ struct BuilderTests {
         #expect(html.contains(#"<p class="cv-entry-description">Tutored</p>"#))
     }
 
-    @Test("inline entries and a profile's parts are separated, so printed text never runs together (review round 4)")
+    @Test("inline entries and a profile's parts are separated, so printed text never runs together")
     func inlineSeparators() throws {
         let doc = CVDocument(language: "en", person: Person(name: "Ada"), sections: [
             .skills([SkillItem(name: "Swift"), SkillItem(name: "Git")]),
@@ -273,7 +273,7 @@ struct BuilderTests {
         #expect(!rendered.textNodes.contains { $0.allSatisfy(\.isWhitespace) })            // separators are not fields
     }
 
-    @Test("a PDF that keeps link labels but loses their destinations is incomplete (review round 3)")
+    @Test("a PDF that keeps link labels but loses their destinations is incomplete")
     func completenessLinkDestinations() throws {
         let rendered = DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         let full = rendered.textNodes.joined(separator: "\n")
@@ -464,7 +464,7 @@ func startTags(in html: String) -> [(name: String, attributes: [String: String])
     return tags
 }
 
-@Suite("ADR 0011 · installing a design goes through the rendering gate (review round 2)")
+@Suite("ADR 0011 · installing a design goes through the rendering gate")
 struct InstallTests {
     let noBundledDesigns = FixedBundledSource(packages: [])
     func gate(_ renderer: any PDFRendering) throws -> FixtureRenderingGate {

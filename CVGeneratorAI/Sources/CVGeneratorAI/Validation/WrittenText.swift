@@ -63,7 +63,7 @@ struct WrittenText {
     ///
     /// ADR 0031, D3: `allowing` holds the words of a duty that quotes its own job's clause word for word: there its acronyms,
     /// number words and seniority words are the person's own. Digits and another job's words still reject it. `ownQualifications`
-    /// holds the qualification words of the person's studies, which a summary sentence of a rich draft names (#354, probe round 21).
+    /// holds the qualification words of the person's studies, which a summary sentence of a rich draft names (#354).
     func rejection(
         of sentence: String, ownWords: Set<String>, foreignWords: Set<String> = [], allowing: Set<String> = [],
         ownQualifications: Set<String> = []
@@ -131,8 +131,8 @@ struct WrittenText {
         (words.seniority.contains(word) || Vocabulary.isLevel(word, in: language)) && !descriptionWords.contains(word)
     }
 
-    /// Whether `word` is a noun of a low level that `previous`, a definite article, makes the matter that is taught (O1; #354, probe
-    /// round 10): "j'explique les notions aux élèves", "ich vermittle die Grundlagen". Without one it states the person's level:
+    /// Whether `word` is a noun of a low level that `previous`, a definite article, makes the matter that is taught (O1; #354):
+    /// "j'explique les notions aux élèves", "ich vermittle die Grundlagen". Without one it states the person's level:
     /// "notions d'anglais", "Grundkenntnisse in Excel". Not "des", which is also the article of "j'ai des notions".
     static func isTaught(_ word: String, after previous: String) -> Bool {
         ["notions", "grundlagen", "grundkenntnisse"].contains(word) && ["les", "aux", "die", "den", "der"].contains(previous)

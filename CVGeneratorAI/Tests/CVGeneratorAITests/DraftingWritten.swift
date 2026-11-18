@@ -16,20 +16,20 @@ struct WrittenMeasure: Codable, Equatable {
     /// The kept jobs whose description has at least 40 characters in all.
     let describedJobs: Int
     let technologies: Int
-    /// The technologies in no class of the reader's that says a technology is no tool of the trade (`notTools`; #354, round 9).
+    /// The technologies in no class of the reader's that says a technology is no tool of the trade (`notTools`; #354).
     let tradeTools: Int
     let softSkills: Int
     /// The sentences of the summary and of the job descriptions.
     let sentences: Int
     /// "<path>: <sentence>" for every written sentence the app's language detector puts in another language than the description's,
-    /// unless the description language's dictionary knows each of its words, as the app reads it (#354, round 13: "Gerencio fluxos
+    /// unless the description language's dictionary knows each of its words, as the app reads it (#354: "Gerencio fluxos
     /// de dados internos." is Portuguese, and the detector says Spanish). A sentence it cannot tell (too short to be sure) is not
     /// counted either way.
     let otherLanguage: [String]
     /// "<path> \"<value>\" (<why>)": a summary, a job description or a skill that holds a tool of another trade (`offField`), and,
     /// for a description with no role, anything written around the facts.
     let offField: [String]
-    /// What a reader rejected in the drafts of b14ceda8 (#354), found by rough rules (`ReaderRules`): numbers to follow, not findings.
+    /// What a reader rejected in the drafts (#354), found by rough rules (`ReaderRules`): numbers to follow, not findings.
     let readerFindings: [ReaderFinding]
 
     /// - Parameters:
@@ -105,7 +105,7 @@ struct WrittenMeasure: Codable, Equatable {
         }
     }
 
-    /// Whether the draft has a summary of 2 to 6 sentences and at least 120 characters: a rich draft keeps up to 6 (probe round 17).
+    /// Whether the draft has a summary of 2 to 6 sentences and at least 120 characters: a rich draft keeps up to 6.
     var hasSummary: Bool { (2...6).contains(summarySentences) && summaryCharacters >= 120 }
 
     /// Whether the draft has at least 4 tools of the trade (`tradeTools`) and 3 soft skills; 3 and 2 for a sparse description.

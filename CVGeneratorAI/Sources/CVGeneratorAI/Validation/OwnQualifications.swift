@@ -1,6 +1,6 @@
 import Foundation
 
-/// The qualification words that a rich summary may name as the person's own (ADR 0031, #354, probe round 21): the words of the kept
+/// The qualification words that a rich summary may name as the person's own (ADR 0031, #354): the words of the kept
 /// degrees, and those of the description's sentences that speak of the person's studies ("I hold a diploma in logistics from Harlow
 /// City College"). A qualification word anywhere else is not a claim about the person: "I calibrate certified weights at Chartered
 /// Scales" gives no "certified" or "chartered".

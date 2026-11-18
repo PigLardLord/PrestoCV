@@ -49,7 +49,7 @@ struct WrittenTextTests {
         #expect(written("I'm a senior teacher with years of experience at a school.").isPlain(sentence, ownWords: []))
     }
 
-    @Test("A noun of a low level after a definite article is the matter taught, not a level; without one it is a level (probe round 10)")
+    @Test("A noun of a low level after a definite article is the matter taught, not a level; without one it is a level")
     func taughtLevelNouns() {
         let french = written("Je suis institutrice. J'enseigne dans une école de ma ville.", languageOfText: { _ in "fr" })
         let german = written("Ich bin Grundschullehrerin. Ich unterrichte an einer Schule.", languageOfText: { _ in "de" })

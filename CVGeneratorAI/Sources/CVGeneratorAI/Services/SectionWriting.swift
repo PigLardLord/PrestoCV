@@ -17,7 +17,7 @@ extension FoundationModelsService {
     nonisolated static var jobRepairDuties: Int { DraftDepth.isRich ? 5 : 3 }
     /// 3 to 5 qualities.
     nonisolated static let softSkillsTokens = 100
-    /// One sentence of the summary, or its repair: a sentence, not a paragraph (#354, round 13).
+    /// One sentence of the summary, or its repair: a sentence, not a paragraph (#354).
     nonisolated static let summarySentenceTokens = 90
 
     /// The cap of a request for at most `most` tools of one title: 80 for 3.
@@ -48,11 +48,11 @@ extension FoundationModelsService {
         )
     }
 
-    /// The duties a job's request writes: the person's own, then the typical ones it needs, 1 to 4 (#354, round 10).
+    /// The duties a job's request writes: the person's own, then the typical ones it needs, 1 to 4 (#354).
     nonisolated static func jobDuties(said: Int, adding: Int) -> Int { min(DraftBrief.Role.mostDuties, max(1, said + adding)) }
 
     /// A job's years and exactly `duties` duties. A range let the model pad: asked for 2 to 4, it wrote 4 for a job that needed one
-    /// more, and the extra ones said a duty again with other words (#354, round 10).
+    /// more, and the extra ones said a duty again with other words (#354).
     nonisolated static func jobSchema(duties: Int) throws -> GenerationSchema {
         let year = { (name: String, about: String) in
             DynamicGenerationSchema.Property(name: name, description: about, schema: DynamicGenerationSchema(type: String.self), isOptional: true)
@@ -106,7 +106,7 @@ extension FoundationModelsService {
     }
 
     /// `count` tools of one title. A job may not go without tools: allowed none, the model answered none for a job with no lines of
-    /// its own, and the next request filled the gap with activities and roles (#354, round 5).
+    /// its own, and the next request filled the gap with activities and roles (#354).
     nonisolated static func toolsSchema(count: ClosedRange<Int>) throws -> GenerationSchema {
         let root = DynamicGenerationSchema(name: "Tools", properties: [
             DynamicGenerationSchema.Property(
@@ -143,7 +143,7 @@ extension FoundationModelsService {
         var properties: [DynamicGenerationSchema.Property] = []
         if tools > 0 {
             // The trade first, as properties are generated in order: asked for the tools of the jobs, the request wrote a general
-            // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354, round 15).
+            // kind of the work ("sistema di tracciamento dati") and the tools of a trade the person left (#354).
             let who = title.map { "a person working as \($0)" } ?? "the person"
             properties.append(DynamicGenerationSchema.Property(
                 name: "trade", description: "The trade of \(who) and the kinds of software, systems, machines and instruments it uses, in a few words",
@@ -297,7 +297,7 @@ extension FoundationModelsService {
     }
 
     /// The skills of a list, trimmed. The request once wrote all its skills in the first value, joined by ";", and the schema's
-    /// type name "string" in the others (probe round 11): each part is a skill, and the type name is none.
+    /// type name "string" in the others: each part is a skill, and the type name is none.
     nonisolated static func skills(_ values: [String]?) -> [String] {
         clean(values?.flatMap { $0.split(separator: ";").map(String.init) }).filter { $0.lowercased() != "string" }
     }

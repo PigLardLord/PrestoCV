@@ -17,14 +17,14 @@ enum SectionPrompts {
         Prompt(instructions: jobInstructions, text: (jobLines(number: number, of: brief) + [count(of: brief.roles[number])]).joined(separator: "\n"))
     }
 
-    /// How many duties the job's request writes: the person's, then exactly the typical ones the job needs (#354, round 10), after
-    /// them (O1, round 13).
+    /// How many duties the job's request writes: the person's, then exactly the typical ones the job needs (#354), after
+    /// them (O1).
     private static func count(of role: DraftBrief.Role) -> String {
         let more = role.adding == 1 ? "1 more duty" : "\(role.adding) more duties"
         switch (role.said, role.adding) {
         // Clauses that pin no duty (a name or a number in each) still say the person's work: the request writes it first, or the
-        // model writes typical duties in its place (#354, round 10). Clauses that only say where the person worked name no work:
-        // asked for it, the model wrote that they worked there (#354, round 11).
+        // model writes typical duties in its place (#354). Clauses that only say where the person worked name no work:
+        // asked for it, the model wrote that they worked there (#354).
         case (0, _) where !role.clauses.isEmpty && role.clausesNameWork:
             return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties"): first the duties the person said above, then typical ones of this job."
         case (0, _): return "Write exactly \(role.adding == 1 ? "1 duty" : "\(role.adding) duties") typical of this job."
@@ -45,7 +45,7 @@ enum SectionPrompts {
         """
 
     /// The repair of the job at `number`: the duties the check kept, each sentence it rejected with its reason, and exactly the
-    /// duties the job still needs to reach `DraftBrief.Role.leastDuties` (O1, round 13).
+    /// duties the job still needs to reach `DraftBrief.Role.leastDuties` (O1).
     static func jobRepair(number: Int, of brief: DraftBrief, kept: [String], rejected: [String]) -> Prompt {
         let role = brief.roles[number]
         var lines = jobLines(number: number, of: brief, avoiding: false)
@@ -71,7 +71,7 @@ enum SectionPrompts {
         var lines = header(brief)
         if role.title.presentValue == nil, let headline = brief.headline { lines.append("Headline title: \(headline)") }
         // The employer is masked, and so is a name of its own in the job's clauses: asked for duties typical of an accountant at
-        // "Transportes Ebro Norte", the model wrote that they calculated the monthly transport costs (#354, round 11).
+        // "Transportes Ebro Norte", the model wrote that they calculated the monthly transport costs (#354).
         var masking = brief
         masking.names = brief.names.filter { $0.first?.isUppercase == true }
         lines.append("Job: " + roleLine(role, employer: true, masked: brief))
@@ -84,7 +84,7 @@ enum SectionPrompts {
 
     // MARK: The skills
 
-    /// The tools request of one job, or of the jobs that share its title (`roles`, #354, round 6): the title, or the headline
+    /// The tools request of one job, or of the jobs that share its title (`roles`, #354): the title, or the headline
     /// for a job with none; the jobs' own lines; and what their work is done on, which is no tool. Asked for the tools of every job
     /// at once, the request listed the panels a person repairs, activities and everyday objects.
     static func tools(for brief: DraftBrief, roles: [Int], count: ClosedRange<Int>) -> Prompt {
@@ -106,7 +106,7 @@ enum SectionPrompts {
     }
 
     /// `text` with each of the brief's names, and each word of 4 letters or more of one that has a capital, written as "the company"
-    /// in the brief's language (#354, round 7): the request read "Kestrel Logistics" and wrote a "Kestrel forklift". In German,
+    /// in the brief's language (#354): the request read "Kestrel Logistics" and wrote a "Kestrel forklift". In German,
     /// whose nouns all take a capital, only the whole names go.
     static func masked(_ text: String, in brief: DraftBrief) -> String {
         let company = companyWords[brief.language] ?? "the company"
@@ -136,10 +136,10 @@ enum SectionPrompts {
     /// The tools request's rules, asking `count` tools. Asked for objects only, the request named household and room objects
     /// ("frigorifero", "microonde", "classe"); asked for methods and fields of knowledge too, it named fields instead of products
     /// ("linguagens de programação" for Python and Java) and the job's own duties: a standard or method is asked only by its own
-    /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1; probe round 11). Asked the tools a job ad of the title
-    /// asks, a rich draft named the ad's words for the work ("shift", "pallet") and its fields ("Stromversorgung"; probe round 17).
+    /// name, as a CV of the trade lists it (`SkillKind`, ADR 0031; O1). Asked the tools a job ad of the title
+    /// asks, a rich draft named the ad's words for the work ("shift", "pallet") and its fields ("Stromversorgung").
     /// Asked those of the trade, a rich draft named a home's objects ("frigorifero", "microonde") and fields ("Bilancio"): it asks
-    /// those a workplace of the trade has (`workplaceTools`; probe round 20).
+    /// those a workplace of the trade has (`workplaceTools`).
     static func toolsInstructions(count: ClosedRange<Int>) -> String {
         let trade = DraftDepth.isRich ? "those of the trade: \(workplaceTools)" : "those of the trade"
         return """
@@ -156,7 +156,7 @@ enum SectionPrompts {
         """
     }
 
-    /// The tools of the trade a rich draft's tools request asks (probe round 20).
+    /// The tools of the trade a rich draft's tools request asks.
     static let workplaceTools = "the professional machines, equipment and software a workplace of that trade has, by the names "
         + "the trade gives them, not those a home has"
 
@@ -169,16 +169,16 @@ enum SectionPrompts {
         )
     }
 
-    /// A quality said as an adjective and its noun, by language, for a rich draft (`DraftDepth`; probe round 19): asked for nouns,
+    /// A quality said as an adjective and its noun, by language, for a rich draft (`DraftDepth`): asked for nouns,
     /// it still wrote the person's adjectives ("reliable", "organizzata"); told "the noun that names the quality", it named the
-    /// nouns of the person's text instead ("Football", "Bread", "piatto"; probe round 18).
+    /// nouns of the person's text instead ("Football", "Bread", "piatto").
     static let qualityAsNoun = [
         "English": "\"reliable\" → \"reliability\"", "Italian": "\"affidabile\" → \"affidabilità\"",
         "German": "\"zuverlässig\" → \"Zuverlässigkeit\"", "Spanish": "\"responsable\" → \"responsabilidad\"",
         "French": "\"rigoureux\" → \"rigueur\"", "Portuguese": "\"responsável\" → \"responsabilidade\"",
     ]
 
-    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`; probe round 13), 3 to 5 of the others.
+    /// The soft skills instructions: 4 to 6 qualities of a rich draft (`DraftDepth`), 3 to 5 of the others.
     static var softSkillsInstructions: String {
         """
         You name \(DraftDepth.isRich ? "4 to 6" : "3 to 5") personal qualities at work that fit the person's jobs, as nouns of 1 to \
@@ -188,7 +188,7 @@ enum SectionPrompts {
     }
 
     /// The request for the skills a draft still misses: `tools` more tools, of the trade of the tools kept or, with none kept, of the
-    /// jobs (#354, round 4), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`
+    /// jobs (#354), and `qualities` more qualities in the CV's language; none of those kept and none of `rejected`
     /// ("skill": reason).
     static func moreSkills(
         for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
@@ -200,11 +200,11 @@ enum SectionPrompts {
         if tools > 0 {
             // Asked for the tools of the jobs, the request wrote the tools of a past trade; asked for "named software products, named
             // devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"). The general kinds of the work it
-            // writes go by code (`repairedTools`; #354, round 15). Asked "each of another kind" of software, systems, machines or
+            // writes go by code (`repairedTools`; #354). Asked "each of another kind" of software, systems, machines or
             // instruments, it wrote kinds an office or a school has none of ("Termostatos", "Blockchain"): it is asked the tools a
-            // CV of the trade typically lists, the most common first, machines only when the trade uses any (probe round 9). Asked
+            // CV of the trade typically lists, the most common first, machines only when the trade uses any. Asked
             // for its methods and fields of knowledge too, it named fields instead of products ("linguagens de programação"): only
-            // a standard or method known by its own name is asked, after the products (probe round 11).
+            // a standard or method known by its own name is asked, after the products.
             let who = title.map { "a person working as \($0)" } ?? "a person with these jobs"
             let trade = listedTools.isEmpty ? "the trade" : "the trade of the tools listed"
             let new = listedTools.isEmpty && rejected.isEmpty ? "" : " none of the tools listed or rejected;"
@@ -230,13 +230,13 @@ enum SectionPrompts {
 
     // MARK: The summary
 
-    /// One sentence of the summary, written last on one slot (#354, round 13, O1): the job's title and its tense, past when it ended
+    /// One sentence of the summary, written last on one slot (#354, O1): the job's title and its tense, past when it ended
     /// and present otherwise (told only the past, a current job's sentence came in the past), with the
     /// field, the topics of its kept duties or two qualities, after the summary so far, the opening code wrote first. Asked for the
     /// whole summary from every job, the request ran short.
-    /// The studies slot of a rich draft (probe round 21) has no job line (probe round 22): told its job, the sentence said the
+    /// The studies slot of a rich draft has no job line: told its job, the sentence said the
     /// job's work again and left the studies out. The rule says its studies in the past. Each study is a Course and a School line,
-    /// and the languages are a list of the language (`listed`; probe rounds 24 and 26): given "logistics, Leeds City College" and
+    /// and the languages are a list of the language (`listed`): given "logistics, Leeds City College" and
     /// "English; Polish", the sentences copied the separators ("I speak English; Polish"), and given commas, the commas.
     static func summarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) -> Prompt {
         var lines = header(brief)
@@ -253,7 +253,7 @@ enum SectionPrompts {
         if !topic.languages.isEmpty { lines.append("Languages: " + listed(topic.languages, in: brief.language)) }
         if !written.isEmpty { lines.append("Summary so far:\n" + bullets(written)) }
         // The first verbs said, by name, of a rich draft (`DraftDepth`): told only not to start as an earlier sentence, the
-        // sentences kept starting with the same verb and the check rejected them (#354, probe round 3).
+        // sentences kept starting with the same verb and the check rejected them (#354).
         var seen = Set<String>()
         let verbs = written.compactMap(CVDataSanitizer.leadingVerb(of:)).filter { seen.insert($0).inserted }
         if DraftDepth.isRich, !verbs.isEmpty { lines.append("Do not start with: " + verbs.joined(separator: "; ")) }
@@ -261,7 +261,7 @@ enum SectionPrompts {
         return Prompt(instructions: instructions, text: lines.joined(separator: "\n"))
     }
 
-    /// `names` as a list of `language`, the last two joined by its "and" (probe round 26): joined by commas, the sentences of 3
+    /// `names` as a list of `language`, the last two joined by its "and": joined by commas, the sentences of 3
     /// inputs of 9 copied them ("parlo italiano, inglese"). Spanish writes "e" before a word that starts with the sound "i"
     /// ("español e inglés"). A language with no word here keeps the commas.
     static func listed(_ names: [String], in language: String) -> String {
@@ -275,15 +275,15 @@ enum SectionPrompts {
         "English": "and", "Italian": "e", "German": "und", "French": "et", "Spanish": "y", "Portuguese": "e",
     ]
 
-    /// Whether `topic` is the studies slot of a rich draft (`DraftDepth`), which asks with its own rules (probe round 23): under the
+    /// Whether `topic` is the studies slot of a rich draft (`DraftDepth`), which asks with its own rules: under the
     /// rule of the job, its sentences spoke of the job in the 5 inputs of 9 that asked it.
     private static func isOfStudies(_ topic: SummaryTopic) -> Bool {
         DraftDepth.isRich && topic.isOfStudies
     }
 
     /// What every summary sentence keeps to (S2): typical duties and tools are draft content (O1); no fact the person did not say.
-    /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool (probe round 4), and a slot of the person's
-    /// studies and languages, which its limits allow by the names given (probe round 21) and which has its own rule (probe round 23).
+    /// A rich draft (`DraftDepth`) also has a tools slot, whose sentences named no tool, and a slot of the person's
+    /// studies and languages, which its limits allow by the names given and which has its own rule.
     static var summarySentenceRules: String {
         DraftDepth.isRich ? richWorkRule + richSummarySentenceLimits : plainWorkRule + summarySentenceLimits
     }
@@ -303,9 +303,9 @@ enum SectionPrompts {
 
         """
 
-    /// The rule of the studies slot of a rich draft, in place of the rule of the job (probe round 23); it asks to join the names
-    /// in the words of the language, since the sentences copied the separators of the lines (probe round 24). It names only the
-    /// lines `topic` gives (probe round 25): asked for the Course line of a study with only a school, the sentence named a course
+    /// The rule of the studies slot of a rich draft, in place of the rule of the job; it asks to join the names
+    /// in the words of the language, since the sentences copied the separators of the lines. It names only the
+    /// lines `topic` gives: asked for the Course line of a study with only a school, the sentence named a course
     /// of its own ("Ho studiato Corso di cucina") and the check rejected it; told only "no job", one sentence spoke of the job.
     static func studiesSentenceRule(for topic: SummaryTopic) -> String {
         let courses = topic.studies.contains { $0.course != nil }, schools = topic.studies.contains { $0.school != nil }
@@ -329,7 +329,7 @@ enum SectionPrompts {
         no "experience", "years", "senior", "expert", "experienced", and never guarantee a result.
         """
 
-    /// The limits of a rich draft: the school, study and language of the lines are the person's own (probe round 21, O1).
+    /// The limits of a rich draft: the school, study and language of the lines are the person's own (O1).
     static let richSummarySentenceLimits = """
         - Do not start with the first verb of a sentence of the summary so far. Start with a capital letter, end with a full stop; \
         no list.
@@ -380,8 +380,8 @@ enum SectionPrompts {
     }
 
     /// A clause a job request reads, which the model writes back as a duty: a whole sentence without the relative word that tied
-    /// it to the employer (`CVDataSanitizer.withoutRelativeOpening`): the model wrote "Où j'ai formé…" back as a duty (#354, round
-    /// 12). Only the job requests drop it: the skills requests copy no clause, and there the dropped word changed the tools.
+    /// it to the employer (`CVDataSanitizer.withoutRelativeOpening`): the model wrote "Où j'ai formé…" back as a duty (#354).
+    /// Only the job requests drop it: the skills requests copy no clause, and there the dropped word changed the tools.
     static func asDuty(_ clause: String) -> String {
         asSentence(CVDataSanitizer.withoutRelativeOpening(asSentence(clause)))
     }

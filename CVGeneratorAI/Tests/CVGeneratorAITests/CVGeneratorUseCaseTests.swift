@@ -8,7 +8,7 @@ struct CVGeneratorUseCaseTests {
     private let validRequest = CVGenerationRequest(
         userPrompt: "I am John Doe, an engineer at Tech Corp since 2020"
     )
-    /// The fake's sample as the draft gives it: the model wrote no summary, so the summary floor names the title (#354, round 6).
+    /// The fake's sample as the draft gives it: the model wrote no summary, so the summary floor names the title (#354).
     private static let flooredSample = CVData(
         personalInfo: FakeCVGenerationService.sample.personalInfo, summary: "I worked as an Engineer.",
         experience: FakeCVGenerationService.sample.experience

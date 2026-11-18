@@ -50,7 +50,7 @@ struct FirstPersonDutyTests {
         #expect(duty == "Usavo il comando del quadro.")
     }
 
-    @Test("A duty that opens with a Portuguese infinitive in -ar or an Italian one in -are is written in the job's first person, each part; another infinitive, a Spanish one, an exception or one the word list does not know keeps the duty (#354, round 10)")
+    @Test("A duty that opens with a Portuguese infinitive in -ar or an Italian one in -are is written in the job's first person, each part; another infinitive, a Spanish one, an exception or one the word list does not know keeps the duty (#354)")
     func infinitiveDuty() {
         #expect(FirstPersonDuty.written("criar um sistema para os pedidos das lojas.", current: true, language: .portuguese, wordList: words)
             == "Crio um sistema para os pedidos das lojas.")
@@ -71,7 +71,7 @@ struct FirstPersonDutyTests {
         ) == "Criar um sistema para os pedidos.")
     }
 
-    @Test("An Italian infinitive in -ere or -ire is written in the imperfect of an ended job; in the current job, whose present often changes the stem, and for an exception, it keeps the duty (#354, round 14)")
+    @Test("An Italian infinitive in -ere or -ire is written in the imperfect of an ended job; in the current job, whose present often changes the stem, and for an exception, it keeps the duty (#354)")
     func italianPastOfEveryInfinitive() {
         #expect(FirstPersonDuty.written("seguire i turni del magazzino.", current: false, language: .italian, wordList: words)
             == "Seguivo i turni del magazzino.")
@@ -86,7 +86,7 @@ struct FirstPersonDutyTests {
         ) == "Seguire i turni del magazzino.")
     }
 
-    @Test("An imperfect duty takes the compound past in Italian and the perfect in Portuguese when the job's earlier duties use it; any other duty, or a form the word list does not know, keeps its words (#354, round 12)")
+    @Test("An imperfect duty takes the compound past in Italian and the perfect in Portuguese when the job's earlier duties use it; any other duty, or a form the word list does not know, keeps its words (#354)")
     func pastOfTheHeldDuties() {
         #expect(FirstPersonDuty.inThePast(of: ["Ho riparato le pompe."], "Preparavo le bolle e controllavo i carichi.", language: .italian, wordList: words)
             == "Ho preparato le bolle e controllato i carichi.")

@@ -6,7 +6,7 @@ struct ExpectedFact: Codable, Equatable, Hashable, Sendable, CustomStringConvert
     enum Kind: String, Codable, CaseIterable, Sendable {
         case name, title, employer, school, language, skill
         /// A duty the person states, in a job's sentence ("where I rigged the lights") or in none ("I mix on digital consoles"):
-        /// kept by a job's description or a skill (#354, round 1). Each input with four jobs states the duties of its jobs (#362).
+        /// kept by a job's description or a skill (#354). Each input with four jobs states the duties of its jobs (#362).
         case duty
         /// A quality the person states of themselves ("calm under pressure"): kept by a skill.
         case quality
@@ -168,12 +168,12 @@ enum DraftingInputs {
         "jobs-fr": ("accueil hôtelier", []), "jobs-pt": ("carpintaria", []),
     ]
 
-    /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354,
-    /// round 1): a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
+    /// The tools a reader expects of a trade, beyond those the description names, for the inputs with a trade of its own (#354):
+    /// a technology of the draft with a word in neither is no tool of that trade, or jargon (`ReaderClass.offTradeTechnology`).
     /// The list is the reader's, independent of the rules of the draft: no stationery a person of any trade uses ("cahiers"), and
-    /// the kinds of tool named by their trade that the reader accepted at f16cdea1 ("editor de código"; round 4), and the tools of
-    /// round 6's answers the reader accepted ("ordinateur portable", "Java"; round 7), and those of round 7's answers ("Google Sheets",
-    /// "Werkzeugkasten"; round 8).
+    /// the kinds of tool named by their trade that the reader accepted ("editor de código"), and other tools it accepted
+    /// ("ordinateur portable", "Java", "Google Sheets",
+    /// "Werkzeugkasten").
     static let vocabularies: [String: [String]] = [
         "jobs-en": [
             "mixing desks", "digital consoles", "PA systems", "line arrays", "stage monitors", "in-ear monitors", "wireless microphones",
@@ -221,8 +221,8 @@ enum DraftingInputs {
         ],
     ]
 
-    /// The parts, materials and work objects a person of the trade installs, repairs or handles, which are no tool of it (#354,
-    /// rounds 3 and 7): a technology of the draft whose head noun is one is a work object (`ReaderClass.workObjectTechnology`).
+    /// The parts, materials and work objects a person of the trade installs, repairs or handles, which are no tool of it (#354):
+    /// a technology of the draft whose head noun is one is a work object (`ReaderClass.workObjectTechnology`).
     /// The list is the reader's.
     static let parts: [String: [String]] = [
         "de-plain": ["Schalter", "Leitungen", "Kabel", "Steckdosen", "Sicherungen"],
@@ -276,7 +276,7 @@ enum DraftingInputs {
         "fr": [
             .name("Maria Rossi"), .title("institutrice"), .employer("Don Milani"), .employer("crèche"),
             .school("université de Bologne"), .language("italien"), .language("anglais"), .duty("enseigne"),
-            // The person trained new teachers: a job's text keeps it, its count is theirs (#354, round 6).
+            // The person trained new teachers: a job's text keeps it, its count is theirs (#354).
             .duty("nouveaux enseignants"),
         ],
         "pt": [
@@ -713,7 +713,7 @@ enum DraftingInputs {
     // MARK: - The app's end-to-end campaign
 
     /// The descriptions the app's end-to-end campaign types that the evaluation did not have. `ai-language-data` ran 265 s and
-    /// ended in `serviceFailed` at a1e64ab5 (#354).
+    /// ended in `serviceFailed` (#354).
     static let app: [DraftingInput] = [
         DraftingInput(
             id: "ai-language-data", kind: .app, language: "en",

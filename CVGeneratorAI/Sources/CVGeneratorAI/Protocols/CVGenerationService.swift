@@ -40,14 +40,13 @@ public protocol CVGenerationService {
 
     /// `tools` more technologies and `qualities` more soft skills for the jobs of `brief`, none of the tools and qualities kept
     /// (`listedTools`, `listedQualities`) and none of `rejected` ("skill": reason), the skills the checks dropped; the tools of a
-    /// person working as `title`, the headline title (#354, round 15).
+    /// person working as `title`, the headline title (#354).
     func writeMoreSkills(
         for brief: DraftBrief, title: String?, tools: Int, qualities: Int, listedTools: [String], listedQualities: [String],
         rejected: [String]
     ) async throws -> DraftWriting?
 
-    /// One sentence of the summary, on `topic` alone, after the sentences `written` so far: no duty, which it would copy (#354,
-    /// round 13).
+    /// One sentence of the summary, on `topic` alone, after the sentences `written` so far: no duty, which it would copy (#354).
     func writeSummarySentence(for brief: DraftBrief, topic: SummaryTopic, written: [String]) async throws -> String?
 
     /// The sentence on `topic` written again, from the one the check rejected and why (`rejected`, "sentence": reason).
