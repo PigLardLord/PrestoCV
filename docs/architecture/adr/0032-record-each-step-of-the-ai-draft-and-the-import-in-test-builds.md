@@ -7,7 +7,7 @@
 ## Context
 
 - **A tester's empty draft cannot be explained.** On 2026-10-28 the maintainer tried build 121.2: from an eight-line description the AI draft kept one job with no title and no duties, and wrote no summary and no skills. The logs of [ADR 0030](0030-log-through-one-interface-that-carries-no-cv-content.md) carry counts and names only, by design, and reading them needs Console on a Mac. So the same empty draft could come from an unavailable model, missing language data, a refusal, an answer that was already empty, a grounding that removed everything, or a claim check that withdrew everything.
-- **The evaluation does not cover it.** It runs the model on our own examples on the Mac mini, not on what a tester typed.
+- **The evaluation does not cover it.** It runs the model on our own examples on a Mac, not on what a tester typed.
 - **The maintainer's direction (2026-10-28):** we must see what happens under the hood on a real device and where the mechanism breaks. The trace is on in TestFlight builds only; it goes through one central chain, built in the composition root with the decorators each environment needs; and in an App Store install it must be certain that no CV content leaks.
 - **The App Store binary is the TestFlight binary.** A build setting cannot tell them apart: only the system's record of how the app was installed can, at run time.
 

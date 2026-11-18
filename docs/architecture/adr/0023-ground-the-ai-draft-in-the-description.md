@@ -197,7 +197,7 @@
 
 ## Validation
 
-- **Tests.** `GroundingContractTests` pass, together with the sanitiser's other tests, on the Mac mini.
+- **Tests.** `GroundingContractTests` pass, together with the sanitiser's other tests, on macOS.
 - **Existing sanitiser tests.** Those that this ADR reverses are rewritten in the commit that implements it, each one named in the commit. Any safety property they pinned exists as a contract row first.
 - **The real model.** Each run is recorded with its kept and dropped fields. On 2026-10-18 Apple's on-device model on macOS 27.0.1 drafted the six in-app example descriptions and one realistic description, three times each:
   - **Nothing was invented** in any of the 21 runs.
