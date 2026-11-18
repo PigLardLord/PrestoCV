@@ -3,7 +3,8 @@
 An ADR records one decision: the context that forced it, what was decided, and what it costs.
 
 - **While their branch is open, ADRs are drafts.** They are corrected as reviews find problems, including the ones already marked Accepted. "Accepted" there means the maintainer has taken the decision; the text can still be refined.
-- **Once the branch is merged, an ADR is immutable.** A changed decision gets a new ADR that supersedes the old one, and the old one's status says so. Only editorial changes that leave the decision as it was are allowed afterwards: wording, links, and how people and machines are named.
+- **Once the branch is merged, an ADR is immutable.** A changed decision gets a new ADR that supersedes the old one, and the old one's status says so. Only editorial changes that leave the decision as it was are allowed afterwards: wording, links, how people and machines are named, and moving the measurements behind a decision to an evidence appendix.
+- **Evidence appendices** are in [evidence/](evidence/), named like their ADR. The ADR keeps the decision and the figures it rests on, in short; the appendix keeps every number as it was measured.
 - **An ADR is binding only once it is Accepted and merged.** Proposed ADRs describe the intended target and guide the prototype, but they are not rules yet.
 
 Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected**.
