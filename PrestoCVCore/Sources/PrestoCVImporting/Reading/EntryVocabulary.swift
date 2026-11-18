@@ -93,13 +93,83 @@ enum EntryVocabulary {
         return words.contains { degreeWords.contains($0) || degreeStems.contains(where: $0.hasPrefix) }
     }
 
-    /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik".
+    /// Whether a piece names a certification by its word: "Certified Scrum Developer", "Certificazione ITIL Foundation",
+    /// "Zertifizierung". The nouns of a document ("certificate", "certificato", "certificado", "certificat") are not among them: they name
+    /// degrees too ("Graduate Certificate in Data Science").
+    static func isCertification(_ text: String) -> Bool {
+        text.words.contains { certificationWords.contains($0.folded) }
+    }
+
+    private static let certificationWords: Set<String> = Set([
+        "certified", "certification", "certifications", "certificazione", "certificazioni", "zertifizierung",
+        "zertifizierungen", "zertifiziert", "zertifizierte", "zertifizierter", "zertifikat", "zertifikate", "certificación",
+        "certificaciones", "certifié", "certifiée", "certificação", "certificações",
+    ].map(\.folded))
+
+    /// Whether the text opens with the word of a degree: "Bachelor of Science in Nursing", "Diplom Elektrotechnik", "MSc Data
+    /// Science". The codes of two letters ("BA", "MA", "MS") are not among the openers: they are also a state, or a name
+    /// ("MS Office Specialist").
     static func startsWithDegree(_ text: String) -> Bool {
         guard let first = text.words.first?.folded else { return false }
         return degreeStems.contains(where: first.hasPrefix) || degreeOpeners.contains(first)
     }
 
-    private static let degreeOpeners: Set<String> = ["phd", "ph.d", "mba", "doctor", "doctorate", "doctorado", "doctorat", "doutorado", "mestrado", "grado", "licence"]
+    /// The codes and words that open a degree besides its stems. "LLM" is not among them: it is also the large language
+    /// model a course is named after ("LLM Fine-Tuning"), so it is a degree only where `degreeWords` reads it.
+    private static let degreeOpeners: Set<String> = [
+        "phd", "ph.d", "mba", "bsc", "msc", "beng", "meng", "llb", "doctor", "doctorate", "doctorado", "doctorat", "doutorado",
+        "mestrado", "grado", "licence",
+    ]
+
+    /// Whether a line of a section of studies opens with the word of a degree, as `startsWithDegree` reads it, with one
+    /// difference: "Licence" opens a study only when a French word follows it ("Licence en Droit", "Licence professionnelle
+    /// Logistique", "Licence d'Économie", "Licence ès Lettres"). In English it is a permission to work, a certification
+    /// ("Licence to Practise — General Medical Council, 2015").
+    static func opensAStudy(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        guard let first = words.first else { return false }
+        guard first == "licence" else { return startsWithDegree(text) }
+        guard let next = words.dropFirst().first else { return false }
+        return licenceContinuations.contains(next) || next.hasPrefix("d'")
+    }
+
+    /// The French words that follow "Licence" in the name of a degree.
+    private static let licenceContinuations: Set<String> = ["en", "de", "du", "des", "es", "professionnelle", "pro"]
+
+    /// Whether the name of a line names a degree by one of its words, wherever it stands ("Certified Nursing Assistant
+    /// Diploma", "Certified Diploma in Nursing"), or by "Master" before "of" or "in" ("Master of Science"). Whole words
+    /// only, unlike `isDegree`: "Scrum Master" and "LLM Applications" name no degree. "Degree" after a number or an
+    /// ordinal is a grade or an angle ("2nd Degree Black Belt", "360 Degree Feedback"), unless "of" or "in" follows it
+    /// ("Second Degree in Nursing").
+    static func namesADegree(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        if words.contains(where: degreeNames.contains) { return true }
+        return words.indices.contains { index in
+            let next = index + 1 < words.count ? words[index + 1] : nil
+            let namesTheSubject = next == "of" || next == "in"
+            switch words[index] {
+            case "master": return namesTheSubject
+            case "degree": return namesTheSubject || index == 0 || !countsAGrade(words[index - 1])
+            default: return false
+            }
+        }
+    }
+
+    /// A number or an ordinal, which makes the "Degree" after it a grade or an angle.
+    private static func countsAGrade(_ word: String) -> Bool {
+        word.first?.isNumber == true || ordinals.contains(word)
+    }
+
+    private static let ordinals: Set<String> = [
+        "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth",
+    ]
+
+    /// The words that name a degree wherever they stand in a name.
+    private static let degreeNames: Set<String> = Set([
+        "diploma", "diplom", "diplôme", "diplomado", "diplomatura", "bachelor", "bachelor's", "master's", "laurea",
+        "licenciatura", "doctorate", "doctorado", "doctorat", "dottorato", "doutorado", "mestrado", "maestría", "phd", "mba",
+        "bsc", "msc", "beng", "meng", "llb", "abitur", "maturità", "baccalauréat", "bachillerato", "ausbildung", "studium",
+    ].map(\.folded))
 
     private static let legalForms: Set<String> = [
         "gmbh", "ag", "kg", "ohg", "ug", "ev", "spa", "srl", "srls", "sas", "snc", "ltd", "limited", "inc", "llc", "llp", "plc", "corp",
