@@ -1,10 +1,11 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The export of the open CV: its PDF as the person will send it, how many pages it has, where the export stands, a
-/// share that went through, and what the CV lacks. A tap on the pages, or their corner button, shows the PDF on the
-/// whole screen; Share, in the bar, opens the system's share sheet with it. It renders the sheet's model and forwards
-/// Close, Share and the taps; the export and the share are the model's (R5).
+/// The export of the open CV: its PDF as the person will send it, how many pages it has, the language of its headings
+/// with the way to change it, where the export stands, a share that went through, and what the CV lacks. A tap on the
+/// pages, or their corner button, shows the PDF on the whole screen; Share, in the bar, opens the system's share sheet
+/// with it. It renders the sheet's model and forwards Close, Share, the language chosen and the taps; the export, the
+/// share and keeping the language in the CV are the model's (R5).
 struct ExportSheetView: View {
     let sheet: ExportSheetViewModel
     /// Closes the sheet, which stops an export that runs.
@@ -16,6 +17,7 @@ struct ExportSheetView: View {
                 VStack(spacing: Spacing.medium) {
                     preview
                     PageCountLine(pages: sheet.document?.pages)
+                    HeadingsLanguageLine(sheet: sheet)
                     ExportStatusView(status: sheet.status)
                     ShareOutcomeLine(outcome: sheet.shareOutcome)
                     ShareFailedLine(failure: sheet.shareFailure)

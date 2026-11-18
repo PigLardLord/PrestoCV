@@ -123,6 +123,7 @@ final class ShellExports {
     let exporter = ExportingFake()
     let files = SharedFilesFake()
     let clock = ManualClock()
+    let detector = LanguageDetectorStub()
     private(set) var made = 0
 
     func sheet(for editor: EditorViewModel) -> ExportSheetViewModel? {
@@ -132,6 +133,6 @@ final class ShellExports {
             exporter: exporter, files: files, snapshot: { editor.exportSnapshot() ?? loaded },
             offeredLanguages: SheetWorld.offered, appLanguage: SheetWorld.appLanguage,
             fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" }, onLanguageChosen: { _ in },
-            clock: clock, pause: SheetWorld.pause)
+            languageDetector: detector, onLanguageFound: { _ in }, clock: clock, pause: SheetWorld.pause)
     }
 }
