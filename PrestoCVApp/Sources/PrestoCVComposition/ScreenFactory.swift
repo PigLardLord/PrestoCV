@@ -106,7 +106,8 @@ public final class ScreenFactory {
     /// opens reloads `list` and `firstRun` after each write the store took, so that the list shows the CV as stored and
     /// the first CV stored ends a first run: leaving it shows the list, not the welcome. The shell keeps neither alive.
     /// Its export sheet exports the CV as the open editor shows it, and takes to that editor's CV, which stores it, a
-    /// language chosen in the sheet, or the language the words of a CV that keeps none were found written in (#407).
+    /// language or a look chosen in the sheet, or the language the words of a CV that keeps none were found written in
+    /// (#407).
     /// - Parameters:
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's words (R13).
     ///   - fileNamePattern: The pattern of the PDF's title in a language, with "%@" where the name goes (R13).
@@ -135,6 +136,10 @@ public final class ScreenFactory {
                     // Kept only if the CV still keeps none once the changes asked for before it have run (#407)
                     guard let editor else { return }
                     Task { await editor.keepFoundLanguage(language.tag) }
+                },
+                onLookChosen: { [weak editor] look, parts in
+                    guard let editor else { return }
+                    Task { await editor.changeLook(to: look, parts: parts) }
                 }
             )
         }, backgroundTime: backgroundTime)
@@ -185,11 +190,13 @@ public final class ScreenFactory {
     ///   - onLanguageChosen: Takes a language chosen in the sheet to the CV.
     ///   - onLanguageFound: Keeps in a CV that keeps no language the one its words were found written in, once; never
     ///     over a language the CV keeps by then (#407).
+    ///   - onLookChosen: Takes to the CV the parts of a look chosen in the sheet, over the installed designs (#407).
     public func makeExportSheet(
         for editor: EditorViewModel, appLanguage: ExportLanguage,
         fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
         onLanguageChosen: @escaping @MainActor (ExportLanguage) -> Void,
-        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void
+        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void,
+        onLookChosen: @escaping @MainActor (EditorLook, Set<LookPart>) -> Void
     ) -> ExportSheetViewModel? {
         guard let loaded = editor.exportSnapshot() else { return nil }
         return ExportSheetViewModel(
@@ -197,6 +204,7 @@ public final class ScreenFactory {
             snapshot: { editor.exportSnapshot() ?? loaded },
             offeredLanguages: languages, appLanguage: appLanguage, fileNamePattern: fileNamePattern,
             onLanguageChosen: onLanguageChosen, languageDetector: languageDetector, onLanguageFound: onLanguageFound,
+            lookOptions: lookOptions, look: editor.look, onLookChosen: onLookChosen,
             clock: editorClock, pause: Self.exportPause
         )
     }

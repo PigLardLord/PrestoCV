@@ -50,6 +50,12 @@ public final class ExportSheetViewModel {
     /// The languages the sheet offers.
     public let offeredLanguages: [ExportLanguage]
 
+    /// The designs, palettes and font schemes the sheet offers.
+    public let lookChoices: LookChoices
+    /// The look of the PDF: the CV's as the last export read it, with the parts chosen in the sheet on top; before the
+    /// first export, the look the editor showed, else the app's default one (#407).
+    public private(set) var shownLook: EditorLook
+
     /// Whether Share can be used now: it waits for the export and for the file of a share, and needs the PDF. The share
     /// sheet itself is not counted: it covers the sheet until it ends.
     public var shareAvailability: ShareAvailability {
@@ -71,6 +77,10 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private let onLanguageChosen: @MainActor (ExportLanguage) -> Void
     @ObservationIgnored private let detector: any CVLanguageDetecting
     @ObservationIgnored private let onLanguageFound: @MainActor (ExportLanguage) -> Void
+    @ObservationIgnored private let onLookChosen: @MainActor (EditorLook, Set<LookPart>) -> Void
+    /// The parts of the look chosen in the sheet, put on the CV each export reads: the CV the editor shows may not hold
+    /// them yet, and the other parts follow it.
+    @ObservationIgnored private var chosenLook: LookChange?
     /// The language the sheet found in the words of a CV that keeps none: the words are read until they tell one, and
     /// then no more.
     @ObservationIgnored private var found: DocumentLanguage?
@@ -98,6 +108,10 @@ public final class ExportSheetViewModel {
     ///   - onLanguageFound: Keeps in the CV the language its words were found in, unless the person chose one in the
     ///     sheet: the headings then stay in that language. It must never replace a language the CV keeps by the time it
     ///     is stored, found by another sheet or chosen (#407).
+    ///   - lookOptions: The designs, palettes and font schemes the sheet offers, and the look of a CV that keeps none.
+    ///   - look: The look the editor shows, nil for a CV that keeps none.
+    ///   - onLookChosen: Takes a look chosen in the sheet to the CV, with the part the person chose: the others are what
+    ///     the sheet showed. Called after the export begins, as `onLanguageChosen` is.
     ///   - clock: The clock the pause is measured on.
     ///   - pause: How long after the last intent the export starts, so that several quick changes make one export.
     public init(
@@ -105,7 +119,10 @@ public final class ExportSheetViewModel {
         offeredLanguages: [ExportLanguage],
         appLanguage: ExportLanguage, fileNamePattern: @escaping @Sendable (ExportLanguage) -> String,
         onLanguageChosen: @escaping @MainActor (ExportLanguage) -> Void, languageDetector: any CVLanguageDetecting,
-        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void, clock: any Clock<Duration>, pause: Duration
+        onLanguageFound: @escaping @MainActor (ExportLanguage) -> Void,
+        lookOptions: any LookOptionsProviding, look: EditorLook?,
+        onLookChosen: @escaping @MainActor (EditorLook, Set<LookPart>) -> Void,
+        clock: any Clock<Duration>, pause: Duration
     ) {
         self.exporter = exporter
         self.files = files
@@ -116,6 +133,11 @@ public final class ExportSheetViewModel {
         self.onLanguageChosen = onLanguageChosen
         self.detector = languageDetector
         self.onLanguageFound = onLanguageFound
+        let options = lookOptions.options()
+        self.lookChoices = LookChoices(options)
+        self.shownLook = look
+            ?? EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
+        self.onLookChosen = onLookChosen
         self.pauseFromNow = Self.pause(pause, on: clock)
     }
 
@@ -147,6 +169,21 @@ public final class ExportSheetViewModel {
 
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
     public func refresh() { begin() }
+
+    /// Exports with `design`, shows it and takes it to the CV; the palette and fonts stay as shown.
+    public func choose(design: String) {
+        choose(.design, EditorLook(design: design, palette: shownLook.palette, fonts: shownLook.fonts))
+    }
+
+    /// Exports with `palette`, shows it and takes it to the CV; the design and fonts stay as shown.
+    public func choose(palette: String?) {
+        choose(.palette, EditorLook(design: shownLook.design, palette: palette, fonts: shownLook.fonts))
+    }
+
+    /// Exports with `fonts`, shows them and takes them to the CV; the design and palette stay as shown.
+    public func choose(fonts: String?) {
+        choose(.fonts, EditorLook(design: shownLook.design, palette: shownLook.palette, fonts: fonts))
+    }
 
     /// Shows the PDF on the whole screen, under the name of its file. Without a PDF there is nothing to show.
     public func showFullPDF() {
@@ -247,6 +284,21 @@ public final class ExportSheetViewModel {
         shareFailure = ShareFailure(ordinal: failures)
     }
 
+    // MARK: - The look
+
+    /// The person chose `part` of the look, and `look` is the whole look shown with it. The choice stays on the CV of
+    /// every later export of this sheet, and goes to the CV after the export begins, so a call into the sheet from
+    /// `onLookChosen` is the later intent. The look of the PDF on screen, or of the one being made, keeps that PDF: the
+    /// choice still goes to the CV. A look with an id no design may have changes nothing.
+    private func choose(_ part: LookPart, _ look: EditorLook) {
+        guard let step = LookChange(shown: look, parts: [part]) else { return }
+        let keepsThePDF = look == shownLook && (status == .exporting || document != nil)
+        chosenLook = chosenLook.map { $0.followed(by: step) } ?? step
+        shownLook = look
+        if !keepsThePDF { begin() }
+        onLookChosen(look, [part])
+    }
+
     // MARK: - The export
 
     private func begin() {
@@ -331,7 +383,11 @@ public final class ExportSheetViewModel {
         return found
     }
 
-    private func prepare(_ cv: CV, automatic: ExportLanguage) -> (CV, DocumentLanguage)? {
+    /// Publishes what the sheet knows of the CV before the export, and gives the CV to export, with the look chosen in the
+    /// sheet on top, in the language of the PDF; nil when the CV lacks a field the PDF needs.
+    private func prepare(_ read: CV, automatic: ExportLanguage) -> (CV, DocumentLanguage)? {
+        let cv = chosenLook.map { ChangeCV.applying($0, to: read) } ?? read
+        shownLook = cv.design.map { EditorLook($0) } ?? shownLook
         automaticLanguage = automatic
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {

@@ -132,6 +132,7 @@ struct ExportSheetStatusTests {
             offeredLanguages: SheetWorld.offered,
             appLanguage: SheetWorld.appLanguage, fileNamePattern: { SheetWorld.patterns[$0.tag] ?? "%@" },
             onLanguageChosen: { _ in }, languageDetector: world.detector, onLanguageFound: { _ in },
+            lookOptions: LookOptionsFake(), look: editor.look, onLookChosen: { _, _ in },
             clock: world.clock, pause: SheetWorld.pause)
 
         sheet.start()

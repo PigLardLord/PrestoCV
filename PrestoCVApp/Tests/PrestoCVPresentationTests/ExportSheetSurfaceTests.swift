@@ -32,6 +32,15 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShar
     sheet.select(language: ExportLanguage.preferred(["de"]))
     let announced: LanguageChoice? = sheet.languageToAnnounce
     let _: ExportLanguage? = announced?.language
+    let choices: LookChoices = sheet.lookChoices
+    let _: [LookChoice] = choices.designs + choices.palettes + choices.fontSchemes
+    let shown: EditorLook = sheet.shownLook
+    let _: String = shown.design
+    let _: String? = shown.palette
+    let _: String? = shown.fonts
+    sheet.choose(design: "classic")
+    sheet.choose(palette: nil)
+    sheet.choose(fonts: nil)
     sheet.share()
     let _: PDFShare? = sheet.openShare
     let _: URL = share.url
