@@ -52,7 +52,7 @@ The rules are strict, and a change that breaks one does not merge ([ADR 0006](do
 - **The checker:** `Tools/ArchitectureCheck/check.sh` must report 0 findings. Its first build takes a few minutes, because it compiles SwiftSyntax. [Its README](Tools/ArchitectureCheck/README.md) explains its options and how to install it as a pre-commit hook.
 - **Violations:** a temporary one is a baseline entry, and the baseline may only shrink. A permanent one is an exception in `Tools/ArchitectureCheck/rules.json` that cites an ADR.
 - **A new target, or a new dependency between targets,** updates `docs/architecture/modules.md` and `Tools/ArchitectureCheck/rules.json` in the same pull request.
-- **Ownership:** changes to `docs/architecture/` and `Tools/ArchitectureCheck/` need the owner's review (`.github/CODEOWNERS`).
+- **Ownership:** changes to `docs/architecture/` and `Tools/ArchitectureCheck/` need a code owner's review (`.github/CODEOWNERS`).
 
 ## Code
 

@@ -83,7 +83,7 @@ Xcode Cloud archives version 1, signs it and uploads it to TestFlight, and tests
 - **Main:** a merge to `main` archives a build and uploads it to TestFlight for the internal testers. It runs no tests: the pull request check tested that tree before the merge.
 - **Release:** a GitHub Release with a tag such as `v1.2.3`, or a push to a branch such as `release/1.2.3`, tests that commit, archives version 1.2.3 and uploads it to TestFlight.
 
-Nothing submits a build for App Review: the owner does it in App Store Connect, with Add for Review.
+Nothing submits a build for App Review: the maintainer does it in App Store Connect, with Add for Review.
 
 Xcode Cloud checks no pull request. A pull request is checked on the Mac mini ([ADR 0029](docs/architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)): the commit status `Mac mini · CI` on its head runs the `CI` test plan on an iPhone and an iPad simulator, the Apple checks of `ci_scripts/ci_post_xcodebuild.sh`, and then `PrestoCVUITests` on the iPhone, unless every file the pull request changes is a Markdown file or lies in `docs/`, `Tools/`, `ci_scripts/` or `.github/`. The Linux checks and the Android build run on a Linux computer, through a script outside the repository that writes the commit statuses `Linux (local) · CI` and `Android (local) · CI`; the GitHub Actions workflow with the same jobs runs only when started by hand. A pull request merges when its branch contains the latest `main` and the checks are green on its head.
 

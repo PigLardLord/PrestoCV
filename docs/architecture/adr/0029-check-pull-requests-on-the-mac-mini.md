@@ -10,11 +10,11 @@
 - **What ADR 0024 decided.** Three Xcode Cloud workflows. The Pull Request workflow ran the `CI` test plan on an iPhone and an iPad simulator, and `ci_scripts/ci_post_xcodebuild.sh`, on every pull request and on every push to one.
 - **What it cost.** The plan has 25 compute hours a month for the whole team. From 13 October to 25 October, 75 pull request runs took 17.25 hours (about 14 minutes each), 80% of the hours spent; the 24 runs of the Main workflow took 3.82 hours. Apple bills about 1.09 times the sum of the actions' durations.
 - **What happened.** On 25 October, from 14:55 UTC, runs of the Pull Request and the Main workflows were cancelled within seconds, with no action started, while the estimate of the hours spent stood at 86%. Apple's API shows neither the usage nor the cause. A merge needs its check to run, so a budget that runs out stops the merges, and it stops the release builds as well.
-- **What the owner has.** A Mac mini and a MacBook Pro with Xcode 27 and the simulators, already used for every test run before a push (`mac-test.sh`), whose hours are free.
+- **What the maintainer has.** A Mac mini and a MacBook Pro with Xcode 27 and the simulators, already used for every test run before a push (`mac-test.sh`), whose hours are free.
 
 ## Decision
 
-**The owner decided on 2026-10-25** that the pull request check runs on the Mac mini, and that the Xcode Cloud Pull Request workflow is disabled. This amends the Pull Request workflow in ADR 0024, whose text stays as it was decided. The Main and Release workflows are unchanged.
+**The maintainer decided on 2026-10-25** that the pull request check runs on the Mac mini, and that the Xcode Cloud Pull Request workflow is disabled. This amends the Pull Request workflow in ADR 0024, whose text stays as it was decided. The Main and Release workflows are unchanged.
 
 **The flow.** A script run on the Mac mini for a pull request:
 1. refuses, and writes no status, when the pull request is not open, is not to `main`, or its head commit does not contain the latest `origin/main`;
@@ -24,7 +24,7 @@
 
 **The merge rule.** A pull request merges when its branch contains the latest `main`, every check of the `CI` GitHub workflow is green, and `Mac mini · CI` is `success` on the exact head commit. A pull request whose changed files are all in `docs/` or match `*.md` does not need the Mac status. The retired Xcode Cloud status `PrestoCV | Pull Request` is ignored by name. The merge step enforces the rule, because the repository's plan has no rulesets and no branch protection.
 
-**Amended 2026-11-17 (owner's decision):** the `CI` workflow runs only when someone starts it by hand, so that the repository stays on GitHub's free plan and its Actions minutes go only where they are needed. On a pull request, a script run on a Linux computer, outside the repository, runs the steps of the workflow's two jobs on the head commit and writes the commit statuses `Linux (local) · CI` (`Tools/check-linux.sh`) and `Android (local) · CI` (the Android build). A pull request merges when its branch contains the latest `main`, both statuses are `success` on its exact head commit, a docs-only pull request included, and `Mac mini · CI` is `success` there too unless every changed file is in `docs/` or matches `*.md`. When someone runs the workflow on that head, the local status of each job decides, not the job's own check. The text above stays as it was decided.
+**Amended 2026-11-17 (maintainer's decision):** the `CI` workflow runs only when someone starts it by hand, so that the repository stays on GitHub's free plan and its Actions minutes go only where they are needed. On a pull request, a script run on a Linux computer, outside the repository, runs the steps of the workflow's two jobs on the head commit and writes the commit statuses `Linux (local) · CI` (`Tools/check-linux.sh`) and `Android (local) · CI` (the Android build). A pull request merges when its branch contains the latest `main`, both statuses are `success` on its exact head commit, a docs-only pull request included, and `Mac mini · CI` is `success` there too unless every changed file is in `docs/` or matches `*.md`. When someone runs the workflow on that head, the local status of each job decides, not the job's own check. The text above stays as it was decided.
 
 **Xcode Cloud** keeps the Main workflow (archive and TestFlight after a merge) and the Release workflow (tests, archive and TestFlight for a tag). Its hours go only to those.
 
@@ -40,7 +40,7 @@
 
 ## Alternatives considered
 
-- **Keep the Xcode Cloud Pull Request workflow and buy more hours.** Rejected by the owner: the check would use 80% of the hours again, with every push, and the release builds would depend on what is left.
+- **Keep the Xcode Cloud Pull Request workflow and buy more hours.** Rejected by the maintainer: the check would use 80% of the hours again, with every push, and the release builds would depend on what is left.
 - **Run the pull request check on the Xcode Cloud workflow only for code changes.** Rejected: a workflow start condition on file paths still starts a run per push, and the code pushes are the 75 runs.
 - **A self-hosted GitHub Actions runner on the Mac mini.** Rejected: it brings back the runner that ADR 0024 retired, with a token on the Mac and a runner process that must stay registered, to do what one script does.
 - **GitHub's hosted macOS runners.** Rejected as in ADR 0024: they offer Xcode 27 only as a preview.

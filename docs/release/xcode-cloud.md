@@ -1,6 +1,6 @@
 # Releasing with Xcode Cloud
 
-Xcode Cloud tests version 1 before a store build, archives it, signs it and uploads it to TestFlight (ADR 0022, ADR 0024). It does not check pull requests: the Mac mini does, with the check described below (ADR 0029). The workflows are set up in Xcode and App Store Connect with the owner's Apple ID, so they are not in the repository. This page holds the settings to enter, the pull request check, the one-time setup, and the steps of a release. The repository holds the rest:
+Xcode Cloud tests version 1 before a store build, archives it, signs it and uploads it to TestFlight (ADR 0022, ADR 0024). It does not check pull requests: the Mac mini does, with the check described below (ADR 0029). The workflows are set up in Xcode and App Store Connect with the maintainer's Apple ID, so they are not in the repository. This page holds the settings to enter, the pull request check, the one-time setup, and the steps of a release. The repository holds the rest:
 
 | Path | What it does |
 |---|---|
@@ -37,7 +37,7 @@ A test that read the source tree passed on a Mac, next to the sources, and faile
 
 ## The pull request check
 
-A pull request to `main` is checked on the Mac mini ([ADR 0029](../architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)). The result is a GitHub commit status on the pull request's head commit, with the context `Mac mini · CI` (the separator is U+00B7, a middle dot). A script writes it; it lives with the owner's other tooling for the Mac mini, outside the repository, and does this:
+A pull request to `main` is checked on the Mac mini ([ADR 0029](../architecture/adr/0029-check-pull-requests-on-the-mac-mini.md)). The result is a GitHub commit status on the pull request's head commit, with the context `Mac mini · CI` (the separator is U+00B7, a middle dot). A script writes it; it lives with the maintainer's other tooling for the Mac mini, outside the repository, and does this:
 
 1. It refuses, and writes no status, when the head commit does not contain the latest `origin/main`: bring `main` onto the branch locally first.
 2. It writes `pending` on the head commit, then runs on the Mac mini:
@@ -96,7 +96,7 @@ A Main build takes the project's version (`MARKETING_VERSION`), and its build nu
 | Action 2 | Archive. Scheme `PrestoCV`, platform iOS. The scheme archives with the Release configuration. Deployment preparation: TestFlight and App Store. |
 | Post-actions | TestFlight Internal Testing, with the group of internal testers. |
 
-The Release workflow tests the exact commit it archives. Its Test action is required to pass, so a failing test, package test or architecture check fails the build, and nothing reaches TestFlight, even for a tag on a commit that never went through a pull request. This is the one Xcode Cloud run that tests the tree on machines without the repository. It archives the version the tag or branch names, so a tag `v1.2.3` or a branch `release/1.2.3` gives version 1.2.3. Nothing submits a build for App Review: the owner does it by hand.
+The Release workflow tests the exact commit it archives. Its Test action is required to pass, so a failing test, package test or architecture check fails the build, and nothing reaches TestFlight, even for a tag on a commit that never went through a pull request. This is the one Xcode Cloud run that tests the tree on machines without the repository. It archives the version the tag or branch names, so a tag `v1.2.3` or a branch `release/1.2.3` gives version 1.2.3. Nothing submits a build for App Review: the maintainer does it by hand.
 
 ## Enforce the checks
 

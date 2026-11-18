@@ -126,7 +126,7 @@ Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new t
 
 ### Porting from the validation prototype
 
-The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (owner decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
+The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (maintainer decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
 
 Code ported from the prototype into the real targets, in step 1 (the checker) and in steps 3 to 6, is treated as new code:
 - it is reviewed in full in the pull request that ports it, including the final adversarial review;
