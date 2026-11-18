@@ -57,6 +57,8 @@ public enum ReviewedField: Hashable, Sendable {
 public enum ReviewReason: Hashable, Sendable, CaseIterable {
     case nameByPosition, titleByPosition, locationByPosition, summaryWithoutHeading
     case roleOrEmployerByOrder, entryBoundsUnsure
+    /// A line in capitals in the entry may be a section heading the import does not know.
+    case headingUnsure
     /// The dates could not be made a period, such as an end before the start.
     case periodUnreadable
     /// The period has no end; the draft does not call it current.

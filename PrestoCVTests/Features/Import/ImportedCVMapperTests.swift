@@ -290,6 +290,28 @@ struct ImportedCVMapperTests {
         #expect(draft.review.passages.isEmpty)
     }
 
+    @Test("A job that may have taken a heading the import does not know is listed to check")
+    func headingToCheck() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Lena Okafor
+        lena.okafor@example.com
+        SUMMARY
+        Field technician.
+        EXPERIENCE
+        2020 – Present
+        Technician
+        BRACKEN MILLS
+        • Serviced pumps.
+        2016 – 2020
+        Technician — Marlow Studio
+        • Serviced boilers.
+        SKILLS
+        Welding
+        """))
+
+        #expect(draft.review.items.filter { $0.reason == .heading }.map(\.field) == [.experience(1)], "\(draft.review.items)")
+    }
+
     @Test("Every reason and field of the review has a text in the string catalog")
     func reviewIsWorded() {
         let items = [
@@ -298,6 +320,7 @@ struct ImportedCVMapperTests {
             ImportReview.Item(field: .experience(1), reason: .languageLevels, text: ""), ImportReview.Item(field: .education(1), reason: .byPosition, text: ""),
             ImportReview.Item(field: .language, reason: .byPosition, text: ""), ImportReview.Item(field: .experience(2), reason: .entryBounds, text: ""),
             ImportReview.Item(field: .education(2), reason: .placeNotKept, text: ""),
+            ImportReview.Item(field: .experience(3), reason: .heading, text: ""),
         ]
         for item in items {
             #expect(item.fieldKey.localized != item.fieldKey, "\(item.fieldKey) is missing from the string catalog")

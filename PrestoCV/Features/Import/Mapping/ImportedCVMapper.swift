@@ -162,6 +162,7 @@ struct ImportedCVMapper {
             case .nameByPosition, .titleByPosition, .locationByPosition, .summaryWithoutHeading: reason = .byPosition
             case .roleOrEmployerByOrder: reason = .partsByOrder
             case .entryBoundsUnsure: reason = .entryBounds
+            case .headingUnsure: reason = .heading
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels
