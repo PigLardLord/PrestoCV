@@ -3,13 +3,12 @@ import Testing
 import PrestoCVWorkflowPorts
 import PrestoCVIntegration
 
-/// The notices file as the app bundles it, with the notices given.
-private func file(notices: String) -> Data {
-    Data("""
-    {"licences": [{"id": "Apache-2.0", "name": "Apache License 2.0", "text": "Apache License\\n\\nTERMS"},
-                  {"id": "OFL-1.1", "name": "SIL Open Font License 1.1", "text": "Permission is granted."}],
-     "notices": [\(notices)]}
-    """.utf8)
+private let apacheLicence = #"{"id": "Apache-2.0", "name": "Apache License 2.0", "text": "Apache License\n\nTERMS"}"#
+private let fontLicence = #"{"id": "OFL-1.1", "name": "SIL Open Font License 1.1", "text": "Permission is granted."}"#
+
+/// The notices file as the app bundles it, with the notices given and, unless given, its two licences.
+private func file(notices: String, licences: String = apacheLicence + "," + fontLicence) -> Data {
+    Data(#"{"licences": [\#(licences)], "notices": [\#(notices)]}"#.utf8)
 }
 
 private let own = #"{"id": "prestocv", "title": "PrestoCV", "licence": "Apache-2.0", "thirdParty": false, "text": "Ours."}"#
@@ -38,6 +37,22 @@ struct LicenceNoticesFileTests {
 
         await #expect(throws: LicenceNoticesFile.Failure.unknownLicence("MIT")) {
             try await LicenceNoticesFile(contents: { file(notices: own + "," + notice) }).notices()
+        }
+    }
+
+    @Test("two notices with the same id fail with that id")
+    func duplicateNoticeFails() async {
+        await #expect(throws: LicenceNoticesFile.Failure.duplicateNotice("prestocv")) {
+            try await LicenceNoticesFile(contents: { file(notices: own + "," + font + "," + own) }).notices()
+        }
+    }
+
+    @Test("two licences with the same id fail with that id")
+    func duplicateLicenceFails() async {
+        await #expect(throws: LicenceNoticesFile.Failure.duplicateLicence("OFL-1.1")) {
+            try await LicenceNoticesFile(contents: {
+                file(notices: own, licences: apacheLicence + "," + fontLicence + "," + fontLicence)
+            }).notices()
         }
     }
 

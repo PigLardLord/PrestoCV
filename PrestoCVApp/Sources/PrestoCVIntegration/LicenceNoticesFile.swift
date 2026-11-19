@@ -11,6 +11,10 @@ public struct LicenceNoticesFile: LicenceNoticesReading {
         case unreadable
         /// A notice names a licence the file does not hold, by that id.
         case unknownLicence(String)
+        /// The file holds two notices with the same id, by that id.
+        case duplicateNotice(String)
+        /// The file holds two licences with the same id, by that id.
+        case duplicateLicence(String)
     }
 
     private let contents: @Sendable () async throws -> Data
@@ -28,7 +32,14 @@ public struct LicenceNoticesFile: LicenceNoticesReading {
         } catch {
             throw Failure.unreadable
         }
-        let licences = Dictionary(file.licences.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var licences: [String: NoticesFile.LicenceText] = [:]
+        for licence in file.licences {
+            guard licences.updateValue(licence, forKey: licence.id) == nil else { throw Failure.duplicateLicence(licence.id) }
+        }
+        var noticeIDs: Set<String> = []
+        for notice in file.notices {
+            guard noticeIDs.insert(notice.id).inserted else { throw Failure.duplicateNotice(notice.id) }
+        }
         return try file.notices.map { notice in
             guard let licence = licences[notice.licence] else { throw Failure.unknownLicence(notice.licence) }
             return LicenceNotice(id: notice.id, title: notice.title, isThirdParty: notice.thirdParty, text: notice.text,
