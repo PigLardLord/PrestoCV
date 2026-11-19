@@ -102,18 +102,31 @@ struct LegacyCVFileTests {
         #expect(Set(legacy.drops) == [.email, .phone, .website, .skillLevel, .certificationYear, .certificationLink, .profile, .documentLanguage])
     }
 
-    @Test("a period that is not an unambiguous range is dropped and reported", arguments: ["2020", "since forever", "2023 – 2020", "13/2020 – 2021", "1500 – 1600"])
-    func unreadablePeriod(text: String) throws {
+    @Test("a period that is not an unambiguous range is kept as written in the description, and reported to check, not as a drop", arguments: ["2020", "since forever", "2023 – 2020", "13/2020 – 2021", "1500 – 1600"])
+    func uncertainPeriod(text: String) throws {
         let fields = #""relevant_experience":[{"title":"T","company":"C","period":"\#(text)"}]"#
         let legacy = try #require(mapped(LegacyFixtures.minimal(fields)))
-        #expect(legacy.cv.sections.experiences.first?.period == nil)
-        #expect(legacy.drops == [.period])
+        let job = try #require(legacy.cv.sections.experiences.first)
+        #expect(job.period == nil && job.description == text)
+        #expect(legacy.drops.isEmpty && legacy.checks == [.period])
     }
 
-    @Test("an empty period is no period and no drop")
+    @Test("an uncertain period is the first line above the description an entry had, for a job and a study alike")
+    func uncertainPeriodAboveDescription() throws {
+        let fields = #""relevant_experience":[{"title":"T","company":"C","period":"  since forever ","description":"Did X"}],"#
+            + #""education":[{"degree":"D","school":"S","period":"2020","description":"Thesis on Y"}]"#
+        let legacy = try #require(mapped(LegacyFixtures.minimal(fields)))
+        let job = try #require(legacy.cv.sections.experiences.first), study = try #require(legacy.cv.sections.education.first)
+        #expect(job.period == nil && job.description == "since forever\nDid X")
+        #expect(study.period == nil && study.description == "2020\nThesis on Y")
+        #expect(legacy.drops.isEmpty && legacy.checks == [.period])
+    }
+
+    @Test("an empty period is no period, no drop and nothing to check")
     func emptyPeriod() throws {
         let legacy = try #require(mapped(LegacyFixtures.minimal(#""education":[{"degree":"D","school":"S","period":"  "}]"#)))
-        #expect(legacy.cv.sections.education.count == 1 && legacy.drops.isEmpty)
+        #expect(legacy.cv.sections.education.count == 1 && legacy.cv.sections.education.first?.description == "")
+        #expect(legacy.drops.isEmpty && legacy.checks.isEmpty)
     }
 
     @Test("a file without times takes the fallback; one with a time but not the other keeps it")

@@ -17,7 +17,7 @@ enum LegacyCVFile {
         guard text == uuid.uuidString, fileName == "cv_\(text).json" else { return .invalid(.name) }
         var mapper = LegacyMapper()
         let cv = mapper.map(raw, id: CVID(uuid), fallback: fallback)
-        return .cv(LegacyCV(cv: cv, drops: mapper.drops))
+        return .cv(LegacyCV(cv: cv, drops: mapper.drops, checks: mapper.checks))
     }
 
     // MARK: The legacy shape
