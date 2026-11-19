@@ -75,7 +75,7 @@ struct LegacyMapper {
         case .period(let period): return (period, description)
         case .unreadable:
             note(.period)
-            let written = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let written = text ?? ""
             return (nil, description.isEmpty ? written : written + "\n" + description)
         }
     }

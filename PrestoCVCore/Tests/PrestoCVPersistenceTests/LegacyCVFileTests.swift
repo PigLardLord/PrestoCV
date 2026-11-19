@@ -111,14 +111,17 @@ struct LegacyCVFileTests {
         #expect(legacy.drops.isEmpty && legacy.checks == [.period])
     }
 
-    @Test("an uncertain period is the first line above the description an entry had, for a job and a study alike")
-    func uncertainPeriodAboveDescription() throws {
-        let fields = #""relevant_experience":[{"title":"T","company":"C","period":"  since forever ","description":"Did X"}],"#
-            + #""education":[{"degree":"D","school":"S","period":"2020","description":"Thesis on Y"}]"#
+    @Test("an uncertain period, spaces included, is the first line above the description an entry had, for a job and a study alike", arguments: [
+        (period: "  since forever ", description: #","description":"Did X""#, expected: "  since forever \nDid X"),
+        (period: " 2020", description: "", expected: " 2020"),
+    ])
+    func uncertainPeriodAboveDescription(period: String, description: String, expected: String) throws {
+        let fields = #""relevant_experience":[{"title":"T","company":"C","period":"\#(period)"\#(description)}],"#
+            + #""education":[{"degree":"D","school":"S","period":"\#(period)"\#(description)}]"#
         let legacy = try #require(mapped(LegacyFixtures.minimal(fields)))
         let job = try #require(legacy.cv.sections.experiences.first), study = try #require(legacy.cv.sections.education.first)
-        #expect(job.period == nil && job.description == "since forever\nDid X")
-        #expect(study.period == nil && study.description == "2020\nThesis on Y")
+        #expect(job.period == nil && job.description == expected)
+        #expect(study.period == nil && study.description == expected)
         #expect(legacy.drops.isEmpty && legacy.checks == [.period])
     }
 
