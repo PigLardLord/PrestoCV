@@ -82,7 +82,8 @@ struct PackageManifests {
 
     // MARK: Declarations
 
-    /// `.library(name: "X", type: .dynamic, targets: ["A", "B"])`
+    /// `.library(name: "X", type: .dynamic, targets: ["A", "B"])`; a product declared again (in the other branch of an
+    /// `#if`) reaches the targets of both.
     private mutating func readLibrary(_ body: String, in package: String) {
         let arguments = Self.arguments(of: body)
         guard let name = arguments["name"].flatMap(Self.name), let members = arguments["targets"].flatMap(Self.list) else {
@@ -90,7 +91,8 @@ struct PackageManifests {
         }
         let names = members.compactMap(Self.name)
         guard names.count == members.count else { return report(".library(\(body))", in: package) }
-        products[package, default: [:]][name] = names
+        let earlier = products[package]?[name] ?? []
+        products[package, default: [:]][name] = earlier + names.filter { !earlier.contains($0) }
     }
 
     /// `.target(name: "A", dependencies: [...], path: "Sources/Elsewhere")`; a target declared again (in the other

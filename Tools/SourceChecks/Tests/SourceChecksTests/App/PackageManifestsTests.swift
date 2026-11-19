@@ -140,4 +140,21 @@ struct PackageManifestsTests {
         #expect(manifests.targets["P/A"]?.targets == ["B", "C", "D"])
         #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
     }
+
+    @Test("A product declared in both branches of a condition reaches the targets of both")
+    func aProductDeclaredTwiceReachesBothTargets() {
+        let manifests = read(["P": """
+            #if os(Linux)
+            products.append(.library(name: "Lib", targets: ["A"]))
+            #else
+            products.append(.library(name: "Lib", targets: ["B"]))
+            #endif
+            .target(name: "A")
+            .target(name: "B")
+            """])
+
+        #expect(manifests.products["P"]?["Lib"] == ["A", "B"])
+        #expect(Set(manifests.reached(from: [.init(name: "Lib", package: "P")]).targets.map(\.name)) == ["A", "B"])
+        #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
+    }
 }
