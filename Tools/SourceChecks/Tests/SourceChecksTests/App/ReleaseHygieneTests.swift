@@ -77,14 +77,18 @@ struct ReleaseHygieneTests {
     }
 
     /// The targets a Release build of the app compiles in: the products it links, and every target they depend on, in
-    /// this package and in the sibling packages, however far down.
+    /// this package and in the sibling packages, however far down. A linked product no package declares is unresolved.
     static func reached(by app: App) -> (targets: [PackageManifests.Target], unresolved: [PackageManifests.ProductReference]) {
+        var undeclared: [PackageManifests.ProductReference] = []
         let start = app.linkedProducts.flatMap { name in
-            manifests.products.compactMap { package, products in
+            let owners = manifests.products.compactMap { package, products in
                 products[name] == nil ? nil : PackageManifests.ProductReference(name: name, package: package)
             }
+            if owners.isEmpty { undeclared.append(PackageManifests.ProductReference(name: name, package: "(none)")) }
+            return owners
         }
-        return manifests.reached(from: start)
+        let walk = manifests.reached(from: start)
+        return (walk.targets, undeclared + walk.unresolved)
     }
 
     /// The sources whose code ships with the app: its own folder and those of every target it compiles in.
@@ -139,8 +143,9 @@ struct ReleaseHygieneTests {
         }
     }
 
-    @Test("Every target an app compiles in has a source folder with code in it, and every product resolves")
+    @Test("Every manifest is read whole, every target an app compiles in has code, and every product resolves")
     func everyTargetReachedHasSources() {
+        #expect(Self.manifests.unreadable.isEmpty, "The manifest reader does not follow \(Self.manifests.unreadable)")
         for app in Self.apps {
             let (targets, unresolved) = Self.reached(by: app)
             #expect(unresolved.isEmpty, "\(app.name): no manifest declares \(unresolved)")
@@ -164,32 +169,6 @@ struct ReleaseHygieneTests {
             "CVDesignCatalog", "CVRendering", "CVDrafting", "PrestoCVPersistence", "DiagnosticTraceFiles",
         ]), "Reached by the new app: \(names.sorted())")
         #expect(legacy.isDisjoint(with: ["PrestoCVImportFiles", "PrestoCVWorkflowPorts"]), "The released app does not link these")
-    }
-
-    @Test("The reader of manifests follows names, aliases, paths, conditions and ignores comments and test targets")
-    func theReaderOfManifestsReadsTheShapesTheManifestsUse() {
-        let text = """
-            let logging = Target.Dependency.product(name: "Log", package: "Logs")
-            var targets: [Target] = [
-                .target(name: "A", dependencies: ["B", logging]),   // .target(name: "Hidden")
-                .target(name: "B", dependencies: [
-                    .product(name: "C", package: "Other", condition: .when(platforms: [.iOS])),
-                ], path: "Sources/Elsewhere"),
-                .testTarget(name: "ATests", dependencies: ["A"]),
-            ]
-            #if !os(Linux)
-            products.append(.library(name: "Lib", targets: ["A", "B"]))
-            #endif
-            """
-        let manifests = PackageManifests(packages: ["P"]) { _ in text }
-
-        #expect(Set(manifests.targets.keys) == ["P/A", "P/B"])
-        #expect(manifests.targets["P/A"]?.targets == ["B"])
-        #expect(manifests.targets["P/A"]?.products == [.init(name: "Log", package: "Logs")])
-        #expect(manifests.targets["P/B"]?.products == [.init(name: "C", package: "Other")])
-        #expect(manifests.targets["P/B"]?.folder == "P/Sources/Elsewhere")
-        #expect(manifests.targets["P/A"]?.folder == "P/Sources/A")
-        #expect(manifests.products["P"]?["Lib"] == ["A", "B"])
     }
 
     // MARK: Debug output

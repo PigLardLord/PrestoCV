@@ -8,6 +8,10 @@ import Foundation
 /// (the AI drafting and rendering adapters, the composition), so a dump on Linux, where the checks run, would hide code
 /// that a Release build for iOS compiles. Reading the text sees every branch of an `#if`, and so reads a superset of one
 /// platform's build, which is the safe side for a check of what ships.
+///
+/// The reader fails closed: a declaration or a dependency written in a shape it does not follow goes to `unreadable`,
+/// which the release checks require empty, so a new way of writing a manifest fails them instead of shrinking what they
+/// scan.
 struct PackageManifests {
 
     struct Target: Hashable {
@@ -30,19 +34,22 @@ struct PackageManifests {
     private(set) var targets: [String: Target] = [:]
     /// Product name to the targets it is made of, per package
     private(set) var products: [String: [String: [String]]] = [:]
+    /// What the reader does not follow, as `<package>: <text>`, with its white space folded to single spaces
+    private(set) var unreadable: [String] = []
+
+    /// The calls that declare a target. Only `.target(` is read; the others are named so that a `.target(name:)` among
+    /// their dependencies is not taken for a declaration.
+    private static let declarations = [
+        ".target(", ".testTarget(", ".executableTarget(", ".macro(", ".plugin(", ".binaryTarget(", ".systemLibrary(",
+    ]
 
     init(packages: [String], read: (String) throws -> String) rethrows {
         for package in packages {
             let text = Self.withoutComments(try read(package))
             let aliases = Self.aliases(in: text)
-            for (name, members) in Self.libraries(in: text) { products[package, default: [:]][name] = members }
-            for call in Self.calls(of: ".target(", in: text) {
-                guard let name = Self.first(#"name:\s*"([^"]+)""#, in: call) else { continue }
-                let path = Self.first(#"path:\s*"([^"]+)""#, in: call) ?? "Sources/\(name)"
-                let (local, external) = Self.dependencies(of: call, aliases: aliases, package: package)
-                targets[Self.key(package, name)] = Target(
-                    package: package, name: name, folder: "\(package)/\(path)", targets: local, products: external
-                )
+            for call in Self.calls(of: [".library("], in: text) { readLibrary(call.body, in: package) }
+            for call in Self.calls(of: Self.declarations, in: text) where call.opening == ".target(" {
+                readTarget(call.body, in: package, aliases: aliases)
             }
         }
     }
@@ -73,6 +80,95 @@ struct PackageManifests {
         return (seen.values.sorted { $0.folder < $1.folder }, unresolved)
     }
 
+    // MARK: Declarations
+
+    /// `.library(name: "X", type: .dynamic, targets: ["A", "B"])`
+    private mutating func readLibrary(_ body: String, in package: String) {
+        let arguments = Self.arguments(of: body)
+        guard let name = arguments["name"].flatMap(Self.name), let members = arguments["targets"].flatMap(Self.list) else {
+            return report(".library(\(body))", in: package)
+        }
+        let names = members.compactMap(Self.name)
+        guard names.count == members.count else { return report(".library(\(body))", in: package) }
+        products[package, default: [:]][name] = names
+    }
+
+    /// `.target(name: "A", dependencies: [...], path: "Sources/Elsewhere")`; a target declared again (in the other
+    /// branch of an `#if`) keeps the dependencies of both.
+    private mutating func readTarget(_ body: String, in package: String, aliases: [String: ProductReference]) {
+        let arguments = Self.arguments(of: body)
+        guard let name = arguments["name"].flatMap(Self.name) else { return report(".target(\(body))", in: package) }
+        var folder = "\(package)/Sources/\(name)"
+        if let path = arguments["path"] {
+            guard let literal = Self.literal(path) else { return report(".target(\(body))", in: package) }
+            folder = "\(package)/\(literal)"
+        }
+        var local: [String] = []
+        var external: [ProductReference] = []
+        if let dependencies = arguments["dependencies"] {
+            if let elements = Self.list(dependencies) {
+                for element in elements {
+                    switch Self.dependency(element, aliases: aliases) {
+                    case .target(let target): local.append(target)
+                    case .product(let product): external.append(product)
+                    case .unknown: report(element, in: package)
+                    }
+                }
+            } else {
+                report("\(name) dependencies: \(dependencies)", in: package)
+            }
+        }
+        let id = Self.key(package, name)
+        if let earlier = targets[id] {
+            guard earlier.folder == folder else {
+                return report("\(name) declared at \(earlier.folder) and at \(folder)", in: package)
+            }
+            local = earlier.targets + local.filter { !earlier.targets.contains($0) }
+            external = earlier.products + external.filter { !earlier.products.contains($0) }
+        }
+        targets[id] = Target(package: package, name: name, folder: folder, targets: local, products: external)
+    }
+
+    private enum Dependency {
+        case target(String)
+        case product(ProductReference)
+        case unknown
+    }
+
+    /// `"B"`, `.target(name: "B")`, `.byName(name: "B")`, `.product(name: "C", package: "Other")` (each may carry a
+    /// condition), or an alias.
+    private static func dependency(_ element: String, aliases: [String: ProductReference]) -> Dependency {
+        if let target = Self.name(element) { return .target(target) }
+        if let alias = aliases[element] { return .product(alias) }
+        guard let found = Self.call(element) else { return .unknown }
+        let arguments = Self.arguments(of: found.body)
+        guard let named = arguments["name"].flatMap(Self.name) else { return .unknown }
+        switch found.function {
+        case "target", "byName":
+            return .target(named)
+        case "product":
+            guard let owner = arguments["package"].flatMap(Self.name) else { return .unknown }
+            return .product(ProductReference(name: named, package: owner))
+        default:
+            return .unknown
+        }
+    }
+
+    /// `let logging = Target.Dependency.product(name: "Log", package: "Logs")`, or `let logging: Target.Dependency =
+    /// .product(...)`, on one line or several. An alias written another way is not here, so its use is reported.
+    private static func aliases(in text: String) -> [String: ProductReference] {
+        let pattern = #"let\s+(\w+)\s*(?::\s*Target\.Dependency\s*)?=\s*(?:Target\.Dependency)?\.product\(\s*name:\s*"([\w-]+)"\s*,\s*package:\s*"([\w-]+)"\s*\)"#
+        var found: [String: ProductReference] = [:]
+        for match in matches(pattern, in: text) {
+            found[match[0]] = ProductReference(name: match[1], package: match[2])
+        }
+        return found
+    }
+
+    private mutating func report(_ text: String, in package: String) {
+        unreadable.append("\(package): \(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))")
+    }
+
     // MARK: Reading the text
 
     /// The text without `//` comments (a `//` inside a string literal stays).
@@ -96,67 +192,119 @@ struct PackageManifests {
         return result
     }
 
-    /// `let logging = Target.Dependency.product(name: "DiagnosticLogging", package: "DiagnosticLogging")`
-    private static func aliases(in text: String) -> [String: ProductReference] {
-        var found: [String: ProductReference] = [:]
-        for match in matches(#"let (\w+) = Target\.Dependency\.product\(name:\s*"(\w+)",\s*package:\s*"(\w+)""#, in: text) {
-            found[match[0]] = ProductReference(name: match[1], package: match[2])
-        }
-        return found
-    }
-
-    /// `.library(name: "X", targets: ["A", "B"])`
-    private static func libraries(in text: String) -> [String: [String]] {
-        var found: [String: [String]] = [:]
-        for match in matches(#"\.library\(name:\s*"(\w+)",\s*targets:\s*\[([^\]]*)\]"#, in: text) {
-            found[match[0]] = matches(#""(\w+)""#, in: match[1]).map { $0[0] }
-        }
-        return found
-    }
-
-    /// The text between the parentheses of every call that starts with `opening` (`.target(`, not `.testTarget(`).
-    static func calls(of opening: String, in text: String) -> [String] {
-        var found: [String] = []
-        var search = text.startIndex..<text.endIndex
-        while let range = text.range(of: opening, range: search) {
-            var depth = 1
-            var inString = false
-            var index = range.upperBound
-            while index < text.endIndex, depth > 0 {
-                let character = text[index]
-                if character == "\"" { inString.toggle() }
-                if !inString { depth += character == "(" ? 1 : character == ")" ? -1 : 0 }
-                index = text.index(after: index)
+    /// The text between the parentheses of every call that starts with one of `openings`, outside string literals, and
+    /// outermost only: a call written inside one already found is part of that one's text.
+    static func calls(of openings: [String], in text: String) -> [(opening: String, body: String)] {
+        var found: [(opening: String, body: String)] = []
+        var index = text.startIndex
+        var inString = false
+        var previous: Character?
+        while index < text.endIndex {
+            let character = text[index]
+            if character == "\"" && previous != "\\" { inString.toggle() }
+            if !inString, character == ".", let opening = openings.first(where: { text[index...].hasPrefix($0) }) {
+                let start = text.index(index, offsetBy: opening.count)
+                let end = closing(in: text, from: start, opening: "(", closing: ")")
+                found.append((opening, String(text[start..<end])))
+                index = end < text.endIndex ? text.index(after: end) : end
+                previous = ")"
+                continue
             }
-            found.append(String(text[range.upperBound..<index]))
-            search = index..<text.endIndex
+            previous = character
+            index = text.index(after: index)
         }
         return found
     }
 
-    private static func dependencies(
-        of call: String, aliases: [String: ProductReference], package: String
-    ) -> (targets: [String], products: [ProductReference]) {
-        guard let label = call.range(of: "dependencies:"), let open = call[label.upperBound...].firstIndex(of: "[") else {
-            return ([], [])
+    /// The index of the bracket that closes the one open just before `start`, or the end of the text.
+    private static func closing(in text: String, from start: String.Index, opening: Character, closing: Character) -> String.Index {
+        var depth = 1
+        var inString = false
+        var previous: Character?
+        var index = start
+        while index < text.endIndex {
+            let character = text[index]
+            if character == "\"" && previous != "\\" { inString.toggle() }
+            if !inString && character == opening { depth += 1 }
+            if !inString && character == closing {
+                depth -= 1
+                if depth == 0 { return index }
+            }
+            previous = character
+            index = text.index(after: index)
         }
-        var depth = 0
-        var index = open
-        while index < call.endIndex {
-            if call[index] == "[" { depth += 1 }
-            if call[index] == "]" { depth -= 1; if depth == 0 { break } }
-            index = call.index(after: index)
-        }
-        var list = String(call[call.index(after: open)..<index])
-        let external = matches(#"\.product\(name:\s*"(\w+)",\s*package:\s*"(\w+)""#, in: list)
-            .map { ProductReference(name: $0[0], package: $0[1]) }
-        list = list.replacingOccurrences(of: #"\.product\([^)]*\)"#, with: "", options: .regularExpression)
-        let local = matches(#""(\w+)""#, in: list).map { $0[0] }
-        let named = matches(#"(?<![\w."])([a-z]\w*)(?![\w"])"#, in: list).compactMap { aliases[$0[0]] }
-        return (local, external + named)
+        return text.endIndex
     }
 
-    private static func first(_ pattern: String, in text: String) -> String? { matches(pattern, in: text).first?[0] }
+    /// The parts of a list or of a call's arguments: the text between the commas outside brackets and string literals,
+    /// trimmed, without the empty part a trailing comma leaves.
+    static func elements(of text: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var depth = 0
+        var inString = false
+        var previous: Character?
+        for character in text {
+            if character == "\"" && previous != "\\" { inString.toggle() }
+            if !inString && "([{".contains(character) { depth += 1 }
+            if !inString && ")]}".contains(character) { depth -= 1 }
+            if character == "," && depth == 0 && !inString {
+                parts.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+            previous = character
+        }
+        parts.append(current)
+        return parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
+    /// A call's arguments by label; an argument without a label is left out.
+    private static func arguments(of body: String) -> [String: String] {
+        var found: [String: String] = [:]
+        for element in elements(of: body) {
+            guard let colon = element.firstIndex(of: ":") else { continue }
+            let label = element[..<colon].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !label.isEmpty, label.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) else { continue }
+            found[label] = element[element.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return found
+    }
+
+    /// The text of a string literal that is the whole of `value`.
+    private static func literal(_ value: String) -> String? {
+        guard value.count >= 2, value.first == "\"", value.last == "\"" else { return nil }
+        let inside = value.dropFirst().dropLast()
+        return inside.contains("\"") || inside.contains("\\") ? nil : String(inside)
+    }
+
+    /// A name written as a string literal (`"CVRendering"`, `"swift-syntax"`).
+    private static func name(_ value: String) -> String? {
+        guard let text = literal(value), !text.isEmpty,
+              text.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) else { return nil }
+        return text
+    }
+
+    /// The parts of a list that is the whole of `value` (`["A", "B"]`, not `["A"] + more`).
+    private static func list(_ value: String) -> [String]? {
+        guard value.count >= 2, value.first == "[", value.last == "]" else { return nil }
+        let start = value.index(after: value.startIndex)
+        let end = value.index(before: value.endIndex)
+        guard closing(in: value, from: start, opening: "[", closing: "]") == end else { return nil }
+        return elements(of: String(value[start..<end]))
+    }
+
+    /// The function and the arguments of a call that is the whole of `value` (`.product(...)`,
+    /// `Target.Dependency.target(...)`).
+    private static func call(_ value: String) -> (function: String, body: String)? {
+        guard let head = matches(#"^(?:Target\.Dependency)?\.(\w+)\("#, in: value).first?.first,
+              let open = value.firstIndex(of: "("), value.last == ")" else { return nil }
+        let start = value.index(after: open)
+        let end = value.index(before: value.endIndex)
+        guard closing(in: value, from: start, opening: "(", closing: ")") == end else { return nil }
+        return (head, String(value[start..<end]))
+    }
 
     /// The capture groups of every match of `pattern`.
     private static func matches(_ pattern: String, in text: String) -> [[String]] {
