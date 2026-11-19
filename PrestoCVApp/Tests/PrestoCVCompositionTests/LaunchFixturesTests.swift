@@ -368,7 +368,8 @@ struct LaunchFixturesTests {
             Issue.record("expected ready, got \(state)")
             return
         }
-        #expect(try Self.entries(root.appendingPathComponent("Store")) == ["planted.cv.json"])
+        let store = try Self.entries(root.appendingPathComponent("Store")).filter { $0 != ".lock" }
+        #expect(store == ["planted.cv.json"], "The seed, beside the lock the import of the legacy store takes")
         #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
     }
 

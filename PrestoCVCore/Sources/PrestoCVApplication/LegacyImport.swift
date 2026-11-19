@@ -133,6 +133,13 @@ public struct LegacyAcknowledgement: Sendable, Equatable {
     public init() {}
 }
 
+/// What the import of the legacy store did at a launch. A run that could not list the legacy store, or begin the import,
+/// imported nothing and left every legacy file: the next launch runs again.
+public enum LegacyImportOutcome: Sendable, Equatable {
+    case ran(LegacyImportReport)
+    case failed(RepositoryError)
+}
+
 public struct ImportLegacyStore: Sendable {
     let source: any LegacyStore, target: any LegacyImportTarget, removingVerifiedSources: Bool
     public init(source: any LegacyStore, target: any LegacyImportTarget, removingVerifiedSources: Bool = true) {
