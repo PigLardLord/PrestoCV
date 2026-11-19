@@ -51,12 +51,13 @@ This is the target. Version 1 offers a blank CV, an example, or, on devices with
 |---|---|---|---|
 | **v1** | Today's app, made right. | None | None |
 | **v1.1** | A guided start with ESCO skill suggestions that the person confirms, offline on every device, from a free text, a scanned document or a written chat with the coach. | None: the skill packs are static files, regenerated in batches and synced in the background. | Hosting is free. Generating the packs is a one-off batch, repeated only for packs whose inputs changed. |
+| **v1.1.x** | Whole CVs of each trade, written in advance and filled with the facts of the person's text that code checks and the person confirms, offline on every device. | None: the CVs ship inside the app. | One run of the pipeline writes them. |
 | **v1.2** | Experience suggestions and tailoring to a job ad, on Apple's models (on the device and Private Cloud Compute), and the coach's voice, on the device. | None | None |
 | **v2** | The cloud tier: employer lookup, job-market demand, stronger models. | A stateless, autoscaling backend with device attestation and quotas. | It grows with paid use only. |
 
 ## Sources
 
-- The maintainer's decisions of 2026-10-16, 2026-10-17 and 2026-10-18, and of 2026-11-06 on the ways in ([ADR 0036](../architecture/adr/0036-build-the-draft-from-prepared-lines-of-each-trade.md)).
+- The maintainer's decisions of 2026-10-16, 2026-10-17 and 2026-10-18, of 2026-11-06 on the ways in, and of 2026-11-18 and 2026-11-19 on the whole CVs of each trade ([ADR 0036](../architecture/adr/0036-build-the-draft-from-prepared-lines-of-each-trade.md)).
 - The product review of 2026-10-16.
 - The market analysis of 2026-10-17.
 - The ESCO spike (#229).
