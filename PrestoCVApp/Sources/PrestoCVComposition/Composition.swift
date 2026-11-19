@@ -294,6 +294,7 @@ public final class Composition {
         let wrapStore: WrapStore
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
+        let legacy: URL
         #if DEBUG
         // A fixture that cannot be read, or a fixture folder that fails its check, fails the launch inside `make` before
         // the trace chain starts: nothing is made, and nothing is purged.
@@ -309,6 +310,7 @@ public final class Composition {
         paths = fixtures.paths(device: device, fresh: UUID())
         gate = fixtures.distribution.map { .asking(GivenDistribution(given: $0)) } ?? .debug
         samples = fixtures.samples(bundled: bundled, paths: paths)
+        legacy = fixtures.legacyStore(device: AppPaths.legacyStoreOnDevice(), paths: paths)
         check = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
             do throws(LaunchFixtures.Failure) {
@@ -331,6 +333,7 @@ public final class Composition {
         paths = device
         gate = .asking(AppTransactionDistribution())
         samples = bundled
+        legacy = AppPaths.legacyStoreOnDevice()
         check = {}
         prepare = {}
         wrapListEditing = { $0 }
@@ -369,9 +372,7 @@ public final class Composition {
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
-            legacyStore: DirectoryLegacyStore(
-                directory: paths.root.appendingPathComponent("Legacy", isDirectory: true), clock: SystemTimeSource()
-            )
+            legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource())
         ))
     }
 }

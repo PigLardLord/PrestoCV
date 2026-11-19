@@ -28,6 +28,7 @@ struct AppPathsTests {
             .map(\.standardizedFileURL.path)
         #expect(Set(folders).count == 5)
         let legacy = URL.applicationSupportDirectory.appendingPathComponent("PrestoCV/CVs").standardizedFileURL.path
+        #expect(AppPaths.legacyStoreOnDevice().standardizedFileURL.path == legacy, "The launch imports from the released app's store")
         for folder in folders {
             #expect(folder != legacy)
             #expect(!folder.hasPrefix(legacy))
