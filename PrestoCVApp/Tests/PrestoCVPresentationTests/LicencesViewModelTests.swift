@@ -15,6 +15,50 @@ final class NoticesFake: LicenceNoticesReading {
     }
 }
 
+/// A source of notices whose calls the test finishes one by one, in the order it chooses.
+final class GatedNotices: LicenceNoticesReading {
+    private struct Calls {
+        var pending: [CheckedContinuation<[LicenceNotice], any Error>] = []
+        var awaited = 0
+        var waiter: CheckedContinuation<Void, Never>?
+    }
+
+    private let calls = Mutex(Calls())
+
+    func notices() async throws -> [LicenceNotice] {
+        try await withCheckedThrowingContinuation { call in
+            calls.withLock {
+                $0.pending.append(call)
+                if let waiter = $0.waiter {
+                    $0.waiter = nil
+                    $0.awaited += 1
+                    waiter.resume()
+                }
+            }
+        }
+    }
+
+    /// Returns once one more call than the last time has reached the source.
+    func nextCall() async {
+        await withCheckedContinuation { waiter in
+            calls.withLock {
+                if $0.pending.count > $0.awaited {
+                    $0.awaited += 1
+                    waiter.resume()
+                } else {
+                    $0.waiter = waiter
+                }
+            }
+        }
+    }
+
+    /// Finishes the call that arrived at `index` (from 0).
+    func finish(_ index: Int, with result: Result<[LicenceNotice], any Error>) {
+        let call = calls.withLock { $0.pending[index] }
+        call.resume(with: result)
+    }
+}
+
 private let apache = Licence(id: "Apache-2.0", name: "Apache License 2.0", text: "Apache License\nVersion 2.0\n\nTERMS")
 private let own = LicenceNotice(id: "prestocv", title: "PrestoCV", isThirdParty: false, text: "This product includes PrestoCV.",
                                 licence: apache)
@@ -90,5 +134,60 @@ struct LicencesViewModelTests {
 
         #expect(alone.othersState == .noOthers)
         #expect(withOthers.othersState == nil)
+    }
+
+    @Test("a slow older load that ends with rows does not replace the rows of the newer one")
+    func olderLoadWithRowsIsIgnored() async {
+        let source = GatedNotices()
+        let licences = LicencesViewModel(reading: source)
+        let older = Task { await licences.load() }
+        await source.nextCall()
+        let newer = Task { await licences.load() }
+        await source.nextCall()
+
+        source.finish(1, with: .success([own]))
+        await newer.value
+        source.finish(0, with: .success([font]))
+        await older.value
+
+        #expect(licences.state == .loaded)
+        #expect(licences.rows.map(\.id) == ["prestocv"])
+    }
+
+    @Test("a slow older load that fails does not turn the newer one's loaded state into failed")
+    func olderLoadFailureIsIgnored() async {
+        let source = GatedNotices()
+        let licences = LicencesViewModel(reading: source)
+        let older = Task { await licences.load() }
+        await source.nextCall()
+        let newer = Task { await licences.load() }
+        await source.nextCall()
+
+        source.finish(1, with: .success([own]))
+        await newer.value
+        source.finish(0, with: .failure(NoticesFake.Unreadable()))
+        await older.value
+
+        #expect(licences.state == .loaded)
+        #expect(licences.rows.map(\.id) == ["prestocv"])
+    }
+
+    @Test("a cancelled older load leaves the newer one's state alone, loading and then loaded")
+    func cancelledOlderLoadIsIgnored() async {
+        let source = GatedNotices()
+        let licences = LicencesViewModel(reading: source)
+        let older = Task { await licences.load() }
+        await source.nextCall()
+        let newer = Task { await licences.load() }
+        await source.nextCall()
+
+        source.finish(0, with: .failure(CancellationError()))
+        await older.value
+        #expect(licences.state == .loading)
+
+        source.finish(1, with: .success([own]))
+        await newer.value
+        #expect(licences.state == .loaded)
+        #expect(licences.rows.map(\.id) == ["prestocv"])
     }
 }

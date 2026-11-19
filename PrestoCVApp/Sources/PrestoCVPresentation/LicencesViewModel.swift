@@ -10,6 +10,7 @@ public final class LicencesViewModel {
     public private(set) var state: LicencesState = .loading
     private var notices: [LicenceNotice] = []
     @ObservationIgnored private let reading: any LicenceNoticesReading
+    @ObservationIgnored private var latestLoad = 0
 
     public init(reading: any LicenceNoticesReading) {
         self.reading = reading
@@ -32,15 +33,21 @@ public final class LicencesViewModel {
         }
     }
 
-    /// Reads the notices; a read that fails is `failed` and a new call tries again. A cancelled read changes nothing more.
+    /// Reads the notices; a read that fails is `failed` and a new call tries again. Only the latest call changes the
+    /// screen: a read that ends after a newer call started, with rows, an error or a cancellation, changes nothing.
     public func load() async {
+        latestLoad += 1
+        let thisLoad = latestLoad
         state = .loading
         do {
-            notices = try await reading.notices()
+            let read = try await reading.notices()
+            guard thisLoad == latestLoad else { return }
+            notices = read
             state = .loaded
         } catch is CancellationError {
             return
         } catch {
+            guard thisLoad == latestLoad else { return }
             notices = []
             state = .failed
         }
