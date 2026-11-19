@@ -85,13 +85,13 @@ struct WorkRoundReferencesTests {
             "/// The bar (no-go round 3).",
             "/// What it accepted (rounds 3 and 7).",
             "/// A pass (round 4).",
-            "/// Accepted at f16cdea1.",
+            "/// Accepted at 942ff6ab.",
             "// MARK: Round 16",
             "// MARK: - Probe round 13",
             "/// A finding of the review rounds.",
             #"@Test("The classes of round 3")"#,
             #"@Suite("Drafting evaluation: the reader's classes of round 3")"#,
-            "let x = 1 // drafts of 5bcc19bf",
+            "let x = 1 // drafts of d0e29864",
         ]
         for line in planted {
             #expect(Self.found("let a = 1\n" + line + "\n") == [2], "Not found: \(line)")
@@ -112,7 +112,7 @@ struct WorkRoundReferencesTests {
             "/// Round to 2 decimals.",
             "// The colour is #FF00AA.",
             "let colour = 0xFF00AA80",
-            "let hash = \"f16cdea1\"",
+            "let hash = \"942ff6ab\"",
             "let id = UUID(uuidString: \"E621E1F8-C36C-495A-93FC-0C247A3E6E5F\")",
             "let url = \"https://example.org/round 3\"",
             "// The word defaced has seven letters, all hexadecimal.",
