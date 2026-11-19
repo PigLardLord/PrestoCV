@@ -142,13 +142,12 @@ public final class ScreenFactory {
                     Task { await editor.changeLook(to: look, parts: parts) }
                 }
             )
-        }, backgroundTime: backgroundTime)
+        }, makeImporter: { self.makeImport() }, backgroundTime: backgroundTime)
     }
 
-    /// The first run and the ways to start another CV. It does not offer the import while the app has no import screen
-    /// (step 5-13 adds the screen and the choice), so that no choice leads nowhere.
+    /// The first run and the ways to start another CV, the import first: the shell shows the import (`showImport()`).
     public func makeFirstRun() -> FirstRunViewModel {
-        FirstRunViewModel(browsing: browsing, editing: editing, offersImport: false)
+        FirstRunViewModel(browsing: browsing, editing: editing, offersImport: true)
     }
 
     /// The import of a CV the person already has: a text, a pasted PDF or a PDF file.

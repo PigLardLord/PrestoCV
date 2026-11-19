@@ -108,6 +108,9 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     switch screen { case .loading, .welcome, .split: break }
     let _: Bool = shell.canLeave
     let _: CVRow? = shell.selectedRow(in: rows)
+    verdicts.append(shell.showImport())
+    let importer: ImportViewModel? = shell.importer
+    shell.importStatusChanged()
     shell.reconcile(with: rows)
     shell.sceneChanged(isActive: false)
     shell.sceneChanged(isActive: true)
@@ -130,7 +133,7 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
             let _: [StatusAction] = status.statusActions
         }
     }
-    _ = (reference, detail, editor)
+    _ = (reference, detail, editor, importer)
 }
 
 func useEveryPublicMember(of chrome: EditorChrome) {
