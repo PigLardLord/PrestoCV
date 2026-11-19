@@ -14,6 +14,14 @@ struct EmptyLegacyStore: LegacyStore {
     }
 }
 
+/// A legacy store that cannot be listed, as when its folder cannot be read.
+struct UnlistableLegacyStore: LegacyStore {
+    func records() async throws(RepositoryError) -> [LegacyRecord] { throw .storeUnavailable(.cannotList) }
+    func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval {
+        .alreadyGone
+    }
+}
+
 /// The import of the released app's store through the composition: real legacy files in a temporary folder, read by the
 /// real legacy store, into the composition's own repository.
 @MainActor
@@ -21,6 +29,7 @@ struct EmptyLegacyStore: LegacyStore {
 struct LegacyImportAtLaunchTests {
     static let good = "AAAAAAAA-0000-4000-8000-000000000001"
     static let dropped = "BBBBBBBB-0000-4000-8000-000000000002"
+    static let broken = "CCCCCCCC-0000-4000-8000-000000000003"
 
     /// A legacy file of 1.0.1: the required members, then `fields`.
     static func legacyFile(_ id: String, _ fields: String = "") -> String {
@@ -69,5 +78,39 @@ struct LegacyImportAtLaunchTests {
         #expect(firstRun.state == .returning)
         #expect(shell.screen(for: firstRun.state) == .split)
         #expect(try Self.files(folder) == ["cv_\(Self.dropped).json"], "the CV with a loss keeps its file until it is acknowledged")
+    }
+
+    @Test("A launch that cannot list the legacy store opens with the failure, keeps the files, and the next launch imports")
+    func aFailedImportIsShownAndRetried() async throws {
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let folder = try Self.legacyFolder(paths, [Self.good: Self.legacyFile(Self.good)])
+
+        let failed = try await Self.launch(paths, from: UnlistableLegacyStore())
+        #expect(failed.legacyImport == .failed(.storeUnavailable(.cannotList)))
+        #expect(failed.legacyImport.imported == 0)
+        #expect(failed.legacyImport.failed == nil, "how many failed is not known, so never zero, as if there were nothing")
+        #expect(try Self.files(folder) == ["cv_\(Self.good).json"])
+
+        let next = try await Self.launch(paths, from: DirectoryLegacyStore(directory: folder, clock: SteppingClock()))
+        #expect(next.legacyImport.imported == 1)
+        #expect(next.legacyImport.failed == 0)
+        #expect(try await Self.stored(next) == [Self.good])
+    }
+
+    @Test("A partial import counts the CVs stored and the CVs left out, whose files stay, and skips the welcome")
+    func aPartialImportCountsBoth() async throws {
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let folder = try Self.legacyFolder(paths, [Self.good: Self.legacyFile(Self.good), Self.broken: "{"])
+
+        let composition = try await Self.launch(paths, from: DirectoryLegacyStore(directory: folder, clock: SteppingClock()))
+        let firstRun = composition.screens.makeFirstRun()
+        await firstRun.load()
+
+        #expect(composition.legacyImport.imported == 1)
+        #expect(composition.legacyImport.failed == 1)
+        #expect(try Self.files(folder) == ["cv_\(Self.broken).json"])
+        #expect(firstRun.state == .returning)
     }
 }

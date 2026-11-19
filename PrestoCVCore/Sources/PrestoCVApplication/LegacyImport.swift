@@ -140,6 +140,36 @@ public enum LegacyImportOutcome: Sendable, Equatable {
     case failed(RepositoryError)
 }
 
+extension LegacyImportOutcome {
+    /// The legacy CVs the new store holds after the run: those it stored and those an earlier run had.
+    public var imported: Int {
+        switch self {
+        case .ran(let report): report.imported.count + report.alreadyStored.count
+        case .failed: 0
+        }
+    }
+
+    /// The legacy CVs the run left out of the new store, their files kept for the next launch; nil when the run stopped
+    /// before it knew them all. A CV that was stored but whose file stayed is imported, not failed.
+    public var failed: Int? {
+        switch self {
+        case .ran(let report) where report.storeErased: nil
+        case .ran(let report): report.failures.filter(\.reason.leavesTheCVOut).count
+        case .failed: nil
+        }
+    }
+}
+
+extension LegacyImportFailure.Reason {
+    /// Whether the CV is missing from the new store, rather than stored with its legacy file left in place.
+    var leavesTheCVOut: Bool {
+        switch self {
+        case .invalid, .unreadable, .notStored, .didNotReadBack: true
+        case .sourceNotRemoved, .sourceChanged: false
+        }
+    }
+}
+
 public struct ImportLegacyStore: Sendable {
     let source: any LegacyStore, target: any LegacyImportTarget, removingVerifiedSources: Bool
     public init(source: any LegacyStore, target: any LegacyImportTarget, removingVerifiedSources: Bool = true) {
