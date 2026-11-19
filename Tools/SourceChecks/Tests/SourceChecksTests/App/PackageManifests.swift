@@ -97,7 +97,7 @@ struct PackageManifests {
 
     /// `.target(name: "A", dependencies: [...], path: "Sources/Elsewhere")`; a target declared again (in the other
     /// branch of an `#if`) keeps the dependencies of both.
-    private mutating func readTarget(_ body: String, in package: String, aliases: [String: ProductReference]) {
+    private mutating func readTarget(_ body: String, in package: String, aliases: [String: [ProductReference]]) {
         let arguments = Self.arguments(of: body)
         guard let name = arguments["name"].flatMap(Self.name) else { return report(".target(\(body))", in: package) }
         var folder = "\(package)/Sources/\(name)"
@@ -112,7 +112,7 @@ struct PackageManifests {
                 for element in elements {
                     switch Self.dependency(element, aliases: aliases) {
                     case .target(let target): local.append(target)
-                    case .product(let product): external.append(product)
+                    case .products(let found): external.append(contentsOf: found)
                     case .unknown: report(element, in: package)
                     }
                 }
@@ -133,15 +133,16 @@ struct PackageManifests {
 
     private enum Dependency {
         case target(String)
-        case product(ProductReference)
+        /// One product, or every product an alias names across the branches of a condition
+        case products([ProductReference])
         case unknown
     }
 
     /// `"B"`, `.target(name: "B")`, `.byName(name: "B")`, `.product(name: "C", package: "Other")` (each may carry a
     /// condition), or an alias.
-    private static func dependency(_ element: String, aliases: [String: ProductReference]) -> Dependency {
+    private static func dependency(_ element: String, aliases: [String: [ProductReference]]) -> Dependency {
         if let target = Self.name(element) { return .target(target) }
-        if let alias = aliases[element] { return .product(alias) }
+        if let named = aliases[element] { return .products(named) }
         guard let found = Self.call(element) else { return .unknown }
         let arguments = Self.arguments(of: found.body)
         guard let named = arguments["name"].flatMap(Self.name) else { return .unknown }
@@ -150,21 +151,27 @@ struct PackageManifests {
             return .target(named)
         case "product":
             guard let owner = arguments["package"].flatMap(Self.name) else { return .unknown }
-            return .product(ProductReference(name: named, package: owner))
+            return .products([ProductReference(name: named, package: owner)])
         default:
             return .unknown
         }
     }
 
     /// `let logging = Target.Dependency.product(name: "Log", package: "Logs")`, or `let logging: Target.Dependency =
-    /// .product(...)`, on one line or several. An alias written another way is not here, so its use is reported.
-    private static func aliases(in text: String) -> [String: ProductReference] {
+    /// .product(...)`, on one line or several. A name declared in several branches of a condition names the products of
+    /// all of them. A name declared another way, in any branch, is not here, so its use is reported.
+    private static func aliases(in text: String) -> [String: [ProductReference]] {
         let pattern = #"let\s+(\w+)\s*(?::\s*Target\.Dependency\s*)?=\s*(?:Target\.Dependency)?\.product\(\s*name:\s*"([\w-]+)"\s*,\s*package:\s*"([\w-]+)"\s*\)"#
-        var found: [String: ProductReference] = [:]
+        var found: [String: [ProductReference]] = [:]
+        var readDeclarations: [String: Int] = [:]
         for match in matches(pattern, in: text) {
-            found[match[0]] = ProductReference(name: match[1], package: match[2])
+            let product = ProductReference(name: match[1], package: match[2])
+            readDeclarations[match[0], default: 0] += 1
+            if !found[match[0], default: []].contains(product) { found[match[0], default: []].append(product) }
         }
-        return found
+        var declarations: [String: Int] = [:]
+        for match in matches(#"\b(?:let|var)\s+(\w+)"#, in: text) { declarations[match[0], default: 0] += 1 }
+        return found.filter { name, _ in declarations[name] == readDeclarations[name] }
     }
 
     private mutating func report(_ text: String, in package: String) {

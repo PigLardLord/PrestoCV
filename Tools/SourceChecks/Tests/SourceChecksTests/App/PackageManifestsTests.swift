@@ -157,4 +157,40 @@ struct PackageManifestsTests {
         #expect(Set(manifests.reached(from: [.init(name: "Lib", package: "P")]).targets.map(\.name)) == ["A", "B"])
         #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
     }
+
+    @Test("An alias declared in both branches of a condition reaches the products of both")
+    func anAliasDeclaredTwiceReachesBothProducts() {
+        let manifests = read([
+            "P": """
+                #if os(Linux)
+                let logging = Target.Dependency.product(name: "LogA", package: "Logs")
+                #else
+                let logging = Target.Dependency.product(name: "LogB", package: "Logs")
+                #endif
+                .library(name: "Lib", targets: ["A"])
+                .target(name: "A", dependencies: [logging])
+                """,
+            "Logs": #".library(name: "LogA", targets: ["LA"]); .library(name: "LogB", targets: ["LB"]); .target(name: "LA"); .target(name: "LB")"#,
+        ])
+
+        #expect(manifests.targets["P/A"]?.products == [.init(name: "LogA", package: "Logs"), .init(name: "LogB", package: "Logs")])
+        #expect(Set(manifests.reached(from: [.init(name: "Lib", package: "P")]).targets.map(\.name)) == ["A", "LA", "LB"])
+        #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
+    }
+
+    @Test("An alias declared once as a product and once another way is reported where it is used, not read as the product")
+    func anAliasDeclaredAnotherWayInOneBranchIsReported() {
+        let manifests = read(["P": """
+            #if os(Linux)
+            let logging = Target.Dependency.product(name: "Log", package: "Logs")
+            #else
+            let logging = Target.Dependency.target(name: "B")
+            #endif
+            .target(name: "A", dependencies: [logging])
+            .target(name: "B")
+            """])
+
+        #expect(manifests.unreadable.contains { $0.contains("logging") }, "\(manifests.unreadable)")
+        #expect(manifests.targets["P/A"]?.products == [])
+    }
 }
