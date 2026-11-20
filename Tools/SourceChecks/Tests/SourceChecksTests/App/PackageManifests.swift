@@ -12,7 +12,9 @@ import Foundation
 /// The reader fails closed: a declaration or a dependency written in a shape it does not follow goes to `unreadable`,
 /// which the release checks require empty, so a new way of writing a manifest fails them instead of shrinking what they
 /// scan. It does not depend on spelling: white space before a call's parenthesis is read as none, and a declaration word
-/// used in any other way than `.word(` is reported.
+/// used in any other way than `.word(` is reported. It follows a string only in its plain form, opened and closed by a
+/// quote on one line: a line that holds another form of string, a block comment or a regex literal, or that ends inside a
+/// string, is reported, as the reader could take code there for text and skip a declaration.
 struct PackageManifests {
 
     struct Target: Hashable {
@@ -55,7 +57,9 @@ struct PackageManifests {
 
     init(packages: [String], read: (String) throws -> String) rethrows {
         for package in packages {
-            let text = Self.canonical(Self.withoutComments(try read(package)))
+            let source = try read(package)
+            for line in Self.stringsTheReaderDoesNotFollow(in: source) { report(line, in: package) }
+            let text = Self.canonical(Self.withoutComments(source))
             for line in Self.declarationWordsOutsideCalls(in: text) { report(line, in: package) }
             let aliases = Self.aliases(in: text)
             for call in Self.calls(of: [".library("], in: text) { readLibrary(call.body, in: package) }
@@ -189,8 +193,10 @@ struct PackageManifests {
         return found.filter { name, _ in declarations[name] == readDeclarations[name] }
     }
 
+    /// Reports a line once, though more than one rule may find it.
     private mutating func report(_ text: String, in package: String) {
-        unreadable.append("\(package): \(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))")
+        let entry = "\(package): \(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))"
+        if !unreadable.contains(entry) { unreadable.append(entry) }
     }
 
     // MARK: Reading the text
@@ -214,6 +220,36 @@ struct PackageManifests {
             previous = character
         }
         return result
+    }
+
+    /// The lines whose strings the reader does not follow. It takes a string for the text between two quotes on one line,
+    /// so it lists the forms that break that: a raw string (`#"`), a multi-line string (`"""`), an escaped backslash
+    /// (`\\`), an interpolation (`\(`), a block comment (`/*`) and a regex literal (`#/`). A line that ends inside a
+    /// string is reported as well, for a form the list does not name. No manifest uses any of them.
+    static func stringsTheReaderDoesNotFollow(in source: String) -> [String] {
+        let forms = ["#\"", "\"\"\"", "\\\\", "\\(", "/*", "#/"]
+        let withForms = source.split(separator: "\n", omittingEmptySubsequences: false).filter { line in
+            forms.contains { line.contains($0) }
+        }
+        return withForms.map(String.init) + linesEndingInsideAString(withoutComments(source))
+    }
+
+    private static func linesEndingInsideAString(_ text: String) -> [String] {
+        var found: [String] = []
+        var line = ""
+        var inString = false
+        var previous: Character?
+        for character in text + "\n" {
+            if character == "\n" {
+                if inString { found.append(line) }
+                (line, inString, previous) = ("", false, nil)
+                continue
+            }
+            if character == "\"" && previous != "\\" { inString.toggle() }
+            line.append(character)
+            previous = character
+        }
+        return found
     }
 
     /// The text with the white space between a member's name and its parenthesis taken out, outside string literals:

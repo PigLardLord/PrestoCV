@@ -252,4 +252,32 @@ struct PackageManifestsTests {
         #expect(manifests.unreadable.count == 1, "\(manifests.unreadable)")
         #expect(manifests.unreadable.contains { $0.contains("target") }, "\(manifests.unreadable)")
     }
+
+    @Test("A string, a comment or a regex literal the reader does not follow is reported, so no declaration after it is skipped", arguments: [
+        #"let folder = "Sources\\""#,
+        ##"let flag = #"a"b"#"##,
+        "let note = \"\"\"\n    say \"hi\n    \"\"\"",
+        #"let note = 1 /* say "hi */"#,
+        #"let name = "\(prefix)C""#,
+        ##"let pattern = #/a"b"c/#"##,
+        #"let pattern = /"/"#,
+    ])
+    func aStringOrACommentTheReaderDoesNotFollowIsReported(line: String) {
+        let manifests = read(["P": """
+            .library(name: "Lib", targets: ["A"])
+            .target(name: "A", dependencies: ["B"])
+            \(line)
+            .target(name: "B", dependencies: [.product(name: "C", package: "Other")])
+            """])
+
+        let first = line.prefix { $0 != "\n" }
+        #expect(manifests.unreadable.contains { $0.hasSuffix(first) }, "\(manifests.unreadable)")
+    }
+
+    @Test("A line found by two rules is reported once")
+    func aLineFoundByTwoRulesIsReportedOnce() {
+        let manifests = read(["P": #".target/* say "hi */(name: "A")"#])
+
+        #expect(manifests.unreadable.count == 1, "\(manifests.unreadable)")
+    }
 }
