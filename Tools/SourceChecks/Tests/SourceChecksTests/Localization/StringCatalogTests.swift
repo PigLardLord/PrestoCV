@@ -26,13 +26,15 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
             // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
-            // the designs "Minimal" and "Modern" and the fonts "System" as English does.
+            // the designs "Minimal" and "Modern" and the fonts "System" as English does. An alert's "OK" reads the same in all
+            // but Spanish.
             sameInSomeLanguages: [
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
                 "editor.entry.title.certification": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
+                "import.error.ok": ["de", "fr", "it", "pt"],
             ],
             // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
             // composition's LookNamesTests checks that those codes and these keys are the same set.

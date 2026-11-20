@@ -49,6 +49,18 @@ enum ParagraphHeight {
     static let minimum: CGFloat = 96
 }
 
+/// The height of the box that holds the text of a CV to import, at the default text size. It grows with the text size
+/// up to a share of the screen's height, and a long CV scrolls inside it, so that the buttons under it stay one swipe
+/// away.
+enum ImportBoxHeight {
+    static let compact: CGFloat = 220
+    /// A wide screen, such as an iPad's
+    static let regular: CGFloat = 260
+    /// A short screen, such as an iPhone on its side
+    static let compactHeight: CGFloat = 140
+    static let maximumShare: CGFloat = 0.6
+}
+
 /// The shape of a page of the PDF, its width over its height (A4)
 enum PageShape {
     static let a4: CGFloat = 210.0 / 297.0

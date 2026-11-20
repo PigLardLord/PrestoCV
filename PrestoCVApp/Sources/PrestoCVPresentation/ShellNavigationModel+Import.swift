@@ -1,5 +1,16 @@
 extension ShellNavigationModel {
 
+    /// Goes where a way to start leads: a draft opens in the editor and the import shows, each in place of what was
+    /// open (R5: the view forwards the destination and decides nothing). No destination changes nothing.
+    @discardableResult
+    public func start(at destination: StartDestination?) -> LeaveVerdict {
+        switch destination {
+        case .draft(let draft)?: open(.draft(draft))
+        case .importCV?: showImport()
+        case nil: .left
+        }
+    }
+
     /// The import's status changed. The view forwards every change and decides nothing: a ready import hands its draft
     /// to the editor (`open(_:)`), and any other status leaves the import on the screen (R5). Only a ready import holds
     /// a draft.

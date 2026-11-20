@@ -62,6 +62,29 @@ struct ShellImportTests {
         #expect(importer.text == Self.text)
     }
 
+    @Test("a way to start goes where it leads: a draft to the editor, the import to its screen, nothing nowhere")
+    func startGoesWhereTheChoiceLeads() throws {
+        let world = World()
+
+        #expect(world.shell.start(at: nil) == .left)
+        #expect(world.shell.importer == nil)
+        #expect(world.shell.detail == nil)
+
+        #expect(world.shell.start(at: .importCV) == .left)
+        let importer = try #require(world.shell.importer)
+        #expect(world.shell.preferredColumn == .detail)
+
+        let draft = CVDraft(cv: ImportValues.cv("Ada Ferro"))
+        #expect(world.shell.start(at: .draft(draft)) == .left)
+        #expect(world.shell.importer == nil)
+        #expect(importer.status == .idle)
+        guard case .draft(let opened)? = world.shell.detail else {
+            Issue.record("no draft in the detail: \(String(describing: world.shell.detail))")
+            return
+        }
+        #expect(opened.cv == draft.cv)
+    }
+
     @Test("an editor whose text cannot be stored as it is keeps the person in it, and no import shows")
     func showImportStaysWhileTheEditorCannotBeLeft() async throws {
         let world = World()

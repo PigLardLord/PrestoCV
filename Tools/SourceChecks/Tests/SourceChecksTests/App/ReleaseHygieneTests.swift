@@ -204,6 +204,18 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture that fails renames outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test cancels a read that never ends by itself; no Release build may hold the person's import.
+    @Test("The fixture that holds the import's reads is read only by Debug builds")
+    func theFixtureThatHoldsTheImportIsReadOnlyInDebugBuilds() {
+        let names = ["holdImportArgument", "holdsImport", "HeldImport", "fixtures.importing"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that holds the import outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
     /// carries the composition's flag, always false, and has no code that sets it, passes it on or shows the stand-in.
     @Test("The stand-in of the share sheet is set, passed on and shown only by Debug builds")
