@@ -1,6 +1,7 @@
 #if DEBUG
 import DiagnosticTrace
 import Foundation
+import PrestoCVApplication
 import Testing
 @testable import PrestoCVComposition
 
@@ -208,6 +209,18 @@ struct LaunchFixturesTests {
         #expect(fixtures.samples(bundled: bundled, paths: paths).path == "/tmp/t/PrestoCVNextFixture-no-samples/Samples")
     }
 
+    @Test("The legacy store is the device's, or for a fixture folder one in it, so a fixture never reads the released app's")
+    func legacyStoreFolder() {
+        let device = URL(filePath: "/support/PrestoCV/CVs", directoryHint: .isDirectory)
+        var fixtures = LaunchFixtures()
+        #expect(fixtures.legacyStore(device: device, paths: Self.device) == device)
+
+        fixtures.storage = .named("legacy")
+        let paths = fixtures.paths(device: Self.device, fresh: Self.fresh)
+
+        #expect(fixtures.legacyStore(device: device, paths: paths).path == "/tmp/t/PrestoCVNextFixture-legacy/Legacy")
+    }
+
     @Test("The seed is written as files in the store folder, which it makes")
     func writesTheSeed() throws {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("Seed-\(UUID().uuidString)", isDirectory: true)
@@ -302,13 +315,13 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("A design folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal)
-    func linkedDesigns() async throws {
+    @Test("A design or legacy folder inside the fixture folder that is a link fails the launch, and nothing is written there", .printsForReal, arguments: ["Designs", "Legacy"])
+    func linkedFolder(_ folder: String) async throws {
         let target = try Self.target()
         let name = Self.unique()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("Designs"), withDestinationURL: target)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent(folder), withDestinationURL: target)
         defer {
             try? FileManager.default.removeItem(at: root)
             try? FileManager.default.removeItem(at: target)
@@ -368,7 +381,9 @@ struct LaunchFixturesTests {
             Issue.record("expected ready, got \(state)")
             return
         }
-        #expect(try Self.entries(root.appendingPathComponent("Store")) == ["planted.cv.json"])
+        let store = try Self.entries(root.appendingPathComponent("Store")).filter { $0 != ".lock" }
+        #expect(store == ["planted.cv.json"], "The seed, beside the lock the import of the legacy store takes")
+        #expect(composition.legacyImport == .ran(LegacyImportReport()), "The fixture folder has no legacy store: a run with nothing")
         #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
     }
 

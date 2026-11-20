@@ -143,6 +143,12 @@ struct LaunchFixtures: Equatable, Sendable {
         withoutSamples ? paths.root.appendingPathComponent("Samples", isDirectory: true) : bundled
     }
 
+    /// The legacy store this launch imports from: the device's, or for a fixture folder a folder in it, so that a launch
+    /// with a fixture never reads, or removes, the files of the released app.
+    func legacyStore(device: URL, paths: AppPaths) -> URL {
+        storage == .device ? device : Self.legacyFolder(of: paths)
+    }
+
     /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
     func listEditing(_ editing: any CVEditing) -> any CVEditing {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
@@ -154,9 +160,10 @@ struct LaunchFixtures: Equatable, Sendable {
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no
-    /// link on the way to its store, design or trace folder, and nothing outside the temporary folder. The composition runs it
-    /// before anything touches these paths, the purge of the trace included, so a link planted in the temporary folder
-    /// never leads a launch into another folder, such as the real store, its designs or its traces.
+    /// link on the way to its store, design, trace or legacy folder, and nothing outside the temporary folder. The
+    /// composition runs it before anything touches these paths, the purge of the trace included, so a link planted in the
+    /// temporary folder never leads a launch into another folder, such as the real store, its designs, its traces or the
+    /// released app's store.
     func check(_ paths: AppPaths) throws(Failure) {
         guard storage != .device else { return }
         try Self.requirePlainFolders(of: paths)
@@ -198,7 +205,7 @@ struct LaunchFixtures: Equatable, Sendable {
     /// a root that resolves to somewhere outside the temporary folder.
     private static func requirePlainFolders(of paths: AppPaths) throws(Failure) {
         let temporary = paths.temporary.standardizedFileURL.path
-        for folder in [paths.store, paths.designs, paths.trace] {
+        for folder in [paths.store, paths.designs, paths.trace, legacyFolder(of: paths)] {
             var url = folder.standardizedFileURL
             while url.path.hasPrefix(temporary + "/") {
                 if isLink(url) { throw .unsafeFolder }
@@ -207,6 +214,10 @@ struct LaunchFixtures: Equatable, Sendable {
         }
         let resolvedTemporary = paths.temporary.resolvingSymlinksInPath().path
         guard paths.root.resolvingSymlinksInPath().path.hasPrefix(resolvedTemporary + "/") else { throw .unsafeFolder }
+    }
+
+    private static func legacyFolder(of paths: AppPaths) -> URL {
+        paths.root.appendingPathComponent("Legacy", isDirectory: true)
     }
 
     /// Whether the entry is a link. An entry that is not there is none; one that cannot be read counts as one (fail closed).

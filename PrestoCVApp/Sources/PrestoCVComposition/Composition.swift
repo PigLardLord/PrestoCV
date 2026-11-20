@@ -93,6 +93,8 @@ public final class Composition {
         /// True when a share opens the stand-in of the system's share sheet: only a Debug build's launch argument sets it
         /// (`LaunchFixtures`), for the UI tests.
         let sharesWithStandIn: Bool
+        /// The store of the released app, whose CVs the launch moves into the new store before any screen reads it
+        let legacyStore: any LegacyStore
     }
 
     let paths: AppPaths
@@ -113,6 +115,8 @@ public final class Composition {
     /// True when a share should open the stand-in of the system's share sheet, which a UI test can read and answer. It is
     /// true only in a Debug build launched with `-PrestoCVNextShareStandIn`; a Release build has no code that sets it.
     public let sharesWithStandIn: Bool
+    /// What the import of the released app's store did at this launch, before any screen read the store
+    public let legacyImport: LegacyImportOutcome
 
     /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
     private struct Parts {
@@ -124,9 +128,12 @@ public final class Composition {
         let languages: [ExportLanguage]
     }
 
-    private init(inputs: Inputs, parts: Parts, trace: TraceChain) {
+    private init(
+        inputs: Inputs, repository: FileCVRepository, legacyImport: LegacyImportOutcome, parts: Parts, trace: TraceChain
+    ) {
         paths = inputs.paths
-        repository = FileCVRepository(directory: inputs.paths.store, clock: inputs.clock)
+        self.repository = repository
+        self.legacyImport = legacyImport
         renderer = parts.renderer
         inspector = parts.inspector
         headings = parts.headings
@@ -209,6 +216,8 @@ public final class Composition {
         } catch {
             return .failed(CompositionFailure(error))
         }
+        let repository = FileCVRepository(directory: inputs.paths.store, clock: inputs.clock)
+        let legacyImport = await importLegacy(from: inputs.legacyStore, into: repository)
         let rules: WKContentRuleList
         do {
             rules = try await inputs.compileRules()
@@ -217,7 +226,17 @@ public final class Composition {
         }
         do {
             let parts = try await rendering(inputs, rules: rules, logger: trace.logger)
-            return .ready(Composition(inputs: inputs, parts: parts, trace: trace))
+            return .ready(Composition(inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, trace: trace))
+        } catch {
+            return .failed(error)
+        }
+    }
+
+    /// Moves the CVs of the released app's store into the new store before any screen reads it, so the first-run decision
+    /// sees them. A run that fails does not stop the launch: the legacy files stay, and the next launch runs again.
+    private static func importLegacy(from source: any LegacyStore, into store: FileCVRepository) async -> LegacyImportOutcome {
+        do throws(RepositoryError) {
+            return .ran(try await ImportLegacyStore(source: source, target: store).run())
         } catch {
             return .failed(error)
         }
@@ -275,6 +294,7 @@ public final class Composition {
         let wrapStore: WrapStore
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
+        let legacy: URL
         #if DEBUG
         // A fixture that cannot be read, or a fixture folder that fails its check, fails the launch inside `make` before
         // the trace chain starts: nothing is made, and nothing is purged.
@@ -290,6 +310,7 @@ public final class Composition {
         paths = fixtures.paths(device: device, fresh: UUID())
         gate = fixtures.distribution.map { .asking(GivenDistribution(given: $0)) } ?? .debug
         samples = fixtures.samples(bundled: bundled, paths: paths)
+        legacy = fixtures.legacyStore(device: AppPaths.legacyStoreOnDevice(), paths: paths)
         check = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
             do throws(LaunchFixtures.Failure) {
@@ -312,6 +333,7 @@ public final class Composition {
         paths = device
         gate = .asking(AppTransactionDistribution())
         samples = bundled
+        legacy = AppPaths.legacyStoreOnDevice()
         check = {}
         prepare = {}
         wrapListEditing = { $0 }
@@ -349,7 +371,8 @@ public final class Composition {
             wrapStore: wrapStore,
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
-            sharesWithStandIn: sharesWithStandIn
+            sharesWithStandIn: sharesWithStandIn,
+            legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource())
         ))
     }
 }

@@ -81,7 +81,8 @@ struct CompositionTests {
         copyFolders: [URL] = [],
         compileRules: @escaping Composition.CompileRules,
         designs: any BundledDesignSource = BundleDesignSource(),
-        makeGate: @escaping Composition.MakeGate = { _, _, _ in FakeRenderingGate() }
+        makeGate: @escaping Composition.MakeGate = { _, _, _ in FakeRenderingGate() },
+        legacyStore: any LegacyStore = EmptyLegacyStore()
     ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
@@ -103,7 +104,8 @@ struct CompositionTests {
             wrapStore: { $0 },
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
-            sharesWithStandIn: false
+            sharesWithStandIn: false,
+            legacyStore: legacyStore
         )
     }
 

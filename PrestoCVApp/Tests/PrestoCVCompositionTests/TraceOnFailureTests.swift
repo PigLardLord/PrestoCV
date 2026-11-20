@@ -50,7 +50,8 @@ struct TraceOnFailureTests {
             wrapStore: { $0 },
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
-            sharesWithStandIn: false
+            sharesWithStandIn: false,
+            legacyStore: EmptyLegacyStore()
         )
     }
 
