@@ -13,8 +13,9 @@ import Foundation
 /// which the release checks require empty, so a new way of writing a manifest fails them instead of shrinking what they
 /// scan. It does not depend on spelling: white space before a call's parenthesis is read as none, and a declaration word
 /// used in any other way than `.word(` is reported. It follows a string only in its plain form, opened and closed by a
-/// quote on one line: a line that holds another form of string, a block comment or a regex literal, or that ends inside a
-/// string, is reported, as the reader could take code there for text and skip a declaration.
+/// quote on one line, and a slash outside a string only as the start of a `//` comment: a line that holds another form of
+/// string, a block comment, a regex literal or any other slash, or that ends inside a string, is reported, as the reader
+/// could take code there for text and skip a declaration.
 struct PackageManifests {
 
     struct Target: Hashable {
@@ -224,32 +225,30 @@ struct PackageManifests {
 
     /// The lines whose strings the reader does not follow. It takes a string for the text between two quotes on one line,
     /// so it lists the forms that break that: a raw string (`#"`), a multi-line string (`"""`), an escaped backslash
-    /// (`\\`), an interpolation (`\(`), a block comment (`/*`) and a regex literal (`#/`). A line that ends inside a
-    /// string is reported as well, for a form the list does not name. No manifest uses any of them.
+    /// (`\\`), an interpolation (`\(`), a block comment (`/*`) and a regex literal (`#/`). On the other lines every
+    /// string is a plain one, so walking a line from the left tells exactly what is inside a string up to the first slash
+    /// outside one; the walk reports that slash unless it starts a `//` comment (a bare regex literal `/"/` could hide a
+    /// declaration between two quotes on one line, and a division is reported with it), and reports a line that ends
+    /// inside a string. No manifest uses any of them.
     static func stringsTheReaderDoesNotFollow(in source: String) -> [String] {
         let forms = ["#\"", "\"\"\"", "\\\\", "\\(", "/*", "#/"]
-        let withForms = source.split(separator: "\n", omittingEmptySubsequences: false).filter { line in
-            forms.contains { line.contains($0) }
-        }
-        return withForms.map(String.init) + linesEndingInsideAString(withoutComments(source))
+        let lines = source.split(separator: "\n", omittingEmptySubsequences: false)
+        let withForms = lines.filter { line in forms.contains { line.contains($0) } }
+        return withForms.map(String.init) + lines.filter { !walksToItsEnd(Array($0)) }.map(String.init)
     }
 
-    private static func linesEndingInsideAString(_ text: String) -> [String] {
-        var found: [String] = []
-        var line = ""
+    /// Whether a line ends outside a string with no slash outside a string, but one that starts a `//` comment.
+    private static func walksToItsEnd(_ line: [Character]) -> Bool {
         var inString = false
-        var previous: Character?
-        for character in text + "\n" {
-            if character == "\n" {
-                if inString { found.append(line) }
-                (line, inString, previous) = ("", false, nil)
-                continue
-            }
+        for index in line.indices {
+            let character = line[index]
+            let previous = index > line.startIndex ? line[index - 1] : nil
             if character == "\"" && previous != "\\" { inString.toggle() }
-            line.append(character)
-            previous = character
+            if !inString && character == "/" {
+                return index + 1 < line.endIndex && line[index + 1] == "/"
+            }
         }
-        return found
+        return !inString
     }
 
     /// The text with the white space between a member's name and its parenthesis taken out, outside string literals:

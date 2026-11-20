@@ -253,7 +253,7 @@ struct PackageManifestsTests {
         #expect(manifests.unreadable.contains { $0.contains("target") }, "\(manifests.unreadable)")
     }
 
-    @Test("A string, a comment or a regex literal the reader does not follow is reported, so no declaration after it is skipped", arguments: [
+    @Test("A string, a comment, a regex literal or a slash the reader does not follow is reported, so no declaration on its line or after it is skipped", arguments: [
         #"let folder = "Sources\\""#,
         ##"let flag = #"a"b"#"##,
         "let note = \"\"\"\n    say \"hi\n    \"\"\"",
@@ -261,6 +261,8 @@ struct PackageManifestsTests {
         #"let name = "\(prefix)C""#,
         ##"let pattern = #/a"b"c/#"##,
         #"let pattern = /"/"#,
+        #"let first = /"/; targets.append(.target(name: "C")); let second = /"/"#,
+        "let half = width / 2",
     ])
     func aStringOrACommentTheReaderDoesNotFollowIsReported(line: String) {
         let manifests = read(["P": """
