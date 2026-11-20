@@ -11,7 +11,8 @@ import Foundation
 ///
 /// The reader fails closed: a declaration or a dependency written in a shape it does not follow goes to `unreadable`,
 /// which the release checks require empty, so a new way of writing a manifest fails them instead of shrinking what they
-/// scan.
+/// scan. It does not depend on spelling: white space before a call's parenthesis is read as none, and a declaration word
+/// used in any other way than `.word(` is reported.
 struct PackageManifests {
 
     struct Target: Hashable {
@@ -45,9 +46,17 @@ struct PackageManifests {
         ".target(", ".testTarget(", ".executableTarget(", ".macro(", ".plugin(", ".binaryTarget(", ".systemLibrary(",
     ]
 
+    /// The words that declare a target or a product, or name one as a dependency. Each must be written `.word(`; any
+    /// other use (an escaped name, a comment before the parenthesis, a reference to the function) is reported, so no
+    /// spelling of a declaration leaves the scan.
+    private static let declarationWords = [
+        "target", "testTarget", "executableTarget", "macro", "plugin", "binaryTarget", "systemLibrary", "library", "product",
+    ]
+
     init(packages: [String], read: (String) throws -> String) rethrows {
         for package in packages {
-            let text = Self.withoutComments(try read(package))
+            let text = Self.canonical(Self.withoutComments(try read(package)))
+            for line in Self.declarationWordsOutsideCalls(in: text) { report(line, in: package) }
             let aliases = Self.aliases(in: text)
             for call in Self.calls(of: [".library("], in: text) { readLibrary(call.body, in: package) }
             for call in Self.calls(of: Self.declarations, in: text) {
@@ -207,6 +216,53 @@ struct PackageManifests {
         return result
     }
 
+    /// The text with the white space between a member's name and its parenthesis taken out, outside string literals:
+    /// `.target (name: "A")` and `.target` with `(name: "A")` on the next line read as `.target(name: "A")`.
+    static func canonical(_ text: String) -> String {
+        outsideStrings(text, emptying: false) { code in
+            NSRegularExpression.compiled(#"\.(\w+)\s+\("#).stringByReplacingMatches(
+                in: code, range: NSRange(code.startIndex..., in: code), withTemplate: ".$1("
+            )
+        }
+    }
+
+    /// The lines that use a declaration word, outside string literals, in another way than `.word(`.
+    private static func declarationWordsOutsideCalls(in text: String) -> [String] {
+        let words = declarationWords.joined(separator: "|")
+        let misuse = NSRegularExpression.compiled(#"(?<![\w.])(?:"# + words + #")(?!\w)|(?<=\.)(?:"# + words + #")(?![\w(])"#)
+        let code = outsideStrings(text, emptying: true) { $0 }.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        return zip(code, lines).compactMap { code, line in
+            let code = String(code)
+            return misuse.firstMatch(in: code, range: NSRange(code.startIndex..., in: code)) == nil ? nil : String(line)
+        }
+    }
+
+    /// The text with `transform` applied to each part outside string literals. The literals are kept, or, when
+    /// `emptying`, each of their characters but a line break becomes a space, so the lines stay where they were.
+    private static func outsideStrings(_ text: String, emptying: Bool, _ transform: (String) -> String) -> String {
+        var result = ""
+        var code = ""
+        var inString = false
+        var previous: Character?
+        for character in text {
+            if character == "\"" && previous != "\\" {
+                if !inString {
+                    result += transform(code)
+                    code = ""
+                }
+                inString.toggle()
+                result.append(character)
+            } else if inString {
+                result.append(emptying && character != "\n" ? " " : character)
+            } else {
+                code.append(character)
+            }
+            previous = character
+        }
+        return result + transform(code)
+    }
+
     /// The text between the parentheses of every call that starts with one of `openings`, outside string literals, and
     /// outermost only: a call written inside one already found is part of that one's text.
     static func calls(of openings: [String], in text: String) -> [(opening: String, body: String)] {
@@ -323,10 +379,15 @@ struct PackageManifests {
 
     /// The capture groups of every match of `pattern`.
     private static func matches(_ pattern: String, in text: String) -> [[String]] {
-        let expression: NSRegularExpression
-        do { expression = try NSRegularExpression(pattern: pattern) } catch { preconditionFailure("\(pattern) is not a pattern") }
-        return expression.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
+        NSRegularExpression.compiled(pattern).matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
             (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: text).map { String(text[$0]) } }
         }
+    }
+}
+
+private extension NSRegularExpression {
+    /// A pattern written in this file, which is known to compile.
+    static func compiled(_ pattern: String) -> NSRegularExpression {
+        do { return try NSRegularExpression(pattern: pattern) } catch { preconditionFailure("\(pattern) is not a pattern") }
     }
 }

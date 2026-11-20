@@ -216,4 +216,40 @@ struct PackageManifestsTests {
 
         #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
     }
+
+    @Test("A declaration with white space before its parenthesis is read as one without", arguments: [" ", "\n    ", "\t  "])
+    func aDeclarationWithWhiteSpaceBeforeItsParenthesisIsRead(space: String) {
+        let manifests = read(["P": """
+            .library\(space)(name: "Lib", targets: ["A"])
+            #if os(Linux)
+            targets.append(.target(name: "A"))
+            #else
+            targets.append(.target\(space)(name: "A", dependencies: ["B", .product\(space)(name: "C", package: "Other")]))
+            #endif
+            .target(name: "B", path: "Sources/library target")
+            """])
+
+        #expect(Set(manifests.reached(from: [.init(name: "Lib", package: "P")]).targets.map(\.name)) == ["A", "B"])
+        #expect(manifests.targets["P/A"]?.products == [.init(name: "C", package: "Other")])
+        #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
+    }
+
+    @Test("A declaration word written in a shape the reader does not follow is reported, even beside a target it reads in the other branch", arguments: [
+        ".`target`(name: \"A\", dependencies: [\"B\"])",
+        ".target/* note */(name: \"A\", dependencies: [\"B\"])",
+        "let make = Target.target\nmake(name: \"A\", dependencies: [\"B\"])",
+    ])
+    func aDeclarationWordInAShapeTheReaderDoesNotFollowIsReported(shape: String) {
+        let manifests = read(["P": """
+            #if os(Linux)
+            targets.append(.target(name: "A"))
+            #else
+            \(shape)
+            #endif
+            .target(name: "B")
+            """])
+
+        #expect(manifests.unreadable.count == 1, "\(manifests.unreadable)")
+        #expect(manifests.unreadable.contains { $0.contains("target") }, "\(manifests.unreadable)")
+    }
 }
