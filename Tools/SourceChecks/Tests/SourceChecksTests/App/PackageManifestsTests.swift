@@ -193,4 +193,27 @@ struct PackageManifestsTests {
         #expect(manifests.unreadable.contains { $0.contains("logging") }, "\(manifests.unreadable)")
         #expect(manifests.targets["P/A"]?.products == [])
     }
+
+    @Test("A target kind the reader does not follow is reported, even beside a target it reads in the other branch", arguments: [
+        "executableTarget", "macro", "plugin", "binaryTarget", "systemLibrary",
+    ])
+    func aTargetKindTheReaderDoesNotFollowIsReported(kind: String) {
+        let manifests = read(["P": """
+            #if os(Linux)
+            targets.append(.target(name: "A"))
+            #else
+            targets.append(.\(kind)(name: "A", dependencies: ["B"]))
+            #endif
+            .target(name: "B")
+            """])
+
+        #expect(manifests.unreadable.contains { $0.contains(".\(kind)(") }, "\(manifests.unreadable)")
+    }
+
+    @Test("A test target is not reported: it is never in a build that ships")
+    func aTestTargetIsNotReported() {
+        let manifests = read(["P": #".target(name: "A"); .testTarget(name: "ATests", dependencies: ["A"])"#])
+
+        #expect(manifests.unreadable.isEmpty, "\(manifests.unreadable)")
+    }
 }

@@ -37,8 +37,10 @@ struct PackageManifests {
     /// What the reader does not follow, as `<package>: <text>`, with its white space folded to single spaces
     private(set) var unreadable: [String] = []
 
-    /// The calls that declare a target. Only `.target(` is read; the others are named so that a `.target(name:)` among
-    /// their dependencies is not taken for a declaration.
+    /// The calls that declare a target. The reader follows a list of what it knows: `.target(` is read, `.testTarget(`
+    /// is skipped as it never ships, and any other kind is reported, so a target of a kind it does not follow (in any
+    /// branch of a condition) fails the checks instead of leaving the scan. Naming them all also keeps a
+    /// `.target(name:)` among their dependencies from being taken for a declaration.
     private static let declarations = [
         ".target(", ".testTarget(", ".executableTarget(", ".macro(", ".plugin(", ".binaryTarget(", ".systemLibrary(",
     ]
@@ -48,8 +50,12 @@ struct PackageManifests {
             let text = Self.withoutComments(try read(package))
             let aliases = Self.aliases(in: text)
             for call in Self.calls(of: [".library("], in: text) { readLibrary(call.body, in: package) }
-            for call in Self.calls(of: Self.declarations, in: text) where call.opening == ".target(" {
-                readTarget(call.body, in: package, aliases: aliases)
+            for call in Self.calls(of: Self.declarations, in: text) {
+                switch call.opening {
+                case ".target(": readTarget(call.body, in: package, aliases: aliases)
+                case ".testTarget(": continue
+                default: report("\(call.opening)\(call.body))", in: package)
+                }
             }
         }
     }
