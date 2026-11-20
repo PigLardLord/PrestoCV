@@ -253,7 +253,7 @@ struct PackageManifestsTests {
         #expect(manifests.unreadable.contains { $0.contains("target") }, "\(manifests.unreadable)")
     }
 
-    @Test("A string, a comment, a regex literal or a slash the reader does not follow is reported, so no declaration on its line or after it is skipped", arguments: [
+    @Test("A string, a comment, a regex literal, a slash or a backtick the reader does not follow is reported, so no declaration on its line or after it is skipped", arguments: [
         #"let folder = "Sources\\""#,
         ##"let flag = #"a"b"#"##,
         "let note = \"\"\"\n    say \"hi\n    \"\"\"",
@@ -263,6 +263,8 @@ struct PackageManifestsTests {
         #"let pattern = /"/"#,
         #"let first = /"/; targets.append(.target(name: "C")); let second = /"/"#,
         "let half = width / 2",
+        #"let `a"b` = 1; targets.append(.target(name: "C")); let `c"d` = 2"#,
+        #"let `x//` = 1; targets.append(.target(name: "C"))"#,
     ])
     func aStringOrACommentTheReaderDoesNotFollowIsReported(line: String) {
         let manifests = read(["P": """
@@ -274,6 +276,23 @@ struct PackageManifestsTests {
 
         let first = line.prefix { $0 != "\n" }
         #expect(manifests.unreadable.contains { $0.hasSuffix(first) }, "\(manifests.unreadable)")
+    }
+
+    @Test("A line with a character outside printable ASCII is reported, so a quote joined to a combining mark or a line the reader does not split hides no declaration", arguments: [
+        "let first = \"\u{301}\"; targets.append(.target(name: \"C\")); let second = \"\u{301}\"",
+        "let first = 1 // note\r\ntargets.append(.target(name: \"C\"))",
+        "let first = 1 // note\rtargets.append(.target(name: \"C\"))",
+    ])
+    func aLineWithACharacterOutsidePrintableASCIIIsReported(line: String) {
+        let manifests = read(["P": """
+            .library(name: "Lib", targets: ["A"])
+            .target(name: "A", dependencies: ["B"])
+            \(line)
+            .target(name: "B", dependencies: [.product(name: "C", package: "Other")])
+            """])
+
+        let folded = line.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(manifests.unreadable.contains("P: \(folded)"), "\(manifests.unreadable)")
     }
 
     @Test("A line found by two rules is reported once")
