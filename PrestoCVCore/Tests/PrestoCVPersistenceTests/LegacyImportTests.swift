@@ -565,3 +565,23 @@ struct LegacySourceKeptTests {
         await #expect(throws: RepositoryError.storeUnavailable(.cannotList)) { try await ImportLegacyStore(source: Broken(), target: target).run() }
     }
 }
+
+@Suite("What a launch tells of its import")
+struct LegacyImportOutcomeTests {
+    @Test("a CV stored with its file left counts as imported, not failed; a run that stopped or never listed knows no count")
+    func counts() {
+        var report = LegacyImportReport()
+        report.imported = [idA]
+        report.alreadyStored = [idB]
+        report.failures = [.unreadable, .didNotReadBack, .sourceChanged, .sourceNotRemoved(.storeUnavailable(.cannotLock))]
+            .enumerated().map { LegacyImportFailure(key: key("\($0.offset)"), reason: $0.element) }
+        var erased = LegacyImportReport()
+        erased.storeErased = true
+
+        #expect(LegacyImportOutcome.ran(report).imported == 2)
+        #expect(LegacyImportOutcome.ran(report).failed == 2)
+        #expect(LegacyImportOutcome.ran(LegacyImportReport()).failed == 0)
+        #expect(LegacyImportOutcome.ran(erased).failed == nil)
+        #expect(LegacyImportOutcome.failed(.storeUnavailable(.cannotList)).failed == nil)
+    }
+}
