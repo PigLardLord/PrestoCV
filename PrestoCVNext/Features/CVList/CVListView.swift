@@ -6,9 +6,11 @@ import SwiftUI
 /// back to the front and on a pull; the view model reads it again after its own changes. A change of a row that did not
 /// work is said in a notice of its own that names the row and stays until the person hides it. An editor the person left
 /// whose text is not stored has a notice under its CV's row, or above the rows when the list does not have that CV
-/// (#402, decisions 16 and 17).
+/// (#402, decisions 16 and 17). Old CVs of the released app that the import did not bring in are said in a notice above
+/// the others, which stays until the person hides it for this launch (#406).
 struct CVListView: View {
     let list: CVListViewModel
+    let report: LegacyImportReportViewModel
     let firstRun: FirstRunViewModel
     let selection: Binding<CVReference?>
     /// Opens the way to start the person chose in the empty list.
@@ -83,7 +85,9 @@ struct CVListView: View {
 
     // MARK: Notices
 
+    @ViewBuilder
     private var notices: some View {
+        legacyNotice
         ForEach(list.notices, id: \.self) { notice in
             switch notice {
             case .stale:
@@ -102,6 +106,25 @@ struct CVListView: View {
                 ) { rowFailureMessage(failure) }
                     .accessibilityIdentifier("list.rowFailure")
             }
+        }
+    }
+
+    /// The old CVs not imported, or an import that did not run: never an empty list as if the CVs were gone.
+    @ViewBuilder
+    private var legacyNotice: some View {
+        if let notice = report.notice {
+            InlineNotice(
+                actionTitle: "list.hide", actionIdentifier: "legacyImport.notice.hide", action: { report.hideNotice() }
+            ) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    switch notice {
+                    case .notImported: LegacyNotImportedLines(report: report)
+                    case .didNotRun: WholeWordsText("legacyImport.failed.unknown").font(.headline)
+                    }
+                    kindLine("legacyImport.notice")
+                }
+            }
+            .accessibilityIdentifier("legacyImport.notice")
         }
     }
 

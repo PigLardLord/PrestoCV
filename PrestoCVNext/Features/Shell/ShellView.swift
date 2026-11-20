@@ -5,11 +5,13 @@ import SwiftUI
 /// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
 /// what is open, which column shows, whether the welcome shows and whether the open CV may be left; this view binds to
 /// them. It shows the export of the open CV in a sheet while the shell holds one. It tells the shell when the scene stops
-/// being active, which stores the open CV at once on its way to the background.
+/// being active, which stores the open CV at once on its way to the background. Over the list it shows what the import of
+/// the released app's CVs left out, while the report's model presents it.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let report: LegacyImportReportViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @State private var addingCV = false
@@ -19,6 +21,7 @@ struct ShellView: View {
     var body: some View {
         screen
             .task { await firstRun.load() }
+            .task { await report.load() }
             .onChange(of: scenePhase) { _, phase in shell.sceneChanged(isActive: phase == .active) }
     }
 
@@ -37,7 +40,7 @@ struct ShellView: View {
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
             CVListView(
-                list: list, firstRun: firstRun, selection: selection, choose: start,
+                list: list, report: report, firstRun: firstRun, selection: selection, choose: start,
                 kept: list.keptNotices(shell.keptEditors),
                 retryKept: { id in Task { await shell.retryKept(id) } },
                 openKept: { id in _ = shell.openKept(id) }
@@ -65,6 +68,21 @@ struct ShellView: View {
         .sheet(item: exportSheet) { sheet in
             ExportSheetView(sheet: sheet, close: { shell.closeExport() })
         }
+        .sheet(isPresented: reportShown) {
+            LegacyImportReportView(report: report)
+        }
+        // Here and not in the sheet, which has closed by the time the old copies are all removed
+        .announce(report.state) { LegacyImportReportView.announcement(of: $0) }
+    }
+
+    /// The import report while its model presents it. A swipe down closes it as Not now does; it never confirms.
+    private var reportShown: Binding<Bool> {
+        Binding(
+            get: { report.isPresented },
+            set: { shown in
+                if !shown { report.close() }
+            }
+        )
     }
 
     /// The export sheet of the open CV. A swipe down closes it as Close does, which stops an export that runs.

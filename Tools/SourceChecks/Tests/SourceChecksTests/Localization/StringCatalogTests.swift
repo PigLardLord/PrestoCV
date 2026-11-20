@@ -25,6 +25,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
             // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
+            // German also names the website a CV of the released app lost "Website".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
             // the designs "Minimal" and "Modern" and the fonts "System" as English does.
             sameInSomeLanguages: [
@@ -33,6 +34,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
                 "editor.entry.title.certification": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
+                "legacyImport.detail.website": ["de"],
             ],
             // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
             // composition's LookNamesTests checks that those codes and these keys are the same set.
@@ -69,6 +71,15 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
+                #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
+                #"legacyImport.row.label \(name) \(details)"#: ValueTypes(
+                    ["%@", "%@"], "a row's label and its details as a list are Strings"),
+                #"legacyImport.row.toCheck \(name) \(details)"#: ValueTypes(
+                    ["%@", "%@"], "a row's label and its details as a list are Strings"),
+                #"legacyImport.result.kept \(count)"#: ValueTypes(["%lld"], "LegacyReportState.keptSome holds an Int"),
+                #"legacyImport.failed.count \(report.notImportedTotal)"#: ValueTypes(["%lld"], "notImportedTotal is an Int"),
+                #"legacyImport.failed.damaged \(line.count)"#: ValueTypes(["%lld"], "NotImportedCount's count is an Int"),
+                #"legacyImport.failed.notSaved \(line.count)"#: ValueTypes(["%lld"], "NotImportedCount's count is an Int"),
             ],
             // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
             // ErrorStateView as title:, message:, code: and retryTitle:.
