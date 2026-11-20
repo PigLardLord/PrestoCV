@@ -39,6 +39,13 @@ struct AppPaths: Equatable, Sendable {
         )
     }
 
+    /// The store of the released app, which the launch imports from. It lies in the app's own container, so an app with
+    /// another container, such as PrestoCVNext, finds none there and imports nothing.
+    static func legacyStoreOnDevice() -> URL {
+        URL.applicationSupportDirectory.appendingPathComponent("PrestoCV", isDirectory: true)
+            .appendingPathComponent("CVs", isDirectory: true)
+    }
+
     /// The folders where the system puts the copy of a file opened in the app: `<bundle id>-Inbox` in the temporary folder
     /// (iOS 26 and later), and `Inbox` in Documents (older systems). The import deletes a copy only when it lies directly in
     /// one of them. With no bundle id there is no temporary inbox to name, so only the one in Documents is given.
