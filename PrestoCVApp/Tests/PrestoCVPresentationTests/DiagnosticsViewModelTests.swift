@@ -126,7 +126,7 @@ struct DiagnosticsViewModelTests {
         #expect(reading.discards == 1)
     }
 
-    @Test("a copy that finishes after the screen closed is discarded and not offered")
+    @Test("a copy that finishes after the screen closed is not offered, and the discard comes after it")
     func lateCopyAfterFinish() async throws {
         let reading = DiagnosticsFake(runs: [newer])
         await reading.copying.close()
@@ -134,16 +134,20 @@ struct DiagnosticsViewModelTests {
         let loading = Task { await diagnostics.load() }
         #expect(try await reading.copying.holds(1))
 
-        await diagnostics.finish()
+        let closing = Task { await diagnostics.finish() }
+        await settle()
+        #expect(reading.discards == 0, "The discard waits for the copy")
         await reading.copying.open()
         await loading.value
+        await closing.value
 
         #expect(diagnostics.shareFiles.isEmpty)
-        #expect(reading.discards == 2)
+        #expect(reading.calls == [.copy(newer.id), .copied(newer.id), .discard])
+        #expect(reading.folder.isEmpty)
     }
 
-    @Test("a slower copy of an earlier choice does not replace the files of the later one")
-    func staleCopyIsIgnored() async throws {
+    @Test("a later choice waits for the copy of an earlier one, and its files stay in the folder")
+    func copiesOneAtATime() async throws {
         let reading = DiagnosticsFake(runs: [newer, older])
         let diagnostics = DiagnosticsViewModel(reading: reading)
         await diagnostics.load()
@@ -151,17 +155,98 @@ struct DiagnosticsViewModelTests {
         let first = Task { await diagnostics.select(older.id) }
         #expect(try await reading.copying.holds(1))
         let second = Task { await diagnostics.select(newer.id) }
-        #expect(try await reading.copying.holds(2))
+        await settle()
+        #expect(reading.copiesMadeFor == [newer.id, older.id], "The later copy has not started")
 
-        await reading.copying.releaseNewest()
-        await second.value
-        await reading.copying.releaseAll()
+        await reading.copying.open()
         await first.value
+        await second.value
 
         #expect(diagnostics.selection == newer.id)
         #expect(diagnostics.summary == "Summary of run 2")
         #expect(diagnostics.shareFiles == DiagnosticsFake.files(of: newer.id))
+        #expect(reading.folder == diagnostics.shareFiles, "No earlier copy emptied the folder after the later one")
+        #expect(reading.mostCopiesAtOnce == 1)
         #expect(reading.discards == 0)
+    }
+
+    @Test("a choice replaced before its turn came makes no copy")
+    func replacedChoiceMakesNoCopy() async throws {
+        let reading = DiagnosticsFake(runs: [newer, older])
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        await diagnostics.load()
+        await reading.copying.close()
+        let first = Task { await diagnostics.select(older.id) }
+        #expect(try await reading.copying.holds(1))
+        let replaced = Task { await diagnostics.select(newer.id) }
+        await settle()
+        let last = Task { await diagnostics.select(older.id) }
+        await settle()
+
+        await reading.copying.open()
+        await first.value
+        await replaced.value
+        await last.value
+
+        #expect(reading.copiesMadeFor == [newer.id, older.id, older.id])
+        #expect(diagnostics.selection == older.id)
+        #expect(diagnostics.shareFiles == DiagnosticsFake.files(of: older.id))
+        #expect(reading.folder == diagnostics.shareFiles)
+    }
+
+    @Test("a screen closed while its runs are read lists nothing and makes no copy")
+    func closedWhileLoading() async throws {
+        let reading = DiagnosticsFake(runs: [newer])
+        await reading.listing.close()
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        let loading = Task { await diagnostics.load() }
+        #expect(try await reading.listing.holds(1))
+
+        await diagnostics.finish()
+        await reading.listing.open()
+        await loading.value
+
+        #expect(diagnostics.state == .loading)
+        #expect(diagnostics.rows.isEmpty)
+        #expect(diagnostics.selection == nil)
+        #expect(reading.calls == [.discard])
+    }
+
+    @Test("the runs read for an earlier opening of the screen are not listed in a later one")
+    func earlierOpeningIsIgnored() async throws {
+        let reading = DiagnosticsFake(runs: [newer])
+        await reading.listing.close()
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        let firstOpening = Task { await diagnostics.load() }
+        #expect(try await reading.listing.holds(1))
+        await diagnostics.finish()
+        reading.setRuns([newer, older])
+        let secondOpening = Task { await diagnostics.load() }
+        #expect(try await reading.listing.holds(2))
+
+        await reading.listing.releaseNewest()
+        await secondOpening.value
+        await reading.listing.releaseAll()
+        await firstOpening.value
+
+        #expect(diagnostics.rows.map(\.id) == [newer.id, older.id])
+        #expect(diagnostics.selection == newer.id)
+        #expect(reading.calls == [.discard, .copy(newer.id), .copied(newer.id)])
+        #expect(diagnostics.shareFiles == DiagnosticsFake.files(of: newer.id))
+    }
+
+    @Test("a choice on a closed screen changes nothing")
+    func choiceOnAClosedScreen() async {
+        let reading = DiagnosticsFake(runs: [newer, older])
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        await diagnostics.load()
+        await diagnostics.finish()
+
+        await diagnostics.select(older.id)
+
+        #expect(diagnostics.selection == newer.id)
+        #expect(diagnostics.shareFiles.isEmpty)
+        #expect(reading.copiesMadeFor == [newer.id])
     }
 
     @Test("DiagnosticsViewModel reports a failed copy")
@@ -202,9 +287,11 @@ struct DiagnosticsViewModelTests {
         let loading = Task { await diagnostics.load() }
         #expect(try await reading.copying.holds(1))
 
-        await diagnostics.finish()
+        let closing = Task { await diagnostics.finish() }
+        await settle()
         await reading.copying.open()
         await loading.value
+        await closing.value
 
         #expect(!diagnostics.copiesFailed)
     }
