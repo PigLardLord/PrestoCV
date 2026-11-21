@@ -141,6 +141,10 @@ public struct ImportedCertification: Hashable, Sendable {
     public var name: Sourced<String>
     public var issuer: Sourced<String>?
     public var year: Sourced<Int>?
+    /// The web address the text gives for the certification, in its line or on a line of its own under it.
+    public var link: Sourced<WebLink>?
+    /// The sentences under the certification that tell what it is, in order.
+    public var description: Sourced<String>?
 }
 
 // MARK: - What was not imported
@@ -217,6 +221,8 @@ extension ImportedCV {
             add("certifications[\(index)].name", certification.name)
             add("certifications[\(index)].issuer", certification.issuer)
             add("certifications[\(index)].year", certification.year, as: String.init)
+            add("certifications[\(index)].link", certification.link, as: \.value)
+            add("certifications[\(index)].description", certification.description)
         }
         for (index, interest) in interests.enumerated() { add("interests[\(index)]", interest) }
         return fields
@@ -273,8 +279,10 @@ extension ImportedLanguage {
 }
 
 extension ImportedCertification {
-    package static func scripted(_ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?) -> ImportedCertification {
-        ImportedCertification(name: name, issuer: issuer, year: year)
+    package static func scripted(
+        _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?
+    ) -> ImportedCertification {
+        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description)
     }
 }
 

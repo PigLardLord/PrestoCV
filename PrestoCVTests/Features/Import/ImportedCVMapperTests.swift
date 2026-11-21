@@ -48,6 +48,8 @@ struct ImportedCVMapperTests {
 
     ## Zertifikate
     - Elektrofachkraft – TÜV Beispiel (2020)
+    Überprüfen: https://tuev.example.com/elektrofachkraft
+    Prüfung mit sehr gutem Ergebnis bestanden.
 
     ## Hobbys
     Klettern, Fotografie
@@ -87,6 +89,8 @@ struct ImportedCVMapperTests {
         #expect(cv.certifications.map(\.name) == ["Elektrofachkraft"])
         #expect(cv.certifications.map(\.issuer) == ["TÜV Beispiel"])
         #expect(cv.certifications.map(\.year) == [2020])
+        #expect(cv.certifications.map(\.url) == ["https://tuev.example.com/elektrofachkraft"])
+        #expect(cv.certifications.map(\.description) == ["Prüfung mit sehr gutem Ergebnis bestanden."])
         #expect(cv.interests == ["Klettern", "Fotografie"])
         #expect(cv.documentLanguage == "de")
     }

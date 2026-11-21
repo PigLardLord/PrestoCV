@@ -61,6 +61,8 @@ enum FullImport {
     Spanish fluent
     Certifications
     Certified Kubernetes Administrator, Linux Foundation, 2017
+    https://training.example.org/cka
+    Renewed after a hands-on exam in a live cluster.
     Interests
     Chess
     Volunteering at the harbour clean-up.
@@ -112,7 +114,9 @@ enum FullImport {
         ]
         cv.certifications = [
             f.certification(f.quoted("Certified Kubernetes Administrator"), issuer: f.quoted("Linux Foundation"),
-                            year: f.sourced(2017, quoting: "2017", reading: .year)),
+                            year: f.sourced(2017, quoting: "2017", reading: .year),
+                            link: f.sourced(link("https://training.example.org/cka"), quoting: "https://training.example.org/cka"),
+                            description: f.quoted("Renewed after a hands-on exam in a live cluster.")),
         ]
         cv.interests = [f.quoted("Chess")]
         return f.result(cv, language: .en, unplaced: [f.unplaced("Volunteering at the harbour clean-up.")])

@@ -47,7 +47,8 @@ private let mapped: [String: Destination] = [
     "experience[].role": inCV, "experience[].employer": inCV, "experience[].location": inCV, "experience[].details[]": inCV,
     "education[].degree": inCV, "education[].school": inCV, "education[].details[]": inCV,
     "skills[]": inCV, "languages[].name": inCVOrListed, "languages[].level": inCV,
-    "certifications[].name": inCV, "certifications[].issuer": inCV, "interests[]": inCV,
+    "certifications[].name": inCV, "certifications[].issuer": inCV, "certifications[].link": inCV,
+    "certifications[].description": inCV, "interests[]": inCV,
 ]
 
 private let reported: [String: Destination] = [
