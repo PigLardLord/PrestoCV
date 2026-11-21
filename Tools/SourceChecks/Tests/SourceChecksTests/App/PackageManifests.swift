@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - Package manifests
 
 /// The targets of the repository's local packages and what each depends on, read from the text of every `Package.swift`.
@@ -9,14 +7,23 @@ import Foundation
 /// that a Release build for iOS compiles. Reading the text sees every branch of an `#if`, and so reads a superset of one
 /// platform's build, which is the safe side for a check of what ships.
 ///
-/// The reader fails closed: a declaration or a dependency written in a shape it does not follow goes to `unreadable`,
-/// which the release checks require empty, so a new way of writing a manifest fails them instead of shrinking what they
-/// scan. It does not depend on spelling: white space before a call's parenthesis is read as none, and a declaration word
-/// used in any other way than `.word(` is reported. It reads printable ASCII only, follows a string only in its plain
-/// form, opened and closed by a quote on one line, a slash outside a string only as the start of a `//` comment, and no
-/// backtick outside a string: a line that holds another character, another form of string, a block comment, a regex
-/// literal, any other slash or a backtick, or that ends inside a string, is reported, as the reader could take code there
-/// for text and skip a declaration.
+/// The reader fails closed: it follows a small grammar, and every statement outside it goes to `unreadable` as the
+/// lines that hold it, which the release checks require empty. A new way of writing a manifest fails them instead of
+/// shrinking what they scan.
+/// - **Text:** printable ASCII and tabs. A string is the plain one, with no backslash, on one line; a `//` comment runs
+///   to a line feed or a carriage return.
+/// - **Statements:** one per line, or over several lines while a bracket is open: `import PackageDescription`; `#if`
+///   or `#elseif` with its whole condition on its line, ending in a word or `)`; `#else`; `#endif`; `let` or `var`
+///   name, an optional type, `=` and a value; `name += value`; `name.append(value)`.
+/// - **Values:** a string; a list `[...]` (a trailing comma allowed); `.name`; `.name(arguments)`;
+///   `Target.Dependency.name(arguments)`; `Package(arguments)`; a word.
+/// - **Declarations:** `.target` (name, dependencies, path, resources) and `.library` (name, type, targets) are read;
+///   `.testTarget` is skipped, as it never ships; the labels of `.package` (path) and of `Package` (name, platforms,
+///   products, dependencies, targets) are allowed. Any other member, label, or name that is not a literal is reported.
+///
+/// Every accepted statement ends in a word, a string, `)` or `]`, and none starts with an operator or a `.`, or holds a
+/// brace or a semicolon, so the compiler splits the text into the same statements. With no brace there is no closure,
+/// function or loop, and a list or a target changes only through `+=` or `append` on a name.
 struct PackageManifests {
 
     struct Target: Hashable {
@@ -42,36 +49,19 @@ struct PackageManifests {
     /// What the reader does not follow, as `<package>: <text>`, with its white space folded to single spaces
     private(set) var unreadable: [String] = []
 
-    /// The calls that declare a target. The reader follows a list of what it knows: `.target(` is read, `.testTarget(`
-    /// is skipped as it never ships, and any other kind is reported, so a target of a kind it does not follow (in any
-    /// branch of a condition) fails the checks instead of leaving the scan. Naming them all also keeps a
-    /// `.target(name:)` among their dependencies from being taken for a declaration.
-    private static let declarations = [
-        ".target(", ".testTarget(", ".executableTarget(", ".macro(", ".plugin(", ".binaryTarget(", ".systemLibrary(",
-    ]
-
-    /// The words that declare a target or a product, or name one as a dependency. Each must be written `.word(`; any
-    /// other use (an escaped name, a comment before the parenthesis, a reference to the function) is reported, so no
-    /// spelling of a declaration leaves the scan.
-    private static let declarationWords = [
-        "target", "testTarget", "executableTarget", "macro", "plugin", "binaryTarget", "systemLibrary", "library", "product",
-    ]
-
     init(packages: [String], read: (String) throws -> String) rethrows {
         for package in packages {
-            let source = try read(package)
-            for line in Self.stringsTheReaderDoesNotFollow(in: source) { report(line, in: package) }
-            let text = Self.canonical(Self.withoutComments(source))
-            for line in Self.declarationWordsOutsideCalls(in: text) { report(line, in: package) }
-            let aliases = Self.aliases(in: text)
-            for call in Self.calls(of: [".library("], in: text) { readLibrary(call.body, in: package) }
-            for call in Self.calls(of: Self.declarations, in: text) {
-                switch call.opening {
-                case ".target(": readTarget(call.body, in: package, aliases: aliases)
-                case ".testTarget(": continue
-                default: report("\(call.opening)\(call.body))", in: package)
+            let bytes = Array(try read(package).utf8)
+            var statements: [Statement] = []
+            for tokens in Self.statements(of: Self.tokens(of: bytes)) {
+                var parser = Parser(tokens: tokens, bytes: bytes)
+                if let statement = parser.statement() {
+                    statements.append(statement)
+                } else {
+                    report(Self.lines(holding: tokens, in: bytes), in: package)
                 }
             }
+            readDeclarations(in: statements, of: package)
         }
     }
 
@@ -103,42 +93,89 @@ struct PackageManifests {
 
     // MARK: Declarations
 
+    /// Reads every declaration the statements hold. A declaration typed `Target.Dependency` or `[Target.Dependency]`
+    /// names dependencies, so a `.target(name:)` in it is not a target's declaration.
+    private mutating func readDeclarations(in statements: [Statement], of package: String) {
+        let aliases = Self.aliases(in: statements)
+        for statement in statements {
+            switch statement {
+            case .importDescription, .directive:
+                continue
+            case let .declaration(_, type, node):
+                if type == "Target.Dependency" || type == "[Target.Dependency]" { continue }
+                walk(node, in: package, aliases: aliases)
+            case let .addition(node):
+                walk(node, in: package, aliases: aliases)
+            }
+        }
+    }
+
+    /// Follows a value down to the declarations it holds: a list, `Package(...)` and its products, dependencies and
+    /// targets. A member the reader does not know is reported, so a kind of target or product it does not follow (in any
+    /// branch of a condition) fails the checks instead of leaving the scan.
+    private mutating func walk(_ node: Node, in package: String, aliases: [String: [ProductReference]]) {
+        switch node.value {
+        case .member("testTarget", _):
+            return
+        case let .member("target", given?):
+            readTarget(node, given, in: package, aliases: aliases)
+        case let .member("library", given?):
+            readLibrary(node, given, in: package)
+        case let .member("package", given?):
+            if !Self.byLabel(given, allowed: ["path"]).stray.isEmpty { report(node.text, in: package) }
+        case let .packageDeclaration(given):
+            let (labelled, stray) = Self.byLabel(given, allowed: ["name", "platforms", "products", "dependencies", "targets"])
+            for argument in stray { report("Package \(argument.text)", in: package) }
+            for label in ["products", "dependencies", "targets"] {
+                if let argument = labelled[label] { walk(argument.node, in: package, aliases: aliases) }
+            }
+        case let .list(elements):
+            for element in elements { walk(element, in: package, aliases: aliases) }
+        case .word, .string, .dependency:
+            return
+        case .member:
+            report(node.text, in: package)
+        }
+    }
+
     /// `.library(name: "X", type: .dynamic, targets: ["A", "B"])`; a product declared again (in the other branch of an
     /// `#if`) reaches the targets of both.
-    private mutating func readLibrary(_ body: String, in package: String) {
-        let arguments = Self.arguments(of: body)
-        guard let name = arguments["name"].flatMap(Self.name), let members = arguments["targets"].flatMap(Self.list) else {
-            return report(".library(\(body))", in: package)
-        }
+    private mutating func readLibrary(_ node: Node, _ given: [Argument], in package: String) {
+        let (labelled, stray) = Self.byLabel(given, allowed: ["name", "type", "targets"])
+        if !stray.isEmpty { report(node.text, in: package) }
+        guard let name = labelled["name"].flatMap({ Self.name($0.node) }),
+              case let .list(members)? = labelled["targets"]?.node.value
+        else { return report(node.text, in: package) }
         let names = members.compactMap(Self.name)
-        guard names.count == members.count else { return report(".library(\(body))", in: package) }
+        guard names.count == members.count else { return report(node.text, in: package) }
         let earlier = products[package]?[name] ?? []
         products[package, default: [:]][name] = earlier + names.filter { !earlier.contains($0) }
     }
 
     /// `.target(name: "A", dependencies: [...], path: "Sources/Elsewhere")`; a target declared again (in the other
-    /// branch of an `#if`) keeps the dependencies of both.
-    private mutating func readTarget(_ body: String, in package: String, aliases: [String: [ProductReference]]) {
-        let arguments = Self.arguments(of: body)
-        guard let name = arguments["name"].flatMap(Self.name) else { return report(".target(\(body))", in: package) }
+    /// branch of an `#if`) keeps the dependencies of both. Another label is reported, and the target is still read.
+    private mutating func readTarget(_ node: Node, _ given: [Argument], in package: String, aliases: [String: [ProductReference]]) {
+        let (labelled, stray) = Self.byLabel(given, allowed: ["name", "dependencies", "path", "resources"])
+        guard let name = labelled["name"].flatMap({ Self.name($0.node) }) else { return report(node.text, in: package) }
+        for argument in stray { report("\(name) \(argument.text)", in: package) }
         var folder = "\(package)/Sources/\(name)"
-        if let path = arguments["path"] {
-            guard let literal = Self.literal(path) else { return report(".target(\(body))", in: package) }
+        if let path = labelled["path"] {
+            guard case let .string(literal) = path.node.value else { return report(node.text, in: package) }
             folder = "\(package)/\(literal)"
         }
         var local: [String] = []
         var external: [ProductReference] = []
-        if let dependencies = arguments["dependencies"] {
-            if let elements = Self.list(dependencies) {
+        if let dependencies = labelled["dependencies"] {
+            if case let .list(elements) = dependencies.node.value {
                 for element in elements {
                     switch Self.dependency(element, aliases: aliases) {
-                    case .target(let target): local.append(target)
-                    case .products(let found): external.append(contentsOf: found)
-                    case .unknown: report(element, in: package)
+                    case let .target(target): local.append(target)
+                    case let .products(products): external += products
+                    case .unknown: report(element.text, in: package)
                     }
                 }
             } else {
-                report("\(name) dependencies: \(dependencies)", in: package)
+                report("\(name) \(dependencies.text)", in: package)
             }
         }
         let id = Self.key(package, name)
@@ -161,41 +198,79 @@ struct PackageManifests {
 
     /// `"B"`, `.target(name: "B")`, `.byName(name: "B")`, `.product(name: "C", package: "Other")` (each may carry a
     /// condition), or an alias.
-    private static func dependency(_ element: String, aliases: [String: [ProductReference]]) -> Dependency {
-        if let target = Self.name(element) { return .target(target) }
-        if let named = aliases[element] { return .products(named) }
-        guard let found = Self.call(element) else { return .unknown }
-        let arguments = Self.arguments(of: found.body)
-        guard let named = arguments["name"].flatMap(Self.name) else { return .unknown }
-        switch found.function {
+    private static func dependency(_ node: Node, aliases: [String: [ProductReference]]) -> Dependency {
+        switch node.value {
+        case .string:
+            return name(node).map(Dependency.target) ?? .unknown
+        case let .word(word):
+            return aliases[word].map(Dependency.products) ?? .unknown
+        case let .member(function, given?), let .dependency(function, given):
+            return call(function, given)
+        case .member, .list, .packageDeclaration:
+            return .unknown
+        }
+    }
+
+    /// A dependency written as a call; one with a label the reader does not follow is unknown.
+    private static func call(_ function: String, _ given: [Argument]) -> Dependency {
+        switch function {
         case "target", "byName":
-            return .target(named)
+            let (labelled, stray) = byLabel(given, allowed: ["name", "condition"])
+            guard stray.isEmpty, let target = labelled["name"].flatMap({ Self.name($0.node) }) else { return .unknown }
+            return .target(target)
         case "product":
-            guard let owner = arguments["package"].flatMap(Self.name) else { return .unknown }
-            return .products([ProductReference(name: named, package: owner)])
+            let (labelled, stray) = byLabel(given, allowed: ["name", "package", "condition"])
+            guard stray.isEmpty,
+                  let product = labelled["name"].flatMap({ Self.name($0.node) }),
+                  let owner = labelled["package"].flatMap({ Self.name($0.node) })
+            else { return .unknown }
+            return .products([ProductReference(name: product, package: owner)])
         default:
             return .unknown
         }
     }
 
     /// `let logging = Target.Dependency.product(name: "Log", package: "Logs")`, or `let logging: Target.Dependency =
-    /// .product(...)`, on one line or several. A name declared in several branches of a condition names the products of
-    /// all of them. A name declared another way, in any branch, is not here, so its use is reported.
-    private static func aliases(in text: String) -> [String: [ProductReference]] {
-        let pattern = #"let\s+(\w+)\s*(?::\s*Target\.Dependency\s*)?=\s*(?:Target\.Dependency)?\.product\(\s*name:\s*"([\w-]+)"\s*,\s*package:\s*"([\w-]+)"\s*\)"#
+    /// .product(...)`; `var` reads the same, as the grammar has no statement that gives a name another value. A name
+    /// declared in several branches of a condition names the products of all of them. A name declared another way, in
+    /// any branch, is not here, so its use is reported.
+    private static func aliases(in statements: [Statement]) -> [String: [ProductReference]] {
+        var declared: [String: Int] = [:]
+        var read: [String: Int] = [:]
         var found: [String: [ProductReference]] = [:]
-        var readDeclarations: [String: Int] = [:]
-        for match in matches(pattern, in: text) {
-            let product = ProductReference(name: match[1], package: match[2])
-            readDeclarations[match[0], default: 0] += 1
-            if !found[match[0], default: []].contains(product) { found[match[0], default: []].append(product) }
+        for case let .declaration(alias, _, node) in statements {
+            declared[alias, default: 0] += 1
+            guard case let .products(products) = dependency(node, aliases: [:]) else { continue }
+            read[alias, default: 0] += 1
+            let earlier = found[alias] ?? []
+            found[alias] = earlier + products.filter { !earlier.contains($0) }
         }
-        var declarations: [String: Int] = [:]
-        for match in matches(#"\b(?:let|var)\s+(\w+)"#, in: text) { declarations[match[0], default: 0] += 1 }
-        return found.filter { name, _ in declarations[name] == readDeclarations[name] }
+        return found.filter { declared[$0.key] == read[$0.key] }
     }
 
-    /// Reports a line once, though more than one rule may find it.
+    /// A name written as a string literal (`"CVRendering"`, `"swift-syntax"`).
+    private static func name(_ node: Node) -> String? {
+        guard case let .string(text) = node.value, !text.isEmpty,
+              text.utf8.allSatisfy({ $0.isWordByte || $0 == .hyphen })
+        else { return nil }
+        return text
+    }
+
+    /// The first argument of each allowed label; every other argument, and a label given twice, is stray.
+    private static func byLabel(_ given: [Argument], allowed: Set<String>) -> (labelled: [String: Argument], stray: [Argument]) {
+        var labelled: [String: Argument] = [:]
+        var stray: [Argument] = []
+        for argument in given {
+            if let label = argument.label, allowed.contains(label), labelled[label] == nil {
+                labelled[label] = argument
+            } else {
+                stray.append(argument)
+            }
+        }
+        return (labelled, stray)
+    }
+
+    /// Reports a text once, though more than one rule may find it.
     private mutating func report(_ text: String, in package: String) {
         let entry = "\(package): \(text.split(whereSeparator: \.isWhitespace).joined(separator: " "))"
         if !unreadable.contains(entry) { unreadable.append(entry) }
@@ -203,236 +278,321 @@ struct PackageManifests {
 
     // MARK: Reading the text
 
-    /// The text without `//` comments (a `//` inside a string literal stays).
-    static func withoutComments(_ text: String) -> String {
-        var result = ""
-        var inString = false
-        var iterator = text.makeIterator()
-        var previous: Character?
-        while let character = iterator.next() {
-            if character == "\"" && previous != "\\" { inString.toggle() }
-            if !inString && character == "/" && previous == "/" {
-                result.removeLast()
-                while let skipped = iterator.next(), skipped != "\n" {}
-                result.append("\n")
-                previous = nil
-                continue
-            }
-            result.append(character)
-            previous = character
+    private enum Statement {
+        case importDescription
+        case directive
+        case declaration(name: String, type: String?, node: Node)
+        case addition(Node)
+    }
+
+    private enum Value {
+        case string(String)
+        case list([Node])
+        /// `.name`, or `.name(arguments)`
+        case member(String, [Argument]?)
+        /// `Target.Dependency.name(arguments)`
+        case dependency(String, [Argument])
+        case packageDeclaration([Argument])
+        case word(String)
+    }
+
+    /// A value and the text it was read from
+    private struct Node {
+        let value: Value
+        let text: String
+    }
+
+    private struct Argument {
+        let label: String?
+        let node: Node
+        /// The label and the value, as written
+        let text: String
+    }
+
+    private struct Token {
+        enum Kind { case word, string, directive, symbol, lineBreak, bad }
+        let kind: Kind
+        /// Where the token is in the bytes of the manifest
+        let range: Range<Int>
+        let text: String
+    }
+
+    /// The tokens of a manifest. A plain string and a `//` comment end at the end of their line. A string or a comment
+    /// the grammar does not follow (one that holds a byte outside printable ASCII and tab, or a string with a backslash
+    /// or with no closing quote) is a `bad` token, and any other byte is a symbol of its own: no statement accepts a bad
+    /// token or a symbol the grammar does not name. White space but a line break is skipped, and a comment is dropped.
+    private static func tokens(of bytes: [UInt8]) -> [Token] {
+        var tokens: [Token] = []
+        var index = 0
+        func emit(_ kind: Token.Kind, to end: Int) {
+            tokens.append(Token(kind: kind, range: index..<end, text: String(decoding: bytes[index..<end], as: UTF8.self)))
+            index = end
         }
-        return result
-    }
-
-    /// The lines whose strings the reader does not follow. It takes a string for the text between two quotes on one line,
-    /// so it lists what breaks that: a character outside printable ASCII (a combining mark joins a quote into another
-    /// character, and a carriage return ends a line the reader does not split), a raw string (`#"`), a multi-line string
-    /// (`"""`), an escaped backslash (`\\`), an interpolation (`\(`), a block comment (`/*`) and a regex literal (`#/`).
-    /// On the other lines every string is a plain one, so walking a line from the left tells exactly what is inside a
-    /// string up to the first slash or backtick outside one; the walk reports that slash unless it starts a `//` comment
-    /// (a bare regex literal `/"/` could hide a declaration between two quotes on one line, and a division is reported
-    /// with it), reports that backtick (an escaped name such as `` `a"b` `` or `` `x//` `` can hold a quote or a slash),
-    /// and reports a line that ends inside a string. No manifest uses any of them.
-    static func stringsTheReaderDoesNotFollow(in source: String) -> [String] {
-        let forms = ["#\"", "\"\"\"", "\\\\", "\\(", "/*", "#/"]
-        let lines = source.split(separator: "\n", omittingEmptySubsequences: false)
-        let withForms = lines.filter { line in !isPrintableASCII(line) || forms.contains { line.contains($0) } }
-        return withForms.map(String.init) + lines.filter { !walksToItsEnd(Array($0)) }.map(String.init)
-    }
-
-    /// Whether every character of a line is printable ASCII or a tab.
-    private static func isPrintableASCII(_ line: Substring) -> Bool {
-        line.unicodeScalars.allSatisfy { $0 == "\t" || (" "..."~").contains($0) }
-    }
-
-    /// Whether a line ends outside a string with no backtick outside a string, and no slash outside a string but one
-    /// that starts a `//` comment.
-    private static func walksToItsEnd(_ line: [Character]) -> Bool {
-        var inString = false
-        for index in line.indices {
-            let character = line[index]
-            let previous = index > line.startIndex ? line[index - 1] : nil
-            if character == "\"" && previous != "\\" { inString.toggle() }
-            if !inString && character == "`" { return false }
-            if !inString && character == "/" {
-                return index + 1 < line.endIndex && line[index + 1] == "/"
-            }
+        func end(from start: Int, while holds: (UInt8) -> Bool) -> Int {
+            var last = start
+            while last < bytes.count, holds(bytes[last]) { last += 1 }
+            return last
         }
-        return !inString
-    }
-
-    /// The text with the white space between a member's name and its parenthesis taken out, outside string literals:
-    /// `.target (name: "A")` and `.target` with `(name: "A")` on the next line read as `.target(name: "A")`.
-    static func canonical(_ text: String) -> String {
-        outsideStrings(text, emptying: false) { code in
-            NSRegularExpression.compiled(#"\.(\w+)\s+\("#).stringByReplacingMatches(
-                in: code, range: NSRange(code.startIndex..., in: code), withTemplate: ".$1("
-            )
-        }
-    }
-
-    /// The lines that use a declaration word, outside string literals, in another way than `.word(`.
-    private static func declarationWordsOutsideCalls(in text: String) -> [String] {
-        let words = declarationWords.joined(separator: "|")
-        let misuse = NSRegularExpression.compiled(#"(?<![\w.])(?:"# + words + #")(?!\w)|(?<=\.)(?:"# + words + #")(?![\w(])"#)
-        let code = outsideStrings(text, emptying: true) { $0 }.split(separator: "\n", omittingEmptySubsequences: false)
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-        return zip(code, lines).compactMap { code, line in
-            let code = String(code)
-            return misuse.firstMatch(in: code, range: NSRange(code.startIndex..., in: code)) == nil ? nil : String(line)
-        }
-    }
-
-    /// The text with `transform` applied to each part outside string literals. The literals are kept, or, when
-    /// `emptying`, each of their characters but a line break becomes a space, so the lines stay where they were.
-    private static func outsideStrings(_ text: String, emptying: Bool, _ transform: (String) -> String) -> String {
-        var result = ""
-        var code = ""
-        var inString = false
-        var previous: Character?
-        for character in text {
-            if character == "\"" && previous != "\\" {
-                if !inString {
-                    result += transform(code)
-                    code = ""
+        while index < bytes.count {
+            let byte = bytes[index]
+            let following = index + 1 < bytes.count ? bytes[index + 1] : nil
+            if byte == .space || byte == .tab {
+                index += 1
+            } else if byte.isLineBreak {
+                emit(.lineBreak, to: index + 1)
+            } else if byte == .slash, following == UInt8.slash {
+                let close = end(from: index, while: { !$0.isLineBreak })
+                if bytes[index..<close].allSatisfy({ $0.isPrintable || $0 == .tab }) { index = close } else { emit(.bad, to: close) }
+            } else if byte == .quote {
+                let close = end(from: index + 1, while: { $0 != .quote && !$0.isLineBreak })
+                if close < bytes.count, bytes[close] == .quote {
+                    let plain = bytes[(index + 1)..<close].allSatisfy { $0.isPrintable && $0 != .backslash }
+                    emit(plain ? .string : .bad, to: close + 1)
+                } else {
+                    emit(.bad, to: close)
                 }
-                inString.toggle()
-                result.append(character)
-            } else if inString {
-                result.append(emptying && character != "\n" ? " " : character)
+            } else if byte == .hash, following?.isWordByte == true {
+                emit(.directive, to: end(from: index + 1, while: \.isWordByte))
+            } else if byte == .plus, following == UInt8.equals {
+                emit(.symbol, to: index + 2)
+            } else if byte.isWordByte {
+                emit(.word, to: end(from: index, while: \.isWordByte))
             } else {
-                code.append(character)
+                emit(.symbol, to: index + 1)
             }
-            previous = character
         }
-        return result + transform(code)
+        return tokens
     }
 
-    /// The text between the parentheses of every call that starts with one of `openings`, outside string literals, and
-    /// outermost only: a call written inside one already found is part of that one's text.
-    static func calls(of openings: [String], in text: String) -> [(opening: String, body: String)] {
-        var found: [(opening: String, body: String)] = []
-        var index = text.startIndex
-        var inString = false
-        var previous: Character?
-        while index < text.endIndex {
-            let character = text[index]
-            if character == "\"" && previous != "\\" { inString.toggle() }
-            if !inString, character == ".", let opening = openings.first(where: { text[index...].hasPrefix($0) }) {
-                let start = text.index(index, offsetBy: opening.count)
-                let end = closing(in: text, from: start, opening: "(", closing: ")")
-                found.append((opening, String(text[start..<end])))
-                index = end < text.endIndex ? text.index(after: end) : end
-                previous = ")"
+    private static let openings: Set<String> = ["(", "[", "{"]
+    private static let closings: Set<String> = [")", "]", "}"]
+
+    /// The tokens split into statements: at each line break outside brackets. A line break inside a bracket stays in
+    /// its statement, as it does for the compiler.
+    private static func statements(of tokens: [Token]) -> [[Token]] {
+        var statements: [[Token]] = []
+        var current: [Token] = []
+        var depth = 0
+        for token in tokens {
+            if token.kind == .lineBreak, depth == 0 {
+                if !current.isEmpty { statements.append(current) }
+                current = []
                 continue
             }
-            previous = character
-            index = text.index(after: index)
+            current.append(token)
+            guard token.kind == .symbol else { continue }
+            if openings.contains(token.text) { depth += 1 }
+            if closings.contains(token.text) { depth = max(0, depth - 1) }
         }
-        return found
+        if !current.isEmpty { statements.append(current) }
+        return statements
     }
 
-    /// The index of the bracket that closes the one open just before `start`, or the end of the text.
-    private static func closing(in text: String, from start: String.Index, opening: Character, closing: Character) -> String.Index {
-        var depth = 1
-        var inString = false
-        var previous: Character?
-        var index = start
-        while index < text.endIndex {
-            let character = text[index]
-            if character == "\"" && previous != "\\" { inString.toggle() }
-            if !inString && character == opening { depth += 1 }
-            if !inString && character == closing {
-                depth -= 1
-                if depth == 0 { return index }
+    /// The lines that hold the tokens of a statement, from its first token (only white space comes before it on its
+    /// line) to the end of its last line, so a comment there is in the report.
+    private static func lines(holding tokens: [Token], in bytes: [UInt8]) -> String {
+        guard let first = tokens.first, let last = tokens.last else { return "" }
+        var upper = last.range.upperBound
+        while upper < bytes.count, !bytes[upper].isLineBreak { upper += 1 }
+        return String(decoding: bytes[first.range.lowerBound..<upper], as: UTF8.self)
+    }
+
+    /// Reads one statement of the grammar, or nothing when a token is left over or out of place.
+    private struct Parser {
+        private static let conditionSymbols: Set<String> = ["!", "&", "|", "(", ")", ">", "<", "=", "."]
+
+        private let tokens: [Token]
+        private let bytes: [UInt8]
+        private let spansLines: Bool
+        private var position = 0
+
+        init(tokens: [Token], bytes: [UInt8]) {
+            self.tokens = tokens.filter { $0.kind != .lineBreak }
+            self.bytes = bytes
+            spansLines = tokens.contains { $0.kind == .lineBreak }
+        }
+
+        mutating func statement() -> Statement? {
+            guard let statement = readStatement(), position == tokens.count else { return nil }
+            return statement
+        }
+
+        private mutating func readStatement() -> Statement? {
+            guard position < tokens.count else { return nil }
+            let first = tokens[position]
+            if first.kind == .directive {
+                position += 1
+                return directive(first.text)
             }
-            previous = character
-            index = text.index(after: index)
+            guard let name = word() else { return nil }
+            switch name {
+            case "import":
+                return take(word: "PackageDescription") ? .importDescription : nil
+            case "let", "var":
+                return declaration()
+            default:
+                if take("+=") { return value().map(Statement.addition) }
+                guard take("."), take(word: "append"), take("("), let node = value(), take(")") else { return nil }
+                return .addition(node)
+            }
         }
-        return text.endIndex
-    }
 
-    /// The parts of a list or of a call's arguments: the text between the commas outside brackets and string literals,
-    /// trimmed, without the empty part a trailing comma leaves.
-    static func elements(of text: String) -> [String] {
-        var parts: [String] = []
-        var current = ""
-        var depth = 0
-        var inString = false
-        var previous: Character?
-        for character in text {
-            if character == "\"" && previous != "\\" { inString.toggle() }
-            if !inString && "([{".contains(character) { depth += 1 }
-            if !inString && ")]}".contains(character) { depth -= 1 }
-            if character == "," && depth == 0 && !inString {
-                parts.append(current)
-                current = ""
+        /// `name`, an optional `: Type`, `=` and a value
+        private mutating func declaration() -> Statement? {
+            guard let name = word() else { return nil }
+            var type: String?
+            if take(":") {
+                guard let named = typeName() else { return nil }
+                type = named
+            }
+            guard take("="), let node = value() else { return nil }
+            return .declaration(name: name, type: type, node: node)
+        }
+
+        /// `Product`, `Target.Dependency`, `[Target]`, `[Package.Dependency]`
+        private mutating func typeName() -> String? {
+            let bracketed = take("[")
+            guard var name = word() else { return nil }
+            while take(".") {
+                guard let part = word() else { return nil }
+                name += ".\(part)"
+            }
+            guard bracketed else { return name }
+            return take("]") ? "[\(name)]" : nil
+        }
+
+        /// `#if` or `#elseif` with a condition of words and the symbols of a condition, on one line and ending in a
+        /// word or `)`, so the compiler ends it where the reader does; `#else` and `#endif` alone.
+        private mutating func directive(_ name: String) -> Statement? {
+            let condition = tokens[position...]
+            position = tokens.count
+            switch name {
+            case "#if", "#elseif":
+                guard !spansLines, let last = condition.last,
+                      last.kind == .word || last.kind == .symbol && last.text == ")",
+                      condition.allSatisfy({ $0.kind == .word || $0.kind == .symbol && Self.conditionSymbols.contains($0.text) })
+                else { return nil }
+                return .directive
+            case "#else", "#endif":
+                return condition.isEmpty ? .directive : nil
+            default:
+                return nil
+            }
+        }
+
+        private mutating func value() -> Node? {
+            guard position < tokens.count else { return nil }
+            let start = position
+            let token = tokens[position]
+            let value: Value?
+            if token.kind == .string {
+                position += 1
+                value = .string(String(token.text.dropFirst().dropLast()))
+            } else if take("[") {
+                value = list()
+            } else if take(".") {
+                value = member()
+            } else if take(word: "Target") {
+                value = dependency()
+            } else if take(word: "Package") {
+                value = arguments().map(Value.packageDeclaration)
+            } else if token.kind == .word {
+                position += 1
+                value = .word(token.text)
             } else {
-                current.append(character)
+                value = nil
             }
-            previous = character
+            return value.map { Node(value: $0, text: text(from: start)) }
         }
-        parts.append(current)
-        return parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-    }
 
-    /// A call's arguments by label; an argument without a label is left out.
-    private static func arguments(of body: String) -> [String: String] {
-        var found: [String: String] = [:]
-        for element in elements(of: body) {
-            guard let colon = element.firstIndex(of: ":") else { continue }
-            let label = element[..<colon].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !label.isEmpty, label.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) else { continue }
-            found[label] = element[element.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+        /// The elements of a list, after its `[`
+        private mutating func list() -> Value? {
+            var elements: [Node] = []
+            while !take("]") {
+                guard let element = value(), take(",") || peek("]") else { return nil }
+                elements.append(element)
+            }
+            return .list(elements)
         }
-        return found
-    }
 
-    /// The text of a string literal that is the whole of `value`.
-    private static func literal(_ value: String) -> String? {
-        guard value.count >= 2, value.first == "\"", value.last == "\"" else { return nil }
-        let inside = value.dropFirst().dropLast()
-        return inside.contains("\"") || inside.contains("\\") ? nil : String(inside)
-    }
+        /// `.name` or `.name(arguments)`, after the `.`
+        private mutating func member() -> Value? {
+            guard let name = word() else { return nil }
+            guard peek("(") else { return .member(name, nil) }
+            return arguments().map { .member(name, $0) }
+        }
 
-    /// A name written as a string literal (`"CVRendering"`, `"swift-syntax"`).
-    private static func name(_ value: String) -> String? {
-        guard let text = literal(value), !text.isEmpty,
-              text.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) else { return nil }
-        return text
-    }
+        /// `.Dependency.name(arguments)`, after `Target`
+        private mutating func dependency() -> Value? {
+            guard take("."), take(word: "Dependency"), take("."), let name = word(), let given = arguments() else { return nil }
+            return .dependency(name, given)
+        }
 
-    /// The parts of a list that is the whole of `value` (`["A", "B"]`, not `["A"] + more`).
-    private static func list(_ value: String) -> [String]? {
-        guard value.count >= 2, value.first == "[", value.last == "]" else { return nil }
-        let start = value.index(after: value.startIndex)
-        let end = value.index(before: value.endIndex)
-        guard closing(in: value, from: start, opening: "[", closing: "]") == end else { return nil }
-        return elements(of: String(value[start..<end]))
-    }
+        /// `(label: value, value, ...)`, a trailing comma allowed
+        private mutating func arguments() -> [Argument]? {
+            guard take("(") else { return nil }
+            var given: [Argument] = []
+            while !take(")") {
+                let start = position
+                var label: String?
+                if position + 1 < tokens.count, tokens[position].kind == .word,
+                   tokens[position + 1].kind == .symbol, tokens[position + 1].text == ":" {
+                    label = tokens[position].text
+                    position += 2
+                }
+                guard let node = value() else { return nil }
+                given.append(Argument(label: label, node: node, text: text(from: start)))
+                guard take(",") || peek(")") else { return nil }
+            }
+            return given
+        }
 
-    /// The function and the arguments of a call that is the whole of `value` (`.product(...)`,
-    /// `Target.Dependency.target(...)`).
-    private static func call(_ value: String) -> (function: String, body: String)? {
-        guard let head = matches(#"^(?:Target\.Dependency)?\.(\w+)\("#, in: value).first?.first,
-              let open = value.firstIndex(of: "("), value.last == ")" else { return nil }
-        let start = value.index(after: open)
-        let end = value.index(before: value.endIndex)
-        guard closing(in: value, from: start, opening: "(", closing: ")") == end else { return nil }
-        return (head, String(value[start..<end]))
-    }
+        private func peek(_ symbol: String) -> Bool {
+            position < tokens.count && tokens[position].kind == .symbol && tokens[position].text == symbol
+        }
 
-    /// The capture groups of every match of `pattern`.
-    private static func matches(_ pattern: String, in text: String) -> [[String]] {
-        NSRegularExpression.compiled(pattern).matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
-            (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: text).map { String(text[$0]) } }
+        private mutating func take(_ symbol: String) -> Bool {
+            guard peek(symbol) else { return false }
+            position += 1
+            return true
+        }
+
+        private mutating func take(word expected: String) -> Bool {
+            guard position < tokens.count, tokens[position].kind == .word, tokens[position].text == expected else { return false }
+            position += 1
+            return true
+        }
+
+        private mutating func word() -> String? {
+            guard position < tokens.count, tokens[position].kind == .word else { return nil }
+            position += 1
+            return tokens[position - 1].text
+        }
+
+        /// The text from the token at `start` to the last one read, as written
+        private func text(from start: Int) -> String {
+            String(decoding: bytes[tokens[start].range.lowerBound..<tokens[position - 1].range.upperBound], as: UTF8.self)
         }
     }
 }
 
-private extension NSRegularExpression {
-    /// A pattern written in this file, which is known to compile.
-    static func compiled(_ pattern: String) -> NSRegularExpression {
-        do { return try NSRegularExpression(pattern: pattern) } catch { preconditionFailure("\(pattern) is not a pattern") }
-    }
+// MARK: - Bytes of a manifest
+
+private extension UInt8 {
+    static let tab: UInt8 = 0x09
+    static let lineFeed: UInt8 = 0x0A
+    static let carriageReturn: UInt8 = 0x0D
+    static let space: UInt8 = 0x20
+    static let quote: UInt8 = 0x22
+    static let hash: UInt8 = 0x23
+    static let plus: UInt8 = 0x2B
+    static let hyphen: UInt8 = 0x2D
+    static let slash: UInt8 = 0x2F
+    static let equals: UInt8 = 0x3D
+    static let backslash: UInt8 = 0x5C
+
+    var isLineBreak: Bool { self == .lineFeed || self == .carriageReturn }
+    var isPrintable: Bool { (0x20...0x7E).contains(self) }
+    var isDigit: Bool { (0x30...0x39).contains(self) }
+    var isWordByte: Bool { isDigit || (0x41...0x5A).contains(self) || (0x61...0x7A).contains(self) || self == 0x5F }
 }
