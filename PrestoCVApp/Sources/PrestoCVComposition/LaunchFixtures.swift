@@ -21,6 +21,8 @@ import PrestoCVWorkflowPorts
 ///   answer (save, send, cancel), and never the system's own. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextHoldImport`: a read of the import never ends by itself, and ends as cancelled when the person cancels it.
+///   It writes nothing, so it needs no folder.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
 
@@ -54,6 +56,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
+    static let holdImportArgument = "-PrestoCVNextHoldImport"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -70,6 +73,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var sharesWithStandIn = false
     /// What another window does to the stored CV written first, nil when no other window changes it
     var otherWindow: OtherWindow?
+    /// The import's reads wait until they are cancelled
+    var holdsImport = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -105,6 +110,8 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableOtherWindow
                 }
                 fixtures.otherWindow = change
+            case holdImportArgument:
+                fixtures.holdsImport = true
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:
@@ -152,6 +159,11 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
     func listEditing(_ editing: any CVEditing) -> any CVEditing {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
+    }
+
+    /// What the import reads through: the importer it is given, or with the fixture one whose reads wait until cancelled.
+    func importing(_ importer: any CVImporting) -> any CVImporting {
+        holdsImport ? HeldImport() : importer
     }
 
     /// What the app stores through: the store it is given, or with the fixture one that another window changes once.
