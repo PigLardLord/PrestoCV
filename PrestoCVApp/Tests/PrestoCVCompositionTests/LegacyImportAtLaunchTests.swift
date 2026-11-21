@@ -156,6 +156,24 @@ struct LegacyImportAtLaunchTests {
         #expect(try Self.files(folder).isEmpty)
     }
 
+    @Test("A CV whose period is no clear range is listed to check, with nothing lost, and Confirm removes its old copy")
+    func theReportListsAPeriodToCheck() async throws {
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let unclear = #""relevant_experience":[{"title":"T","company":"C","period":"since forever"}]"#
+        let folder = try Self.legacyFolder(paths, [Self.dropped: Self.legacyFile(Self.dropped, unclear)])
+        let composition = try await Self.launch(paths, from: DirectoryLegacyStore(directory: folder, clock: SteppingClock()))
+        let report = Self.report(composition)
+
+        await report.load()
+        #expect(report.leftOut.isEmpty && report.toCheck.map(\.details) == [[.period]])
+        #expect(report.state == .review)
+        await report.confirm()
+
+        #expect(report.state == .removed)
+        #expect(try Self.files(folder).isEmpty)
+    }
+
     @Test("After the choice not to be reminded, kept in the app's folder, the report keeps its rows but shows no sheet")
     func theChoiceIsKept() async throws {
         let paths = CompositionTests.paths()
