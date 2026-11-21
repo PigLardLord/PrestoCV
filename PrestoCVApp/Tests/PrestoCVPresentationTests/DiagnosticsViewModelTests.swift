@@ -163,4 +163,49 @@ struct DiagnosticsViewModelTests {
         #expect(diagnostics.shareFiles == DiagnosticsFake.files(of: newer.id))
         #expect(reading.discards == 0)
     }
+
+    @Test("DiagnosticsViewModel reports a failed copy")
+    func reportsAFailedCopy() async {
+        let reading = DiagnosticsFake(runs: [newer, older])
+        reading.failCopies(of: older.id)
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        await diagnostics.load()
+        #expect(!diagnostics.copiesFailed)
+
+        await diagnostics.select(older.id)
+
+        #expect(diagnostics.copiesFailed)
+        #expect(diagnostics.shareFiles.isEmpty)
+    }
+
+    @Test("a newer choice clears a failed copy")
+    func newerChoiceClearsAFailedCopy() async {
+        let reading = DiagnosticsFake(runs: [newer, older])
+        reading.failCopies(of: older.id)
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        await diagnostics.load()
+        await diagnostics.select(older.id)
+        #expect(diagnostics.copiesFailed)
+
+        await diagnostics.select(newer.id)
+
+        #expect(!diagnostics.copiesFailed)
+        #expect(diagnostics.shareFiles == DiagnosticsFake.files(of: newer.id))
+    }
+
+    @Test("a failed copy after the screen closed is not reported")
+    func failedCopyAfterFinishIsNotReported() async throws {
+        let reading = DiagnosticsFake(runs: [newer])
+        reading.failCopies(of: newer.id)
+        await reading.copying.close()
+        let diagnostics = DiagnosticsViewModel(reading: reading)
+        let loading = Task { await diagnostics.load() }
+        #expect(try await reading.copying.holds(1))
+
+        await diagnostics.finish()
+        await reading.copying.open()
+        await loading.value
+
+        #expect(!diagnostics.copiesFailed)
+    }
 }

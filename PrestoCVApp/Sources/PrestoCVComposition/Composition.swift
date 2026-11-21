@@ -334,6 +334,11 @@ public final class Composition {
         wrapListEditing = { fixtures.listEditing($0) }
         sharesWithStandIn = fixtures.sharesWithStandIn
         wrapStore = { fixtures.store($0) }
+        // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
+        // left alone here, and `make` fails the launch through `check`.
+        if rejected == nil, fixtures.passesCheck(paths) {
+            await fixtures.seedTrace(into: paths)
+        }
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())

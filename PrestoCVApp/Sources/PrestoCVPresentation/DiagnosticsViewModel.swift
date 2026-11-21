@@ -13,6 +13,8 @@ public final class DiagnosticsViewModel {
     public private(set) var selection: UUID?
     public private(set) var summary = ""
     public private(set) var shareFiles: [URL] = []
+    /// The copies of the chosen run could not be made, so there is nothing to share and the view says why.
+    public private(set) var copiesFailed = false
 
     private var runs: [DiagnosticRun] = []
     @ObservationIgnored private let reading: any DiagnosticsReading
@@ -34,6 +36,7 @@ public final class DiagnosticsViewModel {
             selection = nil
             summary = ""
             shareFiles = []
+            copiesFailed = false
             return
         }
         state = .listed
@@ -50,13 +53,15 @@ public final class DiagnosticsViewModel {
         selection = id
         summary = run.summary
         shareFiles = []
+        copiesFailed = false
         let copies: [URL]
         do {
             copies = try await reading.shareCopies(of: id)
         } catch is CancellationError {
             return
         } catch {
-            // The store logs why; with no copy there is nothing to share
+            // The store logs why; with no copy there is nothing to share. Only the latest choice of an open screen says so
+            if !isClosed, thisSelection == latestSelection { copiesFailed = true }
             return
         }
         if isClosed {
@@ -72,6 +77,7 @@ public final class DiagnosticsViewModel {
         isClosed = true
         latestSelection += 1
         shareFiles = []
+        copiesFailed = false
         await reading.discardCopies()
     }
 }
