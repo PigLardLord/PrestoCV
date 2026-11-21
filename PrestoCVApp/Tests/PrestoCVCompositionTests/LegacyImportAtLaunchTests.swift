@@ -1,8 +1,10 @@
 import Foundation
 import PrestoCVApplication
 import PrestoCVCoreTestSupport
+import PrestoCVIntegration
 import PrestoCVPersistence
 import PrestoCVPresentation
+import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
 
@@ -20,6 +22,17 @@ struct UnlistableLegacyStore: LegacyStore {
     func remove(_ key: LegacyRecord.Key, ifUnchanged version: LegacyRecord.Version) async throws(RepositoryError) -> LegacyRemoval {
         .alreadyGone
     }
+}
+
+extension LegacyImportAtLaunch {
+    /// A launch with no released app's store: nothing imported, nothing to report.
+    static let nothing = LegacyImportAtLaunch(
+        outcome: .ran(LegacyImportReport()),
+        review: LegacyImportReview(
+            outcome: .ran(LegacyImportReport()), importer: ImportLegacyStore(source: EmptyLegacyStore(), target: InMemoryCVRepository())
+        ),
+        reminder: LegacyReportMarker(file: FileManager.default.temporaryDirectory.appendingPathComponent("NoLegacyReportOff-\(UUID())"))
+    )
 }
 
 /// The import of the released app's store through the composition: real legacy files in a temporary folder, read by the
@@ -51,6 +64,10 @@ struct LegacyImportAtLaunchTests {
     static func launch(_ paths: AppPaths, from legacy: any LegacyStore) async throws -> Composition {
         let rules = CompositionTests.counting(CompositionTests.CompileCounter())
         return try CompositionTests.ready(await Composition.make(CompositionTests.inputs(paths, compileRules: rules, legacyStore: legacy)))
+    }
+
+    static func report(_ composition: Composition) -> LegacyImportReportViewModel {
+        composition.screens.makeLegacyImportReport(untitled: "Untitled", numbered: { title, number in "\(title) (\(number))" })
     }
 
     static func stored(_ composition: Composition) async throws -> [String] {
@@ -87,6 +104,12 @@ struct LegacyImportAtLaunchTests {
         let folder = try Self.legacyFolder(paths, [Self.good: Self.legacyFile(Self.good)])
 
         let failed = try await Self.launch(paths, from: UnlistableLegacyStore())
+        let firstRun = failed.screens.makeFirstRun()
+        await firstRun.load()
+        let report = Self.report(failed)
+        await report.load()
+        #expect(firstRun.state == .returning, "never the welcome of an empty app, as if the old CVs were gone")
+        #expect(report.notice == .didNotRun)
         #expect(failed.legacyImport == .failed(.storeUnavailable(.cannotList)))
         #expect(failed.legacyImport.imported == 0)
         #expect(failed.legacyImport.failed == nil, "how many failed is not known, so never zero, as if there were nothing")
@@ -112,5 +135,45 @@ struct LegacyImportAtLaunchTests {
         #expect(composition.legacyImport.failed == 1)
         #expect(try Self.files(folder) == ["cv_\(Self.broken).json"])
         #expect(firstRun.state == .returning)
+    }
+
+    @Test("The report lists the CV that lost a detail, and Confirm removes its old copy")
+    func theReportConfirms() async throws {
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let folder = try Self.legacyFolder(paths, [
+            Self.good: Self.legacyFile(Self.good), Self.dropped: Self.legacyFile(Self.dropped, #""look":{"palette":"ocean"}"#),
+        ])
+        let composition = try await Self.launch(paths, from: DirectoryLegacyStore(directory: folder, clock: SteppingClock()))
+        let report = Self.report(composition)
+
+        await report.load()
+        #expect(report.leftOut.map(\.details) == [[.look]] && report.toCheck.isEmpty)
+        #expect(report.state == .review && report.notice == nil)
+        await report.confirm()
+
+        #expect(report.state == .removed)
+        #expect(try Self.files(folder).isEmpty)
+    }
+
+    @Test("After the choice not to be reminded, kept in the app's folder, the report keeps its rows but shows no sheet")
+    func theChoiceIsKept() async throws {
+        let paths = CompositionTests.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let folder = try Self.legacyFolder(paths, [Self.dropped: Self.legacyFile(Self.dropped, #""look":{"palette":"ocean"}"#)])
+        let composition = try await Self.launch(paths, from: DirectoryLegacyStore(directory: folder, clock: SteppingClock()))
+        let marker = LegacyReportMarker(file: paths.legacyReportOff)
+        #expect(await marker.remindsAgain())
+
+        try await marker.stopReminding()
+        let report = Self.report(composition)
+        await report.load()
+
+        #expect(await !marker.remindsAgain())
+        #expect(report.leftOut.count == 1 && report.state == .hidden)
+        #expect(try Self.files(folder) == ["cv_\(Self.dropped).json"])
+        await #expect(throws: LegacyReminderFailure.notKept) {
+            try await LegacyReportMarker(file: folder.appendingPathComponent("missing/LegacyReportOff")).stopReminding()
+        }
     }
 }

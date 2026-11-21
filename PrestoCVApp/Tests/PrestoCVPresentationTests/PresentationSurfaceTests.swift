@@ -96,6 +96,28 @@ func useEveryPublicMember(of look: LookViewModel) async {
 }
 
 @MainActor
+func useEveryPublicMember(of report: LegacyImportReportViewModel) async {
+    await report.load()
+    let _: LegacyReportState = report.state
+    let _: Bool = report.isPresented || report.isBusy
+    for row in report.leftOut + report.toCheck as [LegacyReportRow] {
+        let _: CVReference = row.id
+        let _: String = row.label
+        let _: [LegacyDetail] = row.details
+    }
+    for line in report.notImported as [NotImportedCount] {
+        let _: NotImportedCause = line.cause
+        let _: Int = line.count
+    }
+    let _: Int = report.notImportedTotal
+    let _: LegacyImportNotice? = report.notice
+    report.remindsNoMore = true
+    await report.confirm()
+    report.close()
+    report.hideNotice()
+}
+
+@MainActor
 func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let reference: CVReference? = shell.selection
     let column: ShellColumn = shell.preferredColumn
