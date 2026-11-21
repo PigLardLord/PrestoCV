@@ -75,4 +75,58 @@ struct ImportReviewViewModelTests {
         #expect(model.isShown == false)
         #expect(model.entries == entries && model.notImported == "Hobbies: chess")
     }
+
+    @Test("the notice's words follow what the review holds: values to check, a text to copy, or both")
+    func noticeKindFollowsWhatTheReviewHolds() {
+        #expect(review(entries, notImported: "Hobbies: chess").noticeKind == .checkAndCopy)
+        #expect(review(entries, notImported: "").noticeKind == .checkOnly)
+        #expect(review([], notImported: "Hobbies: chess").noticeKind == .copyOnly)
+        #expect(review([], notImported: "").noticeKind == nil)
+    }
+
+    @Test("the sheet opens only while the review is shown, and closes")
+    func sheetOpensOnlyWhileShown() {
+        let model = review(entries, notImported: "Hobbies: chess")
+        let empty = review([], notImported: "")
+        let dismissed = review(entries, notImported: "Hobbies: chess")
+        dismissed.dismiss()
+
+        model.openSheet()
+        empty.openSheet()
+        dismissed.openSheet()
+
+        #expect(model.isSheetShown)
+        #expect(!empty.isSheetShown)
+        #expect(!dismissed.isSheetShown)
+        model.closeSheet()
+        #expect(!model.isSheetShown)
+    }
+
+    @Test("a sheet open when the review ends stays until the person closes it")
+    func sheetOutlivesTheNotice() {
+        let model = review(entries, notImported: "Hobbies: chess")
+        model.openSheet()
+
+        model.editorStored()
+
+        #expect(!model.isShown)
+        #expect(model.isSheetShown)
+        model.closeSheet()
+        #expect(!model.isSheetShown)
+    }
+
+    @Test("each copy of the text not imported is counted, so that each is told, until the sheet closes")
+    func copyCountsEachTap() {
+        let model = review(entries, notImported: "Hobbies: chess")
+        model.openSheet()
+        #expect(model.copyCount == 0 && !model.didCopy)
+
+        model.noteCopied()
+        #expect(model.copyCount == 1 && model.didCopy)
+        model.noteCopied()
+        #expect(model.copyCount == 2 && model.didCopy)
+        model.closeSheet()
+        model.openSheet()
+        #expect(model.copyCount == 0 && !model.didCopy)
+    }
 }
