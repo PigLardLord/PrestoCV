@@ -12,44 +12,92 @@ struct ReleaseHygieneTests {
 
     private static let root = Repository.root
 
-    /// The package products the app links, with the sources of each: their code ships in the app.
-    static let linkedProducts = [
-        "PrestoCVCore": "PrestoCVCore/Sources/PrestoCVCore",
-        "CVPDFExporter": "CVPDFExporter/Sources/CVPDFExporter",
-        "CVGeneratorAI": "CVGeneratorAI/Sources/CVGeneratorAI",
-        "PrestoCVDomain": "PrestoCVCore/Sources/PrestoCVDomain",
-        "PrestoCVApplication": "PrestoCVCore/Sources/PrestoCVApplication",
-        "PrestoCVImporting": "PrestoCVCore/Sources/PrestoCVImporting",
-        "PrestoCVImportingPDFKit": "PrestoCVCore/Sources/PrestoCVImportingPDFKit",
-        "DiagnosticLogging": "DiagnosticLogging/Sources/DiagnosticLogging",
-        "DiagnosticLoggingOSLog": "DiagnosticLogging/Sources/DiagnosticLoggingOSLog",
-        "DiagnosticTrace": "DiagnosticTrace/Sources/DiagnosticTrace",
-        "DiagnosticTraceFiles": "DiagnosticTrace/Sources/DiagnosticTraceFiles",
-        "DiagnosticTraceDistribution": "DiagnosticTrace/Sources/DiagnosticTraceDistribution",
-        "PrestoCVComposition": "PrestoCVApp/Sources/PrestoCVComposition",
-        "PrestoCVPresentation": "PrestoCVApp/Sources/PrestoCVPresentation",
-    ]
+    /// An app target of the project, with its privacy manifest and the products it links directly.
+    struct App {
+        let name: String
+        let folder: String
+        let manifest: String
+        /// The package products the project links into the target: the start of the walk through the manifests, kept
+        /// equal to the project by `scansCoverTheLinkedProducts`.
+        let linkedProducts: [String]
+    }
 
-    /// The targets that ship only as a dependency of a linked product and that the scans read: the composition's, which
-    /// the second app target takes in through `PrestoCVComposition`. The project file does not name them, so
-    /// `scansCoverTheLinkedProducts` cannot see them; `scansCoverTheComposition` reads them from the package's manifest.
-    static let transitiveProducts = [
-        "PrestoCVExportFiles": "PrestoCVApp/Sources/PrestoCVExportFiles",
-        "PrestoCVApplicationNaturalLanguage": "PrestoCVCore/Sources/PrestoCVApplicationNaturalLanguage",
-    ]
+    /// The released app, which does not link the new app's targets.
+    static let legacy = App(
+        name: "PrestoCV", folder: "PrestoCV", manifest: "PrestoCV/PrivacyInfo.xcprivacy",
+        linkedProducts: [
+            "PrestoCVCore", "CVPDFExporter", "CVGeneratorAI", "PrestoCVDomain", "PrestoCVApplication", "PrestoCVImporting",
+            "PrestoCVImportingPDFKit", "DiagnosticLogging", "DiagnosticLoggingOSLog", "DiagnosticTrace", "DiagnosticTraceFiles",
+            "DiagnosticTraceDistribution",
+        ]
+    )
 
-    /// The composition's other targets, which the scans do not read yet (#430): they are scanned when the scans follow
-    /// the package manifests and each app has its own privacy manifest. This list may only shrink.
-    static let notYetScanned: Set<String> = [
-        "CVBundledDesigns", "CVDesignCatalog", "CVDesignCatalogFileStore", "CVDocumentModel", "CVRendering",
-        "CVRenderingIOS", "CVRenderingWebKitSupport", "PrestoCVImportFiles", "PrestoCVIntegration", "PrestoCVPersistence",
-        "PrestoCVWorkflowPorts",
-    ]
+    /// The second app, which becomes the shipped one at the switch (docs/architecture/modules.md).
+    static let next = App(
+        name: "PrestoCVNext", folder: "PrestoCVNext", manifest: "PrestoCVNext/PrivacyInfo.xcprivacy",
+        linkedProducts: ["PrestoCVComposition", "PrestoCVPresentation"]
+    )
 
-    /// The sources whose code ships with the app: the shipped target, the second one that becomes it at the switch
-    /// (docs/architecture/modules.md), the products they link, and those products' targets in `transitiveProducts`.
-    static let shippedFolders = ["PrestoCV", "PrestoCVNext"]
-        + linkedProducts.merging(transitiveProducts) { linked, _ in linked }.values.sorted()
+    static let apps = [legacy, next]
+
+    private static func projectText() -> String {
+        do {
+            return try String(contentsOf: root.appendingPathComponent("PrestoCV.xcodeproj/project.xcproj"), encoding: .utf8)
+        } catch {
+            preconditionFailure("The project file cannot be read: \(error)")
+        }
+    }
+
+    /// The manifests of the local packages the project names.
+    static let manifests: PackageManifests = {
+        let project = projectText()
+        let expression = try! NSRegularExpression(pattern: #""kind": "local",\s*"path": "(\w+)""#)
+        let packages = expression.matches(in: project, range: NSRange(project.startIndex..., in: project)).compactMap { match in
+            Range(match.range(at: 1), in: project).map { String(project[$0]) }
+        }
+        do {
+            return try PackageManifests(packages: packages) { package in
+                try String(contentsOf: root.appendingPathComponent("\(package)/Package.swift"), encoding: .utf8)
+            }
+        } catch {
+            preconditionFailure("A package manifest cannot be read: \(error)")
+        }
+    }()
+
+    /// The package products the project links into a target, by the target's name.
+    static func productsLinked(byTarget target: String) -> [String] {
+        let project = projectText()
+        guard let start = project.range(of: "\"name\": \"\(target)\"") else { return [] }
+        let end = project.range(of: "\"name\": \"", range: start.upperBound..<project.endIndex)?.lowerBound ?? project.endIndex
+        let block = String(project[start.lowerBound..<end])
+        let member = try! NSRegularExpression(pattern: #""product-name": "([^"]+)""#)
+        return member.matches(in: block, range: NSRange(block.startIndex..., in: block)).compactMap { match in
+            Range(match.range(at: 1), in: block).map { String(block[$0]) }
+        }
+    }
+
+    /// The targets a Release build of the app compiles in: the products it links, and every target they depend on, in
+    /// this package and in the sibling packages, however far down. A linked product no package declares is unresolved.
+    static func reached(by app: App) -> (targets: [PackageManifests.Target], unresolved: [PackageManifests.ProductReference]) {
+        var undeclared: [PackageManifests.ProductReference] = []
+        let start = app.linkedProducts.flatMap { name in
+            let owners = manifests.products.compactMap { package, products in
+                products[name] == nil ? nil : PackageManifests.ProductReference(name: name, package: package)
+            }
+            if owners.isEmpty { undeclared.append(PackageManifests.ProductReference(name: name, package: "(none)")) }
+            return owners
+        }
+        let walk = manifests.reached(from: start)
+        return (walk.targets, undeclared + walk.unresolved)
+    }
+
+    /// The sources whose code ships with the app: its own folder and those of every target it compiles in.
+    static func shippedFolders(of app: App) -> [String] {
+        [app.folder] + reached(by: app).targets.map(\.folder)
+    }
+
+    /// The folders of both apps: what any Release build of the repository carries.
+    static let shippedFolders = Array(Set(apps.flatMap(shippedFolders(of:)))).sorted()
 
     struct Line {
         let file: String
@@ -60,9 +108,9 @@ struct ReleaseHygieneTests {
     }
 
     /// The code lines of the shipped sources, without comments and without the previews at the end of a file.
-    static func shippedLines() -> [Line] {
+    static func shippedLines(in folders: [String] = shippedFolders) -> [Line] {
         var lines: [Line] = []
-        for folder in shippedFolders {
+        for folder in folders {
             let url = root.appendingPathComponent(folder)
             guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil) else { continue }
             for case let file as URL in enumerator where file.pathExtension == "swift" {
@@ -87,49 +135,40 @@ struct ReleaseHygieneTests {
         return lines
     }
 
-    @Test("The scans read the sources of every package product the app links")
-    func scansCoverTheLinkedProducts() throws {
-        let project = try String(
-            contentsOf: Self.root.appendingPathComponent("PrestoCV.xcodeproj/project.xcproj"), encoding: .utf8
-        )
-        let member = try NSRegularExpression(pattern: #""product-name": "([^"]+)""#)
-        let linked = member.matches(in: project, range: NSRange(project.startIndex..., in: project)).compactMap { match in
-            Range(match.range(at: 1), in: project).map { String(project[$0]) }
+    @Test("The scans start from the package products each app target links, as the project says")
+    func scansCoverTheLinkedProducts() {
+        for app in Self.apps {
+            let linked = Self.productsLinked(byTarget: app.name)
+            #expect(Set(linked) == Set(app.linkedProducts), "\(app.name): add a newly linked product to its start set")
         }
-
-        #expect(Set(linked) == Set(Self.linkedProducts.keys), "Add the sources of a newly linked product to the scans")
     }
 
-    @Test("The scans read the sources of every target and product the composition takes in")
-    func scansCoverTheComposition() throws {
-        let manifest = try String(
-            contentsOf: Self.root.appendingPathComponent("PrestoCVApp/Package.swift"), encoding: .utf8
-        )
-        let start = try #require(manifest.range(of: #".target(name: "PrestoCVComposition", dependencies: ["#))
-        let end = try #require(manifest.range(of: "]))", range: start.upperBound..<manifest.endIndex))
-        let block = String(manifest[start.upperBound..<end.lowerBound])
-        let name = try NSRegularExpression(pattern: #"(?:^|[\s,\[])"([A-Za-z]+)"|\.product\(name: "([A-Za-z]+)""#)
-        let taken = name.matches(in: block, range: NSRange(block.startIndex..., in: block)).compactMap { match in
-            (Range(match.range(at: 1), in: block) ?? Range(match.range(at: 2), in: block)).map { String(block[$0]) }
+    @Test("Every manifest is read whole, every target an app compiles in has code, and every product resolves")
+    func everyTargetReachedHasSources() {
+        #expect(Self.manifests.unreadable.isEmpty, "The manifest reader does not follow \(Self.manifests.unreadable)")
+        for app in Self.apps {
+            let (targets, unresolved) = Self.reached(by: app)
+            #expect(unresolved.isEmpty, "\(app.name): no manifest declares \(unresolved)")
+            #expect(targets.count >= app.linkedProducts.count, "\(app.name): the walk reached only \(targets.map(\.name))")
+            for target in targets {
+                let folder = Self.root.appendingPathComponent(target.folder)
+                let files = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)?
+                    .compactMap { ($0 as? URL)?.pathExtension == "swift" ? $0 : nil } ?? []
+                #expect(!files.isEmpty, "\(app.name): the scan reads no code at \(target.folder) (target \(target.name))")
+            }
         }
-        let scanned = Set(Self.linkedProducts.keys).union(Self.transitiveProducts.keys)
-        let unread = Set(taken).subtracting(scanned).subtracting(Self.notYetScanned)
-
-        #expect(taken.count > 20, "The scan no longer reads the composition's dependencies: update it with the manifest")
-        #expect(unread.isEmpty, "Add the sources of \(unread.sorted()) to the scans")
-        #expect(Self.notYetScanned.isDisjoint(with: scanned), "A target the scans read is still listed as not scanned")
-        #expect(Self.notYetScanned.subtracting(taken).isEmpty, "Take \(Self.notYetScanned.subtracting(taken).sorted()) off the list")
     }
 
-    @Test("Every folder the scans read is there")
-    func scannedFoldersExist() {
-        let missing = Self.shippedFolders.filter { folder in
-            var isFolder: ObjCBool = false
-            return !FileManager.default.fileExists(atPath: Self.root.appendingPathComponent(folder).path, isDirectory: &isFolder)
-                || !isFolder.boolValue
-        }
+    @Test("The walk reaches the targets the linked products take in, however far down")
+    func theWalkReachesTheTargetsBelow() {
+        let names = Set(Self.reached(by: Self.next).targets.map(\.name))
+        let legacy = Set(Self.reached(by: Self.legacy).targets.map(\.name))
 
-        #expect(missing.isEmpty, "The scans read no folder at \(missing)")
+        #expect(names.isSuperset(of: [
+            "PrestoCVComposition", "PrestoCVWorkflowPorts", "PrestoCVIntegration", "PrestoCVImportFiles", "CVDocumentModel",
+            "CVDesignCatalog", "CVRendering", "CVDrafting", "PrestoCVPersistence", "DiagnosticTraceFiles",
+        ]), "Reached by the new app: \(names.sorted())")
+        #expect(legacy.isDisjoint(with: ["PrestoCVImportFiles", "PrestoCVWorkflowPorts"]), "The released app does not link these")
     }
 
     // MARK: Debug output
@@ -292,26 +331,38 @@ struct ReleaseHygieneTests {
         "NSPrivacyAccessedAPICategoryActiveKeyboards": #"\bactiveInputModes\b"#,
     ]
 
-    private func declaredCategories() throws -> Set<String> {
-        let manifest = Self.root.appendingPathComponent("PrestoCV/PrivacyInfo.xcprivacy")
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: manifest), format: nil) as? [String: Any])
+    private func declaredCategories(in manifest: String) throws -> Set<String> {
+        let url = Self.root.appendingPathComponent(manifest)
+        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return Set(types.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
     }
 
-    @Test("The privacy manifest declares the required-reason APIs the code uses, and no others")
+    private func declaredWithoutReasons(in manifest: String) throws -> [String] {
+        let url = Self.root.appendingPathComponent(manifest)
+        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
+        return types.filter { ($0["NSPrivacyAccessedAPITypeReasons"] as? [String] ?? []).isEmpty }
+            .compactMap { $0["NSPrivacyAccessedAPIType"] as? String }
+    }
+
+    @Test("Each app's privacy manifest declares the required-reason APIs its code uses, and no others")
     func privacyManifestMatchesTheCode() throws {
-        let lines = Self.shippedLines()
-        var used: Set<String> = []
-        for (category, pattern) in Self.requiredReasonAPIs {
-            let api = try NSRegularExpression(pattern: pattern)
-            if lines.contains(where: { api.firstMatch(in: $0.code, range: NSRange($0.code.startIndex..., in: $0.code)) != nil }) {
-                used.insert(category)
+        for app in Self.apps {
+            let lines = Self.shippedLines(in: Self.shippedFolders(of: app))
+            var used: Set<String> = []
+            for (category, pattern) in Self.requiredReasonAPIs {
+                let api = try NSRegularExpression(pattern: pattern)
+                if lines.contains(where: { api.firstMatch(in: $0.code, range: NSRange($0.code.startIndex..., in: $0.code)) != nil }) {
+                    used.insert(category)
+                }
             }
+
+            let declared = try declaredCategories(in: app.manifest)
+
+            let withoutReason = try declaredWithoutReasons(in: app.manifest)
+            #expect(withoutReason.isEmpty, "\(app.name): no reason declared for \(withoutReason)")
+            #expect(declared == used, "\(app.name): declared \(declared.sorted()), used by the code \(used.sorted())")
         }
-
-        let declared = try declaredCategories()
-
-        #expect(declared == used, "Declared \(declared.sorted()), used by the code \(used.sorted())")
     }
 }
