@@ -136,6 +136,10 @@ final class SettingsUITests: RuntimeIssueFailingTestCase {
         row.tap()
         XCTAssertTrue(text(containing: "This product includes PrestoCV", in: app).waitForExistence(timeout: 30))
         XCTAssertTrue(app.navigationBars["PrestoCV"].exists)
+        let licenceTitle = text(containing: "Version 2.0, January 2004", in: app)
+        XCTAssertTrue(licenceTitle.waitForExistence(timeout: 30))
+        XCTAssertGreaterThan(licenceTitle.frame.height, 0)
+        XCTAssertTrue(text(containing: "TERMS AND CONDITIONS", in: app).exists)
 
         app.backButton.tap()
         XCTAssertTrue(row.waitForExistence(timeout: 30))
