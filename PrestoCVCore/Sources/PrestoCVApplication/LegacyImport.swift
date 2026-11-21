@@ -5,14 +5,22 @@ import PrestoCVDomain
 
 /// What the importer drops from a legacy CV because the domain does not accept it. Reported per CV, never silent.
 public enum LegacyDrop: Sendable, Equatable, Hashable {
-    case look, email, phone, website, skillLevel, certificationYear, certificationLink, profile, documentLanguage, period
+    case look, email, phone, website, skillLevel, certificationYear, certificationLink, profile, documentLanguage
 }
 
-/// A legacy CV as the domain sees it: revision 0 and the times the legacy file carried, plus what was dropped.
+/// What the importer keeps in another place than the legacy app had it, for the person to check. Nothing is lost: a period
+/// that is not a clear range is kept as written, as the first line of its entry's description, and the dates stay empty.
+public enum LegacyCheck: Sendable, Equatable, Hashable {
+    case period
+}
+
+/// A legacy CV as the domain sees it: revision 0 and the times the legacy file carried, plus what was dropped and what
+/// the person should check.
 public struct LegacyCV: Sendable, Equatable {
     public let cv: CV
     public let drops: [LegacyDrop]
-    public init(cv: CV, drops: [LegacyDrop]) { self.cv = cv; self.drops = drops }
+    public let checks: [LegacyCheck]
+    public init(cv: CV, drops: [LegacyDrop], checks: [LegacyCheck]) { self.cv = cv; self.drops = drops; self.checks = checks }
 }
 
 /// Why a candidate file is not a legacy CV: it is not the JSON of one, it has no usable id, or its name is not its id's.
@@ -113,10 +121,13 @@ public struct LegacyImportReport: Sendable, Equatable {
     /// What each CV lost in the mapping, for every CV this run finds stored (`imported` or `alreadyStored`): an earlier run
     /// may have stored it and stopped before its report.
     public var drops: [CVID: [LegacyDrop]] = [:]
-    /// The source of each CV with drops. `run()` keeps it: the source is the durable record of the loss, so it goes only
-    /// when the caller calls `acknowledgeLosses(of:)` after the person has seen what was lost. A run that stops before that
-    /// leaves the source, and the next run reports the same drops again. Each entry holds the bytes the run read: the
-    /// acknowledgement removes the source only while it still holds them.
+    /// What each CV keeps in another place, for the person to check, reported as `drops` is: apart from it, as nothing was
+    /// lost.
+    public var checks: [CVID: [LegacyCheck]] = [:]
+    /// The source of each CV with drops or checks. `run()` keeps it: the source is the durable record of what the person must
+    /// be told, so it goes only when the caller calls `acknowledgeLosses(of:)` after the person has seen it. A run that stops
+    /// before that leaves the source, and the next run reports the same drops and checks again. Each entry holds the bytes the
+    /// run read: the acknowledgement removes the source only while it still holds them.
     public var awaitingAcknowledgement: [CVID: LegacyRecord.Source] = [:]
     public var failures: [LegacyImportFailure] = []
     /// The store was erased while the run went on, and the run stopped: what it had stored went with the store, so the report
@@ -177,8 +188,8 @@ public struct ImportLegacyStore: Sendable {
     }
 
     /// Adopts every legacy CV the store holds. A source goes only once its copy is stored and reads back as what was mapped,
-    /// only while it still holds the exact bytes the run read, and only if its CV lost nothing: the source of a CV with drops stays (`awaitingAcknowledgement`) until
-    /// `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed, or a
+    /// only while it still holds the exact bytes the run read, and only if there is nothing to tell about its CV: the source
+    /// of a CV with drops or checks stays (`awaitingAcknowledgement`) until `acknowledgeLosses(of:)`. Whatever fails is reported and left where it was. Only a source that cannot be listed, or a
     /// store that cannot say which erase it is at, fails the run. An erase of the store after the run began stops it: nothing
     /// more is stored and no source goes, and the report says only `storeErased`.
     public func run() async throws(RepositoryError) -> LegacyImportReport {
@@ -194,9 +205,9 @@ public struct ImportLegacyStore: Sendable {
         return report
     }
 
-    /// Removes the sources `run()` kept for their losses, once the caller says the person has seen them. Removes nothing
+    /// Removes the sources `run()` kept for their drops and checks, once the caller says the person has seen them. Removes nothing
     /// when `removingVerifiedSources` is false. A source it cannot remove stays and is reported as `sourceNotRemoved`; one that
-    /// no longer holds the bytes its report read stays and is reported as `sourceChanged`: the person saw the losses of the
+    /// no longer holds the bytes its report read stays and is reported as `sourceChanged`: the person saw the report of the
     /// earlier file, not of this one, and the next run reports it again.
     public func acknowledgeLosses(of report: LegacyImportReport) async -> LegacyAcknowledgement {
         var done = LegacyAcknowledgement()
@@ -240,10 +251,12 @@ public struct ImportLegacyStore: Sendable {
         case .stored: report.failures.append(.init(key: key, reason: .didNotReadBack)); return true
         }
         // Reported for every CV found stored, also one an earlier run stored: that run may have stopped before its report.
-        // The source of a CV with drops is the durable record of the loss, so it stays until `acknowledgeLosses(of:)`; a run
-        // that stops before then reports the same drops again. A loss reported twice is the safe way to fail; never is not.
-        if legacy.drops.isEmpty { await removeSource(source, into: &report); return true }
-        report.drops[legacy.cv.id] = legacy.drops
+        // The source of a CV with drops or checks is the durable record of what the person must be told, so it stays until
+        // `acknowledgeLosses(of:)`; a run that stops before then reports them again. Told twice is the safe way to fail; never
+        // is not.
+        if legacy.drops.isEmpty && legacy.checks.isEmpty { await removeSource(source, into: &report); return true }
+        if !legacy.drops.isEmpty { report.drops[legacy.cv.id] = legacy.drops }
+        if !legacy.checks.isEmpty { report.checks[legacy.cv.id] = legacy.checks }
         report.awaitingAcknowledgement[legacy.cv.id] = source
         return true
     }

@@ -54,6 +54,27 @@ struct LegacyImportTests {
         #expect(report.drops[idA] == [.look])
     }
 
+    @Test("a CV whose only finding is a period to check is imported whole, and its source stays until the person has seen it")
+    func periodToCheckKeepsTheSource() async throws {
+        let fields = #""relevant_experience":[{"title":"T","company":"C","period":"since forever"}]"#
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.minimal(fields)])
+        let report = try await w.importer().run()
+        #expect(report.imported == [idA] && report.checks[idA] == [.period] && report.drops[idA] == nil)
+        #expect(report.removedSources.isEmpty && report.awaitingAcknowledgement[idA] != nil)
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        let done = await w.importer().acknowledgeLosses(of: report)
+        #expect(done.removedSources.count == 1 && done.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("what was dropped and what is to check are reported apart, for the same CV")
+    func reportsDropsAndChecksApart() async throws {
+        let fields = #""look":{"palette":"ocean"},"education":[{"degree":"D","school":"S","period":"2020"}]"#
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.minimal(fields)])
+        let report = try await w.importer().run()
+        #expect(report.drops[idA] == [.look] && report.checks[idA] == [.period])
+    }
+
     @Test("a source is removed only once its copy is stored, and the copy reads back")
     func removesVerifiedSources() async throws {
         let w = try standard()
@@ -443,7 +464,7 @@ private func oneRecord() -> LegacyRecord { oneRecord(drops: []) }
 private func oneRecord(drops: [LegacyDrop]) -> LegacyRecord {
     let cv = CV(id: idA, revision: 0, createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 200), title: "T",
                 personal: PersonalDetails(fullName: "N"), sections: CVSections(), design: nil, language: nil)
-    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops)), version: .init(bytes: fakeBytes))
+    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops, checks: [])), version: .init(bytes: fakeBytes))
 }
 
 @Suite("The source is kept until the new copy is verified")

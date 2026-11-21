@@ -1,0 +1,53 @@
+import Foundation
+import Observation
+
+/// The Settings sheet (#405): its groups in order and the rows of each, as codes the view words (R13). Every value comes
+/// from the composition, so the sheet reads no bundle and no system setting itself (R17).
+@MainActor
+@Observable
+public final class SettingsViewModel {
+
+    public let groups: [SettingsGroup]
+    /// Shown under the support row as written, also when it makes no mail link.
+    public let supportAddress: String
+    public let appName: String
+
+    public init(supportAddress: String, privacyPolicy: URL, sourceCode: URL, version: String, build: String, appName: String) {
+        self.supportAddress = supportAddress
+        self.appName = appName
+        groups = [
+            SettingsGroup(kind: .support, rows: Self.mailLink(to: supportAddress).map { [.contactSupport($0)] } ?? []),
+            SettingsGroup(kind: .legal, rows: [.privacyPolicy(privacyPolicy)]),
+            SettingsGroup(kind: .openSource, rows: [.openSourceStatement, .licences, .sourceCode(sourceCode)]),
+            SettingsGroup(kind: .about, rows: [.version(version), .build(build)]),
+        ]
+    }
+
+    /// A mail to the address with no subject and no body, so that nothing about the person or the device goes with it.
+    private static func mailLink(to address: String) -> URL? {
+        var link = URLComponents()
+        link.scheme = "mailto"
+        link.path = address
+        return link.url
+    }
+}
+
+/// One group of the sheet: what it is about and its rows, in order.
+public struct SettingsGroup: Hashable, Sendable {
+    public enum Kind: Hashable, Sendable { case support, legal, openSource, about }
+
+    public let kind: Kind
+    public let rows: [SettingsRow]
+}
+
+/// A row of the sheet. A link opens outside the app; `licences` opens the Licences screen and `openSourceStatement` is
+/// a text with no action.
+public enum SettingsRow: Hashable, Sendable {
+    case contactSupport(URL)
+    case privacyPolicy(URL)
+    case openSourceStatement
+    case licences
+    case sourceCode(URL)
+    case version(String)
+    case build(String)
+}
