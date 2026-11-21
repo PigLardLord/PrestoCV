@@ -19,6 +19,9 @@ import PrestoCVWorkflowPorts
 ///   failures of two rows are pending at once. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextShareStandIn`: a share opens a stand-in of the system's share sheet, which a UI test can read and
 ///   answer (save, send, cancel), and never the system's own. It writes nothing, so it needs no folder.
+/// - `-PrestoCVNextTraceRuns`: two invented runs of the diagnostics (an AI draft that finished, an import that failed) are
+///   stored before the trace chain starts, so that a closed gate purges them and an open one lists them. The launch shows
+///   its first screen only once the gate has done so. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {
@@ -41,6 +44,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case failuresWithoutFolder
         case unreadableOtherWindow
         case otherWindowWithoutFolder
+        case traceRunsWithoutFolder
         case seedUnwritable
         /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
         case unsafeFolder
@@ -54,6 +58,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
+    static let traceRunsArgument = "-PrestoCVNextTraceRuns"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -70,6 +75,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var sharesWithStandIn = false
     /// What another window does to the stored CV written first, nil when no other window changes it
     var otherWindow: OtherWindow?
+    /// Two invented runs of the diagnostics are stored before the app starts
+    var storesTraceRuns = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -100,6 +107,8 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.failsRenamesInPairs = true
             case shareStandInArgument:
                 fixtures.sharesWithStandIn = true
+            case traceRunsArgument:
+                fixtures.storesTraceRuns = true
             case otherWindowArgument:
                 guard let change = OtherWindow(rawValue: try value(after: argument, in: arguments, at: &index)) else {
                     throw .unreadableOtherWindow
@@ -122,6 +131,7 @@ struct LaunchFixtures: Equatable, Sendable {
         if fixtures.withoutSamples && fixtures.storage == .device { throw .samplesWithoutFolder }
         if fixtures.failsRenamesInPairs && fixtures.storage == .device { throw .failuresWithoutFolder }
         if fixtures.otherWindow != nil && fixtures.storage == .device { throw .otherWindowWithoutFolder }
+        if fixtures.storesTraceRuns && fixtures.storage == .device { throw .traceRunsWithoutFolder }
         return fixtures
     }
 
@@ -169,12 +179,30 @@ struct LaunchFixtures: Equatable, Sendable {
         try Self.requirePlainFolders(of: paths)
     }
 
+    /// Whether the fixture folder passes `check`: a failure is not reported here, since `make` runs the check and fails the
+    /// launch with it.
+    func passesCheck(_ paths: AppPaths) -> Bool {
+        do throws(Failure) {
+            try check(paths)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Makes the fixture ready before the app reads it: for a fixture folder, checks it again and then writes the seed.
     /// Nothing is made or written before the check passes.
     func prepare(_ paths: AppPaths) throws(Failure) {
         guard storage != .device else { return }
         try check(paths)
         try writeSeed(into: paths.store)
+    }
+
+    /// Stores the invented runs, when the fixture asks for them, in the trace folder of a fixture folder. Called after the
+    /// check and before the trace chain starts, so that the gate then decides what becomes of them.
+    func seedTrace(into paths: AppPaths) async {
+        guard storesTraceRuns, storage != .device else { return }
+        await InventedTraceRuns.store(into: paths)
     }
 
     /// Puts the seed in the store folder, which it makes.

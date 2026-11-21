@@ -43,10 +43,12 @@ private final class ShellModels: ObservableObject {
     let firstRun: FirstRunViewModel
     let settings: SettingsViewModel
     let licences: LicencesViewModel
+    let diagnostics: DiagnosticsViewModel
 
     init(screens: ScreenFactory, settings factory: SettingsFactory) {
         settings = factory.makeSettings()
         licences = factory.makeLicences()
+        diagnostics = factory.makeDiagnostics()
         firstRun = screens.makeFirstRun()
         list = screens.makeCVList(
             untitled: String(localized: "shell.untitled"),
@@ -73,7 +75,7 @@ private struct ReadyShell: View {
     var body: some View {
         ShellView(
             shell: models.shell, list: models.list, firstRun: models.firstRun, settings: models.settings,
-            licences: models.licences
+            licences: models.licences, diagnostics: models.diagnostics
         )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")

@@ -13,6 +13,7 @@ struct ShellView: View {
     let firstRun: FirstRunViewModel
     let settings: SettingsViewModel
     let licences: LicencesViewModel
+    let diagnostics: DiagnosticsViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @State private var addingCV = false
@@ -71,7 +72,7 @@ struct ShellView: View {
             }
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(settings: settings, licences: licences)
+            SettingsView(settings: settings, licences: licences, diagnostics: diagnostics)
         }
         .sheet(item: exportSheet) { sheet in
             ExportSheetView(sheet: sheet, close: { shell.closeExport() })
