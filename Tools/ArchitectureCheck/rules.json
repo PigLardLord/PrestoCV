@@ -568,6 +568,7 @@
     "CVDocumentModel",
     "CVDesignCatalog",
     "CVBundledHeadings",
+    "CVBundledDesigns",
     "CoreGraphics",
     "CoreText",
     "Foundation",

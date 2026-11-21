@@ -181,6 +181,14 @@ extension IOSPDFRendererTests {
     }
 
     @MainActor
+    @Suite("#467 · page breaks of the bundled designs")
+    struct PageBreakChecks {
+        @Test("no section title alone at a page's foot and no blank page, wherever the page breaks",
+              arguments: ["minimal", "modern", "professional"])
+        func bundled(design: String) async throws { try await IOSPDFRendererTests.checks().pageBreaks(design: design) }
+    }
+
+    @MainActor
     @Suite("#78 · the step budget")
     struct StepBudget {
         @Test("real documents use at most 10% of the budget")

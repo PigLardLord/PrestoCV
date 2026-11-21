@@ -28,9 +28,22 @@ public struct DocumentHTMLBuilder: Sendable {
         render(doc, stylesheet: stylesheet, palette: palette, fonts: fonts, headings: headings).html
     }
 
-    /// Every link prints its destination as text, so completeness covers it even where the PDF drops the
-    /// clickable annotation; the base style lets that text wrap, since designs cannot set overflow-wrap.
-    static let baseStyle = "a{overflow-wrap:anywhere}"
+    /// The builder's own rules, which a design cannot override, since it cannot use `!important`:
+    /// - Every link prints its destination as text, so completeness covers it even where the PDF drops the clickable
+    ///   annotation; the base style lets that text wrap, since designs cannot set overflow-wrap.
+    /// - A section's start, its title and first block, never breaks across pages, so a title is never alone at the foot of
+    ///   a page. Neither print path honours `break-after: avoid` (#467).
+    /// - Nothing follows the last line: no bottom margin along the last elements, on `.cv` or on the body, and no bottom
+    ///   padding on `.cv`. Space after the last line makes both print paths push out a blank page when the last page is
+    ///   full; the page's own margin is the space at its foot (#467).
+    static let baseStyle = "a{overflow-wrap:anywhere}.cv-section-start{break-inside:avoid!important}"
+        + "body,.cv{margin-bottom:0!important}.cv{padding-bottom:0!important}"
+        + (1...maxDepth).map { ".cv" + String(repeating: ">:last-child", count: $0) }.joined(separator: ",")
+        + "{margin-bottom:0!important}"
+
+    /// How deep the builder nests elements below `main.cv`: a section, its start, an entry, then a line of the entry
+    /// (`p.cv-language > span` is as deep). The builder tests measure it on a document with every kind of section.
+    static let maxDepth = 4
 
     public func render(_ doc: CVDocument, stylesheet: ValidatedStylesheet, palette: Palette,
                        fonts: FontScheme = .system, headings: Headings) -> RenderedDocument {
@@ -61,13 +74,19 @@ public struct DocumentHTMLBuilder: Sendable {
     }
 
     private func section(_ s: Section, _ h: Headings) -> HTML? {
-        func wrap(_ kind: String, _ title: String, _ items: [HTML]) -> HTML? {
-            items.isEmpty ? nil : el(.section, "cv-section", [(.dataSection, kind)],
-                                     [el(.h2, "cv-section-title", [], [.text(title)])] + items)
+        /// A section's title and its first block are one `div.cv-section-start`, which the base style keeps on one page
+        /// (#467); the other blocks follow it.
+        func wrap(_ kind: String, _ title: String, start: [HTML], rest: [HTML]) -> HTML? {
+            start.isEmpty ? nil : el(.section, "cv-section", [(.dataSection, kind)],
+                                     [el(.div, "cv-section-start", [], [el(.h2, "cv-section-title", [], [.text(title)])] + start)] + rest)
         }
-        /// Inline entries (skills, profiles, interests) are separated by one space.
-        func inline(_ items: [HTML]) -> [HTML] {
-            items.enumerated().flatMap { $0.offset == 0 ? [$0.element] : [.separator, $0.element] }
+        func blocks(_ kind: String, _ title: String, _ items: [HTML]) -> HTML? {
+            wrap(kind, title, start: Array(items.prefix(1)), rest: Array(items.dropFirst()))
+        }
+        /// Inline entries (skills, profiles, interests) share their lines, so they are one block, all of it the section's
+        /// start. They are separated by one space.
+        func inline(_ kind: String, _ title: String, _ items: [HTML]) -> HTML? {
+            wrap(kind, title, start: items.enumerated().flatMap { $0.offset == 0 ? [$0.element] : [.separator, $0.element] }, rest: [])
         }
         func date(_ d: DocumentDate) -> String {
             guard let m = d.month else { return "\(d.year)" }
@@ -96,27 +115,27 @@ public struct DocumentHTMLBuilder: Sendable {
         }
         switch s {
         case .summary(let text):
-            return wrap("summary", h.summary, paragraphs("cv-summary", text))
+            return blocks("summary", h.summary, paragraphs("cv-summary", text))
         case .experience(let items):
-            return wrap("experience", h.experience, items.map { i in
+            return blocks("experience", h.experience, items.map { i in
                 el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.role) + optional(.p, "cv-entry-subtitle", i.company)
                    + optional(.p, "cv-entry-location", i.location) + period(i.period) + paragraphs("cv-entry-description", i.description))
             })
         case .education(let items):
-            return wrap("education", h.education, items.map { i in
+            return blocks("education", h.education, items.map { i in
                 el(.article, "cv-entry", [], optional(.h3, "cv-entry-title", i.degree) + optional(.p, "cv-entry-subtitle", i.school)
                    + period(i.period) + paragraphs("cv-entry-description", i.description))
             })
         case .skills(let items):
-            return wrap("skills", h.skills, inline(items.map { i in
+            return inline("skills", h.skills, items.map { i in
                 el(.span, "cv-skill", i.rating.map { [(.dataRating, "\($0)")] } ?? [], [.text(i.name)])
-            }))
+            })
         case .languages(let items):
-            return wrap("languages", h.languages, items.map { i in
+            return blocks("languages", h.languages, items.map { i in
                 el(.p, "cv-language", [], [.text(i.language + " "), el(.span, "cv-language-level", [], [.text(h.levelName(i.level))])])
             })
         case .certifications(let items):
-            return wrap("certifications", h.certifications, items.map { i in
+            return blocks("certifications", h.certifications, items.map { i in
                 var children = optional(.h3, "cv-entry-title", i.name) + optional(.p, "cv-entry-subtitle", i.issuer)
                 if let y = i.year { children.append(el(.p, "cv-entry-period", [], [.text("\(y)")])) }
                 children += paragraphs("cv-entry-description", i.description)
@@ -124,13 +143,13 @@ public struct DocumentHTMLBuilder: Sendable {
                 return el(.article, "cv-entry", [], children)
             })
         case .profiles(let links):
-            return wrap("profiles", h.profiles, inline(links.compactMap { l in
+            return inline("profiles", h.profiles, links.compactMap { l in
                 guard let link = WebLink(l.url) else { return nil }
                 return el(.a, "cv-profile", [(.href, link.url)], [el(.span, "cv-profile-platform", [], [.text(l.platform)]), .separator,
                                                                  el(.span, "cv-profile-url", [], [.text(link.url)])])
-            }))
+            })
         case .interests(let items):
-            return wrap("interests", h.interests, inline(items.map { el(.span, "cv-interest", [], [.text($0)]) }))
+            return inline("interests", h.interests, items.map { el(.span, "cv-interest", [], [.text($0)]) })
         }
     }
 }

@@ -353,10 +353,12 @@ public actor FileDesignStore: DesignStore {
 
     /// The fields an index holds are checked as the validator checks them in a package (the identifier is checked
     /// with the list, and the version, palette and font scheme are typed, so they are checked by decoding): an entry the
-    /// validator would refuse is corrupt.
+    /// validator would refuse is corrupt. The one exception is a markup contract older than the current one: the entry
+    /// of a design saved before the contract changed is listed, its design is refused when read (`designRejected`), and
+    /// the sync replaces a bundled one with its new version. A corrupt entry would make the whole store unreadable (#467).
     private static func isValid(_ manifest: DesignManifest) -> Bool {
         DesignManifest.isValidName(manifest.name) && DesignManifest.isValidDescription(manifest.description)
-            && manifest.markupContract == MarkupContract.version
+            && (1...MarkupContract.version).contains(manifest.markupContract)
     }
 
     // MARK: Writing

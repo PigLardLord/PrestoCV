@@ -4,7 +4,7 @@ import CVDesignCatalog
 import CVBundledDesigns
 
 func designData(_ css: String, id: String = "ok", extra: [String: Any] = [:], manifestExtra: [String: Any] = [:],
-                manifestWithout: [String] = [], contract: Int = 1) -> Data {
+                manifestWithout: [String] = [], contract: Int = MarkupContract.version) -> Data {
     var manifest: [String: Any] = ["id": id, "name": "x", "version": "1.0.0", "description": "", "defaultPalette": "ink",
                                    "defaultFonts": "system", "markupContract": contract]
     manifest.merge(manifestExtra) { $1 }
@@ -129,13 +129,16 @@ struct CatalogTests {
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", extra: ["htmlContent": NSNull()])) }
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", extra: ["scripts": "x"])) }
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", manifestExtra: ["homepage": "x"])) }
-        #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", contract: 2)) }
+        // A design targets the contract of this version: a newer one is unknown, and one written for contract 1 no longer fits the nesting (#467).
+        for contract in [0, 1, MarkupContract.version + 1] {
+            #expect(throws: DesignPackageRejected.self, "contract \(contract)") { _ = try v.validate(designData(".cv{}", contract: contract)) }
+        }
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", extra: ["previewImageBase64": "not base64"])) }
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(designData(".cv{}", extra: ["previewImageBase64": Data("GIF89a".utf8).base64EncodedString()])) }
         #expect(throws: DesignPackageRejected.self) { _ = try DesignPackageValidator(maxBytes: 100).validate(designData(String(repeating: " ", count: 200))) }
         #expect(throws: DesignPackageRejected.self) { _ = try v.validate(Data("[]".utf8)) }
         let ok = try v.validate(designData(".cv{}", extra: ["previewImageBase64": png.base64EncodedString()]))
-        #expect(ok.previewPNG == png && ok.manifest.markupContract == 1)
+        #expect(ok.previewPNG == png && ok.manifest.markupContract == MarkupContract.version)
     }
 
     @Test("only readable palettes exist; colour parsing rejects trailing line terminators (security S7)")

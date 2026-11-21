@@ -5,13 +5,13 @@ This document defines two things, both normative ([ADR 0011](../../docs/architec
 - the HTML structure that `CVRendering` produces from a `CVDocument`;
 - the CSS a design may use to style it.
 
-A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version.
+A design declares the contract version it targets in its manifest (`markupContract`), and the validator rejects any other version. A design store still lists a design it saved for an older version, but refuses it when read; the sync replaces a bundled one with its new version.
 
 The manifest also names the design's default palette (`defaultPalette`: `ink`, `slate`, `ocean` or `plum`) and default font scheme (`defaultFonts`: `system`, `serif` or `rounded`), both required and written as identifiers; a user's choice that names none, or one the catalog does not know, falls back to them. Its `version` is `MAJOR.MINOR.PATCH`, each part `0` or one to nine ASCII digits without a leading zero, and versions are compared by number. Its `name` is one line of 1–80 Unicode scalars and its `description` up to 500; neither holds a control character (a description may span lines with `\n`), a line or paragraph separator or a bidirectional override. The validator rejects an unknown identifier, a malformed version, and a name or description outside these bounds.
 
 The source of truth is code in `CVDesignCatalog`: `MarkupContract` for the structure, `allowedProperties` for the properties. This page must match that code exactly. That code is `CSS.swift` and `MarkupContract.swift` in `CVPDFExporter/Sources/CVDesignCatalog/`, with the attack fixtures in `CVPDFExporter/Tests/`. `MarkupContractPageTests`, in `CVPDFExporter/Tests/CVDesignCatalogTests/`, reads this page through `Bundle.module`, since its test target copies it, and fails when it and the code disagree: the sets must be equal, and every documented value and bound is probed at its edges.
 
-## Version 1
+## Version 2
 
 ### Structure
 
@@ -27,8 +27,10 @@ html[lang]
         │   ├── p.cv-location         (if present)
         │   └── a.cv-website[href]    (if present and a valid WebLink; its text is the href)
         └── section.cv-section[data-section=<kind>]      one per non-empty section, in document order
-            ├── h2.cv-section-title                     localised heading
-            └── entries:
+            ├── div.cv-section-start                    the title and the first entry, kept on one page
+            │   ├── h2.cv-section-title                 localised heading
+            │   └── the first entry                     (skills, profiles, interests: all the entries)
+            └── the other entries, each one of:
                 experience, education,
                 certifications:          article.cv-entry
                                          ├── h3.cv-entry-title        role / degree / certification name
@@ -58,14 +60,18 @@ html[lang]
 
 ### Pages
 
-The renderers print on the page size, A4 unless the caller says otherwise. Every page keeps 36pt free at its top and at its bottom, the pages after the first too; a design's padding only applies where the document starts and ends. The left and right margins are the design's: its padding on `.cv`. A design keeps a heading with what follows it with `break-after: avoid`, and an entry together with `break-inside: avoid`.
+The renderers print on the page size, A4 unless the caller says otherwise. Every page keeps 36pt free at its top and at its bottom, the pages after the first too; a design's top padding on `.cv` only applies where the document starts. The left and right margins are the design's: its padding on `.cv`. A design keeps an entry together with `break-inside: avoid`.
+
+The builder's own base style decides two things whatever the design says, with `!important`, which a design cannot use (#467):
+- **A title is never alone at the foot of a page.** A section's title and its first entry are one block, `div.cv-section-start`, which never breaks across pages. Neither print path honours `break-after: avoid`, so a design cannot keep a title with what follows it by itself.
+- **Nothing follows the last line,** so a full last page never pushes out a blank one: the bottom margins of `body`, of `.cv` and of the last element at every depth below `.cv` (`.cv > :last-child`, `.cv > :last-child > :last-child`, and so on), and the bottom padding of `.cv`, are zero. The page's own 36pt is the space at its foot. A bottom padding or border a design puts on another last element still prints.
 
 ### Selectable by a design
 
 | Kind | Values |
 |---|---|
-| Elements | `main`, `header`, `section`, `article`, `h1`, `h2`, `h3`, `p`, `span`, `a` |
-| Classes | `cv`, `cv-header`, `cv-name`, `cv-title`, `cv-contact`, `cv-phone`, `cv-location`, `cv-website`, `cv-section`, `cv-section-title`, `cv-summary`, `cv-entry`, `cv-entry-title`, `cv-entry-subtitle`, `cv-entry-location`, `cv-entry-period`, `cv-entry-description`, `cv-entry-link`, `cv-skill`, `cv-language`, `cv-language-level`, `cv-profile`, `cv-profile-platform`, `cv-profile-url`, `cv-interest` |
+| Elements | `main`, `header`, `section`, `div`, `article`, `h1`, `h2`, `h3`, `p`, `span`, `a` |
+| Classes | `cv`, `cv-header`, `cv-name`, `cv-title`, `cv-contact`, `cv-phone`, `cv-location`, `cv-website`, `cv-section`, `cv-section-start`, `cv-section-title`, `cv-summary`, `cv-entry`, `cv-entry-title`, `cv-entry-subtitle`, `cv-entry-location`, `cv-entry-period`, `cv-entry-description`, `cv-entry-link`, `cv-skill`, `cv-language`, `cv-language-level`, `cv-profile`, `cv-profile-platform`, `cv-profile-url`, `cv-interest` |
 | `[data-section=…]` | `summary`, `experience`, `education`, `skills`, `languages`, `certifications`, `profiles`, `interests` |
 | `[data-rating=…]` | `1` … `5` |
 | Pseudo-classes | `:first-child`, `:last-child`, `:only-child` |
@@ -133,5 +139,6 @@ Anything that could load a resource, or hide, move, reorder or inject content, i
 | Version | Change | Compatible with |
 |---|---|---|
 | 1 | Initial contract (2026-09-28): structure, contact fields, certifications, links that print their destination, spaces between inline entries, an experience's location, CSS grammar with absolute font sizes and no universal selector. | — |
+| 2 | A section's title and its first entry, or all the entries of skills, profiles and interests, are wrapped in `div.cv-section-start`, which never breaks across pages; the base style ends the document at its last line (2026-11-21, #467). | not 1: the nesting changed, so `.cv-section > .cv-entry`, `.cv-entry + .cv-entry` and `:last-child` no longer select what they did |
 
 A change that could break an existing design bumps the version, for example removing a class, changing the nesting, or tightening a bound. Adding a class, a property or a wider bound does not.

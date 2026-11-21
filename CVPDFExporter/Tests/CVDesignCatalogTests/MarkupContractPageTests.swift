@@ -37,6 +37,14 @@ struct MarkupContractPageTests {
         #expect(elements == MarkupContract.elements)
     }
 
+    @Test("the page describes the code's version, and its changelog ends with it")
+    func version() throws {
+        let page = try Page.text()
+        #expect(page.contains("\n## Version \(MarkupContract.version)\n"))
+        let rows = Page.matches(#"^\| (\d+) \|"#, in: try Page.section(from: "## Changelog", to: "A change that could break"))
+        #expect(rows.last == "\(MarkupContract.version)")
+    }
+
     @Test("the declarations table lists exactly the allowed properties")
     func propertyNames() throws {
         #expect(Set(try Page.properties().map(\.name)) == Set(allowedProperties.keys))
