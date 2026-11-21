@@ -77,17 +77,33 @@ struct ShellView: View {
         )
     }
 
+    /// The review's sheet while it is open. A swipe down closes it as Done does; it closes too when the review goes, with
+    /// the editor.
+    private var reviewSheet: Binding<ImportReviewViewModel?> {
+        Binding(
+            get: { shell.reviewSheet },
+            set: { review in
+                if review == nil { shell.review?.closeSheet() }
+            }
+        )
+    }
+
     /// The open CV's editor, a new one for each CV opened, at the root of the detail's stack, so the page of a row
     /// opens on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person
     /// answers the status first: the notice above the form offers the ways out, and "Discard" closes the editor without
-    /// storing its text. In its place, the import while the shell holds one; the shell hears of each change of its
+    /// storing its text. The draft of an import shows its review, and the review's sheet opens over the editor, not
+    /// over the split, where the export sheet is. In its place, the import while the shell holds one; the shell hears of each change of its
     /// status, and opens the draft of an import that is ready.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor), export: { shell.openExport() }, discard: { shell.discardEditor() })
+            EditorView(editor: editor, title: title(of: editor), review: shell.review, export: { shell.openExport() },
+                       discard: { shell.discardEditor() })
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
+                .sheet(item: reviewSheet) { review in
+                    ImportReviewSheet(review: review)
+                }
         } else if let importer = shell.importer {
             ImportView(importer: importer)
                 .id(ObjectIdentifier(importer))

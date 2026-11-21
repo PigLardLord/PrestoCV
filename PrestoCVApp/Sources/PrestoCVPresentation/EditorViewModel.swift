@@ -118,6 +118,9 @@ public final class EditorViewModel {
     /// Counts the edits that changed the form, so that a replacement can tell whether the person typed meanwhile, even
     /// if the text is back to what it was.
     @ObservationIgnored var formEdits = 0
+    /// Whether a write the store took held a change to the CV its autosave stood on: a write of the CV as it opened, as
+    /// the list's read or the app leaving the foreground makes, holds none.
+    @ObservationIgnored private(set) var storedAChange = false
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
     /// The change elsewhere the maker was last told of (`storeChanged`), nil since the form stood on its CV: it is told
@@ -223,10 +226,11 @@ public final class EditorViewModel {
             content: cv, unchangedFrom: unchanged, isStored: isStored, pause: pause,
             isWorthStoring: { $0.canBeSaved }, clock: self.clock,
             onWriteFailure: { [weak self] error in self?.writeFailed(error, generation: mine) },
-            // Only the writer and the callback: a write that ends after the editor is gone still stores what it was given,
-            // and still tells it
-            write: { content, _ in
+            // The writer and the callback held strongly: a write that ends after the editor is gone still stores what it
+            // was given, and still tells it
+            write: { [weak self] content, _ in
                 try await mineWrites.run { try await writer.write(content) }
+                if content != cv { self?.storedAChange = true }
                 storeChanged()
             }
         )

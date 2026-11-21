@@ -3,8 +3,8 @@ import PrestoCVDomain
 import PrestoCVWorkflowPorts
 @testable import PrestoCVPresentation
 
-/// The review of an import in the shell (#404): it comes with the imported draft, ends once the editor stored the CV, and
-/// goes with the editor when anything else opens.
+/// The review of an import in the shell (#404): it comes with the imported draft, ends once the editor stored a change the
+/// person made, and goes with the editor when anything else opens.
 @MainActor
 @Suite("The shell's import review")
 struct ShellReviewTests {
@@ -69,6 +69,43 @@ struct ShellReviewTests {
         #expect(world.editing.storesTold.count == 1)
     }
 
+    /// The stores of the draft that come with no act of the person: the list's read stores every open editor, and the
+    /// app leaving the foreground stores the one shown.
+    enum StoreAsImported: CaseIterable {
+        case listRead, leavingTheForeground
+    }
+
+    @Test("a store of the draft as it was imported leaves the review shown", arguments: StoreAsImported.allCases)
+    func storeAsImportedLeavesTheReview(_ store: StoreAsImported) async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+
+        switch store {
+        case .listRead: await editor.saveWhatItShows()
+        case .leavingTheForeground: await world.shell.flushAll()
+        }
+
+        await waitUntil("the draft stored") { world.editing.storesTold.count == 1 }
+        #expect(review.isShown, "the person changed nothing yet")
+    }
+
+    @Test("an edit stored after the draft was stored as it was imported ends the review")
+    func editAfterAStoreAsImportedEndsTheReview() async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+        await editor.saveWhatItShows()
+        await waitUntil("the draft stored") { world.editing.storesTold.count == 1 }
+        #expect(review.isShown)
+
+        editor.type(\.fullName, "Ada Ferro-Renn")
+        await world.editing.passThePause(thenWrites: 2)
+
+        await waitUntil("the review ended") { !review.isShown }
+        #expect(world.editing.storesTold.count == 2)
+    }
+
     @Test("dismissing the review ends it, and the shell keeps it for a sheet open over it")
     func reviewEndsOnDismiss() async throws {
         let world = World()
@@ -93,6 +130,29 @@ struct ShellReviewTests {
 
         await waitUntil("the write failed") { editor.saveStatus == .failed }
         #expect(review.isShown)
+    }
+
+    @Test("the review's sheet shows while it is open, also once the editor stored, and goes with the review")
+    func reviewSheetFollowsTheReview() async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+        #expect(world.shell.reviewSheet == nil)
+
+        review.openSheet()
+        #expect(world.shell.reviewSheet === review)
+        editor.type(\.fullName, "Ada Ferro-Renn")
+        await world.editing.passThePause(thenWrites: 1)
+        await waitUntil("the review ended") { !review.isShown }
+        #expect(world.shell.reviewSheet === review, "the text to copy is not taken from under the person")
+        review.closeSheet()
+        #expect(world.shell.reviewSheet == nil)
+
+        try await world.importDraft()
+        let again = try #require(world.shell.review)
+        again.openSheet()
+        world.shell.deselect()
+        #expect(world.shell.reviewSheet == nil)
     }
 
     /// The ways to open something else, each from the imported draft open in the editor.

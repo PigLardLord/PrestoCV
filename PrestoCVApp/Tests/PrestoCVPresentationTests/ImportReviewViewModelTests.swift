@@ -82,6 +82,9 @@ struct ImportReviewViewModelTests {
         #expect(review(entries, notImported: "").noticeKind == .checkOnly)
         #expect(review([], notImported: "Hobbies: chess").noticeKind == .copyOnly)
         #expect(review([], notImported: "").noticeKind == nil)
+        let dismissed = review(entries, notImported: "Hobbies: chess")
+        dismissed.dismiss()
+        #expect(dismissed.noticeKind == nil)
     }
 
     @Test("the sheet opens only while the review is shown, and closes")
@@ -115,7 +118,7 @@ struct ImportReviewViewModelTests {
         #expect(!model.isSheetShown)
     }
 
-    @Test("each copy of the text not imported is counted, so that each is told, until the sheet closes")
+    @Test("each copy of the text not imported is counted, so that each is told, and the next sheet starts with none")
     func copyCountsEachTap() {
         let model = review(entries, notImported: "Hobbies: chess")
         model.openSheet()
@@ -126,6 +129,7 @@ struct ImportReviewViewModelTests {
         model.noteCopied()
         #expect(model.copyCount == 2 && model.didCopy)
         model.closeSheet()
+        #expect(model.copyCount == 2, "the sheet on its way out tells nothing more")
         model.openSheet()
         #expect(model.copyCount == 0 && !model.didCopy)
     }

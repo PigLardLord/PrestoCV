@@ -21,10 +21,11 @@ public final class ImportReviewViewModel {
         notImported = review.notImported
     }
 
-    /// What the notice says, by what the review holds: nil when it holds nothing, and so is never shown (R13: the view
-    /// words it).
+    /// What the notice says, by what the review holds, while it is shown: nil once it ended, and for a review that holds
+    /// nothing (R13: the view words it).
     public var noticeKind: ReviewNoticeKind? {
-        switch (hasEntries, hasNotImported) {
+        guard isShown else { return nil }
+        return switch (hasEntries, hasNotImported) {
         case (true, true): .checkAndCopy
         case (true, false): .checkOnly
         case (false, true): .copyOnly
@@ -39,27 +40,26 @@ public final class ImportReviewViewModel {
     /// How many times the person copied the text not imported since the sheet opened, so that each copy is told.
     public private(set) var copyCount = 0
 
-    /// Whether the text not imported was copied since the sheet opened, so that the button says so until it closes.
+    /// Whether the text not imported was copied since the sheet opened, so that the button says so.
     public var didCopy: Bool { copyCount > 0 }
 
-    /// Opens the sheet with the whole review, while the review is shown.
+    /// Opens the sheet with the whole review, while the review is shown, with nothing copied yet.
     public func openSheet() {
         guard isShown else { return }
+        copyCount = 0
         isSheetShown = true
     }
 
-    /// Closes the sheet: the person is done with it, or swiped it away. The next sheet starts with nothing copied.
-    public func closeSheet() {
-        isSheetShown = false
-        copyCount = 0
-    }
+    /// Closes the sheet: the person is done with it, or swiped it away. The count of copies stays until the next sheet,
+    /// so that the sheet on its way out tells nothing more.
+    public func closeSheet() { isSheetShown = false }
 
     /// The person copied the text not imported.
     public func noteCopied() { copyCount += 1 }
 
     public func dismiss() { ended = true }
 
-    /// The editor stored the CV: what the review points at is the person's CV now.
+    /// The editor stored a change the person made: what the review points at is the person's CV now.
     public func editorStored() { ended = true }
 }
 
@@ -72,3 +72,5 @@ public enum ReviewNoticeKind: Hashable, Sendable {
     /// A text the import could not place only.
     case copyOnly
 }
+
+extension ImportReviewViewModel: Identifiable {}

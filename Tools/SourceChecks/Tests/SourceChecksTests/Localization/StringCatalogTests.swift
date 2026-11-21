@@ -71,6 +71,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
+                #"import.review.field.experience \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.experiencePeriod \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.education \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.educationPeriod \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.educationLocation \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
             ],
             // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
             // ErrorStateView as title:, message:, code: and retryTitle:.

@@ -51,9 +51,13 @@ public final class ShellNavigationModel {
     /// or the person goes back to the list, and a pasted text goes with it (decision 9 of #404).
     public private(set) var importer: ImportViewModel?
 
-    /// The review of the import whose draft the editor shows, nil for any other CV. It ends once that editor stored the
-    /// CV, and goes with the editor when anything else opens; it outlives its end for a sheet open over it.
+    /// The review of the import whose draft the editor shows, nil for any other CV. It ends once that editor stored a
+    /// change the person made, and goes with the editor when anything else opens; it outlives its end for a sheet open
+    /// over it.
     public private(set) var review: ImportReviewViewModel?
+
+    /// The import's review while its sheet is open, for the view to show the sheet.
+    public var reviewSheet: ImportReviewViewModel? { review.flatMap { $0.isSheetShown ? $0 : nil } }
 
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
@@ -139,9 +143,10 @@ public final class ShellNavigationModel {
     public func open(_ start: EditorStart) -> LeaveVerdict { open(start, review: nil) }
 
     /// Opens `start` as `open(_:)` does, with the review of the import it comes from, if any. The review ends at the
-    /// editor's first call of `storeChanged`, which is its first write the store took: a draft has nothing another save
-    /// could change before it is stored. The hook holds this review only, so that a late write of an editor left behind
-    /// ends no other.
+    /// editor's first write the store took that held a change the person made: a draft has nothing another save could
+    /// change before it is stored, and a store of the draft as it was imported, as the list's read or the app leaving
+    /// the foreground makes, leaves the review shown. The hook holds this review only, so that a late write of an editor
+    /// left behind ends no other; while the shell shows this review, its editor is the one made here.
     @discardableResult
     func open(_ start: EditorStart, review: ImportReview?) -> LeaveVerdict {
         if case .stored(let reference) = start, reference == selection { return .left }
@@ -150,7 +155,10 @@ public final class ShellNavigationModel {
         detail = start
         let shown = review.map(ImportReviewViewModel.init(review:))
         self.review = shown
-        editor = takeBack(start) ?? makeEditor(start) { [weak shown] in shown?.editorStored() }
+        editor = takeBack(start) ?? makeEditor(start) { [weak self, weak shown] in
+            guard let shown, self?.review === shown, self?.editor?.storedAChange == true else { return }
+            shown.editorStored()
+        }
         return .left
     }
 
