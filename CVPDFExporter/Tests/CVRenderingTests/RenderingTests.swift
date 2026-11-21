@@ -273,7 +273,7 @@ struct BuilderTests {
         #expect(!rendered.textNodes.contains { $0.allSatisfy(\.isWhitespace) })            // separators are not fields
     }
 
-    @Test("a section's title and its first block are one block, the title alone of an inline section's entries (#467)")
+    @Test("a section's start holds its title and first block; an inline section's start holds its title alone, its entries follow (#467)")
     func titleStartsWithFirstBlock() throws {
         let h = try headingsCatalog.headings(for: "it")
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: h)
@@ -284,8 +284,9 @@ struct BuilderTests {
         #expect(html.contains(start("experience", h.experience) + #"<article class="cv-entry"><h3 class="cv-entry-title">Analyst</h3>"#))
         #expect(html.contains(#"</article></div><article class="cv-entry"><h3 class="cv-entry-title">Clerk</h3>"#))
         #expect(html.contains(#"</p></div><p class="cv-language">Italiano "#))
-        #expect(html.contains(start("skills", h.skills) + #"<span class="cv-skill" data-rating="5">Swift</span> <span class="cv-skill">Git</span></div></section>"#))
-        #expect(html.contains(start("interests", h.interests) + #"<span class="cv-interest">Poetry</span></div></section>"#))
+        #expect(html.contains(start("skills", h.skills) + #"</div><span class="cv-skill" data-rating="5">Swift</span> <span class="cv-skill">Git</span></section>"#))
+        #expect(html.contains(start("profiles", h.profiles) + #"</div><a class="cv-profile" href="https://github.com/ada">"#))
+        #expect(html.contains(start("interests", h.interests) + #"</div><span class="cv-interest">Poetry</span></section>"#))
         #expect(html.components(separatedBy: "<div").count - 1 == 8 && html.components(separatedBy: "<section").count - 1 == 8)
     }
 
@@ -293,7 +294,11 @@ struct BuilderTests {
     func baseStyleKeepsAndEnds() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         let base = try #require(html.firstMatch(of: #/<style>([^<]*)</style>/#)?.1)
-        #expect(base.contains(".cv-section-start{break-inside:avoid!important}"))
+        // A title reserves room for what must follow it at a page's foot: 5em, and 150pt above a description (bundled designs: 4.3em, 143pt).
+        #expect(base.contains(#".cv-section-title::before{content:"";display:block;height:5em;margin-bottom:-5em;break-inside:avoid}"#))
+        #expect(base.contains(".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::before"
+                              + "{height:max(5em,150pt);margin-bottom:calc(-1*max(5em,150pt))}"))
+        #expect(base.contains(".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"))
         #expect(base.contains("body,.cv{margin-bottom:0!important}") && base.contains(".cv{padding-bottom:0!important}"))
         // The last element at every depth the builder nests below `main.cv` has no bottom margin: the fixture has every kind of section.
         let reset = try #require(base.firstMatch(of: #/([^}]*)\{margin-bottom:0!important\}$/#)?.1)

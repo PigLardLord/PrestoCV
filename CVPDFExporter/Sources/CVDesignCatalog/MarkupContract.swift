@@ -4,8 +4,9 @@
 /// A text of several lines (the summary, a description) is one `p` per non-blank line, each with the same class
 /// (`cv-summary`, `cv-entry-description`): the person's line breaks are never lost, and no element is added.
 ///
-/// A section's title and its first entry (all the entries of an inline section: skills, profiles, interests) are wrapped
-/// in `div.cv-section-start`, which the builder keeps on one page: a title is never alone at the foot of a page (#467).
+/// A section's title and its first entry are wrapped in `div.cv-section-start`, which the builder keeps on one page where
+/// it fits; an inline section's (skills, profiles, interests) holds the title alone, and its entries follow. The title
+/// reserves room for what must follow it, so it is never alone at the foot of a page (#467).
 public enum MarkupContract {
     /// Bumped on any change a design could depend on; designs declare the version they target. Version 2 added
     /// `div.cv-section-start`, which changed the nesting (#467).

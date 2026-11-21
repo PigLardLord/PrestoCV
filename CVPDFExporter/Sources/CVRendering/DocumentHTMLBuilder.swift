@@ -31,12 +31,22 @@ public struct DocumentHTMLBuilder: Sendable {
     /// The builder's own rules, which a design cannot override, since it cannot use `!important`:
     /// - Every link prints its destination as text, so completeness covers it even where the PDF drops the clickable
     ///   annotation; the base style lets that text wrap, since designs cannot set overflow-wrap.
-    /// - A section's start, its title and first block, never breaks across pages, so a title is never alone at the foot of
-    ///   a page. Neither print path honours `break-after: avoid` (#467).
+    /// - A section's title is never alone at the foot of a page (#467). Neither print path honours `break-after: avoid`,
+    ///   so the title holds an empty block as tall as itself and what must follow it, which may not break across pages:
+    ///   where that space is not left, the title moves to the next page with its section. It reaches 5em below the
+    ///   title's top, the title and the next line in every bundled design (4.3em at most), and 150pt when the first entry
+    ///   has a description, its head (title, organisation, place, dates) and first line (143pt at most). The block takes
+    ///   no room: its negative bottom margin gives it back.
+    /// - A block section's start, its title and first block, never breaks across pages where it fits on one, so a short
+    ///   first entry moves with its title; a longer start breaks inside, so the entry starts under its title.
     /// - Nothing follows the last line: no bottom margin along the last elements, on `.cv` or on the body, and no bottom
     ///   padding on `.cv`. Space after the last line makes both print paths push out a blank page when the last page is
     ///   full; the page's own margin is the space at its foot (#467).
-    static let baseStyle = "a{overflow-wrap:anywhere}.cv-section-start{break-inside:avoid!important}"
+    static let baseStyle = "a{overflow-wrap:anywhere}"
+        + ".cv-section-title::before{content:\"\";display:block;height:5em;margin-bottom:-5em;break-inside:avoid}"
+        + ".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::before"
+        + "{height:max(5em,150pt);margin-bottom:calc(-1*max(5em,150pt))}"
+        + ".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"
         + "body,.cv{margin-bottom:0!important}.cv{padding-bottom:0!important}"
         + (1...maxDepth).map { ".cv" + String(repeating: ">:last-child", count: $0) }.joined(separator: ",")
         + "{margin-bottom:0!important}"
@@ -74,19 +84,20 @@ public struct DocumentHTMLBuilder: Sendable {
     }
 
     private func section(_ s: Section, _ h: Headings) -> HTML? {
-        /// A section's title and its first block are one `div.cv-section-start`, which the base style keeps on one page
-        /// (#467); the other blocks follow it.
-        func wrap(_ kind: String, _ title: String, start: [HTML], rest: [HTML]) -> HTML? {
-            start.isEmpty ? nil : el(.section, "cv-section", [(.dataSection, kind)],
+        /// A section starts with `div.cv-section-start`, its title and `start`, which the base style keeps together (#467);
+        /// `rest` follows it. A section with no entry is left out.
+        func wrap(_ kind: String, _ title: String, _ items: [HTML], start: [HTML], rest: [HTML]) -> HTML? {
+            items.isEmpty ? nil : el(.section, "cv-section", [(.dataSection, kind)],
                                      [el(.div, "cv-section-start", [], [el(.h2, "cv-section-title", [], [.text(title)])] + start)] + rest)
         }
         func blocks(_ kind: String, _ title: String, _ items: [HTML]) -> HTML? {
-            wrap(kind, title, start: Array(items.prefix(1)), rest: Array(items.dropFirst()))
+            wrap(kind, title, items, start: Array(items.prefix(1)), rest: Array(items.dropFirst()))
         }
-        /// Inline entries (skills, profiles, interests) share their lines, so they are one block, all of it the section's
-        /// start. They are separated by one space.
+        /// Inline entries (skills, profiles, interests) share their lines, so their start is the title alone and the
+        /// entries follow it, separated by one space: a block of them could be longer than a page.
         func inline(_ kind: String, _ title: String, _ items: [HTML]) -> HTML? {
-            wrap(kind, title, start: items.enumerated().flatMap { $0.offset == 0 ? [$0.element] : [.separator, $0.element] }, rest: [])
+            wrap(kind, title, items, start: [],
+                 rest: items.enumerated().flatMap { $0.offset == 0 ? [$0.element] : [.separator, $0.element] })
         }
         func date(_ d: DocumentDate) -> String {
             guard let m = d.month else { return "\(d.year)" }

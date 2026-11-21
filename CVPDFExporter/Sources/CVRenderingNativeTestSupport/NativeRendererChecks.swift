@@ -25,8 +25,8 @@ public enum NativeCheckFailure: Error, Equatable {
     case geometry([GeometryViolation])
     case pageCountDiffers(layout: Int, rendered: Int)
     case budget(steps: Int, exhausted: Bool)
-    /// The faults of a bundled design's PDFs, by the number of profile lines of the document that showed them.
-    case pageBreaks(design: String, faults: [Int: [PageBreakFault]])
+    /// The faults of a bundled design's PDFs of one body, by the number of profile lines of the document that showed them.
+    case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
 }
 
 /// A design that lays the inline entries (skills, profiles, interests) out with `display:flex` or `display:grid` and the
@@ -60,24 +60,6 @@ public enum SeparationDesign: String, Sendable, CaseIterable {
     public func rendered() throws -> RenderedDocument {
         DocumentHTMLBuilder().render(Self.document, stylesheet: try ContractFixture.stylesheet(css), palette: ContractFixture.palette,
                                      headings: try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en"))
-    }
-}
-
-/// #467: a CV whose experience section falls at every height of a page's foot as its profile grows: one profile line
-/// per paragraph, then one role of eight one-line duties. The names and contacts are made up.
-public enum PageBreakDocument {
-    /// Enough profile lengths that the role crosses the foot of the first page and of the second: its title and its last
-    /// line reach every height there.
-    public static let summaryLines = 4...39
-
-    public static func document(summaryLines: Int) -> CVDocument {
-        CVDocument(language: "en", person: Person(name: "Alex Example", professionalTitle: "Software developer",
-                                                  email: "alex@example.org", phone: "+49 30 0000000", location: "Berlin"), sections: [
-            .summary((1...summaryLines).map { "Line \($0) of a profile that fills the page." }.joined(separator: "\n")),
-            .experience([ExperienceItem(role: "Senior developer", company: "Example GmbH", location: "Berlin",
-                                        period: DocumentPeriod(start: DocumentDate(year: 2020, month: 1), end: .present),
-                                        description: (1...8).map { "Duty \($0) of the role, one line long." }.joined(separator: "\n"))]),
-        ])
     }
 }
 
@@ -200,9 +182,10 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
 
     // MARK: Page breaks
 
-    /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` on A4 with
-    /// no section title alone at a page's foot and no blank page, and the page count is the PDF's own.
-    public func pageBreaks(design name: String) async throws {
+    /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` of `body` on A4
+    /// with no section's start (its title, or the head of its first entry) at a page's foot, no blank page, no line cut by
+    /// a page's edge, every text node and no line outside its page; and the page count is the PDF's own.
+    public func pageBreaks(design name: String, body: PageBreakDocument.Body) async throws {
         guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
             throw NativeCheckFailure.fixtureLacks(name)
         }
@@ -210,18 +193,21 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
         var faults: [Int: [PageBreakFault]] = [:]
         for lines in PageBreakDocument.summaryLines {
-            let html = DocumentHTMLBuilder().build(PageBreakDocument.document(summaryLines: lines), stylesheet: design.stylesheet,
-                                                   palette: design.manifest.defaultPalette.palette, fonts: design.manifest.defaultFonts,
-                                                   headings: headings)
-            let pdf = try await renderer.render(html: html, page: .a4)
-            guard let layout = inspector.layout(of: pdf.data) else { throw NativeCheckFailure.unreadablePDF }
+            let document = DocumentHTMLBuilder().render(PageBreakDocument.document(summaryLines: lines, body: body),
+                                                        stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
+                                                        fonts: design.manifest.defaultFonts, headings: headings)
+            let pdf = try await renderer.render(html: document.html, page: .a4)
+            guard let layout = inspector.layout(of: pdf.data), let text = inspector.text(of: pdf.data) else {
+                throw NativeCheckFailure.unreadablePDF
+            }
             guard layout.pages.count == pdf.pageCount else {
                 throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
             }
-            let found = PageBreaks.faults(in: layout, titles: [headings.summary, headings.experience])
+            let found = PageBreaks.faults(of: document, printedAs: layout, text: text, starts: PageBreakDocument.startLines(headings),
+                                          page: .a4)
             if !found.isEmpty { faults[lines] = found }
         }
-        guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, faults: faults) }
+        guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, body: body, faults: faults) }
     }
 
     // MARK: Step budget

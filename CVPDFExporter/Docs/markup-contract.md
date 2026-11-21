@@ -27,9 +27,9 @@ html[lang]
         │   ├── p.cv-location         (if present)
         │   └── a.cv-website[href]    (if present and a valid WebLink; its text is the href)
         └── section.cv-section[data-section=<kind>]      one per non-empty section, in document order
-            ├── div.cv-section-start                    the title and the first entry, kept on one page
+            ├── div.cv-section-start                    the title and the first entry, kept on one page where it fits
             │   ├── h2.cv-section-title                 localised heading
-            │   └── the first entry                     (skills, profiles, interests: all the entries)
+            │   └── the first entry                     (skills, profiles, interests: none, the entries all follow)
             └── the other entries, each one of:
                 experience, education,
                 certifications:          article.cv-entry
@@ -63,7 +63,7 @@ html[lang]
 The renderers print on the page size, A4 unless the caller says otherwise. Every page keeps 36pt free at its top and at its bottom, the pages after the first too; a design's top padding on `.cv` only applies where the document starts. The left and right margins are the design's: its padding on `.cv`. A design keeps an entry together with `break-inside: avoid`.
 
 The builder's own base style decides two things whatever the design says, with `!important`, which a design cannot use (#467):
-- **A title is never alone at the foot of a page.** A section's title and its first entry are one block, `div.cv-section-start`, which never breaks across pages. Neither print path honours `break-after: avoid`, so a design cannot keep a title with what follows it by itself.
+- **A title is never alone at the foot of a page.** Neither print path honours `break-after: avoid`, so a design cannot keep a title with what follows it by itself. The title holds an empty block, as tall as the title and what must follow it, that never breaks across pages and takes no room: where the page's foot cannot hold it, the title moves to the next page with its section. It reaches 5em below the title's top (the title and the next line, a first row of skills included: 4.3em at most in the bundled designs), and 150pt when the first entry has a description (its head, title, organisation, place and dates, and its first line: 143pt at most). A section's title and its first entry are one block, `div.cv-section-start`, which does not break across pages where it fits on one, so a short first entry moves with its title; a longer one breaks inside, under its title. An inline section's start holds its title alone, since its entries can fill more than a page.
 - **Nothing follows the last line,** so a full last page never pushes out a blank one: the bottom margins of `body`, of `.cv` and of the last element at every depth below `.cv` (`.cv > :last-child`, `.cv > :last-child > :last-child`, and so on), and the bottom padding of `.cv`, are zero. The page's own 36pt is the space at its foot. A bottom padding or border a design puts on another last element still prints.
 
 ### Selectable by a design
@@ -139,6 +139,6 @@ Anything that could load a resource, or hide, move, reorder or inject content, i
 | Version | Change | Compatible with |
 |---|---|---|
 | 1 | Initial contract (2026-09-28): structure, contact fields, certifications, links that print their destination, spaces between inline entries, an experience's location, CSS grammar with absolute font sizes and no universal selector. | — |
-| 2 | A section's title and its first entry, or all the entries of skills, profiles and interests, are wrapped in `div.cv-section-start`, which never breaks across pages; the base style ends the document at its last line (2026-11-21, #467). | not 1: the nesting changed, so `.cv-section > .cv-entry`, `.cv-entry + .cv-entry` and `:last-child` no longer select what they did |
+| 2 | A section's title and its first entry are wrapped in `div.cv-section-start`, which does not break across pages where it fits on one (the title alone for skills, profiles and interests, whose entries follow it); the title keeps room for what follows it at a page's foot; the base style ends the document at its last line (2026-11-21, #467). | not 1: the nesting changed, so `.cv-section > .cv-entry`, `.cv-entry + .cv-entry`, `:first-child` and `:last-child` no longer select what they did in block sections |
 
 A change that could break an existing design bumps the version, for example removing a class, changing the nesting, or tightening a bound. Adding a class, a property or a wider bound does not.
