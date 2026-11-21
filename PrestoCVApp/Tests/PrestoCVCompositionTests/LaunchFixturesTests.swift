@@ -106,6 +106,23 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The legacy seed maps the released app's file names to content, and needs a folder of the fixture")
+    func legacySeed() throws {
+        let files = ["cv_0F6E2B7A-3C59-4D8E-A1B2-7C4D5E6F8091.json": "{}"]
+        let fixtures = try LaunchFixtures.parse([
+            Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextLegacySeed", Self.seed(files),
+        ])
+        #expect(fixtures.legacySeed == files)
+        #expect(throws: LaunchFixtures.Failure.legacySeedWithoutFolder) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextLegacySeed", Self.seed(files)])
+        }
+        for refused in [try Self.seed(["a.cv.json": "{}"]), try Self.seed(["cv_../x.json": "{}"]), "not base 64"] {
+            #expect(throws: LaunchFixtures.Failure.unreadableLegacySeed) {
+                try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextLegacySeed", refused])
+            }
+        }
+    }
+
     @Test("The argument without examples is read, with a folder of its own")
     func withoutSamples() throws {
         let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextNoSamples"])
@@ -385,6 +402,38 @@ struct LaunchFixturesTests {
         #expect(store == ["planted.cv.json"], "The seed, beside the lock the import of the legacy store takes")
         #expect(composition.legacyImport == .ran(LegacyImportReport()), "The fixture folder has no legacy store: a run with nothing")
         #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
+    }
+
+    @MainActor
+    @Test(
+        "A launch with a legacy seed imports it from the fixture's legacy folder, and a launch without it writes none",
+        .printsForReal
+    )
+    func legacySeedLaunches() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let id = "0F6E2B7A-3C59-4D8E-A1B2-7C4D5E6F8091"
+        let file = #"{"id":"\#(id)","updatedAt":"2026-10-02T00:00:00Z","look":{"palette":"ocean"}}"#
+        let seeded = [Self.program, "-PrestoCVNextStorage", name]
+
+        let first = await Composition.launch(
+            arguments: seeded + ["-PrestoCVNextLegacySeed", try Self.seed(["cv_\(id).json": file])],
+            settlement: TraceSettlement(), backgroundTime: NoBackgroundTime()
+        )
+        try FileManager.default.removeItem(at: root.appendingPathComponent("Legacy/cv_\(id).json"))
+        let again = await Composition.launch(arguments: seeded, settlement: TraceSettlement(), backgroundTime: NoBackgroundTime())
+
+        guard case .ready(let composition) = first, case .ran(let report) = composition.legacyImport else {
+            Issue.record("expected an import that ran, got \(first)")
+            return
+        }
+        #expect(Array(report.drops.values) == [[.look]], "The released app's file was read, with its loss")
+        #expect(try Self.entries(root.appendingPathComponent("Legacy")).isEmpty, "A launch without the seed writes it no more")
+        guard case .ready = again else {
+            Issue.record("expected ready, got \(again)")
+            return
+        }
     }
 
     @MainActor

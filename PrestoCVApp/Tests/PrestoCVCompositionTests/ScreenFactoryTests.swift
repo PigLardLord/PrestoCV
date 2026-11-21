@@ -347,7 +347,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"])
+            appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -375,7 +375,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"])
+            appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -409,7 +409,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"])
+            appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
@@ -439,7 +439,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"])
+            appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let shell = factory.makeShell(

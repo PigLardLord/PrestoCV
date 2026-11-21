@@ -129,11 +129,11 @@ public final class Composition {
     }
 
     private init(
-        inputs: Inputs, repository: FileCVRepository, legacyImport: LegacyImportOutcome, parts: Parts, trace: TraceChain
+        inputs: Inputs, repository: FileCVRepository, legacyImport: LegacyImportAtLaunch, parts: Parts, trace: TraceChain
     ) {
         paths = inputs.paths
         self.repository = repository
-        self.legacyImport = legacyImport
+        self.legacyImport = legacyImport.outcome
         renderer = parts.renderer
         inspector = parts.inspector
         headings = parts.headings
@@ -159,7 +159,7 @@ public final class Composition {
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
             languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
             wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
-            appLanguage: inputs.appLanguage
+            appLanguage: inputs.appLanguage, legacyImport: legacyImport
         )
     }
 
@@ -217,7 +217,12 @@ public final class Composition {
             return .failed(CompositionFailure(error))
         }
         let repository = FileCVRepository(directory: inputs.paths.store, clock: inputs.clock)
-        let legacyImport = await importLegacy(from: inputs.legacyStore, into: repository)
+        let importer = ImportLegacyStore(source: inputs.legacyStore, target: repository)
+        let outcome = await importLegacy(with: importer)
+        let legacyImport = LegacyImportAtLaunch(
+            outcome: outcome, review: LegacyImportReview(outcome: outcome, importer: importer),
+            reminder: LegacyReportMarker(file: inputs.paths.legacyReportOff)
+        )
         let rules: WKContentRuleList
         do {
             rules = try await inputs.compileRules()
@@ -234,9 +239,9 @@ public final class Composition {
 
     /// Moves the CVs of the released app's store into the new store before any screen reads it, so the first-run decision
     /// sees them. A run that fails does not stop the launch: the legacy files stay, and the next launch runs again.
-    private static func importLegacy(from source: any LegacyStore, into store: FileCVRepository) async -> LegacyImportOutcome {
+    private static func importLegacy(with importer: ImportLegacyStore) async -> LegacyImportOutcome {
         do throws(RepositoryError) {
-            return .ran(try await ImportLegacyStore(source: source, target: store).run())
+            return .ran(try await importer.run())
         } catch {
             return .failed(error)
         }

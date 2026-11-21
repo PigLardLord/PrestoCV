@@ -12,8 +12,8 @@ struct BrowseCVsWorkflowTests {
     let ids = SequentialIDGenerator()
     let sample = FixtureCV.full(id: CVID(UUID(uuidString: "77777777-7777-7777-7777-777777777777")!))
 
-    func workflow(samples: [CV] = []) -> BrowseCVsWorkflow {
-        BrowseCVsWorkflow(repository: repository, samples: InMemorySampleCVSource(samples), ids: ids)
+    func workflow(samples: [CV] = [], legacyImport: LegacyImportOutcome = .ran(LegacyImportReport())) -> BrowseCVsWorkflow {
+        BrowseCVsWorkflow(repository: repository, samples: InMemorySampleCVSource(samples), ids: ids, legacyImport: legacyImport)
     }
 
     private func store(_ name: String) async throws -> CV {
@@ -47,6 +47,17 @@ struct BrowseCVsWorkflowTests {
     @Test("a store with nothing in it is a first run")
     func emptyStoreIsFirstRun() async throws {
         #expect(try await workflow().onboarding() == .firstRun)
+    }
+
+    @Test("an empty store after an import that failed, or left CVs out, is a returning person; after drops only, a first run")
+    func anImportThatLeftCVsOutIsNoFirstRun() async throws {
+        let leftOut = try await ImportLegacyStore(source: InMemoryLegacyStore([], damaged: 1), target: InMemoryCVRepository()).run()
+        var dropsOnly = LegacyImportReport()
+        dropsOnly.drops = [CVID(UUID()): [.look]]
+
+        #expect(try await workflow(legacyImport: .failed(.storeUnavailable(.cannotList))).onboarding() == .returning)
+        #expect(try await workflow(legacyImport: .ran(leftOut)).onboarding() == .returning)
+        #expect(try await workflow(legacyImport: .ran(dropsOnly)).onboarding() == .firstRun)
     }
 
     @Test("a store with a CV, or with only an issue, is a returning person")

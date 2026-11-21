@@ -41,14 +41,18 @@ private final class ShellModels: ObservableObject {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let report: LegacyImportReportViewModel
 
     init(screens: ScreenFactory) {
         firstRun = screens.makeFirstRun()
-        list = screens.makeCVList(
-            untitled: String(localized: "shell.untitled"),
-            // The order and the punctuation of a title and its number are the translation's
-            numbered: { title, number in String(localized: "shell.numbered \(title) \(number)") }
-        )
+        let untitled = String(localized: "shell.untitled")
+        // The order and the punctuation of a title and its number are the translation's
+        let numbered: @MainActor (String, Int) -> String = { title, number in
+            String(localized: "shell.numbered \(title) \(number)")
+        }
+        list = screens.makeCVList(untitled: untitled, numbered: numbered)
+        // The report names the CVs as the list does
+        report = screens.makeLegacyImportReport(untitled: untitled, numbered: numbered)
         // A copy is named as the list names one, in the language the app shows; a PDF's file in the language of its
         // document (R13)
         shell = screens.makeShell(
@@ -67,7 +71,7 @@ private struct ReadyShell: View {
     }
 
     var body: some View {
-        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun)
+        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun, report: models.report)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
     }

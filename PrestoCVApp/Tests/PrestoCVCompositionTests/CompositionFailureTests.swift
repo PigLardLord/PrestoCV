@@ -41,7 +41,8 @@ struct CompositionFailureTests {
         let failures: [LaunchFixtures.Failure] = [
             .conflictingStorage, .missingValue(argument: "-PrestoCVNextSeed"), .invalidFolderName, .unreadableSeed,
             .unreadableDistribution, .seedWithoutFolder, .seedUnwritable, .unsafeFolder, .samplesWithoutFolder,
-            .failuresWithoutFolder, .unreadableOtherWindow, .otherWindowWithoutFolder,
+            .failuresWithoutFolder, .unreadableOtherWindow, .otherWindowWithoutFolder, .unreadableLegacySeed,
+            .legacySeedWithoutFolder,
         ]
         for failure in failures {
             #expect(CompositionFailure(failure) == .launchFixturesRejected)
