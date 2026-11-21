@@ -44,6 +44,8 @@ public enum ImportReviewField: Sendable, Hashable {
     /// The n-th language the text lists (from one, in the text's order), which the CV does not hold; its words are in the text not imported.
     case languageNotKept(Int)
     case certificationYear(Int)
+    /// The position in the returned CV's certifications.
+    case certification(Int)
 }
 
 /// Why a value should be checked.
@@ -68,6 +70,8 @@ public enum ImportReviewReason: String, Sendable, Hashable, CaseIterable {
     case locationNotKept
     /// The certification's year is no year the CV can hold.
     case yearUnreadable
+    /// A line may be the certification's description or a certification of its own.
+    case descriptionOrEntryUnsure
 }
 
 /// Why an import gave no CV.

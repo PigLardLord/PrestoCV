@@ -99,12 +99,12 @@ enum CertificationReader {
     ///    A certification whose line had a second part after a comma ("First Aid, Level 2") took that lone part as its
     ///    issuer, so it has one, and a lead line below it stays an entry of its own: the safe, visible split;
     /// 4. a line that is the link or the description of the certification above, by the rules of `CertificationLine`
-    ///    (split rather than merge), goes on with it; a line of web addresses with no certification above is text not
-    ///    imported;
+    ///    (split rather than merge), goes on with it, and a description that only its words placed there marks that
+    ///    certification to check; a line of web addresses with no certification above is text not imported;
     /// 5. a block with no part is text not imported;
     /// 6. anything else is a certification of its own: the first part is the name, the issuer is the part that reads as an
     ///    organisation, or the only part left, the first web address is the link, a label of a link is left out, and the
-    ///    rest is text not imported.
+    ///    rest is text not imported. One that may as well be the description of the certification above is marked to check.
     private static func read(_ block: SourceBlock, in section: Section, after open: OpenCertification?, into findings: inout Findings)
         -> OpenCertification? {
         if block.kind == .tableHeader {
@@ -124,15 +124,16 @@ enum CertificationReader {
             addLink(line, to: open.index, section, &findings)
             open.isRightAbove = false
             return open
-        case .description(var open):
+        case .description(var open, let check):
             addDescription(line, to: open.index, &findings)
+            if let check { findings.cv.certifications[open.index].check = check }
             open.isRightAbove = false
             return open
         case .unplaced:
             for cell in cells { findings.unplace(cell, in: section) }
             return nil
-        case .entry:
-            return addEntry(line, section, &findings)
+        case .entry(let check):
+            return addEntry(line, check: check, section, &findings)
         }
     }
 
@@ -166,9 +167,10 @@ enum CertificationReader {
         findings.cv.certifications[index].description = Sourced(value: texts.joined(separator: "\n"), spans: (previous?.spans ?? []) + line.cells.map(\.span))
     }
 
-    /// Branches 5 and 6: a certification of its own, or text not imported when the line has no part. The certification is
-    /// open for the lines under it.
-    private static func addEntry(_ line: CertificationLine, _ section: Section, _ findings: inout Findings) -> OpenCertification? {
+    /// Branches 5 and 6: a certification of its own, with the reason to check it if any, or text not imported when the line
+    /// has no part. The certification is open for the lines under it.
+    private static func addEntry(_ line: CertificationLine, check: CheckReason?, _ section: Section, _ findings: inout Findings)
+        -> OpenCertification? {
         var split = line.split
         // On a line with an address, a part can be the label of the link: "Swift Basics – Verify: https://…"
         let labels = line.addresses.isEmpty ? [] : split.parts.filter { CertificationLinkLabel.isLabel($0.text) }
@@ -180,10 +182,11 @@ enum CertificationReader {
         add(name, split, section, &findings)
         let index = findings.cv.certifications.count - 1
         findings.cv.certifications[index].link = line.addresses.first?.link.address
+        findings.cv.certifications[index].check = check
         for label in line.labels + labels { findings.leaveOut(label, .categoryLabel) }
         for address in line.addresses.dropFirst() { findings.unplace(address.piece, in: section) }
         let certification = findings.cv.certifications[index]
-        return OpenCertification(index: index, title: line.block, titleIsSentence: CertificationLine.endsAsSentence(line.text),
+        return OpenCertification(index: index, title: line.block, titleIsSentence: line.readsAsSentence,
                                  statesIssuerOrYear: certification.issuer != nil || certification.year != nil)
     }
 

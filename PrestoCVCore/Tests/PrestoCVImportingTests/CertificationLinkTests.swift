@@ -109,12 +109,14 @@ struct CertificationLinkTests {
 
     @Test("A title with its issuer that ends with a full stop is a certification of its own, not the description above (the trap of the second attempt)", arguments: [
         "Swift Basics, Beispiel Institut.", "Swift Basics, Example Academy.", "Swift basics course, Example Academy.",
+        "Introduction to cloud security, Example Academy.", "Einführung in die sichere Entwicklung, Beispiel Institut.",
     ])
     func titleAndIssuerSentence(line: String) {
         let found = read("Certifications\nFirst Certificate – Example Academy (2023)\n\(line)")
         #expect(found.cv.certifications.count == 2)
         #expect(found.cv.certifications.map { $0.description == nil } == [true, true])
         #expect(found.cv.certifications.last?.issuer != nil)
+        #expect(found.cv.certifications.map(\.check) == [nil, nil])
         #expect(found.unplaced.isEmpty)
     }
 
@@ -256,6 +258,8 @@ struct CertificationLinkTests {
         #expect(found.cv.certifications.count == 1)
         #expect(certification.description?.value == "Covers actors and structured concurrency in depth.\nIncludes a capstone project reviewed by a mentor.")
         #expect(certification.description?.spans.count == 2)
+        // Only the words of the lines placed them there, no layout: the person checks the certification
+        #expect(certification.check == .descriptionOrEntryUnsure)
         #expect(found.unplaced.isEmpty)
     }
 
@@ -274,6 +278,7 @@ struct CertificationLinkTests {
         #expect(found.cv.certifications.first?.description?.value == "Covers actors and structured concurrency in depth.\nIncludes a capstone project reviewed by a mentor.")
         #expect(found.cv.certifications.last?.link == nil)
         #expect(found.cv.certifications.last?.description == nil)
+        #expect(found.cv.certifications.map(\.check) == [.descriptionOrEntryUnsure, nil])
         #expect(found.unplaced.isEmpty)
     }
 
@@ -287,6 +292,7 @@ struct CertificationLinkTests {
         #expect(found.cv.certifications.count == 2)
         #expect(found.cv.certifications.map { $0.link?.value.value } == [nil, longAddress])
         #expect(found.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(found.cv.certifications.map(\.check) == [nil, .descriptionOrEntryUnsure])
     }
 
     @Test("In a PDF, a regular sentence under a bold title is its description")
@@ -299,6 +305,9 @@ struct CertificationLinkTests {
         ])
         #expect(result.cv.certifications.map(\.name.value) == ["Applied Swift Series (Pro, Level Advanced)", "Our Best Practice (Pro, Remote Edition)"])
         #expect(result.cv.certifications.map { $0.description?.value } == ["Covers actors and structured concurrency.\nIncludes a capstone project.", nil])
+        // Neither indented nor smaller: only the words placed the lines there, so the person checks the certification
+        #expect(result.cv.certifications.map(\.check) == [.descriptionOrEntryUnsure, nil])
+        #expect(checked(result).map(\.field) == [.certification(0)])
         #expect(result.unplaced.isEmpty)
         #expect(result.ungrounded.isEmpty)
     }
@@ -315,6 +324,7 @@ struct CertificationLinkTests {
         ])
         #expect(result.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
         #expect(result.cv.certifications.map { $0.description?.value } == ["Advanced\nRemote cohort", nil])
+        #expect(result.cv.certifications.allSatisfy { $0.check == nil })
         #expect(result.unplaced.isEmpty)
         #expect(result.ungrounded.isEmpty)
     }
@@ -445,6 +455,7 @@ struct CertificationLinkTests {
         """)
         #expect(found.cv.certifications.map(\.name.value) == ["BLSD", "Corso di primo soccorso", "Patente nautica"])
         #expect(found.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(found.cv.certifications.allSatisfy { $0.check == nil })
         #expect(found.unplaced.isEmpty)
     }
 
@@ -477,6 +488,104 @@ struct CertificationLinkTests {
             #expect(found.cv.certifications.allSatisfy { $0.description == nil })
             #expect(found.unplaced.isEmpty)
         }
+
+        // A sentence under a title that reads as a description, split off only by its date, its gap or its marker, is
+        // in doubt: the person checks it. A list of sentences is no doubt.
+        for found in [dated, afterGap, bullet] {
+            #expect(found.cv.certifications.map(\.check) == [nil, .descriptionOrEntryUnsure])
+        }
+        for found in [sentences, underASentence] {
+            #expect(found.cv.certifications.map(\.check) == [nil, nil])
+        }
+    }
+
+    // MARK: In doubt, the person checks the certification
+
+    /// The certifications the review list asks the person to check.
+    private func checked(_ result: ImportResult) -> [ReviewItem] {
+        result.reviewList.filter { item in
+            if case .certification = item.field { return true }
+            return false
+        }
+    }
+
+    @Test("A sentence under a bare title stays its description, but only its words placed it there: the person checks the certification", arguments: [
+        ("First Certificate", "Introduction to machine learning."),
+        ("Erstes Zertifikat", "Einführung in das maschinelle Lernen."),
+        ("Primo Certificato", "Introduzione al machine learning."),
+    ])
+    func sentenceShapeAloneIsChecked(title: String, line: String) throws {
+        let result = try imported("Certifications\n\(title)\n\(line)")
+        let certification = try #require(result.cv.certifications.first)
+        #expect(result.cv.certifications.count == 1)
+        #expect(certification.name.value == title)
+        #expect(certification.description?.value == line)
+        #expect(certification.check == .descriptionOrEntryUnsure)
+        #expect(checked(result) == [ReviewItem(field: .certification(0), reason: .descriptionOrEntryUnsure, text: title)])
+        #expect(result.unplaced.isEmpty)
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
+    }
+
+    @Test("In a PDF, a sentence the layout places under the title, indented or smaller, is its description with nothing to check", arguments: [
+        "Introduction to machine learning.", "Covers Swift, testing and deployment.", "Tratta Swift, i test e il rilascio.",
+    ])
+    func laidOutSentenceIsNotChecked(line: String) async throws {
+        for title in ["First Certificate", "First Certificate – Example Academy (2023)"] {
+            for (indent, size) in [(6.0, 9.5), (0.0, 8.0)] {
+                let result = try await importedPDF([Row(text: title, bold: true), Row(text: line, indent: indent, size: size)])
+                #expect(result.cv.certifications.map(\.name.value) == ["First Certificate"], "\(title), indent \(indent), size \(size)")
+                #expect(result.cv.certifications.first?.description?.value == line)
+                #expect(result.cv.certifications.first?.check == nil)
+                #expect(checked(result).isEmpty)
+                #expect(result.unplaced.isEmpty)
+                #expect(result.ungrounded.isEmpty)
+            }
+        }
+    }
+
+    @Test("A sentence with commas under a certification is its description: a comma before words in lower case names no issuer", arguments: [
+        "Covers Swift, testing and deployment.", "Behandelt Swift, das Testen und die Auslieferung.", "Tratta Swift, i test e il rilascio.",
+    ])
+    func commaInASentence(line: String) throws {
+        let result = try imported("Certifications\nFirst Certificate – Example Academy (2023)\n\(line)")
+        let certification = try #require(result.cv.certifications.first)
+        #expect(result.cv.certifications.count == 1)
+        #expect(certification.issuer?.value == "Example Academy")
+        #expect(certification.description?.value == line)
+        // No layout placed it, only its words
+        #expect(certification.check == .descriptionOrEntryUnsure)
+        #expect(result.unplaced.isEmpty)
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
+    }
+
+    @Test("A sentence that reads as neither a clear description nor a clear title is a certification of its own, and the person checks it", arguments: [
+        "Includes exercises on AWS, Azure.", "Umfasst die Übungen mit AWS, Azure.",
+    ])
+    func neitherDescriptionNorTitleIsChecked(line: String) throws {
+        let result = try imported("Certifications\nFirst Certificate – Example Academy (2023)\n\(line)")
+        #expect(result.cv.certifications.count == 2)
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(result.cv.certifications.map(\.check) == [nil, .descriptionOrEntryUnsure])
+        #expect(checked(result).map(\.field) == [.certification(1)])
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
+    }
+
+    @Test("A sentence with a web address is a certification of its own with the address as its link, and the person checks it", arguments: [
+        "The full syllabus is at https://academy.example/syllabus.",
+        "Il programma completo è su https://academy.example/programma con tutti gli argomenti.",
+    ])
+    func sentenceWithAddressIsChecked(line: String) throws {
+        let result = try imported("Certifications\nFirst Certificate – Example Academy (2023)\n\(line)")
+        #expect(result.cv.certifications.count == 2)
+        #expect(result.cv.certifications.map { $0.link == nil } == [true, false])
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(result.cv.certifications.map(\.check) == [nil, .descriptionOrEntryUnsure])
+        #expect(checked(result).map(\.field) == [.certification(1)])
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
     }
 
     // MARK: In doubt, nothing is lost
@@ -518,6 +627,9 @@ struct CertificationLinkTests {
             "https://academy.example/achievement", "https://academy.example/c/123", "https://academy.example/c/456",
         ])
         #expect(result.cv.certifications.map { $0.description?.value } == ["Covers actors and structured concurrency in depth.", nil, nil])
+        #expect(checked(result) == [
+            ReviewItem(field: .certification(0), reason: .descriptionOrEntryUnsure, text: "Advanced Swift Concurrency (Level 2) — Example Academy"),
+        ])
         #expect(result.unplaced.map(\.text) == ["2024", "https://academy.example/orphan"])
         #expect(result.ungrounded.isEmpty)
         #expect(Coverage.lost(result).isEmpty)

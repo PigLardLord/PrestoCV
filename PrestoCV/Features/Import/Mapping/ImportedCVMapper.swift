@@ -159,6 +159,7 @@ struct ImportedCVMapper {
             case .experience(let index), .experiencePeriod(let index): field = .experience(index + 1)
             case .education(let index), .educationPeriod(let index): field = .education(index + 1)
             case .language: return nil   // a language without a level is listed once, where it is left out
+            case .certification(let index): field = .certification(index + 1)
             }
             let reason: ImportReview.Item.Reason
             switch item.reason {
@@ -169,6 +170,7 @@ struct ImportedCVMapper {
             case .periodUnreadable, .periodOpenEnd: reason = .period
             case .levelNotCEFR: reason = .languageNotAdded
             case .levelsDiffer: reason = .languageLevels
+            case .descriptionOrEntryUnsure: reason = .descriptionOrEntry
             }
             return ImportReview.Item(field: field, reason: reason, text: item.text)
         }

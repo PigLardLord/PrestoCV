@@ -60,6 +60,9 @@ public enum CheckReason: String, Hashable, Sendable, CaseIterable {
     case levelNotCEFR
     /// A Europass grid that gives the language different levels.
     case levelsDiffer
+    /// A line under a certification that only its words, not the layout, made the certification's description; or a line
+    /// that reads as such a description and became a certification of its own (#283).
+    case descriptionOrEntryUnsure
 }
 
 // MARK: - The imported CV
@@ -145,6 +148,8 @@ public struct ImportedCertification: Hashable, Sendable {
     public var link: Sourced<WebLink>?
     /// The sentences under the certification that tell what it is, in order.
     public var description: Sourced<String>?
+    /// Why the person should check the certification as a whole.
+    public var check: CheckReason?
 }
 
 // MARK: - What was not imported
@@ -218,6 +223,7 @@ extension ImportedCV {
             add("languages[\(index)].levelWords", language.levelWords)
         }
         for (index, certification) in certifications.enumerated() {
+            addCheck("certifications[\(index)].check", certification.check)
             add("certifications[\(index)].name", certification.name)
             add("certifications[\(index)].issuer", certification.issuer)
             add("certifications[\(index)].year", certification.year, as: String.init)
@@ -280,9 +286,10 @@ extension ImportedLanguage {
 
 extension ImportedCertification {
     package static func scripted(
-        _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?
+        _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?,
+        check: CheckReason?
     ) -> ImportedCertification {
-        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description)
+        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description, check: check)
     }
 }
 

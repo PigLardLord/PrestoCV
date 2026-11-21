@@ -64,9 +64,9 @@ public struct ImportFixture: Sendable {
 
     public func certification(
         _ name: Sourced<String>, issuer: Sourced<String>? = nil, year: Sourced<Int>? = nil, link: Sourced<WebLink>? = nil,
-        description: Sourced<String>? = nil
+        description: Sourced<String>? = nil, check: CheckReason? = nil
     ) -> ImportedCertification {
-        ImportedCertification.scripted(name, issuer: issuer, year: year, link: link, description: description)
+        ImportedCertification.scripted(name, issuer: issuer, year: year, link: link, description: description, check: check)
     }
 
     /// Text that fits no field, quoted from `piece`.

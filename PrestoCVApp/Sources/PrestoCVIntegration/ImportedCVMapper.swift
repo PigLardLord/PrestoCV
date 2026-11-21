@@ -170,7 +170,7 @@ private extension ReviewItem {
     var isAboutAPeriod: Bool {
         switch field {
         case .experiencePeriod, .educationPeriod: true
-        case .name, .title, .location, .summary, .experience, .education, .language: false
+        case .name, .title, .location, .summary, .experience, .education, .language, .certification: false
         }
     }
 }

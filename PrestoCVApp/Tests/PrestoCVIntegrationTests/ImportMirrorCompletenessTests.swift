@@ -56,7 +56,7 @@ private let reported: [String: Destination] = [
     "person.links[].heading": { _, _ in true },   // the heading a second website is listed under: the address is checked
     "languages[].heading": { _, _ in true },   // the heading a language the CV cannot take is listed under: its name is checked
     "education[].heading": { _, _ in true },   // the heading a study's place is listed under: the place is checked
-    "experience[].check": checkReported, "education[].check": checkReported,
+    "experience[].check": checkReported, "education[].check": checkReported, "certifications[].check": checkReported,
     "experience[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .experience) },
     "education[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .education) },
     "education[].location": { field, outcome in outcome.notImported.contains(field.value) },

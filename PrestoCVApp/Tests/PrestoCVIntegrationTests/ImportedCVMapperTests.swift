@@ -119,6 +119,19 @@ struct ImportedCVMapperTests {
         #expect(outcome.notImported.contains("1850"))
     }
 
+    @Test("a certification to check is reported at its place in the CV, with its name and issuer as the person wrote them")
+    func certificationToCheckIsReported() {
+        let f = ImportFixture(text: "Alpha Beta Example Academy")
+        let outcome = map(f) {
+            $0.certifications = [
+                f.certification(f.quoted("Alpha")),
+                f.certification(f.quoted("Beta"), issuer: f.quoted("Example Academy"), check: .descriptionOrEntryUnsure),
+            ]
+        }
+        #expect(outcome.cv.sections.certifications.map(\.name) == ["Alpha", "Beta"])
+        #expect(outcome.review == [ImportReviewItem(field: .certification(2), reason: .descriptionOrEntryUnsure, text: "Beta — Example Academy")])
+    }
+
     @Test("a language without a CEFR level stays out of the CV and is listed for review and in the text not imported")
     func languageWithoutLevelIsNotAddedButReported() {
         let f = ImportFixture(text: "English B2 Spanish fluent French")

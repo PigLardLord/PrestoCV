@@ -116,7 +116,7 @@ enum FullImport {
             f.certification(f.quoted("Certified Kubernetes Administrator"), issuer: f.quoted("Linux Foundation"),
                             year: f.sourced(2017, quoting: "2017", reading: .year),
                             link: f.sourced(link("https://training.example.org/cka"), quoting: "https://training.example.org/cka"),
-                            description: f.quoted("Renewed after a hands-on exam in a live cluster.")),
+                            description: f.quoted("Renewed after a hands-on exam in a live cluster."), check: .descriptionOrEntryUnsure),
         ]
         cv.interests = [f.quoted("Chess")]
         return f.result(cv, language: .en, unplaced: [f.unplaced("Volunteering at the harbour clean-up.")])
