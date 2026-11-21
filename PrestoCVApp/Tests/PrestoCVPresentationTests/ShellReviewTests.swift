@@ -106,6 +106,86 @@ struct ShellReviewTests {
         #expect(world.editing.storesTold.count == 2)
     }
 
+    /// The choices of the person that the writer stores beside the text, with no write of it.
+    enum Choice: CaseIterable {
+        case look, language
+    }
+
+    /// Makes `choice` in `editor`.
+    static func choose(_ choice: Choice, in editor: EditorViewModel) async {
+        switch choice {
+        case .look: await editor.changeLook(to: EditorLook(design: "classic", palette: "ocean", fonts: nil), parts: [.design])
+        case .language: await editor.setDocumentLanguage("de")
+        }
+    }
+
+    /// Whether `cv` holds `choice`.
+    static func holds(_ cv: CV, _ choice: Choice) -> Bool {
+        switch choice {
+        case .look: cv.design?.design == "classic"
+        case .language: cv.language?.tag == "de"
+        }
+    }
+
+    /// The imported draft as the store holds it.
+    static func stored(in world: World) async throws -> CV {
+        try await world.editing.editing.inStore(ImportValues.cv("Ada Ferro").id)
+    }
+
+    @Test("a look or a language the person chose, stored at once, ends the review, and the list is told",
+          arguments: Choice.allCases)
+    func storedChoiceEndsTheReview(_ choice: Choice) async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+        await editor.saveWhatItShows()
+        await waitUntil("the draft stored") { world.editing.storesTold.count == 1 }
+        #expect(review.isShown)
+
+        await Self.choose(choice, in: editor)
+
+        #expect(Self.holds(try await Self.stored(in: world), choice))
+        #expect(!review.isShown)
+        #expect(world.editing.storesTold.count == 2)
+    }
+
+    @Test("a look or a language the person chose before the draft was stored ends the review with its first write",
+          arguments: Choice.allCases)
+    func choiceKeptForTheFirstWriteEndsTheReview(_ choice: Choice) async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+
+        await Self.choose(choice, in: editor)
+        #expect(review.isShown, "nothing is stored yet")
+        #expect(world.editing.storesTold.count == 0)
+
+        await editor.saveWhatItShows()
+
+        await waitUntil("the review ended") { !review.isShown }
+        #expect(Self.holds(try await Self.stored(in: world), choice))
+        #expect(world.editing.storesTold.count == 1)
+    }
+
+    @Test("a language the app found in the words leaves the review shown, stored at once or with the first write",
+          arguments: [false, true])
+    func foundLanguageLeavesTheReview(draftStoredFirst: Bool) async throws {
+        let world = World()
+        let editor = try await world.importDraft()
+        let review = try #require(world.shell.review)
+        if draftStoredFirst {
+            await editor.saveWhatItShows()
+            await waitUntil("the draft stored") { world.editing.storesTold.count == 1 }
+        }
+
+        await editor.keepFoundLanguage("de")
+        if !draftStoredFirst { await editor.saveWhatItShows() }
+
+        await waitUntil("the list told") { world.editing.storesTold.count == (draftStoredFirst ? 2 : 1) }
+        #expect(Self.holds(try await Self.stored(in: world), .language))
+        #expect(review.isShown, "the person chose nothing")
+    }
+
     @Test("dismissing the review ends it, and the shell keeps it for a sheet open over it")
     func reviewEndsOnDismiss() async throws {
         let world = World()

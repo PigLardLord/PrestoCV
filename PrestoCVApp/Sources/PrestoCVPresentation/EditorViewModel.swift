@@ -118,9 +118,12 @@ public final class EditorViewModel {
     /// Counts the edits that changed the form, so that a replacement can tell whether the person typed meanwhile, even
     /// if the text is back to what it was.
     @ObservationIgnored var formEdits = 0
-    /// Whether a write the store took held a change to the CV its autosave stood on: a write of the CV as it opened, as
-    /// the list's read or the app leaving the foreground makes, holds none.
+    /// Whether the store took a change the person made: a write of a change to the CV its autosave stood on, or a look or
+    /// a language the person chose, which the writer stores at once or with the first write. A write of the CV as it
+    /// opened, as the list's read or the app leaving the foreground makes, holds none, unless it stores such a choice.
     @ObservationIgnored private(set) var storedAChange = false
+    /// Whether the writer keeps a look or a language the person chose for the first write, as nothing was stored yet.
+    @ObservationIgnored private var choiceToStore = false
     /// Counts the edits that changed the title, for the same purpose.
     @ObservationIgnored var titleEdits = 0
     /// The change elsewhere the maker was last told of (`storeChanged`), nil since the form stood on its CV: it is told
@@ -141,9 +144,9 @@ public final class EditorViewModel {
     ///   - pause: How long after the last change the form is stored.
     ///   - copyTitle: The title of a copy of a CV with the given title, in the person's language (R13).
     ///   - storeChanged: Called when the store changed, so that what shows the stored CVs can read them again: after each
-    ///     write the store took, a copy saved included, and when a write, a reload or a copy found that another save or a
-    ///     deletion changed the CV, once each time the editor learns it. Never for a write that failed otherwise. It is
-    ///     called even when the editor is gone by then.
+    ///     write the store took, a copy saved included, after each change of the look or the language the writer stored,
+    ///     and when a write, a reload or a copy found that another save or a deletion changed the CV, once each time the
+    ///     editor learns it. Never for a write that failed otherwise. It is called even when the editor is gone by then.
     public init(
         start: EditorStart, editing: any CVEditing, clock: any Clock<Duration>,
         pause: Duration, copyTitle: @escaping @MainActor (String) -> String, storeChanged: @escaping @MainActor () -> Void
@@ -230,7 +233,7 @@ public final class EditorViewModel {
             // was given, and still tells it
             write: { [weak self] content, _ in
                 try await mineWrites.run { try await writer.write(content) }
-                if content != cv { self?.storedAChange = true }
+                if content != cv || self?.choiceToStore == true { self?.storedAChange = true }
                 storeChanged()
             }
         )
@@ -240,11 +243,24 @@ public final class EditorViewModel {
         self.writes = mineWrites
         base = cv
         restyled = nil
+        choiceToStore = false
         given = cv
         failure = nil
         changeFailure = nil
         toldChangedElsewhere = nil
         refreshSaveStatus()
+    }
+
+    /// The writer took a change of the look or the language, which the person asked for (`byThePerson`) or the app made
+    /// by itself. Once the CV is stored the writer stored it, and the maker is told the store changed; before, it keeps
+    /// it for the first write.
+    func writerTookAChangeOfStyle(byThePerson: Bool) {
+        guard autosave?.isStored == true else {
+            if byThePerson { choiceToStore = true }
+            return
+        }
+        if byThePerson { storedAChange = true }
+        storeChanged()
     }
 
     // MARK: - Status
