@@ -13,6 +13,8 @@
 #     whole, by a rename, so that a copy that fails leaves no file of that language; and a run that is killed (no chance to
 #     clean up) leaves the captures of the languages it had finished, and none of the language it was in or of those after
 #     it, so that a --compose-only accepts only a language that is whole,
+#   - make a simulator that is not there yet on the newest iOS runtime that runs its device type, and refuse an --ios whose
+#     runtime does not run it,
 #   - run its tests where Xcode enforces their time allowance: the plan turns test timeouts on.
 #
 #   Tools/Release/store-screenshots-selftest.sh
@@ -25,10 +27,11 @@ cleanup() { [ -z "$LIVE" ] || kill "$LIVE" 2>/dev/null; rm -rf "$T"; }
 trap cleanup EXIT
 pass=0; fail=0
 
-BIN="$T/bin"; LOG="$T/calls.log"; COMPOSED="$T/composed.log"; DEVICES="$T/devices.json"
+BIN="$T/bin"; LOG="$T/calls.log"; COMPOSED="$T/composed.log"; DEVICES="$T/devices.json"; RUNTIMES="$T/runtimes.json"
 mkdir -p "$BIN" "$T/tmp"
 mkfifo "$T/block" "$T/ready"
 export PATH="$BIN:$PATH" TMPDIR="$T/tmp" FAKE_LOG="$LOG" FAKE_COMPOSED="$COMPOSED" FAKE_DEVICES="$DEVICES" FAKE_BLOCK="$T/block"
+export FAKE_RUNTIMES="$RUNTIMES"
 LOCK="$TMPDIR/prestocv-store-screenshots/lock"
 OUT_DIR="$T/out"
 
@@ -41,9 +44,16 @@ case "$1 $2" in
         case "$3" in
             devices) cat "$FAKE_DEVICES" ;;
             devicetypes) echo '{"devicetypes":[{"name":"iPhone 17 Pro Max","identifier":"type-iphone"},{"name":"iPad Pro 13-inch (M5)","identifier":"type-ipad"}]}' ;;
-            runtimes) echo '{"runtimes":[{"platform":"iOS","isAvailable":true,"version":"27.0","identifier":"runtime-27"}]}' ;;
+            runtimes) cat "$FAKE_RUNTIMES" ;;
         esac ;;
-    "simctl create") echo NEW-UDID ;;
+    "simctl create")
+        # simctl makes a device only on a runtime that lists its type: simctl create <name> <type> <runtime>
+        python3 -c '
+import json, sys
+runtime = next(r for r in json.load(open(sys.argv[1]))["runtimes"] if r["identifier"] == sys.argv[3])
+sys.exit(0 if any(t["identifier"] == sys.argv[2] for t in runtime["supportedDeviceTypes"]) else 1)' "$FAKE_RUNTIMES" "$4" "$5" \
+            || { echo "An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=403): Incompatible device" >&2; exit 1; }
+        echo NEW-UDID ;;
     "simctl erase") [ "${FAKE_FAIL_ON:-}" != erase ] || exit 1 ;;
     "simctl spawn")
         # The keyboard's flag reads back as it was written, unless FAKE_FAIL_ON=intro: a write that did not take
@@ -108,6 +118,15 @@ chmod +x "$BIN/xcrun" "$BIN/xcodebuild" "$BIN/swiftc"
 write_devices() {
     printf '{"devices":{"runtime-27":[{"name":"PrestoCV store iphone","udid":"OWN-UDID"},{"name":"PrestoCV store ipad","udid":"OWN-IPAD-UDID"},{"name":"MyTests iphone","udid":"THEIR-UDID"}]}}' > "$DEVICES"
 }
+# runtime <identifier> <version> <device type>...: an available iOS runtime that runs those device types, as simctl lists it
+runtime() {
+    local identifier="$1" version="$2" types="" type; shift 2
+    for type in "$@"; do types="$types${types:+,}{\"name\":\"$type\",\"identifier\":\"type-$type\"}"; done
+    printf '{"platform":"iOS","isAvailable":true,"version":"%s","identifier":"%s","supportedDeviceTypes":[%s]}' \
+        "$version" "$identifier" "$types"
+}
+# The runtimes the Mac has: one, that runs both devices
+printf '{"runtimes":[%s]}' "$(runtime runtime-27 27.0 iphone ipad)" > "$RUNTIMES"
 
 # run <environment assignments>... -- <arguments of the script>...; sets OUT, RC and TOOK (seconds), and LOG holds the calls to xcrun
 run() {
@@ -402,6 +421,44 @@ expect "    does not compose" "the composer ran" not_composed
 run -- --compose-only --languages en
 expect "  a --compose-only for the language that is whole" "exit $RC" [ "$RC" = 0 ]
 expect "    composes it" "the composer did not run" composed
+
+# 14. A simulator that is not there yet is made on the newest iOS runtime that runs its device type. An Xcode can bring a
+#     newer runtime that runs only some devices: Xcode 27.2 has iOS 27.1, which runs only the iPhone Duo, and simctl will not
+#     make an iPhone 17 Pro Max on it ("Incompatible device"). An --ios whose runtime does not run the device is refused.
+printf '{"runtimes":[%s,%s,%s]}' "$(runtime runtime-26-5 26.5 iphone ipad)" "$(runtime runtime-27-0 27.0 iphone ipad)" \
+    "$(runtime runtime-27-1 27.1 duo)" > "$T/runtimes-xcode-27.2.json"
+printf '{"runtimes":[%s]}' "$(runtime runtime-27-1 27.1 duo)" > "$T/runtimes-duo-only.json"
+XCODE_27_2="FAKE_RUNTIMES=$T/runtimes-xcode-27.2.json"
+# A prefix no simulator carries yet, so that the run makes its simulator
+NEW=(--simulator-prefix "PrestoCV store new")
+rm -rf "$LOCK" "$OUT_DIR"
+run "$XCODE_27_2" -- "${NEW[@]}"
+expect "a newest runtime that does not run the device" "exit $RC" [ "$RC" = 0 ]
+expect "  makes the simulator on the newest one that does" "no simctl create on runtime-27-0" \
+    called "simctl create PrestoCV store new iphone type-iphone runtime-27-0"
+expect "  and not on the newest" "a simctl call names runtime-27-1" not_called "runtime-27-1"
+run "$XCODE_27_2" -- "${NEW[@]}" --ios 27
+expect "an --ios of two runtimes, the newer of which does not run the device" "exit $RC" [ "$RC" = 0 ]
+expect "  makes the simulator on the one that does" "no simctl create on runtime-27-0" \
+    called "simctl create PrestoCV store new iphone (iOS 27) type-iphone runtime-27-0"
+run "$XCODE_27_2" -- "${NEW[@]}" --ios 27.1
+expect "an --ios whose runtime does not run the device" "exit $RC, want 2" [ "$RC" = 2 ]
+expect "  says why" "no mention of iOS 27.1" says "iOS 27.1"
+expect "  names the device" "no mention of the iPhone 17 Pro Max" says "iPhone 17 Pro Max"
+expect "  names the runtimes that run it" "no mention of 26.5 and 27.0" says "26.5, 27.0"
+expect "  makes no simulator" "simctl create was called" not_called "simctl create"
+expect "  erases nothing" "something was erased" not_called "simctl erase"
+expect "  leaves no lock" "$LOCK is left" no_lock
+run "FAKE_RUNTIMES=$T/runtimes-duo-only.json" -- "${NEW[@]}"
+expect "a Mac with no runtime that runs the device" "exit $RC, want 1" [ "$RC" = 1 ]
+expect "  says why" "no mention of the iPhone 17 Pro Max" says "iPhone 17 Pro Max"
+expect "  makes no simulator" "simctl create was called" not_called "simctl create"
+expect "  erases nothing" "something was erased" not_called "simctl erase"
+expect "  leaves no lock" "$LOCK is left" no_lock
+run "FAKE_RUNTIMES=$T/runtimes-duo-only.json" -- "${NEW[@]}" --ios 27.1
+expect "an --ios whose runtime does not run the device, on a Mac where none does" "exit $RC, want 2" [ "$RC" = 2 ]
+expect "  says that no other runtime runs it" "no mention of the other runtimes" says "no other iOS runtime of this Mac does"
+expect "  makes no simulator" "simctl create was called" not_called "simctl create"
 
 # The test sets a time allowance for each language, and Xcode enforces it only where the plan turns test timeouts on
 PLAN="$HERE/../../TestPlans/StoreScreenshots.xctestplan"
