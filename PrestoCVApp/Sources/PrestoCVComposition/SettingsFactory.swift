@@ -22,18 +22,18 @@ public struct SettingsFactory {
     }
 
     private let facts: Facts
-    private let diagnostics: any DiagnosticsReading
+    private let trace: TraceAccess
 
-    /// - Parameter diagnostics: The trace of a test build, over its gate (`TraceDiagnostics`).
-    init(facts: Facts, diagnostics: any DiagnosticsReading) {
+    /// - Parameter trace: The gate and the stored runs of a test build's trace, which `TraceDiagnostics` adapts.
+    init(facts: Facts, trace: TraceAccess) {
         self.facts = facts
-        self.diagnostics = diagnostics
+        self.trace = trace
     }
 
     public func makeSettings() -> SettingsViewModel {
         SettingsViewModel(
             supportAddress: facts.supportAddress, privacyPolicy: facts.privacyPolicy, sourceCode: facts.sourceCode,
-            version: facts.version, build: facts.build, appName: facts.appName, diagnostics: diagnostics
+            version: facts.version, build: facts.build, appName: facts.appName, diagnostics: TraceDiagnostics(access: trace)
         )
     }
 
@@ -41,7 +41,9 @@ public struct SettingsFactory {
         LicencesViewModel(reading: LicenceNoticesFile(contents: facts.notices))
     }
 
+    /// Each screen gets an adapter of its own, and with it copies of its own: a screen open in two windows never removes
+    /// the files the other offers.
     public func makeDiagnostics() -> DiagnosticsViewModel {
-        DiagnosticsViewModel(reading: diagnostics)
+        DiagnosticsViewModel(reading: TraceDiagnostics(access: trace))
     }
 }

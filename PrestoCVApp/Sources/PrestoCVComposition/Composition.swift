@@ -148,7 +148,7 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
-        settings = SettingsFactory(facts: inputs.settings, diagnostics: TraceDiagnostics(access: trace.access))
+        settings = SettingsFactory(facts: inputs.settings, trace: trace.access)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer

@@ -9,10 +9,11 @@ public protocol DiagnosticsReading: Sendable {
     func isAvailable() async -> Bool
     /// The stored runs, newest first.
     func runs() async -> [DiagnosticRun]
-    /// Copies of a run's files to share, in a temporary folder that `discardCopies` removes. A copy that cannot be made
-    /// throws; a cancelled task stays a `CancellationError` (R3, R7).
+    /// Copies of a run's files to share, in a temporary folder that `discardCopies` removes. Each reader keeps one set of
+    /// copies of its own, which each copy replaces: one reader's copies and discard never touch another's. A copy that
+    /// cannot be made throws; a cancelled task stays a `CancellationError` (R3, R7).
     func shareCopies(of id: UUID) async throws -> [URL]
-    /// Removes the copies made to share.
+    /// Removes this reader's copies made to share.
     func discardCopies() async
 }
 

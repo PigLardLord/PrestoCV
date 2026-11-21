@@ -4,24 +4,39 @@ import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
 
-/// A trace reader with fixed runs that records the calls it got.
-actor TraceReaderFake: TraceReading {
+/// A trace reader with fixed runs that records the calls it got: a copy or a discard of the single set has no holder.
+actor TraceReaderFake: TraceReading, TraceSharing {
     struct Unreadable: Error {}
+    struct Copy: Equatable {
+        let run: UUID
+        let holder: UUID?
+    }
+
     private let stored: [TraceRunListing]
-    private(set) var copiesMadeFor: [UUID] = []
-    private(set) var discards = 0
+    private(set) var copies: [Copy] = []
+    private(set) var discards: [UUID?] = []
 
     init(runs: [TraceRunListing]) { stored = runs }
 
     func runs() async -> [TraceRunListing] { stored }
 
     func shareCopies(of id: UUID) async throws -> [URL] {
-        copiesMadeFor.append(id)
+        try copy(id, for: nil)
+    }
+
+    func discardCopies() async { discards.append(nil) }
+
+    func shareCopies(of id: UUID, for holder: UUID) async throws -> [URL] {
+        try copy(id, for: holder)
+    }
+
+    func discardCopies(for holder: UUID) async { discards.append(holder) }
+
+    private func copy(_ id: UUID, for holder: UUID?) throws -> [URL] {
+        copies.append(Copy(run: id, holder: holder))
         guard stored.contains(where: { $0.id == id }) else { throw Unreadable() }
         return [URL(fileURLWithPath: "/tmp/share/\(id.uuidString).json")]
     }
-
-    func discardCopies() async { discards += 1 }
 }
 
 /// The diagnostics port over the trace: the runs in the port's own terms, the gate from `TraceAccess`, and the copies
@@ -30,9 +45,9 @@ actor TraceReaderFake: TraceReading {
 struct TraceDiagnosticsTests {
     private static let started = Date(timeIntervalSince1970: 1_800_000_000)
 
-    /// An adapter over a closed gate and no runs
-    static func reading() -> TraceDiagnostics {
-        TraceDiagnostics(access: TraceAccess(isOn: { false }, reader: TraceReaderFake(runs: [])))
+    /// A trace whose gate is closed, with no runs
+    static func closedTrace() -> TraceAccess {
+        TraceAccess(isOn: { false }, reader: TraceReaderFake(runs: []))
     }
 
     private static func listing(_ kind: TraceKind, _ outcome: TraceOutcome?) -> TraceRunListing {
@@ -65,7 +80,7 @@ struct TraceDiagnosticsTests {
         #expect(await !closed.isAvailable())
     }
 
-    @Test("Diagnostics adapter passes the copies and their discard to the reader")
+    @Test("Diagnostics adapter passes the copies and their discard to the reader, as its own holder's")
     func passesCopies() async throws {
         let listing = Self.listing(.aiDraft, .finished)
         let reader = TraceReaderFake(runs: [listing])
@@ -75,8 +90,24 @@ struct TraceDiagnosticsTests {
         await adapter.discardCopies()
 
         #expect(files.map(\.lastPathComponent) == ["\(listing.id.uuidString).json"])
-        #expect(await reader.copiesMadeFor == [listing.id])
-        #expect(await reader.discards == 1)
+        #expect(await reader.copies == [TraceReaderFake.Copy(run: listing.id, holder: adapter.holder)])
+        #expect(await reader.discards == [adapter.holder])
+    }
+
+    @Test("Two diagnostics adapters over one trace hold copies of their own")
+    func adaptersHoldTheirOwnCopies() async throws {
+        let listing = Self.listing(.aiDraft, .finished)
+        let reader = TraceReaderFake(runs: [listing])
+        let access = TraceAccess(isOn: { true }, reader: reader)
+        let window = TraceDiagnostics(access: access)
+        let otherWindow = TraceDiagnostics(access: access)
+
+        _ = try await window.shareCopies(of: listing.id)
+        await otherWindow.discardCopies()
+
+        #expect(window.holder != otherWindow.holder)
+        #expect(await reader.copies.map(\.holder) == [window.holder])
+        #expect(await reader.discards == [otherWindow.holder])
     }
 
     @Test("Diagnostics adapter lets a copy that cannot be made throw")

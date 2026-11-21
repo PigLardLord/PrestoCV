@@ -54,7 +54,7 @@ public final class DiagnosticsViewModel {
 
     /// Chooses a run: shows its summary at once and makes the copies of its files to share. Only the latest choice sets the
     /// files: a copy that ends after a newer choice started, or after the screen closed, is not offered. The copies are
-    /// made one choice at a time, because the store keeps one folder of copies and each copy empties it first; a choice
+    /// made one choice at a time, because the reader keeps one set of copies and each copy replaces it; a choice
     /// that a newer one replaced before its turn came makes no copy. An id the screen does not list, or a choice on a
     /// closed screen, changes nothing.
     public func select(_ id: UUID) async {
