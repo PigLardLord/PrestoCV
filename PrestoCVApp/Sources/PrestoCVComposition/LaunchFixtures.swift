@@ -20,8 +20,8 @@ import PrestoCVWorkflowPorts
 /// - `-PrestoCVNextShareStandIn`: a share opens a stand-in of the system's share sheet, which a UI test can read and
 ///   answer (save, send, cancel), and never the system's own. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextTraceRuns`: two invented runs of the diagnostics (an AI draft that finished, an import that failed) are
-///   stored before the trace chain starts, so that a closed gate purges them and an open one lists them. It needs one of
-///   the two storage arguments, as the seed does.
+///   stored before the trace chain starts, so that a closed gate purges them and an open one lists them. The launch shows
+///   its first screen only once the gate has done so. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
 struct LaunchFixtures: Equatable, Sendable {

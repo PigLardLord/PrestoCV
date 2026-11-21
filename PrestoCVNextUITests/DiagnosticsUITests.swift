@@ -127,7 +127,8 @@ final class DiagnosticsUITests: RuntimeIssueFailingTestCase {
     }
 
     /// A gate that is closed purges the runs: the app launched with them on an App Store install, and launched again on a
-    /// TestFlight install over the same folder, has none to list.
+    /// TestFlight install over the same folder, has none to list. A launch with the runs shows its first screen only once
+    /// the gate has purged them, so the first app may be ended as soon as Settings shows.
     @MainActor
     func testTheRunsOfAClosedGateAreGone() throws {
         let storage = ["-PrestoCVNextStorage", "closed-gate-\(UUID().uuidString)"]

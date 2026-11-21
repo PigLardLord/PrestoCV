@@ -350,7 +350,7 @@ public final class Composition {
         sharesWithStandIn = false
         wrapStore = { $0 }
         #endif
-        return await make(Inputs(
+        let state = await make(Inputs(
             paths: paths,
             clock: SystemTimeSource(),
             ids: UUIDGenerator(),
@@ -385,6 +385,12 @@ public final class Composition {
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             settings: bundledSettings()
         ))
+        #if DEBUG
+        // A launch with the invented runs returns once its trace has settled, so that a UI test that sees the first screen
+        // knows what the gate did with them: a closed gate has purged them. The fixture's distribution answers at once.
+        if fixtures.storesTraceRuns { await settlement.previous()?.value }
+        #endif
+        return state
     }
 
     /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of

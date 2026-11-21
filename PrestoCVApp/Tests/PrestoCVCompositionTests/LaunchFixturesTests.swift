@@ -407,7 +407,7 @@ struct LaunchFixturesTests {
     }
 
     @MainActor
-    @Test("The invented runs of a launch with an open gate are listed, and a closed gate purges them", .printsForReal, arguments: [("sandbox", 2), ("production", 0)])
+    @Test("The invented runs of a launch with an open gate are listed, and a closed gate has purged them once the launch is ready", .printsForReal, arguments: [("sandbox", 2), ("production", 0)])
     func inventedRunsAndTheGate(answer: String, listed: Int) async throws {
         let name = Self.unique()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
@@ -422,8 +422,7 @@ struct LaunchFixturesTests {
             Issue.record("expected ready, got \(state)")
             return
         }
-        _ = await composition.traceAccess.isOn()
-        #expect(await composition.traceAccess.reader.runs().count == listed)
+        #expect(await composition.traceAccess.reader.runs().count == listed, "Read before anything waits for the trace")
     }
 
     @MainActor
