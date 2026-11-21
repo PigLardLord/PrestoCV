@@ -8,6 +8,10 @@ struct OpenCertification {
     var statesIssuerOrYear: Bool
     /// Whether the title is the line right above: only that line can be completed by a line that names its issuer.
     var isRightAbove = true
+    /// Whether the title's line starts with the certification's name: only then does the place of that line on the page
+    /// tell where the name stands. A line that starts with a date, "2023  First Certificate", or with the section's
+    /// heading beside the title, starts where they do.
+    let startsWithTheName: Bool
 }
 
 /// A line of a certifications section, as the rules that join it to the certification above it see it (#283).
@@ -72,22 +76,25 @@ struct CertificationLine {
     ///    "Verifica online", in the six languages), is that certification's link. With none above, it is text not
     ///    imported. A bare noun, "Certificate https://…", is no label: the line is a certification of its own.
     /// 2. With no certification above, any other line is a certification of its own.
-    /// 3. A plain line (not bold, with no gap before it and no web address) that reads as one text and names no
-    ///    organisation or school, that the layout places under the title (in the same column, indented or in a smaller
-    ///    size), is that certification's description when the certification has an issuer or a year: a bare name could as
-    ///    well be a heading over the lines under it. The weight of a line is never evidence.
+    /// 3. A plain line (not bold, with no gap before it and no web address) with none of the separators the reader cuts
+    ///    a line at, that names no organisation or school and that the layout places under the title (in the same column,
+    ///    indented from the name or in a smaller size), is that certification's description when the certification has an
+    ///    issuer or a year: a bare name could as well be a heading over the lines under it. The weight of a line is never
+    ///    evidence.
     /// 4. A plain line that reads as one text and as a sentence is that certification's description, when the
-    ///    certification's title is no sentence itself. When the layout does not place it under the title, only its
-    ///    words did: the person checks the certification ("First Certificate" over "Introduction to machine learning.").
+    ///    certification's title is no sentence itself. When the layout does not place it under the title, or the reader
+    ///    cuts it, only its words did: the person checks the certification ("First Certificate" over "Introduction to
+    ///    machine learning.", or over an indented "Covers Swift, testing and deployment.").
     /// 5. Everything else is a certification of its own: a line the reader cuts into a title and its issuer, "Swift
-    ///    Basics, Example Academy.", whatever it ends with. One that reads as a sentence with no issuer, split off only by
-    ///    an address, a date, a gap, a marker or a part in capitals, may as well be the description above: the person
-    ///    checks it.
+    ///    Basics, Example Academy.", whatever it ends with. One that may as well be the description above, the person
+    ///    checks: a line the layout places under the title that the reader cuts, "Swift Basics, remote", which only the
+    ///    case of its later part reads as one text, and a sentence with no issuer, split off only by an address, a date, a
+    ///    gap, a marker or a part in capitals.
     func role(after open: OpenCertification?) -> Role {
         guard let open else { return isLinkOnly ? .unplaced : .entry(check: nil) }
         if isLinkOnly { return .link(open) }
-        if isPlacedUnder(open) { return .description(open, check: nil) }
-        if isSentence(under: open) { return .description(open, check: isLaidOutUnder(open) ? nil : .descriptionOrEntryUnsure) }
+        if isPlacedUnder(open) && isUncut { return .description(open, check: nil) }
+        if isSentence(under: open) { return .description(open, check: isLaidOutUnder(open) && isUncut ? nil : .descriptionOrEntryUnsure) }
         return .entry(check: isInDoubt(under: open) ? .descriptionOrEntryUnsure : nil)
     }
 
@@ -115,8 +122,12 @@ struct CertificationLine {
     /// Whether the reader's cut leaves the line one text: no date, and, when it cuts the line, no part that names an
     /// organisation or school and no part after the first in capitals. A comma alone is no evidence of an issuer:
     /// "Covers Swift, testing and deployment." is one text; "Swift Basics, Example Academy." and "Level 2, Remote" are a
-    /// title with its details.
+    /// title with its details. On a cut line, only the case of its words decides: never clear evidence on its own.
     private var readsAsOneText: Bool { split.year == nil && !namesAnIssuer && !namesAPartInCapitals }
+
+    /// The line holds none of the separators the reader cuts a line at, outside brackets: no comma, dash or bar. A line
+    /// whose name holds a list, "Managing Anxiety, Stress, Sleep", is cut at its commas all the same.
+    private var isUncut: Bool { cells.allSatisfy { $0.split(by: CertificationReader.lineSeparators).count <= 1 } }
 
     /// The reader cuts the line, and one of its parts names an organisation or school.
     private var namesAnIssuer: Bool { split.parts.count > 1 && split.parts.contains { Self.isIssuer($0.text) } }
@@ -133,10 +144,11 @@ struct CertificationLine {
         isPlainText && readsAsOneText && !open.titleIsSentence && readsAsSentence
     }
 
-    /// Whether a line made a certification of its own may as well be the description of the one above: it reads as a
-    /// sentence, names no issuer, and the title above is no sentence itself.
+    /// Whether a line made a certification of its own may as well be the description of the one above: the layout
+    /// places it under the title, though the reader cuts it, or it reads as a sentence, names no issuer, and the title
+    /// above is no sentence itself.
     private func isInDoubt(under open: OpenCertification) -> Bool {
-        !open.titleIsSentence && readsAsSentence && !namesAnIssuer
+        isPlacedUnder(open) || (!open.titleIsSentence && readsAsSentence && !namesAnIssuer)
     }
 
     /// Whether the layout places the line under a certification with an issuer or a year, as its detail: a plain line
@@ -146,9 +158,11 @@ struct CertificationLine {
     }
 
     /// Whether the layout places the line under the certification's title: in the same column of the same page, and
-    /// either indented or in a smaller size.
+    /// either indented or in a smaller size. Only a title's line that starts with the name tells where the name stands,
+    /// and how large it is.
     private func isLaidOutUnder(_ open: OpenCertification) -> Bool {
-        guard let frame = block.frame, let titleFrame = open.title.frame, let size = block.fontSize, let titleSize = open.title.fontSize,
+        guard open.startsWithTheName, let frame = block.frame, let titleFrame = open.title.frame,
+              let size = block.fontSize, let titleSize = open.title.fontSize,
               block.page == open.title.page, block.column == open.title.column else { return false }
         return frame.x - titleFrame.x > 0.5 * titleSize || size < 0.9 * titleSize
     }

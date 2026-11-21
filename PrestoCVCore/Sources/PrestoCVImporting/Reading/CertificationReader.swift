@@ -187,7 +187,8 @@ enum CertificationReader {
         for address in line.addresses.dropFirst() { findings.unplace(address.piece, in: section) }
         let certification = findings.cv.certifications[index]
         return OpenCertification(index: index, title: line.block, titleIsSentence: line.readsAsSentence,
-                                 statesIssuerOrYear: certification.issuer != nil || certification.year != nil)
+                                 statesIssuerOrYear: certification.issuer != nil || certification.year != nil,
+                                 startsWithTheName: line.block.cells.first?.lowerBound == name.span.lowerBound)
     }
 
     /// Branch 6: a certification of its own, its name, issuer and year.

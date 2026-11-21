@@ -37,16 +37,23 @@ struct CertificationLinkTests {
     }
 
     private func importedPDF(_ rows: [Row]) async throws -> ImportResult {
+        try await importedPDF { sketch in
+            sketch.put("Certifications", x: 46, y: 130, size: 11, bold: true)
+            var y = 150.0
+            for row in rows {
+                if row.gap { y += 12 }
+                sketch.put(row.text, x: 46 + row.indent, y: y, size: row.size, bold: row.bold)
+                y += 14
+            }
+        }
+    }
+
+    /// A PDF page with a name and a role at the top, and what `place` puts under them.
+    private func importedPDF(_ place: (inout PageSketch) -> Void) async throws -> ImportResult {
         var sketch = PageSketch()
         sketch.put("Lena Marsh", x: 46, y: 50, size: 20, bold: true)
         sketch.put("iOS Developer", x: 46, y: 80)
-        sketch.put("Certifications", x: 46, y: 130, size: 11, bold: true)
-        var y = 150.0
-        for row in rows {
-            if row.gap { y += 12 }
-            sketch.put(row.text, x: 46 + row.indent, y: y, size: row.size, bold: row.bold)
-            y += 14
-        }
+        place(&sketch)
         return try await ImportCV(pdfReader: ScriptedPDFReader(layout: .pages([sketch.page])), limits: .standard).importPDF(Data([1]))
     }
 
@@ -528,7 +535,7 @@ struct CertificationLinkTests {
     }
 
     @Test("In a PDF, a sentence the layout places under the title, indented or smaller, is its description with nothing to check", arguments: [
-        "Introduction to machine learning.", "Covers Swift, testing and deployment.", "Tratta Swift, i test e il rilascio.",
+        "Introduction to machine learning.", "Einführung in das maschinelle Lernen.", "Introduzione al machine learning.",
     ])
     func laidOutSentenceIsNotChecked(line: String) async throws {
         for title in ["First Certificate", "First Certificate – Example Academy (2023)"] {
@@ -542,6 +549,103 @@ struct CertificationLinkTests {
                 #expect(result.ungrounded.isEmpty)
             }
         }
+    }
+
+    @Test("In a PDF, an indented sentence with a comma is the description, but only its words made it one text: the person checks the certification", arguments: [
+        "Covers Swift, testing and deployment.", "Behandelt Swift, das Testen und die Auslieferung.", "Tratta Swift, i test e il rilascio.",
+    ])
+    func laidOutSentenceWithACommaIsChecked(line: String) async throws {
+        for title in ["First Certificate", "First Certificate – Example Academy (2023)"] {
+            for (indent, size) in [(6.0, 9.5), (0.0, 8.0)] {
+                let result = try await importedPDF([Row(text: title, bold: true), Row(text: line, indent: indent, size: size)])
+                #expect(result.cv.certifications.map(\.name.value) == ["First Certificate"], "\(title), indent \(indent), size \(size)")
+                #expect(result.cv.certifications.first?.description?.value == line)
+                #expect(result.cv.certifications.first?.check == .descriptionOrEntryUnsure, "\(title), indent \(indent), size \(size)")
+                #expect(checked(result).map(\.field) == [.certification(0)])
+                #expect(result.unplaced.isEmpty)
+                #expect(result.ungrounded.isEmpty)
+            }
+        }
+    }
+
+    @Test("In a PDF, an indented line the reader cuts, its later part in lower case, is a certification of its own, and the person checks it", arguments: [
+        ("First Certificate – Example Academy (2023)", "Swift Basics, remote", "Swift Basics"),
+        ("First Certificate – Example Academy (2023)", "Swift Basics – online", "Swift Basics"),
+        ("First Certificate – Example Academy (2023)", "Swift Basics - online", "Swift Basics"),
+        ("First Certificate – Example Academy (2023)", "Managing Anxiety, Stress, Sleep", "Managing Anxiety, Stress, Sleep"),
+        ("Erstes Zertifikat – Beispiel Akademie (2023)", "Swift-Grundlagen, berufsbegleitend", "Swift-Grundlagen"),
+        ("Primo Certificato – Accademia Esempio (2023)", "Fondamenti di Swift, da remoto", "Fondamenti di Swift"),
+    ])
+    func laidOutCutLineIsChecked(title: String, line: String, name: String) async throws {
+        for (indent, size) in [(8.0, 9.5), (0.0, 8.0)] {
+            for bold in [false, true] {
+                let result = try await importedPDF([Row(text: title, bold: bold), Row(text: line, indent: indent, size: size)])
+                let layout = "\(line), indent \(indent), size \(size), bold \(bold)"
+                #expect(result.cv.certifications.count == 2, "\(layout)")
+                #expect(result.cv.certifications.last?.name.value == name, "\(layout)")
+                #expect(result.cv.certifications.allSatisfy { $0.description == nil }, "\(layout)")
+                #expect(result.cv.certifications.map(\.check) == [nil, .descriptionOrEntryUnsure], "\(layout)")
+                #expect(checked(result).map(\.field) == [.certification(1)], "\(layout)")
+                #expect(result.ungrounded.isEmpty)
+                #expect(Coverage.lost(result).isEmpty)
+            }
+        }
+    }
+
+    /// The heading, then a certification whose line starts with its date: in a rail of its own, close enough to join the
+    /// line, or in the same words. Then `line` under the certification's name.
+    private func importedUnderADatedTitle(dateApart: Bool, line: String) async throws -> ImportResult {
+        try await importedPDF { sketch in
+            sketch.put("Certifications", x: 46, y: 130, size: 11, bold: true)
+            if dateApart {
+                sketch.put("2023", x: 46, y: 150)
+                sketch.put("First Certificate – Example Academy", x: 76, y: 150)
+            } else {
+                sketch.put("2023 First Certificate – Example Academy", x: 46, y: 150)
+            }
+            sketch.put(line, x: dateApart ? 76 : 68, y: 164)
+        }
+    }
+
+    @Test("In a PDF, a title line that starts with its date tells nothing of where the name stands: a plain line under the name is a certification of its own", arguments: [
+        true, false,
+    ])
+    func lineUnderADatedTitle(dateApart: Bool) async throws {
+        let result = try await importedUnderADatedTitle(dateApart: dateApart, line: "Swift Basics")
+        #expect(result.cv.certifications.map(\.name.value) == ["First Certificate", "Swift Basics"])
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(result.cv.certifications.first?.year?.value == 2023)
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
+    }
+
+    @Test("In a PDF, a sentence under the name of a title line that starts with its date is its description by its words only: the person checks the certification", arguments: [
+        true, false,
+    ])
+    func sentenceUnderADatedTitle(dateApart: Bool) async throws {
+        let result = try await importedUnderADatedTitle(dateApart: dateApart, line: "Introduction to machine learning.")
+        #expect(result.cv.certifications.map(\.name.value) == ["First Certificate"])
+        #expect(result.cv.certifications.first?.description?.value == "Introduction to machine learning.")
+        #expect(result.cv.certifications.first?.check == .descriptionOrEntryUnsure)
+        #expect(checked(result).map(\.field) == [.certification(0)])
+        #expect(result.ungrounded.isEmpty)
+    }
+
+    @Test("In a PDF, a title on the line of the heading stands where the heading does: a plain line under its name is a certification of its own", arguments: [
+        11.0, 9.5,
+    ])
+    func lineUnderATitleBesideTheHeading(headingSize: Double) async throws {
+        let result = try await importedPDF { sketch in
+            sketch.put("Certifications", x: 46, y: 150, size: headingSize, bold: true)
+            sketch.put("First Certificate – Example Academy (2023)", x: 140, y: 150)
+            sketch.put("Swift Basics", x: 140, y: 164)
+            sketch.put("Advanced Swift", x: 140, y: 178)
+        }
+        #expect(result.cv.certifications.first?.name.value == "First Certificate")
+        #expect(result.cv.certifications.last?.name.value == "Advanced Swift")
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil })
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
     }
 
     @Test("A sentence with commas under a certification is its description: a comma before words in lower case names no issuer", arguments: [
