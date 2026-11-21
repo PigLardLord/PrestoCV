@@ -96,7 +96,7 @@ struct LegacyImportReportTests {
         #expect(report.state == .review)
     }
 
-    @Test("no sheet without losses, after the choice not to be reminded, or when the list cannot be read")
+    @Test("no sheet without losses, after the choice not to be reminded, or when the list cannot be read; the mark stays")
     func noSheet() async throws {
         let ada = try await world.stored(title: "Ada")
         let nothing = report(ReviewingFake())
@@ -111,7 +111,22 @@ struct LegacyImportReportTests {
         world.browsing.listError.withLock { $0 = .unavailable }
         let unlisted = report(ReviewingFake(drops: [ada.id: [.look]]))
         await unlisted.load()
-        #expect(unlisted.state == .hidden && unlisted.leftOut.isEmpty && !unlisted.isIncomplete(world.reference(ada)))
+        #expect(unlisted.state == .hidden && unlisted.leftOut.isEmpty && unlisted.isIncomplete(world.reference(ada)))
+    }
+
+    @Test("a list the report could not read and that reads later still marks the CV that lost details, and no other")
+    func markWithoutTheList() async throws {
+        let ada = try await world.stored(title: "Ada")
+        let linus = try await world.stored(title: "Linus")
+        world.browsing.listError.withLock { $0 = .unavailable }
+        let report = report(ReviewingFake(drops: [ada.id: [.look], linus.id: []], toCheck: [linus.id: [.period]]))
+
+        await report.load()
+        world.browsing.listError.withLock { $0 = nil }
+        let listed = try await world.browsing.list().cvs.map { CVReference(id: $0.id) }
+
+        #expect(listed.filter(report.isIncomplete) == [world.reference(ada)])
+        #expect(report.state == .hidden)
     }
 
     @Test("the list marks the CVs that lost details as incomplete, not those only to check, and the mark stays after Not now")
@@ -143,6 +158,7 @@ struct LegacyImportReportTests {
 
         #expect(reviewing.removals.withLock { $0 } == [[ada.id, linus.id]])
         #expect(report.state == .removed && !report.isIncomplete(world.reference(ada)))
+        #expect(report.isIncomplete(CVReference(id: unlisted)))
     }
 
     @Test("the CVs not imported are counted by cause, and their notice stays until hidden")

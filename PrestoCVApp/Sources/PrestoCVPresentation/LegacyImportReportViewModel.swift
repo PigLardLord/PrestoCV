@@ -14,7 +14,8 @@ public final class LegacyImportReportViewModel {
     /// The CVs that lost details, in the list's order, each with the label the list shows. Read at each launch while the
     /// old copies stay, even when the sheet does not show.
     public private(set) var leftOut: [LegacyReportRow] = []
-    /// The CVs the list marks as incomplete: those of `leftOut` while their old copy stays, whether the sheet shows or not.
+    /// The CVs the list marks as incomplete: those the summary says lost details, while their old copy stays, whether the
+    /// sheet shows or not and whether the list could be read.
     private var incomplete: Set<CVReference> = []
     /// The CVs that keep details as written for the person to check, apart: none of them is incomplete for it.
     public private(set) var toCheck: [LegacyReportRow] = []
@@ -66,6 +67,7 @@ public final class LegacyImportReportViewModel {
             summary.leftOut[cause].flatMap { $0 > 0 ? NotImportedCount(cause: NotImportedCause(cause), count: $0) : nil }
         }
         notice = summary.didNotRun ? .didNotRun : notImportedTotal > 0 ? .notImported(notImportedTotal) : nil
+        incomplete = Set(summary.drops.compactMap { $0.value.isEmpty ? nil : CVReference(id: $0.key) })
         guard !summary.drops.isEmpty || !summary.toCheck.isEmpty else { return }
         let listing: CVListing
         do {
@@ -76,7 +78,6 @@ public final class LegacyImportReportViewModel {
         let labels = CVListViewModel.labels(of: listing.cvs, untitled: untitled, numbered: numbered)
         leftOut = rows(of: listing.cvs, with: summary.drops.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
         toCheck = rows(of: listing.cvs, with: summary.toCheck.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
-        incomplete = Set(leftOut.map(\.id))
         guard !leftOut.isEmpty || !toCheck.isEmpty, await reminder.remindsAgain() else { return }
         state = .review
     }
@@ -91,8 +92,9 @@ public final class LegacyImportReportViewModel {
     public func confirm() async {
         guard state == .review else { return }
         state = .removing
-        let kept = await reviewing.removeOldCopies(of: Set((leftOut + toCheck).map(\.id.id)))
-        incomplete = Set(leftOut.map(\.id).filter { kept.contains($0.id) })
+        let shown = Set((leftOut + toCheck).map(\.id.id))
+        let kept = await reviewing.removeOldCopies(of: shown)
+        incomplete = incomplete.filter { !shown.contains($0.id) || kept.contains($0.id) }
         state = kept.isEmpty ? .removed : .keptSome(kept.count)
     }
 
