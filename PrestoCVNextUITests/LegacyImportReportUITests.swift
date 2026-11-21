@@ -2,7 +2,7 @@ import XCTest
 
 /// The first launch after an upgrade imports the released app's CVs. A sheet over the list names what each CV left out;
 /// Confirm removes the old copies, Not now keeps them and the sheet comes back at the next launch, unless the person
-/// asked not to be reminded. Old CVs the import could not bring in are told in a notice over the list, never as an empty
+/// asked not to be reminded. While the old copy stays, the list marks the CV as incomplete. Old CVs the import could not bring in are told in a notice over the list, never as an empty
 /// list, and their files stay for the next launch.
 final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
 
@@ -57,6 +57,17 @@ final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Backend, ")).firstMatch
     }
 
+    /// The words of the list's mark on a CV the import left details out of.
+    private let incomplete = "Some details left out"
+
+    /// Waits until the list's row of the imported CV shows the mark, or does not.
+    @MainActor
+    private func waitUntilRow(in app: XCUIApplication, isMarked marked: Bool) -> Bool {
+        let format = marked ? "label CONTAINS %@" : "NOT (label CONTAINS %@)"
+        let shown = expectation(for: NSPredicate(format: format, incomplete), evaluatedWith: listRow(in: app))
+        return XCTWaiter().wait(for: [shown], timeout: 30) == .completed
+    }
+
     @MainActor
     private func waitUntilGone(_ element: XCUIElement) -> Bool {
         let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
@@ -98,14 +109,18 @@ final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
         app.buttons["legacyImport.notNow"].tap()
         XCTAssertTrue(waitUntilGone(row), "Not now closes the sheet")
         XCTAssertTrue(listRow(in: app).exists, "The imported CV is listed")
+        XCTAssertTrue(waitUntilRow(in: app, isMarked: true), "The list marks the CV while its old copy stays")
 
         app = try relaunch(app)
         let confirm = app.buttons["legacyImport.confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 30), "The old copy stayed, so the sheet is back")
         confirm.tap()
         XCTAssertTrue(waitUntilGone(confirm), "Confirm closes the sheet once the old copy is removed")
+        XCTAssertTrue(waitUntilRow(in: app, isMarked: false), "Confirm takes the mark away")
 
-        assertListWithoutSheet(try relaunch(app))
+        app = try relaunch(app)
+        assertListWithoutSheet(app)
+        XCTAssertTrue(waitUntilRow(in: app, isMarked: false), "No mark once the old copy is gone")
     }
 
     /// With "Don't remind me again", Not now keeps the old copy and the sheet does not come back.
@@ -119,7 +134,9 @@ final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
         app.buttons["legacyImport.notNow"].tap()
         XCTAssertTrue(waitUntilGone(check))
 
-        assertListWithoutSheet(try relaunch(app))
+        let again = try relaunch(app)
+        assertListWithoutSheet(again)
+        XCTAssertTrue(waitUntilRow(in: again, isMarked: true), "The old copy stays, so the list still marks the CV")
     }
 
     /// Pulling the sheet down closes it as Not now does: it never removes the old copy.

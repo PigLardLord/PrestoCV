@@ -23,8 +23,11 @@ public struct LegacyImportReview: LegacyImportReviewing {
         }
     }
 
-    public func removeOldCopies() async -> Int {
-        guard case .ran(let report) = outcome else { return 0 }
-        return await importer.acknowledgeLosses(of: report).failures.count
+    public func removeOldCopies(of shown: Set<CVID>) async -> Set<CVID> {
+        guard case .ran(let report) = outcome else { return [] }
+        var named = report
+        named.awaitingAcknowledgement = report.awaitingAcknowledgement.filter { shown.contains($0.key) }
+        let kept = Set(await importer.acknowledgeLosses(of: named).failures.map(\.key))
+        return Set(named.awaitingAcknowledgement.compactMap { kept.contains($0.value.key) ? $0.key : nil })
     }
 }

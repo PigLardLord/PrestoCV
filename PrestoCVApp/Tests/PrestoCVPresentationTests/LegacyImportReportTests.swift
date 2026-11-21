@@ -5,25 +5,26 @@ import PrestoCVDomain
 @testable import PrestoCVPresentation
 import PrestoCVWorkflowPorts
 
-/// The import's report as a test sets it, and the removal of the old copies: it returns `kept` after its gate.
+/// The import's report as a test sets it, and the removal of the old copies: it records the CVs each removal names, and
+/// after its gate returns those of them in `kept`.
 final class ReviewingFake: LegacyImportReviewing {
     let summary: LegacyImportSummary
-    let kept: Int
-    let removals = Mutex(0)
+    let kept: Set<CVID>
+    let removals = Mutex<[Set<CVID>]>([])
     let gate = Gate()
 
     init(
         drops: [CVID: [LegacyDrop]] = [:], toCheck: [CVID: [LegacyCheck]] = [:], leftOut: [LegacyLeftOut: Int] = [:],
-        didNotRun: Bool = false, kept: Int = 0
+        didNotRun: Bool = false, kept: Set<CVID> = []
     ) {
         summary = LegacyImportSummary(drops: drops, toCheck: toCheck, leftOut: leftOut, didNotRun: didNotRun)
         self.kept = kept
     }
 
-    func removeOldCopies() async -> Int {
-        removals.withLock { $0 += 1 }
+    func removeOldCopies(of shown: Set<CVID>) async -> Set<CVID> {
+        removals.withLock { $0.append(shown) }
         await gate.pass()
-        return kept
+        return kept.intersection(shown)
     }
 }
 
@@ -105,12 +106,43 @@ struct LegacyImportReportTests {
         let declined = report(ReviewingFake(drops: [ada.id: [.look]]), reminder: ReminderFake(stopped: true))
         await declined.load()
         #expect(declined.state == .hidden)
-        #expect(declined.leftOut.map(\.id) == [world.reference(ada)], "the rows stay for the list's mark")
+        #expect(declined.leftOut.map(\.id) == [world.reference(ada)] && declined.isIncomplete(world.reference(ada)))
 
         world.browsing.listError.withLock { $0 = .unavailable }
         let unlisted = report(ReviewingFake(drops: [ada.id: [.look]]))
         await unlisted.load()
-        #expect(unlisted.state == .hidden && unlisted.leftOut.isEmpty)
+        #expect(unlisted.state == .hidden && unlisted.leftOut.isEmpty && !unlisted.isIncomplete(world.reference(ada)))
+    }
+
+    @Test("the list marks the CVs that lost details as incomplete, not those only to check, and the mark stays after Not now")
+    func incomplete() async throws {
+        let ada = try await world.stored(title: "Ada")
+        let linus = try await world.stored(title: "Linus")
+        let margaret = try await world.stored(title: "Margaret")
+        let report = report(ReviewingFake(drops: [ada.id: [.look]], toCheck: [ada.id: [.period], linus.id: [.period]]))
+
+        await report.load()
+        #expect(report.isIncomplete(world.reference(ada)))
+        #expect(!report.isIncomplete(world.reference(linus)) && !report.isIncomplete(world.reference(margaret)))
+
+        report.close()
+        #expect(report.state == .hidden && report.isIncomplete(world.reference(ada)))
+    }
+
+    @Test("Confirm removes only the old copies of the CVs the sheet shows: one missing from the list keeps its copy")
+    func confirmNamesTheShown() async throws {
+        let ada = try await world.stored(title: "Ada")
+        let linus = try await world.stored(title: "Linus")
+        let unlisted = world.editing.ids.next()
+        let reviewing = ReviewingFake(drops: [ada.id: [.look], unlisted: [.email]], toCheck: [linus.id: [.period], unlisted: [.period]])
+        let report = report(reviewing)
+        await report.load()
+        #expect(report.leftOut.map(\.id) == [world.reference(ada)] && report.toCheck.map(\.id) == [world.reference(linus)])
+
+        await report.confirm()
+
+        #expect(reviewing.removals.withLock { $0 } == [[ada.id, linus.id]])
+        #expect(report.state == .removed && !report.isIncomplete(world.reference(ada)))
     }
 
     @Test("the CVs not imported are counted by cause, and their notice stays until hidden")
@@ -156,20 +188,26 @@ struct LegacyImportReportTests {
         await second.value
 
         #expect(report.state == .removed && !report.isPresented)
-        #expect(reviewing.removals.withLock { $0 } == 1)
+        #expect(reviewing.removals.withLock { $0 } == [[ada.id]])
         #expect(await reminder.remindsAgain())
     }
 
-    @Test("old copies that stay keep the sheet on the result until Done")
+    @Test("old copies that stay keep the sheet on the result until Done, and their CVs keep the mark")
     func keptSome() async throws {
         let ada = try await world.stored(title: "Ada")
-        let report = report(ReviewingFake(drops: [ada.id: [.look]], kept: 2))
+        let grace = try await world.stored(title: "Grace")
+        let linus = try await world.stored(title: "Linus")
+        let report = report(ReviewingFake(
+            drops: [ada.id: [.look], grace.id: [.email]], toCheck: [linus.id: [.period]], kept: [ada.id, linus.id]
+        ))
         await report.load()
 
         await report.confirm()
         #expect(report.state == .keptSome(2) && report.isPresented)
+        #expect(report.isIncomplete(world.reference(ada)))
+        #expect(!report.isIncomplete(world.reference(grace)) && !report.isIncomplete(world.reference(linus)))
         report.close()
-        #expect(report.state == .hidden)
+        #expect(report.state == .hidden && report.isIncomplete(world.reference(ada)))
     }
 
     @Test("Not now keeps the old copies, and with the check the report does not come back")
@@ -190,7 +228,7 @@ struct LegacyImportReportTests {
         await checked.storingChoice?.value
         #expect(checked.state == .hidden && checked.remindsNoMore)
         #expect(await !reminder.remindsAgain())
-        #expect(reviewing.removals.withLock { $0 } == 0)
+        #expect(reviewing.removals.withLock { $0 }.isEmpty)
     }
 
     @Test("a choice that cannot be kept is unchecked, and the report comes back")

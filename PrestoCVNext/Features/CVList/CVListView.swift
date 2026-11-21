@@ -52,7 +52,7 @@ struct CVListView: View {
             notices
             keptAbove
             ForEach(list.rows) { row in
-                CVRowView(list: list, row: row)
+                CVRowView(list: list, row: row, incomplete: report.isIncomplete(row.reference))
                     .tag(row.reference)
                 if let notice = kept.under[row.reference] {
                     keptNotice(notice)

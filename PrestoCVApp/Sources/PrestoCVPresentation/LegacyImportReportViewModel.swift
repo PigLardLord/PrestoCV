@@ -12,8 +12,10 @@ public final class LegacyImportReportViewModel {
 
     public private(set) var state: LegacyReportState = .hidden
     /// The CVs that lost details, in the list's order, each with the label the list shows. Read at each launch while the
-    /// old copies stay, even when the sheet does not show: they are the CVs the list can mark as incomplete.
+    /// old copies stay, even when the sheet does not show.
     public private(set) var leftOut: [LegacyReportRow] = []
+    /// The CVs the list marks as incomplete: those of `leftOut` while their old copy stays, whether the sheet shows or not.
+    private var incomplete: Set<CVReference> = []
     /// The CVs that keep details as written for the person to check, apart: none of them is incomplete for it.
     public private(set) var toCheck: [LegacyReportRow] = []
     /// The old CVs the import did not bring in, by cause.
@@ -74,16 +76,24 @@ public final class LegacyImportReportViewModel {
         let labels = CVListViewModel.labels(of: listing.cvs, untitled: untitled, numbered: numbered)
         leftOut = rows(of: listing.cvs, with: summary.drops.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
         toCheck = rows(of: listing.cvs, with: summary.toCheck.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
+        incomplete = Set(leftOut.map(\.id))
         guard !leftOut.isEmpty || !toCheck.isEmpty, await reminder.remindsAgain() else { return }
         state = .review
     }
 
-    /// Removes the old copies, whatever the check says. A second call while they are removed does nothing.
+    /// Whether the list marks the CV as incomplete.
+    public func isIncomplete(_ reference: CVReference) -> Bool {
+        incomplete.contains(reference)
+    }
+
+    /// Removes the old copies of the CVs the sheet shows, whatever the check says; a CV the sheet does not show keeps its old
+    /// copy. The CVs whose old copy stays keep their mark. A second call while they are removed does nothing.
     public func confirm() async {
         guard state == .review else { return }
         state = .removing
-        let kept = await reviewing.removeOldCopies()
-        state = kept == 0 ? .removed : .keptSome(kept)
+        let kept = await reviewing.removeOldCopies(of: Set((leftOut + toCheck).map(\.id.id)))
+        incomplete = Set(leftOut.map(\.id).filter { kept.contains($0.id) })
+        state = kept.isEmpty ? .removed : .keptSome(kept.count)
     }
 
     /// Not now, Done, or the sheet pulled down. From the review it keeps the choice not to be reminded, when made. Nothing

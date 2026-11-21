@@ -22,9 +22,10 @@ public struct LegacyImportSummary: Sendable, Equatable {
 /// docs/architecture/modules.md.
 public protocol LegacyImportReviewing: Sendable {
     var summary: LegacyImportSummary { get }
-    /// Removes the old copies of the CVs the report names, each only while its file holds what the import read. Returns how many
-    /// stay on the device: one that changed or could not be removed stays, and the next launch reports it again.
-    func removeOldCopies() async -> Int
+    /// Removes the old copies of the CVs in `shown`, the ones the report showed, each only while its file holds what the
+    /// import read; the old copy of a CV the report did not show stays. Returns the CVs of `shown` whose old copy stays on the
+    /// device: one that changed or could not be removed stays, and the next launch reports it again.
+    func removeOldCopies(of shown: Set<CVID>) async -> Set<CVID>
 }
 
 /// Whether the report shows again at the next launches. The import report owns this port (R3); its adapter,

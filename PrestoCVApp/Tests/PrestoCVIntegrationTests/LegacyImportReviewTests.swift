@@ -34,15 +34,23 @@ struct LegacyImportReviewTests {
     @Test("removing the old copies removes those of the CVs with drops or checks and leaves the damaged files")
     func removes() async throws {
         let (review, legacy) = try await launch()
-        #expect(await review.removeOldCopies() == 0)
+        #expect(await review.removeOldCopies(of: [ada, grace, margaret]).isEmpty)
         #expect(await legacy.names == ["damaged_0.json", "damaged_1.json"])
     }
 
-    @Test("an old copy that cannot be removed stays and is counted")
+    @Test("only the old copies of the CVs named are removed: those of the others stay")
+    func removesOnlyTheNamed() async throws {
+        let (review, legacy) = try await launch()
+        #expect(await review.removeOldCopies(of: [ada, linus]).isEmpty)
+        let left = [grace, margaret].map(InMemoryLegacyStore.name(of:)) + ["damaged_0.json", "damaged_1.json"]
+        #expect(await legacy.names == left.sorted())
+    }
+
+    @Test("an old copy that cannot be removed stays, and its CV is given back")
     func keepsWhatItCannotRemove() async throws {
         let (review, legacy) = try await launch()
         await legacy.failRemoving(grace)
-        #expect(await review.removeOldCopies() == 1)
+        #expect(await review.removeOldCopies(of: [ada, grace, margaret]) == [grace])
         #expect(await legacy.names.contains(InMemoryLegacyStore.name(of: grace)))
     }
 
@@ -53,7 +61,7 @@ struct LegacyImportReviewTests {
         let review = LegacyImportReview(outcome: .failed(.storeUnavailable(.cannotList)), importer: importer)
 
         #expect(review.summary == LegacyImportSummary(drops: [:], toCheck: [:], leftOut: [:], didNotRun: true))
-        #expect(await review.removeOldCopies() == 0)
+        #expect(await review.removeOldCopies(of: [ada]).isEmpty)
         #expect(await legacy.names == [InMemoryLegacyStore.name(of: ada)])
     }
 }
