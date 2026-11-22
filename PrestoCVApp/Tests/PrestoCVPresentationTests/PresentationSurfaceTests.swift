@@ -38,6 +38,7 @@ func useEveryPublicMember(of list: CVListViewModel, reference: CVReference) asyn
     }
     _ = list.now
     list.refreshNow()
+    let _: String = list.barTitle(of: nil, selected: reference, editorTitle: "")
     list.dismissNotice()
     if let row = rows.first {
         let _: CVReference = row.reference

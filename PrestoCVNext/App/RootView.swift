@@ -56,7 +56,11 @@ private final class ShellModels: ObservableObject {
         let numbered: @MainActor (String, Int) -> String = { title, number in
             String(localized: "shell.numbered \(title) \(number)")
         }
-        list = screens.makeCVList(untitled: untitled, numbered: numbered)
+        // The editor's bar is narrower than the list, so it has words of its own for a CV with no name and a new one
+        list = screens.makeCVList(
+            untitled: untitled, barUntitled: String(localized: "shell.bar.untitled"),
+            barNewCV: String(localized: "shell.bar.new"), numbered: numbered
+        )
         // The report names the CVs as the list does
         report = screens.makeLegacyImportReport(untitled: untitled, numbered: numbered)
         // A copy is named as the list names one, in the language the app shows; a PDF's file in the language of its

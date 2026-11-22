@@ -101,6 +101,8 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - untitled: The view's words for a CV with no title (R13).
     ///   - numbered: How the view numbers a title that reads like another row's (R13).
+    ///   - barUntitled: The view's words for a CV with no title in the editor's bar (R13).
+    ///   - barNewCV: The view's words for a CV not stored yet in the editor's bar (R13).
     ///
     /// Before it reads the store, the list has every editor still alive store what it shows at its turn, once
     /// (`editorsStored`, through each editor's `saveWhatItShows()`). An edit made after an editor's turn, even while that
@@ -108,11 +110,12 @@ public final class ScreenFactory {
     /// editors call the list's `load()` after each write they stored). The factory holds editors weakly, and the shell
     /// keeps an editor it lets go alive until its `saveNow()` ended, which stores every edit.
     public func makeCVList(
-        untitled: String, numbered: @escaping @MainActor (String, Int) -> String
+        untitled: String, barUntitled: String, barNewCV: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
         let clock = clock
         return CVListViewModel(
-            browsing: browsing, editing: listEditing, untitled: untitled, numbered: numbered, now: { clock.now() },
+            browsing: browsing, editing: listEditing, untitled: untitled, barUntitled: barUntitled, barNewCV: barNewCV,
+            numbered: numbered, now: { clock.now() },
             editorsStored: { [weak self] in await self?.storeEditors() }
         )
     }

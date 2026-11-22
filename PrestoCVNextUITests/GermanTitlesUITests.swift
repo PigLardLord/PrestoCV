@@ -2,15 +2,16 @@ import UIKit
 import XCTest
 
 /// The titles the editor gives its bar are whole in German, where the words are long: the bar cuts a title that needs
-/// more room than it has to "…". The editor of a new CV used to read "Neuer Leben…" (5-15c).
+/// more room than it has to "…". The editor of a new CV used to read "Neuer Leben…" (5-15c), and the bar's words are the shorter ones the released app used.
 ///
 /// A cut title is drawn narrower than its text, so each check measures the text, in the font the bar draws it in,
 /// against the width the bar gives it. VoiceOver reads the whole text either way, which is the text measured.
 final class GermanTitlesUITests: RuntimeIssueFailingTestCase {
 
-    /// `shell.draft.title` and `shell.untitled` in `PrestoCVNext/Resources/Localizable.xcstrings`, in German.
-    private static let newCV = "Neuer Lebenslauf"
-    private static let untitled = "Lebenslauf ohne Titel"
+    /// `shell.bar.new` and `shell.bar.untitled` in `PrestoCVNext/Resources/Localizable.xcstrings`, in German: the bar's own
+    /// words. The list keeps "Neuer Lebenslauf" and "Lebenslauf ohne Titel".
+    private static let newCV = "Lebenslauf"
+    private static let untitled = "Ohne Titel"
 
     private let nameless = "9D2C4B7E-5A1F-4E83-B6C0-2F7A8D9E1B34"
 
