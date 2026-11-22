@@ -285,6 +285,8 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
     func testEducationDescriptionCanBeTypedClearedAndTypedAgain() throws {
         let app = try launchAndOpen()
         addRow(to: "education", in: app)
+        // The new row holds the keyboard, which covers the lower part of the page where the scroll's drag starts
+        putKeyboardAway(in: app)
         let description = app.textViews["editor.field.educationDescription"]
         app.scrollForm(until: description, named: "The description of a study")
         description.tap()
