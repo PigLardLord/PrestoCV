@@ -7,9 +7,13 @@ import Testing
 /// Brazilian Portuguese (`docs/release/store-listing.md`; migration step 5-15b, #408). A person who used 1.0 would read
 /// a text of the other variety as another app's, and a catalog that mixes the two speaks no variety at all.
 ///
-/// Each marker is a word or phrase of the other variety (the Spanish of Spain, the Portuguese of Portugal) that correct
-/// Latin-American or Brazilian text of the app does not use. It is matched as a whole word, in any case, so "tu" does
-/// not match "tutorial" and "a carregar" does not match "para carregar".
+/// Each marker is a word that the app's texts in their variety have no use for in any meaning: a word only the other
+/// variety uses (the Spanish of Spain, the Portuguese of Portugal), or a tu form of Portuguese, which only addresses the
+/// person, whom the app addresses as "você". It is matched as a whole word, in any case, so "tu" does not match
+/// "tutorial". A word that the variety uses in another meaning is no marker, even where the 1.0 app chose another word
+/// for the app's meaning: Brazil keeps things with "guardar" and removes them with "eliminar", while the app saves with
+/// "salvar" and deletes with "excluir"; Latin America also says "añadir" and "versión móvil". Those choices are in the
+/// texts, and a person reads them; this check would reject a correct text for them.
 @Suite("Language Variety Tests")
 struct LanguageVarietyTests {
 
@@ -20,35 +24,17 @@ struct LanguageVarietyTests {
         "es": [
             // The vosotros forms of Spain: Latin America says "ustedes" ("pueden", "tienen", "su").
             "vosotros", "vosotras", "podéis", "tenéis", "vuestro", "vuestra", "vuestros", "vuestras",
-            // Spain's words for a computer and a mobile phone: Latin America says "computadora" and "celular".
-            "ordenador", "ordenadores", "móvil", "móviles",
-            // Spain's verb for adding: Latin America and the 1.0 app say "Agregar" ("Agrega").
-            "añadir", "añade",
-            // Spain's touch and hold, "Mantén pulsado": Latin America says "Mantén presionado".
-            "pulsado", "pulsada",
-            // Spain's compound past for a failure that has just happened: Latin America and the 1.0 app say "no se pudo"
-            // ("no pudo leer").
-            "ha podido", "han podido",
+            // Spain's word for a computer: Latin America says "computadora".
+            "ordenador", "ordenadores",
         ],
         "pt": [
             // Portugal's words for a file, a screen, a user, a record and a mobile phone: Brazil says "arquivo", "tela",
             // "usuário", "registro" and "celular".
             "ficheiro", "ficheiros", "ecrã", "ecrãs", "utilizador", "utilizadores", "registo", "registos", "telemóvel",
             "telemóveis",
-            // Portugal's progressive, a + infinitive: Brazil says "carregando", with the gerund.
-            "a carregar",
-            // Portugal's verb for saving: Brazil and the 1.0 app save with "salvar" ("Salvo"). Brazil guards or puts away
-            // with "guardar", which no text of the app says.
-            "guardar", "guardado", "guardada", "guardados", "guardadas",
-            // Portugal's verb for deleting: Brazil and the 1.0 app delete with "excluir" ("Excluir", "excluído").
-            "eliminar", "eliminado", "eliminada", "eliminados", "eliminadas",
-            // Portugal's Rename: Brazil and the 1.0 app say "Renomear".
-            "mudar o nome",
-            // Portugal's intermediate level: Brazil and the 1.0 app say "Intermediário".
-            "intermédio",
-            // Portugal's spelling of a section: Brazil and the 1.0 app write "seção".
+            // Portugal's spelling of a section: Brazil writes "seção".
             "secção", "secções",
-            // The tu forms of Portugal: Brazil and the 1.0 app address the person as "você" ("seu", "sua").
+            // The tu forms, Portugal's way to address the person: the app, as 1.0, says "você" ("seu", "sua").
             "tu", "teu", "tua", "teus", "tuas",
         ],
     ]
@@ -78,17 +64,19 @@ struct LanguageVarietyTests {
     }
 
     @Test("A marker is found as a whole word in any case, and correct text of the app's variety has none", arguments: [
-        ("Não foi possível ler o ficheiro.", "pt", ["ficheiro"]),
-        ("Mudar o nome do CV", "pt", ["mudar o nome"]),
-        ("A carregar os teus CV…", "pt", ["a carregar", "teus"]),
-        ("Añadir idioma", "es", ["añadir"]),
-        ("No se han podido leer tus CV. Mantén pulsada una entrada.", "es", ["pulsada", "han podido"]),
+        ("Não foi possível ler o Ficheiro.", "pt", ["ficheiro"]),
+        ("Toca no ecrã para abrir os teus registos.", "pt", ["ecrã", "registos", "teus"]),
+        ("Podéis abrirlo desde vuestro ordenador.", "es", ["podéis", "vuestro", "ordenador"]),
         ("Carregando seus currículos…", "pt", []),
         ("Para carregar o arquivo, toque em Arquivos na tela.", "pt", []),
         ("Excluir “%@”? O currículo salvo será excluído.", "pt", []),
         ("Um tutorial de registro do usuário", "pt", []),
+        ("Para guardar o celular, escolha uma gaveta.", "pt", []),
+        ("Eliminar as linhas duplicadas do currículo", "pt", []),
+        ("Por intermédio da escola, você pode mudar o nome do curso.", "pt", []),
         ("Agregar idioma", "es", []),
         ("No se pudo abrir el CV. Guárdalo en el celular.", "es", []),
+        ("Puedes añadir la versión móvil del CV.", "es", []),
         ("Guardar como copia", "es", []),
     ])
     func markersAreWholeWords(text: String, language: String, markers: [String]) {
