@@ -187,4 +187,29 @@ struct LabelledDetailTests {
         #expect(found.cv.person.title?.value == title)
         #expect(found.cv.person.email?.value.value == "person@example.com")
     }
+
+    @Test("A form label that names the occupation is never the title; the value under it is", arguments: [
+        ("Sesso Femminile", "Occupazione desiderata/Settore professionale", "Direttrice Vendite"),
+        ("Sex Female", "Desired employment/Occupational field", "Sales Manager")
+    ])
+    func labelIsNotTheTitle(before: String, label: String, value: String) {
+        let found = header("""
+        Informazioni personali
+        Cognome(i)/Nome(i)
+        Indirizzo(i)
+        Telefono(i)
+        Cellulare
+        E-mail person@example.com
+        Cittadinanza Italiana
+        Data di nascita
+        \(before)
+        \(label)
+        \(value)
+
+        Esperienza professionale
+        Date 01/2007
+        """)
+        #expect(found.cv.person.title?.value != label, "\(String(describing: found.cv.person.name?.value)) / \(String(describing: found.cv.person.title?.value))")
+        #expect(found.cv.person.title == nil || found.cv.person.title?.value == value)
+    }
 }

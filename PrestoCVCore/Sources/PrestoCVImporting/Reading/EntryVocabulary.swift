@@ -319,6 +319,13 @@ enum EntryVocabulary {
             (.maritalStatus, ["marital status", "stato civile", "familienstand", "estado civil", "situation familiale"]),
             (.gender, ["sex", "gender", "sesso", "geschlecht", "sexo", "sexe"]),
             (.fax, ["fax", "telefax"]),
+            // The Europass form's own line for the wanted occupation: a label, never the person's title
+            (.other, ["occupazione desiderata/settore professionale", "occupazione desiderata", "settore professionale",
+                      "desired employment/occupational field", "desired employment", "occupational field",
+                      "gewünschte beschäftigung/berufsfeld", "gewünschte beschäftigung", "berufsfeld",
+                      "empleo deseado/familia profesional", "empleo deseado", "familia profesional",
+                      "emploi recherché/domaine professionnel", "emploi recherché", "domaine professionnel",
+                      "emprego pretendido/área profissional", "emprego pretendido", "área profissional"]),
         ]
         var table: [String: PersonalLabel] = [:]
         for (label, texts) in groups {
