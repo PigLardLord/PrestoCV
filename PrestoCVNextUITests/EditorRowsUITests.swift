@@ -505,7 +505,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
 
     // MARK: Return
 
-    /// Return in a field of a row ends the entry: it adds no line to the field, at the normal and the largest size.
+    /// Return in a field of a row ends the entry: the field lets go of the focus, the keyboard closes and it adds no line, at the normal and the largest size.
     @MainActor
     private func assertReturnEndsTheEntry(largestText: Bool) throws {
         let app = try launchAndOpen(largestText: largestText)
@@ -514,6 +514,8 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         app.typeText("Welding\n")
 
         let skill = app.textInput("editor.field.skillName")
+        XCTAssertTrue(skill.waitUntilUnfocused(), "Return ends the entry of the field")
+        XCTAssertTrue(app.keyboards.firstMatch.waitUntilGone(), "Return closes the keyboard")
         XCTAssertTrue(skill.waitUntil(holds: "Welding"), "Return adds no line to the field")
         XCTAssertEqual(app.textFields.matching(identifier: "editor.field.skillName").count
                        + app.textViews.matching(identifier: "editor.field.skillName").count, 1, "Return adds no row")

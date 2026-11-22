@@ -29,6 +29,13 @@ extension XCUIElement {
         let focused = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasKeyboardFocus == true"), object: self)
         return XCTWaiter().wait(for: [focused], timeout: 30) == .completed
     }
+
+    /// Whether the element gives up the keyboard focus within thirty seconds.
+    @MainActor
+    func waitUntilUnfocused() -> Bool {
+        let unfocused = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hasKeyboardFocus == false"), object: self)
+        return XCTWaiter().wait(for: [unfocused], timeout: 30) == .completed
+    }
 }
 
 extension XCUIElement {
