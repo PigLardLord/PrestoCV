@@ -78,4 +78,7 @@ public protocol ImportFileSystem: Sendable {
     /// Deletes the file at `url` only when it is still the regular file of `identity`; anything else found there is put
     /// back and `notTheFile` thrown. A path already gone is not an error.
     func remove(_ url: URL, identity: FileIdentity) throws(ImportFileError)
+    /// What lies directly in `folder`, by the folder's path and each entry's name, in no set order: files, links, folders
+    /// and anything else alike. None when the folder is not there; anything else that stops the listing is thrown.
+    func entries(in folder: URL) throws(ImportFileError) -> [URL]
 }

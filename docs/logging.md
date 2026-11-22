@@ -79,7 +79,8 @@ The tables list every event the code writes; the source checks fail when the cod
 |---|---|---|---|
 | `import.file.notRead` | error | `reason` (`notReceived`, `noIdentity` or `releasedDuringRead`), or `error` (`notTheFile`, or a system error by name, such as `ENOENT`) | The file the person chose could not be read: the screen never received it, its identity could not be taken when it came, the path no longer names that regular file, or it was let go while it was read. The import then fails with `fileNotRead`. |
 | `import.file.releasedAgain` | notice | none | A file was let go twice, or one never received was let go; nothing else happens. |
-| `import.file.copyNotDeleted` | error | `error` (`notTheFile`, `leftAside`, or a system error by name) | A copy the system made of the chosen file, in one of the app's copy folders, could not be deleted when the last import of that file ended. One line per copy. |
+| `import.file.copyNotDeleted` | error | `error` (`notTheFile`, `leftAside`, or a system error by name) | A copy the system made of the chosen file, in one of the app's copy folders, could not be deleted when the last import of that file ended; or a copy an earlier run left there could not be deleted when the first import that read a file ended. One line per copy. |
+| `import.file.copiesNotListed` | error | `error` (a system error by name, such as `ENOTDIR`) | A copy folder that is there could not be listed when the import's file adapter was made: the copies an earlier run left in it stay. One line per folder. |
 | `pdf.read` | info | `pages`, `words` | PDFKit read the words of a PDF's pages. |
 | `pdf.limit` | notice | `limit` | The PDF reader stopped at a bound of the reading: `bytes`, `pages`, `characters` or `words`. It throws that bound as a `LimitReached`, so `import.failed` names it too. |
 | `import.sections` | info | one count per kind of section recognised, such as `experience=2` | The text was read into sections. |

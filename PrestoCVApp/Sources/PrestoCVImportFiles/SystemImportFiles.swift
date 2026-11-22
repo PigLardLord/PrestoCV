@@ -44,6 +44,10 @@ public struct SystemImportFiles: ImportFileSystem {
     public func remove(_ url: URL, identity: FileIdentity) throws(ImportFileError) {
         try removeFile(url, identity: identity)
     }
+
+    public func entries(in folder: URL) throws(ImportFileError) -> [URL] {
+        try folderEntries(at: folder)
+    }
 }
 
 fileprivate extension FileIdentity {
@@ -53,6 +57,24 @@ fileprivate extension FileIdentity {
 }
 
 // The members `read` and `remove` hide the C functions of the same names, so the work is in free functions.
+
+private func folderEntries(at folder: URL) throws(ImportFileError) -> [URL] {
+    guard let directory = opendir(folder.path) else {
+        let code = errno
+        if code == ENOENT { return [] }
+        throw ImportFileError.system(code)
+    }
+    defer { closedir(directory) }
+    var entries: [URL] = []
+    while let entry = readdir(directory) {
+        let name = withUnsafeBytes(of: entry.pointee.d_name) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
+        guard name != ".", name != ".." else { continue }
+        entries.append(folder.appendingPathComponent(name))
+    }
+    return entries
+}
 
 private func readFile(at path: String, identity: FileIdentity, atMost limit: Int) throws(ImportFileError) -> FileRead {
     let descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)

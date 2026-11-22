@@ -126,10 +126,12 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("a.pdf", in: world.scratch.inbox)
+        let before = world.files.calls.events.count
 
         let received = world.adapter.receive(copy)
 
-        #expect(Array(world.files.calls.events.prefix(3)) == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
+        let events = Array(world.files.calls.events.dropFirst(before).prefix(3))
+        #expect(events == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
         world.adapter.release(received)
     }
 
@@ -447,6 +449,171 @@ struct ImportFileAdapterTests {
         world.expectBalanced()
     }
 
+    // MARK: Copies left by an earlier run
+
+    @Test("a copy an earlier run left in a copy folder goes when the next import that read a file ends")
+    func leftoverGoesAfterARead() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        _ = try world.scratch.file("left.pdf", in: world.scratch.inbox)
+        _ = try world.scratch.file("left.pdf", in: world.scratch.documentsInbox)
+        let launch = world.nextLaunch()
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let received = launch.receive(copy)
+        _ = try await launch.readPDF(of: received)
+        launch.release(received)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == [])
+        world.expectBalanced()
+    }
+
+    @Test("a copy left over stays at a receive, and when a file no import read is let go")
+    func leftoverStaysWithoutARead() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        _ = try world.scratch.file("left.pdf", in: world.scratch.inbox)
+        let launch = world.nextLaunch()
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        launch.release(launch.receive(copy))
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["left.pdf"])
+        #expect(world.files.calls.removed.map(\.lastPathComponent) == ["cv.pdf"])
+        world.expectBalanced()
+    }
+
+    @Test("a copy the system made after the launch is not left over: it stays until its own import")
+    func copyAfterTheLaunchIsNotLeftOver() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let launch = world.nextLaunch()
+        let first = try world.scratch.file("first.pdf", in: world.scratch.inbox)
+        _ = try world.scratch.file("coming.pdf", in: world.scratch.inbox)
+
+        let received = launch.receive(first)
+        _ = try await launch.readPDF(of: received)
+        launch.release(received)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["coming.pdf"])
+    }
+
+    @Test("a copy made before the launch and handed over after it stays while it waits, and goes at its own release")
+    func waitingCopyFromBeforeTheLaunchStays() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let delivered = try world.scratch.file("delivered.pdf", in: world.scratch.inbox)
+        _ = try world.scratch.file("left.pdf", in: world.scratch.inbox)
+        let launch = world.nextLaunch()
+        let waiting = launch.receive(delivered)
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let read = launch.receive(copy)
+        _ = try await launch.readPDF(of: read)
+        launch.release(read)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["delivered.pdf"])
+        launch.release(waiting)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        world.expectBalanced()
+    }
+
+    @Test("a copy made before the launch stays while it is read, when another import ends meanwhile")
+    func copyBeingReadStays() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let reading = try world.scratch.file("reading.pdf", in: world.scratch.inbox, "%PDF-1.7 read")
+        let launch = world.nextLaunch()
+        let done = try world.scratch.file("done.pdf", in: world.scratch.inbox)
+        let first = launch.receive(done)
+        _ = try await launch.readPDF(of: first)
+        let second = launch.receive(reading)
+        let namesDuringTheRead = Box<[String]?>(nil)
+        let inbox = world.scratch.inbox
+        world.files.onRead { url in
+            guard url.lastPathComponent == "reading.pdf" else { return }
+            launch.release(first)
+            do {
+                namesDuringTheRead.set(try FileManager.default.contentsOfDirectory(atPath: inbox.path).sorted())
+            } catch {
+                namesDuringTheRead.set(["not listed: \(error)"])
+            }
+        }
+
+        let data = try await launch.readPDF(of: second)
+
+        #expect(data == Data("%PDF-1.7 read".utf8))
+        #expect(namesDuringTheRead.current == ["reading.pdf"])
+        launch.release(second)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        world.expectBalanced()
+    }
+
+    @Test("only a regular file directly in a copy folder is left over: a person's file, a link and a pipe stay")
+    func onlyCopiesAreLeftOver() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let mine = try world.scratch.file("mine.pdf", in: world.scratch.chosen)
+        let documents = try world.scratch.file("cv.pdf", in: world.scratch.documents)
+        let folder = world.scratch.inbox.appendingPathComponent("sub", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let nested = try world.scratch.file("cv.pdf", in: folder)
+        let link = world.scratch.inbox.appendingPathComponent("link.pdf")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: mine)
+        _ = try world.scratch.pipe("pipe", in: world.scratch.inbox)
+        let launch = world.nextLaunch()
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let received = launch.receive(copy)
+        _ = try await launch.readPDF(of: received)
+        launch.release(received)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["link.pdf", "pipe", "sub"])
+        #expect(FileManager.default.fileExists(atPath: mine.path))
+        #expect(FileManager.default.fileExists(atPath: documents.path))
+        #expect(FileManager.default.fileExists(atPath: nested.path))
+        #expect(world.files.calls.removed.map(\.lastPathComponent) == ["cv.pdf"])
+    }
+
+    @Test("a copy folder that cannot be listed is logged when the adapter is made, and one that is not there is not")
+    func unlistedCopyFolderIsLogged() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        try FileManager.default.removeItem(at: world.scratch.inbox)
+        try FileManager.default.removeItem(at: world.scratch.documentsInbox)
+        _ = FileManager.default.createFile(atPath: world.scratch.documentsInbox.path, contents: Data())
+
+        _ = world.nextLaunch()
+
+        let logged = world.logger.entries("import.file.copiesNotListed").map { $0.value("error") }
+        #expect(logged == [.error(type: "ImportFileError", code: "ENOTDIR")])
+    }
+
+    @Test("adapters made with logging(to:) share their received files and the copies left over, each with its own log")
+    func adaptersThatShareFiles() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        _ = try world.scratch.file("left.pdf", in: world.scratch.inbox)
+        let inbox = world.nextLaunch()
+        let screenLog = RecordingLogger()
+        let screen = inbox.logging(to: screenLog)
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let waiting = inbox.receive(copy)
+        let read = screen.receive(copy)
+        inbox.release(waiting)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf", "left.pdf"])
+        _ = try await screen.readPDF(of: read)
+        screen.release(read)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        screen.release(read)
+        #expect(screenLog.events == ["import.file.releasedAgain"])
+        #expect(world.logger.events.isEmpty)
+        world.expectBalanced()
+    }
+
     // MARK: Helpers
 
     /// Releases `first` while another thread receives `copy` from inside the delete of the copy, and gives that receive's
@@ -581,6 +748,11 @@ private final class SpyFiles: ImportFileSystem {
         return result
     }
 
+    func entries(in folder: URL) throws(ImportFileError) -> [URL] {
+        record("list", folder)
+        return try system.entries(in: folder)
+    }
+
     func remove(_ url: URL, identity: FileIdentity) throws(ImportFileError) {
         record("remove", url) { $0.removed.append(url) }
         hooks.withLock { $0.onRemove }?(url)
@@ -601,6 +773,7 @@ private struct World {
     let scratch: Scratch
     let files: SpyFiles
     let logger: RecordingLogger
+    let maximumBytes: Int
     let adapter: ImportFileAdapter
 
     init(maximumBytes: Int = 1_000, faults: SpyFiles.Faults = SpyFiles.Faults()) throws {
@@ -610,7 +783,14 @@ private struct World {
         self.scratch = scratch
         self.files = files
         self.logger = logger
+        self.maximumBytes = maximumBytes
         adapter = ImportFileAdapter(files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger)
+    }
+
+    /// The adapter of the app launched again, over the same folders, file system and log: what the folders hold now is
+    /// what an earlier run left.
+    func nextLaunch() -> ImportFileAdapter {
+        ImportFileAdapter(files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger)
     }
 
     /// Every start of access has had its stop, on the same URL.

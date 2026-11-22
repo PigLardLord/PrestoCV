@@ -69,9 +69,11 @@ public final class Composition {
         let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
-        /// The folders where the system puts the copy of a file opened in the app: the import deletes a copy only when it
-        /// lies directly in one of them, and never a file the person chose where it is.
-        let copyFolders: [URL]
+        /// The import's file adapter, one for the process (`importFiles(copyFolders:logger:)`): the windows' inboxes and
+        /// the screens hold the files opened in the app through it, so a copy goes only when none of them holds it. It
+        /// deletes a copy only when it lies directly in one of the folders where the system puts the copy of a file opened
+        /// in the app, and never a file the person chose where it is. The composition gives it its own log.
+        let importFiles: ImportFileAdapter
         let compileRules: CompileRules
         /// The designs that ship with the app, synced into the design store at every launch
         let designs: any BundledDesignSource
@@ -158,10 +160,7 @@ public final class Composition {
             clock: ContinuousClock(), tracer: trace.tracer
         )
         let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
-        let importFiles = ImportFileAdapter(
-            files: SystemImportFiles(), copyFolders: inputs.copyFolders,
-            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
-        )
+        let importFiles = inputs.importFiles.logging(to: trace.logger)
         screens = ScreenFactory(
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
@@ -362,7 +361,7 @@ public final class Composition {
             device: .current,
             settlement: settlement,
             samples: samples,
-            copyFolders: AppPaths.importCopiesOnDevice(),
+            importFiles: deviceImportFiles,
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
             },
@@ -394,16 +393,28 @@ public final class Composition {
         return state
     }
 
-    /// The inbox of a window's files opened from another app. It lets go, as the import does, a file that never reaches
-    /// the window's shell; it has no side effect until it does. Its log goes to the system's log only: a window can be
-    /// handed a file before any composition, and its trace, exists.
+    /// The inbox of a window's files opened from another app. It holds a file waiting for the window's shell through the
+    /// process's import file adapter, and lets go, as the import does, a file that never reaches the shell. The adapter's
+    /// log here is the system's log only: a window can be handed a file before any composition, and its trace, exists.
     public static func makeOpenedFileInbox() -> OpenedFileInbox {
-        OpenedFileInbox(files: ImportFileAdapter(
-            files: SystemImportFiles(), copyFolders: AppPaths.importCopiesOnDevice(),
-            maximumBytes: ImportLimits.standard.maximumPDFBytes,
-            logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
-        ))
+        OpenedFileInbox(files: deviceImportFiles)
     }
+
+    /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`. Made once for the
+    /// process: when it is made, what lies in the copy folders is what an earlier run left.
+    nonisolated static func importFiles(copyFolders: [URL], logger: any DiagnosticLogger) -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: copyFolders,
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: logger
+        )
+    }
+
+    /// The process's import file adapter, made at its first use: the first window's inbox, before any file is handed to
+    /// the app.
+    private nonisolated static let deviceImportFiles = importFiles(
+        copyFolders: AppPaths.importCopiesOnDevice(),
+        logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
 }
 
 /// Resumes a continuation the first time it is asked to, and never again.

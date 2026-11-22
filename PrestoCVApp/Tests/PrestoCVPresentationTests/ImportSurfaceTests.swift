@@ -52,7 +52,6 @@ func useEveryPublicMember(of screen: ImportViewModel, file: URL, pdf: Data) {
 func useEveryPublicMember(of inbox: OpenedFileInbox, shell: ShellNavigationModel, file: URL) {
     inbox.receive(file)
     inbox.compositionFailed()
-    inbox.windowClosed()
     inbox.shellReady(shell)
     inbox.receive(file)
     shell.receive(file: file)

@@ -39,7 +39,7 @@ struct TraceOnFailureTests {
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
             settlement: settlement,
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
-            copyFolders: [],
+            importFiles: Composition.importFiles(copyFolders: [], logger: RecordingLogger()),
             compileRules: compileRules,
             designs: BundleDesignSource(),
             makeGate: { _, _, _ in FakeRenderingGate() },

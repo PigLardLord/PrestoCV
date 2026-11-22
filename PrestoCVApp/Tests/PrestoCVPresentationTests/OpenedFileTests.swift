@@ -4,14 +4,14 @@ import PrestoCVDomain
 @testable import PrestoCVPresentation
 
 /// A PDF opened in the app from another app (step 5-13d of #404): the import shows in place of what was open and reads
-/// it, as the person's own way to the import does. A file that arrives before the window's shell exists waits for it, and
-/// a file no import takes is let go, once.
+/// it, as the person's own way to the import does. A file that arrives before the window's shell exists waits for it,
+/// held from its arrival, and a file no import takes is let go, once.
 @MainActor
 @Suite("A file opened in the app")
 struct OpenedFileTests {
 
-    /// The shell on a store, making its import screens on the import's fakes, and a window's inbox that lets go the
-    /// files it holds on a fake of its own.
+    /// The shell on a store, making its import screens on the import's fakes, and a window's inbox that holds and lets
+    /// go the files waiting on a fake of its own.
     @MainActor
     struct World {
         let editing: Editing
@@ -152,7 +152,37 @@ struct OpenedFileTests {
         await world.letGo(Self.file)
         world.inbox.shellReady(world.shell)
         #expect(world.imports.files.recorded == [.read(Self.file), .released(Self.file)])
-        #expect(world.inboxFiles.recorded.isEmpty)
+        #expect(world.inboxFiles.received.map(\.file.url) == [Self.file])
+        #expect(world.inboxFiles.recorded == [.released(Self.file)])
+        #expect(world.inboxFiles.problems(ended: true).isEmpty)
+    }
+
+    @Test("a file waiting for the shell stays held until the shell's import holds it")
+    func waitingFileIsHeldUntilTheImportHoldsIt() {
+        let world = World()
+        let seen = Seen()
+        let imports = world.imports.files
+        world.inboxFiles.whenReleased.withLock { $0 = { _ in seen.counts.append(imports.received.count) } }
+        world.inbox.receive(Self.file)
+
+        world.inbox.shellReady(world.shell)
+
+        #expect(seen.counts == [1], "the import held the file when the inbox let it go")
+    }
+
+    @Test("an inbox that goes away while a file waits lets that file go once")
+    func inboxGoneLetsTheWaitingFileGo() {
+        let files = FileReadingFake(.success(ImportValues.pdf))
+        var inbox: OpenedFileInbox? = OpenedFileInbox(files: files)
+        inbox?.receive(Self.file)
+        weak let probe = inbox
+
+        inbox = nil
+
+        let gone = probe == nil
+        #expect(gone)
+        #expect(files.recorded == [.released(Self.file)])
+        #expect(files.problems(ended: true).isEmpty)
     }
 
     @Test("a newer file opened before the shell exists takes the place of the one waiting, which is let go")
@@ -162,11 +192,14 @@ struct OpenedFileTests {
         world.inbox.receive(Self.file)
         world.inbox.receive(Self.other)
 
-        #expect(world.inboxFiles.recorded == [.released(Self.file)])
-        #expect(world.inboxFiles.problems(ended: true).isEmpty)
+        #expect(world.inboxFiles.received.map(\.file.url) == [Self.file, Self.other])
+        #expect(world.inboxFiles.received.map(\.releases) == [1, 0], "the older let go once, the newer held")
+        #expect(world.inboxFiles.problems(ended: false).isEmpty)
         world.inbox.shellReady(world.shell)
         await world.letGo(Self.other)
         #expect(world.imports.files.recorded == [.read(Self.other), .released(Self.other)])
+        #expect(world.inboxFiles.recorded == [.released(Self.file), .released(Self.other)])
+        #expect(world.inboxFiles.problems(ended: true).isEmpty)
     }
 
     @Test("the same file opened twice before the shell exists waits once, and nothing of it is let go")
@@ -178,11 +211,13 @@ struct OpenedFileTests {
         world.inbox.receive(Self.file)
         world.inbox.receive(same)
 
+        #expect(world.inboxFiles.received.count == 1)
         #expect(world.inboxFiles.recorded.isEmpty)
         world.inbox.shellReady(world.shell)
         await waitUntil("the file let go") { world.imports.files.recorded.count == 2 }
         #expect(world.imports.files.reads == 1)
         #expect(world.imports.files.problems(ended: true).isEmpty)
+        #expect(world.inboxFiles.problems(ended: true).isEmpty)
     }
 
     @Test("a file waiting when the app cannot open its store is let go once, and no shell gets it after")
@@ -200,49 +235,6 @@ struct OpenedFileTests {
         #expect(world.shell.importer == nil)
     }
 
-    @Test("a window that goes away while a file waits for its shell lets that file go once")
-    func windowClosedLetsTheHeldFileGo() async throws {
-        let world = World()
-        world.inbox.receive(Self.file)
-
-        world.inbox.windowClosed()
-
-        #expect(world.inboxFiles.recorded == [.released(Self.file)])
-        #expect(world.inboxFiles.problems(ended: true).isEmpty)
-        world.inbox.windowClosed()
-        world.inbox.shellReady(world.shell)
-        #expect(world.inboxFiles.recorded == [.released(Self.file)])
-        #expect(world.shell.importer == nil)
-        #expect(world.imports.files.recorded.isEmpty)
-    }
-
-    @Test("a file opened after its window went away is let go at once, and the shell gets nothing")
-    func fileAfterTheWindowClosedIsLetGo() async throws {
-        let world = World()
-        world.inbox.windowClosed()
-
-        world.inbox.receive(Self.file)
-
-        #expect(world.inboxFiles.recorded == [.released(Self.file)])
-        world.inbox.shellReady(world.shell)
-        #expect(world.shell.importer == nil)
-        #expect(world.imports.files.recorded.isEmpty)
-    }
-
-    @Test("a window that goes away after its shell took the file leaves the file to the shell's import")
-    func windowClosedAfterTheShellTookTheFile() async throws {
-        let world = World()
-        world.inbox.receive(Self.file)
-        world.inbox.shellReady(world.shell)
-        await world.letGo(Self.file)
-
-        world.inbox.windowClosed()
-
-        #expect(world.inboxFiles.recorded.isEmpty)
-        #expect(world.imports.files.recorded == [.read(Self.file), .released(Self.file)])
-        #expect(world.imports.files.problems(ended: true).isEmpty)
-    }
-
     @Test("with no file waiting, a shell ready or a failed store changes nothing")
     func nothingHeldChangesNothing() {
         let world = World()
@@ -254,4 +246,10 @@ struct OpenedFileTests {
         #expect(world.shell.importer == nil)
         #expect(world.shell.detail == nil)
     }
+}
+
+/// What a hook on the main actor saw, kept for the test that set it.
+@MainActor
+private final class Seen {
+    var counts: [Int] = []
 }
