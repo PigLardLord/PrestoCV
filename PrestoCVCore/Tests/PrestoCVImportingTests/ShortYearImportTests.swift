@@ -21,7 +21,8 @@ struct ShortYearImportTests {
     }
 
     @Test("A percentage or a pay range of two decimals is a detail of its entry, not an entry", arguments: [
-        "3.50–4.50% commission on sales", "10.50–12.50 €/hour plus bonus",
+        "3.50–4.50% commission on sales", "10.50–12.50 €/hour plus bonus", "10.50–12.50 /h plus bonus",
+        "10.50–12.50 /hour plus bonus", "10.50–12.50 per hour plus bonus", "10.50–12.50 pro Stunde plus Bonus",
     ])
     func payIsADetail(line: String) throws {
         let found = try imported("""
@@ -33,6 +34,20 @@ struct ShortYearImportTests {
         let entry = try #require(found.cv.experience.first)
         #expect(entry.period?.value.start.year == 2019)
         #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+    }
+
+    @Test("A job title or a currency amount that begins the description does not hide the period", arguments: [
+        ("09/19 – 08/21    HR Manager, Muster GmbH, Berlin", 2019),
+        ("09/19 – 08/21    EUR 5 million budget responsibility, Muster GmbH, Berlin", 2019),
+    ] as [(String, Int)])
+    func descriptionWords(line: String, year: Int) throws {
+        let found = try imported("""
+        Berufserfahrung
+        \(line)
+        10/21 – heute    Leiter Buchhaltung, Beispiel AG, Hamburg
+        """)
+        #expect(found.cv.experience.count == 2)
+        #expect(found.cv.experience.first?.period?.value.start.year == year)
     }
 
     @Test("Education: an expected end belongs to the period, not to the degree")

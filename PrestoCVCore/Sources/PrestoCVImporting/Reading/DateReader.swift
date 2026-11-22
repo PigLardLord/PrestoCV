@@ -170,23 +170,57 @@ enum DateReader {
         }
     }
 
-    /// A number unit right after the token: a percent sign, a currency, "k", "/h", "/hour", "per hour".
+    /// A number unit right after the token, spaced or not: a percent sign, "k", a currency sign or code that no number
+    /// follows, a rate mark and its time word ("/h", "/ hour", "/Std.") or a rate phrase ("per hour", "pro Stunde",
+    /// "all'ora", "l'heure", "por hora"). A word that only follows the range ("HR Manager") is none.
     private static func isUnit(after index: Int, in tokens: [Token]) -> Bool {
         var next = index + 1
         guard next < tokens.count else { return false }
-        if case .mark("/") = tokens[next].kind, !tokens[next].spaced { next += 1 }
-        else if case .word("per") = tokens[next].kind { next += 1 }
-        else if case .mark(let mark) = tokens[next].kind { return mark == "%" || currencySigns.contains(mark) }
+        switch tokens[next].kind {
+        case .mark(let mark) where mark == "%": return true
+        case .word("k"): return true
+        case .word(let word) where ratePhrases.contains(word): return true
+        case .mark(let mark) where currencySigns.contains(mark): return endsTheAmount(after: next, in: tokens)
+        case .word(let word) where currencyWords.contains(word): return endsTheCode(after: next, in: tokens)
+        default: break
+        }
+        switch tokens[next].kind {
+        case .mark("/"): next += 1
+        case .word(let word) where rateIntroducers.contains(word): next += 1
+        default: return false
+        }
         guard next < tokens.count, case .word(let word) = tokens[next].kind else { return false }
-        return currencyWords.contains(word) || rateWords.contains(word)
+        return rateWords.contains(word)
+    }
+
+    /// A currency right after a range is its unit; a number after it opens an amount of its own ("EUR 5 million budget").
+    private static func endsTheAmount(after index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count, case .number = tokens[index + 1].kind else { return true }
+        return false
+    }
+
+    /// A currency code right after a range is its unit when nothing, a mark or a rate follows; a word after it
+    /// ("Euro zone analyst") belongs to the description.
+    private static func endsTheCode(after index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count else { return true }
+        switch tokens[index + 1].kind {
+        case .number: return false
+        case .mark: return true
+        case .word(let word): return rateIntroducers.contains(word)
+        }
     }
 
     private static let currencySigns: Set<Character> = ["€", "$", "£", "¥"]
     private static let currencyWords: Set<String> = [
         "eur", "euro", "euros", "usd", "chf", "gbp", "dollar", "dollars", "pounds"
     ]
+    private static let rateIntroducers: Set<String> = ["per", "pro", "all'", "l'", "por"]
+    private static let ratePhrases: Set<String> = ["all'ora", "all'ore", "l'heure", "l'ora"].reduce(into: Set<String>()) {
+        $0.insert($1.folded)
+    }
     private static let rateWords: Set<String> = [
-        "k", "h", "hr", "hrs", "hour", "hours", "stunde", "ora", "heure", "hora"
+        "h", "hr", "hrs", "hour", "hours", "std", "stunde", "stunden", "ora", "ore", "heure", "heures", "hora", "horas",
+        "month", "monat", "mese", "mois", "mes", "year", "jahr", "anno", "annee", "ano",
     ]
 
     /// The end date of a range, as a date or a two-digit date, after the words of an expected end ("expected 06/2024").
@@ -260,19 +294,14 @@ enum DateReader {
     private static func shortDate(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
         guard index < tokens.count, case .number(let month, let monthDigits) = tokens[index].kind, monthDigits <= 2, (1...12).contains(month),
               let (value, digits, end) = numberAfterSeparator(index, in: tokens, separators: ["/", "."]), digits == 2,
-              !(isDot(after: index, in: tokens) && monthDigits == 1),
               numberAfterSeparator(end, in: tokens, separators: ["/", "."]) == nil else { return nil }
         let year = value < twoDigitPivot ? 2000 + value : 1900 + value
         return isYear(year) ? (YearMonth(year: year, month: month), end) : nil
     }
 
-    /// A dot between two numbers can be a decimal point: a month written with one digit before it is no month ("3.50").
-    private static func isDot(after index: Int, in tokens: [Token]) -> Bool {
-        index + 1 < tokens.count && tokens[index + 1].kind == .mark(".")
-    }
-
     /// Two-digit years from 00 up to this are 20xx, the others 19xx. Stated here and nowhere else; no clock is read.
-    /// The reader's year bounds (`isYear`) apply after this mapping, so 30 to 39 give 1930 to 1939 and are not read.
+    /// A two-digit year maps 00-29 to 20xx and 30-99 to 19xx, then passes the same year bounds (`isYear`) as a four-digit
+    /// year, so 30 to 39 give 1930 to 1939 and are not read, as "08/1930" is not.
     private static let twoDigitPivot = 30
 
     private static func followsNumber(_ index: Int, in tokens: [Token]) -> Bool {

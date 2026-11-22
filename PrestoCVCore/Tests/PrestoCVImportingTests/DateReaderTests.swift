@@ -104,10 +104,44 @@ struct DateReaderTests {
         "3.50–4.50% commission", "03.50–04.50% commission", "10.50–12.50 €/hour", "10.50–12.50 EUR per hour",
         "10.50-12.50/h", "€10.50–12.50", "$ 10.50 – 12.50", "10.50 – 12.50 CHF", "10.50 – 12.50k",
         "up to 05/20 – 07/30 %",
-        "3.50 – 4.50",
+        "10.50–12.50 /h", "10.50–12.50 / h", "10.50–12.50 /hour", "10.50 – 12.50 /Std.", "10.50 – 12.50 / Stunde",
+        "10.50–12.50 €/h", "10.50–12.50 € / h", "10.50–12.50 per hour", "10.50–12.50 pro Stunde",
+        "10.50–12.50 all'ora", "10.50–12.50 l'heure", "10.50–12.50 por hora", "10.50–12.50 EUR/h", "10.50–12.50 USD per hour",
+        "10.50–12.50 % margin", "10.50–12.50 k",
     ])
     func shortRangeBesideAUnit(text: String) {
         #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("A range of single-digit dotted months is a period, both ends and a current end", arguments: [
+        ("9.19 – 8.21", 2019, 9, ImportedPeriod.End.date(YearMonth(year: 2021, month: 8))),
+        ("09.19 – 8.21", 2019, 9, .date(YearMonth(year: 2021, month: 8))),
+        ("9.19 – heute", 2019, 9, .current),
+        ("9.19 – 10.21", 2019, 9, .date(YearMonth(year: 2021, month: 10))),
+        ("3.50 – 4.50", 1950, 3, .date(YearMonth(year: 1950, month: 4))),
+    ] as [(String, Int, Int, ImportedPeriod.End)])
+    func singleDigitDottedMonths(text: String, year: Int, month: Int, end: ImportedPeriod.End) throws {
+        let (read, period) = try #require(firstPeriod(text))
+        #expect(read == text)
+        #expect(period == ImportedPeriod(start: ym(year, month), end: end))
+    }
+
+    @Test("A word after a range that is no unit of its own leaves the range a period", arguments: [
+        "09/19 – 08/21 HR Manager", "09/19 – 08/21 EUR 5 million budget responsibility",
+        "09/19 – 08/21 Hour of Code teacher", "09/19 – 08/21 Euro zone analyst", "09/19 – 08/21 € 5 million budget",
+        "09/19 – heute HR Manager", "09/19 – 08/21 hr business partner",
+    ])
+    func wordsAfterARange(text: String) throws {
+        let (_, period) = try #require(firstPeriod(text))
+        #expect(period.start == ym(2019, 9))
+    }
+
+    @Test("A two-digit year follows the bounds of a four-digit year: the 1930s are read in neither form", arguments: [
+        ("08/30 – 06/39", "08/1930 – 06/1939"), ("08/35 – heute", "08/1935 – heute"), ("08/30 – 06/38", "08/1930 – 06/1938"),
+    ])
+    func shortAndLongFormAgree(short: String, long: String) {
+        #expect(DateReader.periods(in: short).isEmpty == DateReader.periods(in: long).isEmpty)
+        #expect(DateReader.periods(in: long).isEmpty)
     }
 
     @Test("The pivot: 29 is 2029, 40 is 1940, and the years 30 to 39 stay outside the reader's bounds", arguments: [
