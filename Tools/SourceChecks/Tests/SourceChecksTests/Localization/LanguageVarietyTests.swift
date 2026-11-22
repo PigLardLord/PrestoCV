@@ -73,10 +73,15 @@ struct LanguageVarietyTests {
         ("Um tutorial de registro do usuário", "pt", []),
         ("Para guardar o celular, escolha uma gaveta.", "pt", []),
         ("Eliminar as linhas duplicadas do currículo", "pt", []),
-        ("Por intermédio da escola, você pode mudar o nome do curso.", "pt", []),
+        ("Por intermédio da escola, você fez o curso.", "pt", []),
+        ("Você pode mudar o nome do arquivo.", "pt", []),
+        ("O app começou a carregar o arquivo.", "pt", []),
         ("Agregar idioma", "es", []),
         ("No se pudo abrir el CV. Guárdalo en el celular.", "es", []),
-        ("Puedes añadir la versión móvil del CV.", "es", []),
+        ("Puedes añadir otro CV.", "es", []),
+        ("Abre la versión móvil del sitio.", "es", []),
+        ("El botón pulsado se ve más oscuro.", "es", []),
+        ("Ella ha podido volver al trabajo.", "es", []),
         ("Guardar como copia", "es", []),
     ])
     func markersAreWholeWords(text: String, language: String, markers: [String]) {
