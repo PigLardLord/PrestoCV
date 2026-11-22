@@ -55,28 +55,36 @@ enum ListReader {
         return items
     }
 
-    /// The items of one cell. Prose is one item, whatever commas it has; in a list, the item after a separator loses
-    /// the word that joins it to the one before ("A, B, and C").
+    /// The items of one cell. Prose is one item, whatever commas it has. In a list of commas, a last item that
+    /// starts with a lowercase joining word loses it ("A, B, and C"); every other item is kept as written.
     private static func listItems(of content: Piece) -> [Piece] {
         let commas = content.text.filter { $0 == "," }.count
         if content.words.count > 12 && !content.text.contains(";") && commas < 3 { return [content] }
-        if isSentence(content) { return [content] }
-        let parts = content.split(by: [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"])
-        return parts.enumerated().map { $0.offset == 0 ? $0.element : withoutJoiningWord($0.element) }
+        let parts = content.split(by: separators)
+        if isSentence(content, parts: parts) { return [content] }
+        guard parts.count >= 3, !hasOtherSeparator(content) else { return parts }
+        return Array(parts.dropLast()) + [withoutJoiningWord(parts[parts.count - 1])]
     }
 
-    /// A sentence ends with a full stop (not the dots of a list cut short) and is longer than any skill: cut at its
-    /// commas it would give wrong values.
-    private static func isSentence(_ content: Piece) -> Bool {
+    /// A sentence ends with a full stop (not the dots of a list cut short), is longer than any skill and has an item
+    /// of three words or more: cut at its commas it would give wrong values. A list of short items stays a list.
+    private static func isSentence(_ content: Piece, parts: [Piece]) -> Bool {
         content.text.hasSuffix(".") && !content.text.hasSuffix("..") && content.words.count > maxSkillWords
+            && parts.contains { $0.words.count >= 3 }
+    }
+
+    private static func hasOtherSeparator(_ content: Piece) -> Bool {
+        separators.dropFirst(2).contains { content.text.contains($0) }
     }
 
     private static func withoutJoiningWord(_ item: Piece) -> Piece {
         guard let space = item.text.firstIndex(of: " "),
-              joiningWords.contains(item.text[..<space].lowercased()) else { return item }
-        return item.sub(item.text.index(after: space)..<item.text.endIndex).trimmed()
+              joiningWords.contains(String(item.text[..<space])) else { return item }
+        let rest = item.sub(item.text.index(after: space)..<item.text.endIndex).trimmed()
+        return rest.text.isEmpty ? item : rest
     }
 
+    private static let separators = [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"]
     private static let joiningWords: Set<String> = ["and", "und", "e", "y", "et"]
     private static let maxSkillWords = 6
 }

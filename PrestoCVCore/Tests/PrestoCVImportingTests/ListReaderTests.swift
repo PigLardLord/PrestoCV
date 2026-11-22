@@ -77,6 +77,35 @@ struct ListReaderTests {
         #expect(found.unplaced.map(\.text) == ["I pack orders, check stock, and label parcels."])
     }
 
+    @Test("A plain list that ends with a full stop is still a list, with each separator", arguments: [
+        "Excel, Word, PowerPoint, Outlook, Teams, SharePoint, Access.",
+        "Excel; Word; PowerPoint; Outlook; Teams; SharePoint; Access.",
+        "Excel \u{2022} Word \u{2022} PowerPoint \u{2022} Outlook \u{2022} Teams \u{2022} SharePoint \u{2022} Access.",
+        "Excel | Word | PowerPoint | Outlook | Teams | SharePoint | Access.",
+    ])
+    func punctuatedList(line: String) {
+        let found = read("Skills\n\(line)")
+        #expect(found.cv.skills.map(\.value) == ["Excel", "Word", "PowerPoint", "Outlook", "Teams", "SharePoint", "Access."])
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A list of interests that ends with a full stop is not one combined interest")
+    func punctuatedInterests() {
+        let found = read("Hobbys\nKlettern, Fotografie, Gitarre, Laufen, Kochen, Reisen, Lesen.")
+        #expect(found.cv.interests.map(\.value) == ["Klettern", "Fotografie", "Gitarre", "Laufen", "Kochen", "Reisen", "Lesen."])
+    }
+
+    @Test("An item that starts with a joining word's letters is kept, in any position and with any separator")
+    func joiningWordNames() {
+        #expect(read("Skills\nSwift, E Commerce, Y Combinator").cv.skills.map(\.value) == ["Swift", "E Commerce", "Y Combinator"])
+        #expect(read("Skills\nSwift; E Commerce").cv.skills.map(\.value) == ["Swift", "E Commerce"])
+        #expect(read("Skills\nSwift, e commerce").cv.skills.map(\.value) == ["Swift", "e commerce"])
+        #expect(read("Skills\nSwift, Kotlin, E Commerce").cv.skills.map(\.value) == ["Swift", "Kotlin", "E Commerce"])
+        #expect(read("Skills\nSwift, Kotlin; and shipping").cv.skills.map(\.value) == ["Swift", "Kotlin", "and shipping"])
+        #expect(read("Skills\nand shipping, Swift, Kotlin").cv.skills.map(\.value) == ["and shipping", "Swift", "Kotlin"])
+        #expect(read("Hobbys\nKlettern, E Commerce, Y Combinator").cv.interests.map(\.value) == ["Klettern", "E Commerce", "Y Combinator"])
+    }
+
     @Test("A list that a source cut short with dots is still a list")
     func cutShortList() {
         let found = read("Compétences\nPrise de commandes, gestion des stocks, service à la clientèle...")
