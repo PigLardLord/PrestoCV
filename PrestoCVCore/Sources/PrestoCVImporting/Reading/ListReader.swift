@@ -40,6 +40,11 @@ enum ListReader {
                 cells.removeFirst()
             }
             for cell in cells {
+                // A line that is only the label of a group ("Qualities", "Other"): structure, not a skill (#305)
+                if cells.count == 1, SkillGroups.isLabel(cell.text) {
+                    findings.leaveOut(cell, .categoryLabel)
+                    continue
+                }
                 var content = cell
                 if let colon = cell.text.firstIndex(of: ":") {
                     let label = cell.sub(cell.text.startIndex..<colon).trimmed()
