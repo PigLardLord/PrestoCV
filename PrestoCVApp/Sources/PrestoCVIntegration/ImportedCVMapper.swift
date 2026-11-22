@@ -25,7 +25,7 @@ public struct ImportedCVMapper: Sendable {
         for (index, entry) in imported.experience.enumerated() {
             let place = sections.experiences.count + 1
             let experience = Experience(role: entry.role?.value ?? "", company: entry.employer?.value ?? "", location: entry.location?.value ?? "",
-                                        period: period(entry.period, field: .experiencePeriod(place), notes: &notes), description: description(entry.details))
+                                        period: period(entry.period, field: .experiencePeriod(place), heading: entry.heading, notes: &notes), description: description(entry.details))
             let kept = !experience.hasNoContent
             if kept { sections.experiences.append(experience) }
             notes.settle(from: [.experience(index + 1)], to: kept ? [.experience(place)] : [], withdrawing: [.experiencePeriod(place)], kept: kept)
@@ -34,7 +34,7 @@ public struct ImportedCVMapper: Sendable {
             let place = sections.education.count + 1
             if let location = entry.location { notes.drop(.educationLocation(place), .locationNotKept, location.value, heading: entry.heading) }
             let education = Education(degree: entry.degree?.value ?? "", school: entry.school?.value ?? "",
-                                      period: period(entry.period, field: .educationPeriod(place), notes: &notes), description: description(entry.details))
+                                      period: period(entry.period, field: .educationPeriod(place), heading: entry.heading, notes: &notes), description: description(entry.details))
             let kept = !education.hasNoContent
             if kept { sections.education.append(education) }
             notes.settle(from: [.education(index + 1)], to: kept ? [.education(place)] : [],
@@ -62,7 +62,7 @@ public struct ImportedCVMapper: Sendable {
             var issued: PartialDate?
             if let year = certification.year {
                 issued = PartialDate(year: year.value)
-                if issued == nil { notes.drop(.certificationYear(index + 1), .yearUnreadable, String(year.value)) }
+                if issued == nil { notes.drop(.certificationYear(index + 1), .yearUnreadable, String(year.value), heading: certification.heading) }
             }
             return Certification(name: certification.name.value, issuer: certification.issuer?.value ?? "", issued: issued,
                                  link: certification.link?.value, description: certification.description?.value ?? "")
@@ -149,24 +149,24 @@ public struct ImportedCVMapper: Sendable {
 
     /// The typed period of a range the text states, or none, with the reason: a single date, an end before the start or a
     /// date out of the years the CV holds, or a start with no end ("2019 -"): that is no unambiguous range, and it is never
-    /// "present". Each of these is one review item for the field, and the person's words stay in the text not imported.
-    private func period(_ period: Sourced<ImportedPeriod>?, field: ImportReviewField, notes: inout Notes) -> Period? {
+    /// "present". Each of these is one review item for the field, and the person's words stay in the text not imported, under the heading they stood under.
+    private func period(_ period: Sourced<ImportedPeriod>?, field: ImportReviewField, heading: String?, notes: inout Notes) -> Period? {
         guard let period else { return nil }
         if let check = period.check { notes.drop(field, ReviewItemMapping.reason(check), notes.words(of: period), listed: false) }
         let start = (year: period.value.start.year, month: period.value.start.month)
         do {
             switch period.value.end {
             case nil:
-                notes.drop(field, .periodNotARange, notes.words(of: period))
+                notes.drop(field, .periodNotARange, notes.words(of: period), heading: heading)
                 return nil
             case .date(let end)?: return try Period.make(start: start, end: (year: end.year, month: end.month), current: false)
             case .current?: return try Period.make(start: start, end: nil, current: true)
             case .unstated?:
-                notes.drop(field, .periodOpenEnd, notes.words(of: period))
+                notes.drop(field, .periodOpenEnd, notes.words(of: period), heading: heading)
                 return nil
             }
         } catch {
-            notes.drop(field, .periodUnreadable, notes.words(of: period))
+            notes.drop(field, .periodUnreadable, notes.words(of: period), heading: heading)
             return nil
         }
     }

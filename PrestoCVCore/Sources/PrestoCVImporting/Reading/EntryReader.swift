@@ -451,6 +451,7 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
+            entry.heading = findings.heading(of: section)
             guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.experience.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
@@ -620,6 +621,7 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
+                entry.heading = findings.heading(of: section)
                 entry.check = doubtful.contains(place) ? .headingUnsure : nil
                 findings.cv.experience.append(entry)
             case .education:

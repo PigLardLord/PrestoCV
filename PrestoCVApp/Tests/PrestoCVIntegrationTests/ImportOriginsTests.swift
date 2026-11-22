@@ -87,3 +87,59 @@ struct ImportOriginsTests {
         #expect(outcome.cv.draft?.origins == marked([.entry(.experienceRole, index: 0), .entry(.experienceCompany, index: 0)]))
     }
 }
+
+@Suite("ADR 0009 · a date the CV cannot take keeps the heading it stood under")
+struct RejectedPeriodHeadingTests {
+    private static let text = "Cook 2015 Nurse 2019 - Baker 2020 - 2018 Dentist Teacher Optician 1850 Welder 2012 Tiler"
+
+    private let f = ImportFixture(text: RejectedPeriodHeadingTests.text)
+
+    private func period(_ piece: String, start: Int, end: ImportedPeriod.End?) -> Sourced<ImportedPeriod> {
+        f.sourced(ImportedPeriod(start: yearMonth(start), end: end), quoting: piece, reading: .period)
+    }
+
+    private func rejected() -> [Sourced<ImportedPeriod>] {
+        [period("2015", start: 2015, end: nil), period("2019 -", start: 2019, end: .unstated),
+         period("2020 - 2018", start: 2020, end: .date(yearMonth(2018)))]
+    }
+
+    private func notPlaced(_ cv: ImportedCV) -> [[String]] {
+        mapper.map(f.result(cv), id: id).cv.draft?.notPlaced.map { [$0.text, $0.heading ?? "-"] } ?? []
+    }
+
+    @Test("a single date, an open end and an end before the start of a job keep the heading of its section")
+    func experiencePeriodsKeepTheirHeading() {
+        var cv = ImportedCV()
+        cv.experience = zip(["Cook", "Nurse", "Baker"], rejected()).map {
+            f.experience(role: f.quoted($0), period: $1, heading: "Work history")
+        }
+        #expect(notPlaced(cv) == [["2015", "Work history"], ["2019 -", "Work history"], ["2020 - 2018", "Work history"]])
+    }
+
+    @Test("a single date, an open end and an end before the start of a study keep the heading of its section")
+    func educationPeriodsKeepTheirHeading() {
+        var cv = ImportedCV()
+        cv.education = zip(["Cook", "Nurse", "Baker"], rejected()).map {
+            f.education(degree: f.quoted($0), period: $1, heading: "Studies")
+        }
+        #expect(notPlaced(cv) == [["2015", "Studies"], ["2019 -", "Studies"], ["2020 - 2018", "Studies"]])
+    }
+
+    @Test("a certification year the CV cannot hold keeps the heading of its section")
+    func certificationYearKeepsItsHeading() {
+        var cv = ImportedCV()
+        cv.certifications = [f.certification(f.quoted("Optician"), year: f.sourced(1850, quoting: "1850", reading: .year), heading: "Credentials")]
+        #expect(notPlaced(cv) == [["1850", "Credentials"]])
+    }
+
+    @Test("an entry left out of the CV keeps the heading on each date it could not place")
+    func leftOutEntriesKeepTheirHeading() {
+        var cv = ImportedCV()
+        cv.experience = [f.experience(period: period("2015", start: 2015, end: nil), heading: "Work history"),
+                         f.experience(period: period("2019 -", start: 2019, end: .unstated), heading: "Work history")]
+        cv.education = [f.education(period: period("2020 - 2018", start: 2020, end: .date(yearMonth(2018))), heading: "Studies")]
+        let outcome = mapper.map(f.result(cv), id: id)
+        #expect(outcome.cv.sections.experiences.isEmpty && outcome.cv.sections.education.isEmpty)
+        #expect(notPlaced(cv) == [["2015", "Work history"], ["2019 -", "Work history"], ["2020 - 2018", "Studies"]])
+    }
+}
