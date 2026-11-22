@@ -228,6 +228,9 @@ enum EntryVocabulary {
     /// "Role at Employer" in the six languages: the role is before, the employer after.
     static let roleEmployerConnectors = [" at ", " @ ", " presso ", " bei ", " en ", " chez ", " na ", " no ", " em ", " para ", " für ", " for ", " per "]
 
+    /// The connectors that also occur inside a title ("Teacher for Special Needs"): read only when nothing else can hold the employer.
+    static let weakConnectors = [" para ", " für ", " for ", " per "]
+
     // MARK: The labels of the formato europeo and the Europass
 
     enum EntryLabel: Equatable {

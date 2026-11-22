@@ -202,6 +202,38 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.employer?.value } == ["Klinikum Beispiel", "Restaurante Ejemplo"])
     }
 
+    @Test("A weak connector inside a title is no connector when the entry has an employer line", arguments: [
+        ("Teacher for Special Needs", "Northgate Academy, Leeds"),
+        ("Lehrer für Grundschule", "Schule Beispiel, Leeds"),
+        ("Responsabile per le vendite", "Verdi Ltd, Roma"),
+        ("Profesor para adultos", "Escuela Ejemplo, Madrid"),
+    ])
+    func weakConnectorInATitle(title: String, employerLine: String) {
+        let found = read("""
+        Experience
+        \(title)
+        \(employerLine)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [title])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employerLine.components(separatedBy: ", ")[0]])
+    }
+
+    @Test("A weak connector is a connector when the line is all the entry has", arguments: [
+        ("Developer for Acme Ltd", "Developer", "Acme Ltd"),
+        ("Entwickler für Beispiel GmbH", "Entwickler", "Beispiel GmbH"),
+        ("Venditore per Verdi Srl", "Venditore", "Verdi Srl"),
+    ])
+    func weakConnectorAsConnector(line: String, role: String, employer: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+    }
+
     @Test("Parts no word marks follow the section's own order, and the entry is flagged")
     func orderFallback() throws {
         let found = read("""

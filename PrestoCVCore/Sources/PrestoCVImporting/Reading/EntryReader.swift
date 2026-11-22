@@ -256,36 +256,39 @@ enum EntryReader {
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
-        var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
-        for line in lines {
-            var removed = line.durations
-            if let period = line.period?.piece { removed.append(period) }
-            for cell in line.cells {
-                let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
-                for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
-                    segments += split(piece, kind: kind)
-                }
-            }
+        let pieces = lines.flatMap { linePieces($0) }
+        // A weak connector is read only when no other piece can hold the employer
+        let isAlone = pieces.count == 1
+        return pieces.flatMap { split($0, kind: kind, readsWeakConnectors: isAlone) }
+    }
+
+    /// The pieces of a line without its dates and durations, cut at the strong separators.
+    private static func linePieces(_ line: Line) -> [Piece] {
+        var removed = line.durations
+        if let period = line.period?.piece { removed.append(period) }
+        return line.cells.flatMap { cell -> [Piece] in
+            let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
+            return cell.removing(ranges).flatMap { $0.split(by: Separators.strong + [" - "]) }
         }
-        return segments
     }
 
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
     /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own.
-    private static func split(_ piece: Piece, kind: Kind) -> [Segment] {
+    private static func split(_ piece: Piece, kind: Kind, readsWeakConnectors: Bool) -> [Segment] {
         if piece.text.hasSuffix(")"), let open = piece.text.lastIndex(of: "("), open > piece.text.startIndex {
             let inside = piece.sub(piece.text.index(after: open)..<piece.text.index(before: piece.text.endIndex)).trimmed()
             let before = piece.sub(piece.text.startIndex..<open).trimmed()
             let looksLikePlace = (1...3).contains(inside.words.count) && inside.text.first?.isUppercase == true
                 && !inside.text.contains(where: \.isNumber) && EntryVocabulary.isOrganisation(before.text)
             if !before.isEmpty, Places.isKnownPlace(inside.text) || Places.isCountryOrRegion(inside.text) || looksLikePlace {
-                return split(before, kind: kind) + [Segment(piece: inside, part: .location, isMarked: true)]
+                return split(before, kind: kind, readsWeakConnectors: readsWeakConnectors) + [Segment(piece: inside, part: .location, isMarked: true)]
             }
         }
         if kind == .experience {
             for connector in EntryVocabulary.roleEmployerConnectors {
-                guard let range = piece.text.firstRange(of: connector) else { continue }
+                guard readsWeakConnectors || !EntryVocabulary.weakConnectors.contains(connector),
+                      let range = piece.text.firstRange(of: connector) else { continue }
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
