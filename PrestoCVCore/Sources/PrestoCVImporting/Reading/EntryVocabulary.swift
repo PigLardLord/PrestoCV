@@ -68,6 +68,76 @@ enum EntryVocabulary {
         "erzieherin", "ingenieur", "ingenieurin", "meister", "meisterin", "referent", "referentin", "assistent", "assistentin",
     ].map(\.folded)
 
+    // MARK: What follows a bullet's year
+
+    /// How sure a bullet that opens with a year is of heading an entry.
+    enum HeadEvidence {
+        /// A count, a quantity, or a sentence: a detail.
+        case none
+        /// A capitalised word and nothing else says it is a head ("• 2021 Acme"): an entry only in a section of bullets.
+        case weak
+        /// The year stands alone, a date separator comes before a head, or a word of a school, a qualification, a job or
+        /// an organisation follows it ("• 2021 Leeds College").
+        case strong
+    }
+
+    /// What the text after a bullet's year says, with or without a date separator: a head (a title, a school, an
+    /// employer, a degree) makes an entry, a count ("2000 – hours of placement", "1200 Stunden Praktikum") or a
+    /// sentence ("2019 led the move", "2019 I led the move") a detail. When the evidence is unclear it is a detail.
+    static func headEvidence(after text: String) -> HeadEvidence {
+        var rest = Substring(text)
+        var separated = false
+        while let first = rest.first, first == " " || "|·•—–-,:/".contains(first) {
+            if first != " " { separated = true }
+            rest = rest.dropFirst()
+        }
+        guard let opening = rest.first else { return .strong }
+        // A symbol after the year ("%", "€", a bracket) is no head
+        guard opening.isLetter || opening.isNumber, let lead = rest.words.first else { return .none }
+        let words = rest.words.map { $0.folded }
+        let folded = words[0]
+        let namesAHead = isRole(String(rest)) || isSchool(String(rest)) || isDegree(String(rest)) || isOrganisation(String(rest))
+        if countUnits.contains(folded) || sentenceOpeners.contains(folded) || folded.hasPrefix("j'") { return .none }
+        if countedNouns.contains(folded) {
+            // "2019 – Projects Manager": a job named after what it counts
+            return words.count == 2 && isRole(String(words[1])) ? .strong : .none
+        }
+        if opening.isNumber { return namesAHead ? .strong : .none }
+        if !(lead.first?.isUppercase ?? false) {
+            // A lower-case word opens a head only when it is one: "diploma in nursing", not "led the move"
+            return namesAHead && (isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))) ? .strong : .none
+        }
+        return separated || namesAHead ? .strong : .weak
+    }
+
+    /// The units a number counts, in the six languages: after a year they make a count, never a head.
+    private static let countUnits: Set<String> = Set([
+        "hour", "hours", "hr", "hrs", "h", "stunde", "stunden", "std", "ora", "ore", "hora", "horas", "heure", "heures",
+        "minute", "minutes", "minuten", "minuti", "minutos", "day", "days", "tag", "tage", "tagen", "giorno", "giorni", "día", "días",
+        "jour", "jours", "dia", "dias", "week", "weeks", "woche", "wochen", "settimana", "settimane", "semana", "semanas", "semaine",
+        "semaines", "km", "kg", "m", "euro", "euros", "eur", "usd", "dollars", "dollar", "percent", "prozent", "percento",
+        "porcento", "pourcent", "pieces", "piece", "stück", "stk", "pezzi", "piezas", "pièces", "units", "unit", "unità", "unidades",
+        "unités", "einheiten", "lines", "zeilen", "righe", "líneas", "lignes", "words", "wörter", "parole", "palabras", "mots",
+    ].map(\.folded))
+
+    /// The nouns a number counts: after a year they make a count unless they name a job ("Projects Manager").
+    private static let countedNouns: Set<String> = Set([
+        "people", "persons", "persone", "personen", "personas", "personnes", "projects", "projekte", "progetti", "proyectos", "projets",
+        "clients", "client", "clienti", "clientes", "kunden", "customers", "kundinnen", "users", "nutzer", "benutzer", "utenti",
+        "usuarios", "utilisateurs", "employees", "mitarbeiter", "mitarbeitende", "dipendenti", "empleados", "employés", "patients",
+        "patienten", "pazienti", "pacientes", "cases", "fälle", "casi", "casos", "cas", "students", "schüler", "studenti",
+        "estudiantes", "étudiants", "members", "mitglieder", "membri", "miembros", "membres", "teams", "orders", "bestellungen",
+        "ordini", "pedidos", "commandes", "calls", "anrufe", "chiamate", "llamadas", "appels", "visits", "besuche", "visite", "visitas",
+        "visites", "tickets", "stores", "filialen", "negozi", "tiendas", "magasins", "sites", "events", "veranstaltungen", "eventi",
+        "eventos", "événements", "years", "jahre", "anni", "años", "ans",
+    ].map(\.folded))
+
+    /// The words that open a sentence about the person ("I led", "Ich habe", "Ho completato"): no head.
+    private static let sentenceOpeners: Set<String> = Set([
+        "i", "we", "my", "our", "ich", "wir", "mein", "meine", "unser", "unsere", "io", "noi", "ho", "abbiamo", "yo", "nosotros",
+        "hemos", "je", "nous", "mon",
+    ].map(\.folded))
+
     // MARK: Organisations and schools
 
     /// Whether a piece reads as an organisation: a legal form, or a word of a hospital, a firm or an institution.

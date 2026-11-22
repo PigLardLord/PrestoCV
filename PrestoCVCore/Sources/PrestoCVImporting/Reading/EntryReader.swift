@@ -21,8 +21,9 @@ enum EntryReader {
         var durations: [Piece] = []
         /// The line is only a duration: LinkedIn's total of a company's roles.
         var isDurationOnly = false
-        /// A bullet that heads an entry: its period, then a date separator and a head, or nothing ("• 2021 – Course – School").
-        var isEntryBullet = false
+        /// What a bullet that opens with a period says of itself: a head after the period ("• 2021 – Course – School",
+        /// "• 2021 Leeds College") or not (a count, a sentence).
+        var headEvidence = EntryVocabulary.HeadEvidence.none
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
@@ -89,7 +90,7 @@ enum EntryReader {
         if !isProse && !line.isDurationOnly {
             let anchor = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
             line.period = anchor.map { ($0.0, $0.1) }
-            line.isEntryBullet = anchor?.headsAnEntry == true
+            line.headEvidence = anchor?.evidence ?? .none
         }
         return line
     }
@@ -107,17 +108,17 @@ enum EntryReader {
         return (label, value.isEmpty ? [] : [value])
     }
 
-    /// Whether a bullet that opens with a period heads an entry: the period stands alone, or a date separator (or
-    /// another cell) comes before the head. A count ("2000 hours of training") and a year with prose ("2019 led the
-    /// move to the cloud") have none, so they are details.
-    private static func headsAnEntry(after: String, laterCells: [Piece]) -> Bool {
-        guard let first = after.first else { return true }
-        return !laterCells.isEmpty || "|·•—–-,:/".contains(first)
+    /// What the text after a bullet's period says: nothing but the period, another cell, or a head (see
+    /// `EntryVocabulary.headEvidence`). A count ("2000 hours of training", "2000 – hours of placement") and a year
+    /// with prose ("2019 led the move to the cloud") are no head, so they are details.
+    private static func headEvidence(after: String, laterCells: [Piece]) -> EntryVocabulary.HeadEvidence {
+        guard after.isEmpty || laterCells.isEmpty else { return .strong }
+        return EntryVocabulary.headEvidence(after: after)
     }
 
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod, headsAnEntry: Bool)? {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
         for (cellIndex, cell) in cells.enumerated() {
             for match in DateReader.periods(in: cell.text) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
@@ -127,8 +128,8 @@ enum EntryReader {
                 let closesCell = after.isEmpty || after.first.map { "|·•—–-,):/]*".contains($0) } == true
                     || DurationReader.ranges(in: after).first?.lowerBound == after.startIndex
                 if isBullet ? before.isEmpty : (opensCell || closesCell) {
-                    let head = isBullet && headsAnEntry(after: after, laterCells: Array(cells[(cellIndex + 1)...]))
-                    return (cell.sub(match.range), match.period, head)
+                    let evidence = isBullet ? headEvidence(after: after, laterCells: Array(cells[(cellIndex + 1)...])) : .none
+                    return (cell.sub(match.range), match.period, evidence)
                 }
             }
         }
@@ -143,8 +144,14 @@ enum EntryReader {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
+        let onlyBullets = usable.allSatisfy { $0.isBullet }
         let bulletsAreEntries = bulletsAreEntries(usable)
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || (bulletsAreEntries && usable[$0].isEntryBullet)) }
+        // A head without a separator or a word of a school or a job ("• 2021 Acme") is one only in a section of bullets
+        let anchors = usable.indices.filter { index in
+            guard usable[index].period != nil else { return false }
+            guard usable[index].isBullet else { return true }
+            return bulletsAreEntries && (usable[index].headEvidence == .strong || (onlyBullets && usable[index].headEvidence == .weak))
+        }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
         // Which lines belong to which date, read both ways over the whole section
@@ -200,7 +207,7 @@ enum EntryReader {
     private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
         if usable.allSatisfy({ $0.isBullet }) { return true }
         guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
-        return usable.contains(where: { $0.isEntryBullet })
+        return usable.contains(where: { $0.headEvidence == .strong })
     }
 
     /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").

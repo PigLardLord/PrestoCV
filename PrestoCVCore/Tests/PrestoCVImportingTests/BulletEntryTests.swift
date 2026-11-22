@@ -112,6 +112,8 @@ struct BulletEntryTests {
         let count: String
         let yearAndProse: String
         let sentence: String
+        /// A count after a year and a date separator ("• 2000 – hours of placement")
+        let countAfterSeparator: String
     }
 
     private static let english = Words(
@@ -119,19 +121,36 @@ struct BulletEntryTests {
         entries: ["• 2021 – Nursing course – Leeds College, Leeds", "• 2012 – Diploma – Leeds High School, Leeds"],
         heads: ["Nursing course", "Diploma"], places: ["Leeds College", "Leeds High School"],
         plain: "• Clinical placements", count: "• 2000 hours of clinical training",
-        yearAndProse: "• 2019 led the move to the new ward", sentence: "I completed the practical training.")
+        yearAndProse: "• 2019 led the move to the new ward", sentence: "I completed the practical training.",
+        countAfterSeparator: "• 2000 – hours of placement")
     private static let german = Words(
         language: "German", heading: "Berufserfahrung", kind: .experience,
         entries: ["• 2019 – 2022 – Elektriker – Beispiel GmbH, Erfurt", "• 2015 – 2019 – Monteur – Muster AG, Jena"],
         heads: ["Elektriker", "Monteur"], places: ["Beispiel GmbH", "Muster AG"],
         plain: "• Planung der Installationen", count: "• 2000 Stunden Baustellenpraxis",
-        yearAndProse: "• 2019 leitete den Umzug in die neue Halle", sentence: "Ich habe die Installationen geprüft.")
+        yearAndProse: "• 2019 leitete den Umzug in die neue Halle", sentence: "Ich habe die Installationen geprüft.",
+        countAfterSeparator: "• 2000 – Stunden Praktikum")
     private static let italian = Words(
         language: "Italian", heading: "Istruzione", kind: .education,
         entries: ["• 2021 – Corso di infermieristica – Istituto Esempio, Torino", "• 2012 – Diploma – Liceo Esempio, Torino"],
         heads: ["Corso di infermieristica", "Diploma"], places: ["Istituto Esempio", "Liceo Esempio"],
         plain: "• Tirocini in reparto", count: "• 2000 ore di formazione clinica",
-        yearAndProse: "• 2019 ha guidato il trasferimento al nuovo reparto", sentence: "Ho completato la formazione pratica.")
+        yearAndProse: "• 2019 ha guidato il trasferimento al nuovo reparto", sentence: "Ho completato la formazione pratica.",
+        countAfterSeparator: "• 2000 – ore di tirocinio")
+    private static let spanish = Words(
+        language: "Spanish", heading: "Formación", kind: .education,
+        entries: ["• 2021 – Curso de enfermería – Colegio Ejemplo, Madrid", "• 2012 – Diploma – Instituto Ejemplo, Madrid"],
+        heads: ["Curso de enfermería", "Diploma"], places: ["Colegio Ejemplo", "Instituto Ejemplo"],
+        plain: "• Prácticas en hospital", count: "• 2000 horas de formación clínica",
+        yearAndProse: "• 2019 dirigió el traslado a la nueva planta", sentence: "Completé la formación práctica.",
+        countAfterSeparator: "• 2000 – horas de prácticas")
+    private static let french = Words(
+        language: "French", heading: "Formation", kind: .education,
+        entries: ["• 2021 – Cours d'infirmerie – Lycée Exemple, Lyon", "• 2012 – Diplôme – Institut Exemple, Lyon"],
+        heads: ["Cours d'infirmerie", "Diplôme"], places: ["Lycée Exemple", "Institut Exemple"],
+        plain: "• Stages en service", count: "• 2000 heures de formation clinique",
+        yearAndProse: "• 2019 a dirigé le transfert vers le nouveau service", sentence: "J'ai terminé la formation pratique.",
+        countAfterSeparator: "• 2000 – heures de stage")
 
     fileprivate struct Shape: CustomTestStringConvertible, Sendable {
         let words: Words
@@ -141,8 +160,8 @@ struct BulletEntryTests {
         var testDescription: String { "\(words.language), \(detail) x \(between) between, \(after) after" }
     }
 
-    fileprivate static let shapes: [Shape] = [english, german, italian].flatMap { words -> [Shape] in
-        ["plain", "count", "yearAndProse", "sentence"].flatMap { detail in
+    fileprivate static let shapes: [Shape] = [english, german, italian, spanish, french].flatMap { words -> [Shape] in
+        ["plain", "count", "yearAndProse", "sentence", "countAfterSeparator"].flatMap { detail in
             [(0, 0), (1, 0), (2, 0), (1, 1), (2, 2)].map { Shape(words: words, detail: detail, between: $0.0, after: $0.1) }
         }
     }
@@ -152,6 +171,7 @@ struct BulletEntryTests {
         case "plain": words.plain
         case "count": words.count
         case "yearAndProse": words.yearAndProse
+        case "countAfterSeparator": words.countAfterSeparator
         default: words.sentence
         }
     }
@@ -212,5 +232,89 @@ struct BulletEntryTests {
         """, kind: .education)
         #expect(found.cv.education.count == 3)
         #expect(found.cv.education.first?.degree?.value == "Corso Croce Rossa Italiana")
+    }
+
+    // MARK: What follows the year decides, with a separator or without
+
+    fileprivate struct Dated: CustomTestStringConvertible, Sendable {
+        let language: String
+        let heading: String
+        let kind: EntryReader.Kind
+        let lines: [String]
+        /// The school of an education entry, the role of an experience entry
+        let heads: [String]
+        var testDescription: String { "\(language), \(lines.joined(separator: " / "))" }
+    }
+
+    fileprivate static let datedHeads: [Dated] = [
+        Dated(language: "English", heading: "Education", kind: .education,
+              lines: ["• 2021 Leeds College", "• 2012 Leeds High School"], heads: ["Leeds College", "Leeds High School"]),
+        Dated(language: "English", heading: "Education", kind: .education,
+              lines: ["• 2021 – Leeds College", "• 2012 – Leeds High School"], heads: ["Leeds College", "Leeds High School"]),
+        Dated(language: "English", heading: "Work Experience", kind: .experience,
+              lines: ["• 2019 Electrician", "• 2015 Plumber"], heads: ["Electrician", "Plumber"]),
+        Dated(language: "English", heading: "Work Experience", kind: .experience,
+              lines: ["• 2019 – Electrician", "• 2015 – Plumber"], heads: ["Electrician", "Plumber"]),
+        Dated(language: "German", heading: "Ausbildung", kind: .education,
+              lines: ["• 2021 Hochschule Erfurt", "• 2012 Gymnasium Jena"], heads: ["Hochschule Erfurt", "Gymnasium Jena"]),
+        Dated(language: "German", heading: "Berufserfahrung", kind: .experience,
+              lines: ["• 2019 Elektriker", "• 2015 Monteur"], heads: ["Elektriker", "Monteur"]),
+        Dated(language: "Italian", heading: "Istruzione", kind: .education,
+              lines: ["• 2021 Liceo Esempio", "• 2012 Istituto Esempio"], heads: ["Liceo Esempio", "Istituto Esempio"]),
+        Dated(language: "Italian", heading: "Esperienza professionale", kind: .experience,
+              lines: ["• 2019 Infermiera", "• 2015 Operatrice"], heads: ["Infermiera", "Operatrice"]),
+        Dated(language: "Spanish", heading: "Formación", kind: .education,
+              lines: ["• 2021 Colegio Ejemplo", "• 2012 Instituto Ejemplo"], heads: ["Colegio Ejemplo", "Instituto Ejemplo"]),
+        Dated(language: "French", heading: "Formation", kind: .education,
+              lines: ["• 2021 Lycée Exemple", "• 2012 Institut Exemple"], heads: ["Lycée Exemple", "Institut Exemple"]),
+    ]
+
+    @Test("A bulleted section of dated schools or jobs is read entry by entry, with or without a separator", arguments: datedHeads)
+    fileprivate func datedHeadsAreEntries(_ dated: Dated) throws {
+        let found = read(([dated.heading] + dated.lines).joined(separator: "\n"), kind: dated.kind)
+        let heads = dated.kind == .education
+            ? found.cv.education.map { $0.school?.value ?? $0.degree?.value }
+            : found.cv.experience.map { $0.role?.value ?? $0.employer?.value }
+        #expect(heads == dated.heads)
+        #expect(found.unplaced.isEmpty)
+    }
+
+    fileprivate static let counts: [(words: Words, line: String)] = [
+        (english, "• 2000 – hours of placement"), (english, "• 2000 hours of placement"),
+        (german, "• 1200 – Stunden Praktikum"), (german, "• 2000 – Stunden Praktikum"), (german, "• 2000 Stunden Praktikum"),
+        (italian, "• 800 – ore di tirocinio"), (italian, "• 2000 – ore di tirocinio"), (italian, "• 2000 ore di tirocinio"),
+        (spanish, "• 2000 – horas de prácticas"), (spanish, "• 2000 horas de prácticas"),
+        (french, "• 2000 – heures de stage"), (french, "• 2000 heures de stage"),
+        (english, "• 2010 – clients served"), (english, "• 2010 – people trained"), (english, "• 2000 – 3 projects delivered"),
+        (german, "• 2010 – Kunden betreut"), (german, "• 2010 – Mitarbeiter geschult"),
+        (italian, "• 2010 – clienti seguiti"), (italian, "• 2010 – persone formate"),
+    ]
+
+    @Test("A count after a year is a detail of the entry above, last or between, with a separator or without")
+    func countsAreDetails() throws {
+        for (words, line) in Self.counts {
+            let last = read(([words.heading, words.entries[0], line]).joined(separator: "\n"), kind: words.kind)
+            let between = read(([words.heading, words.entries[0], line, words.entries[1]]).joined(separator: "\n"), kind: words.kind)
+            let lastEntries = words.kind == .education ? last.cv.education.count : last.cv.experience.count
+            let betweenEntries = words.kind == .education ? between.cv.education.count : between.cv.experience.count
+            #expect(lastEntries == 1, "\(line) last")
+            #expect(betweenEntries == 2, "\(line) between")
+            let details = words.kind == .education ? last.cv.education.first?.details.count : last.cv.experience.first?.details.count
+            #expect(details == 1, "\(line) detail")
+        }
+    }
+
+    @Test("The reviewed input: a course with a placement count under it")
+    func placementCount() throws {
+        let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\n• 2000 – hours of placement", kind: .education)
+        try #require(found.cv.education.count == 1)
+        #expect(found.cv.education[0].degree?.value == "Nursing course")
+        #expect(found.cv.education[0].details.map(\.value) == ["2000 – hours of placement"])
+    }
+
+    @Test("Schools without a separator after the year, as the reviewed input")
+    func schoolsWithoutSeparator() throws {
+        let found = read("Education\n• 2021 Leeds College\n• 2012 Leeds High School", kind: .education)
+        #expect(found.cv.education.map { $0.school?.value } == ["Leeds College", "Leeds High School"])
     }
 }
