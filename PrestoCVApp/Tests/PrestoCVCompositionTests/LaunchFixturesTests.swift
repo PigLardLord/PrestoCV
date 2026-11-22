@@ -184,6 +184,31 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The count of failing writes is read, with a folder of its own")
+    func failWrites() throws {
+        #expect(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextFailWrites", "2"]).writesToFail == 2)
+        #expect(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage"]).writesToFail == nil)
+    }
+
+    @Test("A count of failing writes that is no number, is negative, or is missing is a failure of the launch")
+    func unreadableFailWrites() {
+        for refused in ["many", "-1", "1.5", ""] {
+            #expect(throws: LaunchFixtures.Failure.unreadableFailWrites) {
+                try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextFailWrites", refused])
+            }
+        }
+        #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextFailWrites")) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextFailWrites"])
+        }
+    }
+
+    @Test("Writes fail only in a folder of the fixture: never on the device storage")
+    func failWritesWithoutFolder() {
+        #expect(throws: LaunchFixtures.Failure.failWritesWithoutFolder) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextFailWrites", "1"])
+        }
+    }
+
     @Test("The trace runs argument is read, and it needs a folder of the fixture: never the device's own")
     func traceRuns() throws {
         #expect(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextTraceRuns"]).storesTraceRuns)
