@@ -25,7 +25,7 @@ The app is not released, so no user data needs migrating.
   - **Its envelope is frozen too:** `version` is an integer in every future draft, and every addition to the draft raises it. A key the supported version does not know is read past and not written again.
   - **Strict:** a version other than the supported one, an empty block, an unknown field or origin, a section field without an entry or a detail with one, a place the CV does not have, a place named twice, a not-placed text or heading the text rule would change, and a text over the caps are each `corrupt` with their own reason.
   - Origins are written sorted by field and entry, so equal drafts give equal bytes.
-  - **A mark never points at another row.** When the entries change, a mark follows an equal row; a row that matches no old row keeps the marks of its unchanged values only for an unambiguous edit in place (the one such row of its section, every other row at its old position); in every other case, two rows edited at once, a move with an edit, a copy, an insertion, the marks of those rows are dropped.
+  - **A mark never points at another row.** When the entries change, a mark follows an equal row; a row that matches no old row has no marks, so a row the person changed loses all of its marks and a mark never moves to another row (entries have no identity; a stable entry identity is the later way to keep the marks of the unchanged fields); in every other case, a copy, an insertion, the marks of those rows are dropped.
 - **Strict decoding.** Required fields are required.
   - `revision` must lie in 1…2³¹−1, so incrementing it cannot overflow.
   - Periods are built by the domain's single rule, `Period.make`; every contradictory or incomplete combination is rejected.

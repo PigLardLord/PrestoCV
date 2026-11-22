@@ -38,8 +38,8 @@ struct AnchorCase: Sendable, CustomTestStringConvertible {
 let anchorTable: [AnchorCase] = [
     AnchorCase(name: "nothing changes", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
                after: [engineer, tutor], left: [role(0), company(0), role(1)]),
-    AnchorCase(name: "a value edited in place loses its mark; its row keeps the others", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
-               after: [seniorEngineer, tutor], left: [company(0), role(1)]),
+    AnchorCase(name: "a row edited loses all its marks; the other rows keep theirs", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
+               after: [seniorEngineer, tutor], left: [role(1)]),
     AnchorCase(name: "the first row deleted: the second keeps its marks at its new place", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
                after: [tutor], left: [role(0)]),
     AnchorCase(name: "two rows swapped: each mark follows its row", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
@@ -52,12 +52,14 @@ let anchorTable: [AnchorCase] = [
                after: [engineer, engineer], left: [role(0), company(0), role(1)]),
     AnchorCase(name: "two equal rows, one deleted: the one left keeps only the marks both had", before: [engineer, engineer], marks: [role(0), company(0), role(1)],
                after: [engineer], left: [role(0)]),
-    AnchorCase(name: "two equal rows, one edited: the edited value loses its mark", before: [engineer, engineer], marks: [role(0), company(0), role(1), company(1)],
-               after: [seniorEngineer, engineer], left: [company(0), role(1), company(1)]),
+    AnchorCase(name: "two equal rows, one edited: the edited row loses its marks, the other keeps its own", before: [engineer, engineer], marks: [role(0), company(0), role(1), company(1)],
+               after: [seniorEngineer, engineer], left: [role(1), company(1)]),
     AnchorCase(name: "a row copied: neither copy can be told from the other, so both lose their marks", before: [engineer], marks: [role(0), company(0)],
                after: [engineer, engineer], left: []),
     AnchorCase(name: "two rows swapped and both edited: neither new row can be told from the other's old row, so no mark moves", before: [acmeEngineer, acmeTutor], marks: [company(0)],
                after: [seniorAcmeTutor, seniorAcmeEngineer], left: []),
+    AnchorCase(name: "a row deleted and another copied over it with an edit: no mark lands on the copy", before: [acmeEngineer, acmeTutor], marks: [company(0)],
+               after: [seniorAcmeTutor, acmeTutor], left: []),
     AnchorCase(name: "a new row put first and the last deleted: the new row takes no mark of the row that moved on", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
                after: [analyst, engineer], left: [role(1), company(1)]),
 ]
@@ -161,6 +163,15 @@ struct DraftTests {
         let stored = try imported([acmeEngineer, acmeTutor], marks: [company(0)])
         var sections = stored.sections
         sections.experiences = [seniorAcmeTutor, seniorAcmeEngineer]
+        let edited = CV(id: stored.id, title: stored.title, personal: stored.personal, sections: sections)
+        #expect(stored.holding(contentOf: edited).draft == nil)
+    }
+
+    @Test("holding the content of an editor's copy where a row was deleted and another copied over it with an edit moves no mark")
+    func holdingReplacedRow() throws {
+        let stored = try imported([acmeEngineer, acmeTutor], marks: [company(0)])
+        var sections = stored.sections
+        sections.experiences = [seniorAcmeTutor, acmeTutor]
         let edited = CV(id: stored.id, title: stored.title, personal: stored.personal, sections: sections)
         #expect(stored.holding(contentOf: edited).draft == nil)
     }
