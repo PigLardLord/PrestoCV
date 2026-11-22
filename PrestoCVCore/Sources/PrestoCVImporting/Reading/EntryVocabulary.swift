@@ -73,10 +73,48 @@ enum EntryVocabulary {
     /// Whether a piece reads as an organisation: a legal form, or a word of a hospital, a firm or an institution.
     static func isOrganisation(_ text: String) -> Bool {
         let words = text.words.map { $0.folded }
-        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
-        if legalForms.contains(where: { form in words.contains(form) }) { return true }
-        if dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        if hasLegalForm(text) { return true }
         return words.contains { organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix) }
+    }
+
+    /// Whether the vocabulary explains a whole line, so that the line denotes no person: it carries a legal form, opens with
+    /// a word of an organisation or a school, has such a word before a connector ("Ospedale di Erfurt"), or every one of its
+    /// words is a role, a role modifier, an organisation or school word, a connector or a known place ("Senior Nurse",
+    /// "Head Cook"). One word no list explains ("Priya Cook", "Luca Fabbro") leaves the line a possible person: a surname
+    /// may be a trade, a firm's word or a school's.
+    static func explainsWholeLine(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard !words.isEmpty else { return false }
+        if hasLegalForm(text) { return true }
+        let folded = words.map { $0.folded }
+        let namesAnInstitution = { (word: String) in isOrganisation(word) || isSchool(word) }
+        if namesAnInstitution(words[0]) { return true }
+        if folded.indices.dropLast().contains(where: { namesAnInstitution(words[$0]) && connectors.contains(folded[$0 + 1]) }) { return true }
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            return connectors.contains(folded[index]) || roleModifiers.contains(folded[index]) || isRole(word)
+                || namesAnInstitution(word) || Places.isPlaceOnly(word)
+        }
+    }
+
+    /// The words that qualify a role without being one.
+    private static let roleModifiers: Set<String> = Set([
+        "senior", "junior", "head", "chief", "lead", "assistant", "deputy", "vice", "general", "associate", "trainee", "acting",
+        "leitende", "leitender", "leitung", "stellvertretende", "stellvertretender", "oberarzt", "erste", "erster", "kaufmännische",
+        "capo", "vice", "primo", "prima", "aiuto", "responsabile", "junior", "jefe", "jefa", "adjunto", "adjunta", "chef", "adjoint",
+    ].map(\.folded))
+
+    /// The words that join the parts of a role or an organisation.
+    private static let connectors: Set<String> = Set([
+        "of", "the", "and", "for", "at", "in", "&", "für", "der", "die", "das", "und", "des", "di", "del", "della", "dei", "delle",
+        "e", "ed", "de", "la", "le", "el", "y", "du", "et", "da", "do", "dos", "das", "per", "al", "alla", "zu", "zur", "zum", "im",
+    ].map(\.folded))
+
+    /// Whether a piece carries a legal form ("GmbH", "Ltd", "S.r.l.", "Inc.").
+    private static func hasLegalForm(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        return legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) })
     }
 
     /// Whether a piece reads as a school or a university.

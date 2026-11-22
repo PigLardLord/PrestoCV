@@ -445,16 +445,13 @@ enum HeaderReader {
 
     /// Whether the evidence about the whole line says that a line in the shape of a name is no person. In this order:
     /// 1. a line made only of known places, or a section's heading, is no person;
-    /// 2. a line a given name opens ("Rebecca Cook", "Maria Bäcker") stays a possible person, even when a later word is
-    ///    a role, a place or an organisation word;
-    /// 3. otherwise a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland"), or reads as an
-    ///    organisation, a school or a role, is no person.
+    /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person;
+    /// 3. a line the role, organisation and school vocabulary explains as a whole is no person ("Senior Nurse",
+    ///    "Beispiel GmbH", "Ospedale di Erfurt"). One such word is no evidence: "Priya Cook" stays a possible person.
     /// A line with no evidence either way is a possible person: a needless check costs less than a wrong sure name.
     private static func isNotAPerson(_ text: String) -> Bool {
-        if Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil { return true }
-        if GivenNames.opens(text) { return false }
-        return Places.endsInCountryOrRegion(text) || EntryVocabulary.isOrganisation(text) || EntryVocabulary.isSchool(text)
-            || EntryVocabulary.isRole(text)
+        Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil || Places.endsInCountryOrRegion(text)
+            || EntryVocabulary.explainsWholeLine(text)
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
