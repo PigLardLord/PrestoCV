@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// The export sheet shows the PDF's pages for the eye only: its own lines say what the PDF holds, so assistive
 /// technologies skip the pages. SwiftUI's `accessibilityHidden` does not reach into a hosted view, so the pages hide

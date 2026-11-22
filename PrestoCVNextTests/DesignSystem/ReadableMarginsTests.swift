@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 @Suite("ReadableMargins: a form's rows keep the readable width, centred in the space the safe area leaves")
 struct ReadableMarginsTests {

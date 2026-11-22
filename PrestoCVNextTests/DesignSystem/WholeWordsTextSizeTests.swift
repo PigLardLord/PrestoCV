@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 @Suite("WholeWordsText size: a word never breaks, and a text takes the room of its lines and no more")
 @MainActor

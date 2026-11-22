@@ -1,5 +1,5 @@
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 @Suite("WordFit: a text is measured in the pieces between which a line surely may break")
 struct WordFitTests {

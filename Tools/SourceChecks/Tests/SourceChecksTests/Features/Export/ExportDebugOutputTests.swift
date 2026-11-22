@@ -109,10 +109,11 @@ struct ExportDebugOutputTests {
         let names = Set(files.map { Self.path(of: $0) })
 
         #expect(files.count >= 200, "Only \(files.count) Swift files in the code that ships")
-        #expect(names.contains("PrestoCV/DesignSystem/Components/LabeledTextField.swift"), "the design system")
-        #expect(names.contains("PrestoCV/Features/Export/ViewModels/CVExportSheetViewModel.swift"), "the feature")
-        #expect(names.contains { $0.hasPrefix("CVPDFExporter/Sources/CVPDFExporter/") }, "the exporter package")
-        #expect(names.contains { $0.hasPrefix("PrestoCVCore/Sources/PrestoCVCore/") }, "the core package")
+        #expect(names.contains("PrestoCVNext/DesignSystem/LabeledField.swift"), "the design system")
+        #expect(names.contains("PrestoCVNext/Features/Export/ExportSheetView.swift"), "the feature")
+        #expect(names.contains { $0.hasPrefix("PrestoCVApp/Sources/PrestoCVPresentation/") }, "the app package")
+        #expect(names.contains { $0.hasPrefix("CVPDFExporter/Sources/CVRendering/") }, "the exporter package")
+        #expect(names.contains { $0.hasPrefix("PrestoCVCore/Sources/PrestoCVDomain/") }, "the core package")
     }
 
     @Test("no code that ships prints or touches the pasteboard, in a Debug build either, apart from previews and a Copy button")

@@ -12,7 +12,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { name }
 
-    /// The legacy app, which ships until the switch of migration step 5-17 (dropped by 5-17d).
+    /// The legacy app, which no target compiles (dropped by 5-17d).
     static let legacy = CatalogUnderCheck(
         name: "the legacy catalog", catalog: LocalizationCatalogTests.catalogPath,
         folders: LocalizationCatalogTests.shippedFolders, rules: LocalizationCatalogTests.legacyRules)

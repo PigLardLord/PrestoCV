@@ -23,8 +23,8 @@
       ],
       "target" : {
         "containerPath" : "container:PrestoCV.xcodeproj",
-        "identifier" : "23E2E8BD27562C02000F2E5D",
-        "name" : "PrestoCVUITests"
+        "identifier" : "7F121E40E0510CC724113715",
+        "name" : "PrestoCVNextUITests"
       }
     }
   ],
