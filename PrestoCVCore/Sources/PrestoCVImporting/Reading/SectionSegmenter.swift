@@ -93,10 +93,10 @@ enum SectionSegmenter {
                 ))
                 continue
             }
-            // A group of skills named after a group called "Languages" ("Trade skills") that came inside the skills: the
-            // languages end there (#305)
+            // A group's label ("Qualities", "Trade skills") with no language in it, after a group called "Languages" that
+            // came inside the skills: the languages end there (#305)
             if sections[sections.count - 1].kind == .languages, sections.count >= 2, sections[sections.count - 2].kind == .skills, block.kind != .listItem, block.cells.count == 1,
-               SkillGroups.namesGroupOfSkills(firstCell) {
+               SkillGroups.reopensSkills(firstCell) {
                 sections.append(Section(kind: .skills, heading: block, blocks: [], languages: []))
                 continue
             }

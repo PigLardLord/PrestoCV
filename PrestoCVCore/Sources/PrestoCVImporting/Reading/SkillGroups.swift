@@ -20,6 +20,22 @@ enum SkillGroups {
         return skillsWords.contains(first) || skillsWords.contains(last)
     }
 
+    /// Whether a line ends a group of languages that came inside the skills and opens the skills again: a group's label
+    /// (a known one, or a line naming a group of skills) that shows no language evidence. A language the lists know, a
+    /// level (a CEFR one, a word of a level, a native speaker's statement) written with or without punctuation, is a
+    /// language's line and stays in the languages ("Englisch gute Kenntnisse", "Gute Kenntnisse").
+    static func reopensSkills(_ text: String) -> Bool {
+        (isLabel(text) || namesGroupOfSkills(text)) && !showsLanguageEvidence(text)
+    }
+
+    private static func showsLanguageEvidence(_ text: String) -> Bool {
+        let line = text.trimmingCharacters(in: Self.trimmed)
+        if LanguageVocabulary.isNativeStatement(line) || SkillLevelWords.isLevel(line) || LanguageReader.statesCEFRLevel(line) { return true }
+        let key = SectionVocabulary.key(line)
+        if LanguageVocabulary.levelKeys.contains(key) { return true }
+        return line.words.contains { LanguageVocabulary.isName(String($0)) }
+    }
+
     private static let maximumWords = 3
     private static let trimmed = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-–•"))
 
