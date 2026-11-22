@@ -300,4 +300,5 @@ private actor HeldStore: DesignStore {
     func design(id: String) async throws -> ValidatedDesign? { try await store.design(id: id) }
     func installedOrigins() async throws -> [String: DesignOrigin] { try await store.installedOrigins() }
     func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.adoptAsBundled(design) }
+    func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.replaceBundled(design) }
 }
