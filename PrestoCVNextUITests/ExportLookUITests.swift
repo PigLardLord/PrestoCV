@@ -168,11 +168,59 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(reveal("look.palette.plum", in: app).isSelected, "The CV keeps the colour chosen")
     }
 
+    // MARK: Leaving, and the dark mode
+
+    /// A look chosen in the sheet is stored by the sheet itself: closing it and going Back leaves nothing to discard,
+    /// so nothing is asked.
+    @MainActor
+    func testChoosingALookAndGoingBackAsksNothing() throws {
+        let app = try launch(chosen, largestText: false)
+        let line = try openExport(chosen, in: app)
+        if isCompact(app) {
+            line.tap()
+            XCTAssertTrue(app.buttons["look.done"].waitForExistence(timeout: 10), "A tap opens the picker")
+        }
+        let plum = reveal("look.palette.plum", in: app)
+        plum.tap()
+        XCTAssertTrue(wait(for: plum, toBeSelected: true), "The colour tapped is chosen at once")
+        if isCompact(app) {
+            app.buttons["look.done"].tap()
+        }
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The PDF is made again")
+
+        let close = app.buttons["export.close"]
+        close.tap()
+        XCTAssertTrue(waitUntilGone(close), "Close takes the sheet away")
+        if app.isCompactWidth {
+            XCTAssertTrue(app.backButton.waitForExistence(timeout: 10), "The editor has its Back")
+            app.backButton.tap()
+        }
+
+        XCTAssertTrue(app.listRow(titled: chosen.title).waitForExistence(timeout: 30), "The list shows the CV")
+        XCTAssertEqual(app.alerts.count, 0, "Leaving asks nothing")
+        XCTAssertEqual(app.sheets.count, 0, "Leaving shows no question")
+        XCTAssertEqual(app.dialogs.count, 0, "Leaving shows no dialog")
+    }
+
+    /// The list, the editor and the sheet show in dark mode, each with what it holds.
+    @MainActor
+    func testLaunchesInDarkMode() throws {
+        let app = try launch(chosen, largestText: false, darkMode: true)
+        XCTAssertTrue(app.listRow(titled: chosen.title).waitForExistence(timeout: 30), "The list shows the CV in dark mode")
+        keepScreenshot("The list in dark mode", of: app)
+        open(chosen, in: app)
+        XCTAssertEqual(app.textInput("editor.field.title").value as? String, chosen.title, "The editor shows the CV in dark mode")
+        keepScreenshot("The editor in dark mode", of: app)
+        app.buttons["editor.export"].tap()
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages in dark mode")
+        keepScreenshot("The sheet in dark mode", of: app)
+    }
+
     // MARK: Launching
 
     /// A store folder of its own with the CV, in English.
     @MainActor
-    private func launch(_ cv: StoredCV, largestText: Bool) throws -> XCUIApplication {
+    private func launch(_ cv: StoredCV, largestText: Bool, darkMode: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
@@ -180,6 +228,9 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         ]
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        if darkMode {
+            app.launchArguments += ["-AppleInterfaceStyle", "Dark"]
         }
         app.launch()
         return app
