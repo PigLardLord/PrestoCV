@@ -98,4 +98,119 @@ struct BulletEntryTests {
         #expect(found.cv.experience.count == 1)
         #expect(found.cv.experience.first?.details.count == 3)
     }
+
+    // MARK: The class: detail bullets never vote and never become entries
+
+    fileprivate struct Words {
+        let language: String
+        let heading: String
+        let kind: EntryReader.Kind
+        let entries: [String]
+        let heads: [String]
+        let places: [String]
+        let plain: String
+        let count: String
+        let yearAndProse: String
+        let sentence: String
+    }
+
+    private static let english = Words(
+        language: "English", heading: "Education", kind: .education,
+        entries: ["• 2021 – Nursing course – Leeds College, Leeds", "• 2012 – Diploma – Leeds High School, Leeds"],
+        heads: ["Nursing course", "Diploma"], places: ["Leeds College", "Leeds High School"],
+        plain: "• Clinical placements", count: "• 2000 hours of clinical training",
+        yearAndProse: "• 2019 led the move to the new ward", sentence: "I completed the practical training.")
+    private static let german = Words(
+        language: "German", heading: "Berufserfahrung", kind: .experience,
+        entries: ["• 2019 – 2022 – Elektriker – Beispiel GmbH, Erfurt", "• 2015 – 2019 – Monteur – Muster AG, Jena"],
+        heads: ["Elektriker", "Monteur"], places: ["Beispiel GmbH", "Muster AG"],
+        plain: "• Planung der Installationen", count: "• 2000 Stunden Baustellenpraxis",
+        yearAndProse: "• 2019 leitete den Umzug in die neue Halle", sentence: "Ich habe die Installationen geprüft.")
+    private static let italian = Words(
+        language: "Italian", heading: "Istruzione", kind: .education,
+        entries: ["• 2021 – Corso di infermieristica – Istituto Esempio, Torino", "• 2012 – Diploma – Liceo Esempio, Torino"],
+        heads: ["Corso di infermieristica", "Diploma"], places: ["Istituto Esempio", "Liceo Esempio"],
+        plain: "• Tirocini in reparto", count: "• 2000 ore di formazione clinica",
+        yearAndProse: "• 2019 ha guidato il trasferimento al nuovo reparto", sentence: "Ho completato la formazione pratica.")
+
+    fileprivate struct Shape: CustomTestStringConvertible, Sendable {
+        let words: Words
+        let detail: String
+        let between: Int
+        let after: Int
+        var testDescription: String { "\(words.language), \(detail) x \(between) between, \(after) after" }
+    }
+
+    fileprivate static let shapes: [Shape] = [english, german, italian].flatMap { words -> [Shape] in
+        ["plain", "count", "yearAndProse", "sentence"].flatMap { detail in
+            [(0, 0), (1, 0), (2, 0), (1, 1), (2, 2)].map { Shape(words: words, detail: detail, between: $0.0, after: $0.1) }
+        }
+    }
+
+    private static func line(of detail: String, in words: Words) -> String {
+        switch detail {
+        case "plain": words.plain
+        case "count": words.count
+        case "yearAndProse": words.yearAndProse
+        default: words.sentence
+        }
+    }
+
+    @Test("Entry bullets keep both entries whatever detail lines stand between and after them", arguments: shapes)
+    fileprivate func entriesSurviveTheirDetails(_ shape: Shape) throws {
+        let words = shape.words
+        let detail = Self.line(of: shape.detail, in: words)
+        let lines = [words.heading, words.entries[0]] + Array(repeating: detail, count: shape.between)
+            + [words.entries[1]] + Array(repeating: detail, count: shape.after)
+        let found = read(lines.joined(separator: "\n"), kind: words.kind)
+        let entries = words.kind == .education
+            ? found.cv.education.map { ($0.degree?.value, $0.school?.value, $0.details.count) }
+            : found.cv.experience.map { ($0.role?.value, $0.employer?.value, $0.details.count) }
+        try #require(entries.count == 2)
+        #expect(entries.map { $0.0 } == words.heads)
+        #expect(entries.map { $0.1 } == words.places)
+        #expect(entries[0].2 == shape.between)
+        #expect(entries[1].2 == shape.after)
+    }
+
+    @Test("Undated detail bullets beside a sentence do not erase the entries")
+    func detailBulletsKeepTheEntries() throws {
+        let found = read("""
+        Education
+        • 2021 – Nursing course – Leeds College, Leeds
+        I completed the practical training.
+        • Clinical placements
+        • 2012 – Diploma – Leeds High School, Leeds
+        • Laboratory training
+        """, kind: .education)
+        #expect(found.cv.education.map { $0.degree?.value } == ["Nursing course", "Diploma"])
+        #expect(found.cv.education.map { $0.details.count } == [2, 1])
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A bullet that starts with a count is a detail, not an entry dated with that number")
+    func countIsNoPeriod() throws {
+        let found = read("""
+        Education
+        • 2021 – Nursing course – Leeds College, Leeds
+        I completed the practical training.
+        • 2000 hours of clinical training
+        """, kind: .education)
+        #expect(found.cv.education.count == 1)
+        #expect(found.cv.education.first?.details.count == 2)
+    }
+
+    @Test("A bullet with its period alone, or with a head of one part, still opens an entry under details")
+    func periodAloneAndShortHeads() throws {
+        let found = read("""
+        Istruzione
+        • 2015 – Corso Croce Rossa Italiana
+        A giugno 2015 ho completato il corso.
+        • 2012 – Diploma – Liceo Esempio, Torino
+        • 2010
+        • Tirocinio in reparto
+        """, kind: .education)
+        #expect(found.cv.education.count == 3)
+        #expect(found.cv.education.first?.degree?.value == "Corso Croce Rossa Italiana")
+    }
 }
