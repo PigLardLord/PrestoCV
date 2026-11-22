@@ -102,4 +102,73 @@ struct LabelledDetailTests {
         #expect(shown(found).contains("Telefono abitazione"))
         #expect(!shown(found).contains("abitazione"))
     }
+
+    @Test("A title that starts with a personal label's word is a title beside labelled contacts too", arguments: [
+        "Web Developer", "Mobile Developer", "Portfolio Manager", "Site Manager", "City Planner", "Cell Biologist",
+        "Location Scout", "Age Care Worker",
+    ])
+    func titleBesideLabelledContacts(_ title: String) {
+        let found = header("""
+        Anna Weber
+        \(title)
+        Email: person@example.com
+        Phone: +44 20 7946 0000
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title?.value == title)
+        #expect(found.cv.person.location == nil)
+        #expect(found.cv.person.email?.value.value == "person@example.com")
+        #expect(found.cv.person.phone != nil)
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A name that starts with a personal label's word is the name beside labelled contacts")
+    func nameWithALabelWord() {
+        let found = header("""
+        Age Weber
+        Email: person@example.com
+        """)
+        #expect(found.cv.person.name?.value == "Age Weber")
+        #expect(found.cv.person.email?.value.value == "person@example.com")
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A title with a label's word stays a title when a labelled contact comes first and a line has no colon")
+    func titleWithLabelledContactsFirst() {
+        let found = header("""
+        Anna Weber
+        Email: person@example.com
+        City Planner
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title?.value == "City Planner")
+        #expect(found.cv.person.location == nil)
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("Under a personal-information heading, an age or a place-like label is not read from a name or a title")
+    func personalHeadingKeepsNamesAndTitles() {
+        let found = header("""
+        Personal information
+        Age Weber
+        City Planner
+        E-mail person@example.com
+        """)
+        #expect(found.cv.person.name?.value == "Age Weber")
+        #expect(found.cv.person.location == nil)
+        #expect(!shown(found).contains("Planner"))
+    }
+
+    @Test("A form of several bare labels reads its closed details: a nationality, a gender, a birth date")
+    func formOfBareLabels() {
+        let found = header("""
+        Surname(s) / First name(s)
+        Address(es)
+        Date of birth 12 May 1990
+        Nationality German
+        """)
+        #expect(found.cv.person.name == nil)
+        #expect(found.cv.person.title == nil)
+        #expect(shown(found).contains("Nationality German"))
+    }
 }

@@ -226,13 +226,26 @@ enum HeaderReader {
         return value.isEmpty ? nil : (label, [value])
     }
 
-    /// Whether a section is a form of personal details: it is one under a heading of personal information, or it holds a
-    /// line that is a label (or a label with its value) of one. A line that starts with a label's word is the label's
-    /// detail only there: "Nationality German" in a form, "Web Developer" under a name (#321).
+    /// Whether a section is a form of personal details: it is one under a heading of personal information, or it holds
+    /// several lines that are bare labels of one ("Address(es)", "Date of birth"), as a Europass-style form has. One or two
+    /// labelled contacts ("Email: ...") make an ordinary header, not a form (#321).
     private static func isForm(_ section: Section, in document: SourceDocument) -> Bool {
-        section.kind == .personal || section.blocks.contains { block in
+        section.kind == .personal || section.blocks.count(where: { block in
             let cells = Piece.cells(of: block, in: document)
-            return labelled(cells) != nil || (cells.count == 1 && isBareLabel(cells[0].text))
+            return cells.count == 1 && isBareLabel(cells[0].text)
+        }) >= minBareLabelsOfAForm
+    }
+
+    private static let minBareLabelsOfAForm = 2
+
+    /// The details whose value a form may give after its label with no colon: a closed set of values (a nationality, a
+    /// gender, a marital status, a birth date) or the form's own name labels. The other labels start job titles and
+    /// names ("City Planner", "Web Developer", "Mobile Developer"), so they are read only with a colon or a column.
+    private static func isReadByPosition(_ label: EntryVocabulary.PersonalLabel, value: Piece) -> Bool {
+        switch label {
+        case .name, .firstName, .lastName, .nationality, .maritalStatus, .gender: true
+        case .birth: value.text.contains(where: \.isNumber)
+        case .address, .phone, .email, .web, .fax, .other: false
         }
     }
 
@@ -243,7 +256,7 @@ enum HeaderReader {
         for end in wordEnds(of: line.text).reversed() {
             guard let label = EntryVocabulary.personalLabel(String(line.text[..<end])) else { continue }
             let value = line.sub(end..<line.text.endIndex).trimmed()
-            if value.text.contains(where: { $0.isLetter || $0.isNumber }) { return (label, [value]) }
+            if value.text.contains(where: { $0.isLetter || $0.isNumber }), isReadByPosition(label, value: value) { return (label, [value]) }
         }
         return nil
     }
