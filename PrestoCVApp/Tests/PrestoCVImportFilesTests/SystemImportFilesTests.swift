@@ -30,6 +30,21 @@ struct SystemImportFilesTests {
         #expect(files.identity(ofResolved: files.resolve(other)) != identity)
     }
 
+    @Test("a new file was created just now, and a folder, a link left unresolved and a missing path have no creation date")
+    func creationDateOfAFile() throws {
+        let scratch = try Scratch()
+        defer { scratch.remove() }
+        let file = try scratch.file("cv.pdf", in: scratch.chosen)
+        let link = try scratch.link("link.pdf", to: file)
+
+        let created = try #require(files.creationDate(ofResolved: files.resolve(file)))
+
+        #expect(abs(created.timeIntervalSinceNow) < 60)
+        #expect(files.creationDate(ofResolved: scratch.chosen) == nil)
+        #expect(files.creationDate(ofResolved: link) == nil)
+        #expect(files.creationDate(ofResolved: scratch.chosen.appendingPathComponent("none.pdf")) == nil)
+    }
+
     @Test("a hard link is the same file")
     func hardLinkIsTheSameFile() throws {
         let scratch = try Scratch()

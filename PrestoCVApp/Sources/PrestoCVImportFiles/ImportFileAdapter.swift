@@ -1,5 +1,6 @@
 import DiagnosticLogging
 import Foundation
+import PrestoCVApplication
 import PrestoCVImporting
 import PrestoCVWorkflowPorts
 import Synchronization
@@ -17,12 +18,10 @@ import Synchronization
 /// - `readPDF(of:)` reads within the size bound, from the path `receive` captured, and only the file of the identity it
 ///   captured: a path that names another file by then is not read.
 /// - A copy an earlier run left (the app ended while a file waited, or before the system handed it the URL) is deleted
-///   too. The regular files directly in the copy folders when the adapter is made are its copies left over; one that is
-///   received before they go is held like any received file. The rest go, under the same lock, when a received file
-///   whose read began is let go: an import reads only once a shell is ready, after the files opened at the launch were
-///   handed over, so a copy no received file named by then is one no window is handed. A release of a file never read
-///   (one replaced while it waited) can come in the middle of those hand-overs, so it deletes none of them; nor does a
-///   `receive`, as the system puts a copy in its folder before it hands the URL over.
+///   once, when the adapter is made, whether or not any import follows: each regular file directly in a copy folder whose
+///   creation date is older than `leftoverAge`. A copy the system made for this run is seconds old when it waits for its
+///   URL to be handed over, so no sweep ever takes a file on its way, whichever window it is for. The sweep never runs
+///   again, so it never takes a file this run has received.
 /// - `logging(to:)` gives an adapter over the same received files and copies left over, writing to another log: the
 ///   process makes one, and each part that holds files uses its own log.
 public final class ImportFileAdapter: ImportFileReading {
@@ -32,8 +31,6 @@ public final class ImportFileAdapter: ImportFileReading {
         let resolved: URL
         /// The URL access started on, which is the one it stops on; nil when the system started none.
         let scoped: URL?
-        /// True once a read of it began; its release then deletes the copies left over.
-        var readBegan = false
     }
 
     private struct Open {
@@ -46,8 +43,6 @@ public final class ImportFileAdapter: ImportFileReading {
         var nextID = 1
         var received: [Int: Received] = [:]
         var open: [FileIdentity: Open] = [:]
-        /// The copies an earlier run left, by identity, that no received file has named yet.
-        var leftovers: [FileIdentity: Set<URL>]
     }
 
     private struct Released {
@@ -59,8 +54,8 @@ public final class ImportFileAdapter: ImportFileReading {
     private final class Holdings: Sendable {
         let state: Mutex<State>
 
-        init(leftovers: [FileIdentity: Set<URL>]) {
-            state = Mutex(State(leftovers: leftovers))
+        init() {
+            state = Mutex(State())
         }
     }
 
@@ -70,18 +65,29 @@ public final class ImportFileAdapter: ImportFileReading {
     private let logger: any DiagnosticLogger
     private let holdings: Holdings
 
-    /// Lists the copy folders: what lies directly in them now is what an earlier run left. A folder that cannot be listed
-    /// is logged, and what it holds stays.
+    /// How old a copy in a copy folder must be to be one an earlier run left. A copy the system made for this run waits
+    /// seconds for its URL to be handed over (a window's callback can run after another window's import ended), so an
+    /// hour never reaches a copy in use; a copy left by a run that ended is deleted at the next launch, however long
+    /// after.
+    public static let leftoverAge: TimeInterval = 3_600
+
+    /// Deletes the copies an earlier run left, once: the regular files directly in the copy folders that were created
+    /// more than `leftoverAge` before `clock` says now. A folder that cannot be listed, and a copy that cannot be deleted,
+    /// is logged, and the others go on.
     ///
     /// - Parameter copyFolders: the folders the system puts the copy of an opened file in; only a file directly inside
     ///   one of them is ever deleted.
-    public convenience init(
-        files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, logger: any DiagnosticLogger
+    public init(
+        files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, clock: any TimeSource,
+        logger: any DiagnosticLogger
     ) {
-        let leftovers = Self.copies(in: copyFolders, of: files, logger: logger)
-        self.init(
-            files: files, copyFolders: copyFolders, maximumBytes: maximumBytes, logger: logger,
-            holdings: Holdings(leftovers: leftovers)
+        self.files = files
+        self.copyFolders = copyFolders
+        self.maximumBytes = maximumBytes
+        self.logger = logger
+        holdings = Holdings()
+        Self.deleteLeftovers(
+            in: copyFolders, of: files, olderThan: clock.now().addingTimeInterval(-Self.leftoverAge), logger: logger
         )
     }
 
@@ -96,7 +102,7 @@ public final class ImportFileAdapter: ImportFileReading {
         self.holdings = holdings
     }
 
-    /// An adapter over the same received files and copies left over, writing to `logger`.
+    /// An adapter over the same received files, writing to `logger`.
     public func logging(to logger: any DiagnosticLogger) -> ImportFileAdapter {
         ImportFileAdapter(
             files: files, copyFolders: copyFolders, maximumBytes: maximumBytes, logger: logger, holdings: holdings
@@ -113,10 +119,8 @@ public final class ImportFileAdapter: ImportFileReading {
             state.nextID += 1
             state.received[id] = Received(identity: identity, resolved: resolved, scoped: scoped)
             if let identity {
-                // A copy left over that is this file is held from now on, and goes at its last release
-                let left = state.leftovers.removeValue(forKey: identity) ?? []
                 state.open[identity, default: Open(count: 0, paths: [])].count += 1
-                state.open[identity]?.paths.formUnion(left.union([resolved]))
+                state.open[identity]?.paths.insert(resolved)
             }
             return ReceivedFile(id: id, url: url)
         }
@@ -124,8 +128,7 @@ public final class ImportFileAdapter: ImportFileReading {
 
     public func readPDF(of file: ReceivedFile) async throws -> Data {
         let began = holdings.state.withLock { state -> Received? in
-            state.received[file.id]?.readBegan = true
-            return state.received[file.id]
+            state.received[file.id]
         }
         guard let received = began else {
             logger.error(.importing, "import.file.notRead", .token("reason", "notReceived"))
@@ -166,8 +169,8 @@ public final class ImportFileAdapter: ImportFileReading {
         if let scoped = released.scoped { files.stopAccess(scoped) }
     }
 
-    /// Takes the file out of the count, and deletes its copies when it was the last one of its identity, and the copies
-    /// left over when its read began, all under the lock. Gives nil for a file not received or already released.
+    /// Takes the file out of the count, and deletes its copies when it was the last one of its identity, under the lock.
+    /// Gives nil for a file not received or already released.
     private func letGo(_ file: ReceivedFile) -> Released? {
         holdings.state.withLock { state -> Released? in
             guard let received = state.received.removeValue(forKey: file.id) else { return nil }
@@ -181,20 +184,8 @@ public final class ImportFileAdapter: ImportFileReading {
                     state.open[identity] = open
                 }
             }
-            if received.readBegan {
-                failures += deleteLeftovers(&state.leftovers)
-            }
             return Released(scoped: received.scoped, failures: failures)
         }
-    }
-
-    /// Deletes the copies left over, by the same rule as a received file's copies, and forgets them: none is tried twice.
-    private func deleteLeftovers(_ leftovers: inout [FileIdentity: Set<URL>]) -> [ImportFileError] {
-        let copies = leftovers
-            .flatMap { identity, paths in paths.map { (identity: identity, path: $0) } }
-            .sorted { $0.path.path < $1.path.path }
-        leftovers.removeAll()
-        return copies.flatMap { deleteCopies(of: $0.identity, at: [$0.path]) }
     }
 
     /// Deletes each path that lies directly in a copy folder, when it still names the file; a folder's own path and a
@@ -213,12 +204,12 @@ public final class ImportFileAdapter: ImportFileReading {
         return failures
     }
 
-    /// The regular files that lie directly in the copy folders, by identity; a link, a folder or anything else there is
-    /// not a copy. A folder that is not there holds none; one that cannot be listed is logged.
-    private static func copies(
-        in folders: [URL], of files: any ImportFileSystem, logger: any DiagnosticLogger
-    ) -> [FileIdentity: Set<URL>] {
-        var copies: [FileIdentity: Set<URL>] = [:]
+    /// Deletes each regular file directly in the folders created before `cutoff`, by the same rule as a received file's
+    /// copies (still the file, never a link, a folder or what lies in one). A folder that is not there holds none; one
+    /// that cannot be listed, and a file that cannot be deleted, is logged.
+    private static func deleteLeftovers(
+        in folders: [URL], of files: any ImportFileSystem, olderThan cutoff: Date, logger: any DiagnosticLogger
+    ) {
         for folder in folders {
             let entries: [URL]
             do {
@@ -227,11 +218,15 @@ public final class ImportFileAdapter: ImportFileReading {
                 logger.error(.importing, "import.file.copiesNotListed", .error(error))
                 continue
             }
-            for entry in entries {
-                guard let identity = files.identity(ofResolved: entry) else { continue }
-                copies[identity, default: []].insert(entry)
+            for entry in entries.sorted(by: { $0.path < $1.path }) {
+                guard let identity = files.identity(ofResolved: entry),
+                      let created = files.creationDate(ofResolved: entry), created < cutoff else { continue }
+                do {
+                    try files.remove(entry, identity: identity)
+                } catch {
+                    logger.error(.importing, "import.file.copyNotDeleted", .error(error))
+                }
             }
         }
-        return copies
     }
 }

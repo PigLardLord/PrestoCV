@@ -863,6 +863,7 @@
    "path": "PrestoCVApp/Sources/PrestoCVImportFiles",
    "allowedImports": [
     "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
     "PrestoCVImporting",
     "DiagnosticLogging",
     "Foundation",
@@ -893,6 +894,7 @@
     "Android",
     "PrestoCVImportFiles",
     "PrestoCVWorkflowPorts",
+    "PrestoCVApplication",
     "PrestoCVImporting",
     "DiagnosticLogging",
     "DiagnosticLoggingTestSupport"

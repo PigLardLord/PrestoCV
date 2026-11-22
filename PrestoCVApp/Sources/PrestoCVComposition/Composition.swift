@@ -401,11 +401,11 @@ public final class Composition {
     }
 
     /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`. Made once for the
-    /// process: when it is made, what lies in the copy folders is what an earlier run left.
+    /// process: when it is made, it deletes the copies an earlier run left in the copy folders (the old ones).
     nonisolated static func importFiles(copyFolders: [URL], logger: any DiagnosticLogger) -> ImportFileAdapter {
         ImportFileAdapter(
             files: SystemImportFiles(), copyFolders: copyFolders,
-            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: logger
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, clock: SystemTimeSource(), logger: logger
         )
     }
 

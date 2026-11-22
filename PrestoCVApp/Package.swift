@@ -34,6 +34,7 @@ var targets: [Target] = [
     // The files handed to the import: a portable outbound adapter, tested on Linux against the real file system
     .target(name: "PrestoCVImportFiles", dependencies: [
         "PrestoCVWorkflowPorts",
+        .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
         .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
         .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
@@ -59,6 +60,7 @@ targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
 ]))
 targets.append(.testTarget(name: "PrestoCVImportFilesTests", dependencies: [
     "PrestoCVImportFiles", "PrestoCVWorkflowPorts",
+    .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
     .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),

@@ -37,6 +37,17 @@ public struct SystemImportFiles: ImportFileSystem {
         return FileIdentity(status)
     }
 
+    public func creationDate(ofResolved url: URL) -> Date? {
+        var status = stat()
+        guard lstat(url.path, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return nil }
+        #if canImport(Darwin)
+        let time = status.st_birthtimespec
+        #else
+        let time = status.st_ctim
+        #endif
+        return Date(timeIntervalSince1970: Double(time.tv_sec) + Double(time.tv_nsec) / 1_000_000_000)
+    }
+
     public func read(_ url: URL, identity: FileIdentity, atMost limit: Int) throws(ImportFileError) -> FileRead {
         try readFile(at: url.path, identity: identity, atMost: limit)
     }

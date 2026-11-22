@@ -71,6 +71,10 @@ public protocol ImportFileSystem: Sendable {
     func resolve(_ url: URL) -> URL
     /// The identity of a resolved path, when it names a regular file; nil for anything else or for no file.
     func identity(ofResolved url: URL) -> FileIdentity?
+    /// When the regular file at a resolved path was created (on Apple platforms its birth time, which a copy that keeps
+    /// the source's modification date does not inherit; elsewhere the inode's change time); nil for anything else or for
+    /// no file.
+    func creationDate(ofResolved url: URL) -> Date?
     /// The bytes of the file at `url`, read into memory (never mapped) through one descriptor that does not follow a
     /// link and does not wait on a pipe. Throws `notTheFile` when the opened file is not a regular file of `identity`.
     /// Reads at most `limit` bytes and one more, whatever size the file states.
