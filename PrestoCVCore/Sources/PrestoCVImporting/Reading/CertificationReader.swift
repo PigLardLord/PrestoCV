@@ -83,7 +83,12 @@ enum CertificationReader {
             }
             walk.above = read(block, in: section, walk: &walk, into: &findings)
         }
-        if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
+        guard let waiting = walk.waiting else { return }
+        if let before = waiting.before, findings.cv.certifications[before].year == nil {
+            findings.cv.certifications[before].year = waiting.year
+        } else {
+            findings.unplace(waiting.block, in: section)
+        }
     }
 
     /// Where the walk over the blocks of a section stands: the certification just made, which the next block may complete,
@@ -91,8 +96,12 @@ enum CertificationReader {
     private struct Walk {
         let datesFirst: Bool
         var above: Int?
-        var waiting: (block: SourceBlock, year: Sourced<Int>)?
+        var waiting: Waiting?
     }
+
+    /// A line of dates that waits for the certification below it, and the certification above it, which takes the dates when
+    /// nothing follows the line.
+    private typealias Waiting = (block: SourceBlock, year: Sourced<Int>, before: Int?)
 
     private static func startsWithDates(_ section: Section, _ document: SourceDocument, _ consumed: Set<Int>) -> Bool {
         guard let first = section.blocks.first(where: { !consumed.contains($0.index) && $0.kind != .tableHeader }) else { return false }
@@ -149,7 +158,7 @@ enum CertificationReader {
     private static func dateLine(_ block: SourceBlock, _ year: Sourced<Int>, _ walk: inout Walk, _ section: Section, _ findings: inout Findings) -> Bool {
         if walk.datesFirst {
             if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
-            walk.waiting = (block, year)
+            walk.waiting = (block, year, walk.above)
             return true
         }
         guard let above = walk.above, findings.cv.certifications[above].year == nil else { return false }
@@ -171,7 +180,7 @@ enum CertificationReader {
 
     /// Branch 5: a certification of its own.
     private static func add(
-        _ name: Piece, _ line: Line, waiting: (block: SourceBlock, year: Sourced<Int>)?, _ section: Section, _ findings: inout Findings
+        _ name: Piece, _ line: Line, waiting: Waiting?, _ section: Section, _ findings: inout Findings
     ) {
         var certification = ImportedCertification(name: name.quote())
         certification.year = line.year ?? waiting?.year

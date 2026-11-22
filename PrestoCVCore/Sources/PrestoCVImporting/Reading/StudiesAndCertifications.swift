@@ -46,10 +46,12 @@
 ///    part ("University of Leipzig — Master of Science, 2014", "University of Leipzig, MSc Physics"): that line is a
 ///    study of its own, and the line above it is not its name.
 /// 4. A line that holds nothing but dates ("2019 – 2021") has no shape of its own: it belongs to the entry beside it, and
-///    takes that entry's kind, so that the entry reader sees the period with the line it dates. A section that starts with
-///    such a line puts its dates first, and each date line belongs to the entry below it; any other section puts them
-///    after, and each belongs to the entry above it ("Certified Scrum Master — Scrum Alliance" over "2019 – 2021" is a
-///    certification of 2021, not a certification and a study with no name).
+///    takes that entry's kind, so that the entry reader sees the period with the line it dates. It goes to the neighbour
+///    that has no date of its own before one that has ("Certified Scrum Master — Scrum Alliance, 2021" over "2015 – 2017"
+///    over "MSc Physics" dates the MSc). Between two alike, a section that starts with such a line puts its dates first
+///    (each belongs to the entry below it) and any other puts them after (each belongs to the entry above it); the last
+///    line of a section goes to the entry above it whichever way ("Certified Scrum Master — Scrum Alliance" over
+///    "2019 – 2021" is a certification of 2021, not a certification and a study with no name).
 /// 5. Anything else goes with the line before it, a line already taken as noise too; the lines before the first line
 ///    with evidence go with that line. A section with no evidence at all keeps the kind of its heading, as before: read
 ///    as studies under a heading of studies, left in the text not imported under a heading that joins the two kinds.
@@ -95,21 +97,47 @@ enum StudiesAndCertifications {
         return runs
     }
 
-    /// Rule 4: a line of dates alone takes the kind of the entry it dates, the one below it when the section puts its dates
-    /// first (its first line holds dates alone), the one above it otherwise. A neighbour that shows no kind, or a line
-    /// that is not there, leaves the date line with the kind its own period shows. So does a study just below with no date
-    /// of its own and none after it ("Master of Science" over "2010 – 2014" over "University of Leipzig"): the dates are
-    /// that study's.
+    /// Rule 4: a line of dates alone takes the kind of the entry it dates. Both neighbours are looked at, with what each
+    /// already shows: a neighbour with a date of its own, or one that an earlier date line took, is dated already, so the
+    /// line goes to the neighbour that is not ("Certified Scrum Master — Scrum Alliance, 2021" over "2015 – 2017" over
+    /// "MSc Physics"). When both are alike the section decides: dates first, the line belongs to the entry below it, and
+    /// otherwise to the one above. A line with no entry below it (the last of the section) goes to the one above it, and a
+    /// line with none above it to the one below. A neighbour that shows no kind is not an entry; with none left, the line
+    /// keeps the kind its own period shows. So does a study just below with no date of its own and none after it ("Master
+    /// of Science" over "2010 – 2014" over "University of Leipzig"): the dates are that study's.
     private static func giveDateLinesToTheirEntry(_ evidence: inout [SectionKind?], _ shapes: [Shape?]) {
         guard let first = shapes.lazy.compactMap({ $0 }).first else { return }
         let datesFirst = first.datesOnly
-        let order = datesFirst ? Array(shapes.indices.reversed()) : Array(shapes.indices)
-        for index in order where shapes[index]?.datesOnly == true {
-            let neighbour = datesFirst ? index + 1 : index - 1
-            guard shapes.indices.contains(neighbour), shapes[neighbour] != nil, let kind = evidence[neighbour] else { continue }
-            if !datesFirst, studyBelowHasNoDates(of: index, shapes, evidence) { continue }
-            evidence[index] = kind
+        var taken = Set<Int>()
+        for index in shapes.indices where shapes[index]?.datesOnly == true {
+            let above = entry(at: index - 1, shapes, evidence)
+            let below = entry(at: index + 1, shapes, evidence)
+            let neighbour: Int
+            switch (above, below) {
+            case (nil, nil): continue
+            case (let only?, nil), (nil, let only?): neighbour = only
+            case (let up?, let down?):
+                let upFree = shapes[up]?.dated == false && !taken.contains(up)
+                let downFree = shapes[down]?.dated == false && !taken.contains(down)
+                if upFree != downFree {
+                    neighbour = upFree ? up : down
+                } else if !datesFirst, studyBelowHasNoDates(of: index, shapes, evidence) {
+                    continue
+                } else {
+                    neighbour = datesFirst ? down : up
+                }
+            }
+            if let kind = evidence[neighbour] {
+                evidence[index] = kind
+                taken.insert(neighbour)
+            }
         }
+    }
+
+    /// The index of a line that is an entry of some kind: not a date line itself, with a kind.
+    private static func entry(at index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Int? {
+        guard shapes.indices.contains(index), let shape = shapes[index], !shape.datesOnly, evidence[index] != nil else { return nil }
+        return index
     }
 
     private static func studyBelowHasNoDates(of index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Bool {

@@ -178,3 +178,146 @@ struct PeriodLineTests {
         #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
     }
 }
+
+/// A line of dates alone goes to the neighbour that has no dates of its own, whichever way the section begins (#461).
+/// The direction of the section only decides when both neighbours are alike.
+@Suite("A period on its own line goes to the entry that lacks one")
+struct PeriodOwnershipTests {
+
+    struct Sample: Sendable, CustomTestStringConvertible {
+        let language: String
+        let heading: String
+        let bachelor: String
+        let master: String
+        let certification: String
+        let datedCertification: String
+        var testDescription: String { language }
+    }
+
+    static let samples = [
+        Sample(
+            language: "en", heading: "Education & Certifications", bachelor: "BSc Physics — University of Leipzig",
+            master: "MSc Physics — University of Leipzig", certification: "Certified Scrum Master — Scrum Alliance",
+            datedCertification: "Certified Scrum Master — Scrum Alliance, 2021"),
+        Sample(
+            language: "de", heading: "Ausbildung & Zertifizierungen", bachelor: "BSc Physik — Universität Leipzig",
+            master: "MSc Physik — Universität Leipzig", certification: "Zertifizierter Scrum Master — Scrum Alliance",
+            datedCertification: "Zertifizierter Scrum Master — Scrum Alliance, 2021"),
+        Sample(
+            language: "it", heading: "Istruzione e certificazioni", bachelor: "Laurea in Fisica — Università di Pisa",
+            master: "Laurea Magistrale in Fisica — Università di Pisa", certification: "Certificazione Scrum Master — Scrum Alliance",
+            datedCertification: "Certificazione Scrum Master — Scrum Alliance, 2021"),
+    ]
+
+    private func importText(_ sample: Sample, _ body: String) throws -> ImportResult {
+        let text = "Tobias Renn\ntobias.renn@example.com\n\n\(sample.heading)\n\(body)"
+        return try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(text)
+    }
+
+    private func range(_ start: Int, _ end: Int) -> ImportedPeriod {
+        ImportedPeriod(start: YearMonth(year: start, month: nil), end: .date(YearMonth(year: end, month: nil)))
+    }
+
+    private func expectNothingLost(_ found: ImportResult) {
+        #expect(Coverage.lost(found).isEmpty, "\(Coverage.describe(Coverage.lost(found)))")
+    }
+
+    @Test("Dates first, then two studies and a dated certification: each keeps its period", arguments: PeriodOwnershipTests.samples)
+    func theReviewInput(sample: Sample) throws {
+        let body = "2010–2014\n\(sample.bachelor)\n\(sample.master)\n2015–2017\n\(sample.datedCertification)"
+        let found = try importText(sample, body)
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2010, 2014), range(2015, 2017)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 2, "a study with no name was made")
+        #expect(found.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates first, a trailing period with nothing below goes to the certification above", arguments: PeriodOwnershipTests.samples)
+    func trailingPeriodOfACertification(sample: Sample) throws {
+        let found = try importText(sample, "2010–2014\n\(sample.bachelor)\n\(sample.certification)\n2019–2021")
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2010, 2014)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 1, "a study with no name was made")
+        #expect(found.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates first, a trailing period goes to the study above it", arguments: PeriodOwnershipTests.samples)
+    func trailingPeriodOfAStudy(sample: Sample) throws {
+        let found = try importText(sample, "2010–2014\n\(sample.bachelor)\n\(sample.master)\n2015–2017")
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2010, 2014), range(2015, 2017)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 2, "a study with no name was made")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates first with a date line over each entry stays as it was", arguments: PeriodOwnershipTests.samples)
+    func everyEntryHasItsDatesAbove(sample: Sample) throws {
+        let body = "2010–2014\n\(sample.bachelor)\n2015–2017\n\(sample.master)\n2019–2021\n\(sample.certification)"
+        let found = try importText(sample, body)
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2010, 2014), range(2015, 2017)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 2)
+        #expect(found.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates after with a date line under each entry stays as it was", arguments: PeriodOwnershipTests.samples)
+    func everyEntryHasItsDatesBelow(sample: Sample) throws {
+        let body = "\(sample.bachelor)\n2010–2014\n\(sample.master)\n2015–2017\n\(sample.certification)\n2019–2021"
+        let found = try importText(sample, body)
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2010, 2014), range(2015, 2017)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 2)
+        #expect(found.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("A period between a dated certification above and a study below goes to the study", arguments: PeriodOwnershipTests.samples)
+    func periodBetweenADatedEntryAndABareOne(sample: Sample) throws {
+        let body = "\(sample.datedCertification)\n2015–2017\n\(sample.master)"
+        let found = try importText(sample, body)
+
+        #expect(found.cv.education.map { $0.period?.value } == [range(2015, 2017)])
+        #expect(found.cv.education.compactMap { $0.degree?.value }.count == 1)
+        #expect(found.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates first with two certifications: a trailing period goes to the one above it", arguments: PeriodOwnershipTests.samples)
+    func trailingPeriodOfTheSecondCertification(sample: Sample) throws {
+        let other = sample.certification.replacingFirst("Scrum Master", with: "Product Owner")
+        let found = try importText(sample, "2018\n\(sample.certification)\n\(other)\n2021")
+
+        #expect(found.cv.education.isEmpty)
+        #expect(found.cv.certifications.map { $0.year?.value } == [2018, 2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("A period between two entries without dates follows the direction of the section", arguments: PeriodOwnershipTests.samples)
+    func periodBetweenTwoBareEntries(sample: Sample) throws {
+        let after = try importText(sample, "\(sample.certification)\n2019–2021\n\(sample.bachelor)\n2010–2014")
+        #expect(after.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(after.cv.education.map { $0.period?.value } == [range(2010, 2014)])
+        expectNothingLost(after)
+
+        let first = try importText(sample, "2019–2021\n\(sample.certification)\n2010–2014\n\(sample.bachelor)")
+        #expect(first.cv.certifications.map { $0.year?.value } == [2021])
+        #expect(first.cv.education.map { $0.period?.value } == [range(2010, 2014)])
+        expectNothingLost(first)
+    }
+}
+
+private extension String {
+    func replacingFirst(_ target: String, with other: String) -> String {
+        guard let range = self.range(of: target) else { return self }
+        return replacingCharacters(in: range, with: other)
+    }
+}
