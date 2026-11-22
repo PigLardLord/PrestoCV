@@ -131,6 +131,22 @@ struct ListReaderTests {
         #expect(found.unplaced.map(\.text) == [line])
     }
 
+    @Test("A list whose first item starts like a pronoun is still a list", arguments: [
+        ("EU project management, grant writing, budget planning.",
+         ["EU project management", "grant writing", "budget planning."]),
+        ("EU grant writing, Vendor onboarding, budget planning.",
+         ["EU grant writing", "Vendor onboarding", "budget planning."]),
+        ("I Ching practice, tea ceremony, calligraphy tools.",
+         ["I Ching practice", "tea ceremony", "calligraphy tools."]),
+        ("I Corinthians study, choir singing, church archives.",
+         ["I Corinthians study", "choir singing", "church archives."]),
+    ])
+    func pronounLookalikes(line: String, expected: [String]) {
+        let found = read("Skills\n\(line)")
+        #expect(found.cv.skills.map(\.value) == expected)
+        #expect(found.unplaced.isEmpty)
+    }
+
     @Test("A plain list that ends with a full stop is still a list, with each separator", arguments: [
         "Excel, Word, PowerPoint, Outlook, Teams, SharePoint, Access.",
         "Excel; Word; PowerPoint; Outlook; Teams; SharePoint; Access.",

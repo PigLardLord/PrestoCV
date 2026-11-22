@@ -346,10 +346,15 @@ enum EntryVocabulary {
 extension EntryVocabulary {
 
     /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
-    /// positive sign of a sentence, which no noun phrase of a skills list has.
+    /// positive sign of a sentence, which no noun phrase of a skills list has. The pronoun must be written as one
+    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals) and followed by a word that does not start with a
+    /// capital ("I led", never the numeral of "I Corinthians study").
     static func startsWithSubject(_ text: String) -> Bool {
-        guard let first = text.words.first else { return false }
-        return subjectPronouns.contains(first.folded)
+        let words = text.words
+        guard let first = words.first, subjectPronouns.contains(first.folded) else { return false }
+        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy(\.isLowercase)
+        let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
+        return isWrittenAsAWord && !nextStartsWithACapital
     }
 
     private static let subjectPronouns: Set<String> = Set([
