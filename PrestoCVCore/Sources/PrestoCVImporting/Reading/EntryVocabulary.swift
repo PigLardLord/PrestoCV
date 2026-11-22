@@ -289,7 +289,8 @@ enum EntryVocabulary {
     private static let personalLabels: [String: PersonalLabel] = {
         let groups: [(PersonalLabel, [String])] = [
             (.name, ["name", "nome", "nome e cognome", "cognome e nome", "nombre", "nombre y apellidos", "nom", "nom et prénom",
-                     "nome completo", "full name", "vollständiger name", "nombre completo"]),
+                     "nome completo", "full name", "vollständiger name", "nombre completo", "surname first name", "first name surname",
+                     "cognome nome", "nome cognome", "nachname vorname", "vorname nachname", "apellidos nombre", "nombre apellidos"]),
             (.firstName, ["vorname", "first name", "prénom", "nome proprio", "primeiro nome"]),
             (.lastName, ["nachname", "last name", "surname", "cognome", "apellidos", "apellido", "nom de famille", "apelido", "sobrenome"]),
             (.address, ["address", "indirizzo", "residenza", "domicilio", "adresse", "anschrift", "wohnort", "dirección", "morada",

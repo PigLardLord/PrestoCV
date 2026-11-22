@@ -62,11 +62,19 @@ enum SectionVocabulary {
     /// ("e", "and", "und", "y", "et") left out.
     static func key(_ text: String) -> String {
         var cleaned = ""
-        for character in text.folded {
+        for character in withoutPluralMarks(text.folded) {
             cleaned.append(character.isLetter || character.isNumber ? character : " ")
         }
         return cleaned.split(separator: " ").filter { !joiningWords.contains(String($0)) }.joined(separator: " ")
     }
+
+    /// The text without the plural a form writes in brackets: "Surname(s)", "Cognome(i)", "Address(es)".
+    private static func withoutPluralMarks(_ text: String) -> String {
+        guard text.contains("(") else { return text }
+        return pluralMarks.reduce(text) { $0.replacing($1, with: "") }
+    }
+
+    private static let pluralMarks = ["(s)", "(i)", "(es)"]
 
     private static let joiningWords: Set<String> = ["and", "e", "und", "y", "et", "s"]
 

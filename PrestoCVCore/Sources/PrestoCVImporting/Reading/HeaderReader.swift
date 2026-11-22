@@ -34,9 +34,10 @@ enum HeaderReader {
 
         for section in sections {
             let heading = findings.heading(of: section)
+            let isForm = isForm(section, in: findings.document)
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
                 let cells = Piece.cells(of: block, in: findings.document)
-                if let (label, values) = labelled(cells) {
+                if let (label, values) = labelled(cells) ?? (isForm ? labelledByPosition(cells) : nil) {
                     switch label {
                     case .name:
                         names.add(withoutCredentials(values, in: section, into: &findings), to: \.name, section: section, into: &findings)
@@ -224,6 +225,41 @@ enum HeaderReader {
         let value = first.sub(first.text.index(after: colon)..<first.text.endIndex).trimmed()
         return value.isEmpty ? nil : (label, [value])
     }
+
+    /// Whether a section is a form of personal details: it is one under a heading of personal information, or it holds a
+    /// line that is a label (or a label with its value) of one. A line that starts with a label's word is the label's
+    /// detail only there: "Nationality German" in a form, "Web Developer" under a name (#321).
+    private static func isForm(_ section: Section, in document: SourceDocument) -> Bool {
+        section.kind == .personal || section.blocks.contains { block in
+            let cells = Piece.cells(of: block, in: document)
+            return labelled(cells) != nil || (cells.count == 1 && isBareLabel(cells[0].text))
+        }
+    }
+
+    /// A line of one cell that starts with the whole label of a personal detail and goes on with its value, with no colon
+    /// and no column between them: "Nationality German", "Cognome(i)/Nome(i) Weber Anna". The longest label wins.
+    private static func labelledByPosition(_ cells: [Piece]) -> (EntryVocabulary.PersonalLabel, [Piece])? {
+        guard cells.count == 1, let line = cells.first, !line.text.contains(":"), !isBareLabel(line.text) else { return nil }
+        for end in wordEnds(of: line.text).reversed() {
+            guard let label = EntryVocabulary.personalLabel(String(line.text[..<end])) else { continue }
+            let value = line.sub(end..<line.text.endIndex).trimmed()
+            if value.text.contains(where: { $0.isLetter || $0.isNumber }) { return (label, [value]) }
+        }
+        return nil
+    }
+
+    /// Where the first words of a text end, as many as the longest label has.
+    private static func wordEnds(of text: String) -> [String.Index] {
+        var ends: [String.Index] = []
+        var start = text.startIndex
+        while ends.count < maxLabelWords, let space = text[start...].firstIndex(of: " ") {
+            if space > start { ends.append(space) }
+            start = text.index(after: space)
+        }
+        return ends
+    }
+
+    private static let maxLabelWords = 6
 
     // MARK: Contacts
 
