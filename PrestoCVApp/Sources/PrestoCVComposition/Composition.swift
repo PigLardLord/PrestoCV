@@ -96,6 +96,8 @@ public final class Composition {
         let wrapListEditing: WrapListEditing
         let wrapStore: WrapStore
         let wrapImport: WrapImport
+        /// How long an editor waits after the last change before it stores: the autosave's own pause, but for a UI test.
+        let autosavePause: Duration
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
@@ -176,8 +178,8 @@ public final class Composition {
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
             languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
-            wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, backgroundTime: inputs.backgroundTime,
-            appLanguage: inputs.appLanguage, legacyImport: legacyImport
+            wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, autosavePause: inputs.autosavePause,
+            backgroundTime: inputs.backgroundTime, appLanguage: inputs.appLanguage, legacyImport: legacyImport
         )
     }
 
@@ -327,6 +329,7 @@ public final class Composition {
         let wrapStore: WrapStore
         let wrapImport: WrapImport
         let wrapGate: WrapGate
+        let autosavePause: Duration
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
@@ -368,6 +371,7 @@ public final class Composition {
         wrapStore = { fixtures.store($0) }
         wrapImport = { fixtures.importing($0) }
         wrapGate = { fixtures.designGate($0) }
+        autosavePause = fixtures.autosavePause(Autosave<CV>.pause)
         // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
         // left alone here, and `make` fails the launch through `check`.
         if rejected == nil, fixtures.passesCheck(paths) {
@@ -386,6 +390,7 @@ public final class Composition {
         wrapStore = { $0 }
         wrapImport = { $0 }
         wrapGate = { $0 }
+        autosavePause = Autosave<CV>.pause
         #endif
         let state = await make(Inputs(
             paths: paths,
@@ -419,6 +424,7 @@ public final class Composition {
             wrapListEditing: wrapListEditing,
             wrapStore: wrapStore,
             wrapImport: wrapImport,
+            autosavePause: autosavePause,
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,

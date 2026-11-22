@@ -3,7 +3,8 @@ import XCTest
 /// The editor while the store refuses to write (#402, 5-15c): the person's text stays on screen, the status line and
 /// the notice say so, Try Again writes it again, and nothing leaves the editor while the text is not stored, by Back,
 /// by the edge swipe or by another row of the list. The launch fixture `-PrestoCVNextFailWrites <count>` makes the first
-/// <count> writes fail and the next ones succeed.
+/// <count> writes fail and the next ones succeed; `-PrestoCVNextAutosavePause <seconds>` lengthens the autosave's
+/// pause.
 final class EditorFailedSaveUITests: RuntimeIssueFailingTestCase {
 
     private let foreman = (identity: "8D3A8E3A-3DAE-4E3D-9F77-3B5D4EAD9C03", title: "Site Foreman")
@@ -19,6 +20,8 @@ final class EditorFailedSaveUITests: RuntimeIssueFailingTestCase {
 
     /// Writes that never run out: more than any test makes.
     private let always = "1000000"
+    /// The seconds the autosave waits when a test leaves the editor before the pause: longer than any typing takes.
+    private let longPause = "60"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -70,21 +73,21 @@ final class EditorFailedSaveUITests: RuntimeIssueFailingTestCase {
     }
 
     @MainActor
-    func testBackBeforeThePauseWithAFailingStoreStaysAndSaysWhy() throws {
-        let app = try launch(failingWrites: always)
+    func testBackBeforeThePauseWithAFailingStoreKeepsTheEditorAndTheListOffersItBack() throws {
+        // The pause is a minute, so that however long the typing takes, nothing has been written when the editor is left:
+        // leaving hands the editor to its write at once. That write fails, so the shell keeps the editor and the list
+        // says so, with Open. The editor, once opened, says why.
+        let app = try launch(failingWrites: always, autosavePause: longPause)
         typeTheTitle(in: app)
 
-        // Straight after the last key, before the pause that stores the text is over: Back is still there, and leaving
-        // hands the editor to its write. That write fails, so the shell keeps the editor and the list says so, with
-        // Open. Where the pause was quicker, the failure has hidden Back and the editor stays open. Either way the text
-        // is not lost and the editor, once it is open, says why.
         if app.isCompactWidth {
-            if app.backButton.exists { app.backButton.tap() }
+            app.backButton.tap()
         } else {
             app.listRow(titled: surveyor.title).tap()
         }
         let open = app.element("list.kept.open")
-        if open.waitForExistence(timeout: 10) { open.tap() }
+        XCTAssertTrue(open.waitForExistence(timeout: 30), "The list offers the editor whose text was not stored")
+        open.tap()
 
         XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: failed), "The editor says that the text is not stored")
         XCTAssertEqual(app.textInput("editor.field.title").value as? String, edited, "The text typed stays in the editor")
@@ -110,10 +113,11 @@ final class EditorFailedSaveUITests: RuntimeIssueFailingTestCase {
 
     /// The two CVs stored, the Site Foreman open, in English, with the writes failing as told.
     @MainActor
-    private func launch(failingWrites count: String) throws -> XCUIApplication {
+    private func launch(failingWrites count: String, autosavePause seconds: String? = nil) throws -> XCUIApplication {
+        let pause = seconds.map { ["-PrestoCVNextAutosavePause", $0] } ?? []
         let app = try XCUIApplication.seeded(
             [foreman, surveyor].map { ($0.identity, XCUIApplication.storedCV(identity: $0.identity, title: $0.title)) },
-            arguments: ["-PrestoCVNextFailWrites", count])
+            arguments: ["-PrestoCVNextFailWrites", count] + pause)
         app.launch()
         app.openCV(titled: foreman.title)
         return app

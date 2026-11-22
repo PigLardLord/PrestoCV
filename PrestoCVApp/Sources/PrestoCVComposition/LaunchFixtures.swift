@@ -32,6 +32,9 @@ import PrestoCVWorkflowPorts
 /// - `-PrestoCVNextFailWrites <count>`: the first `<count>` writes of a CV (a creation, a replacement, a deletion) fail with a
 ///   failed write, and the writes after them succeed; a count that never runs out never succeeds. It needs one of the two
 ///   storage arguments, as the seed does.
+/// - `-PrestoCVNextAutosavePause <seconds>`: the editors' autosave waits this many whole seconds (at least one) after the last
+///   change, instead of its own pause, so that a UI test leaves an editor before the pause is over, however long the typing
+///   took. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextHoldImport`: a read of the import never ends by itself, and ends as cancelled when the person cancels it.
 ///   It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextReadyDesigns`: the bundled designs are accepted without the renders that check them (`AcceptedDesigns`),
@@ -63,6 +66,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case otherWindowWithoutFolder
         case unreadableFailWrites
         case failWritesWithoutFolder
+        case unreadableAutosavePause
         case traceRunsWithoutFolder
         case readyDesignsWithoutFolder
         case seedUnwritable
@@ -80,6 +84,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
     static let failWritesArgument = "-PrestoCVNextFailWrites"
+    static let autosavePauseArgument = "-PrestoCVNextAutosavePause"
     static let holdImportArgument = "-PrestoCVNextHoldImport"
     static let traceRunsArgument = "-PrestoCVNextTraceRuns"
     static let readyDesignsArgument = "-PrestoCVNextReadyDesigns"
@@ -103,6 +108,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var otherWindow: OtherWindow?
     /// How many of the first writes of a CV fail, nil when none does
     var writesToFail: Int?
+    /// How many whole seconds the editors' autosave waits after the last change, nil for its own pause
+    var autosavePauseSeconds: Int?
     /// The import's reads wait until they are cancelled
     var holdsImport = false
     /// Two invented runs of the diagnostics are stored before the app starts
@@ -156,6 +163,11 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableFailWrites
                 }
                 fixtures.writesToFail = count
+            case autosavePauseArgument:
+                guard let seconds = Int(try value(after: argument, in: arguments, at: &index)), seconds >= 1 else {
+                    throw .unreadableAutosavePause
+                }
+                fixtures.autosavePauseSeconds = seconds
             case holdImportArgument:
                 fixtures.holdsImport = true
             case readyDesignsArgument:
@@ -217,6 +229,11 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
     func listEditing(_ editing: any CVEditing) -> any CVEditing {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
+    }
+
+    /// The pause of the editors' autosave: the given one, or with the fixture the seconds it asks for.
+    func autosavePause(_ normal: Duration) -> Duration {
+        autosavePauseSeconds.map { Duration.seconds($0) } ?? normal
     }
 
     /// What the import reads through: the importer it is given, or with the fixture one whose reads wait until cancelled.

@@ -209,6 +209,28 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The autosave pause is read in whole seconds, and is the editors' own when none is given")
+    func autosavePause() throws {
+        let given = try LaunchFixtures.parse([Self.program, "-PrestoCVNextAutosavePause", "60"])
+        #expect(given.autosavePauseSeconds == 60)
+        #expect(given.autosavePause(.seconds(1)) == .seconds(60))
+        let none = try LaunchFixtures.parse([Self.program])
+        #expect(none.autosavePauseSeconds == nil)
+        #expect(none.autosavePause(.seconds(1)) == .seconds(1))
+    }
+
+    @Test("A pause of the autosave that is no number, under one second, or missing is a failure of the launch")
+    func unreadableAutosavePause() {
+        for refused in ["long", "0", "-1", "1.5", ""] {
+            #expect(throws: LaunchFixtures.Failure.unreadableAutosavePause) {
+                try LaunchFixtures.parse([Self.program, "-PrestoCVNextAutosavePause", refused])
+            }
+        }
+        #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextAutosavePause")) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextAutosavePause"])
+        }
+    }
+
     @Test("The trace runs argument is read, and it needs a folder of the fixture: never the device's own")
     func traceRuns() throws {
         #expect(try LaunchFixtures.parse([Self.program, "-PrestoCVNextEmptyStorage", "-PrestoCVNextTraceRuns"]).storesTraceRuns)

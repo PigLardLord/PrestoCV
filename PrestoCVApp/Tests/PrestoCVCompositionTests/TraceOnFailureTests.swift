@@ -49,6 +49,7 @@ struct TraceOnFailureTests {
             wrapListEditing: { $0 },
             wrapStore: { $0 },
             wrapImport: { $0 },
+            autosavePause: .seconds(1),
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
