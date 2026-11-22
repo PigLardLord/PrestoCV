@@ -60,9 +60,8 @@ extension ImportFileError: LoggableError {
     }
 }
 
-/// What the import's file adapter asks of the file system and of the platform's access to a chosen file, and where its
-/// sweep keeps its record. The device's is `SystemImportFiles`; the tests wrap it to record the calls and to fail on
-/// purpose.
+/// What the import's file adapter asks of the file system and of the platform's access to a chosen file. The device's
+/// is `SystemImportFiles`; the tests wrap it to record the calls and to fail on purpose.
 public protocol ImportFileSystem: Sendable {
     /// Starts security-scoped access to a chosen file. True when access started; it is then stopped exactly once.
     func startAccess(_ url: URL) -> Bool
@@ -79,14 +78,4 @@ public protocol ImportFileSystem: Sendable {
     /// Deletes the file at `url` only when it is still the regular file of `identity`; anything else found there is put
     /// back and `notTheFile` thrown. A path already gone is not an error.
     func remove(_ url: URL, identity: FileIdentity) throws(ImportFileError)
-    /// What lies directly in `folder`, by the folder's path and each entry's name, in no set order: files, links, folders
-    /// and anything else alike. None when the folder is not there; anything else that stops the listing is thrown.
-    func entries(in folder: URL) throws(ImportFileError) -> [URL]
-    /// The bytes of the regular file at `url`, read like `read` but of whatever regular file is there: nil when nothing
-    /// is at the path; `notTheFile` when what is there is not a regular file (a link is not followed).
-    func contents(of url: URL, atMost limit: Int) throws(ImportFileError) -> FileRead?
-    /// Writes `data` whole as the file at `url`, making its folder when it is missing (not the folders above it): it is
-    /// written beside, then renamed over the path, so a reader finds the old file or the new one, and a link there is
-    /// replaced, never followed.
-    func store(_ data: Data, at url: URL) throws(ImportFileError)
 }

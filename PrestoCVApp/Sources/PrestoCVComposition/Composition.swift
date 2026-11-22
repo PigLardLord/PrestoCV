@@ -69,7 +69,7 @@ public final class Composition {
         let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
-        /// The import's file adapter, one for the process (`importFiles(copyFolders:record:logger:)`): the windows'
+        /// The import's file adapter, one for the process (`importFiles(copyFolders:logger:)`): the windows'
         /// inboxes and the screens hold the files opened in the app through it, so a copy goes only when none of them
         /// holds it. It deletes a copy only when it lies directly in one of the folders where the system puts the copy of a
         /// file opened in the app, and never a file the person chose where it is. The composition gives it its own log.
@@ -400,13 +400,12 @@ public final class Composition {
         OpenedFileInbox(files: deviceImportFiles)
     }
 
-    /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`. Made once for the
-    /// process: when it is made, it deletes the copies an earlier run left in the copy folders, those the last launch's
-    /// record at `record` names too.
-    nonisolated static func importFiles(copyFolders: [URL], record: URL, logger: any DiagnosticLogger) -> ImportFileAdapter {
+    /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`, and only those
+    /// this run received. Made once for the process.
+    nonisolated static func importFiles(copyFolders: [URL], logger: any DiagnosticLogger) -> ImportFileAdapter {
         ImportFileAdapter(
             files: SystemImportFiles(), copyFolders: copyFolders,
-            maximumBytes: ImportLimits.standard.maximumPDFBytes, record: record, logger: logger
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: logger
         )
     }
 
@@ -414,7 +413,6 @@ public final class Composition {
     /// the app.
     private nonisolated static let deviceImportFiles = importFiles(
         copyFolders: AppPaths.importCopiesOnDevice(),
-        record: AppPaths.onDevice().importCopiesRecord,
         logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
     )
 }

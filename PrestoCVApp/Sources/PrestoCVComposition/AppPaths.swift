@@ -21,12 +21,6 @@ struct AppPaths: Equatable, Sendable {
     var traceShare: URL { temporary.appendingPathComponent("DiagnosticsShare", isDirectory: true) }
     /// The PDFs written for an export's share, each in a folder of its own; the next launch removes what is left
     var exportShare: URL { temporary.appendingPathComponent("ExportShare", isDirectory: true) }
-    /// The record of the copies of opened files a launch found, which the next launch reads to delete those still there;
-    /// its folder is the app's own and never a copy folder
-    var importCopiesRecord: URL {
-        temporary.appendingPathComponent("ImportCopies", isDirectory: true)
-            .appendingPathComponent("found.json", isDirectory: false)
-    }
 
     /// Makes the root and the store; making them again changes nothing.
     func create() throws(Failure) {
