@@ -68,12 +68,13 @@ enum ListReader {
         return isSentence(content, parts: items) ? [content] : items
     }
 
-    /// A sentence ends with a full stop (not the dots of a list cut short), is longer than any skill and has an item
-    /// of three words or more, the joining word of the last one not counted: cut at its commas it would give wrong
-    /// values. A list of short items stays a list.
+    /// A sentence ends with a full stop (not the dots of a list cut short), is longer than any skill and has an item of
+    /// three words or more that starts with a subject ("I led teams"): cut at its commas it would give wrong values.
+    /// Length alone proves nothing, and a preposition inside a phrase ("gestione dei progetti") is a noun phrase, so a
+    /// list of those stays a list.
     private static func isSentence(_ content: Piece, parts: [Piece]) -> Bool {
         content.text.hasSuffix(".") && !content.text.hasSuffix("..") && content.words.count > maxSkillWords
-            && parts.contains { $0.words.count >= 3 }
+            && parts.contains { $0.words.count >= 3 && EntryVocabulary.startsWithSubject($0.text) }
     }
 
     private static func hasOtherSeparator(_ content: Piece) -> Bool {

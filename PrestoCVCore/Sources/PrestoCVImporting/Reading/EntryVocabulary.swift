@@ -340,3 +340,19 @@ enum EntryVocabulary {
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",
     ].map(SectionVocabulary.key))
 }
+
+// MARK: - Sentences
+
+extension EntryVocabulary {
+
+    /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
+    /// positive sign of a sentence, which no noun phrase of a skills list has.
+    static func startsWithSubject(_ text: String) -> Bool {
+        guard let first = text.words.first else { return false }
+        return subjectPronouns.contains(first.folded)
+    }
+
+    private static let subjectPronouns: Set<String> = Set([
+        "i", "we", "ich", "wir", "io", "noi", "yo", "nosotros", "nosotras", "je", "nous", "eu",
+    ].map(\.folded))
+}

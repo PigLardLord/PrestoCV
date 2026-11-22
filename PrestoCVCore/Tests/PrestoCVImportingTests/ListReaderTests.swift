@@ -97,6 +97,40 @@ struct ListReaderTests {
         #expect(found.unplaced.map(\.text) == ["I pack orders, check stock, and label parcels."])
     }
 
+    @Test("A list of noun phrases that ends with a full stop splits, with or without a preposition inside a phrase", arguments: [
+        ("Skills", "Python, machine learning models, SQL databases, cloud computing.",
+         ["Python", "machine learning models", "SQL databases", "cloud computing."]),
+        ("Kenntnisse", "Python, Machine Learning Modelle, SQL Datenbanken, Cloud Computing Dienste.",
+         ["Python", "Machine Learning Modelle", "SQL Datenbanken", "Cloud Computing Dienste."]),
+        ("Competenze", "Python, gestione dei progetti, analisi dei dati, controllo di qualit\u{e0}.",
+         ["Python", "gestione dei progetti", "analisi dei dati", "controllo di qualit\u{e0}."]),
+        ("Habilidades", "Python, gesti\u{f3}n de proyectos, an\u{e1}lisis de datos, control de calidad.",
+         ["Python", "gesti\u{f3}n de proyectos", "an\u{e1}lisis de datos", "control de calidad."]),
+        ("Comp\u{e9}tences", "Python, gestion de projets, analyse de donn\u{e9}es, contr\u{f4}le qualit\u{e9}.",
+         ["Python", "gestion de projets", "analyse de donn\u{e9}es", "contr\u{f4}le qualit\u{e9}."]),
+        ("Compet\u{ea}ncias", "Python, gest\u{e3}o de projetos, an\u{e1}lise de dados, controlo de qualidade.",
+         ["Python", "gest\u{e3}o de projetos", "an\u{e1}lise de dados", "controlo de qualidade."]),
+    ])
+    func nounPhraseListWithAFullStop(heading: String, line: String, expected: [String]) {
+        let found = read("\(heading)\n\(line)")
+        #expect(found.cv.skills.map(\.value) == expected)
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A sentence with a subject stays whole as text not imported, in each language", arguments: [
+        ("Skills", "I led teams, wrote reports and trained staff."),
+        ("Kenntnisse", "Ich leitete Teams, schrieb Berichte und schulte Mitarbeiter."),
+        ("Competenze", "Io gestivo i team, scrivevo report e formavo il personale."),
+        ("Habilidades", "Yo dirig\u{ed} equipos, escrib\u{ed} informes y form\u{e9} al personal."),
+        ("Comp\u{e9}tences", "Je dirigeais des \u{e9}quipes, r\u{e9}digeais des rapports et formais le personnel."),
+        ("Compet\u{ea}ncias", "Eu liderei equipas, escrevi relat\u{f3}rios e formei o pessoal."),
+    ])
+    func sentenceWithASubject(heading: String, line: String) {
+        let found = read("\(heading)\n\(line)")
+        #expect(found.cv.skills.isEmpty)
+        #expect(found.unplaced.map(\.text) == [line])
+    }
+
     @Test("A plain list that ends with a full stop is still a list, with each separator", arguments: [
         "Excel, Word, PowerPoint, Outlook, Teams, SharePoint, Access.",
         "Excel; Word; PowerPoint; Outlook; Teams; SharePoint; Access.",
