@@ -238,4 +238,26 @@ struct HeadNameEvidenceTests {
         ] + Self.experience())
         #expect(result.cv.person.name?.value == "Community Outreach")
     }
+
+    // MARK: Ranking and certainty apart
+
+    @Test("A name-shaped line with a title under it, after the name and its contacts, does not win the name, and it keeps an unmarked name to be checked")
+    func rivalAfterTheContactsKeepsTheNameFlagged() throws {
+        let first = try importing(text:
+            "Anna Weber\nNurse\nperson@example.com\nCommunity Outreach\nBuilt a scheduling application\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital"
+        )
+        #expect(first.cv.person.name?.value == "Anna Weber")
+        #expect(first.cv.person.name?.check == .nameByPosition)
+        #expect(first.cv.person.title?.value == "Nurse")
+        let second = try importing(text: "Greater Wexby\nNurse\nperson@example.com\nAnna Weber\nSenior Nurse")
+        #expect(second.cv.person.name?.value == "Greater Wexby")
+        #expect(second.cv.person.name?.check == .nameByPosition)
+    }
+
+    @Test("A line after the name and its contacts that is no rival, with no title under it, leaves the name sure")
+    func noRivalAfterTheContactsLeavesTheNameSure() throws {
+        let result = try importing(text: "Anna Weber\nNurse\nperson@example.com\nCommunity Outreach\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital")
+        #expect(result.cv.person.name?.value == "Anna Weber")
+        #expect(result.cv.person.name?.check == nil)
+    }
 }

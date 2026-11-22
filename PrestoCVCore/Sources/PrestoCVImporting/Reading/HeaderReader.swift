@@ -396,7 +396,7 @@ enum HeaderReader {
     /// evidence, neither a mark of any kind nor a title ("Anna Weber / person@example.com / Community Outreach", the last
     /// line the largest); nor does a heading of the first level under a line in the shape of a name, in any column ("Anna
     /// Weber / Nurse / # University Projects"). Such a line stays one that could be the name, so the name is to be checked
-    /// unless a mark of its own makes it sure. A line made only of known places above it, or a piece after a contact,
+    /// unless a mark of its own makes it sure: a title under it still keeps an unmarked name flagged (#328). A line made only of known places above it, or a piece after a contact,
     /// takes no evidence away.
     private static func headName(of candidates: [Candidate], closedAt closing: Int?, in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
@@ -410,6 +410,12 @@ enum HeaderReader {
         }
         let titled = indices.filter {
             !candidates[$0].followsContact && !gainsNoEvidence($0) && hasTitle(under: $0, in: candidates, readings: indices)
+        }
+        // Ranking and certainty apart (#328): a title under a line after the closing block gains that line no evidence of the
+        // name, but it still tells that the line could have been it, so it keeps an unmarked name to be checked.
+        let titledAfterTheClosing = indices.filter { index in
+            guard let closing, candidates[index].block.index > closing else { return false }
+            return !candidates[index].followsContact && hasTitle(under: index, in: candidates, readings: indices)
         }
         let first = candidates.indices.first { !candidates[$0].followsContact }
         func isMarked(_ index: Int) -> Bool {
@@ -428,7 +434,9 @@ enum HeaderReader {
         let hasOwnTitle = titleLine(under: best.index, in: candidates).map { !indices.contains($0) } ?? false
         let isOnlyMarked = isMarked(best.index) && !rivals.contains(where: isMarked)
         let isPlainlyFirst = best.index == first && (hasOwnTitle || rivals.isEmpty)
-        let isSure = (isOnlyMarked || isPlainlyFirst) && best.doubt == 0 && titled.subtracting([best.index]).isEmpty
+        let hasTitledRival = !titled.subtracting([best.index]).isEmpty
+        let isSure = best.doubt == 0 && !hasTitledRival
+            && (isOnlyMarked || (isPlainlyFirst && titledAfterTheClosing.subtracting([best.index]).isEmpty))
         return HeadName(reading: best, isSure: isSure, rivals: rivals)
     }
 
