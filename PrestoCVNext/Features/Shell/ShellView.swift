@@ -92,8 +92,9 @@ struct ShellView: View {
     /// opens on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person
     /// answers the status first: the notice above the form offers the ways out, and "Discard" closes the editor without
     /// storing its text. The draft of an import shows its review, and the review's sheet opens over the editor, not
-    /// over the split, where the export sheet is. In its place, the import while the shell holds one; the shell hears of each change of its
-    /// status, and opens the draft of an import that is ready.
+    /// over the split, where the export sheet is. A PDF opened in the app while the text cannot be stored asks the
+    /// shell's question over the editor (`OpenedFileDialog`). In its place, the import while the shell holds one; the
+    /// shell hears of each change of its status, and opens the draft of an import that is ready.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
@@ -104,6 +105,7 @@ struct ShellView: View {
                 .sheet(item: reviewSheet) { review in
                     ImportReviewSheet(review: review)
                 }
+                .modifier(OpenedFileDialog(shell: shell))
         } else if let importer = shell.importer {
             ImportView(importer: importer)
                 .id(ObjectIdentifier(importer))

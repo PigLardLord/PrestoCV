@@ -81,6 +81,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.opened.message \(reason)"#: ValueTypes(["%@"], "OpenedFileDialog's reason is a String"),
             ],
             // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
             // ErrorStateView as title:, message:, code: and retryTitle:.

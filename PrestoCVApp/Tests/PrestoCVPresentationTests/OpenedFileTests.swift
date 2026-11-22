@@ -5,7 +5,8 @@ import PrestoCVDomain
 
 /// A PDF opened in the app from another app (step 5-13d of #404): the import shows in place of what was open and reads
 /// it, as the person's own way to the import does. A file that arrives before the window's shell exists waits for it,
-/// held from its arrival, and a file no import takes is let go, once.
+/// held from its arrival, and a file no import takes is let go, once. A file over an editor that cannot store is held
+/// by the shell for its question (`HeldFileTests`).
 @MainActor
 @Suite("A file opened in the app")
 struct OpenedFileTests {
@@ -102,8 +103,8 @@ struct OpenedFileTests {
         #expect(world.imports.importer.pdfs.withLock { $0 } == [ImportValues.pdf])
     }
 
-    @Test("an editor whose text cannot be stored as it is keeps the person in it, and the file opened is let go")
-    func fileOverAnEditorThatStaysIsLetGo() async throws {
+    @Test("an editor whose text cannot be stored as it is keeps the person in it, and the file is held for the question")
+    func fileOverAnEditorThatStaysIsHeld() async throws {
         let world = World()
         world.inbox.shellReady(world.shell)
         let cv = try await world.editing.storedCV()
@@ -116,8 +117,10 @@ struct OpenedFileTests {
 
         #expect(world.shell.importer == nil)
         #expect(world.shell.editor === editor)
-        #expect(world.imports.files.recorded == [.released(Self.file)])
-        #expect(world.imports.files.problems(ended: true).isEmpty)
+        #expect(world.shell.question == .keepEditingOrDiscard(.textTooLong(.summary)))
+        #expect(world.imports.files.received.map(\.file.url) == [Self.file])
+        #expect(world.imports.files.recorded.isEmpty, "held until the person answers")
+        #expect(world.inboxFiles.received.isEmpty, "the shell holds it, not the inbox")
     }
 
     @Test("a file opened while an import reads one is let go: the import goes on with the first")
