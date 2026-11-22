@@ -130,8 +130,8 @@ enum EntryReader {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
-        let isOnlyBullets = usable.allSatisfy { $0.isBullet }
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
+        let bulletsAreEntries = bulletsAreEntries(usable)
+        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || bulletsAreEntries) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
         // Which lines belong to which date, read both ways over the whole section
@@ -179,6 +179,17 @@ enum EntryReader {
             drafts.append(draft)
         }
         return drafts
+    }
+
+    /// Whether the section's bullets that open with a period are its entries ("• 2021 – Course – School, City"): when
+    /// the section is bullets only, or when most of its bullets open with a period and no other line is dated. Bullets
+    /// under a dated entry stay its details, even if one of them starts with a year.
+    private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
+        if usable.allSatisfy({ $0.isBullet }) { return true }
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        let bullets = usable.count(where: { $0.isBullet })
+        let dated = usable.count(where: { $0.isBullet && $0.period != nil })
+        return dated * 2 > bullets
     }
 
     /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").
