@@ -58,6 +58,26 @@ struct ListReaderTests {
         #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
     }
 
+    @Test("A list of multi-word items that ends with a full stop loses its joining word and is not read as a sentence", arguments: [
+        ("Skills", "Project management, customer service, and team leadership.",
+         ["Project management", "customer service", "team leadership."]),
+        ("Kenntnisse", "Strategische Planung, digitale Kommunikation, und freundliche Beratung.",
+         ["Strategische Planung", "digitale Kommunikation", "freundliche Beratung."]),
+        ("Competenze", "Servizio clienti, gestione magazzino, e controllo qualit\u{e0}.",
+         ["Servizio clienti", "gestione magazzino", "controllo qualit\u{e0}."]),
+        ("Habilidades", "Servicio cliente, gesti\u{f3}n log\u{ed}stica, y planificaci\u{f3}n estrat\u{e9}gica.",
+         ["Servicio cliente", "gesti\u{f3}n log\u{ed}stica", "planificaci\u{f3}n estrat\u{e9}gica."]),
+        ("Comp\u{e9}tences", "Service client, gestion logistique, et planification strat\u{e9}gique.",
+         ["Service client", "gestion logistique", "planification strat\u{e9}gique."]),
+        ("Compet\u{ea}ncias", "Atendimento cliente, gest\u{e3}o log\u{ed}stica, e planeamento estrat\u{e9}gico.",
+         ["Atendimento cliente", "gest\u{e3}o log\u{ed}stica", "planeamento estrat\u{e9}gico."]),
+    ])
+    func joiningWordInAPunctuatedList(heading: String, line: String, expected: [String]) {
+        let found = read("\(heading)\n\(line)")
+        #expect(found.cv.skills.map(\.value) == expected)
+        #expect(found.unplaced.isEmpty)
+    }
+
     @Test("A skill that starts with a joining word's letters is kept as written")
     func joiningLookAlike() {
         let found = read("Skills\nSwift, E-commerce, Yoga, Anderson tooling")

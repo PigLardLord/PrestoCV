@@ -61,13 +61,16 @@ enum ListReader {
         let commas = content.text.filter { $0 == "," }.count
         if content.words.count > 12 && !content.text.contains(";") && commas < 3 { return [content] }
         let parts = content.split(by: separators)
-        if isSentence(content, parts: parts) { return [content] }
-        guard parts.count >= 3, !hasOtherSeparator(content) else { return parts }
-        return Array(parts.dropLast()) + [withoutJoiningWord(parts[parts.count - 1])]
+        guard parts.count >= 3, !hasOtherSeparator(content) else {
+            return isSentence(content, parts: parts) ? [content] : parts
+        }
+        let items = Array(parts.dropLast()) + [withoutJoiningWord(parts[parts.count - 1])]
+        return isSentence(content, parts: items) ? [content] : items
     }
 
     /// A sentence ends with a full stop (not the dots of a list cut short), is longer than any skill and has an item
-    /// of three words or more: cut at its commas it would give wrong values. A list of short items stays a list.
+    /// of three words or more, the joining word of the last one not counted: cut at its commas it would give wrong
+    /// values. A list of short items stays a list.
     private static func isSentence(_ content: Piece, parts: [Piece]) -> Bool {
         content.text.hasSuffix(".") && !content.text.hasSuffix("..") && content.words.count > maxSkillWords
             && parts.contains { $0.words.count >= 3 }
