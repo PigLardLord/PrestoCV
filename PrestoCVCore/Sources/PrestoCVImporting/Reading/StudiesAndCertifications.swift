@@ -70,15 +70,21 @@ enum StudiesAndCertifications {
             return shape(of: section.cells(of: block, in: document), joined: joined)
         }
         var evidence = shapes.map { $0?.kind }
+        var partners: [Int: Int] = [:]
         for index in shapes.indices.dropFirst() {
             guard let above = shapes[index - 1], let below = shapes[index] else { continue }
             if above.schoolDecides, below.namesASchool {
                 evidence[index - 1] = .education
+                partners[index - 1] = index
+                partners[index] = index - 1
             } else if below.schoolOnly, above.bare, above.kind != .unknown {
                 evidence[index - 1] = .education
+                partners[index - 1] = index
+                partners[index] = index - 1
             }
         }
-        let owners = Dictionary(uniqueKeysWithValues: giveDateLinesToTheirEntry(&evidence, shapes).map { (section.blocks[$0.key].index, $0.value) })
+        let owned = giveDateLinesToTheirEntry(&evidence, shapes, partners: partners)
+        let owners = Dictionary(uniqueKeysWithValues: owned.map { (section.blocks[$0.key].index, $0.value) })
         guard let first = evidence.compactMap({ $0 }).first else { return [section] }
         var runs: [Section] = []
         var current = first
@@ -103,17 +109,24 @@ enum StudiesAndCertifications {
     /// Rule 4: a line of dates alone takes the kind of the entry it dates. Both neighbours are looked at, with what each
     /// already shows: a neighbour with a date of its own, or one that an earlier date line took, is dated already, so the
     /// line goes to the neighbour that is not ("Certified Scrum Master — Scrum Alliance, 2021" over "2015 – 2017" over
-    /// "MSc Physics"). When both are alike the section decides: dates first, the line belongs to the entry below it, and
+    /// "MSc Physics"). An entry of two lines (a degree over its school, `partners`) is one neighbour: it is dated when
+    /// either line is. When both are alike the section decides: dates first, the line belongs to the entry below it, and
     /// otherwise to the one above. A line with no entry below it (the last of the section) goes to the one above it, and a
     /// line with none above it to the one below. A neighbour that shows no kind is not an entry; with none left, the line
-    /// keeps the kind its own period shows. So does a study just below with no date of its own and none after it ("Master
-    /// of Science" over "2010 – 2014" over "University of Leipzig"): the dates are that study's.
+    /// keeps the kind its own period shows. So does a line between the degree and the school of one study ("Master of
+    /// Science" over "2010 – 2014" over "University of Leipzig"): the dates are that study's, see `datesInsideAStudy`.
     /// The result says which neighbour each line took, by its position in the section, for the reader of its run.
-    private static func giveDateLinesToTheirEntry(_ evidence: inout [SectionKind?], _ shapes: [Shape?]) -> [Int: Section.DateOwner] {
+    private static func giveDateLinesToTheirEntry(
+        _ evidence: inout [SectionKind?], _ shapes: [Shape?], partners: [Int: Int]
+    ) -> [Int: Section.DateOwner] {
         var owners: [Int: Section.DateOwner] = [:]
         guard let first = shapes.lazy.compactMap({ $0 }).first else { return owners }
         let datesFirst = first.datesOnly
         var taken = Set<Int>()
+        func isFree(_ line: Int) -> Bool {
+            let lines = [line] + (partners[line].map { [$0] } ?? [])
+            return !lines.contains { shapes[$0]?.dated == true || taken.contains($0) }
+        }
         for index in shapes.indices where shapes[index]?.datesOnly == true {
             let above = entry(at: index - 1, shapes, evidence)
             let below = entry(at: index + 1, shapes, evidence)
@@ -122,11 +135,9 @@ enum StudiesAndCertifications {
             case (nil, nil): continue
             case (let only?, nil), (nil, let only?): neighbour = only
             case (let up?, let down?):
-                let upFree = shapes[up]?.dated == false && !taken.contains(up)
-                let downFree = shapes[down]?.dated == false && !taken.contains(down)
-                if upFree != downFree {
-                    neighbour = upFree ? up : down
-                } else if !datesFirst, studyBelowHasNoDates(of: index, shapes, evidence) {
+                if isFree(up) != isFree(down) {
+                    neighbour = isFree(up) ? up : down
+                } else if !datesFirst, datesInsideAStudy(at: index, shapes, evidence) {
                     continue
                 } else {
                     neighbour = datesFirst ? down : up
@@ -135,6 +146,7 @@ enum StudiesAndCertifications {
             if let kind = evidence[neighbour] {
                 evidence[index] = kind
                 taken.insert(neighbour)
+                if let partner = partners[neighbour] { taken.insert(partner) }
                 owners[index] = neighbour > index ? .below : .above
             }
         }
@@ -147,9 +159,14 @@ enum StudiesAndCertifications {
         return index
     }
 
-    private static func studyBelowHasNoDates(of index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Bool {
-        guard shapes.indices.contains(index + 1), let below = shapes[index + 1], !below.datesOnly, !below.dated,
-            evidence[index + 1] == .education else { return false }
+    /// Whether the line of dates at `index` stands between the degree and the school of one study: the line above names a
+    /// degree and nothing else (no school, issuer or date, and no certification), the line below names a school and no
+    /// degree, and no line of dates follows. Any other pair is two entries, and the section's direction decides.
+    private static func datesInsideAStudy(at index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Bool {
+        guard shapes.indices.contains(index + 1), let above = shapes[index - 1], let below = shapes[index + 1],
+            !below.datesOnly, !below.dated, below.namesASchool, evidence[index + 1] == .education,
+            above.bare, !above.namesASchool, evidence[index - 1] == .education || evidence[index - 1] == .unknown
+        else { return false }
         return !(shapes.indices.contains(index + 2) && shapes[index + 2]?.datesOnly == true)
     }
 
