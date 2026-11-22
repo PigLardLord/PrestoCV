@@ -415,7 +415,9 @@ enum HeaderReader {
         // name, but it still tells that the line could have been it, so it keeps an unmarked name to be checked.
         // Only a line that nothing says is something else is such a rival: not a place, an organisation, a school, a role or
         // a heading ("Berlin Germany / Open to relocation").
-        let personLike = Dictionary(uniqueKeysWithValues: readings.map { ($0.index, !isNotAPerson($0.name.text)) })
+        let personLike = Dictionary(uniqueKeysWithValues: readings.map { reading in
+            (reading.index, !isNotAPerson(reading.name.text, titledAsARole: hasRoleUnder(reading.index, in: candidates)))
+        })
         let titledAfterTheClosing = indices.filter { index in
             guard let closing, candidates[index].block.index > closing, personLike[index] == true else { return false }
             return !candidates[index].followsContact && hasTitle(under: index, in: candidates, readings: indices)
@@ -445,13 +447,21 @@ enum HeaderReader {
 
     /// Whether the evidence about the whole line says that a line in the shape of a name is no person. In this order:
     /// 1. a line made only of known places, or a section's heading, is no person;
-    /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person;
+    /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person, unless the line
+    ///    under it is a recognised role: that is evidence outside the ambiguous word, and "Sarah Ireland / Senior Nurse" is
+    ///    a person (#328);
     /// 3. a line the role, organisation and school vocabulary explains as a whole is no person ("Senior Nurse",
     ///    "Beispiel GmbH", "Ospedale di Erfurt"). One such word is no evidence: "Priya Cook" stays a possible person.
     /// A line with no evidence either way is a possible person: a needless check costs less than a wrong sure name.
-    private static func isNotAPerson(_ text: String) -> Bool {
-        Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil || Places.endsInCountryOrRegion(text)
+    private static func isNotAPerson(_ text: String, titledAsARole: Bool) -> Bool {
+        Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil
+            || (!titledAsARole && Places.endsInCountryOrRegion(text))
             || EntryVocabulary.explainsWholeLine(text)
+    }
+
+    /// Whether the line under the one at `index` is a recognised role.
+    private static func hasRoleUnder(_ index: Int, in candidates: [Candidate]) -> Bool {
+        titleLine(under: index, in: candidates).map { EntryVocabulary.isRole(candidates[$0].piece.text) } ?? false
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,

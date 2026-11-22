@@ -90,10 +90,13 @@ enum EntryVocabulary {
         let namesAnInstitution = { (word: String) in isOrganisation(word) || isSchool(word) }
         if namesAnInstitution(words[0]) { return true }
         if folded.indices.dropLast().contains(where: { namesAnInstitution(words[$0]) && connectors.contains(folded[$0 + 1]) }) { return true }
+        // A place word explains a word only after a role or an institution word, never as the first one: a given name may be
+        // a city too ("Charlotte Baker"), and nothing outside the ambiguous word then says it is a place (#328).
         return words.indices.allSatisfy { index in
             let word = words[index]
+            let followsARoleOrInstitution = words[..<index].contains { isRole($0) || namesAnInstitution($0) }
             return connectors.contains(folded[index]) || roleModifiers.contains(folded[index]) || isRole(word)
-                || namesAnInstitution(word) || Places.isPlaceOnly(word)
+                || namesAnInstitution(word) || (followsARoleOrInstitution && Places.isPlaceOnly(word))
         }
     }
 
