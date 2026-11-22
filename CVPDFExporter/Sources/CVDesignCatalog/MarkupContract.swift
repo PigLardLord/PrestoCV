@@ -21,4 +21,16 @@ public enum MarkupContract {
     public static let sectionKinds: Set<String> = ["summary", "experience", "education", "skills", "languages", "certifications", "profiles", "interests"]
     public static let ratings: Set<String> = ["1", "2", "3", "4", "5"]
     public static let pseudoClasses: Set<String> = ["first-child", "last-child", "only-child"]
+
+    /// A length a design may not exceed, in the element's em or in pt (px and rem count as pt, at 16px to 1rem).
+    public struct Limit: Sendable, Equatable {
+        public let em: Double
+        public let pt: Double
+    }
+
+    /// The most a section's title may set below its last line (#467): its bottom padding and its bottom margin, each up to
+    /// `titleBottomSpacing`, and a bottom border up to `borderWidth`, as any border. The builder reserves room for them
+    /// under the title; the title stays a block, and a section's start takes no layout and nothing below its children.
+    public static let titleBottomSpacing = Limit(em: 1, pt: 12)
+    public static let borderWidth = Limit(em: 0.3, pt: 4)
 }

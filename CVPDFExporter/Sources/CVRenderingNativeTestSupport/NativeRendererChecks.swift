@@ -25,25 +25,23 @@ public enum NativeCheckFailure: Error, Equatable {
     case geometry([GeometryViolation])
     case pageCountDiffers(layout: Int, rendered: Int)
     case budget(steps: Int, exhausted: Bool)
-    /// The faults of a bundled design's PDFs of one body, by the number of profile lines of the document that showed them.
+    /// The faults of a design's PDFs of one body, by the number of profile lines of the document that showed them.
     case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
 }
 
-/// A design that lays the inline entries (skills, profiles, interests) out with `display:flex` or `display:grid` and the
-/// minimum column gap the CSS policy requires. The builder separates the entries with a space, which flex and grid
-/// drop, so only the gap keeps the words apart in the printed text.
+/// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
+/// minimum column gap the CSS policy requires. The builder separates the two with a space, which flex and grid drop, so
+/// only the gap keeps the words apart in the printed text. The skills and the interests stay apart by their spaces: a
+/// section stays a block (#467).
 public enum SeparationDesign: String, Sendable, CaseIterable {
     case flex, grid
 
     public var css: String {
         switch self {
         case .flex:
-            ".cv{padding:0 36pt}[data-section=\"skills\"],[data-section=\"profiles\"],[data-section=\"interests\"],.cv-profile"
-                + "{display:flex;flex-wrap:wrap;column-gap:3pt}"
+            ".cv{padding:0 36pt}.cv-profile{display:flex;flex-wrap:wrap;column-gap:3pt}"
         case .grid:
-            ".cv{padding:0 36pt}[data-section=\"skills\"],[data-section=\"interests\"]{display:grid;grid-template-columns:1fr 1fr 1fr;column-gap:3pt}"
-                + ".cv-skill,.cv-interest{text-align:right}.cv-skill:last-child,.cv-interest:last-child{text-align:left}"
-                + ".cv-profile{display:grid;grid-template-columns:1fr 1fr;column-gap:3pt}.cv-profile-platform{text-align:right}"
+            ".cv{padding:0 36pt}.cv-profile{display:grid;grid-template-columns:1fr 1fr;column-gap:3pt}.cv-profile-platform{text-align:right}"
         }
     }
 
@@ -190,12 +188,24 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
             throw NativeCheckFailure.fixtureLacks(name)
         }
         let design = try DesignPackageValidator().validate(package.data)
+        try await pageBreaks(name, stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
+                             fonts: design.manifest.defaultFonts, body: body)
+    }
+
+    /// #467: the same for an imported design at the markup contract's limits for a section title, in the contract
+    /// fixture's palette and the system fonts.
+    public func pageBreaks(imported design: PageBreakDocument.LimitDesign, body: PageBreakDocument.Body) async throws {
+        try await pageBreaks("imported-\(design.rawValue)", stylesheet: try ContractFixture.stylesheet(design.css),
+                             palette: ContractFixture.palette, fonts: .system, body: body)
+    }
+
+    private func pageBreaks(_ name: String, stylesheet: ValidatedStylesheet, palette: Palette, fonts: FontScheme,
+                            body: PageBreakDocument.Body) async throws {
         let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
         var faults: [Int: [PageBreakFault]] = [:]
         for lines in PageBreakDocument.summaryLines {
             let document = DocumentHTMLBuilder().render(PageBreakDocument.document(summaryLines: lines, body: body),
-                                                        stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
-                                                        fonts: design.manifest.defaultFonts, headings: headings)
+                                                        stylesheet: stylesheet, palette: palette, fonts: fonts, headings: headings)
             let pdf = try await renderer.render(html: document.html, page: .a4)
             guard let layout = inspector.layout(of: pdf.data), let text = inspector.text(of: pdf.data) else {
                 throw NativeCheckFailure.unreadablePDF

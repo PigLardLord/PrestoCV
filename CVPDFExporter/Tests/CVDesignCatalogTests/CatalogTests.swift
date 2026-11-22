@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import CVDesignCatalog
 import CVBundledDesigns
+import CVRenderingTestSupport
 
 func designData(_ css: String, id: String = "ok", extra: [String: Any] = [:], manifestExtra: [String: Any] = [:],
                 manifestWithout: [String] = [], contract: Int = MarkupContract.version) -> Data {
@@ -77,15 +78,15 @@ struct CatalogTests {
     func hugeNumbers(css: String) { #expect(rejected(css)) }
 
     @Test("flex and grid containers keep inline entries apart with a column gap", arguments: [
-        ".cv-section{display:flex}", ".cv-profile{display:inline-flex}", ".cv-section{display:grid;grid-template-columns:1fr 1fr}",
-        ".cv-section{display:flex;gap:0}", ".cv-section{display:flex;gap:4pt 0}", ".cv-section{display:flex;column-gap:2pt}",
-        ".cv-section{display:flex;column-gap:0.2em}", ".cv-section{display:flex;row-gap:8pt}", ".cv-section{display:flex;gap:4pt 2px}",
+        ".cv-profile{display:flex}", ".cv-profile{display:inline-flex}", ".cv-profile{display:grid;grid-template-columns:1fr 1fr}",
+        ".cv-profile{display:flex;gap:0}", ".cv-profile{display:flex;gap:4pt 0}", ".cv-profile{display:flex;column-gap:2pt}",
+        ".cv-profile{display:flex;column-gap:0.2em}", ".cv-profile{display:flex;row-gap:8pt}", ".cv-profile{display:flex;gap:4pt 2px}",
     ])
     func flexNeedsGap(css: String) { #expect(rejected(css)) }
 
     @Test("a flex or grid container with a column gap of at least 3pt is accepted", arguments: [
-        ".cv-section{display:flex;gap:3pt}", ".cv-profile{display:inline-flex;column-gap:0.25em}",
-        ".cv-section{display:grid;gap:0 12pt}", ".cv-section{display:flex;flex-wrap:wrap;gap:4px}", ".cv-skill{row-gap:0}",
+        ".cv-profile{display:flex;gap:3pt}", ".cv-profile{display:inline-flex;column-gap:0.25em}",
+        ".cv-entry{display:grid;gap:0 12pt}", ".cv-header{display:flex;flex-wrap:wrap;gap:4px}", ".cv-skill{row-gap:0}",
     ])
     func flexWithGap(css: String) throws { _ = try DesignPackageValidator().validate(designData(css)) }
 
@@ -109,14 +110,14 @@ struct CatalogTests {
         let css = """
         /* Two columns */
         .cv { font-family: var(--font-body); color: var(--color-text); }
-        .cv-section , .cv-entry:first-child{ display:grid; grid-template-columns: 1fr 2fr; gap: 12px 8px }
+        .cv-entry , .cv-profile:first-child{ display:grid; grid-template-columns: 1fr 2fr; gap: 12px 8px }
         @media print { .cv-section { break-inside: avoid } }
         [data-section="skills"] > .cv-skill[data-rating="5"] { font-weight: 700; border-bottom: 1pt solid var(--color-primary) }
         .cv-entry-period{font-size:9pt;margin:0 0 4pt}
         """
         let validated = try DesignPackageValidator().validate(designData(css))
         #expect(validated.stylesheet.css == """
-        .cv{font-family:var(--font-body);color:var(--color-text)}.cv-section,.cv-entry:first-child{display:grid;grid-template-columns:1fr 2fr;gap:12px 8px}@media print{.cv-section{break-inside:avoid}}[data-section="skills"]>.cv-skill[data-rating="5"]{font-weight:700;border-bottom:1pt solid var(--color-primary)}.cv-entry-period{font-size:9pt;margin:0 0 4pt}
+        .cv{font-family:var(--font-body);color:var(--color-text)}.cv-entry,.cv-profile:first-child{display:grid;grid-template-columns:1fr 2fr;gap:12px 8px}@media print{.cv-section{break-inside:avoid}}[data-section="skills"]>.cv-skill[data-rating="5"]{font-weight:700;border-bottom:1pt solid var(--color-primary)}.cv-entry-period{font-size:9pt;margin:0 0 4pt}
         """)
         #expect(!validated.stylesheet.css.contains("/*"))
     }
@@ -175,4 +176,69 @@ struct CatalogTests {
         #expect(black.red == 0 && black.green == 0 && black.blue == 0)
         #expect(white.red == 1 && white.green == 1 && white.blue == 1)
     }
+}
+
+/// A section title keeps a fixed room below its last line, for its own spacing and the next line, so that it is never
+/// alone at the foot of a page (#467). A design may not set more below the title, or on its start, than that room covers.
+@Suite("#467 · what a design may set below a section's title and on its start")
+struct SectionStartLimitTests {
+    func reason(_ css: String) -> String? {
+        do { _ = try DesignPackageValidator().validate(designData(css)); return nil } catch {
+            return error.violations.compactMap { if case .css(let reason) = $0 { reason } else { nil } }.first ?? "\(error)"
+        }
+    }
+
+    @Test("a section title's bottom padding or margin beyond 1em or 12pt is refused, whatever the selector reaching it", arguments: [
+        ".cv-section-title{padding-bottom:4em}", ".cv-section-title{padding-bottom:13pt}", ".cv-section-title{padding-bottom:17px}",
+        ".cv-section-title{padding-bottom:1.1rem}", ".cv-section-title{padding:0 0 1.5em}", ".cv-section-title{padding:2em}",
+        "h2{margin-bottom:4em}", ".cv-section-title{margin:0 0 13pt}", "h2.cv-section-title:only-child{margin:16pt 0}",
+        ".cv-section>:first-child{margin-bottom:24pt}", ".cv-section-start :first-child{padding-bottom:2em}",
+        ".cv-entry,.cv-section-title{margin-bottom:2em}",
+    ])
+    func titleSpacing(css: String) {
+        #expect(reason(css)?.hasPrefix("a section title's bottom padding and bottom margin") == true, "\(css): \(reason(css) ?? "accepted")")
+    }
+
+    @Test("a section title stays a block", arguments: [
+        ".cv-section-title{display:flex;gap:3pt}", ".cv-section-title{display:grid;gap:3pt}", "h2{display:inline-block}", ":first-child{display:inline}",
+    ])
+    func titleDisplay(css: String) {
+        #expect(reason(css)?.hasPrefix("a section title stays display: block") == true, "\(css): \(reason(css) ?? "accepted")")
+    }
+
+    @Test("a section start takes no layout and nothing below its title", arguments: [
+        ".cv-section-start{padding-bottom:48pt}", ".cv-section-start{padding:4pt}", ".cv-section-start{display:grid;gap:3pt}",
+        ".cv-section-start{display:flex;gap:3pt}", "div{margin-bottom:1pt}", "div.cv-section-start{margin:0 0 4pt}",
+        ".cv-section-start{border-bottom:1pt solid var(--color-primary)}", ".cv-section-start{border:solid}",
+        ".cv-section>:first-child{padding-bottom:2pt}",
+    ])
+    func start(css: String) {
+        #expect(reason(css)?.hasPrefix("a section start takes") == true, "\(css): \(reason(css) ?? "accepted")")
+    }
+
+    @Test("the document and its sections stay blocks: printed, flex and grid cut lines at a page's end", arguments: [
+        ".cv{display:flex;flex-direction:column;gap:3pt}", "main{display:grid;gap:3pt}", "section{display:flex;gap:3pt}",
+        ".cv-section{display:grid;gap:3pt}", "[data-section=\"skills\"]{display:flex;flex-wrap:wrap;column-gap:3pt}",
+        ".cv>.cv-section:last-child{display:inline-block}", "section.cv-section[data-section=\"interests\"]{display:grid;column-gap:3pt}",
+    ])
+    func containers(css: String) {
+        #expect(reason(css)?.hasPrefix("the document and its sections stay display: block") == true, "\(css): \(reason(css) ?? "accepted")")
+    }
+
+    @Test("spacing up to the limits, and rules that cannot reach the title or the start, are accepted", arguments: [
+        // The bundled designs' title rules.
+        ".cv-section-title{margin-bottom:6pt}", ".cv-section-title{margin-bottom:8pt;padding-bottom:2pt;border-bottom:1pt solid var(--color-primary)}",
+        // At the limits, in every unit; the space above the title is free.
+        ".cv-section-title{padding-bottom:1em;margin-bottom:1em;border-bottom:0.3em solid var(--color-primary)}",
+        ".cv-section-title{padding:4em 0 12pt;margin:4em 0 16px}", ".cv-section-title{margin:1rem;display:block}",
+        ".cv-section-start{padding-top:8pt;margin-top:4pt;border-top:1pt solid var(--color-primary);border-bottom:none;display:block}",
+        ".cv-section-start{border:0 solid var(--color-primary)}",
+        ".cv-entry-title{padding-bottom:4em}", ".cv-section{padding-bottom:4em;display:block}", ".cv-skill:first-child{display:inline}",
+        // Flex and grid inside an entry or a line, and on the header.
+        ".cv-entry{display:grid;grid-template-columns:1fr 1fr;column-gap:3pt}", ".cv-profile{display:flex;column-gap:3pt}",
+        ".cv-header{display:flex;flex-wrap:wrap;gap:3pt}", "[data-section=\"skills\"] .cv-skill{display:inline-block}",
+        // A forced break inside a section start, or right after it, is ignored by the base style rather than refused.
+        ".cv-section-title{break-after:page}", ".cv-entry{break-before:page}", ".cv-section{break-before:page}",
+    ] + PageBreakDocument.LimitDesign.allCases.map(\.css)) // and the native page-break checks' designs at the limits
+    func accepted(css: String) { #expect(reason(css) == nil, "\(css): \(reason(css) ?? "")") }
 }

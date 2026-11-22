@@ -294,10 +294,20 @@ struct BuilderTests {
     func baseStyleKeepsAndEnds() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         let base = try #require(html.firstMatch(of: #/<style>([^<]*)</style>/#)?.1)
-        // A title reserves room for what must follow it at a page's foot: 5em, and 150pt above a description (bundled designs: 4.3em, 143pt).
-        #expect(base.contains(#".cv-section-title::before{content:"";display:block;height:5em;margin-bottom:-5em;break-inside:avoid}"#))
-        #expect(base.contains(".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::before"
-                              + "{height:max(5em,150pt);margin-bottom:calc(-1*max(5em,150pt))}"))
+        // A title, kept whole, reserves room for what may follow its last line at a page's foot: its bottom padding and
+        // margin and its bottom border at the contract's limits and the next line, or 150pt above a description (bundled
+        // designs: 23pt, 143pt). All but 1px is given back, so a pushed reserve makes the title cross the page's end.
+        let reserve = "calc(2*max(1em,12pt) + max(0.3em,4pt) + max(2.5em,30pt))"
+        let spacing = MarkupContract.titleBottomSpacing, border = MarkupContract.borderWidth
+        #expect([spacing.em, spacing.pt, border.em, border.pt] == [1, 12, 0.3, 4])
+        #expect(base.contains(".cv-section-start>.cv-section-title{display:flow-root!important;break-inside:avoid!important}"))
+        #expect(base.contains(#".cv-section-title::after{content:"";display:block;height:\#(reserve);margin-bottom:calc(1px - \#(reserve));break-inside:avoid}"#))
+        #expect(base.contains(".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::after"
+                              + "{height:max(\(reserve),150pt);margin-bottom:calc(1px - max(\(reserve),150pt))}"))
+        // No forced break separates a title from what follows it.
+        #expect(base.contains(".cv-section-title{break-after:auto!important}.cv-section-title~*,.cv-section-title~* *{break-before:auto!important}"
+                              + ".cv-section-start:has(>.cv-section-title:only-child){break-after:auto!important}"
+                              + ".cv-section-start:has(>.cv-section-title:only-child)+*{break-before:auto!important}"))
         #expect(base.contains(".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"))
         #expect(base.contains("body,.cv{margin-bottom:0!important}") && base.contains(".cv{padding-bottom:0!important}"))
         // The last element at every depth the builder nests below `main.cv` has no bottom margin: the fixture has every kind of section.

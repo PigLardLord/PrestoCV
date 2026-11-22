@@ -1,4 +1,5 @@
 import CVDocumentModel
+import CVDesignCatalog
 import CVRendering
 
 /// #467: CVs whose section after the profile falls at every height of a page's foot as the profile grows, one profile
@@ -16,6 +17,23 @@ public enum PageBreakDocument {
         /// A first role of one-line duties, then a short role at another firm. The duties grow with the profile, from 20 to
         /// 55, so the first role grows from shorter than a page to longer than one.
         case longFirstRole
+    }
+
+    /// An imported design that sets the most the markup contract lets a section title set below its last line: the
+    /// bottom padding and the bottom margin at `MarkupContract.titleBottomSpacing`, and a bottom border at
+    /// `MarkupContract.borderWidth`, in em or, on a small title, in pt.
+    public enum LimitDesign: String, Sendable, CaseIterable {
+        case em, pt
+
+        public var css: String {
+            let spacing = MarkupContract.titleBottomSpacing, border = MarkupContract.borderWidth
+            return switch self {
+            case .em: ".cv-section-title{padding-bottom:\(spacing.em)em;margin-bottom:\(spacing.em)em;"
+                + "border-bottom:\(border.em)em solid var(--color-primary)}"
+            case .pt: ".cv-section-title{font-size:7pt;padding-bottom:\(spacing.pt)pt;margin-bottom:\(spacing.pt)pt;"
+                + "border-bottom:\(border.pt)pt solid var(--color-primary)}"
+            }
+        }
     }
 
     public static func document(summaryLines: Int, body: Body) -> CVDocument {

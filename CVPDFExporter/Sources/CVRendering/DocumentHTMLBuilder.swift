@@ -32,21 +32,28 @@ public struct DocumentHTMLBuilder: Sendable {
     /// - Every link prints its destination as text, so completeness covers it even where the PDF drops the clickable
     ///   annotation; the base style lets that text wrap, since designs cannot set overflow-wrap.
     /// - A section's title is never alone at the foot of a page (#467). Neither print path honours `break-after: avoid`,
-    ///   so the title holds an empty block as tall as itself and what must follow it, which may not break across pages:
-    ///   where that space is not left, the title moves to the next page with its section. It reaches 5em below the
-    ///   title's top, the title and the next line in every bundled design (4.3em at most), and 150pt when the first entry
-    ///   has a description, its head (title, organisation, place, dates) and first line (143pt at most). The block takes
-    ///   no room: its negative bottom margin gives it back.
+    ///   so the title, kept whole, holds an empty block that may not break across pages, as tall as what must follow its
+    ///   last line: where that room is not left, the title moves to the next page with its section. The block reaches the
+    ///   title's bottom padding, bottom border and bottom margin at the markup contract's limits, and the next line
+    ///   (2.5em or 30pt; 23pt at most in the bundled designs), or 150pt when the first entry has a description, its head
+    ///   (title, organisation, place, dates) and first line (143pt at most). Its negative bottom margin gives back all
+    ///   but 1px, which makes a title whose block was pushed cross the page's end, so that it moves whole.
+    /// - A forced break between a title and what follows it is ignored: after the title, before what follows it in the
+    ///   section's start, and around an inline section's start. A break before a section, or after a first entry, stays.
     /// - A block section's start, its title and first block, never breaks across pages where it fits on one, so a short
     ///   first entry moves with its title; a longer start breaks inside, so the entry starts under its title.
     /// - Nothing follows the last line: no bottom margin along the last elements, on `.cv` or on the body, and no bottom
     ///   padding on `.cv`. Space after the last line makes both print paths push out a blank page when the last page is
     ///   full; the page's own margin is the space at its foot (#467).
     static let baseStyle = "a{overflow-wrap:anywhere}"
-        + ".cv-section-title::before{content:\"\";display:block;height:5em;margin-bottom:-5em;break-inside:avoid}"
-        + ".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::before"
-        + "{height:max(5em,150pt);margin-bottom:calc(-1*max(5em,150pt))}"
         + ".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"
+        + ".cv-section-start>.cv-section-title{display:flow-root!important;break-inside:avoid!important}"
+        + ".cv-section-title::after{content:\"\";display:block;height:\(reserve);margin-bottom:calc(1px - \(reserve));break-inside:avoid}"
+        + ".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::after"
+        + "{height:max(\(reserve),150pt);margin-bottom:calc(1px - max(\(reserve),150pt))}"
+        + ".cv-section-title{break-after:auto!important}.cv-section-title~*,.cv-section-title~* *{break-before:auto!important}"
+        + ".cv-section-start:has(>.cv-section-title:only-child){break-after:auto!important}"
+        + ".cv-section-start:has(>.cv-section-title:only-child)+*{break-before:auto!important}"
         + "body,.cv{margin-bottom:0!important}.cv{padding-bottom:0!important}"
         + (1...maxDepth).map { ".cv" + String(repeating: ">:last-child", count: $0) }.joined(separator: ",")
         + "{margin-bottom:0!important}"
@@ -54,6 +61,15 @@ public struct DocumentHTMLBuilder: Sendable {
     /// How deep the builder nests elements below `main.cv`: a section, its start, an entry, then a line of the entry
     /// (`p.cv-language > span` is as deep). The builder tests measure it on a document with every kind of section.
     static let maxDepth = 4
+
+    /// Room for the title's bottom padding and bottom margin, its bottom border, and the next line, in the title's em
+    /// or in pt, whichever is larger: what the markup contract lets a design set there (#467).
+    static let reserve = "calc(2*\(atLeast(MarkupContract.titleBottomSpacing)) + \(atLeast(MarkupContract.borderWidth)) + max(2.5em,30pt))"
+
+    private static func atLeast(_ limit: MarkupContract.Limit) -> String {
+        func css(_ d: Double) -> String { d == d.rounded() ? String(Int(d)) : String(d) }
+        return "max(\(css(limit.em))em,\(css(limit.pt))pt)"
+    }
 
     public func render(_ doc: CVDocument, stylesheet: ValidatedStylesheet, palette: Palette,
                        fonts: FontScheme = .system, headings: Headings) -> RenderedDocument {
