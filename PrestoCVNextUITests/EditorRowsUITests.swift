@@ -494,7 +494,15 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         welding.swipeLeft()
         XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 30), "The row is open")
 
-        addRow(to: "skills", in: app)
+        // A tap beside an open row may only close it, as the system does for a swiped row; the row is then added by the
+        // next tap. Where the first tap added it already, the next one would add a second.
+        let add = app.buttons["editor.add.skills"]
+        app.scrollForm(until: add, named: "The add button of skills")
+        add.tap()
+        XCTAssertTrue(app.buttons["Delete"].waitUntilGone(), "The first tap closes the open row")
+        let names = app.textFields.matching(identifier: "editor.field.skillName")
+        if names.count < 2 { addRow(to: "skills", in: app) }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of skills takes the keyboard")
         app.typeText("Rigging")
 
         let rigging = app.textFields.matching(identifier: "editor.field.skillName")

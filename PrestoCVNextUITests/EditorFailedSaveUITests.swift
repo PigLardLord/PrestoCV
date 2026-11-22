@@ -74,13 +74,17 @@ final class EditorFailedSaveUITests: RuntimeIssueFailingTestCase {
         let app = try launch(failingWrites: always)
         typeTheTitle(in: app)
 
-        // Straight after the last key, before the pause that stores the text is over: Back is still there and stores it
-        // first. Where the pause was quicker, the failure has hidden Back and the editor stays all the same.
+        // Straight after the last key, before the pause that stores the text is over: Back is still there, and leaving
+        // hands the editor to its write. That write fails, so the shell keeps the editor and the list says so, with
+        // Open. Where the pause was quicker, the failure has hidden Back and the editor stays open. Either way the text
+        // is not lost and the editor, once it is open, says why.
         if app.isCompactWidth {
             if app.backButton.exists { app.backButton.tap() }
         } else {
             app.listRow(titled: surveyor.title).tap()
         }
+        let open = app.element("list.kept.open")
+        if open.waitForExistence(timeout: 10) { open.tap() }
 
         XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: failed), "The editor says that the text is not stored")
         XCTAssertEqual(app.textInput("editor.field.title").value as? String, edited, "The text typed stays in the editor")

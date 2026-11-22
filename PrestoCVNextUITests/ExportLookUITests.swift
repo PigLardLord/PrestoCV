@@ -262,14 +262,18 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(app.textFields["editor.field.title"].waitForExistence(timeout: 30), "The form of \(cv.title) opens")
     }
 
-    /// Opens the CV's export and gives back the line of its look, once the PDF is made.
+    /// Opens the CV's export and gives back the line of its look, once the PDF is made. The line is there on a narrow
+    /// screen only.
     @MainActor
     private func openExport(_ cv: StoredCV, in app: XCUIApplication) throws -> XCUIElement {
         open(cv, in: app)
         app.buttons["editor.export"].tap()
         XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
         let line = app.buttons["export.look"]
-        XCTAssertTrue(line.waitForExistence(timeout: 10), "The sheet shows the look as one line")
+        // A wide screen shows the picker itself, not the line
+        if isCompact(app) {
+            XCTAssertTrue(line.waitForExistence(timeout: 10), "The sheet shows the look as one line")
+        }
         return line
     }
 
