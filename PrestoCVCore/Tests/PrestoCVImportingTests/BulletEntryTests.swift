@@ -180,7 +180,8 @@ struct BulletEntryTests {
     fileprivate func entriesSurviveTheirDetails(_ shape: Shape) throws {
         let words = shape.words
         let detail = Self.line(of: shape.detail, in: words)
-        let lines = [words.heading, words.entries[0]] + Array(repeating: detail, count: shape.between)
+        // The sentence under the first entry makes the section a mixed one: bullets with other lines
+        let lines = [words.heading, words.entries[0], words.sentence] + Array(repeating: detail, count: shape.between)
             + [words.entries[1]] + Array(repeating: detail, count: shape.after)
         let found = read(lines.joined(separator: "\n"), kind: words.kind)
         let entries = words.kind == .education
@@ -189,7 +190,7 @@ struct BulletEntryTests {
         try #require(entries.count == 2)
         #expect(entries.map { $0.0 } == words.heads)
         #expect(entries.map { $0.1 } == words.places)
-        #expect(entries[0].2 == shape.between)
+        #expect(entries[0].2 == shape.between + 1)
         #expect(entries[1].2 == shape.after)
     }
 
@@ -288,28 +289,48 @@ struct BulletEntryTests {
         (english, "• 2010 – clients served"), (english, "• 2010 – people trained"), (english, "• 2000 – 3 projects delivered"),
         (german, "• 2010 – Kunden betreut"), (german, "• 2010 – Mitarbeiter geschult"),
         (italian, "• 2010 – clienti seguiti"), (italian, "• 2010 – persone formate"),
+        (german, "• 2000 – Prüfungen durchgeführt"), (german, "• 2000 Prüfungen durchgeführt"),
+        (german, "• 2000 – Schulungen geleitet"), (german, "• 2000 Audits begleitet"),
+        (english, "• 2000 hours completed"), (english, "• 2000 – hours completed"), (english, "• 2000 – exams supervised"),
+        (italian, "• 800 ore svolte"), (italian, "• 2000 – esami svolti"),
+        (spanish, "• 2000 horas realizadas"), (spanish, "• 2000 – exámenes supervisados"),
+        (french, "• 2000 heures effectuées"), (french, "• 2000 – examens surveillés"),
     ]
 
     @Test("A count after a year is a detail of the entry above, last or between, with a separator or without")
     func countsAreDetails() throws {
         for (words, line) in Self.counts {
-            let last = read(([words.heading, words.entries[0], line]).joined(separator: "\n"), kind: words.kind)
-            let between = read(([words.heading, words.entries[0], line, words.entries[1]]).joined(separator: "\n"), kind: words.kind)
+            // The sentence under the first entry makes the section a mixed one
+            let last = read(([words.heading, words.entries[0], words.sentence, line]).joined(separator: "\n"), kind: words.kind)
+            let between = read(([words.heading, words.entries[0], words.sentence, line, words.entries[1]]).joined(separator: "\n"), kind: words.kind)
             let lastEntries = words.kind == .education ? last.cv.education.count : last.cv.experience.count
             let betweenEntries = words.kind == .education ? between.cv.education.count : between.cv.experience.count
             #expect(lastEntries == 1, "\(line) last")
             #expect(betweenEntries == 2, "\(line) between")
-            let details = words.kind == .education ? last.cv.education.first?.details.count : last.cv.experience.first?.details.count
-            #expect(details == 1, "\(line) detail")
+            let details = words.kind == .education ? last.cv.education.first?.details.map(\.value) : last.cv.experience.first?.details.map(\.value)
+            #expect(details?.last == String(line.dropFirst(2)), "\(line) detail")
+            #expect(details?.count == 2, "\(line) details")
         }
+    }
+
+    @Test("Employers with a lower-case name particle head their entries in a section that also holds sentences", arguments: [
+        ("Berufserfahrung", "• 2021 – von Linden GmbH", "• 2018 – von Falk GmbH", "von Linden GmbH", "von Falk GmbH"),
+        ("Esperienza professionale", "• 2021 – di Rossi S.r.l.", "• 2018 – di Bianchi S.p.A.", "di Rossi S.r.l.", "di Bianchi S.p.A."),
+        ("Experiencia profesional", "• 2021 – de la Torre S.L.", "• 2018 – de Vega S.A.", "de la Torre S.L.", "de Vega S.A."),
+        ("Expérience professionnelle", "• 2021 – de Lacroix SARL", "• 2018 – de Moreau SAS", "de Lacroix SARL", "de Moreau SAS"),
+    ])
+    func particleEmployers(_ heading: String, _ first: String, _ second: String, _ firstEmployer: String, _ secondEmployer: String) throws {
+        let found = read("\(heading)\n\(first)\nSentence about the work.\n\(second)", kind: .experience)
+        #expect(found.cv.experience.map { $0.employer?.value } == [firstEmployer, secondEmployer])
+        #expect(found.cv.experience.map { $0.period?.value.start.year } == [2021, 2018])
     }
 
     @Test("The reviewed input: a course with a placement count under it")
     func placementCount() throws {
-        let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\n• 2000 – hours of placement", kind: .education)
+        let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\nI completed the practical training.\n• 2000 – hours of placement", kind: .education)
         try #require(found.cv.education.count == 1)
         #expect(found.cv.education[0].degree?.value == "Nursing course")
-        #expect(found.cv.education[0].details.map(\.value) == ["2000 – hours of placement"])
+        #expect(found.cv.education[0].details.map(\.value) == ["I completed the practical training.", "2000 – hours of placement"])
     }
 
     @Test("Schools without a separator after the year, as the reviewed input")

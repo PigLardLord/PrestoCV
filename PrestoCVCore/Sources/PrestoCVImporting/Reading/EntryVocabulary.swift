@@ -104,11 +104,31 @@ enum EntryVocabulary {
         }
         if opening.isNumber { return namesAHead ? .strong : .none }
         if !(lead.first?.isUppercase ?? false) {
-            // A lower-case word opens a head only when it is one: "diploma in nursing", not "led the move"
-            return namesAHead && (isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))) ? .strong : .none
+            // A lower-case word opens a head only when it is one ("diploma in nursing", not "led the move") or a name
+            // particle before a recognised employer or school ("von Linden GmbH", "di Rossi S.r.l.")
+            let opensAHead = isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))
+                || nameParticles.contains(folded)
+            return namesAHead && opensAHead ? .strong : .none
         }
-        return separated || namesAHead ? .strong : .weak
+        if namesAHead { return .strong }
+        // A capitalised word after a separator is a head only when it has a head's shape; a count with its verb
+        // ("2000 – Prüfungen durchgeführt") has a lower-case word after its noun and no further part
+        return separated && hasHeadShape(rest) ? .strong : .weak
     }
+
+    /// Whether a text reads as a head by its shape: one word, words that are all capitalised ("Corso Croce Rossa"), or a
+    /// further part after a separator ("Course – School"). A capitalised noun followed by lower-case words ("Prüfungen
+    /// durchgeführt") is a count with its verb.
+    private static func hasHeadShape(_ text: Substring) -> Bool {
+        if text.contains(where: { "|·•—–,/".contains($0) }) || text.contains(" - ") { return true }
+        let words = text.words
+        return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
+    }
+
+    /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
+    private static let nameParticles: Set<String> = Set([
+        "von", "van", "de", "di", "da", "del", "della", "dei", "degli", "du", "des", "la", "le", "el", "zu", "zur", "der", "den", "dos", "das", "do",
+    ].map(\.folded))
 
     /// The units a number counts, in the six languages: after a year they make a count, never a head.
     private static let countUnits: Set<String> = Set([

@@ -146,11 +146,12 @@ enum EntryReader {
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
         let onlyBullets = usable.allSatisfy { $0.isBullet }
         let bulletsAreEntries = bulletsAreEntries(usable)
-        // A head without a separator or a word of a school or a job ("• 2021 Acme") is one only in a section of bullets
+        // A section of bullets only reads as it always did: every dated bullet is an entry. In a section that mixes bullets
+        // with other lines, a bullet is an entry only when a head follows its year; anything unclear is a detail
         let anchors = usable.indices.filter { index in
             guard usable[index].period != nil else { return false }
-            guard usable[index].isBullet else { return true }
-            return bulletsAreEntries && (usable[index].headEvidence == .strong || (onlyBullets && usable[index].headEvidence == .weak))
+            guard usable[index].isBullet, !onlyBullets else { return true }
+            return bulletsAreEntries && usable[index].headEvidence == .strong
         }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
@@ -201,11 +202,9 @@ enum EntryReader {
         return drafts
     }
 
-    /// Whether the section's entry bullets ("• 2021 – Course – School, City") are its entries: when the section is
-    /// bullets only, or when no other line is dated and a bullet heads an entry. Detail bullets never
-    /// vote: an undated one, a count, or a year with prose stays a detail.
+    /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
+    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
     private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
-        if usable.allSatisfy({ $0.isBullet }) { return true }
         guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
         return usable.contains(where: { $0.headEvidence == .strong })
     }
