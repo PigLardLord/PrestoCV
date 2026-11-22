@@ -6,7 +6,7 @@ enum ListReader {
         for item in items(of: section, into: &findings) {
             if SkillLevelWords.isLevel(item.text) || item.text.allSatisfy({ Piece.isIcon($0) || $0 == " " }) {
                 if !item.text.allSatisfy({ Piece.isIcon($0) || $0 == " " }) { findings.unplace(item, in: section) }
-            } else if item.words.count <= 6 {
+            } else if item.words.count <= maxSkillWords {
                 findings.cv.skills.append(item.quote())
             } else {
                 findings.unplace(item, in: section)
@@ -49,16 +49,36 @@ enum ListReader {
                         content = rest
                     }
                 }
-                // Prose is one item, whatever commas it has
-                if content.words.count > 12 && !content.text.contains(";") && content.text.filter({ $0 == "," }).count < 3 {
-                    items.append(content)
-                    continue
-                }
-                items += content.split(by: [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"])
+                items += listItems(of: content)
             }
         }
         return items
     }
+
+    /// The items of one cell. Prose is one item, whatever commas it has; in a list, the item after a separator loses
+    /// the word that joins it to the one before ("A, B, and C").
+    private static func listItems(of content: Piece) -> [Piece] {
+        let commas = content.text.filter { $0 == "," }.count
+        if content.words.count > 12 && !content.text.contains(";") && commas < 3 { return [content] }
+        if isSentence(content) { return [content] }
+        let parts = content.split(by: [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"])
+        return parts.enumerated().map { $0.offset == 0 ? $0.element : withoutJoiningWord($0.element) }
+    }
+
+    /// A sentence ends with a full stop (not the dots of a list cut short) and is longer than any skill: cut at its
+    /// commas it would give wrong values.
+    private static func isSentence(_ content: Piece) -> Bool {
+        content.text.hasSuffix(".") && !content.text.hasSuffix("..") && content.words.count > maxSkillWords
+    }
+
+    private static func withoutJoiningWord(_ item: Piece) -> Piece {
+        guard let space = item.text.firstIndex(of: " "),
+              joiningWords.contains(item.text[..<space].lowercased()) else { return item }
+        return item.sub(item.text.index(after: space)..<item.text.endIndex).trimmed()
+    }
+
+    private static let joiningWords: Set<String> = ["and", "und", "e", "y", "et"]
+    private static let maxSkillWords = 6
 }
 
 /// The words of a skill's level, which the import never turns into stars.

@@ -46,6 +46,43 @@ struct ListReaderTests {
         #expect(found.unplaced.map(\.text) == ["Esperto"])
     }
 
+    @Test("A list's last item loses the word that joins it, in each language", arguments: [
+        ("Skills", "Order picking, packing, and shipping", ["Order picking", "packing", "shipping"]),
+        ("Kenntnisse", "Kommissionieren, Verpacken, und Versand", ["Kommissionieren", "Verpacken", "Versand"]),
+        ("Competenze", "Magazzino, imballaggio, e spedizioni", ["Magazzino", "imballaggio", "spedizioni"]),
+        ("Habilidades", "Almacén, embalaje, y envíos", ["Almacén", "embalaje", "envíos"]),
+        ("Compétences", "Entrepôt, emballage, et expédition", ["Entrepôt", "emballage", "expédition"]),
+        ("Competências", "Armazém, embalagem, e expedição", ["Armazém", "embalagem", "expedição"]),
+    ])
+    func joiningWord(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
+    }
+
+    @Test("A skill that starts with a joining word's letters is kept as written")
+    func joiningLookAlike() {
+        let found = read("Skills\nSwift, E-commerce, Yoga, Anderson tooling")
+        #expect(found.cv.skills.map(\.value) == ["Swift", "E-commerce", "Yoga", "Anderson tooling"])
+    }
+
+    @Test("A plain comma list and a conjunction inside the last item still split as before")
+    func plainCommaList() {
+        let found = read("Skills\nSwift, Kotlin, TypeScript\nForklift, pallet jack and reach truck")
+        #expect(found.cv.skills.map(\.value) == ["Swift", "Kotlin", "TypeScript", "Forklift", "pallet jack and reach truck"])
+    }
+
+    @Test("A sentence under a skills heading is kept whole as text not imported, not cut at its commas")
+    func sentenceStaysWhole() {
+        let found = read("Skills\nI pack orders, check stock, and label parcels.")
+        #expect(found.cv.skills.isEmpty)
+        #expect(found.unplaced.map(\.text) == ["I pack orders, check stock, and label parcels."])
+    }
+
+    @Test("A list that a source cut short with dots is still a list")
+    func cutShortList() {
+        let found = read("Compétences\nPrise de commandes, gestion des stocks, service à la clientèle...")
+        #expect(found.cv.skills.map(\.value) == ["Prise de commandes", "gestion des stocks", "service à la clientèle..."])
+    }
+
     @Test("Interests split like skills")
     func interests() {
         let found = read("Hobbys\nKlettern, Fotografie · Gitarre")
