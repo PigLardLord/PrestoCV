@@ -17,7 +17,7 @@ enum EntryVocabulary {
         "lead", "head", "director", "coordinator", "specialist", "technician", "electrician", "accountant", "architect", "officer",
         "administrator", "executive", "owner", "founder", "cofounder", "co-founder", "chef", "cook", "waiter", "waitress", "barista", "cashier",
         "clerk", "secretary", "receptionist", "driver", "mechanic", "operator", "supervisor", "advisor", "adviser", "scientist",
-        "researcher", "professor", "lecturer", "tutor", "programmer", "tester", "editor", "writer", "translator", "interpreter",
+        "researcher", "professor", "lecturer", "tutor", "programmer", "planner", "tester", "editor", "writer", "translator", "interpreter",
         "pharmacist", "physician", "doctor", "therapist", "caregiver", "carer", "midwife", "paramedic", "salesperson", "agent",
         "representative", "president", "partner", "associate", "student", "apprentice", "volunteer", "freelancer", "freelance", "ceo",
         "cto", "cfo", "coo", "vp", "senior", "junior", "staff", "principal", "worker", "electrician", "plumber", "carpenter",

@@ -171,4 +171,20 @@ struct LabelledDetailTests {
         #expect(found.cv.person.title == nil)
         #expect(shown(found).contains("Nationality German"))
     }
+
+    @Test("A job title above the name stays the title, with a labelled contact below", arguments: [
+        ("Web Developer", "Anna Weber", "Email"), ("City Planner", "Anna Weber", "Email"),
+        ("Mobile Developer", "Anna Weber", "Email"), ("Softwareentwickler", "Anna Weber", "E-Mail"),
+        ("Ingegnere informatico", "Anna Weber", "Email")
+    ])
+    func titleAboveTheName(title: String, name: String, label: String) {
+        let found = header("""
+        \(title)
+        \(name)
+        \(label): person@example.com
+        """)
+        #expect(found.cv.person.name?.value == name)
+        #expect(found.cv.person.title?.value == title)
+        #expect(found.cv.person.email?.value.value == "person@example.com")
+    }
 }
