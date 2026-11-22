@@ -28,7 +28,7 @@ fail() { echo "::error::$1"; exit 1; }
 [ -f "$APP/PrivacyInfo.xcprivacy" ] || fail "no privacy manifest in the app bundle"
 [ -n "$(read_key CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] || fail "no app icon"
 
-# The document type's contract. AppInfoPlistTests reads typed values (an array of dictionaries, a Bool), and PlistBuddy
+# The document type's contract. ReleaseHygieneTests (infoPlistOpensPDFs, pdfsAreCopied, infoPlistDeclaresNoTypes) reads typed values (an array of dictionaries, a Bool), and PlistBuddy
 # prints a string "false", a number or a dictionary with the key 0 the same way as the right type, so the types are
 # checked with plutil, which names them. Its key paths are separated by dots, and an array index is a number.
 plist_type() { plutil -type "$1" "$PLIST" 2>/dev/null; }

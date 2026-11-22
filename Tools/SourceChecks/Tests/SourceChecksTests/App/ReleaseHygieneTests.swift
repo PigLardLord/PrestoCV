@@ -339,16 +339,19 @@ struct ReleaseHygieneTests {
         "NSPrivacyAccessedAPICategoryActiveKeyboards": #"\bactiveInputModes\b"#,
     ]
 
+    private func propertyList(at path: String) throws -> [String: Any] {
+        let url = Self.root.appendingPathComponent(path)
+        return try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+    }
+
     private func declaredCategories(in manifest: String) throws -> Set<String> {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return Set(types.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
     }
 
     private func declaredWithoutReasons(in manifest: String) throws -> [String] {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return types.filter { ($0["NSPrivacyAccessedAPITypeReasons"] as? [String] ?? []).isEmpty }
             .compactMap { $0["NSPrivacyAccessedAPIType"] as? String }
@@ -372,5 +375,30 @@ struct ReleaseHygieneTests {
             #expect(withoutReason.isEmpty, "\(app.name): no reason declared for \(withoutReason)")
             #expect(declared == used, "\(app.name): declared \(declared.sorted()), used by the code \(used.sorted())")
         }
+    }
+
+    // MARK: Document types
+
+    /// `Tools/Release/check-archive.sh` enforces the same rule on the archive before it is uploaded: change both together.
+    private static let infoPlist = "PrestoCV/Info.plist"
+
+    @Test("Info.plist declares PDFs only, as a viewer of alternate rank, so that \"Open in PrestoCV\" offers the import")
+    func infoPlistOpensPDFs() throws {
+        let types = try #require(try propertyList(at: Self.infoPlist)["CFBundleDocumentTypes"] as? [[String: Any]])
+
+        #expect(types.count == 1)
+        #expect(types.first?["LSItemContentTypes"] as? [String] == ["com.adobe.pdf"])
+        #expect(types.first?["LSHandlerRank"] as? String == "Alternate", "PrestoCV is no default reader of PDFs")
+        #expect(types.first?["CFBundleTypeRole"] as? String == "Viewer")
+    }
+
+    @Test("A PDF opened in the app is copied for it, never opened in place")
+    func pdfsAreCopied() throws {
+        #expect(try propertyList(at: Self.infoPlist)["LSSupportsOpeningDocumentsInPlace"] as? Bool == false)
+    }
+
+    @Test("Info.plist declares no type of its own", arguments: ["UTExportedTypeDeclarations", "UTImportedTypeDeclarations"])
+    func infoPlistDeclaresNoTypes(key: String) throws {
+        #expect(try propertyList(at: Self.infoPlist)[key] == nil)
     }
 }
