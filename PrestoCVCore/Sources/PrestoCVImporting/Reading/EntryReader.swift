@@ -24,6 +24,8 @@ enum EntryReader {
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
+        /// The line is a cell of a table row: only the row's first cell opens an entry.
+        var opensRow: Bool?
 
         var isBody: Bool { isBullet || isProse }
     }
@@ -43,8 +45,9 @@ enum EntryReader {
     }
 
     static func read(_ section: Section, kind: Kind, into findings: inout Findings) throws {
-        let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
+        var lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
             .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
+        let table = tableRows(&lines, findings: &findings)
         for line in lines where line.isDurationOnly {
             findings.leaveOut(line.block, .computedDuration)
         }
@@ -52,6 +55,8 @@ enum EntryReader {
             for duration in line.durations where !line.isDurationOnly { findings.leaveOut(duration, .computedDuration) }
         }
         let labelled = lines.filter { $0.label != nil }.count
+        let before = (findings.cv.experience.count, findings.cv.education.count)
+        defer { if table == .unnamedColumns { flagColumnsByOrder(before, kind: kind, into: &findings) } }
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
@@ -526,6 +531,49 @@ enum EntryReader {
         }
     }
 
+    // MARK: Tables
+
+    enum TableReading { case none, namedColumns, unnamedColumns }
+
+    /// A Markdown table's header row is markup, never data. Where it names the columns, each cell of a row becomes a
+    /// labelled line, the first one opening an entry; otherwise the rows are read as before and flagged.
+    private static func tableRows(_ lines: inout [Line], findings: inout Findings) -> TableReading {
+        guard let head = lines.firstIndex(where: { $0.block.kind == .tableHeader }) else { return .none }
+        let header = lines.remove(at: head)
+        findings.leaveOut(header.block, .markup)
+        let names = header.cells.map { EntryVocabulary.entryLabel($0.text) }
+        guard names.contains(where: { $0 != nil }) else { return .unnamedColumns }
+        var rows: [Line] = []
+        for line in lines[head...] {
+            guard line.cells.count == names.count else { rows.append(line); continue }
+            var opened = false
+            for (column, cell) in line.cells.enumerated() where !cell.text.isEmpty {
+                var part = Line(block: line.block, cells: [cell], isBullet: false, isProse: false)
+                part.label = names[column]
+                part.labelValue = [cell]
+                part.opensRow = !opened
+                opened = true
+                rows.append(part)
+            }
+        }
+        lines = Array(lines[..<head]) + rows
+        return .namedColumns
+    }
+
+    /// The entries read from a table whose columns the vocabulary does not name are marked for the person to check.
+    private static func flagColumnsByOrder(_ before: (Int, Int), kind: Kind, into findings: inout Findings) {
+        switch kind {
+        case .experience:
+            for place in before.0..<findings.cv.experience.count where findings.cv.experience[place].check == nil {
+                findings.cv.experience[place].check = .roleOrEmployerByOrder
+            }
+        case .education:
+            for place in before.1..<findings.cv.education.count where findings.cv.education[place].check == nil {
+                findings.cv.education[place].check = .roleOrEmployerByOrder
+            }
+        }
+    }
+
     // MARK: Labelled rows
 
     private static func readLabelled(_ lines: [Line], section: Section, kind: Kind, into findings: inout Findings) {
@@ -554,8 +602,9 @@ enum EntryReader {
             let rowIsDoubtful = isDoubtful || (pendingLabel != nil && pendingIsDoubtful)
             pendingLabel = nil
             pendingIsDoubtful = false
-            let opensEntry = label == .period || (label == .employer && current.contains { $0.0 == .employer })
-                || (label == .school && current.contains { $0.0 == .school })
+            let opensEntry = line.opensRow ?? (label == .period
+                || (label == .employer && current.contains { $0.0 == .employer })
+                || (label == .school && current.contains { $0.0 == .school }))
             if opensEntry && !current.isEmpty {
                 if currentIsDoubtful { doubtful.insert(entries.count) }
                 entries.append(current)
