@@ -121,6 +121,11 @@ public final class Composition {
     public let sharesWithStandIn: Bool
     /// What the import of the released app's store did at this launch, before any screen read the store
     public let legacyImport: LegacyImportOutcome
+    #if DEBUG
+    /// The PDF of the bundle a window is handed each time it becomes active, as if another app opened it there; nil
+    /// unless a Debug build was launched with `-PrestoCVNextOpenedFile`. A Release build has no such member.
+    public private(set) var openedFile: OpenedFileFixture?
+    #endif
 
     /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
     private struct Parts {
@@ -297,7 +302,8 @@ public final class Composition {
         let sharesWithStandIn: Bool
         let wrapStore: WrapStore
         let wrapImport: WrapImport
-        let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        let bundled = resources.appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
         #if DEBUG
@@ -347,7 +353,7 @@ public final class Composition {
         wrapStore = { $0 }
         wrapImport = { $0 }
         #endif
-        return await make(Inputs(
+        let state = await make(Inputs(
             paths: paths,
             clock: SystemTimeSource(),
             ids: UUIDGenerator(),
@@ -381,6 +387,21 @@ public final class Composition {
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource())
+        ))
+        #if DEBUG
+        if case .ready(let composition) = state { composition.openedFile = fixtures.openedFileFixture(in: resources) }
+        #endif
+        return state
+    }
+
+    /// The inbox of a window's files opened from another app. It lets go, as the import does, a file that never reaches
+    /// the window's shell; it has no side effect until it does. Its log goes to the system's log only: a window can be
+    /// handed a file before any composition, and its trace, exists.
+    public static func makeOpenedFileInbox() -> OpenedFileInbox {
+        OpenedFileInbox(files: ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: AppPaths.importCopiesOnDevice(),
+            maximumBytes: ImportLimits.standard.maximumPDFBytes,
+            logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
         ))
     }
 }

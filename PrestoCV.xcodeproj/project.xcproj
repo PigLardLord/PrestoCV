@@ -62,9 +62,23 @@
     { "path": "docs/design/app-icon.md", "target-membership": [ "PrestoCVTests/resources" ] },
     { "kind": "folder", "path": "PrestoCVUITests", "target-membership": [ "PrestoCVUITests" ] },
     { "path": "PrestoCVCore/Tests/ImportFixtures/de-jonas/chat.txt", "target-membership": [ "PrestoCVUITests/resources" ] },
-    { "path": "PrestoCVCore/Tests/ImportFixtures/en-emily/linkedin.pdf", "target-membership": [ "PrestoCVUITests/resources", "PrestoCVNextUITests/resources" ] },
+    { "path": "PrestoCVCore/Tests/ImportFixtures/en-emily/linkedin.pdf", "target-membership": [ "PrestoCVUITests/resources", "PrestoCVNextUITests/resources", "PrestoCVNext/resources" ] },
     { "path": "PrestoCVCore/Tests/ImportFixtures/scan/scan.pdf", "target-membership": [ "PrestoCVNextUITests/resources" ] },
-    { "kind": "folder", "path": "PrestoCVNext", "target-membership": [ "PrestoCVNext" ] },
+    {
+      "kind": "folder",
+      "path": "PrestoCVNext",
+      "target-membership": [
+        "PrestoCVNext",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "PrestoCVNext",
+          "exclusions": [
+            "Info.plist",
+          ],
+        },
+      ],
+    },
     { "path": "PrestoCV/Resources/Samples", "target-membership": [ "PrestoCVNext/resources" ] },
     { "kind": "folder", "path": "PrestoCVNextUITests", "target-membership": [ "PrestoCVNextUITests" ] },
     { "kind": "folder", "path": "PrestoCVNextTests", "target-membership": [ "PrestoCVNextTests" ] },
@@ -244,7 +258,9 @@
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_PREVIEWS": "YES",
+        "EXCLUDED_SOURCE_FILE_NAMES[config=Release]": "linkedin.pdf",
         "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "PrestoCVNext/Info.plist",
         "INFOPLIST_KEY_CFBundleDisplayName": "PrestoCV",
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption": "NO",
         "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]": "YES",

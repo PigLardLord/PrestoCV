@@ -166,6 +166,30 @@ struct LaunchFixturesTests {
         }
     }
 
+    @Test("The PDF a window is handed as if another app opened it is read, and needs no folder: it writes nothing", arguments: LaunchFixtures.OpenedFile.allCases)
+    func openedFile(_ file: LaunchFixtures.OpenedFile) throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile", file.rawValue])
+        let resources = URL(filePath: "/bundle/Resources", directoryHint: .isDirectory)
+
+        #expect(fixtures.openedFile == file)
+        #expect(fixtures.storage == .device)
+        #expect(fixtures.unknownArguments.isEmpty)
+        #expect(fixtures.openedFileFixture(in: resources)?.file == resources.appendingPathComponent("\(file.rawValue).pdf"))
+        let plain = try LaunchFixtures.parse([Self.program])
+        #expect(plain.openedFile == nil)
+        #expect(plain.openedFileFixture(in: resources) == nil)
+    }
+
+    @Test("A PDF to open that is not in the corpus, or is missing, is a failure of the launch")
+    func unreadableOpenedFile() {
+        #expect(throws: LaunchFixtures.Failure.unreadableOpenedFile) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile", "../secret"])
+        }
+        #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextOpenedFile")) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile"])
+        }
+    }
+
     // MARK: Where the fixtures put the files
 
     private static let device = AppPaths(
@@ -385,6 +409,7 @@ struct LaunchFixturesTests {
         #expect(store == ["planted.cv.json"], "The seed, beside the lock the import of the legacy store takes")
         #expect(composition.legacyImport == .ran(LegacyImportReport()), "The fixture folder has no legacy store: a run with nothing")
         #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
+        #expect(composition.openedFile == nil, "Only the argument hands a window a PDF")
     }
 
     @MainActor
@@ -404,6 +429,26 @@ struct LaunchFixturesTests {
             return
         }
         #expect(composition.sharesWithStandIn)
+    }
+
+    @MainActor
+    @Test("A launch with the argument of the PDF to open gives a composition that hands a window that PDF of the bundle", .printsForReal)
+    func launchHandsAnOpenedFile() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let state = await Composition.launch(
+            arguments: try Self.arguments(storage: name) + ["-PrestoCVNextOpenedFile", "linkedin"], settlement: TraceSettlement(),
+            backgroundTime: NoBackgroundTime()
+        )
+
+        guard case .ready(let composition) = state else {
+            Issue.record("expected ready, got \(state)")
+            return
+        }
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        #expect(composition.openedFile?.file == resources.appendingPathComponent("linkedin.pdf"))
     }
 }
 #endif
