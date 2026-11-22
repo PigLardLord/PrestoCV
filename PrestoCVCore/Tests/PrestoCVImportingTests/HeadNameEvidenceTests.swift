@@ -286,6 +286,21 @@ struct HeadNameEvidenceTests {
         AfterTheContacts(kind: "a titled person's name", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nMaria Jones\nSenior Nurse", isNameSure: false),
         AfterTheContacts(kind: "a titled person's name", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Müller\nProjektleiter", isNameSure: false),
         AfterTheContacts(kind: "a titled person's name", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Bianchi\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nJena Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nViterbo Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nHesse Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHessen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nUmbria Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nRebecca Cook\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Koch\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nLuca Medico\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nDaniel Bank\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nStefan Werk\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Banco\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nJack London\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Berlin\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Milano\nSviluppatore software", isNameSure: false),
     ]
 
     @Test("A name-shaped line after the contacts is a rival only when nothing says it is a place, an organisation, a heading or a job title", arguments: afterTheContacts)
@@ -293,6 +308,6 @@ struct HeadNameEvidenceTests {
         let result = try importing(text: row.head)
         let name = try #require(result.cv.person.name)
         #expect(name.value.hasPrefix("Anna"))
-        #expect((name.check == nil) == row.isNameSure)
+        #expect(name.check == (row.isNameSure ? nil : .nameByPosition), "\(row.testDescription): \(row.head.replacingOccurrences(of: "\n", with: " / "))")
     }
 }
