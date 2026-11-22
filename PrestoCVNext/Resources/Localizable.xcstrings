@@ -324,7 +324,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardar como cópia"
+            "value" : "Salvar como cópia"
           }
         }
       }
@@ -347,7 +347,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir certificación"
+            "value" : "Agregar certificación"
           }
         },
         "fr" : {
@@ -388,7 +388,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir formación"
+            "value" : "Agregar formación"
           }
         },
         "fr" : {
@@ -429,7 +429,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir experiencia"
+            "value" : "Agregar experiencia"
           }
         },
         "fr" : {
@@ -470,7 +470,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir interés"
+            "value" : "Agregar interés"
           }
         },
         "fr" : {
@@ -511,7 +511,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir idioma"
+            "value" : "Agregar idioma"
           }
         },
         "fr" : {
@@ -552,7 +552,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir perfil"
+            "value" : "Agregar perfil"
           }
         },
         "fr" : {
@@ -593,7 +593,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Añadir competencia"
+            "value" : "Agregar competencia"
           }
         },
         "fr" : {
@@ -898,7 +898,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar certificação"
+            "value" : "Excluir certificação"
           }
         }
       }
@@ -939,7 +939,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar curso"
+            "value" : "Excluir curso"
           }
         }
       }
@@ -980,7 +980,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar emprego"
+            "value" : "Excluir emprego"
           }
         }
       }
@@ -1021,7 +1021,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar idioma"
+            "value" : "Excluir idioma"
           }
         }
       }
@@ -1062,7 +1062,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar perfil"
+            "value" : "Excluir perfil"
           }
         }
       }
@@ -1349,7 +1349,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O que fizeste"
+            "value" : "O que você fez"
           }
         }
       }
@@ -1413,7 +1413,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha podido leer el archivo. Abre otro CV de la lista."
+            "value" : "No se pudo leer el archivo. Abre otro CV de la lista."
           }
         },
         "fr" : {
@@ -1431,7 +1431,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível ler o ficheiro. Abre outro CV da lista."
+            "value" : "Não foi possível ler o arquivo. Abra outro CV da lista."
           }
         }
       }
@@ -1454,7 +1454,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha podido abrir el CV"
+            "value" : "No se pudo abrir el CV"
           }
         },
         "fr" : {
@@ -1923,7 +1923,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ligação"
+            "value" : "Link"
           }
         }
       }
@@ -2538,7 +2538,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este CV já não está neste dispositivo."
+            "value" : "Este CV não está mais neste dispositivo."
           }
         }
       }
@@ -2602,7 +2602,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: escribe la dirección de correo completa, como nombre@example.com."
+            "value" : "No se guardó: escribe la dirección de correo completa, como nombre@example.com."
           }
         },
         "fr" : {
@@ -2620,7 +2620,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: escreve o endereço de e-mail completo, por exemplo nome@example.com."
+            "value" : "Não salvo: digite o endereço de e-mail completo, por exemplo nome@example.com."
           }
         }
       }
@@ -2643,7 +2643,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: el final es anterior al inicio. Cambia una de las dos fechas."
+            "value" : "No se guardó: el final es anterior al inicio. Cambia una de las dos fechas."
           }
         },
         "fr" : {
@@ -2661,7 +2661,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: o fim é anterior ao início. Muda uma das duas datas."
+            "value" : "Não salvo: o fim é anterior ao início. Altere uma das duas datas."
           }
         }
       }
@@ -2684,7 +2684,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: escribe el año con cuatro cifras, como 2019."
+            "value" : "No se guardó: escribe el año con cuatro cifras, como 2019."
           }
         },
         "fr" : {
@@ -2702,7 +2702,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: escreve o ano com quatro algarismos, por exemplo 2019."
+            "value" : "Não salvo: digite o ano com quatro dígitos, por exemplo 2019."
           }
         }
       }
@@ -2725,7 +2725,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: escribe la dirección completa, empezando por https://."
+            "value" : "No se guardó: escribe la dirección completa, empezando por https://."
           }
         },
         "fr" : {
@@ -2743,7 +2743,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: escreve o endereço completo, a começar por https://."
+            "value" : "Não salvo: digite o endereço completo, começando com https://."
           }
         }
       }
@@ -2766,7 +2766,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: indica un inicio y, en cada fecha, el año con cuatro cifras, como 2019."
+            "value" : "No se guardó: indica un inicio y, en cada fecha, el año con cuatro cifras, como 2019."
           }
         },
         "fr" : {
@@ -2784,7 +2784,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: indica um início e, em cada data, o ano com quatro algarismos, por exemplo 2019."
+            "value" : "Não salvo: informe um início e, em cada data, o ano com quatro dígitos, por exemplo 2019."
           }
         }
       }
@@ -2807,7 +2807,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: escribe solo el número, con al menos tres dígitos, como +1 555 0100."
+            "value" : "No se guardó: escribe solo el número, con al menos tres dígitos, como +1 555 0100."
           }
         },
         "fr" : {
@@ -2825,7 +2825,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: escreve só o número, com pelo menos três algarismos, por exemplo +1 555 0100."
+            "value" : "Não salvo: digite só o número, com pelo menos três dígitos, por exemplo +1 555 0100."
           }
         }
       }
@@ -2848,7 +2848,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: escribe la dirección completa, empezando por https://."
+            "value" : "No se guardó: escribe la dirección completa, empezando por https://."
           }
         },
         "fr" : {
@@ -2866,7 +2866,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: escreve o endereço completo, a começar por https://."
+            "value" : "Não salvo: digite o endereço completo, começando com https://."
           }
         }
       }
@@ -2907,7 +2907,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Recarregar” mostra a versão guardada e descarta as tuas alterações aqui. “Guardar como cópia” mantém-nas num novo CV."
+            "value" : "“Recarregar” mostra a versão salva e descarta suas alterações aqui. “Salvar como cópia” as mantém em um novo CV."
           }
         }
       }
@@ -2948,7 +2948,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Guardar como cópia” mantém o teu texto num novo CV. “Descartar” fecha-o sem guardar."
+            "value" : "“Salvar como cópia” mantém seu texto em um novo CV. “Descartar” o fecha sem salvar."
           }
         }
       }
@@ -2989,7 +2989,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O teu texto continua no ecrã. Mantém a app aberta e tenta novamente."
+            "value" : "Seu texto continua na tela. Mantenha o app aberto e tente novamente."
           }
         }
       }
@@ -3030,7 +3030,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Um dos teus textos é demasiado longo. Encurta-o para guardar o CV."
+            "value" : "Um dos seus textos é longo demais. Encurte-o para salvar o CV."
           }
         }
       }
@@ -3071,7 +3071,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O texto de “%@” é demasiado longo. Encurta-o para guardar o CV."
+            "value" : "O texto de “%@” é longo demais. Encurte-o para salvar o CV."
           }
         }
       }
@@ -3112,7 +3112,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Encurta os textos mais longos para guardar o CV."
+            "value" : "Encurte os textos mais longos para salvar o CV."
           }
         }
       }
@@ -3153,7 +3153,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Remove algumas entradas da secção mais longa para guardar o CV."
+            "value" : "Remova algumas entradas da seção mais longa para salvar o CV."
           }
         }
       }
@@ -3194,7 +3194,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A abrir o CV…"
+            "value" : "Abrindo o CV…"
           }
         }
       }
@@ -3481,7 +3481,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A1 – Principiante"
+            "value" : "A1 – Iniciante"
           }
         }
       }
@@ -3563,7 +3563,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B1 – Intermédio"
+            "value" : "B1 – Intermediário"
           }
         }
       }
@@ -3604,7 +3604,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "B2 – Intermédio superior"
+            "value" : "B2 – Intermediário superior"
           }
         }
       }
@@ -3768,7 +3768,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar"
+            "value" : "Excluir"
           }
         }
       }
@@ -3850,7 +3850,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar %@"
+            "value" : "Excluir %@"
           }
         }
       }
@@ -3891,7 +3891,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar “%@”?"
+            "value" : "Excluir “%@”?"
           }
         }
       }
@@ -3996,7 +3996,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mantén pulsada una entrada para moverla."
+            "value" : "Mantén presionada una entrada para moverla."
           }
         },
         "fr" : {
@@ -4014,7 +4014,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mantém premida uma entrada para a mover."
+            "value" : "Toque e mantenha pressionada uma entrada para movê-la."
           }
         }
       }
@@ -4324,7 +4324,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: este CV se cambió en otra parte de la app."
+            "value" : "No se guardó: este CV se cambió en otra parte de la app."
           }
         },
         "fr" : {
@@ -4342,7 +4342,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: este CV foi alterado noutro sítio da app."
+            "value" : "Não salvo: este CV foi alterado em outra parte do app."
           }
         }
       }
@@ -4365,7 +4365,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: este CV se eliminó en otra parte de la app."
+            "value" : "No se guardó: este CV se eliminó en otra parte de la app."
           }
         },
         "fr" : {
@@ -4383,7 +4383,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: este CV foi eliminado noutro sítio da app."
+            "value" : "Não salvo: este CV foi excluído em outra parte do app."
           }
         }
       }
@@ -4406,7 +4406,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha podido guardar el último cambio. Se volverá a intentar con tu próximo cambio."
+            "value" : "No se pudo guardar el último cambio. Se volverá a intentar con tu próximo cambio."
           }
         },
         "fr" : {
@@ -4424,7 +4424,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível guardar a última alteração. Volta a ser tentado na tua próxima alteração."
+            "value" : "Não foi possível salvar a última alteração. Uma nova tentativa será feita na sua próxima alteração."
           }
         }
       }
@@ -4465,7 +4465,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nada para guardar. O que escreves é guardado à medida que avanças."
+            "value" : "Nada para salvar. O que você escreve é salvo conforme você avança."
           }
         }
       }
@@ -4506,7 +4506,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Alterações por guardar"
+            "value" : "Alterações não salvas"
           }
         }
       }
@@ -4547,7 +4547,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardado neste dispositivo"
+            "value" : "Salvo neste dispositivo"
           }
         }
       }
@@ -4588,7 +4588,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A guardar…"
+            "value" : "Salvando…"
           }
         }
       }
@@ -4611,7 +4611,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: un texto es demasiado largo. Acórtalo."
+            "value" : "No se guardó: un texto es demasiado largo. Acórtalo."
           }
         },
         "fr" : {
@@ -4629,7 +4629,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: um texto é demasiado longo. Encurta-o."
+            "value" : "Não salvo: um texto é longo demais. Encurte-o."
           }
         }
       }
@@ -4652,7 +4652,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: este CV es demasiado grande. Acorta algunos textos."
+            "value" : "No se guardó: este CV es demasiado grande. Acorta algunos textos."
           }
         },
         "fr" : {
@@ -4670,7 +4670,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: este CV é demasiado grande. Encurta alguns textos."
+            "value" : "Não salvo: este CV é grande demais. Encurte alguns textos."
           }
         }
       }
@@ -4693,7 +4693,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha guardado: una sección tiene demasiadas entradas. Quita algunas."
+            "value" : "No se guardó: una sección tiene demasiadas entradas. Quita algunas."
           }
         },
         "fr" : {
@@ -4711,7 +4711,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não guardado: uma secção tem demasiadas entradas. Remove algumas."
+            "value" : "Não salvo: uma seção tem entradas demais. Remova algumas."
           }
         }
       }
@@ -4734,7 +4734,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un campo no se ha guardado: mira la nota que tiene debajo. El resto está guardado."
+            "value" : "Un campo no se guardó: mira la nota que tiene debajo. El resto está guardado."
           }
         },
         "fr" : {
@@ -4752,7 +4752,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Um campo não foi guardado: vê a nota por baixo dele. O resto está guardado."
+            "value" : "Um campo não foi salvo: veja a nota abaixo dele. O resto está salvo."
           }
         }
       }
@@ -5080,7 +5080,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os nomes e os dados dos exemplos são inventados. Substitui-os pelos teus."
+            "value" : "Os nomes e os dados dos exemplos são inventados. Substitua-os pelos seus."
           }
         }
       }
@@ -5572,7 +5572,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escolhe o idioma dos títulos do PDF."
+            "value" : "Escolha o idioma dos títulos do PDF."
           }
         }
       }
@@ -5695,7 +5695,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O teu texto não é traduzido."
+            "value" : "Seu texto não é traduzido."
           }
         }
       }
@@ -6149,7 +6149,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha podido enviar ni guardar el PDF. Inténtalo de nuevo."
+            "value" : "No se pudo enviar ni guardar el PDF. Inténtalo de nuevo."
           }
         },
         "fr" : {
@@ -6752,7 +6752,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Algo correu mal ao iniciar a app. Tente novamente ou feche a app e abra-a de novo."
+            "value" : "Algo deu errado ao iniciar o app. Tente novamente ou feche o app e abra-o de novo."
           }
         }
       }
@@ -6886,7 +6886,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schreiben Sie Ihren Lebenslauf, behalten Sie ihn auf Ihrem Gerät und exportieren Sie ihn als PDF."
+            "value" : "Schreiben Sie Ihren Lebenslauf, bewahren Sie ihn auf Ihrem Gerät auf und exportieren Sie ihn als PDF."
           }
         },
         "en" : {
@@ -6916,7 +6916,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escreve o teu CV, guarda-o no teu dispositivo e exporta-o em PDF."
+            "value" : "Escreva seu currículo, mantenha-o no seu dispositivo e exporte-o em PDF."
           }
         }
       }
@@ -7121,7 +7121,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar"
+            "value" : "Excluir"
           }
         }
       }
@@ -7203,7 +7203,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mudar o nome"
+            "value" : "Renomear"
           }
         }
       }
@@ -7326,7 +7326,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar CV"
+            "value" : "Excluir currículo"
           }
         }
       }
@@ -7408,7 +7408,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eliminar “%@”?"
+            "value" : "Excluir “%@”?"
           }
         }
       }
@@ -7431,7 +7431,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se han podido leer tus CV."
+            "value" : "No se pudieron leer tus CV."
           }
         },
         "fr" : {
@@ -7449,7 +7449,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível ler os teus CV."
+            "value" : "Não foi possível ler seus currículos."
           }
         }
       }
@@ -7531,7 +7531,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas: este CV foi alterado noutro sítio da app. Abre-o para escolheres o que manter."
+            "value" : "Suas últimas alterações não estão salvas: este CV foi alterado em outra parte do app. Abra-o para escolher o que manter."
           }
         }
       }
@@ -7572,7 +7572,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas: este CV foi eliminado noutro sítio da app. Abre-o para manteres o teu texto como cópia."
+            "value" : "Suas últimas alterações não estão salvas: este CV foi excluído em outra parte do app. Abra-o para manter seu texto como cópia."
           }
         }
       }
@@ -7595,7 +7595,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se han podido guardar tus últimos cambios. Vuelve a intentarlo o abre el CV."
+            "value" : "No se pudieron guardar tus últimos cambios. Vuelve a intentarlo o abre el CV."
           }
         },
         "fr" : {
@@ -7613,7 +7613,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível guardar as tuas últimas alterações. Tenta novamente ou abre o CV."
+            "value" : "Não foi possível salvar suas últimas alterações. Tente novamente ou abra o CV."
           }
         }
       }
@@ -7736,7 +7736,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas. Tenta novamente ou abre o CV."
+            "value" : "Suas últimas alterações não estão salvas. Tente novamente ou abra o CV."
           }
         }
       }
@@ -7777,7 +7777,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tentar guardar “%@” novamente"
+            "value" : "Tentar salvar “%@” novamente"
           }
         }
       }
@@ -7818,7 +7818,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas: um texto é demasiado longo. Abre o CV para o encurtares."
+            "value" : "Suas últimas alterações não estão salvas: um texto é longo demais. Abra o CV para encurtá-lo."
           }
         }
       }
@@ -7859,7 +7859,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas: este CV é demasiado grande. Abre-o para encurtares alguns textos."
+            "value" : "Suas últimas alterações não estão salvas: este CV é grande demais. Abra-o para encurtar alguns textos."
           }
         }
       }
@@ -7900,7 +7900,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "As tuas últimas alterações não estão guardadas: uma secção tem demasiadas entradas. Abre o CV para removeres algumas."
+            "value" : "Suas últimas alterações não estão salvas: uma seção tem entradas demais. Abra o CV para remover algumas."
           }
         }
       }
@@ -7923,7 +7923,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un campo no se ha guardado. Abre el CV para corregirlo."
+            "value" : "Un campo no se guardó. Abre el CV para corregirlo."
           }
         },
         "fr" : {
@@ -7941,7 +7941,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Um campo não foi guardado. Abre o CV para o corrigires."
+            "value" : "Um campo não foi salvo. Abra o CV para corrigi-lo."
           }
         }
       }
@@ -7964,7 +7964,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La dirección de correo no se ha guardado. Abre el CV para corregirla."
+            "value" : "La dirección de correo no se guardó. Abre el CV para corregirla."
           }
         },
         "fr" : {
@@ -7982,7 +7982,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O endereço de e-mail não foi guardado. Abre o CV para o corrigires."
+            "value" : "O endereço de e-mail não foi salvo. Abra o CV para corrigi-lo."
           }
         }
       }
@@ -8005,7 +8005,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El número de teléfono no se ha guardado. Abre el CV para corregirlo."
+            "value" : "El número de teléfono no se guardó. Abre el CV para corregirlo."
           }
         },
         "fr" : {
@@ -8023,7 +8023,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O número de telefone não foi guardado. Abre o CV para o corrigires."
+            "value" : "O número de telefone não foi salvo. Abra o CV para corrigi-lo."
           }
         }
       }
@@ -8046,7 +8046,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La dirección del sitio web no se ha guardado. Abre el CV para corregirla."
+            "value" : "La dirección del sitio web no se guardó. Abre el CV para corregirla."
           }
         },
         "fr" : {
@@ -8064,7 +8064,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O endereço do site não foi guardado. Abre o CV para o corrigires."
+            "value" : "O endereço do site não foi salvo. Abra o CV para corrigi-lo."
           }
         }
       }
@@ -8114,13 +8114,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "No se ha podido abrir %lld CV."
+                  "value" : "No se pudo abrir %lld CV."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "No se han podido abrir %lld CV."
+                  "value" : "No se pudieron abrir %lld CVs."
                 }
               }
             }
@@ -8150,13 +8150,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld CV non può essere aperto."
+                  "value" : "Non è stato possibile aprire %lld CV."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld CV non possono essere aperti."
+                  "value" : "Non è stato possibile aprire %lld CV."
                 }
               }
             }
@@ -8174,7 +8174,7 @@
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Não foi possível abrir %lld CV."
+                  "value" : "Não foi possível abrir %lld CVs."
                 }
               }
             }
@@ -8218,7 +8218,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ficheiro danificado, posto de parte"
+            "value" : "Arquivo danificado, separado"
           }
         }
       }
@@ -8259,7 +8259,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ficheiro danificado, deixado no sítio"
+            "value" : "Arquivo danificado, deixado no lugar"
           }
         }
       }
@@ -8300,7 +8300,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ficheiro demasiado grande para abrir"
+            "value" : "Arquivo grande demais para abrir"
           }
         }
       }
@@ -8323,7 +8323,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Archivo que el dispositivo no ha podido leer"
+            "value" : "Archivo que el dispositivo no pudo leer"
           }
         },
         "fr" : {
@@ -8341,7 +8341,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ficheiro que o dispositivo não conseguiu ler"
+            "value" : "Arquivo que o dispositivo não conseguiu ler"
           }
         }
       }
@@ -8382,7 +8382,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ficheiro de uma versão mais recente do PrestoCV"
+            "value" : "Arquivo de uma versão mais recente do PrestoCV"
           }
         }
       }
@@ -8464,7 +8464,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mudar o nome do CV"
+            "value" : "Renomear currículo"
           }
         }
       }
@@ -8546,7 +8546,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardado %@"
+            "value" : "Salvo %@"
           }
         }
       }
@@ -8610,7 +8610,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tu cambio se guardó, pero no se ha podido actualizar la lista."
+            "value" : "Tu cambio se guardó, pero no se pudo actualizar la lista."
           }
         },
         "fr" : {
@@ -8628,7 +8628,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A tua alteração foi guardada, mas não foi possível atualizar a lista."
+            "value" : "Sua alteração foi salva, mas não foi possível atualizar a lista."
           }
         }
       }
@@ -8669,7 +8669,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este CV foi alterado noutro sítio da app. A lista mostra a versão mais recente: faz a alteração de novo."
+            "value" : "Este CV foi alterado em outra parte do app. A lista mostra a versão mais recente: faça a alteração de novo."
           }
         }
       }
@@ -8692,7 +8692,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se ha podido guardar el cambio. Inténtalo de nuevo."
+            "value" : "No se pudo guardar el cambio. Inténtalo de nuevo."
           }
         },
         "fr" : {
@@ -8710,7 +8710,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não foi possível guardar a alteração. Tenta novamente."
+            "value" : "Não foi possível salvar a alteração. Tente novamente."
           }
         }
       }
@@ -8751,7 +8751,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este CV foi eliminado noutro sítio da app."
+            "value" : "Este CV foi excluído em outra parte do app."
           }
         }
       }
@@ -8792,7 +8792,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Com esta alteração, o CV ficaria demasiado grande."
+            "value" : "Com esta alteração, o CV ficaria grande demais."
           }
         }
       }
@@ -8915,7 +8915,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cada escolha aplica-se de imediato e fica neste CV."
+            "value" : "Cada escolha se aplica de imediato e fica neste CV."
           }
         }
       }
@@ -8956,7 +8956,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O teu CV mantém uma opção que esta versão não oferece. Escolher outra substitui-a."
+            "value" : "Seu CV mantém uma opção que esta versão não oferece. Escolher outra a substitui."
           }
         }
       }
@@ -9161,7 +9161,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escolhe o modelo, a fonte e as cores do PDF."
+            "value" : "Escolha o modelo, a fonte e as cores do PDF."
           }
         }
       }
@@ -9202,7 +9202,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aspeto"
+            "value" : "Aparência"
           }
         }
       }
@@ -9407,7 +9407,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A abrir o PrestoCV…"
+            "value" : "Abrindo o PrestoCV…"
           }
         }
       }
@@ -9489,7 +9489,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Acerca de %@"
+            "value" : "Sobre o %@"
           }
         }
       }
@@ -9612,7 +9612,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Informação legal"
+            "value" : "Informações legais"
           }
         }
       }
@@ -9694,7 +9694,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A ler as licenças…"
+            "value" : "Lendo as licenças…"
           }
         }
       }
@@ -9735,7 +9735,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O PrestoCV não inclui código, tipos de letra nem textos de outros."
+            "value" : "O PrestoCV não inclui código, fontes nem textos de outros."
           }
         }
       }
@@ -9940,7 +9940,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Definições"
+            "value" : "Ajustes"
           }
         }
       }
@@ -10104,7 +10104,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre uma página sobre o código-fonte no teu navegador"
+            "value" : "Abre uma página sobre o código-fonte no seu navegador"
           }
         }
       }
@@ -10227,7 +10227,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre a política de privacidade no teu navegador"
+            "value" : "Abre a política de privacidade no seu navegador"
           }
         }
       }
@@ -10268,7 +10268,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contactar o suporte"
+            "value" : "Contatar o suporte"
           }
         }
       }
@@ -10309,7 +10309,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre a tua app de e-mail com uma nova mensagem"
+            "value" : "Abre seu app de e-mail com uma nova mensagem"
           }
         }
       }
@@ -10432,7 +10432,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Definições"
+            "value" : "Ajustes"
           }
         }
       }
@@ -10555,7 +10555,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os teus CV vão aparecer aqui."
+            "value" : "Seus currículos vão aparecer aqui."
           }
         }
       }
@@ -10596,7 +10596,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não há CV"
+            "value" : "Nenhum currículo"
           }
         }
       }
@@ -10637,7 +10637,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escolhe um CV na lista para o abrir."
+            "value" : "Escolha um CV na lista para abri-lo."
           }
         }
       }
@@ -10760,7 +10760,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A carregar os teus CV…"
+            "value" : "Carregando seus currículos…"
           }
         }
       }
@@ -10801,7 +10801,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Os meus CV"
+            "value" : "Meus currículos"
           }
         }
       }
@@ -10988,7 +10988,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se han podido leer los ejemplos."
+            "value" : "No se pudieron leer los ejemplos."
           }
         },
         "fr" : {
