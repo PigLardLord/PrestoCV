@@ -78,7 +78,8 @@ public enum LanguageProficiency: String, CaseIterable, Hashable, Sendable {
 /// digits, inner hyphens, 1–63 characters each) ending in an alphabetic top-level label. Internationalised letters
 /// are allowed, with the combining marks that follow them (Indic vowel signs, decomposed accents); control, format
 /// and separator characters (NUL, zero-width space, bidirectional overrides) are not, since they can hide or disguise
-/// what is printed. No atom or label starts with a mark.
+/// what is printed. No atom or label starts with a mark. A label is at most 63 bytes once encoded for IDNA (`xn--` and
+/// Punycode), the length a mail server accepts.
 public struct EmailAddress: Hashable, Sendable {
     public let value: String
     static let atom = #"[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-][\p{L}\p{M}\p{N}!#$%&'*+/=?^_`{|}~-]*"#
@@ -92,10 +93,10 @@ public struct EmailAddress: Hashable, Sendable {
         guard v.utf8.count <= 254, !v.unicodeScalars.contains(where: { hidden.contains($0.properties.generalCategory) }),
               v.range(of: Self.pattern, options: .regularExpression) != nil else { return nil }
         // Length limits the pattern cannot express once marks are allowed: a local part of at most 64 bytes, and
-        // domain labels of at most 63 characters, marks included. The exact IDNA length is not checked.
+        // domain labels of at most 63 characters, marks included, and of at most 63 bytes once encoded for IDNA.
         let parts = v.split(separator: "@", omittingEmptySubsequences: false)
         guard parts.count == 2, parts[0].utf8.count <= 64,
-              parts[1].split(separator: ".").allSatisfy({ $0.unicodeScalars.count <= 63 }) else { return nil }
+              parts[1].split(separator: ".").allSatisfy({ $0.unicodeScalars.count <= 63 && IDNALabel.encodedByteCount($0) <= 63 }) else { return nil }
         value = v
     }
 }
