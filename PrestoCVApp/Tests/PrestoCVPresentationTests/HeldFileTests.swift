@@ -129,53 +129,71 @@ struct HeldFileTests {
         #expect(world.shell.keptEditors.isEmpty, "a discarded editor is not kept")
     }
 
-    @Test("Discard my edits and import does nothing while a copy is being stored: the question and the file stay")
-    func discardWhileACopyIsStoredChangesNothing() async throws {
-        let world = World()
+    /// The question shown, then a copy of the editor's text starts, then the person taps "Discard and import" and the
+    /// system closes its dialog, which calls `keepEditing()` after the button's action.
+    private func discardTappedDuringACopy(_ world: World) async throws
+        -> (editor: EditorViewModel, copying: Task<Void, Never>)
+    {
         let (_, editor) = try await world.conflictingEditor()
         world.shell.receive(file: Self.file)
+        try #require(world.shell.question == .keepEditingOrDiscard(.conflict))
         await world.editing.editing.duplicateGate.close()
         let copying = Task { await editor.saveAsCopy() }
         await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
         try #require(editor.isReplacing)
 
         world.shell.discardAndImport()
+        world.shell.keepEditing()
+        return (editor, copying)
+    }
 
-        #expect(world.shell.question == .keepEditingOrDiscard(.conflict), "the question is still there to answer")
+    @Test("Discard and import tapped while a copy is stored, then the dialog's close: the file is held, not let go")
+    func discardDuringACopyKeepsTheFileHeld() async throws {
+        let world = World()
+        let (editor, copying) = try await discardTappedDuringACopy(world)
+
+        #expect(world.shell.question == nil, "no question is left for the dialog's close to answer as keep editing")
         #expect(world.shell.editor === editor, "the editor the copy belongs to is not dropped under it")
         #expect(world.shell.importer == nil)
         #expect(world.imports.files.received.count == 1)
-        #expect(world.imports.files.recorded.isEmpty, "the file is neither let go nor read: the person has not decided")
+        #expect(world.imports.files.recorded.isEmpty, "the file is neither let go nor read while the copy runs")
         await world.editing.editing.duplicateGate.open()
         await copying.value
     }
 
-    @Test("once the copy ended, Discard my edits and import answers the same question, and the file ends once")
-    func discardAfterTheCopyEndedImportsOnce() async throws {
+    @Test("once the copy stored the text, the file held by the tap goes the ordinary way and ends once")
+    func discardDuringACopyImportsWhenTheCopyStored() async throws {
         let world = World()
-        let (_, editor) = try await world.conflictingEditor()
-        world.shell.receive(file: Self.file)
-        await world.editing.editing.duplicateGate.close()
-        let copying = Task { await editor.saveAsCopy() }
-        await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
-        world.shell.discardAndImport()
+        let (_, copying) = try await discardTappedDuringACopy(world)
+
         await world.editing.editing.duplicateGate.open()
         await copying.value
-        try #require(!editor.isReplacing)
-        try #require(world.shell.question != nil)
-        let writes = world.editing.editing.writeCount
-
-        world.shell.discardAndImport()
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
 
         #expect(world.shell.question == nil)
         #expect(world.shell.editor == nil)
         let importer = try #require(world.shell.importer)
-        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
         #expect(importer.status == .ready)
         #expect(world.imports.files.reads == 1)
         #expect(world.imports.files.problems(ended: true).isEmpty, "the shell's hold and the import's, let go once")
-        await settle()
-        #expect(world.editing.editing.writeCount == writes, "nothing is written after the person discarded")
+    }
+
+    @Test("once the copy failed, the file held by the tap asks the question again, and Keep editing lets it go once")
+    func discardDuringACopyAsksAgainWhenTheCopyFailed() async throws {
+        let world = World()
+        world.editing.editing.duplicateErrors.withLock { $0 = [.unavailable] }
+        let (editor, copying) = try await discardTappedDuringACopy(world)
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the question") { world.shell.question != nil }
+
+        #expect(world.shell.question == .keepEditingOrDiscard(editor.saveStatus))
+        #expect(world.shell.editor === editor)
+        #expect(world.imports.files.recorded.isEmpty, "the file waits for the answer")
+        world.shell.keepEditing()
+        #expect(world.imports.files.recorded == [.released(Self.file)])
+        #expect(world.imports.files.problems(ended: true).isEmpty)
     }
 
     @Test("Keep editing while a copy is being stored lets the file go once and the copy goes on")
