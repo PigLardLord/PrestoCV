@@ -58,7 +58,7 @@ The rules are strict, and a change that breaks one does not merge ([ADR 0006](do
 - **Swift 6** language mode with complete concurrency checking (R9). Four-space indentation, `UpperCamelCase` for types, `lowerCamelCase` for methods, properties and test doubles.
 - **Views render, view models present, neither decides** (R5). Business rules live in the domain or application layer of their context, never in a view.
 - **Structure:** group related declarations with `// MARK:` sections, and keep previews next to their views under `#if DEBUG`.
-- **User-facing text** is in the string catalog `PrestoCV/Localizable.xcstrings`, in English, German, Spanish, French, Italian and Portuguese. Keys use dot-separated feature scopes. `Tools/Localization/l10n_manager.py`, run from the repository root, adds, reads, lists, checks and updates them. A pull request says whether it changes any text.
+- **User-facing text** is in the string catalog `PrestoCVNext/Resources/Localizable.xcstrings`, in English, German, Spanish, French, Italian and Portuguese. Keys use dot-separated feature scopes. `Tools/Localization/l10n_manager.py`, run from the repository root, adds, reads, lists, checks and updates them. A pull request says whether it changes any text.
 
 ## Tests
 

@@ -4,7 +4,7 @@
 # Xcode writes from IPHONEOS_DEPLOYMENT_TARGET: the check reads what the archive says, not what the sources set, so a
 # target that no source check can read is found here), and the document type that "Open in PrestoCV" needs. That type is
 # PDF only, with role Viewer and rank Alternate, and the app never opens it in place; the app declares no type of its own
-# (no exported or imported type declaration). PrestoCVTests/App/AppInfoPlistTests.swift requires the same of the source
+# (no exported or imported type declaration). Tools/SourceChecks (ReleaseHygieneTests) requires the same of the source
 # Info.plist, so change both together. Fails on the first thing that is wrong.
 #
 #   Tools/Release/check-archive.sh <path to PrestoCV.xcarchive>

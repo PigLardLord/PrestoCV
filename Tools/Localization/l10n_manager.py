@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 # Supported languages
 SUPPORTED_LANGUAGES = ['en', 'es', 'fr', 'de', 'it', 'pt']
-XCSTRINGS_PATH = Path("PrestoCV/Localizable.xcstrings")
+XCSTRINGS_PATH = Path("PrestoCVNext/Resources/Localizable.xcstrings")
 
 
 class L10nManager:
