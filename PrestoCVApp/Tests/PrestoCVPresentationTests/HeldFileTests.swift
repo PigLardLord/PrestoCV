@@ -197,6 +197,116 @@ struct HeldFileTests {
         #expect(world.imports.files.problems(ended: true).isEmpty)
     }
 
+    /// The conflicting editor with its copy waiting at the store, and the file arrived meanwhile.
+    private func fileDuringACopy(_ world: World) async throws -> (editor: EditorViewModel, copying: Task<Void, Never>) {
+        let (_, editor) = try await world.conflictingEditor()
+        await world.editing.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
+        try #require(editor.isReplacing)
+        world.shell.receive(file: Self.file)
+        return (editor, copying)
+    }
+
+    @Test("a file opened while a copy is being stored shows no question: it is held, not read and not let go")
+    func fileDuringACopyAsksNothing() async throws {
+        let world = World()
+        let (editor, copying) = try await fileDuringACopy(world)
+
+        #expect(world.shell.question == nil, "an answer given during the copy could not be carried out")
+        #expect(world.shell.editor === editor)
+        #expect(world.shell.importer == nil)
+        #expect(world.imports.files.received.map(\.file.url) == [Self.file])
+        #expect(world.imports.files.recorded.isEmpty, "held: neither read nor let go")
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+    }
+
+    @Test("once the copy stored the text, the file held goes the ordinary way with no question, and ends once")
+    func fileHeldDuringACopyImportsWhenTheCopyStored() async throws {
+        let world = World()
+        let (_, copying) = try await fileDuringACopy(world)
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
+
+        #expect(world.shell.question == nil)
+        #expect(world.shell.editor == nil)
+        let importer = try #require(world.shell.importer)
+        #expect(importer.status == .ready)
+        #expect(world.imports.files.reads == 1)
+        #expect(world.imports.files.problems(ended: true).isEmpty, "the shell's hold and the import's, let go once")
+    }
+
+    @Test("once the copy failed, the file held asks the question the editor's status calls for")
+    func fileHeldDuringACopyAsksWhenTheCopyFailed() async throws {
+        let world = World()
+        world.editing.editing.duplicateErrors.withLock { $0 = [.unavailable] }
+        let (editor, copying) = try await fileDuringACopy(world)
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the question") { world.shell.question != nil }
+
+        #expect(world.shell.question == .keepEditingOrDiscard(editor.saveStatus))
+        #expect(world.shell.editor === editor)
+        #expect(world.imports.files.recorded.isEmpty, "the file waits for the answer")
+        world.shell.keepEditing()
+        #expect(world.imports.files.recorded == [.released(Self.file)])
+        #expect(world.imports.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a shell that goes while a copy runs lets the file held go once")
+    func shellGoneDuringACopyLetsTheFileGo() async throws {
+        let editing = Editing()
+        let imports = ImportWorld()
+        var shell: ShellNavigationModel? = editing.shell(imports: imports)
+        let cv = try await editing.storedCV()
+        shell?.open(.stored(CVReference(id: cv.id)))
+        let editor = try #require(shell?.editor)
+        await editor.load()
+        try await editing.editing.otherWindowSaves(cv, fullName: "Tobias Renn")
+        editor.type(\.fullName, "Mara Ellison Lowe")
+        await editor.saveNow()
+        try #require(editor.saveStatus == .conflict)
+        await editing.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await editing.editing.duplicateGate.waiting == 1 }
+        shell?.receive(file: Self.file)
+        try #require(imports.files.received.count == 1)
+        weak let probe = shell
+
+        shell = nil
+
+        let gone = probe == nil
+        #expect(gone)
+        #expect(imports.files.recorded == [.released(Self.file)])
+        await editing.editing.duplicateGate.open()
+        await copying.value
+        await settle()
+        #expect(imports.files.recorded == [.released(Self.file)], "the end of the copy does not touch the file again")
+        #expect(imports.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a newer file opened while a copy runs takes the place of the file held, which is let go")
+    func newerFileDuringACopyReplacesTheHeldOne() async throws {
+        let world = World()
+        let (_, copying) = try await fileDuringACopy(world)
+
+        world.shell.receive(file: Self.other)
+
+        #expect(world.shell.question == nil)
+        #expect(world.imports.files.received.map(\.file.url) == [Self.file, Self.other])
+        #expect(world.imports.files.received.map(\.releases) == [1, 0], "the older let go once, the newer held")
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.other) == 2 }
+        #expect(world.imports.files.recorded.contains(.read(Self.other)))
+        #expect(!world.imports.files.recorded.contains(.read(Self.file)))
+        #expect(world.imports.files.problems(ended: true).isEmpty)
+    }
+
     @Test("the import holds the file before the shell lets its own hold go, so the copy is never removed under it")
     func theImportHoldsTheFileBeforeTheShellLetsGo() async throws {
         let world = World()

@@ -73,6 +73,8 @@ public final class ShellNavigationModel {
     @ObservationIgnored let files: any ImportFileReading
     /// The file the question is about, held from its arrival until the person answers; nil while none is asked.
     @ObservationIgnored private var heldFile: ReceivedFile?
+    /// Waits for the editor's copy to end when a file arrived during it (`receive(file:)`); nil while none waits.
+    @ObservationIgnored private var waitingForCopy: Task<Void, Never>?
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -139,6 +141,7 @@ public final class ShellNavigationModel {
     }
 
     isolated deinit {
+        waitingForCopy?.cancel()
         if let heldFile { files.release(heldFile) }
     }
 
@@ -322,6 +325,11 @@ public final class ShellNavigationModel {
     /// whether to keep editing or to discard the edits and import it (`question`). The sheets over the editor close, so
     /// that the question shows. While it shows, a newer file takes the place of the one held, which is let go, and the
     /// same file opened again is held once.
+    ///
+    /// The question is never asked while the editor's copy runs (`isReplacing`): the copy may store the text, and an
+    /// answer given meanwhile could not be carried out. The file is held with no question, and decided again as on
+    /// arrival once the copy ended: it goes the ordinary way when the editor's text can then be stored, and the
+    /// question shows otherwise.
     public func receive(file url: URL) {
         if let held = heldFile {
             guard !url.namesTheSameFile(as: held.url) else { return }
@@ -332,10 +340,35 @@ public final class ShellNavigationModel {
         switch showImport() {
         case .left:
             importer?.importFile(at: url)
-        case .stayed(let status):
+        case .stayed:
             heldFile = files.receive(url)
             closeExport()
             review?.closeSheet()
+            decideHeldFile()
+        }
+    }
+
+    /// Decides what to do with the file held: waits while the editor's copy runs, then imports it the ordinary way when
+    /// the editor's text can be stored, or asks the question.
+    private func decideHeldFile() {
+        guard let held = heldFile, question == nil, waitingForCopy == nil else { return }
+        if let editor, let copy = editor.replacing {
+            waitingForCopy = Task { [weak self] in
+                await copy.value
+                guard !Task.isCancelled, let self else { return }
+                self.waitingForCopy = nil
+                self.decideHeldFile()
+            }
+            return
+        }
+        // The file is out of the shell's hold while the import is shown, so that leaving the editor does not let it go
+        heldFile = nil
+        switch showImport() {
+        case .left:
+            importer?.importFile(at: held.url)
+            files.release(held)
+        case .stayed(let status):
+            heldFile = held
             question = .keepEditingOrDiscard(status)
         }
     }
@@ -343,6 +376,7 @@ public final class ShellNavigationModel {
     /// The person keeps editing: the file held for the question is let go, and the editor stays with its text and its
     /// status. With no question asked it does nothing.
     public func keepEditing() {
+        guard question != nil else { return }
         dropQuestion()
     }
 
@@ -353,7 +387,7 @@ public final class ShellNavigationModel {
     /// the copy would store the text the person meant to drop. The question and the file stay for the person to answer
     /// once the copy ended.
     public func discardAndImport() {
-        guard let held = heldFile else { return }
+        guard let held = heldFile, question != nil else { return }
         if let editor, editor.isReplacing { return }
         heldFile = nil
         question = nil
@@ -365,6 +399,8 @@ public final class ShellNavigationModel {
 
     /// The question goes, and the file held for it is let go.
     private func dropQuestion() {
+        waitingForCopy?.cancel()
+        waitingForCopy = nil
         guard let held = heldFile else { return }
         heldFile = nil
         question = nil
