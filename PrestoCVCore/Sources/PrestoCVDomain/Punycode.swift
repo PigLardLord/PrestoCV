@@ -1,11 +1,15 @@
+import Foundation   // precomposedStringWithCanonicalMapping (NFC): the same on Apple platforms and swift-corelibs-foundation
+
 /// The length of a domain label once it is encoded for the wire (IDNA, RFC 5891): an all-ASCII label stays as it is,
-/// any other becomes `xn--` and its Punycode (RFC 3492). Only the length check of `EmailAddress` uses it.
+/// any other becomes `xn--` and the Punycode (RFC 3492) of its NFC form, which IDNA requires first (RFC 5891, section 5.2), so
+/// a letter typed composed or decomposed weighs the same. The stored address keeps the spelling as typed. Only the length check of `EmailAddress` uses it.
 enum IDNALabel {
     static let prefix = "xn--"
 
     static func encodedByteCount(_ label: Substring) -> Int {
-        if label.unicodeScalars.allSatisfy(\.isASCII) { return label.utf8.count }
-        return prefix.utf8.count + Punycode.encode(Array(label.unicodeScalars)).utf8.count
+        let normalized = String(label).precomposedStringWithCanonicalMapping
+        if normalized.unicodeScalars.allSatisfy(\.isASCII) { return normalized.utf8.count }
+        return prefix.utf8.count + Punycode.encode(Array(normalized.unicodeScalars)).utf8.count
     }
 }
 

@@ -25,4 +25,11 @@ struct PunycodeTests {
         #expect(IDNALabel.encodedByteCount("example") == 7)
         #expect(IDNALabel.encodedByteCount("bücher") == "xn--bcher-kva".utf8.count)
     }
+
+    @Test("a label weighs the same composed or decomposed, as IDNA normalizes it first (RFC 5891 section 5.2)")
+    func normalizedLength() {
+        let composed = String(repeating: "\u{00E9}", count: 30), decomposed = String(repeating: "e\u{0301}", count: 30)
+        #expect(IDNALabel.encodedByteCount(Substring(decomposed)) == IDNALabel.encodedByteCount(Substring(composed)))
+        #expect(IDNALabel.encodedByteCount(Substring(decomposed)) == 36)
+    }
 }

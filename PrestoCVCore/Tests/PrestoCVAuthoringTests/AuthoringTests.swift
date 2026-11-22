@@ -18,7 +18,9 @@ let emailLengthCases: [(String, Bool)] = {
             ("ada@example.a" + String(repeating: "\u{0301}", count: 20) + "b", true),
             ("ada@" + String(repeating: "a", count: 63) + ".com", true), ("ada@" + String(repeating: "a", count: 64) + ".com", false),
             ("ada@" + String(repeating: "é", count: 57) + ".com", true),     // xn-- and 59 more: exactly 63 bytes
-            ("ada@" + String(repeating: "é", count: 58) + ".com", false)]    // 58 characters, 64 bytes once encoded
+            ("ada@" + String(repeating: "é", count: 58) + ".com", false),
+            ("ada@" + String(repeating: "\u{00E9}", count: 30) + ".example.com", true),    // composed
+            ("ada@" + String(repeating: "e\u{0301}", count: 30) + ".example.com", true)]  // decomposed: the same label    // 58 characters, 64 bytes once encoded
 }()
 
 @Suite("R6 · rich domain")
