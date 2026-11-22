@@ -50,6 +50,50 @@ struct ShortYearImportTests {
         #expect(found.cv.experience.first?.period?.value.start.year == year)
     }
 
+    /// The role, employer, place and lines of an entry, as one text.
+    private func text(of entry: ImportedExperience) -> String {
+        ([entry.role?.value, entry.employer?.value, entry.location?.value] + entry.details.map { $0.value })
+            .compactMap { $0 }.joined(separator: " | ")
+    }
+
+    @Test("Pay with a currency and a gross or net word, or with no unit, stays in its entry in six languages", arguments: [
+        "Salary 10.50 – 12.50 EUR gross", "Gehalt 10.50 – 12.50 EUR brutto", "Stipendio 10.50 – 12.50 EUR lordi",
+        "Salaire 10.50 – 12.50 EUR brut", "Salario 10.50 – 12.50 EUR bruto", "Salário 10.50 – 12.50 EUR líquido",
+        "10.50 – 12.50 EUR net", "10.50 – 12.50 EUR netto", "10.50 – 12.50 EUR netti", "10.50 – 12.50 EUR neto",
+        "3.50 – 4.50 EUR gross", "10.50 – 12.50", "3.50 – 4.50",
+    ])
+    func payWithAWordIsADetail(line: String) throws {
+        let found = try imported("""
+        Berufserfahrung
+        09/19 – 08/21    Verkäufer, Muster GmbH, Berlin
+        \(line)
+        """)
+        #expect(found.cv.experience.count == 1)
+        let entry = try #require(found.cv.experience.first)
+        #expect(entry.period?.value.start == YearMonth(year: 2019, month: 9))
+        #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+        #expect(text(of: entry).contains(line.split(separator: " ").last.map(String.init) ?? line))
+    }
+
+    @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
+        ("K-12 Teacher", "K-12"), ("k8s platform", "k8s"), ("% of revenue", "of revenue"),
+        ("% des Umsatzes", "Umsatzes"), ("% del fatturato", "fatturato"), ("% du chiffre", "chiffre"),
+        ("% de ingresos", "ingresos"), ("% da receita", "receita"), ("per diem staff", "diem"),
+        ("pro bono counsel", "bono"), ("EUR desk analyst", "desk"), ("/ Berlin", "Berlin"),
+    ])
+    func lookalikeAfterAPeriod(description: String, kept: String) throws {
+        let found = try imported("""
+        Berufserfahrung
+        09/19 – 08/21    \(description), Muster GmbH
+        10/21 – heute    Leiter Buchhaltung, Beispiel AG, Hamburg
+        """)
+        #expect(found.cv.experience.count == 2)
+        let entry = try #require(found.cv.experience.first)
+        #expect(entry.period?.value.start == YearMonth(year: 2019, month: 9))
+        #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+        #expect(text(of: entry).contains(kept))
+    }
+
     @Test("Education: an expected end belongs to the period, not to the degree")
     func education() throws {
         let found = try imported("""

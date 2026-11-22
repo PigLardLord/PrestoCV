@@ -147,17 +147,48 @@ enum DateReader {
     }
 
     /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
-    /// A range beside a percent sign, a currency or a rate ("3.50–4.50%", "10.50–12.50 €/hour") is a range of numbers.
+    /// The written form tells a period from pay. A slash is written only in dates, so a slash range is a period whatever
+    /// follows. A dot is written in both, so a dotted range is a period unless a unit stands beside it ("3.50–4.50%",
+    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or its two-digit years are 1940 to 1969, which a price is and a
+    /// career start seldom is ("10.50 – 12.50").
     private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
         guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
               let (first, firstEnd) = shortDate(at: index, in: tokens),
               let next = connector(after: firstEnd, in: tokens) else { return nil }
         if let (second, secondEnd) = rangeEnd(at: next, in: tokens),
-           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0), !isUnit(after: secondEnd, in: tokens) {
+           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
+            let dotted = isDotted(from: index, to: secondEnd, in: tokens)
+            if dotted {
+                if isUnit(after: secondEnd, in: tokens) { return nil }
+                if (1940...1969).contains(first.year), isTwoDigit(secondEnd, in: tokens), (1940...1969).contains(second.year) {
+                    return nil
+                }
+            } else if isPercent(rightAfter: secondEnd, in: tokens) {
+                return nil
+            }
             return (ImportedPeriod(start: first, end: .date(second)), secondEnd)
         }
         guard let currentEnd = currentWords(at: next, in: tokens) else { return nil }
         return (ImportedPeriod(start: first, end: .current), currentEnd)
+    }
+
+    /// A dot between the digits of the first date or of the last one.
+    private static func isDotted(from index: Int, to end: Int, in tokens: [Token]) -> Bool {
+        for mark in [tokens[index + 1].kind, tokens[end - 1].kind] {
+            if case .mark(".") = mark { return true }
+        }
+        return false
+    }
+
+    private static func isTwoDigit(_ index: Int, in tokens: [Token]) -> Bool {
+        if case .number(_, 2) = tokens[index].kind { return true }
+        return false
+    }
+
+    /// A percent sign written right after the last number, no space between ("3/50–4/50%").
+    private static func isPercent(rightAfter index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count, case .mark("%") = tokens[index + 1].kind else { return false }
+        return !tokens[index + 1].spaced
     }
 
     /// A number unit right before the token: a currency sign or code.
@@ -178,10 +209,10 @@ enum DateReader {
         guard next < tokens.count else { return false }
         switch tokens[next].kind {
         case .mark(let mark) where mark == "%": return true
-        case .word("k"): return true
+        case .word("k"): return !joinsTheNext(index: next, in: tokens)
         case .word(let word) where ratePhrases.contains(word): return true
         case .mark(let mark) where currencySigns.contains(mark): return endsTheAmount(after: next, in: tokens)
-        case .word(let word) where currencyWords.contains(word): return endsTheCode(after: next, in: tokens)
+        case .word(let word) where currencyWords.contains(word): return endsTheAmount(after: next, in: tokens)
         default: break
         }
         switch tokens[next].kind {
@@ -199,15 +230,9 @@ enum DateReader {
         return false
     }
 
-    /// A currency code right after a range is its unit when nothing, a mark or a rate follows; a word after it
-    /// ("Euro zone analyst") belongs to the description.
-    private static func endsTheCode(after index: Int, in tokens: [Token]) -> Bool {
-        guard index + 1 < tokens.count else { return true }
-        switch tokens[index + 1].kind {
-        case .number: return false
-        case .mark: return true
-        case .word(let word): return rateIntroducers.contains(word)
-        }
+    /// A "k" is a unit as a token of its own; joined to a mark, a digit or letters that follow ("K-12", "k8s") it begins a word.
+    private static func joinsTheNext(index: Int, in tokens: [Token]) -> Bool {
+        index + 1 < tokens.count && !tokens[index + 1].spaced
     }
 
     private static let currencySigns: Set<Character> = ["€", "$", "£", "¥"]

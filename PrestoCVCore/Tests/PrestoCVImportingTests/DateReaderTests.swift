@@ -103,7 +103,6 @@ struct DateReaderTests {
     @Test("A two-digit range beside a percentage, a price or a rate is a number range, not dates", arguments: [
         "3.50–4.50% commission", "03.50–04.50% commission", "10.50–12.50 €/hour", "10.50–12.50 EUR per hour",
         "10.50-12.50/h", "€10.50–12.50", "$ 10.50 – 12.50", "10.50 – 12.50 CHF", "10.50 – 12.50k",
-        "up to 05/20 – 07/30 %",
         "10.50–12.50 /h", "10.50–12.50 / h", "10.50–12.50 /hour", "10.50 – 12.50 /Std.", "10.50 – 12.50 / Stunde",
         "10.50–12.50 €/h", "10.50–12.50 € / h", "10.50–12.50 per hour", "10.50–12.50 pro Stunde",
         "10.50–12.50 all'ora", "10.50–12.50 l'heure", "10.50–12.50 por hora", "10.50–12.50 EUR/h", "10.50–12.50 USD per hour",
@@ -118,7 +117,6 @@ struct DateReaderTests {
         ("09.19 – 8.21", 2019, 9, .date(YearMonth(year: 2021, month: 8))),
         ("9.19 – heute", 2019, 9, .current),
         ("9.19 – 10.21", 2019, 9, .date(YearMonth(year: 2021, month: 10))),
-        ("3.50 – 4.50", 1950, 3, .date(YearMonth(year: 1950, month: 4))),
     ] as [(String, Int, Int, ImportedPeriod.End)])
     func singleDigitDottedMonths(text: String, year: Int, month: Int, end: ImportedPeriod.End) throws {
         let (read, period) = try #require(firstPeriod(text))
@@ -171,5 +169,44 @@ struct DateReaderTests {
         #expect(read == text)
         let end = YearMonth(year: endYear, month: endMonth == 0 ? nil : endMonth)
         #expect(period == ImportedPeriod(start: ym(startYear, startMonth == 0 ? nil : startMonth), end: .date(end)))
+    }
+
+    @Test("Pay beside a currency, with an ordinary word after it or none, is no period", arguments: [
+        "3.50 – 4.50 EUR gross", "10.50 – 12.50 EUR gross", "10.50 – 12.50 EUR net", "10.50 – 12.50 EUR brutto",
+        "10.50 – 12.50 EUR netto", "10.50 – 12.50 EUR lordi", "10.50 – 12.50 EUR netti", "10.50 – 12.50 EUR brut",
+        "10.50 – 12.50 EUR bruto", "10.50 – 12.50 EUR neto", "10.50 – 12.50 EUR líquido", "10.50 – 12.50 € brut",
+        "10.50 – 12.50 CHF netto", "10.50 – 12.50 USD gross",
+    ])
+    func payWithACurrencyAndAWord(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("A dotted range whose years fall in 1940-1969 is no period, with a unit or none", arguments: [
+        "3.50 – 4.50", "10.50 – 12.50", "10.50-12.50", "9.45 – 12.60",
+    ])
+    func dottedRangeOfThePricesYears(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("A slash range is a period whatever word follows, the words of a unit included", arguments: [
+        "09/19 – 08/21 K-12 Teacher", "09/19 – 08/21 k8s platform", "09/19 – 08/21 % of revenue",
+        "09/19 – 08/21 % des Umsatzes", "09/19 – 08/21 % del fatturato", "09/19 – 08/21 % du chiffre d'affaires",
+        "09/19 – 08/21 % de ingresos", "09/19 – 08/21 % da receita", "09/19 – 08/21 per diem staff",
+        "09/19 – 08/21 pro bono counsel", "09/19 – 08/21 EUR desk analyst", "09/19 – 08/21 / Berlin",
+        "09/19 – 08/21 EUR brut", "09/19 – 08/21 k",
+    ])
+    func slashRangeBeforeALookalike(text: String) throws {
+        let (read, period) = try #require(firstPeriod(text))
+        #expect(period == ImportedPeriod(start: ym(2019, 9), end: .date(ym(2021, 8))))
+        #expect(read.hasPrefix("09/19 – 08/21"))
+    }
+
+    @Test("A dotted range is a period before a word that is no unit, and a k that begins a word is no unit", arguments: [
+        "09.19 – 08.21 K-12 Teacher", "09.19 – 08.21 k8s platform", "09.19 – 08.21 per diem staff",
+        "09.19 – 08.21 pro bono counsel", "09.19 – 08.21 / Berlin", "09.19 – 08.21 EUR 5 million budget",
+    ])
+    func dottedRangeBeforeALookalike(text: String) throws {
+        let (_, period) = try #require(firstPeriod(text))
+        #expect(period == ImportedPeriod(start: ym(2019, 9), end: .date(ym(2021, 8))))
     }
 }
