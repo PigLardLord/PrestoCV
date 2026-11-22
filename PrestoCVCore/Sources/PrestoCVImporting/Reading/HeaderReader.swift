@@ -448,8 +448,8 @@ enum HeaderReader {
     /// Whether the evidence about the whole line says that a line in the shape of a name is no person. In this order:
     /// 1. a line made only of known places, or a section's heading, is no person;
     /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person, unless the line
-    ///    under it is a recognised role: that is evidence outside the ambiguous word, and "Sarah Ireland / Senior Nurse" is
-    ///    a person (#328);
+    ///    under it is a title, a recognised role or any line that is no sentence: that is evidence outside the ambiguous
+    ///    word, and "Sarah Ireland / Dental hygienist" is a person; under "Open to relocation" it is a place (#328);
     /// 3. a line the role, organisation and school vocabulary explains as a whole is no person ("Senior Nurse",
     ///    "Beispiel GmbH", "Ospedale di Erfurt"). One such word is no evidence: "Priya Cook" stays a possible person.
     /// A line with no evidence either way is a possible person: a needless check costs less than a wrong sure name.
@@ -459,9 +459,21 @@ enum HeaderReader {
             || EntryVocabulary.explainsWholeLine(text)
     }
 
-    /// Whether the line under the one at `index` is a recognised role.
+    /// Whether the line under the one at `index` is a title: a recognised role, or a line that is not a sentence. A title
+    /// outside every list ("Dental hygienist") is still no sentence, and that is evidence outside the ambiguous words.
     private static func hasRoleUnder(_ index: Int, in candidates: [Candidate]) -> Bool {
-        titleLine(under: index, in: candidates).map { EntryVocabulary.isRole(candidates[$0].piece.text) } ?? false
+        titleLine(under: index, in: candidates).map {
+            EntryVocabulary.isRole(candidates[$0].piece.text) || !readsAsASentence(candidates[$0].piece.text)
+        } ?? false
+    }
+
+    /// Whether a line reads as a sentence and not as a title, by its shape alone: after its first word it has a short
+    /// function word in lower case (a preposition or an article: "to", "for", "für", "a", "al") and another word in lower
+    /// case ("Open to relocation", "Willing to travel", "Disponibile a trasferte", "Bereit für einen Umzug"). A title has
+    /// no such pair: its words are nouns ("Dental hygienist"), or capitalised around a short connector ("Head of Sales").
+    private static func readsAsASentence(_ text: String) -> Bool {
+        let lower = text.words.dropFirst().filter { $0.first(where: \.isLetter)?.isLowercase == true }
+        return lower.count >= 2 && lower.contains { $0.count(where: \.isLetter) <= 3 }
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
