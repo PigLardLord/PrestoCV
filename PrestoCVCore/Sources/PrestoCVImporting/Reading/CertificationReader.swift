@@ -152,11 +152,12 @@ enum CertificationReader {
         return findings.cv.certifications.count - 1
     }
 
-    /// A line of dates alone: when the dates come first it waits for the certification below (a line that waited already
-    /// is text not imported), otherwise it is the year of the certification above, when that one has no year yet. False,
-    /// and nothing changed, when it is neither.
+    /// A line of dates alone: it waits for the certification below it (a line that waited already is text not imported) or
+    /// is the year of the certification above it, when that one has no year yet. The neighbour is the one the splitter chose
+    /// for the line (`Section.dateOwners`), else the direction of the section. False, and nothing changed, when it is neither.
     private static func dateLine(_ block: SourceBlock, _ year: Sourced<Int>, _ walk: inout Walk, _ section: Section, _ findings: inout Findings) -> Bool {
-        if walk.datesFirst {
+        let owner = section.dateOwners[block.index] ?? (walk.datesFirst ? .below : .above)
+        if owner == .below {
             if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
             walk.waiting = (block, year, walk.above)
             return true

@@ -78,7 +78,7 @@ enum StudiesAndCertifications {
                 evidence[index - 1] = .education
             }
         }
-        giveDateLinesToTheirEntry(&evidence, shapes)
+        let owners = Dictionary(uniqueKeysWithValues: giveDateLinesToTheirEntry(&evidence, shapes).map { (section.blocks[$0.key].index, $0.value) })
         guard let first = evidence.compactMap({ $0 }).first else { return [section] }
         var runs: [Section] = []
         var current = first
@@ -86,11 +86,14 @@ enum StudiesAndCertifications {
             current = found ?? current
             if var last = runs.last, last.kind == current {
                 last.blocks.append(block)
+                last.dateOwners[block.index] = owners[block.index]
                 runs[runs.count - 1] = last
             } else {
                 var run = section
                 run.kind = current
                 run.blocks = [block]
+                run.dateOwners = [:]
+                run.dateOwners[block.index] = owners[block.index]
                 runs.append(run)
             }
         }
@@ -105,8 +108,10 @@ enum StudiesAndCertifications {
     /// line with none above it to the one below. A neighbour that shows no kind is not an entry; with none left, the line
     /// keeps the kind its own period shows. So does a study just below with no date of its own and none after it ("Master
     /// of Science" over "2010 – 2014" over "University of Leipzig"): the dates are that study's.
-    private static func giveDateLinesToTheirEntry(_ evidence: inout [SectionKind?], _ shapes: [Shape?]) {
-        guard let first = shapes.lazy.compactMap({ $0 }).first else { return }
+    /// The result says which neighbour each line took, by its position in the section, for the reader of its run.
+    private static func giveDateLinesToTheirEntry(_ evidence: inout [SectionKind?], _ shapes: [Shape?]) -> [Int: Section.DateOwner] {
+        var owners: [Int: Section.DateOwner] = [:]
+        guard let first = shapes.lazy.compactMap({ $0 }).first else { return owners }
         let datesFirst = first.datesOnly
         var taken = Set<Int>()
         for index in shapes.indices where shapes[index]?.datesOnly == true {
@@ -130,8 +135,10 @@ enum StudiesAndCertifications {
             if let kind = evidence[neighbour] {
                 evidence[index] = kind
                 taken.insert(neighbour)
+                owners[index] = neighbour > index ? .below : .above
             }
         }
+        return owners
     }
 
     /// The index of a line that is an entry of some kind: not a date line itself, with a kind.

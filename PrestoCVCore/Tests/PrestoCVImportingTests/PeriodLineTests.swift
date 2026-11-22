@@ -301,6 +301,36 @@ struct PeriodOwnershipTests {
         expectNothingLost(found)
     }
 
+    @Test("Dates first, a period between two certifications goes to the one that has none", arguments: PeriodOwnershipTests.samples)
+    func interiorPeriodOfACertification(sample: Sample) throws {
+        let owner = sample.certification.replacingFirst("Scrum Master", with: "Product Owner")
+        let third = sample.certification.replacingFirst("Scrum Master", with: "Cloud Practitioner")
+            .replacingFirst("Scrum Alliance", with: "Meridian Board")
+        let found = try importText(sample, "2018\n\(sample.certification)\n\(owner)\n2019–2020\n\(third), 2021")
+
+        #expect(found.cv.education.isEmpty, "a study with no name was made")
+        #expect(found.cv.certifications.map(\.name.value).count == 3)
+        #expect(found.cv.certifications.map { $0.issuer?.value } == ["Scrum Alliance", "Scrum Alliance", "Meridian Board"])
+        #expect(found.cv.certifications.map { $0.year?.value } == [2018, 2020, 2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
+    @Test("Dates after, a period between a dated certification and a bare one goes to the bare one", arguments: PeriodOwnershipTests.samples)
+    func interiorPeriodOfTheCertificationBelow(sample: Sample) throws {
+        let owner = sample.certification.replacingFirst("Scrum Master", with: "Product Owner")
+        let third = sample.certification.replacingFirst("Scrum Master", with: "Cloud Practitioner")
+            .replacingFirst("Scrum Alliance", with: "Meridian Board")
+        let found = try importText(sample, "\(sample.datedCertification.replacingFirst("2021", with: "2018"))\n2019–2020\n\(owner)\n\(third), 2021")
+
+        #expect(found.cv.education.isEmpty, "a study with no name was made")
+        #expect(found.cv.certifications.map(\.name.value).count == 3)
+        #expect(found.cv.certifications.map { $0.issuer?.value } == ["Scrum Alliance", "Scrum Alliance", "Meridian Board"])
+        #expect(found.cv.certifications.map { $0.year?.value } == [2018, 2020, 2021])
+        #expect(found.unplaced.isEmpty, "\(found.unplaced.map(\.text))")
+        expectNothingLost(found)
+    }
+
     @Test("A period between two entries without dates follows the direction of the section", arguments: PeriodOwnershipTests.samples)
     func periodBetweenTwoBareEntries(sample: Sample) throws {
         let after = try importText(sample, "\(sample.certification)\n2019–2021\n\(sample.bachelor)\n2010–2014")
