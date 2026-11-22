@@ -66,8 +66,9 @@ private struct LicenceDetailView: View {
     let detail: LicenceDetail
 
     var body: some View {
+        // A plain stack: both paragraph lists count from zero, and a lazy stack needs its children's ids unique.
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.medium) {
+            VStack(alignment: .leading, spacing: Spacing.medium) {
                 heading("settings.licences.notice")
                 paragraphs(detail.noticeParagraphs)
                 heading("settings.licences.text")
