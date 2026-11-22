@@ -4,7 +4,8 @@ import PrestoCVDomain
 /// The stored form of a CV, schema 1: a DTO separate from the domain (ADR 0009, R12). Decoding is strict: required
 /// fields are required, sizes are capped, and every value must be in the canonical, valid form its value object
 /// produces. A file is never normalised or defaulted on read. The envelope is frozen: `schemaVersion` is a top-level
-/// integer in every future version.
+/// integer in every future version, and so is the `version` of the draft block, which every later addition to the
+/// draft raises (`StoredCVFile` reads both before decoding).
 struct CVFileV1: Codable, Equatable {
     static let version = 1
     static let maxText = 10_000, maxItems = 500
@@ -24,6 +25,8 @@ struct CVFileV1: Codable, Equatable {
     let interests: [String]
     let design: DesignV1?
     let language: String?
+    /// Absent when the CV has no draft.
+    let draft: DraftV1?
 
     struct PersonalV1: Codable, Equatable {
         let fullName: String, professionalTitle: String, email: String?, phone: String?, location: String, website: String?, summary: String
@@ -40,6 +43,21 @@ struct CVFileV1: Codable, Equatable {
     struct CertificationV1: Codable, Equatable { let name: String, issuer: String, description: String, issued: DateV1?, link: String? }
     struct ProfileV1: Codable, Equatable { let platform: String, link: String }
     struct DesignV1: Codable, Equatable { let design: String, palette: String?, fonts: String? }
+
+    /// The draft block (`DraftBlock`). Its arrays are required; a key this version does not know is read past and not
+    /// written again, so a new field needs a new version.
+    struct DraftV1: Codable, Equatable {
+        static let supportedVersion = 1
+        let version: Int
+        let origins: [OriginV1]
+        let notPlaced: [NotPlacedV1]
+    }
+    /// A marked value: `field` names it (`personal.fullName`, `experiences.role`), `entry` is its row in a section and
+    /// absent for a detail of the person.
+    struct OriginV1: Codable, Equatable { let field: String, entry: Int?, origin: KindV1 }
+    /// An origin, an object with a `kind` so that a later origin adds its own values beside it.
+    struct KindV1: Codable, Equatable { let kind: String }
+    struct NotPlacedV1: Codable, Equatable { let text: String, heading: String? }
 
     struct Invalid: Error, Equatable { let reason: String }
 
@@ -84,6 +102,15 @@ struct CVFileV1: Codable, Equatable {
         interests = s.interests
         design = cv.design.map { DesignV1(design: $0.design, palette: $0.palette, fonts: $0.fonts) }
         language = cv.language?.tag
+        draft = cv.draft.map { block in
+            let origins = block.origins.map { place, origin in
+                let (field, entry) = Self.stored(place)
+                return OriginV1(field: field, entry: entry, origin: KindV1(kind: Self.kind(origin)))
+            }
+            return DraftV1(version: DraftV1.supportedVersion,
+                           origins: origins.sorted { ($0.field, $0.entry ?? -1) < ($1.field, $1.entry ?? -1) },
+                           notPlaced: block.notPlaced.map { NotPlacedV1(text: $0.text, heading: $0.heading) })
+        }
     }
 
     static func stored(_ date: PartialDate) -> DateV1 { DateV1(year: date.year, month: date.month) }
@@ -155,9 +182,18 @@ struct CVFileV1: Codable, Equatable {
             guard let valid = DesignChoice(design: d.design, palette: d.palette, fonts: d.fonts) else { throw Invalid(reason: "design") }
             choice = valid
         }
-        return CV(id: CVID(id), revision: revision, createdAt: createdAt, updatedAt: updatedAt, title: title, personal: details,
-                  sections: sections, design: choice,
-                  language: try Self.canonical(language, DocumentLanguage.init, \.tag, "language"))
+        var cv = CV(id: CVID(id), revision: revision, createdAt: createdAt, updatedAt: updatedAt, title: title, personal: details,
+                    sections: sections, design: choice,
+                    language: try Self.canonical(language, DocumentLanguage.init, \.tag, "language"))
+        if let draft {
+            let block = try draft.toDomain()
+            do throws(DraftError) { try cv.setDraft(block) } catch {
+                switch error {
+                case .placeOutsideSections: throw Invalid(reason: "draft place")
+                }
+            }
+        }
+        return cv
     }
 
     /// A stored value is exactly what its value object produces from it.
@@ -186,9 +222,106 @@ struct CVFileV1: Codable, Equatable {
         texts += certifications.flatMap { [$0.name, $0.issuer, $0.description] } + certifications.compactMap(\.link)
         texts += profiles.flatMap { [$0.platform, $0.link] }
         texts += interests
-        let counts = [experiences.count, education.count, skills.count, languages.count, certifications.count, profiles.count, interests.count]
+        texts += (draft?.notPlaced ?? []).flatMap { [$0.text] + [$0.heading].compactMap { $0 } }
+        let counts = [experiences.count, education.count, skills.count, languages.count, certifications.count, profiles.count, interests.count,
+                      draft?.notPlaced.count ?? 0]
         guard texts.allSatisfy({ $0.count <= Self.maxText }), counts.allSatisfy({ $0 <= Self.maxItems }) else {
             throw Invalid(reason: "size limits")
         }
     }
+}
+
+// MARK: The draft block
+
+extension CVFileV1 {
+    /// The stored name of each place's field. A section's fields are named after the section's key in the file.
+    static func stored(_ place: ValuePlace) -> (field: String, entry: Int?) {
+        switch place {
+        case .personal(let field): ("personal." + key(field), nil)
+        case .entry(let field, let index): (key(field), index)
+        }
+    }
+
+    private static func key(_ field: PersonalField) -> String {
+        switch field {
+        case .fullName: "fullName"
+        case .professionalTitle: "professionalTitle"
+        case .email: "email"
+        case .phone: "phone"
+        case .location: "location"
+        case .website: "website"
+        case .summary: "summary"
+        }
+    }
+
+    private static func key(_ field: EntryField) -> String {
+        switch field {
+        case .experienceRole: "experiences.role"
+        case .experienceCompany: "experiences.company"
+        case .experienceLocation: "experiences.location"
+        case .experiencePeriod: "experiences.period"
+        case .experienceDescription: "experiences.description"
+        case .educationDegree: "education.degree"
+        case .educationSchool: "education.school"
+        case .educationPeriod: "education.period"
+        case .educationDescription: "education.description"
+        case .skillName: "skills.name"
+        case .languageName: "languages.language"
+        case .languageProficiency: "languages.proficiency"
+        case .certificationName: "certifications.name"
+        case .certificationIssuer: "certifications.issuer"
+        case .certificationIssued: "certifications.issued"
+        case .profilePlatform: "profiles.platform"
+        case .profileLink: "profiles.link"
+        case .interest: "interests"
+        }
+    }
+
+    static func kind(_ origin: ValueOrigin) -> String {
+        switch origin {
+        case .imported: "imported"
+        }
+    }
+
+    private static let personalFields = Dictionary(uniqueKeysWithValues: PersonalField.allCases.map { ("personal." + key($0), $0) })
+    private static let entryFields = Dictionary(uniqueKeysWithValues: EntryField.allCases.map { (key($0), $0) })
+    private static let origins = Dictionary(uniqueKeysWithValues: [ValueOrigin.imported].map { (kind($0), $0) })
+}
+
+extension CVFileV1.DraftV1 {
+    /// The block as the domain holds it, checked value by value; whether each place is inside the sections is the
+    /// domain's check (`CV.setDraft`).
+    func toDomain() throws(CVFileV1.Invalid) -> DraftBlock {
+        guard version == Self.supportedVersion else { throw CVFileV1.Invalid(reason: "draft version") }
+        guard !origins.isEmpty || !notPlaced.isEmpty else { throw CVFileV1.Invalid(reason: "draft empty") }
+        var marks: [ValuePlace: ValueOrigin] = [:]
+        for record in origins {
+            let place = try CVFileV1.place(record.field, record.entry)
+            guard let origin = CVFileV1.origin(record.origin.kind) else { throw CVFileV1.Invalid(reason: "draft origin") }
+            guard marks.updateValue(origin, forKey: place) == nil else { throw CVFileV1.Invalid(reason: "draft duplicate place") }
+        }
+        var texts: [NotPlacedText] = []
+        for stored in notPlaced {
+            guard let text = NotPlacedText(text: stored.text, heading: stored.heading), text.text == stored.text, text.heading == stored.heading else {
+                throw CVFileV1.Invalid(reason: "draft not-placed text")
+            }
+            texts.append(text)
+        }
+        return DraftBlock(origins: marks, notPlaced: texts)
+    }
+}
+
+extension CVFileV1 {
+    /// A stored field and entry as a place: a detail of the person has no entry, a value of a section has one.
+    fileprivate static func place(_ field: String, _ entry: Int?) throws(Invalid) -> ValuePlace {
+        if let personal = personalFields[field] {
+            guard entry == nil else { throw Invalid(reason: "draft place") }
+            return .personal(personal)
+        }
+        guard let value = entryFields[field] else { throw Invalid(reason: "draft field") }
+        guard let entry else { throw Invalid(reason: "draft place") }
+        return .entry(value, index: entry)
+    }
+
+    fileprivate static func origin(_ kind: String) -> ValueOrigin? { origins[kind] }
 }
