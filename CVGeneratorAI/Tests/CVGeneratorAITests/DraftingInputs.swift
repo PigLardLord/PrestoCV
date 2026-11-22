@@ -240,19 +240,13 @@ enum DraftingInputs {
         }
     }
 
-    /// The example description of the app in `language`, as its string catalog holds it.
+    /// The example description of the app in `language`, as the six languages of `AppExample` give it.
     static func exampleText(in language: String) throws -> String {
-        let catalogURL = SourceTree.root.appendingPathComponent("PrestoCV/Localizable.xcstrings")
-        let catalog = try JSONSerialization.jsonObject(with: Data(contentsOf: catalogURL)) as? [String: Any]
-        let strings = catalog?["strings"] as? [String: [String: Any]]
-        let localizations = strings?["ai.generation.example_text"]?["localizations"] as? [String: [String: Any]]
-        guard let value = (localizations?[language]?["stringUnit"] as? [String: Any])?["value"] as? String else {
-            throw CatalogError.missingExample(language)
-        }
-        return value
+        guard languages.contains(language) else { throw ExampleError.missingExample(language) }
+        return AppExample.text(in: language)
     }
 
-    enum CatalogError: Error {
+    enum ExampleError: Error {
         case missingExample(String)
     }
 

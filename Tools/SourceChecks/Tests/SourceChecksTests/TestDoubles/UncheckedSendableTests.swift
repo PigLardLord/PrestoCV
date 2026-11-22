@@ -19,12 +19,8 @@ struct UncheckedSendableTests {
         var description: String { "\(type) in \(file)" }
     }
 
-    private static let legacy: [Declaration] = [
-        ("PrestoCVTests/Features/CVEditor/ElementBindingTests.swift", ["Names"]),
-        ("PrestoCVTests/Features/CVList/CVListRowTextTests.swift", ["TestClock", "TestZone"]),
-        ("PrestoCVTests/Features/CVList/CVListViewModelUnreadableTests.swift", ["StubListingUseCase"]),
-        ("PrestoCVTests/Features/Import/ImportViewModelTests.swift", ["RemovedFiles"]),
-    ].flatMap { file, types in types.map { Declaration(file: file, type: $0) } }
+    /// The types that still declare it. None: the tests of the app keep what they share in a Mutex.
+    private static let legacy: [Declaration] = []
 
     // MARK: - Reading and comparing
 
@@ -67,7 +63,7 @@ struct UncheckedSendableTests {
     }
 
     private static func appTests() throws -> [RepositorySources.File] {
-        let files = try RepositorySources.swiftFiles(in: "PrestoCVTests")
+        let files = try RepositorySources.swiftFiles(in: "PrestoCVNextTests")
         try #require(!files.isEmpty, "The sources of the app's tests are in the repository")
         return files
     }

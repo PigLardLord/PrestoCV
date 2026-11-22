@@ -12,11 +12,6 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { name }
 
-    /// The legacy app, which no target compiles (dropped by 5-17d).
-    static let legacy = CatalogUnderCheck(
-        name: "the legacy catalog", catalog: LocalizationCatalogTests.catalogPath,
-        folders: LocalizationCatalogTests.shippedFolders, rules: LocalizationCatalogTests.legacyRules)
-
     /// The new app. No source of `PrestoCVApp/Sources` (presentation, composition, integration) names a catalog key
     /// (checked for step 5-15a: none looks up a text, and R13 leaves the text to the views).
     static let next = CatalogUnderCheck(
@@ -88,7 +83,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // French typography: the texts of the new app write a space that cannot break before : ; ? ! and inside « ».
             frenchNoBreakSpaces: true))
 
-    static let all = [legacy, next]
+    static let all = [next]
 
     func findings() throws -> StringFindings {
         try StringChecks.run(

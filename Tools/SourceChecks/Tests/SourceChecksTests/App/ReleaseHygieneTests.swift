@@ -185,6 +185,24 @@ struct ReleaseHygieneTests {
         #expect(!Self.projectText().contains(#""name": "PrestoCVNext","#), "The second app target is still in the project")
     }
 
+    /// What `PrestoCV/` keeps for the shipped target: the released app's `Info.plist`, icon, asset catalog, privacy
+    /// manifest and sample CVs (docs/architecture/modules.md). Everything else in it was the legacy app.
+    static let keptInTargetFolder: [String] = [
+        "PrestoCV/Info.plist", "PrestoCV/PrivacyInfo.xcprivacy", "PrestoCV/PrestoCV.icon/", "PrestoCV/Assets.xcassets/",
+        "PrestoCV/Resources/Samples/",
+    ]
+
+    @Test("The legacy app's code and tests are gone: PrestoCV/ keeps only what the shipped target uses")
+    func theLegacyAppIsGone() throws {
+        let tracked = try Repository.trackedFiles()
+        let legacyCode = tracked.filter { path in
+            path.hasPrefix("PrestoCVTests/") || path.hasPrefix("PrestoCVUITests/")
+                || (path.hasPrefix("PrestoCV/") && !Self.keptInTargetFolder.contains { path == $0 || ($0.hasSuffix("/") && path.hasPrefix($0)) })
+        }
+
+        #expect(legacyCode.isEmpty, "Legacy files are still tracked: \(legacyCode.prefix(10)) and \(max(0, legacyCode.count - 10)) more")
+    }
+
     @Test("The walk reaches the targets the linked products take in, however far down, and no legacy target")
     func theWalkReachesTheTargetsBelow() {
         let names = Set(Self.reached(by: Self.shipped).targets.map(\.name))

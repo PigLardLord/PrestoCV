@@ -13,7 +13,7 @@ struct LoggingGuideTests {
 
     /// The sources that may log through the interface: the packages, the app and the app's own targets.
     static let sourceFolders = [
-        "DiagnosticLogging/Sources", "DiagnosticTrace/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCV",
+        "DiagnosticLogging/Sources", "DiagnosticTrace/Sources", "PrestoCVCore/Sources", "CVPDFExporter/Sources", "CVGeneratorAI/Sources", "PrestoCVNext",
         "PrestoCVApp/Sources",
     ]
 
@@ -68,7 +68,7 @@ struct LoggingGuideTests {
 
     @Test("The guide names the subsystem the app writes its log under")
     func guideNamesTheSubsystem() throws {
-        let app = try Self.text("PrestoCV/PrestoCVApp.swift")
+        let app = try Self.text("PrestoCVApp/Sources/PrestoCVComposition/Composition.swift")
         let subsystem = try #require(app.firstMatch(of: /OSLogDiagnosticLogger\(subsystem:\s*"([^"]+)"\)/)?.output.1)
 
         #expect(try Self.text(Self.guide).contains("subsystem:\(subsystem)"))
