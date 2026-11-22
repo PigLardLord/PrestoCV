@@ -95,6 +95,8 @@ public final class Composition {
         let sharesWithStandIn: Bool
         /// The store of the released app, whose CVs the launch moves into the new store before any screen reads it
         let legacyStore: any LegacyStore
+        /// What the Settings sheet shows about the app, read from its bundle
+        let settings: SettingsFactory.Facts
     }
 
     let paths: AppPaths
@@ -112,6 +114,8 @@ public final class Composition {
     let traceAccess: TraceAccess
     /// Makes the view models of the screens over this composition's repository, clock and ids.
     public let screens: ScreenFactory
+    /// Makes the view models of the Settings sheet and its Licences screen.
+    public let settings: SettingsFactory
     /// True when a share should open the stand-in of the system's share sheet, which a UI test can read and answer. It is
     /// true only in a Debug build launched with `-PrestoCVNextShareStandIn`; a Release build has no code that sets it.
     public let sharesWithStandIn: Bool
@@ -144,6 +148,7 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
+        settings = SettingsFactory(facts: inputs.settings)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
@@ -377,8 +382,25 @@ public final class Composition {
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
-            legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource())
+            legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
+            settings: bundledSettings()
         ))
+    }
+
+    /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of
+    /// the site, and the notices file the bundle holds.
+    private static func bundledSettings() -> SettingsFactory.Facts {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let notices = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Licences.json")
+        return SettingsFactory.Facts(
+            supportAddress: "support@prestocv.app",
+            privacyPolicy: URL(string: "https://prestocv.app/privacy.html"),
+            sourceCode: URL(string: "https://prestocv.app/source.html"),
+            version: info["CFBundleShortVersionString"] as? String ?? "",
+            build: info["CFBundleVersion"] as? String ?? "",
+            appName: info["CFBundleDisplayName"] as? String ?? "PrestoCV",
+            notices: { try Data(contentsOf: notices) }
+        )
     }
 }
 

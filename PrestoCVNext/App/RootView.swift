@@ -23,10 +23,10 @@ struct RootView: View {
         case .ready(let composition):
             #if DEBUG
             // A Debug build launched for the UI tests shares through a stand-in they can read
-            ReadyShell(screens: composition.screens)
+            ReadyShell(screens: composition.screens, settings: composition.settings)
                 .environment(\.sharesWithStandIn, composition.sharesWithStandIn)
             #else
-            ReadyShell(screens: composition.screens)
+            ReadyShell(screens: composition.screens, settings: composition.settings)
             #endif
         case .failed(let failure):
             CompositionFailedView(failure: failure, retry: holder.retry)
@@ -42,8 +42,12 @@ private final class ShellModels: ObservableObject {
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
     let report: LegacyImportReportViewModel
+    let settings: SettingsViewModel
+    let licences: LicencesViewModel
 
-    init(screens: ScreenFactory) {
+    init(screens: ScreenFactory, settings factory: SettingsFactory) {
+        settings = factory.makeSettings()
+        licences = factory.makeLicences()
         firstRun = screens.makeFirstRun()
         let untitled = String(localized: "shell.untitled")
         // The order and the punctuation of a title and its number are the translation's
@@ -66,12 +70,15 @@ private final class ShellModels: ObservableObject {
 private struct ReadyShell: View {
     @StateObject private var models: ShellModels
 
-    init(screens: ScreenFactory) {
-        _models = StateObject(wrappedValue: ShellModels(screens: screens))
+    init(screens: ScreenFactory, settings: SettingsFactory) {
+        _models = StateObject(wrappedValue: ShellModels(screens: screens, settings: settings))
     }
 
     var body: some View {
-        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun, report: models.report)
+        ShellView(
+            shell: models.shell, list: models.list, firstRun: models.firstRun, report: models.report,
+            settings: models.settings, licences: models.licences
+        )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
     }

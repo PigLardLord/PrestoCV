@@ -105,9 +105,17 @@ struct CompositionTests {
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
-            legacyStore: legacyStore
+            legacyStore: legacyStore,
+            settings: Self.settings
         )
     }
+
+    /// What the Settings sheet shows, as a launch would read it
+    static let settings = SettingsFactory.Facts(
+        supportAddress: "help@example.org", privacyPolicy: URL(string: "https://example.org/privacy"),
+        sourceCode: URL(string: "https://example.org/source"), version: "1.0", build: "1", appName: "PrestoCV",
+        notices: { Data() }
+    )
 
     static func ready(_ state: CompositionState) throws -> Composition {
         guard case .ready(let composition) = state else {

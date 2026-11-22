@@ -51,7 +51,8 @@ struct TraceOnFailureTests {
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
-            legacyStore: EmptyLegacyStore()
+            legacyStore: EmptyLegacyStore(),
+            settings: CompositionTests.settings
         )
     }
 

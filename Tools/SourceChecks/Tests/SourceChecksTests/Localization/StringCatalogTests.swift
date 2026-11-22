@@ -27,7 +27,8 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
             // German also names the website a CV of the released app lost "Website".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
-            // the designs "Minimal" and "Modern" and the fonts "System" as English does.
+            // the designs "Minimal" and "Modern" and the fonts "System" as English does. German, French and Italian say
+            // "Build", German and French "Version", German "Support", French "Licences", and French and Italian "Open source".
             sameInSomeLanguages: [
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
@@ -35,10 +36,15 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "editor.entry.title.certification": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
                 "legacyImport.detail.website": ["de"],
+                "settings.about.build": ["de", "fr", "it"], "settings.about.version": ["de", "fr"],
+                "settings.support.header": ["de"], "settings.licences.title": ["fr"], "settings.openSource.licences": ["fr"],
+                "settings.openSource.header": ["fr", "it"],
             ],
             // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
             // composition's LookNamesTests checks that those codes and these keys are the same set.
             dynamicKeyPrefixes: ["design.", "fonts.", "palette."],
+            // The name of the app's licence, which no translation changes.
+            properNamesOfKey: ["settings.openSource.statement": ["Apache"]],
             nonKeyLiterals: [
                 "native": "the code of a language level, which ProficiencyPicker words (R13)",
                 "designsOwn": "the end of the accessibility identifier of the look picker's item for the design's own (LookName)",
@@ -69,6 +75,9 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"editor.row.delete.title \(removalName)"#: ValueTypes(["%@"], "EntryPage's removalName is a String"),
                 #"editor.row.moveUp.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
                 #"editor.row.moveDown.named \(name)"#: ValueTypes(["%@"], "EditorRowView's name is a String"),
+                #"settings.about.header \(settings.appName)"#: ValueTypes(["%@"], "SettingsViewModel's appName is a String"),
+                #"settings.support.footer \(settings.supportAddress)"#: ValueTypes(
+                    ["%@"], "SettingsViewModel's supportAddress is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
                 #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
