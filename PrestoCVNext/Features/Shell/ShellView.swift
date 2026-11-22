@@ -5,14 +5,18 @@ import SwiftUI
 /// shows one column at a time, the list first. A first run shows the welcome in its place until a draft or the import
 /// is open. The models decide what is open, which column shows, whether the welcome shows and whether the open CV may
 /// be left; this view binds to them. It shows the export of the open CV in a sheet while the shell holds one. It tells
-/// the shell when the scene stops being active, which stores the open CV at once on its way to the background.
+/// the shell when the scene stops being active, which stores the open CV at once on its way to the background. The gear in
+/// the sidebar's bar opens Settings in a sheet.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let settings: SettingsViewModel
+    let licences: LicencesViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @State private var addingCV = false
+    @State private var showingSettings = false
     /// The way to start chosen in the "+" sheet, opened when the sheet has closed.
     @State private var chosenInSheet: StartChoice?
 
@@ -43,6 +47,10 @@ struct ShellView: View {
                 openKept: { id in _ = shell.openKept(id) }
             )
                 .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        Button { showingSettings = true } label: { Label("settings.open", systemImage: "gearshape") }
+                            .accessibilityIdentifier("settings.open")
+                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
                             .accessibilityIdentifier("shell.add")
@@ -61,6 +69,9 @@ struct ShellView: View {
                 chosenInSheet = choice
                 addingCV = false
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(settings: settings, licences: licences)
         }
         .sheet(item: exportSheet) { sheet in
             ExportSheetView(sheet: sheet, close: { shell.closeExport() })

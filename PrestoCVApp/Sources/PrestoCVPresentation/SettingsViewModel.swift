@@ -12,15 +12,20 @@ public final class SettingsViewModel {
     public let supportAddress: String
     public let appName: String
 
-    public init(supportAddress: String, privacyPolicy: URL, sourceCode: URL, version: String, build: String, appName: String) {
+    /// A link the composition could not make (nil) leaves its row out, as an address that makes no mail link does, and
+    /// Legal with no row is left out; Support stays, for the address.
+    public init(
+        supportAddress: String, privacyPolicy: URL?, sourceCode: URL?, version: String, build: String, appName: String
+    ) {
         self.supportAddress = supportAddress
         self.appName = appName
+        let source = sourceCode.map { [SettingsRow.sourceCode($0)] } ?? []
         groups = [
             SettingsGroup(kind: .support, rows: Self.mailLink(to: supportAddress).map { [.contactSupport($0)] } ?? []),
-            SettingsGroup(kind: .legal, rows: [.privacyPolicy(privacyPolicy)]),
-            SettingsGroup(kind: .openSource, rows: [.openSourceStatement, .licences, .sourceCode(sourceCode)]),
+            privacyPolicy.map { SettingsGroup(kind: .legal, rows: [.privacyPolicy($0)]) },
+            SettingsGroup(kind: .openSource, rows: [.openSourceStatement, .licences] + source),
             SettingsGroup(kind: .about, rows: [.version(version), .build(build)]),
-        ]
+        ].compactMap { $0 }
     }
 
     /// A mail to the address with no subject and no body, so that nothing about the person or the device goes with it.
