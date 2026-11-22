@@ -79,6 +79,35 @@ struct PageBreaksTests {
         #expect(Self.faults(layout) == [.cut(page: 0, text: "Top of a skills row"), .cut(page: 0, text: "Foot of a skills row")])
     }
 
+    @Test("a line wholly in a margin that the neighbouring page prints in the same place is the copy the page clips: no fault, and not the page's foot")
+    func clippedCopy() {
+        // A4 less its margins is a page step of 770pt; WebKit rounds it to its own pixels, here 0.4pt short.
+        let layout = PDFLayout(pages: [a4Page, a4Page, a4Page], lines: [
+            Self.line("Line 8 of a profile that fills the page.", page: 0, y: 392),
+            Self.line("Experience", page: 0, y: 22),
+            Self.line("Experience", page: 1, y: 791.6),
+            Self.line("Senior developer", page: 1, y: 770),
+            Self.line("Duty 8 of the role, one line long.", page: 1, y: 40),
+            Self.line("Duty 8 of the role, one line long.", page: 2, y: 810.4),
+            Self.line("Duty 9 of the role, one line long.", page: 2, y: 760),
+        ])
+        #expect(Self.faults(layout).isEmpty)
+    }
+
+    @Test("a line wholly in a margin that no neighbouring page prints in its place is hidden, and a page that shows no line is blank")
+    func hiddenLine() {
+        let layout = PDFLayout(pages: [a4Page, a4Page, a4Page], lines: [
+            Self.line("Line 1 of a profile that fills the page.", page: 0, y: 760),
+            Self.line("Experience", page: 0, y: 22),
+            Self.line("Experience", page: 1, y: 700),
+            Self.line("Duty 1 of the role, one line long.", page: 1, y: 600),
+            Self.line("Duty 9 of the role, one line long.", page: 1, y: 810),
+            Self.line("Duty 9 of the role, one line long.", page: 2, y: 10),
+        ])
+        #expect(Self.faults(layout) == [.hidden(page: 0, text: "Experience"), .hidden(page: 1, text: "Duty 9 of the role, one line long."),
+                                        .hidden(page: 2, text: "Duty 9 of the role, one line long."), .blankPage(page: 2)])
+    }
+
     @Test("the whole check adds the document's text the PDF lacks and the lines outside the page, after the page faults")
     func wholeDocument() {
         let document = RenderedDocument(html: "", textNodes: ["Alex Example", "Skill 200 with a long name"])

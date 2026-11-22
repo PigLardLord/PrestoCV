@@ -34,10 +34,10 @@ public struct DocumentHTMLBuilder: Sendable {
     /// - A section's title is never alone at the foot of a page (#467). Neither print path honours `break-after: avoid`,
     ///   so the title, kept whole, holds an empty block that may not break across pages, as tall as what must follow its
     ///   last line: where that room is not left, the title moves to the next page with its section. The block reaches the
-    ///   title's bottom padding, bottom border and bottom margin at the markup contract's limits, and the next line
-    ///   (2.5em or 30pt; 23pt at most in the bundled designs), or 150pt when the first entry has a description, its head
-    ///   (title, organisation, place, dates) and first line (143pt at most). Its negative bottom margin gives back all
-    ///   but 1px, which makes a title whose block was pushed cross the page's end, so that it moves whole.
+    ///   title's bottom padding, bottom border and bottom margin at the markup contract's limits, then the next line
+    ///   (2.5em or 30pt; 23pt at most in the bundled designs), or at least 150pt when the first entry has a description,
+    ///   for its head (title, organisation, place, dates) and first line (143pt at most). Its negative bottom margin
+    ///   gives back all but 1px, which makes a title whose block was pushed cross the page's end, so that it moves whole.
     /// - A forced break between a title and what follows it is ignored: after the title, before what follows it in the
     ///   section's start, and around an inline section's start. A break before a section, or after a first entry, stays.
     /// - A block section's start, its title and first block, never breaks across pages where it fits on one, so a short
@@ -45,12 +45,15 @@ public struct DocumentHTMLBuilder: Sendable {
     /// - Nothing follows the last line: no bottom margin along the last elements, on `.cv` or on the body, and no bottom
     ///   padding on `.cv`. Space after the last line makes both print paths push out a blank page when the last page is
     ///   full; the page's own margin is the space at its foot (#467).
-    static let baseStyle = "a{overflow-wrap:anywhere}"
+    /// - The text keeps the design's sizes. On an iPhone, WebKit's text autosizing enlarges the text of a page wider than
+    ///   the screen (a 24px title to 30px), and with it on, the iOS print path left titles alone at a page's foot that
+    ///   it keeps with their sections once it is off (#467).
+    static let baseStyle = "html{-webkit-text-size-adjust:none!important}a{overflow-wrap:anywhere}"
         + ".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"
         + ".cv-section-start>.cv-section-title{display:flow-root!important;break-inside:avoid!important}"
         + ".cv-section-title::after{content:\"\";display:block;height:\(reserve);margin-bottom:calc(1px - \(reserve));break-inside:avoid}"
         + ".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::after"
-        + "{height:max(\(reserve),150pt);margin-bottom:calc(1px - max(\(reserve),150pt))}"
+        + "{height:\(descriptionReserve);margin-bottom:calc(1px - \(descriptionReserve))}"
         + ".cv-section-title{break-after:auto!important}.cv-section-title~*,.cv-section-title~* *{break-before:auto!important}"
         + ".cv-section-start:has(>.cv-section-title:only-child){break-after:auto!important}"
         + ".cv-section-start:has(>.cv-section-title:only-child)+*{break-before:auto!important}"
@@ -62,9 +65,15 @@ public struct DocumentHTMLBuilder: Sendable {
     /// (`p.cv-language > span` is as deep). The builder tests measure it on a document with every kind of section.
     static let maxDepth = 4
 
-    /// Room for the title's bottom padding and bottom margin, its bottom border, and the next line, in the title's em
-    /// or in pt, whichever is larger: what the markup contract lets a design set there (#467).
-    static let reserve = "calc(2*\(atLeast(MarkupContract.titleBottomSpacing)) + \(atLeast(MarkupContract.borderWidth)) + max(2.5em,30pt))"
+    /// Room for the title's bottom padding and bottom margin and its bottom border, at what the markup contract lets a
+    /// design set there, then for what must follow the title's last line: the next line, or the head and first line of
+    /// a first entry with a description. Each part is in the title's em or in pt, whichever is larger (#467).
+    static let reserve = room(following: "max(2.5em,30pt)")
+    static let descriptionReserve = room(following: "max(2.5em,150pt)")
+
+    private static func room(following next: String) -> String {
+        "calc(2*\(atLeast(MarkupContract.titleBottomSpacing)) + \(atLeast(MarkupContract.borderWidth)) + \(next))"
+    }
 
     private static func atLeast(_ limit: MarkupContract.Limit) -> String {
         func css(_ d: Double) -> String { d == d.rounded() ? String(Int(d)) : String(d) }

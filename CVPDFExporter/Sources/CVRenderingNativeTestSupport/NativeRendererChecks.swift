@@ -27,6 +27,8 @@ public enum NativeCheckFailure: Error, Equatable {
     case budget(steps: Int, exhausted: Bool)
     /// The faults of a design's PDFs of one body, by the number of profile lines of the document that showed them.
     case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
+    /// A design's page-break document of `summaryLines` profile lines needed more pages than `PageBreakDocument.page` keeps.
+    case pageBreakDocumentTruncated(design: String, summaryLines: Int, requiredPages: Int)
 }
 
 /// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
@@ -180,9 +182,10 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
 
     // MARK: Page breaks
 
-    /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` of `body` on A4
-    /// with no section's start (its title, or the head of its first entry) at a page's foot, no blank page, no line cut by
-    /// a page's edge, every text node and no line outside its page; and the page count is the PDF's own.
+    /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` of `body` whole
+    /// on `PageBreakDocument.page` with no section's start (its title, or the head of its first entry) at a page's foot, no
+    /// blank page, no line cut by a page's edge or hidden in its margin, every text node and no line outside its page; and
+    /// the page count is the PDF's own.
     public func pageBreaks(design name: String, body: PageBreakDocument.Body) async throws {
         guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
             throw NativeCheckFailure.fixtureLacks(name)
@@ -206,7 +209,10 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         for lines in PageBreakDocument.summaryLines {
             let document = DocumentHTMLBuilder().render(PageBreakDocument.document(summaryLines: lines, body: body),
                                                         stylesheet: stylesheet, palette: palette, fonts: fonts, headings: headings)
-            let pdf = try await renderer.render(html: document.html, page: .a4)
+            let pdf = try await renderer.render(html: document.html, page: PageBreakDocument.page)
+            guard !pdf.truncated else {
+                throw NativeCheckFailure.pageBreakDocumentTruncated(design: name, summaryLines: lines, requiredPages: pdf.requiredPages)
+            }
             guard let layout = inspector.layout(of: pdf.data), let text = inspector.text(of: pdf.data) else {
                 throw NativeCheckFailure.unreadablePDF
             }
@@ -214,7 +220,7 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
                 throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
             }
             let found = PageBreaks.faults(of: document, printedAs: layout, text: text, starts: PageBreakDocument.startLines(headings),
-                                          page: .a4)
+                                          page: PageBreakDocument.page)
             if !found.isEmpty { faults[lines] = found }
         }
         guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, body: body, faults: faults) }

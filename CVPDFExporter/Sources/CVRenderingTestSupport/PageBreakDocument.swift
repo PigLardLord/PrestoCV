@@ -8,6 +8,10 @@ public enum PageBreakDocument {
     /// Enough profile lengths that the section after the profile starts at every height of a page's foot.
     public static let summaryLines = 4...39
 
+    /// A4 with room for every document: the longest takes five pages in the macOS fonts, one more than `PageSetup.a4`
+    /// keeps, and a page the renderer drops would read as lost text.
+    public static let page = PageSetup(widthPoints: PageSetup.a4.widthPoints, heightPoints: PageSetup.a4.heightPoints, maxPages: 8)
+
     /// What follows the profile.
     public enum Body: String, Sendable, CaseIterable {
         /// One role of eight one-line duties.
