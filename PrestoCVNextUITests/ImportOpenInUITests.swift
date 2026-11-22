@@ -109,14 +109,16 @@ final class ImportOpenInUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(edited.waitForExistence(timeout: 30), "The CV that was open is stored with what was typed")
     }
 
-    /// A PDF opened on the first run shows the import in place of the ways to start, reading it, with its Cancel.
+    /// A PDF opened on the first run shows the import in place of the ways to start, reading it, with its Cancel and the
+    /// text box covered.
     @MainActor
     func testOpenedPDFOnTheFirstRun() throws {
         let app = try launch(seeded: false, holdingTheRead: true)
 
         let cancel = app.buttons["import.cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 30), "The PDF is read at once, with Cancel")
-        XCTAssertTrue(app.importBox.exists, "The import shows")
+        // The import's own screen is under the reading layer, which hides it from accessibility: Cancel is what shows
+        XCTAssertFalse(app.importBox.exists, "The text box is covered while the PDF is read")
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "firstRun.title").firstMatch.exists,
                        "The import takes the place of the ways to start")
     }
