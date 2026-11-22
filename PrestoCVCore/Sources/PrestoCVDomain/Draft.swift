@@ -24,6 +24,11 @@ public struct DraftBlock: Hashable, Sendable {
         return block.isEmpty ? nil : block
     }
 
+    /// The marks that `other` holds too, with the texts this block did not place: a mark goes away with either side.
+    func keeping(marksOf other: DraftBlock?) -> DraftBlock? {
+        orNone(origins.filter { place, origin in other?.origins[place] == origin })
+    }
+
     // MARK: Edits of the person
 
     /// The marks left after the personal details change from `old` to `new`: a detail with another value loses its mark.

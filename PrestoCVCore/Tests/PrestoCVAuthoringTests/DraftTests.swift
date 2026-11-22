@@ -150,12 +150,36 @@ struct DraftTests {
         let stored = FixtureCV.full()
         var details = stored.personal
         details.summary = "Builds careful software, and tests it."
-        let edited = CV(id: stored.id, title: stored.title, personal: details, sections: stored.sections)
+        var edited = stored
+        edited.setPersonalDetails(details)
         let held = stored.holding(contentOf: edited)
         var expected = stored.draft?.origins ?? [:]
         expected[.personal(.summary)] = nil
         #expect(held.draft?.origins == expected)
         #expect(held.draft?.notPlaced == stored.draft?.notPlaced)
+    }
+
+    @Test("holding the content of an editor's copy that has no draft keeps no mark")
+    func holdingCopyWithoutDraft() {
+        let stored = FixtureCV.full()
+        let edited = CV(id: stored.id, title: stored.title, personal: stored.personal, sections: stored.sections)
+        let held = stored.holding(contentOf: edited)
+        #expect(held.draft?.origins.isEmpty == true)
+        #expect(held.draft?.notPlaced == stored.draft?.notPlaced)
+    }
+
+    @Test("holding the content of a copy where a row was edited and then another row changed into its old value gives no mark back")
+    func holdingEditedThenReplaced() throws {
+        let stored = try imported([acmeEngineer, acmeTutor], marks: [role(0), company(0)])
+        var edited = stored
+        var sections = stored.sections
+        sections.experiences = [seniorAcmeTutor, acmeTutor]
+        edited.setSections(sections)
+        sections.experiences = [seniorAcmeTutor, acmeEngineer]
+        edited.setSections(sections)
+        let held = stored.holding(contentOf: edited)
+        #expect(held.draft?.origins[role(0)] == nil && held.draft?.origins[company(0)] == nil)
+        #expect(held.draft?.origins[role(1)] == nil && held.draft?.origins[company(1)] == nil)
     }
 
     @Test("holding the content of an editor's copy with two rows swapped and both edited moves no mark to another row")

@@ -74,11 +74,15 @@ public struct CV: Hashable, Sendable {
     /// This CV with the text of `other`: its title, details and sections. The identity, the revision, the times, the design,
     /// the language and the draft stay this CV's own, so that an editor's text can be written over the stored CV it started
     /// from without undoing a look or a language chosen since; the draft's marks follow the new text as in `setSections(_:)`.
+    /// Marks only ever go away after the import, so a mark survives only when both keep it: this CV's marks moved to the
+    /// new text, and the marks that `other`'s own draft still holds (an `other` with no draft holds none). Comparing the
+    /// two texts alone could give a mark back to a row the person edited and then changed into the old row's value.
     public func holding(contentOf other: CV) -> CV {
         var result = self
         result.rename(other.title)
         result.setPersonalDetails(other.personal)
         result.setSections(other.sections)
+        result.draft = result.draft?.keeping(marksOf: other.draft)
         return result
     }
 
