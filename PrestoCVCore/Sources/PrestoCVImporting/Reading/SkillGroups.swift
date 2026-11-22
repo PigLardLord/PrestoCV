@@ -20,6 +20,16 @@ enum SkillGroups {
         return skillsWords.contains(first) || skillsWords.contains(last)
     }
 
+    /// Whether a line names a group of skills by a word for skills that is not also a word of a level. Such a line is a
+    /// group's label even when it holds a language name ("Spanish cooking skills", "Competenze di inglese"). "Kenntnisse"
+    /// is both a skills word and a level word, and a language's level in "Englisch gute Kenntnisse", so it does not count:
+    /// the language wins, as the first round of #305 required.
+    private static func namesGroupByPureSkillsWord(_ text: String) -> Bool {
+        guard namesGroupOfSkills(text) else { return false }
+        let words = SectionVocabulary.key(text.trimmingCharacters(in: Self.trimmed)).split(separator: " ").map(String.init)
+        return [words.first, words.last].contains { $0.map { skillsWords.contains($0) && !levelSkillsWords.contains($0) } ?? false }
+    }
+
     /// Whether a line ends a group of languages that came inside the skills and opens the skills again: a group's label
     /// (a known one, or a line naming a group of skills) that shows no language evidence. A language the lists know, a
     /// level (a CEFR one, a word of a level, a native speaker's statement) written with or without punctuation, is a
@@ -33,6 +43,7 @@ enum SkillGroups {
         if LanguageVocabulary.isNativeStatement(line) || SkillLevelWords.isLevel(line) || LanguageReader.statesCEFRLevel(line) { return true }
         let key = SectionVocabulary.key(line)
         if LanguageVocabulary.levelKeys.contains(key) { return true }
+        if namesGroupByPureSkillsWord(line) { return false }
         return line.words.contains { LanguageVocabulary.isName(String($0)) }
     }
 
@@ -48,6 +59,9 @@ enum SkillGroups {
         "compétences", "aptitudes",
         "competências", "habilidades",
     ].map(SectionVocabulary.key))
+
+    /// The words for skills that are also words of a level.
+    private static let levelSkillsWords: Set<String> = Set(["kenntnisse"].map(SectionVocabulary.key))
 
     /// The labels that group qualities and the rest, by language.
     private static let labels: Set<String> = Set([

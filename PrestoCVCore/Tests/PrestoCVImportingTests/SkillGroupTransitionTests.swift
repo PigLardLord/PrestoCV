@@ -32,8 +32,11 @@ struct SkillGroupTransitionTests {
         (italian, "Qualità", true), (italian, "Altro", true), (italian, "Competenze di mestiere", true),
         (spanish, "Cualidades", true), (spanish, "Habilidades de oficio", true),
         (french, "Qualités", true), (french, "Autres", true), (french, "Compétences de métier", true),
+        // A group's label that holds a language name is still a group of skills, and names no language
+        (english, "Spanish cooking skills", true), (german, "Englisch Kompetenzen", true), (german, "Französisch Fähigkeiten", true),
+        (italian, "Competenze di inglese", true), (spanish, "Habilidades de inglés", true), (french, "Compétences en anglais", true),
         // A language with its level, written without punctuation, after a dash, after a colon, or as a CEFR level
-        (english, "French fluent", false), (english, "French – fluent", false), (english, "French: fluent", false), (english, "French B2", false),
+        (english, "Spanish fluent", false), (french, "Français C1", false), (english, "French fluent", false), (english, "French – fluent", false), (english, "French: fluent", false), (english, "French B2", false),
         (german, "Englisch gute Kenntnisse", false), (german, "Englisch – gute Kenntnisse", false),
         (german, "Englisch: gute Kenntnisse", false), (german, "Französisch C1", false),
         (italian, "Inglese buono", false), (italian, "Inglese – ottimo", false), (italian, "Inglese: B2", false), (italian, "Inglese madrelingua", false),
@@ -68,5 +71,19 @@ struct SkillGroupTransitionTests {
             #expect(found.cv.languages.map(\.name.value).last == words.languageAfter, "\(line)")
             #expect(found.cv.languages.map(\.name.value).first == words.firstLanguage, "\(line)")
         }
+    }
+
+    @Test("A group label that holds a language name keeps the skills after it and invents no language")
+    func labelWithLanguageName() throws {
+        let found = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""
+        Skills
+        Welding
+        Languages
+        German
+        Spanish cooking skills
+        Paella preparation
+        """)
+        #expect(found.cv.skills.map(\.value) == ["Welding", "Paella preparation"])
+        #expect(found.cv.languages.map(\.name.value) == ["German"])
     }
 }
