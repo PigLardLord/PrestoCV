@@ -71,16 +71,37 @@ enum CertificationReader {
         }
     }
 
-    /// Reads each line of the section as a certification, or as the issuer of the one above it.
+    /// Reads each line of the section as a certification, or as the issuer of the one above it. A line of dates alone is
+    /// the year of the certification it dates: the one below it when the section starts with such a line (the dates come
+    /// first), the one above it otherwise (#461).
     static func read(_ section: Section, into findings: inout Findings) {
-        var above: Int?
+        var walk = Walk(datesFirst: startsWithDates(section, findings.document, findings.consumedBlocks))
         for block in section.blocks {
             guard !findings.consumedBlocks.contains(block.index) else {
-                above = nil
+                walk.above = nil
                 continue
             }
-            above = read(block, in: section, after: above, into: &findings)
+            walk.above = read(block, in: section, walk: &walk, into: &findings)
         }
+        if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
+    }
+
+    /// Where the walk over the blocks of a section stands: the certification just made, which the next block may complete,
+    /// and, when the dates come first, the line of dates that waits for the certification below it.
+    private struct Walk {
+        let datesFirst: Bool
+        var above: Int?
+        var waiting: (block: SourceBlock, year: Sourced<Int>)?
+    }
+
+    private static func startsWithDates(_ section: Section, _ document: SourceDocument, _ consumed: Set<Int>) -> Bool {
+        guard let first = section.blocks.first(where: { !consumed.contains($0.index) && $0.kind != .tableHeader }) else { return false }
+        return datesAlone(Line(section.cells(of: first, in: document))) != nil
+    }
+
+    /// The year of a line that holds dates and nothing else.
+    private static func datesAlone(_ line: Line) -> Sourced<Int>? {
+        line.parts.isEmpty ? line.year : nil
     }
 
     /// Decides what a block is, by the first branch that holds. The result is the index of the certification it made, which
@@ -101,7 +122,8 @@ enum CertificationReader {
     /// 4. a block with no part is text not imported;
     /// 5. anything else is a certification of its own: the first part is the name, the issuer is the part that reads as an
     ///    organisation, or the only part left, and the rest is text not imported.
-    private static func read(_ block: SourceBlock, in section: Section, after above: Int?, into findings: inout Findings) -> Int? {
+    private static func read(_ block: SourceBlock, in section: Section, walk: inout Walk, into findings: inout Findings) -> Int? {
+        let above = walk.above
         if block.kind == .tableHeader {
             findings.leaveOut(block, .markup)
             return nil
@@ -109,13 +131,30 @@ enum CertificationReader {
         let cells = section.cells(of: block, in: findings.document)
         guard !cells.isEmpty else { return nil }
         let line = Line(cells)
+        if let dates = datesAlone(line), dateLine(block, dates, &walk, section, &findings) { return nil }
         if let above, completeCertification(at: above, with: line, section, &findings) { return nil }
         guard let name = line.parts.first else {
             findings.unplace(block, in: section)
             return nil
         }
-        add(name, line, section, &findings)
+        add(name, line, waiting: walk.waiting, section, &findings)
+        if let waiting = walk.waiting, line.year != nil { findings.unplace(waiting.block, in: section) }
+        walk.waiting = nil
         return findings.cv.certifications.count - 1
+    }
+
+    /// A line of dates alone: when the dates come first it waits for the certification below (a line that waited already
+    /// is text not imported), otherwise it is the year of the certification above, when that one has no year yet. False,
+    /// and nothing changed, when it is neither.
+    private static func dateLine(_ block: SourceBlock, _ year: Sourced<Int>, _ walk: inout Walk, _ section: Section, _ findings: inout Findings) -> Bool {
+        if walk.datesFirst {
+            if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
+            walk.waiting = (block, year)
+            return true
+        }
+        guard let above = walk.above, findings.cv.certifications[above].year == nil else { return false }
+        findings.cv.certifications[above].year = year
+        return true
     }
 
     /// Branch 3: the line is the issuer of the certification above it. False, and nothing changed, when it is not.
@@ -131,9 +170,11 @@ enum CertificationReader {
     }
 
     /// Branch 5: a certification of its own.
-    private static func add(_ name: Piece, _ line: Line, _ section: Section, _ findings: inout Findings) {
+    private static func add(
+        _ name: Piece, _ line: Line, waiting: (block: SourceBlock, year: Sourced<Int>)?, _ section: Section, _ findings: inout Findings
+    ) {
         var certification = ImportedCertification(name: name.quote())
-        certification.year = line.year
+        certification.year = line.year ?? waiting?.year
         let rest = line.parts.dropFirst()
         let issuer = rest.first { EntryVocabulary.isOrganisation($0.text) || EntryVocabulary.isSchool($0.text) } ?? (rest.count == 1 ? rest.first : nil)
         certification.issuer = issuer?.quote()
