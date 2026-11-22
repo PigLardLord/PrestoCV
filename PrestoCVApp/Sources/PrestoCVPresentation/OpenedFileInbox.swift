@@ -5,7 +5,8 @@ import PrestoCVWorkflowPorts
 /// file can arrive before the window's shell exists, while the store is still being opened: it waits, and the shell
 /// gets it once it is ready. One file waits at most: a newer one takes its place and the older is let go, unless both
 /// are the same file. When the store cannot be opened, the file waiting is let go; one that arrives while the failure
-/// shows waits for a try that opens it, and is let go if that try fails too.
+/// shows waits for a try that opens it, and is let go if that try fails too. When the window goes away, the file
+/// waiting is let go, and so is any that arrives after.
 ///
 /// Each window has its own, as it has its own shell. The file a window is handed is a copy (ADR 0027), so letting it go
 /// removes it.
@@ -14,6 +15,7 @@ public final class OpenedFileInbox {
     private let files: any ImportFileReading
     private var waiting: URL?
     private var shell: ShellNavigationModel?
+    private var isClosed = false
 
     /// - Parameter files: Lets go the files that never reach a shell.
     public init(files: any ImportFileReading) {
@@ -22,6 +24,10 @@ public final class OpenedFileInbox {
 
     /// A file opened in the window: its shell imports it, or it waits for the shell.
     public func receive(_ url: URL) {
+        if isClosed {
+            letGo(url)
+            return
+        }
         if let shell {
             shell.receive(file: url)
             return
@@ -32,10 +38,18 @@ public final class OpenedFileInbox {
 
     /// The window's shell is ready: the file waiting goes to it, and every file opened from now on.
     public func shellReady(_ shell: ShellNavigationModel) {
+        guard !isClosed else { return }
         self.shell = shell
         guard let waiting else { return }
         self.waiting = nil
         shell.receive(file: waiting)
+    }
+
+    /// The window is gone: the file waiting is let go, and so is any that arrives after, as no shell is left to take it.
+    /// A file the shell already took is the shell's.
+    public func windowClosed() {
+        isClosed = true
+        compositionFailed()
     }
 
     /// The store could not be opened: the file waiting is let go.

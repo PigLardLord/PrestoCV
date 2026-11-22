@@ -200,6 +200,49 @@ struct OpenedFileTests {
         #expect(world.shell.importer == nil)
     }
 
+    @Test("a window that goes away while a file waits for its shell lets that file go once")
+    func windowClosedLetsTheHeldFileGo() async throws {
+        let world = World()
+        world.inbox.receive(Self.file)
+
+        world.inbox.windowClosed()
+
+        #expect(world.inboxFiles.recorded == [.released(Self.file)])
+        #expect(world.inboxFiles.problems(ended: true).isEmpty)
+        world.inbox.windowClosed()
+        world.inbox.shellReady(world.shell)
+        #expect(world.inboxFiles.recorded == [.released(Self.file)])
+        #expect(world.shell.importer == nil)
+        #expect(world.imports.files.recorded.isEmpty)
+    }
+
+    @Test("a file opened after its window went away is let go at once, and the shell gets nothing")
+    func fileAfterTheWindowClosedIsLetGo() async throws {
+        let world = World()
+        world.inbox.windowClosed()
+
+        world.inbox.receive(Self.file)
+
+        #expect(world.inboxFiles.recorded == [.released(Self.file)])
+        world.inbox.shellReady(world.shell)
+        #expect(world.shell.importer == nil)
+        #expect(world.imports.files.recorded.isEmpty)
+    }
+
+    @Test("a window that goes away after its shell took the file leaves the file to the shell's import")
+    func windowClosedAfterTheShellTookTheFile() async throws {
+        let world = World()
+        world.inbox.receive(Self.file)
+        world.inbox.shellReady(world.shell)
+        await world.letGo(Self.file)
+
+        world.inbox.windowClosed()
+
+        #expect(world.inboxFiles.recorded.isEmpty)
+        #expect(world.imports.files.recorded == [.read(Self.file), .released(Self.file)])
+        #expect(world.imports.files.problems(ended: true).isEmpty)
+    }
+
     @Test("with no file waiting, a shell ready or a failed store changes nothing")
     func nothingHeldChangesNothing() {
         let world = World()

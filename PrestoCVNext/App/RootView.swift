@@ -16,6 +16,7 @@ struct RootView: View {
         content
             .task { holder.start() }
             .onOpenURL { opened.inbox.receive($0) }
+            .onDisappear { opened.inbox.windowClosed() }
     }
 
     @ViewBuilder
