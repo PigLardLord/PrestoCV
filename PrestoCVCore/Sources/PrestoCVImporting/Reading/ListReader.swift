@@ -72,6 +72,9 @@ enum SkillLevelWords {
         words.contains(SectionVocabulary.key(text))
     }
 
+    /// The words, in the form `SectionVocabulary.key` gives.
+    static var keys: [String] { Array(words) }
+
     private static let words: Set<String> = Set([
         "beginner", "basic", "elementary", "intermediate", "advanced", "expert", "proficient", "good", "very good", "excellent",
         "base", "di base", "elementare", "intermedio", "buono", "ottimo", "avanzato", "esperto", "eccellente", "discreto",

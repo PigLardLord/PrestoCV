@@ -35,6 +35,12 @@ struct SkillGroupTransitionTests {
         // A group's label that holds a language name is still a group of skills, and names no language
         (english, "Spanish cooking skills", true), (german, "Englisch Kompetenzen", true), (german, "Französisch Fähigkeiten", true),
         (italian, "Competenze di inglese", true), (spanish, "Habilidades de inglés", true), (french, "Compétences en anglais", true),
+        // A language name with a level word and a skills word is a language, whatever else the line holds
+        (english, "French conversational skills", false), (german, "Englisch fließend – Kenntnisse", false), (german, "Englisch fließend Kenntnisse", false),
+        (italian, "Inglese ottime competenze", false), (italian, "Inglese ottimo competenze", false), (spanish, "Inglés básico habilidades", false),
+        (spanish, "Inglés avanzado competencias", false), (french, "Anglais courant compétences", false), (french, "Anglais compétences courant", false),
+        (english, "German C1 skills", false), (english, "Spanish native skills", false), (german, "Englisch C1 Kompetenzen", false),
+        (italian, "Competenze inglese madrelingua", false), (french, "Compétences anglais B2", false),
         // A language with its level, written without punctuation, after a dash, after a colon, or as a CEFR level
         (english, "Spanish fluent", false), (french, "Français C1", false), (english, "French fluent", false), (english, "French – fluent", false), (english, "French: fluent", false), (english, "French B2", false),
         (german, "Englisch gute Kenntnisse", false), (german, "Englisch – gute Kenntnisse", false),
@@ -85,5 +91,19 @@ struct SkillGroupTransitionTests {
         """)
         #expect(found.cv.skills.map(\.value) == ["Welding", "Paella preparation"])
         #expect(found.cv.languages.map(\.name.value) == ["German"])
+    }
+
+    @Test("A language described by a level word and a skills word stays a language and the skills stay apart")
+    func languageWithLevelAndSkillsWord() throws {
+        let found = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""
+        Skills
+        Welding
+        Languages
+        Spanish
+        French conversational skills
+        German C1
+        """)
+        #expect(found.cv.skills.map(\.value) == ["Welding"])
+        #expect(found.cv.languages.map(\.name.value) == ["Spanish", "French", "German"])
     }
 }

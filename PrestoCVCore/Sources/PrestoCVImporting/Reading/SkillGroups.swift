@@ -38,13 +38,31 @@ enum SkillGroups {
         (isLabel(text) || namesGroupOfSkills(text)) && !showsLanguageEvidence(text)
     }
 
+    /// Whether a line is a language's: the one rule that settles a line holding a language name or a level and a skills
+    /// word, in this order. (1) A language name with any level evidence anywhere in the line is a language, whatever else
+    /// the line holds, "skills" included ("French conversational skills"). (2) Otherwise a line with a pure skills word is
+    /// a group's label, even with a language name ("Spanish cooking skills"). (3) Otherwise a level on its own, or a
+    /// language name, is a language's line.
     private static func showsLanguageEvidence(_ text: String) -> Bool {
         let line = text.trimmingCharacters(in: Self.trimmed)
-        if LanguageVocabulary.isNativeStatement(line) || SkillLevelWords.isLevel(line) || LanguageReader.statesCEFRLevel(line) { return true }
-        let key = SectionVocabulary.key(line)
-        if LanguageVocabulary.levelKeys.contains(key) { return true }
+        if namesLanguage(line) && showsLevelEvidence(line) { return true }
         if namesGroupByPureSkillsWord(line) { return false }
-        return line.words.contains { LanguageVocabulary.isName(String($0)) }
+        let key = SectionVocabulary.key(line)
+        if LanguageVocabulary.isNativeStatement(line) || SkillLevelWords.isLevel(line) || LanguageReader.statesCEFRLevel(line)
+            || LanguageVocabulary.levelKeys.contains(key) { return true }
+        return namesLanguage(line)
+    }
+
+    private static func namesLanguage(_ line: String) -> Bool {
+        line.words.contains { LanguageVocabulary.isName(String($0)) }
+    }
+
+    /// Whether a line holds a level anywhere: a CEFR level, a native speaker's statement, a word or a phrase of a level.
+    private static func showsLevelEvidence(_ line: String) -> Bool {
+        if LanguageReader.statesCEFRLevel(line) || LanguageReader.isNative(line) { return true }
+        let padded = " " + SectionVocabulary.key(line) + " "
+        let phrases = LanguageVocabulary.levelKeys + SkillLevelWords.keys
+        return phrases.contains { padded.contains(" " + $0 + " ") }
     }
 
     private static let maximumWords = 3
