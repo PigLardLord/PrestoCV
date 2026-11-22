@@ -258,9 +258,28 @@ enum EntryReader {
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
         let pieces = lines.flatMap { linePieces($0) }
-        // A weak connector is read only when no other piece can hold the employer
-        let isAlone = pieces.count == 1
-        return pieces.flatMap { split($0, kind: kind, readsWeakConnectors: isAlone) }
+        return pieces.enumerated().flatMap { index, piece in
+            let others = pieces.enumerated().filter { $0.offset != index }.map(\.element)
+            return split(piece, kind: kind, readsWeakConnectors: !otherPartHoldsEmployer(piece, others: others, kind: kind))
+        }
+    }
+
+    /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
+    /// piece itself, that reads as an organisation or as a name that is no place ("Freie Schule Frankfurt" holds a city and is an employer). "Teacher for Special Needs, Acme Ltd,
+    /// Leeds" and a title above an employer line keep "for" in the title; "Developer for Acme Ltd | Leeds" has only a place
+    /// besides the connector, so "for" stays a connector.
+    private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
+        let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
+        let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
+        return (afterComma + inOthers).contains { canHoldEmployer($0) }
+    }
+
+    private static func canHoldEmployer(_ segment: Segment) -> Bool {
+        switch segment.part {
+        case .secondary: true
+        case .unknown, .location: !hasPlaceShape(segment.piece)
+        case .primary, .address: false
+        }
     }
 
     /// The pieces of a line without its dates and durations, cut at the strong separators.

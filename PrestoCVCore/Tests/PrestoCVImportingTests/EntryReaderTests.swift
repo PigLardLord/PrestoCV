@@ -219,6 +219,19 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.employer?.value } == [employerLine.components(separatedBy: ", ")[0]])
     }
 
+    @Test("An employer line that holds a city name is still an employer: the title stays whole")
+    func weakConnectorBesideACityNamedEmployer() {
+        let found = read("""
+        Experience
+        Lehrer für Grundschule
+        Freie Schule Frankfurt
+        08/2021 – 02/2025
+        Frankfurt am Main
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Lehrer für Grundschule"])
+        #expect(found.cv.experience.map { $0.employer?.value } != ["Grundschule"])
+    }
+
     @Test("A weak connector is a connector when the line is all the entry has", arguments: [
         ("Developer for Acme Ltd", "Developer", "Acme Ltd"),
         ("Entwickler für Beispiel GmbH", "Entwickler", "Beispiel GmbH"),
@@ -232,6 +245,41 @@ struct EntryReaderTests {
         """)
         #expect(found.cv.experience.map { $0.role?.value } == [role])
         #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+    }
+
+    @Test("A weak connector inside a title stays in the title when the employer comes after a comma on the same line", arguments: [
+        ("Teacher for Special Needs, Acme Ltd, Leeds", "Teacher for Special Needs"),
+        ("Lehrer für Grundschule, Beispiel GmbH, Leeds", "Lehrer für Grundschule"),
+        ("Responsabile per le vendite, Verdi Srl, Roma", "Responsabile per le vendite"),
+        ("Profesor para adultos, Escuela Ejemplo S.L., Madrid", "Profesor para adultos"),
+    ])
+    func weakConnectorInATitleBeforeCommas(line: String, title: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        let parts = line.components(separatedBy: ", ")
+        #expect(found.cv.experience.map { $0.role?.value } == [title])
+        #expect(found.cv.experience.map { $0.employer?.value } == [parts[1]])
+        #expect(found.cv.experience.map { $0.location?.value } == [parts[2]])
+    }
+
+    @Test("A place does not turn a real weak connector off: on the same line, on its own line, in another table cell", arguments: [
+        "Developer for Acme Ltd | Leeds",
+        "Developer for Acme Ltd, Leeds",
+        "Developer for Acme Ltd\nLeeds",
+        "Developer for Acme Ltd\t\tLeeds",
+    ])
+    func weakConnectorWithAPlace(line: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Developer"])
+        #expect(found.cv.experience.map { $0.employer?.value } == ["Acme Ltd"])
+        #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"])
     }
 
     @Test("Parts no word marks follow the section's own order, and the entry is flagged")
