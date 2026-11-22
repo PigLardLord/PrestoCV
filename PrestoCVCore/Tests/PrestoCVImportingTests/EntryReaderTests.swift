@@ -302,6 +302,35 @@ struct EntryReaderTests {
         }
     }
 
+    @Test("A weak connector in a title with organisation vocabulary stays whole beside an employer of four unknown words", arguments: [
+        ("Lead for Systems", "Example North South West"), ("Leiter für Logistik", "Beispiel Nord Süd West"),
+        ("Responsabile per la logistica", "Esempio Nord Sud Ovest"), ("Jefe para Logística", "Ejemplo Norte Sur Oeste"),
+    ])
+    func weakConnectorWithOrganisationWordBesideALongUnknownEmployer(title: String, employer: String) {
+        for layout in ["\(title)\n\(employer)", "\(title), \(employer)", "\(title)\t\t\(employer)", "\(title) | \(employer)"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [nil], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector with nothing else to hold the employer keeps the title whole")
+    func weakConnectorAlone() {
+        let found = read("""
+        Experience
+        Developer for Acme
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Developer for Acme"])
+        #expect(found.cv.experience.map { $0.employer?.value } == [nil])
+        #expect(found.cv.experience.map { $0.location?.value } == [nil])
+    }
+
     @Test("A weak connector before an organisation reads as a connector, with a place after a comma", arguments: [
         ("Developer for Acme Ltd, Leeds", "Developer", "Acme Ltd", "Leeds"),
         ("Entwickler für Beispiel GmbH, Berlin", "Entwickler", "Beispiel GmbH", "Berlin"),

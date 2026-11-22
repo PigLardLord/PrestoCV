@@ -264,13 +264,23 @@ enum EntryReader {
         }
     }
 
-    /// Whether another piece, or a part after a comma of the piece itself, already reads as an organisation (a legal form
-    /// or an organisation word). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds"
-    /// and a title above "Acme Ltd" keep "for" in the title. A name no list knows ("Acme") is no evidence either way.
+    /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
+    /// piece itself, that reads as an organisation or is no recognised place (four unknown words are a name, not a
+    /// city). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds", a title above
+    /// "Acme Ltd" and "Leiter für Logistik" above "Beispiel Nord Süd West" keep it. A short name no list knows ("Acme")
+    /// has the shape of a place and is no evidence either way.
     private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
         let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
         let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
-        return (afterComma + inOthers).contains { $0.part == .secondary }
+        return (afterComma + inOthers).contains { canHoldEmployer($0) }
+    }
+
+    private static func canHoldEmployer(_ segment: Segment) -> Bool {
+        switch segment.part {
+        case .secondary: true
+        case .unknown, .location: !hasPlaceShape(segment.piece)
+        case .primary, .address: false
+        }
     }
 
     /// The pieces of a line without its dates and durations, cut at the strong separators.
