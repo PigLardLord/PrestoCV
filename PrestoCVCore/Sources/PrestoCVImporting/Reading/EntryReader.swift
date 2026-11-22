@@ -581,7 +581,7 @@ enum EntryReader {
         var previous = -1
         var table = 0
         var rowsOfTable = -1
-        for line in lines {
+        for (place, line) in lines.enumerated() {
             if line.block.kind == .tableHeader {
                 findings.leaveOut(line.block, .markup)
                 names = line.cells.map { EntryVocabulary.entryLabel($0.text) }
@@ -590,11 +590,13 @@ enum EntryReader {
                 table += 1
                 continue
             }
-            // A row follows the one before; a blank line between two rows keeps the table where the cell count matches
-            let isRow = inTable && line.block.index == previous + 1
+            // A row is written between the table's bars and follows the one before; a blank line between two rows keeps
+            // the table where the cell count matches. Cells set apart by tabs or a wide gap are a line of their own.
+            let isRow = inTable && line.block.isTableRow && line.block.index == previous + 1
                 && (line.block.followsGap ? line.cells.count > 1 && line.cells.count == names.count
                     : line.cells.count > 1 || line.cells.count == names.count)
-            if !isRow, inTable, continues(line, after: result.last, ofTable: rowsOfTable == table) {
+            let next = place + 1 < lines.count ? lines[place + 1] : nil
+            if !isRow, inTable, continues(line, before: next, after: result.last, ofTable: rowsOfTable == table) {
                 // A line with no date right under a row is that job's description, not an entry of its own
                 previous = line.block.index
                 result[result.count - 1] = result[result.count - 1].appending(line)
@@ -631,8 +633,15 @@ enum EntryReader {
     }
 
     /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
-    private static func continues(_ line: Line, after last: TablePart?, ofTable current: Bool) -> Bool {
+    /// A line the dated entry right below it can take as its heading is not a detail: it names that entry's employer.
+    private static func continues(
+        _ line: Line, before next: Line?, after last: TablePart?, ofTable current: Bool
+    ) -> Bool {
         guard !line.block.followsGap, line.period == nil, line.label == nil, !line.isDurationOnly else { return false }
+        if let next, !next.block.followsGap, !next.block.isTableRow, next.period != nil, !next.isBullet, !line.isBullet,
+           !line.isProse {
+            return false
+        }
         switch last {
         case .columns?: return current
         case .ordinary(_, let isDoubtful)?: return isDoubtful

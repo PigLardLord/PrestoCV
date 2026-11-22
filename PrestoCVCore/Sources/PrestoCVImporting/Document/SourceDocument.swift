@@ -93,4 +93,6 @@ public struct SourceBlock: Hashable, Sendable {
     public let frame: Rect?
     public let column: Int?
     public let fontSize: Double?
+    /// Written between a Markdown table's bars, so it belongs to a table and not to a line laid out in columns.
+    public var isTableRow = false
 }

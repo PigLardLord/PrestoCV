@@ -268,7 +268,7 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
-    // MARK: Gaps and continuations (round 2)
+    // MARK: Gaps and continuations
 
     @Test("Blank lines between the data rows of one table keep the header's columns", arguments: [
         ("Experience", "| Employer | Role | Period |", "Chief Wizard", "Quillon Brae", "Growth Hacker", "Fennick Mere"),
@@ -375,6 +375,59 @@ struct TableHeaderTests {
         #expect(jobs.first?.details.map(\.value) == ["Supported pupils"])
         #expect(jobs.first?.check != nil)
         #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
+    // MARK: Lines that only look like the table's
+
+    @Test("After a gap, a line of tab-separated columns, with no bars, is an ordinary entry, in its own field order", arguments: [
+        ("Experience", "| Employer | Role | Period |", "Northgate Academy", "Teaching Assistant",
+         "Tutor\tRiverside School\t2018 – 2020", "Tutor", "Riverside School"),
+        ("Berufserfahrung", "| Unternehmen | Rolle | Zeitraum |", "Beispiel Werke", "Mechatroniker",
+         "Monteur\tMuster Technik\t2018 – 2020", "Monteur", "Muster Technik"),
+        ("Esperienza", "| Datore di lavoro | Ruolo | Periodo |", "Esempio Impianti", "Tecnico",
+         "Cuoco\tTrattoria Sole\t2018 – 2020", "Cuoco", "Trattoria Sole"),
+    ])
+    func ordinaryEntryAfterAGap(_ heading: String, _ header: String, _ employer: String, _ role: String,
+                                _ plain: String, _ plainRole: String, _ plainEmployer: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|
+        | \(employer) | \(role) | 2020 – 2022 |
+
+        \(plain)
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == [role, plainRole])
+        #expect(jobs.map { $0.employer?.value } == [employer, plainEmployer])
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018])
+        noLoss(result)
+    }
+
+    @Test("A heading with no date right under a table row belongs to the dated entry after it", arguments: [
+        ("Experience", "| Period | Employer | Role |", "Northgate Academy", "Teaching Assistant",
+         "Harbor Systems", "Planner, 2015 – 2017", "Planner"),
+        ("Berufserfahrung", "| Zeitraum | Unternehmen | Rolle |", "Beispiel Werke", "Mechatroniker",
+         "Hafen Systeme GmbH", "Planer, 2015 – 2017", "Planer"),
+        ("Esperienza", "| Periodo | Datore di lavoro | Ruolo |", "Esempio Impianti", "Tecnico",
+         "Porto Sistemi SRL", "Pianificatore, 2015 – 2017", "Pianificatore"),
+    ])
+    func headingBeforeADatedEntry(_ heading: String, _ header: String, _ employer: String, _ role: String,
+                                  _ nextEmployer: String, _ nextLine: String, _ nextRole: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|
+        | 2020 – 2022 | \(employer) | \(role) |
+        \(nextEmployer)
+        \(nextLine)
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == [role, nextRole])
+        #expect(jobs.map { $0.employer?.value } == [employer, nextEmployer])
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2015])
+        #expect(jobs.map { $0.details.map(\.value) } == [[], []])
         noLoss(result)
     }
 
