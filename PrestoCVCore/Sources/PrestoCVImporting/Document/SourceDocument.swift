@@ -93,11 +93,13 @@ public struct SourceBlock: Hashable, Sendable {
     public let frame: Rect?
     public let column: Int?
     public let fontSize: Double?
-    /// From a PDF: where the text of the first cell starts and how large it is, which a date or another cell beside it,
-    /// or an icon before it, does not change. Nil when the PDF's cells are not the block's cells one by one.
+    /// From a PDF: where the main text of the first cell starts and how large it is, which a date or another cell beside
+    /// it, an icon before it or a small marker in it does not change. Nil when the PDF's cells are not the block's cells
+    /// one by one, when the cell tells neither, or when the cell runs on a line in another size.
     public let firstCellLook: CellLook?
 
-    /// Where the text of a cell of a PDF starts, and the smallest font size of its words.
+    /// Where the main text of a cell of a PDF starts, and its size: the size that holds most of the cell's letters and
+    /// digits.
     public struct CellLook: Hashable, Sendable {
         public let x: Double
         public let fontSize: Double

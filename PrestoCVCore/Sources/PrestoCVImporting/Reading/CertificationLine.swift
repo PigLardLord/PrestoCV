@@ -159,9 +159,10 @@ struct CertificationLine {
 
     /// Whether the layout places the line under the certification's title: in the same column of the same page, and
     /// either indented from the name or in a smaller size than the name. Only a title's line that starts with the name
-    /// tells where the name stands, and only the text of that line's first cell tells where and how large: a date beside
-    /// the name in a larger size makes the line larger, not the name, and an icon before it starts the line, not the
-    /// name. Where the title's cells cannot be told one by one, the layout places nothing.
+    /// tells where the name stands, and only the main text of that line's first cell tells where and how large: a date
+    /// beside the name in a larger size makes the line larger, not the name, an icon before it starts the line, not the
+    /// name, and a small marker beside it is neither the name's size nor its edge. Where the title's cells cannot be told
+    /// one by one, or the name's cell holds as many letters in two sizes, the layout places nothing.
     private func isLaidOutUnder(_ open: OpenCertification) -> Bool {
         guard open.startsWithTheName, let frame = block.frame, let size = block.fontSize, let name = open.title.firstCellLook,
               block.page == open.title.page, block.column == open.title.column else { return false }

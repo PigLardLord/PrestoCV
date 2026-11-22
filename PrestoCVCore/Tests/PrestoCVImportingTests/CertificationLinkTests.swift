@@ -762,6 +762,145 @@ struct CertificationLinkTests {
         #expect(Coverage.lost(result).isEmpty)
     }
 
+    /// The places of a small letter marker in the name's cell: raised just after the name, which ends at x 124.66 in each
+    /// language here, or just before it; and the name the reader then reads.
+    private func markers(around title: String) -> [(x: Double, y: Double, name: String)] {
+        [(127, 189, "\(title) a"), (38, 191, "a \(title)")]
+    }
+
+    @Test("In a PDF, a small marker in the name's cell tells nothing of the name's size or edge: a regular line under the name, as large and 4 points in, is a certification of its own", arguments: [
+        ("First Certificate", "Swift Basics"), ("Erstes Zertifikat", "Swift-Grundlagen"), ("Primo Certificato", "Fondamenti di Swift"),
+    ])
+    func lineUnderANameWithASmallMarker(title: String, next: String) async throws {
+        for marker in markers(around: title) {
+            for titleBold in [false, true] {
+                let result = try await importedPDF { sketch in
+                    putSummary(&sketch)
+                    sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+                    sketch.put(title, x: 46, y: 190, size: 9.5, bold: titleBold)
+                    sketch.put("a", x: marker.x, y: marker.y, size: 6, bold: titleBold)
+                    sketch.put("2023", x: 480, y: 187.5, size: 12)
+                    sketch.put(next, x: 50, y: 204, size: 9.5)
+                }
+                let layout = "\(marker.name), bold \(titleBold)"
+                #expect(result.cv.certifications.map(\.name.value) == [marker.name, next], "\(layout): 4 points in is less than half the name's size")
+                #expect(result.cv.certifications.map { $0.year?.value } == [2023, nil], "\(layout)")
+                #expect(result.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil }, "\(layout)")
+                #expect(result.unplaced.isEmpty, "\(layout)")
+                #expect(result.ungrounded.isEmpty)
+                #expect(Coverage.lost(result).isEmpty, "\(layout)")
+            }
+        }
+    }
+
+    @Test("In a PDF, a small marker in the name's cell leaves the name's size and edge: a line under it, smaller than the name or indented from it, is its description", arguments: [
+        ("First Certificate", "Introduction to machine learning."), ("Erstes Zertifikat", "Einführung in das maschinelle Lernen."),
+        ("Primo Certificato", "Introduzione al machine learning."),
+    ])
+    func lineUnderANameWithASmallMarkerIsItsDescription(title: String, line: String) async throws {
+        for marker in markers(around: title) {
+            for (indent, size) in [(6.0, 9.5), (0.0, 8.0)] {
+                let result = try await importedPDF { sketch in
+                    putSummary(&sketch)
+                    sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+                    sketch.put(title, x: 46, y: 190, size: 9.5, bold: true)
+                    sketch.put("a", x: marker.x, y: marker.y, size: 6, bold: true)
+                    sketch.put("2023", x: 480, y: 187.5, size: 12)
+                    sketch.put(line, x: 46 + indent, y: 204, size: size)
+                }
+                let layout = "\(marker.name), indent \(indent), size \(size)"
+                #expect(result.cv.certifications.map(\.name.value) == [marker.name], "\(layout): the layout places the line under the name")
+                #expect(result.cv.certifications.first?.description?.value == line, "\(layout)")
+                #expect(result.cv.certifications.first?.check == nil, "\(layout): the layout, not only the words, placed it")
+                #expect(result.unplaced.isEmpty, "\(layout)")
+                #expect(result.ungrounded.isEmpty)
+            }
+        }
+    }
+
+    @Test("In a PDF, a name whose two sizes hold as many letters tells neither its size nor its edge: a regular line under it, indented or smaller, is a certification of its own", arguments: [
+        ("Cloud", "Award", "Swift Basics"), ("Cloud", "Preis", "Swift-Grundlagen"), ("Corso", "Cloud", "Fondamenti di Swift"),
+    ])
+    func lineUnderANameInTwoEqualSizes(first: String, second: String, next: String) async throws {
+        // Five letters in each size, on one baseline, the larger word first or the smaller one
+        let orders: [(first: (x: Double, y: Double, size: Double), second: (x: Double, y: Double, size: Double))] = [
+            ((46, 190, 9.5), (72.5, 194.2, 6)), ((46, 194.2, 6), (63.75, 190, 9.5)),
+        ]
+        for order in orders {
+            for (indent, size) in [(6.0, 9.5), (0.0, 8.0)] {
+                let result = try await importedPDF { sketch in
+                    putSummary(&sketch)
+                    sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+                    sketch.put(first, x: order.first.x, y: order.first.y, size: order.first.size)
+                    sketch.put(second, x: order.second.x, y: order.second.y, size: order.second.size)
+                    sketch.put("2023", x: 480, y: 187.5, size: 12)
+                    sketch.put(next, x: 46 + indent, y: 204, size: size)
+                }
+                let layout = "first in \(order.first.size), indent \(indent), size \(size)"
+                #expect(result.cv.certifications.map(\.name.value) == ["\(first) \(second)", next], "\(layout): neither size is the name's, so the layout places nothing")
+                #expect(result.cv.certifications.map { $0.year?.value } == [2023, nil], "\(layout)")
+                #expect(result.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil }, "\(layout)")
+                #expect(result.unplaced.isEmpty, "\(layout)")
+                #expect(result.ungrounded.isEmpty, "\(layout)")
+                #expect(Coverage.lost(result).isEmpty, "\(layout)")
+            }
+        }
+    }
+
+    /// A PDF whose certification's name runs over two lines, the column's widest first, so that the second line is where
+    /// the name wrapped; with its year on the first line, its issuer on the second and `under` below them.
+    private func importedWithAWrappedName(_ name: String, issuer: String, issuerSize: Double, marker: Bool,
+                                          under: String, indent: Double, size: Double) async throws -> ImportResult {
+        try await importedPDF { sketch in
+            sketch.put("Certifications", x: 46, y: 130, size: 11, bold: true)
+            sketch.put("\(name), 2023,", x: 46, y: 150, size: 9.5)
+            sketch.put(issuer, x: 46, y: 164, size: issuerSize)
+            if marker {
+                // Raised, just after the issuer, which ends at x 124.66 in each language here
+                sketch.put("a", x: 127, y: 163, size: 6)
+            }
+            sketch.put(under, x: 46 + indent, y: 178, size: size)
+        }
+    }
+
+    @Test("In a PDF, a name wrapped onto a line in its own size keeps its size and edge, a small marker there included: a regular line under it 4 points in is a certification of its own, a smaller one its description", arguments: [
+        ("Professional Certificate in Cloud Architecture and Secure Systems Design", "Northwind Academy", "Swift Basics", "Introduction to machine learning."),
+        ("Professionelles Zertifikat für Cloud-Architektur und sicheres Systemdesign", "Beispiel Akademie", "Swift-Grundlagen", "Einführung in das maschinelle Lernen."),
+        ("Certificato professionale in architettura cloud e progettazione di sistemi sicuri", "Accademia Esempio", "Fondamenti di Swift", "Introduzione al machine learning."),
+    ])
+    func lineUnderAWrappedName(name: String, issuer: String, next: String, line: String) async throws {
+        let entry = try await importedWithAWrappedName(name, issuer: issuer, issuerSize: 9.5, marker: true, under: next, indent: 4, size: 9.5)
+        #expect(entry.cv.certifications.map(\.name.value) == [name, next], "4 points in is less than half the name's size")
+        #expect(entry.cv.certifications.map { $0.issuer?.value } == ["\(issuer) a", nil])
+        #expect(entry.cv.certifications.map { $0.year?.value } == [2023, nil])
+        #expect(entry.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil })
+        #expect(entry.unplaced.isEmpty)
+        #expect(Coverage.lost(entry).isEmpty)
+
+        let detail = try await importedWithAWrappedName(name, issuer: issuer, issuerSize: 9.5, marker: true, under: line, indent: 0, size: 8)
+        #expect(detail.cv.certifications.map(\.name.value) == [name], "the layout places a smaller line under the name")
+        #expect(detail.cv.certifications.first?.description?.value == line)
+        #expect(detail.cv.certifications.first?.check == nil, "the layout, not only the words, placed it")
+        #expect(detail.unplaced.isEmpty)
+        #expect(detail.ungrounded.isEmpty)
+    }
+
+    @Test("In a PDF, a name wrapped onto a line in another size tells neither its size nor its edge: a regular line under it, as large as that line, is a certification of its own", arguments: [
+        ("Professional Certificate in Cloud Architecture and Secure Systems Design", "Northwind Academy", "Swift Basics"),
+        ("Professionelles Zertifikat für Cloud-Architektur und sicheres Systemdesign", "Beispiel Akademie", "Swift-Grundlagen"),
+        ("Certificato professionale in architettura cloud e progettazione di sistemi sicuri", "Accademia Esempio", "Fondamenti di Swift"),
+    ])
+    func lineUnderANameWrappedInAnotherSize(name: String, issuer: String, next: String) async throws {
+        let result = try await importedWithAWrappedName(name, issuer: issuer, issuerSize: 8, marker: false, under: next, indent: 0, size: 8)
+        #expect(result.cv.certifications.map(\.name.value) == [name, next], "neither size is the name's, so the layout places nothing")
+        #expect(result.cv.certifications.map { $0.issuer?.value } == [issuer, nil])
+        #expect(result.cv.certifications.map { $0.year?.value } == [2023, nil])
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
+    }
+
     @Test("A sentence with commas under a certification is its description: a comma before words in lower case names no issuer", arguments: [
         "Covers Swift, testing and deployment.", "Behandelt Swift, das Testen und die Auslieferung.", "Tratta Swift, i test e il rilascio.",
     ])
