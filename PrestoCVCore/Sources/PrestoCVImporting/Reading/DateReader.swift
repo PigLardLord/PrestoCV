@@ -147,15 +147,47 @@ enum DateReader {
     }
 
     /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
+    /// A range beside a percent sign, a currency or a rate ("3.50–4.50%", "10.50–12.50 €/hour") is a range of numbers.
     private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
-        guard !followsNumber(index, in: tokens), let (first, firstEnd) = shortDate(at: index, in: tokens), let next = connector(after: firstEnd, in: tokens) else { return nil }
+        guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
+              let (first, firstEnd) = shortDate(at: index, in: tokens),
+              let next = connector(after: firstEnd, in: tokens) else { return nil }
         if let (second, secondEnd) = rangeEnd(at: next, in: tokens),
-           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
+           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0), !isUnit(after: secondEnd, in: tokens) {
             return (ImportedPeriod(start: first, end: .date(second)), secondEnd)
         }
         guard let currentEnd = currentWords(at: next, in: tokens) else { return nil }
         return (ImportedPeriod(start: first, end: .current), currentEnd)
     }
+
+    /// A number unit right before the token: a currency sign or code.
+    private static func isUnit(before index: Int, in tokens: [Token]) -> Bool {
+        guard index > 0 else { return false }
+        switch tokens[index - 1].kind {
+        case .mark(let mark): return currencySigns.contains(mark)
+        case .word(let word): return currencyWords.contains(word)
+        case .number: return false
+        }
+    }
+
+    /// A number unit right after the token: a percent sign, a currency, "k", "/h", "/hour", "per hour".
+    private static func isUnit(after index: Int, in tokens: [Token]) -> Bool {
+        var next = index + 1
+        guard next < tokens.count else { return false }
+        if case .mark("/") = tokens[next].kind, !tokens[next].spaced { next += 1 }
+        else if case .word("per") = tokens[next].kind { next += 1 }
+        else if case .mark(let mark) = tokens[next].kind { return mark == "%" || currencySigns.contains(mark) }
+        guard next < tokens.count, case .word(let word) = tokens[next].kind else { return false }
+        return currencyWords.contains(word) || rateWords.contains(word)
+    }
+
+    private static let currencySigns: Set<Character> = ["€", "$", "£", "¥"]
+    private static let currencyWords: Set<String> = [
+        "eur", "euro", "euros", "usd", "chf", "gbp", "dollar", "dollars", "pounds"
+    ]
+    private static let rateWords: Set<String> = [
+        "k", "h", "hr", "hrs", "hour", "hours", "stunde", "ora", "heure", "hora"
+    ]
 
     /// The end date of a range, as a date or a two-digit date, after the words of an expected end ("expected 06/2024").
     private static func rangeEnd(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
@@ -228,12 +260,19 @@ enum DateReader {
     private static func shortDate(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
         guard index < tokens.count, case .number(let month, let monthDigits) = tokens[index].kind, monthDigits <= 2, (1...12).contains(month),
               let (value, digits, end) = numberAfterSeparator(index, in: tokens, separators: ["/", "."]), digits == 2,
+              !(isDot(after: index, in: tokens) && monthDigits == 1),
               numberAfterSeparator(end, in: tokens, separators: ["/", "."]) == nil else { return nil }
         let year = value < twoDigitPivot ? 2000 + value : 1900 + value
         return isYear(year) ? (YearMonth(year: year, month: month), end) : nil
     }
 
+    /// A dot between two numbers can be a decimal point: a month written with one digit before it is no month ("3.50").
+    private static func isDot(after index: Int, in tokens: [Token]) -> Bool {
+        index + 1 < tokens.count && tokens[index + 1].kind == .mark(".")
+    }
+
     /// Two-digit years from 00 up to this are 20xx, the others 19xx. Stated here and nowhere else; no clock is read.
+    /// The reader's year bounds (`isYear`) apply after this mapping, so 30 to 39 give 1930 to 1939 and are not read.
     private static let twoDigitPivot = 30
 
     private static func followsNumber(_ index: Int, in tokens: [Token]) -> Bool {

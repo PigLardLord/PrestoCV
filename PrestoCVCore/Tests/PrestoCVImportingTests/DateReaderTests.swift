@@ -100,6 +100,29 @@ struct DateReaderTests {
         #expect(DateReader.periods(in: text).isEmpty)
     }
 
+    @Test("A two-digit range beside a percentage, a price or a rate is a number range, not dates", arguments: [
+        "3.50–4.50% commission", "03.50–04.50% commission", "10.50–12.50 €/hour", "10.50–12.50 EUR per hour",
+        "10.50-12.50/h", "€10.50–12.50", "$ 10.50 – 12.50", "10.50 – 12.50 CHF", "10.50 – 12.50k",
+        "up to 05/20 – 07/30 %",
+        "3.50 – 4.50",
+    ])
+    func shortRangeBesideAUnit(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("The pivot: 29 is 2029, 40 is 1940, and the years 30 to 39 stay outside the reader's bounds", arguments: [
+        ("05/29 – heute", 2029, 5), ("05/40 – 06/41", 1940, 5), ("05/99 – 06/01", 1999, 5),
+    ] as [(String, Int, Int)])
+    func pivotBoundaries(text: String, year: Int, month: Int) throws {
+        let (_, period) = try #require(firstPeriod(text))
+        #expect(period.start == ym(year, month))
+    }
+
+    @Test("A two-digit range of the 1930s is no period", arguments: ["08/30 – 06/39", "08/35 – heute", "08/39 – 06/40"])
+    func nineteenThirties(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
     @Test("An expected end is the end of the range, and its word stays in the span", arguments: [
         ("08/2020 – expected 06/2024", 2020, 8, 2024, 6),
         ("08/2020 – voraussichtlich 06/2024", 2020, 8, 2024, 6),
