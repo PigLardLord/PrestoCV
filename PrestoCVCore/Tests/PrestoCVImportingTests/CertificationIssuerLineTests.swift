@@ -319,7 +319,7 @@ struct CertificationIssuerLineTests {
         for var section in sections where section.kind == .certifications {
             let first = section.blocks[0]
             let empty = SourceBlock(index: 99, span: first.span, cells: [], kind: .line, isEmphasized: false, followsGap: false,
-                                    page: nil, frame: nil, column: nil, fontSize: nil)
+                                    page: nil, frame: nil, column: nil, fontSize: nil, firstCellLook: nil)
             section.blocks.insert(empty, at: 1)
             CertificationReader.read(section, into: &findings)
         }

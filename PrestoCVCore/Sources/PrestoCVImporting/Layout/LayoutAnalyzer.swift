@@ -93,6 +93,7 @@ enum LayoutAnalyzer {
             rawLine.firstCellBold = line.cells.first?.isBold ?? false
             rawLine.firstWordWidth = line.cells.first?.words.first?.frame.width
             rawLine.columnRight = rightEdges[entry.column]
+            rawLine.cellLooks = line.cells.map(\.look)
             raw.append(rawLine)
             previous = entry
         }
@@ -113,6 +114,13 @@ enum LayoutAnalyzer {
 
         var text: String { words.map(\.text).joined(separator: " ") }
         var fontSize: Double { words.map(\.fontSize).max() ?? 0 }
+        /// Where the cell's text starts and its smallest size: of its words that hold a letter or a number, so that an
+        /// icon font's glyph or a bullet drawn before them changes neither.
+        var look: SourceBlock.CellLook {
+            let text = words.filter { $0.text.contains { $0.isLetter || $0.isNumber } }
+            let measured = text.isEmpty ? words : text
+            return SourceBlock.CellLook(x: measured[0].frame.x, fontSize: measured.map(\.fontSize).min() ?? 0)
+        }
         var isBold: Bool { words.allSatisfy(\.isBold) }
     }
 

@@ -78,9 +78,9 @@ struct CertificationLine {
     /// 2. With no certification above, any other line is a certification of its own.
     /// 3. A plain line (not bold, with no gap before it and no web address) with none of the separators the reader cuts
     ///    a line at, that names no organisation or school and that the layout places under the title (in the same column,
-    ///    indented from the name or in a smaller size), is that certification's description when the certification has an
-    ///    issuer or a year: a bare name could as well be a heading over the lines under it. The weight of a line is never
-    ///    evidence.
+    ///    indented from the name or in a smaller size than the name, whatever stands beside the name), is that
+    ///    certification's description when the certification has an issuer or a year: a bare name could as well be a
+    ///    heading over the lines under it. The weight of a line is never evidence.
     /// 4. A plain line that reads as one text and as a sentence is that certification's description, when the
     ///    certification's title is no sentence itself. When the layout does not place it under the title, or the reader
     ///    cuts it, only its words did: the person checks the certification ("First Certificate" over "Introduction to
@@ -158,13 +158,14 @@ struct CertificationLine {
     }
 
     /// Whether the layout places the line under the certification's title: in the same column of the same page, and
-    /// either indented or in a smaller size. Only a title's line that starts with the name tells where the name stands,
-    /// and how large it is.
+    /// either indented from the name or in a smaller size than the name. Only a title's line that starts with the name
+    /// tells where the name stands, and only the text of that line's first cell tells where and how large: a date beside
+    /// the name in a larger size makes the line larger, not the name, and an icon before it starts the line, not the
+    /// name. Where the title's cells cannot be told one by one, the layout places nothing.
     private func isLaidOutUnder(_ open: OpenCertification) -> Bool {
-        guard open.startsWithTheName, let frame = block.frame, let titleFrame = open.title.frame,
-              let size = block.fontSize, let titleSize = open.title.fontSize,
+        guard open.startsWithTheName, let frame = block.frame, let size = block.fontSize, let name = open.title.firstCellLook,
               block.page == open.title.page, block.column == open.title.column else { return false }
-        return frame.x - titleFrame.x > 0.5 * titleSize || size < 0.9 * titleSize
+        return frame.x - name.x > 0.5 * name.fontSize || size < 0.9 * name.fontSize
     }
 
     private static func isIssuer(_ text: String) -> Bool {

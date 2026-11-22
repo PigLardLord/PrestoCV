@@ -48,6 +48,14 @@ struct CertificationLinkTests {
         }
     }
 
+    /// A summary of two lines that run across the page, in the body's size: a date at the page's right edge then stands
+    /// in the main column, beside its title, and not in a column of its own.
+    private func putSummary(_ sketch: inout PageSketch) {
+        sketch.put("Summary", x: 46, y: 110, size: 11, bold: true)
+        sketch.put("Developer with eight years of experience building mobile apps for banks, shops and public services", x: 46, y: 128, size: 9.5)
+        sketch.put("Leads small teams, writes clear code and tests, and works closely with designers and product owners", x: 46, y: 142, size: 9.5)
+    }
+
     /// A PDF page with a name and a role at the top, and what `place` puts under them.
     private func importedPDF(_ place: (inout PageSketch) -> Void) async throws -> ImportResult {
         var sketch = PageSketch()
@@ -652,9 +660,7 @@ struct CertificationLinkTests {
     /// the right, on the baseline of the title, one row every `pitch` points.
     private func importedWithADateColumn(_ titles: [String], dateLeft: Bool, dateSize: Double, pitch: Double) async throws -> ImportResult {
         try await importedPDF { sketch in
-            sketch.put("Summary", x: 46, y: 110, size: 11, bold: true)
-            sketch.put("Developer with eight years of experience building mobile apps for banks, shops and public services", x: 46, y: 128, size: 9.5)
-            sketch.put("Leads small teams, writes clear code and tests, and works closely with designers and product owners", x: 46, y: 142, size: 9.5)
+            putSummary(&sketch)
             sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
             for (index, title) in titles.enumerated() {
                 let y = 190 + Double(index) * pitch
@@ -686,6 +692,74 @@ struct CertificationLinkTests {
                 }
             }
         }
+    }
+
+    @Test("In a PDF, a date larger than the name beside it does not make the name larger: a regular line under it, as large and at the same edge, is a certification of its own", arguments: [
+        ("First Certificate", "Swift Basics"), ("Erstes Zertifikat", "Swift-Grundlagen"), ("Primo Certificato", "Fondamenti di Swift"),
+    ])
+    func largerDateIsNotTheNamesSize(title: String, next: String) async throws {
+        for titleBold in [false, true] {
+            let result = try await importedPDF { sketch in
+                sketch.put("Summary", x: 46, y: 110, size: 11, bold: true)
+                sketch.put("Developer with eight years of experience building mobile apps for banks, shops and public services", x: 46, y: 128, size: 9.5)
+                sketch.put("Leads small teams, writes clear code and tests, and works closely with designers and product owners", x: 46, y: 142, size: 9.5)
+                sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+                sketch.put(title, x: 46, y: 190, size: 9.5, bold: titleBold)
+                // The date on the name's baseline, in a larger size: the row's largest font is the date's, not the name's
+                sketch.put("2023", x: 480, y: 187.5, size: 12)
+                sketch.put(next, x: 46, y: 204, size: 9.5)
+            }
+            let layout = "\(title), bold \(titleBold)"
+            #expect(result.cv.certifications.map(\.name.value) == [title, next], "\(layout): as large as the name and at its edge, the line is no detail of it")
+            #expect(result.cv.certifications.map { $0.year?.value } == [2023, nil], "\(layout)")
+            #expect(result.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil }, "\(layout)")
+            #expect(result.unplaced.isEmpty, "\(layout)")
+            #expect(result.ungrounded.isEmpty)
+            #expect(Coverage.lost(result).isEmpty, "\(layout)")
+        }
+    }
+
+    @Test("In a PDF, a date larger than the name beside it leaves the name's size: a line under it, smaller than the name or indented from it, is its description", arguments: [
+        ("First Certificate", "Introduction to machine learning."), ("Erstes Zertifikat", "Einführung in das maschinelle Lernen."),
+        ("Primo Certificato", "Introduzione al machine learning."),
+    ])
+    func lineUnderANameBesideALargerDate(title: String, line: String) async throws {
+        for (indent, size) in [(6.0, 9.5), (0.0, 8.0)] {
+            let result = try await importedPDF { sketch in
+                putSummary(&sketch)
+                sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+                sketch.put(title, x: 46, y: 190, size: 9.5, bold: true)
+                sketch.put("2023", x: 480, y: 187.5, size: 12)
+                sketch.put(line, x: 46 + indent, y: 204, size: size)
+            }
+            let layout = "\(title), indent \(indent), size \(size)"
+            #expect(result.cv.certifications.map(\.name.value) == [title], "\(layout): the layout places the line under the name")
+            #expect(result.cv.certifications.first?.description?.value == line, "\(layout)")
+            #expect(result.cv.certifications.first?.check == nil, "\(layout): the layout, not only the words, placed it")
+            #expect(result.unplaced.isEmpty, "\(layout)")
+            #expect(result.ungrounded.isEmpty)
+        }
+    }
+
+    @Test("In a PDF, an icon before the name tells nothing of where the name stands: a regular line under the name, as large, is a certification of its own", arguments: [
+        ("First Certificate", "Swift Basics"), ("Erstes Zertifikat", "Swift-Grundlagen"), ("Primo Certificato", "Fondamenti di Swift"),
+    ])
+    func lineUnderANameAfterAnIcon(title: String, next: String) async throws {
+        let result = try await importedPDF { sketch in
+            putSummary(&sketch)
+            sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+            // An icon font's glyph, a private-use character the import leaves out, on the left of the name
+            sketch.put("\u{E0BE}", x: 30, y: 190, size: 9.5)
+            sketch.put(title, x: 46, y: 190, size: 9.5, bold: true)
+            sketch.put("2023", x: 480, y: 190, size: 9.5)
+            sketch.put(next, x: 46, y: 204, size: 9.5)
+        }
+        #expect(result.cv.certifications.map(\.name.value) == [title, next], "at the name's edge, the line is not indented from it")
+        #expect(result.cv.certifications.map { $0.year?.value } == [2023, nil])
+        #expect(result.cv.certifications.allSatisfy { $0.description == nil && $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        #expect(result.ungrounded.isEmpty)
+        #expect(Coverage.lost(result).isEmpty)
     }
 
     @Test("A sentence with commas under a certification is its description: a comma before words in lower case names no issuer", arguments: [
