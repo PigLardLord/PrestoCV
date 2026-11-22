@@ -77,8 +77,10 @@ private extension EntryLayout {
             self.anchors = anchors
             var primary = [0], secondary = [0], marked = [0], markedHeads = [0], headsOrMarked = [0]
             var parts: [(primary: Int, secondary: Int, isEmpty: Bool)] = []
-            for line in lines {
-                let segments = EntryReader.segments(of: EntryReader.Draft(head: [line]), kind: kind)
+            let headsAbove = EntryReader.headsAboveDates(lines, anchors: anchors, kind: kind)
+            for (index, line) in lines.enumerated() {
+                let draft = EntryReader.Draft(head: [line], above: headsAbove && index > 0 ? lines[index - 1] : nil)
+                let segments = EntryReader.segments(of: draft, kind: kind)
                 let lineParts = (primary: segments.filter { $0.isMarked && $0.part == .primary }.count,
                                  secondary: segments.filter { $0.isMarked && $0.part == .secondary }.count,
                                  isEmpty: segments.isEmpty)
