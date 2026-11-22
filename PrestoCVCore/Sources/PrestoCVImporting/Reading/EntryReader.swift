@@ -264,22 +264,13 @@ enum EntryReader {
         }
     }
 
-    /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
-    /// piece itself, that reads as an organisation or as a name that is no place ("Freie Schule Frankfurt" holds a city and is an employer). "Teacher for Special Needs, Acme Ltd,
-    /// Leeds" and a title above an employer line keep "for" in the title; "Developer for Acme Ltd | Leeds" has only a place
-    /// besides the connector, so "for" stays a connector.
+    /// Whether another piece, or a part after a comma of the piece itself, already reads as an organisation (a legal form
+    /// or an organisation word). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds"
+    /// and a title above "Acme Ltd" keep "for" in the title. A name no list knows ("Acme") is no evidence either way.
     private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
         let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
         let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
-        return (afterComma + inOthers).contains { canHoldEmployer($0) }
-    }
-
-    private static func canHoldEmployer(_ segment: Segment) -> Bool {
-        switch segment.part {
-        case .secondary: true
-        case .unknown, .location: !hasPlaceShape(segment.piece)
-        case .primary, .address: false
-        }
+        return (afterComma + inOthers).contains { $0.part == .secondary }
     }
 
     /// The pieces of a line without its dates and durations, cut at the strong separators.
@@ -310,6 +301,8 @@ enum EntryReader {
                       let range = piece.text.firstRange(of: connector) else { continue }
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
+                // A weak connector splits only before an organisation ("Developer for Acme Ltd"); "for Special Needs" is a title.
+                if EntryVocabulary.weakConnectors.contains(connector), !EntryVocabulary.isOrganisation(employerHead(employer)) { continue }
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
                 return [Segment(piece: role, part: .primary, isMarked: true)]
@@ -327,6 +320,11 @@ enum EntryReader {
                 + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
         return parts.map { classify($0, kind: kind) }
+    }
+
+    /// The text of an employer up to its first comma: what follows ("Leeds") is a place, not a part of the name.
+    private static func employerHead(_ employer: Piece) -> String {
+        employer.split(by: [", "]).first?.text ?? employer.text
     }
 
     /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the

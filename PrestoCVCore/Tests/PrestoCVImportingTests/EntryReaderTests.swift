@@ -282,6 +282,43 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"])
     }
 
+    @Test("A weak connector inside a title stays whole beside an employer no list knows, in every layout", arguments: [
+        "Teacher for Special Needs", "Lehrer für Grundschule", "Responsabile per le vendite", "Profesor para adultos",
+    ])
+    func weakConnectorBesideAnUnknownEmployer(title: String) {
+        let layouts: [(text: String, place: String?)] = [
+            ("\(title)\nAcme", nil), ("\(title), Acme", nil), ("\(title)\t\tAcme", nil), ("\(title) | Acme", nil),
+            ("\(title), Acme, Leeds", "Leeds"), ("\(title) | Acme | Leeds", "Leeds"), ("\(title)\nAcme, Leeds", "Leeds"),
+        ]
+        for layout in layouts {
+            let found = read("""
+            Experience
+            \(layout.text)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.location?.value } == [layout.place], "\(layout.text)")
+        }
+    }
+
+    @Test("A weak connector before an organisation reads as a connector, with a place after a comma", arguments: [
+        ("Developer for Acme Ltd, Leeds", "Developer", "Acme Ltd", "Leeds"),
+        ("Entwickler für Beispiel GmbH, Berlin", "Entwickler", "Beispiel GmbH", "Berlin"),
+        ("Venditore per Verdi Srl, Roma", "Venditore", "Verdi Srl", "Roma"),
+        ("Profesor para Escuela Ejemplo S.L., Madrid", "Profesor", "Escuela Ejemplo S.L.", "Madrid"),
+    ])
+    func weakConnectorBeforeAnOrganisationWithAPlace(line: String, role: String, employer: String, place: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [place])
+    }
+
     @Test("Parts no word marks follow the section's own order, and the entry is flagged")
     func orderFallback() throws {
         let found = read("""
