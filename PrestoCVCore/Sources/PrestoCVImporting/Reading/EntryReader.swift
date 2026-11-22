@@ -45,9 +45,22 @@ enum EntryReader {
     }
 
     static func read(_ section: Section, kind: Kind, into findings: inout Findings) throws {
-        var lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
+        let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
             .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
-        let table = tableRows(&lines, findings: &findings)
+        for part in tableParts(of: lines, findings: &findings) {
+            switch part {
+            case .columns(let rows):
+                readLabelled(rows, section: section, kind: kind, into: &findings)
+            case .ordinary(let ordinary, let isDoubtful):
+                try readOrdinary(ordinary, isDoubtful: isDoubtful, section: section, kind: kind, into: &findings)
+            }
+        }
+    }
+
+    /// The lines that are not a table's mapped rows, read by their dates, or by their labels where a Europass has them.
+    /// The entries read from rows a table's header does not explain are marked for the person to check.
+    private static func readOrdinary(_ lines: [Line], isDoubtful: Bool, section: Section, kind: Kind,
+                                     into findings: inout Findings) throws {
         for line in lines where line.isDurationOnly {
             findings.leaveOut(line.block, .computedDuration)
         }
@@ -56,7 +69,7 @@ enum EntryReader {
         }
         let labelled = lines.filter { $0.label != nil }.count
         let before = (findings.cv.experience.count, findings.cv.education.count)
-        defer { if table == .unnamedColumns { flagColumnsByOrder(before, kind: kind, into: &findings) } }
+        defer { if isDoubtful { flagColumnsByOrder(before, kind: kind, into: &findings) } }
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
@@ -533,20 +546,55 @@ enum EntryReader {
 
     // MARK: Tables
 
-    enum TableReading { case none, namedColumns, unnamedColumns }
+    /// A part of a section, read on its own: the rows of one table whose header names the columns, or everything else.
+    enum TablePart {
+        case columns([Line])
+        /// The lines read by their dates; `true` where they are rows of a table the header does not explain.
+        case ordinary([Line], Bool)
+    }
 
-    /// A Markdown table's header row is markup, never data. Where it names the columns, each cell of a row becomes a
-    /// labelled line, the first one opening an entry; otherwise the rows are read as before and flagged.
-    private static func tableRows(_ lines: inout [Line], findings: inout Findings) -> TableReading {
-        guard let head = lines.firstIndex(where: { $0.block.kind == .tableHeader }) else { return .none }
-        let header = lines.remove(at: head)
-        findings.leaveOut(header.block, .markup)
-        let names = header.cells.map { EntryVocabulary.entryLabel($0.text) }
-        guard names.contains(where: { $0 != nil }) else { return .unnamedColumns }
-        var rows: [Line] = []
-        for line in lines[head...] {
-            guard line.cells.count == names.count else { rows.append(line); continue }
+    /// Cuts a section's lines into its tables and the lines between them. A Markdown table's header row is markup,
+    /// never data, and each table is read by its own header: a row ends the table when it does not follow the one
+    /// before without a gap, or has a single cell. Where the header names the columns, each cell of a row with as many
+    /// cells becomes a labelled line, the first one opening an entry. Any other row, and the rows of a table with no
+    /// known column name, are read by their dates like the rest of the section and are flagged.
+    private static func tableParts(of lines: [Line], findings: inout Findings) -> [TablePart] {
+        var result: [TablePart] = []
+        func add(_ line: Line, isDoubtful: Bool) {
+            if case .ordinary(let held, let flag)? = result.last, flag == isDoubtful {
+                result[result.count - 1] = .ordinary(held + [line], flag)
+            } else {
+                result.append(.ordinary([line], isDoubtful))
+            }
+        }
+        var names: [EntryVocabulary.EntryLabel?] = []
+        var inTable = false
+        var previous = -1
+        var table = 0
+        var rowsOfTable = -1
+        for line in lines {
+            if line.block.kind == .tableHeader {
+                findings.leaveOut(line.block, .markup)
+                names = line.cells.map { EntryVocabulary.entryLabel($0.text) }
+                inTable = true
+                previous = line.block.index
+                table += 1
+                continue
+            }
+            let isRow = inTable && !line.block.followsGap && line.block.index == previous + 1
+                && (line.cells.count > 1 || line.cells.count == names.count)
+            guard isRow else {
+                inTable = false
+                add(line, isDoubtful: false)
+                continue
+            }
+            previous = line.block.index
+            guard names.contains(where: { $0 != nil }), line.cells.count == names.count else {
+                add(line, isDoubtful: true)
+                continue
+            }
             var opened = false
+            var rows: [Line] = []
             for (column, cell) in line.cells.enumerated() where !cell.text.isEmpty {
                 var part = Line(block: line.block, cells: [cell], isBullet: false, isProse: false)
                 part.label = names[column]
@@ -555,9 +603,14 @@ enum EntryReader {
                 opened = true
                 rows.append(part)
             }
+            if case .columns(let held)? = result.last, rowsOfTable == table {
+                result[result.count - 1] = .columns(held + rows)
+            } else {
+                result.append(.columns(rows))
+                rowsOfTable = table
+            }
         }
-        lines = Array(lines[..<head]) + rows
-        return .namedColumns
+        return result
     }
 
     /// The entries read from a table whose columns the vocabulary does not name are marked for the person to check.

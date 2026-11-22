@@ -108,4 +108,188 @@ struct TableHeaderTests {
         #expect(result.cv.experience.allSatisfy { $0.check != nil })
         noLoss(result)
     }
+
+    // MARK: Each table on its own
+
+    @Test("Two tables with different column orders in one section are each read by their own header")
+    func twoTables() throws {
+        let result = try importText("""
+        Experience
+        | Role | Employer | Period |
+        |---|---|---|
+        | Teaching Assistant | Northgate Academy | 2020 – 2022 |
+        | Tutor | Riverside School | 2018 – 2020 |
+
+        | Employer | Role | Period |
+        |---|---|---|
+        | Harbor Systems | Planner | 2015 – 2017 |
+        | Kestrel Cloud | Analyst | 2012 – 2015 |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == ["Teaching Assistant", "Tutor", "Planner", "Analyst"])
+        #expect(jobs.map { $0.employer?.value } == ["Northgate Academy", "Riverside School", "Harbor Systems", "Kestrel Cloud"])
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015, 2012])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
+    @Test("Two tables with no blank line between them: the second header is markup, not an entry")
+    func adjacentTables() throws {
+        let result = try importText("""
+        Experience
+        | Role | Employer | Period |
+        |---|---|---|
+        | Teaching Assistant | Northgate Academy | 2020 – 2022 |
+        | Employer | Role | Period |
+        |---|---|---|
+        | Harbor Systems | Planner | 2015 – 2017 |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == ["Teaching Assistant", "Planner"])
+        #expect(jobs.map { $0.employer?.value } == ["Northgate Academy", "Harbor Systems"])
+        noLoss(result)
+    }
+
+    @Test("A row with fewer cells than the header is read by its dates, opens its own job and is flagged")
+    func shortRow() throws {
+        let result = try importText("""
+        Experience
+        | Period | Employer | Role | Tasks |
+        |---|---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant | Supported pupils |
+        | Tutor | Riverside School | 2018 – 2020 |
+        | 2015 – 2017 | Harbor Systems | Planner | Drew up plans |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 3)
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015])
+        #expect(jobs.map { $0.role?.value } == ["Teaching Assistant", "Tutor", "Planner"])
+        #expect(jobs.map { $0.employer?.value } == ["Northgate Academy", "Riverside School", "Harbor Systems"])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Supported pupils"], [], ["Drew up plans"]])
+        #expect(jobs.map { $0.check == nil } == [true, false, true])
+        noLoss(result)
+    }
+
+    @Test("A row with more cells than the header keeps every cell and is flagged")
+    func longRow() throws {
+        let result = try importText("""
+        Experience
+        | Period | Employer | Role |
+        |---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant |
+        | 2018 – 2020 | Riverside School | Tutor | Part time |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 2)
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018])
+        #expect(jobs.first?.check == nil)
+        #expect(jobs.last?.check != nil)
+        let last = jobs.last
+        let kept = (last?.details.map(\.value) ?? []) + result.unplaced.map(\.text) + [last?.role?.value, last?.employer?.value, last?.location?.value].compactMap { $0 }
+        #expect(kept.contains { $0.contains("Part time") })
+        noLoss(result)
+    }
+
+    @Test("Plain dated entries before and after a table keep their own boundaries")
+    func plainEntriesAround() throws {
+        let result = try importText("""
+        Experience
+        Analyst at Kestrel Cloud, 2012 – 2015
+        - Built reports
+
+        | Period | Employer | Role |
+        |---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant |
+
+        Planner at Harbor Systems, 2015 – 2017
+        - Drew up plans
+        Tutor at Riverside School, 2018 – 2020
+        - Ran workshops
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == ["Analyst", "Teaching Assistant", "Planner", "Tutor"])
+        #expect(jobs.map { $0.employer?.value } == ["Kestrel Cloud", "Northgate Academy", "Harbor Systems", "Riverside School"])
+        #expect(jobs.map { $0.period?.value.start.year } == [2012, 2020, 2015, 2018])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Built reports"], [], ["Drew up plans"], ["Ran workshops"]])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        noLoss(result)
+    }
+
+    @Test("A plain dated entry right under a table, with no blank line, is not a row of it")
+    func plainEntryUnderTable() throws {
+        let result = try importText("""
+        Experience
+        | Period | Employer | Role |
+        |---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant |
+        Planner at Harbor Systems, 2015 – 2017
+        - Drew up plans
+        Tutor at Riverside School, 2018 – 2020
+        - Ran workshops
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == ["Teaching Assistant", "Planner", "Tutor"])
+        #expect(jobs.map { $0.details.map(\.value) } == [[], ["Drew up plans"], ["Ran workshops"]])
+        noLoss(result)
+    }
+
+    @Test("A section with no table reads its entries by their dates")
+    func noTable() throws {
+        let result = try importText("""
+        Experience
+        Planner at Harbor Systems, 2015 – 2017
+        - Drew up plans
+        Tutor at Riverside School, 2018 – 2020
+        - Ran workshops
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == ["Planner", "Tutor"])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Drew up plans"], ["Ran workshops"]])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        noLoss(result)
+    }
+
+    @Test("A table whose header has no known word flags only its own rows, not the entries around it")
+    func unknownHeaderAmongPlainEntries() throws {
+        let result = try importText("""
+        Experience
+        Analyst at Kestrel Cloud, 2012 – 2015
+        - Built reports
+
+        | Alpha | Beta | Gamma |
+        |---|---|---|
+        | Teaching Assistant | Northgate Academy | 2020 – 2022 |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 2)
+        #expect(jobs.first?.check == nil)
+        #expect(jobs.last?.check != nil)
+        noLoss(result)
+    }
+
+    // MARK: Header words in each language
+
+    @Test("The header words of each language", arguments: [
+        ("Esperienza", "| Periodo | Datore di lavoro | Ruolo |", "Tecnico", "Esempio Impianti"),
+        ("Experiencia", "| Fechas | Empleador | Puesto |", "Técnico", "Ejemplo Industrias"),
+        ("Expérience", "| Dates | Employeur | Poste |", "Technicien", "Exemple Industrie"),
+        ("Experiência", "| Datas | Empregador | Cargo |", "Técnico", "Exemplo Indústria"),
+        ("Berufserfahrung", "| Zeitraum | Arbeitgeber | Rolle |", "Monteur", "Muster Technik"),
+        ("Experience", "| Dates | Employer | Role |", "Technician", "Sample Works"),
+    ])
+    func languages(_ heading: String, _ header: String, _ role: String, _ employer: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|
+        | 2020 – 2022 | \(employer) | \(role) |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == [role])
+        #expect(jobs.map { $0.employer?.value } == [employer])
+        #expect(jobs.map { $0.period?.value.start.year } == [2020])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        noLoss(result)
+    }
 }
