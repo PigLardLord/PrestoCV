@@ -478,12 +478,13 @@ enum HeaderReader {
             let position = reading.index == first ? 2 : 0
             return mark + title + position - (Places.isPlaceOnly(reading.name.text) ? 3 : 0) - (isTitleAboveAName(reading) ? 3 : 0)
         }
-        // A role above a line with the shape of a name that no list doubts is that name's title ("Web Developer / Anna Weber")
+        // A role above a line with the shape of a name that no list doubts is that name's title ("Web Developer / Anna Weber"),
+        // when the role line holds evidence of a title: a role word that is never a surname, or a qualified role. A role word
+        // that may be a surname ("Anna Planner / Community Outreach") is no such evidence, and the first line stays the name.
         func isTitleAboveAName(_ reading: NameReading) -> Bool {
-            guard reading.doubt > 0, EntryVocabulary.isRole(reading.name.text), indices.contains(reading.index + 1),
+            guard reading.doubt > 0, EntryVocabulary.hasTitleEvidence(reading.name.text), indices.contains(reading.index + 1),
                   candidates[reading.index + 1].section == candidates[reading.index].section,
-                  candidates[reading.index + 1].block.index == candidates[reading.index].block.index + 1,
-                  !(reading.name.words.last.map { surnamesOfATrade.contains($0.folded) } ?? false) else { return false }
+                  candidates[reading.index + 1].block.index == candidates[reading.index].block.index + 1 else { return false }
             return readings.first { $0.index == reading.index + 1 }.map { $0.doubt == 0 } ?? false
         }
         let best = readings.max { (evidence($0), -$0.doubt, -$0.index) < (evidence($1), -$1.doubt, -$1.index) }
@@ -548,9 +549,6 @@ enum HeaderReader {
     }
 
     private static let listWeight = 2
-
-    /// Role words that are also surnames ("Rebecca Cook"): a line ending in one is not told from a name by its words.
-    private static let surnamesOfATrade: Set<String> = ["cook", "driver", "writer", "clerk", "tutor"]
 
     /// The credentials of a name given under the label of a name stay visible as text not imported.
     private static func withoutCredentials(_ values: [Piece], in section: Section, into findings: inout Findings) -> [Piece] {

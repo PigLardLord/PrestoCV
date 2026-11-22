@@ -12,6 +12,32 @@ enum EntryVocabulary {
         }
     }
 
+    /// Whether a line holds evidence that it is a job title and not a person's name: a word that is only ever a role
+    /// (never a surname), or a role word with a qualifier beside it ("City Planner", "Junior Cook"). A role word that is
+    /// also a surname ("Planner", "Cook", "Koch") is no evidence alone: "Anna Planner" is a name.
+    static func hasTitleEvidence(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        if words.contains(where: { titleOnlyWords.contains($0) || roleStems.contains(where: $0.hasPrefix) }) { return true }
+        if words.contains(where: { word in roleSuffixes.contains { word.hasSuffix($0) && word.count > $0.count + 2 } }) { return true }
+        return words.count > 1 && isRole(text) && words.contains { titleQualifiers.contains($0) }
+    }
+
+    private static let titleOnlyWords: Set<String> = Set([
+        "developer", "engineer", "manager", "nurse", "consultant", "assistant", "designer", "analyst", "intern", "trainee",
+        "teacher", "coordinator", "specialist", "technician", "administrator", "accountant", "architect", "programmer",
+        "scientist", "researcher", "supervisor", "receptionist", "paramedic", "pharmacist", "therapist", "apprentice",
+        "freelancer", "ceo", "cto", "cfo", "coo", "sviluppatore", "sviluppatrice", "ingegnere", "infermiere", "infermiera",
+        "consulente", "analista", "stagista", "progettista", "programmatore", "programmatrice", "entwickler", "entwicklerin",
+        "ingenieur", "berater", "beraterin", "projektleiter", "projektleiterin", "desarrollador", "desarrolladora",
+        "développeur", "développeuse", "desenvolvedor", "desenvolvedora", "gerente", "especialista", "spécialiste",
+    ].map(\.folded))
+
+    /// Words that qualify a role in a title and are not what a first name is: seniority, a field or a place of work.
+    private static let titleQualifiers: Set<String> = Set([
+        "senior", "junior", "lead", "chief", "principal", "head", "staff", "city", "urban", "regional", "web", "mobile",
+        "software", "data", "cloud", "project", "product", "sales", "digital", "site", "assistant", "associate",
+    ].map(\.folded))
+
     private static let roleWords: Set<String> = Set([
         "developer", "engineer", "manager", "nurse", "consultant", "assistant", "designer", "analyst", "intern", "trainee", "teacher",
         "lead", "head", "director", "coordinator", "specialist", "technician", "electrician", "accountant", "architect", "officer",

@@ -212,4 +212,43 @@ struct LabelledDetailTests {
         #expect(found.cv.person.title?.value != label, "\(String(describing: found.cv.person.name?.value)) / \(String(describing: found.cv.person.title?.value))")
         #expect(found.cv.person.title == nil || found.cv.person.title?.value == value)
     }
+
+    @Test("A title above the name reads as the title when it holds a word only a role can be, or a qualified role", arguments: [
+        ("Senior Planner", "Anna Weber", "Email"), ("Junior Cook", "Anna Weber", "Email"), ("Data Engineer", "Marco Rossi", "Email"),
+        ("Pflegefachkraft", "Lena Fischer", "E-Mail")
+    ])
+    func qualifiedTitleAboveTheName(title: String, name: String, label: String) {
+        let found = header("""
+        \(title)
+        \(name)
+        \(label): person@example.com
+        """)
+        #expect(found.cv.person.name?.value == name)
+        #expect(found.cv.person.title?.value == title)
+    }
+
+    @Test("A name that holds a trade word keeps the name when the line under it is not a name", arguments: [
+        ("Anna Planner", "Community Outreach"), ("Anna Carpenter", "Community Outreach"), ("Anna Koch", "Community Outreach"),
+        ("Mark Mason", "Site Supervisor"), ("Lena Fischer", "Projektleiterin"), ("Anna Weber", "Web Developer"),
+        ("Anna Cook", "Community Outreach"), ("Anna Writer", "Policy Advisor")
+    ])
+    func nameAboveTheTitle(name: String, title: String) {
+        let found = header("""
+        \(name)
+        \(title)
+        Email: person@example.com
+        """)
+        #expect(found.cv.person.name?.value == name)
+        #expect(found.cv.person.title?.value == title)
+    }
+
+    @Test("A name with a trade word and no title line stays the name, with no title")
+    func nameWithATradeWordAlone() {
+        let found = header("""
+        Anna Planner
+        Email: person@example.com
+        """)
+        #expect(found.cv.person.name?.value == "Anna Planner")
+        #expect(found.cv.person.title == nil)
+    }
 }
