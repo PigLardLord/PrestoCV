@@ -31,7 +31,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 [ -f "$APP/PrivacyInfo.xcprivacy" ] || fail "no privacy manifest in the app bundle"
 
 # The privacy manifest the archive ships is read, not only found. The two are compared as property lists (both converted
-# to JSON by plutil), so that the format and the order of the keys do not matter.
+# to JSON by plutil with sorted keys), so that the format and the order of the keys do not matter.
 MANIFEST="$APP/PrivacyInfo.xcprivacy"
 SOURCE_MANIFEST="$ROOT/PrestoCV/PrivacyInfo.xcprivacy"
 [ -f "$SOURCE_MANIFEST" ] || fail "no source privacy manifest at PrestoCV/PrivacyInfo.xcprivacy"
@@ -46,8 +46,11 @@ no_entries() {
 }
 no_entries NSPrivacyTrackingDomains || fail "the privacy manifest lists tracking domains"
 no_entries NSPrivacyCollectedDataTypes || fail "the privacy manifest declares collected data types"
-[ "$(plutil -convert json -o - "$MANIFEST")" = "$(plutil -convert json -o - "$SOURCE_MANIFEST")" ] \
-  || fail "the privacy manifest differs from the source manifest PrestoCV/PrivacyInfo.xcprivacy"
+# -r sorts the keys of every dictionary, so that the order of the keys in the file does not matter (without it plutil
+# lists them in an order that depends on the file). Each conversion is checked on its own.
+manifest_json="$(plutil -convert json -r -o - "$MANIFEST" 2>/dev/null)" || fail "the privacy manifest cannot be converted to JSON"
+source_json="$(plutil -convert json -r -o - "$SOURCE_MANIFEST" 2>/dev/null)" || fail "the source privacy manifest cannot be converted to JSON"
+[ "$manifest_json" = "$source_json" ] || fail "the privacy manifest differs from the source manifest PrestoCV/PrivacyInfo.xcprivacy"
 [ -n "$(read_key CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] || fail "no app icon"
 
 # The document type's contract. ReleaseHygieneTests (infoPlistOpensPDFs, pdfsAreCopied, infoPlistDeclaresNoTypes) reads typed values (an array of dictionaries, a Bool), and PlistBuddy

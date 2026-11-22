@@ -152,6 +152,39 @@ check_manifest "a manifest of plain text" "$NOT_PLIST" "$WORK/text.xcprivacy"
 head -c 120 "$SOURCE_MANIFEST" > "$WORK/cut.xcprivacy"
 check_manifest "a manifest cut short" "$NOT_PLIST" "$WORK/cut.xcprivacy"
 
+# The order of the keys is not a difference, in XML or in a binary property list, at the top level or in a nested
+# dictionary. The real manifest cannot show it (plutil lists its few keys in the same order whatever the file says), so
+# the check runs from a copy of the tree whose source manifest is a small property list with a nested dictionary, which
+# plutil lists in the order of the file unless it is asked to sort. The archive carries the same list with its keys in
+# another order, or with a value changed.
+TREE="$WORK/tree"
+mkdir -p "$TREE/Tools/Release" "$TREE/PrestoCV"
+cp "$CHECK" "$TREE/Tools/Release/check-archive.sh"
+keyed() { # keyed <the top-level keys> <the keys of the nested dictionary b>
+  printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyTracking</key><false/>'
+  printf '%s</dict></plist>\n' "${1//@NESTED@/<key>b</key><dict>$2</dict>}"
+}
+KEY_A='<key>a</key><integer>1</integer>'
+KEY_X='<key>x</key><integer>1</integer>'
+KEY_Y='<key>y</key><integer>2</integer>'
+keyed "$KEY_A@NESTED@" "$KEY_X$KEY_Y" > "$TREE/PrestoCV/PrivacyInfo.xcprivacy"
+# reorder_case <name> <message, or "" when it must pass> <the top-level keys> <the keys of b> <binary: yes or no>
+reorder_case() {
+  local file="$WORK/keyed-$((count + 1)).xcprivacy"
+  keyed "$3" "$4" > "$file"
+  [ "$5" = yes ] && plutil -convert binary1 "$file"
+  CHECK="$TREE/Tools/Release/check-archive.sh" check_manifest "$1" "$2" "$file"
+}
+for binary in no yes; do
+  as=""; [ "$binary" = yes ] && as=", as binary"
+  reorder_case "the same keys in the same order$as" "" "$KEY_A@NESTED@" "$KEY_X$KEY_Y" "$binary"
+  reorder_case "top-level keys in another order$as" "" "@NESTED@$KEY_A" "$KEY_X$KEY_Y" "$binary"
+  reorder_case "nested keys in another order$as" "" "$KEY_A@NESTED@" "$KEY_Y$KEY_X" "$binary"
+  reorder_case "both in another order$as" "" "@NESTED@$KEY_A" "$KEY_Y$KEY_X" "$binary"
+  reorder_case "another order and a nested value that differs$as" "$DIFFERS" "@NESTED@$KEY_A" "$KEY_Y<key>x</key><integer>9</integer>" "$binary"
+  reorder_case "another order and a top-level value that differs$as" "$DIFFERS" "@NESTED@<key>a</key><integer>2</integer>" "$KEY_Y$KEY_X" "$binary"
+done
+
 manifest_variant "tracking true" "$NOT_FALSE" -replace NSPrivacyTracking -bool YES
 manifest_variant "tracking as the string false" "$NOT_FALSE" -replace NSPrivacyTracking -string false
 manifest_variant "tracking as the number 0" "$NOT_FALSE" -replace NSPrivacyTracking -integer 0
