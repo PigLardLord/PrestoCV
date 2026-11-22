@@ -265,7 +265,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reintentar"
+            "value" : "Intentar de nuevo"
           }
         },
         "fr" : {
@@ -1800,7 +1800,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Entidade emissora"
+            "value" : "Emissor"
           }
         }
       }
@@ -1964,7 +1964,7 @@
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Localidade"
+            "value" : "Localização"
           }
         }
       }
@@ -5472,7 +5472,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Títulos en %@"
+            "value" : "Encabezados en %@"
           }
         },
         "fr" : {
@@ -5554,7 +5554,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elige el idioma de los títulos del PDF."
+            "value" : "Elige el idioma de los encabezados del PDF."
           }
         },
         "fr" : {
@@ -5566,7 +5566,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Scegli la lingua dei titoli nel PDF."
+            "value" : "Scegli la lingua dei titoli del PDF."
           }
         },
         "pt" : {
@@ -5595,7 +5595,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cambiar el idioma de los títulos"
+            "value" : "Cambiar el idioma de los encabezados"
           }
         },
         "fr" : {
@@ -5636,7 +5636,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Idioma de los títulos"
+            "value" : "Idioma de los encabezados"
           }
         },
         "fr" : {
@@ -6775,7 +6775,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reintentar"
+            "value" : "Intentar de nuevo"
           }
         },
         "fr" : {
@@ -6886,7 +6886,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Schreiben Sie Ihren Lebenslauf, bewahren Sie ihn auf Ihrem Gerät auf und exportieren Sie ihn als PDF."
+            "value" : "Schreiben Sie Ihren Lebenslauf, behalten Sie ihn auf Ihrem Gerät und exportieren Sie ihn als PDF."
           }
         },
         "en" : {
@@ -6898,7 +6898,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escribe tu CV, guárdalo en tu dispositivo y expórtalo en PDF."
+            "value" : "Escribe tu CV, guárdalo en tu dispositivo y expórtalo como PDF."
           }
         },
         "fr" : {
@@ -7320,7 +7320,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Elimina il CV"
+            "value" : "Elimina CV"
           }
         },
         "pt" : {
@@ -8150,13 +8150,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Non è stato possibile aprire %lld CV."
+                  "value" : "%lld CV non può essere aperto."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "Non è stato possibile aprire %lld CV."
+                  "value" : "%lld CV non possono essere aperti."
                 }
               }
             }
@@ -8458,7 +8458,7 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rinomina il CV"
+            "value" : "Rinomina CV"
           }
         },
         "pt" : {
@@ -8487,7 +8487,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reintentar"
+            "value" : "Intentar de nuevo"
           }
         },
         "fr" : {
@@ -9799,7 +9799,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reintentar"
+            "value" : "Intentar de nuevo"
           }
         },
         "fr" : {
