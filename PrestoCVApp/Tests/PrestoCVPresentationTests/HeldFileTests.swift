@@ -129,6 +129,74 @@ struct HeldFileTests {
         #expect(world.shell.keptEditors.isEmpty, "a discarded editor is not kept")
     }
 
+    @Test("Discard my edits and import does nothing while a copy is being stored: the question and the file stay")
+    func discardWhileACopyIsStoredChangesNothing() async throws {
+        let world = World()
+        let (_, editor) = try await world.conflictingEditor()
+        world.shell.receive(file: Self.file)
+        await world.editing.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
+        try #require(editor.isReplacing)
+
+        world.shell.discardAndImport()
+
+        #expect(world.shell.question == .keepEditingOrDiscard(.conflict), "the question is still there to answer")
+        #expect(world.shell.editor === editor, "the editor the copy belongs to is not dropped under it")
+        #expect(world.shell.importer == nil)
+        #expect(world.imports.files.received.count == 1)
+        #expect(world.imports.files.recorded.isEmpty, "the file is neither let go nor read: the person has not decided")
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+    }
+
+    @Test("once the copy ended, Discard my edits and import answers the same question, and the file ends once")
+    func discardAfterTheCopyEndedImportsOnce() async throws {
+        let world = World()
+        let (_, editor) = try await world.conflictingEditor()
+        world.shell.receive(file: Self.file)
+        await world.editing.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
+        world.shell.discardAndImport()
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        try #require(!editor.isReplacing)
+        try #require(world.shell.question != nil)
+        let writes = world.editing.editing.writeCount
+
+        world.shell.discardAndImport()
+
+        #expect(world.shell.question == nil)
+        #expect(world.shell.editor == nil)
+        let importer = try #require(world.shell.importer)
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
+        #expect(importer.status == .ready)
+        #expect(world.imports.files.reads == 1)
+        #expect(world.imports.files.problems(ended: true).isEmpty, "the shell's hold and the import's, let go once")
+        await settle()
+        #expect(world.editing.editing.writeCount == writes, "nothing is written after the person discarded")
+    }
+
+    @Test("Keep editing while a copy is being stored lets the file go once and the copy goes on")
+    func keepEditingWhileACopyIsStored() async throws {
+        let world = World()
+        let (_, editor) = try await world.conflictingEditor()
+        world.shell.receive(file: Self.file)
+        await world.editing.editing.duplicateGate.close()
+        let copying = Task { await editor.saveAsCopy() }
+        await waitUntil("the copy to wait at the store") { await world.editing.editing.duplicateGate.waiting == 1 }
+
+        world.shell.keepEditing()
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+
+        #expect(world.shell.question == nil)
+        #expect(world.shell.editor === editor)
+        #expect(world.imports.files.recorded == [.released(Self.file)])
+        #expect(world.imports.files.problems(ended: true).isEmpty)
+    }
+
     @Test("the import holds the file before the shell lets its own hold go, so the copy is never removed under it")
     func theImportHoldsTheFileBeforeTheShellLetsGo() async throws {
         let world = World()

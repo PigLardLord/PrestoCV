@@ -349,9 +349,12 @@ public final class ShellNavigationModel {
     /// The person discards their edits and imports the file held: the editor goes with its text that is not stored, on
     /// the person's word, whatever its status, and nothing is written; the import shows and reads the file. The import
     /// holds the file before the shell lets its own hold go, so its copy is never removed under it. With no question
-    /// asked it does nothing.
+    /// asked it does nothing, and so while a copy of the editor's text runs (`isReplacing`), as `discardEditor()` does:
+    /// the copy would store the text the person meant to drop. The question and the file stay for the person to answer
+    /// once the copy ended.
     public func discardAndImport() {
         guard let held = heldFile else { return }
+        if let editor, editor.isReplacing { return }
         heldFile = nil
         question = nil
         dropEditor()
