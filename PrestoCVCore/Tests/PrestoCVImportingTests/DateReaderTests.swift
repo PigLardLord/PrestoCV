@@ -79,4 +79,40 @@ struct DateReaderTests {
         let periods = DateReader.periods(in: "2012 – 2016 Bachelor, 2016 – 2018 Master")
         #expect(periods.map(\.period.start.year) == [2012, 2016])
     }
+
+    @Test("A two-digit year is read inside a range, with the century rule", arguments: [
+        ("09/19 – 08/21", 2019, 9, ImportedPeriod.End.date(YearMonth(year: 2021, month: 8))),
+        ("08/78-06/82", 1978, 8, .date(YearMonth(year: 1982, month: 6))),
+        ("10/21 – heute", 2021, 10, .current),
+        ("10.21 – 03.23", 2021, 10, .date(YearMonth(year: 2023, month: 3))),
+        ("09/19 – 08/2021", 2019, 9, .date(YearMonth(year: 2021, month: 8))),
+        ("03/2019 – 08/21", 2019, 3, .date(YearMonth(year: 2021, month: 8))),
+        ("11/98 – 02/03", 1998, 11, .date(YearMonth(year: 2003, month: 2))),
+    ] as [(String, Int, Int, ImportedPeriod.End)])
+    func shortYears(text: String, year: Int, month: Int, end: ImportedPeriod.End) throws {
+        let (read, period) = try #require(firstPeriod(text))
+        #expect(read == text)
+        #expect(period == ImportedPeriod(start: ym(year, month), end: end))
+    }
+
+    @Test("A two-digit year alone, or in a full date, is no date", arguments: ["12/96", "Rev 03.21 of the plan", "12.03.26", "Room 5/21"])
+    func shortYearAlone(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("An expected end is the end of the range, and its word stays in the span", arguments: [
+        ("08/2020 – expected 06/2024", 2020, 8, 2024, 6),
+        ("08/2020 – voraussichtlich 06/2024", 2020, 8, 2024, 6),
+        ("08/2020 – previsto 06/2024", 2020, 8, 2024, 6),
+        ("08/2020 – prevista 06/2024", 2020, 8, 2024, 6),
+        ("08/2020 – prévu 06/2024", 2020, 8, 2024, 6),
+        ("08/2020 – esperado 06/2024", 2020, 8, 2024, 6),
+        ("2020 – Expected 2024", 2020, 0, 2024, 0),
+    ] as [(String, Int, Int, Int, Int)])
+    func expectedEnd(text: String, startYear: Int, startMonth: Int, endYear: Int, endMonth: Int) throws {
+        let (read, period) = try #require(firstPeriod(text))
+        #expect(read == text)
+        let end = YearMonth(year: endYear, month: endMonth == 0 ? nil : endMonth)
+        #expect(period == ImportedPeriod(start: ym(startYear, startMonth == 0 ? nil : startMonth), end: .date(end)))
+    }
 }

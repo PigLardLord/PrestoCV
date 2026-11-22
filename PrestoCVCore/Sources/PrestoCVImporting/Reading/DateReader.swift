@@ -122,9 +122,10 @@ enum DateReader {
            date(at: index, in: tokens) == nil {
             return (ImportedPeriod(start: YearMonth(year: end.year, month: month.month), end: .date(end)), endIndex)
         }
+        if let found = shortRange(at: index, in: tokens) { return found }
         guard let (first, firstEnd) = date(at: index, in: tokens) else { return nil }
         if let next = connector(after: firstEnd, in: tokens) {
-            if let (second, secondEnd) = date(at: next, in: tokens) {
+            if let (second, secondEnd) = rangeEnd(at: next, in: tokens) {
                 let ordered = (second.year, second.month ?? 0) >= (first.year, first.month ?? 0)
                 if ordered { return (ImportedPeriod(start: first, end: .date(second)), secondEnd) }
             }
@@ -144,6 +145,28 @@ enum DateReader {
         if quoteStart != start { return period(at: index, in: tokens) }
         return (ImportedPeriod(start: first, end: nil), firstEnd)
     }
+
+    /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
+    private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
+        guard !followsNumber(index, in: tokens), let (first, firstEnd) = shortDate(at: index, in: tokens), let next = connector(after: firstEnd, in: tokens) else { return nil }
+        if let (second, secondEnd) = rangeEnd(at: next, in: tokens),
+           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
+            return (ImportedPeriod(start: first, end: .date(second)), secondEnd)
+        }
+        guard let currentEnd = currentWords(at: next, in: tokens) else { return nil }
+        return (ImportedPeriod(start: first, end: .current), currentEnd)
+    }
+
+    /// The end date of a range, as a date or a two-digit date, after the words of an expected end ("expected 06/2024").
+    private static func rangeEnd(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
+        var start = index
+        if index < tokens.count, case .word(let word) = tokens[index].kind, expectedWords.contains(word) { start += 1 }
+        return date(at: start, in: tokens) ?? shortDate(at: start, in: tokens)
+    }
+
+    private static let expectedWords: Set<String> = [
+        "expected", "voraussichtlich", "previsto", "prevista", "prevu", "prevue", "esperado", "esperada",
+    ].reduce(into: Set<String>()) { $0.insert($1.folded) }
 
     private enum Prefix { case since, from }
 
@@ -199,6 +222,24 @@ enum DateReader {
             return (YearMonth(year: first, month: second), afterSecond)
         }
         return (YearMonth(year: first, month: nil), index)
+    }
+
+    /// A month and a two-digit year, "09/19" or "09.19", that no other number touches.
+    private static func shortDate(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
+        guard index < tokens.count, case .number(let month, let monthDigits) = tokens[index].kind, monthDigits <= 2, (1...12).contains(month),
+              let (value, digits, end) = numberAfterSeparator(index, in: tokens, separators: ["/", "."]), digits == 2,
+              numberAfterSeparator(end, in: tokens, separators: ["/", "."]) == nil else { return nil }
+        let year = value < twoDigitPivot ? 2000 + value : 1900 + value
+        return isYear(year) ? (YearMonth(year: year, month: month), end) : nil
+    }
+
+    /// Two-digit years from 00 up to this are 20xx, the others 19xx. Stated here and nowhere else; no clock is read.
+    private static let twoDigitPivot = 30
+
+    private static func followsNumber(_ index: Int, in tokens: [Token]) -> Bool {
+        guard index >= 2, case .mark(let mark) = tokens[index - 1].kind, ["/", ".", "-"].contains(mark), !tokens[index].spaced else { return false }
+        if case .number = tokens[index - 2].kind { return true }
+        return false
     }
 
     private static func numberAfterSeparator(_ index: Int, in tokens: [Token], separators: Set<Character> = ["/", ".", "-"]) -> (Int, Int, Int)? {
