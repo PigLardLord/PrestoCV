@@ -23,10 +23,10 @@ struct RootView: View {
         case .ready(let composition):
             #if DEBUG
             // A Debug build launched for the UI tests shares through a stand-in they can read
-            ReadyShell(screens: composition.screens)
+            ReadyShell(screens: composition.screens, settings: composition.settings)
                 .environment(\.sharesWithStandIn, composition.sharesWithStandIn)
             #else
-            ReadyShell(screens: composition.screens)
+            ReadyShell(screens: composition.screens, settings: composition.settings)
             #endif
         case .failed(let failure):
             CompositionFailedView(failure: failure, retry: holder.retry)
@@ -41,8 +41,12 @@ private final class ShellModels: ObservableObject {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let settings: SettingsViewModel
+    let licences: LicencesViewModel
 
-    init(screens: ScreenFactory) {
+    init(screens: ScreenFactory, settings factory: SettingsFactory) {
+        settings = factory.makeSettings()
+        licences = factory.makeLicences()
         firstRun = screens.makeFirstRun()
         list = screens.makeCVList(
             untitled: String(localized: "shell.untitled"),
@@ -62,12 +66,15 @@ private final class ShellModels: ObservableObject {
 private struct ReadyShell: View {
     @StateObject private var models: ShellModels
 
-    init(screens: ScreenFactory) {
-        _models = StateObject(wrappedValue: ShellModels(screens: screens))
+    init(screens: ScreenFactory, settings: SettingsFactory) {
+        _models = StateObject(wrappedValue: ShellModels(screens: screens, settings: settings))
     }
 
     var body: some View {
-        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun)
+        ShellView(
+            shell: models.shell, list: models.list, firstRun: models.firstRun, settings: models.settings,
+            licences: models.licences
+        )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
     }
