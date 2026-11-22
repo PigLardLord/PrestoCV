@@ -10,6 +10,10 @@ private let engineer = Experience(role: "Engineer", company: "Analytical")
 private let tutor = Experience(role: "Tutor", company: "Home")
 private let lead = Experience(role: "Lead", company: "Next")                          // typed by the person, never imported
 private let seniorEngineer = Experience(role: "Senior Engineer", company: "Analytical")  // `engineer` with its role edited
+private let acmeEngineer = Experience(role: "Engineer", company: "Acme")             // the two rows below share a company
+private let acmeTutor = Experience(role: "Tutor", company: "Acme")
+private let seniorAcmeTutor = Experience(role: "Senior Tutor", company: "Acme")
+private let seniorAcmeEngineer = Experience(role: "Senior Engineer", company: "Acme")
 private let analyst = Experience(role: "Analyst", company: "Analytical")              // a new row at `engineer`'s company
 
 private func role(_ index: Int) -> ValuePlace { .entry(.experienceRole, index: index) }
@@ -52,6 +56,8 @@ let anchorTable: [AnchorCase] = [
                after: [seniorEngineer, engineer], left: [company(0), role(1), company(1)]),
     AnchorCase(name: "a row copied: neither copy can be told from the other, so both lose their marks", before: [engineer], marks: [role(0), company(0)],
                after: [engineer, engineer], left: []),
+    AnchorCase(name: "two rows swapped and both edited: neither new row can be told from the other's old row, so no mark moves", before: [acmeEngineer, acmeTutor], marks: [company(0)],
+               after: [seniorAcmeTutor, seniorAcmeEngineer], left: []),
     AnchorCase(name: "a new row put first and the last deleted: the new row takes no mark of the row that moved on", before: [engineer, tutor], marks: [role(0), company(0), role(1)],
                after: [analyst, engineer], left: [role(1), company(1)]),
 ]
@@ -148,6 +154,15 @@ struct DraftTests {
         expected[.personal(.summary)] = nil
         #expect(held.draft?.origins == expected)
         #expect(held.draft?.notPlaced == stored.draft?.notPlaced)
+    }
+
+    @Test("holding the content of an editor's copy with two rows swapped and both edited moves no mark to another row")
+    func holdingSwappedAndEdited() throws {
+        let stored = try imported([acmeEngineer, acmeTutor], marks: [company(0)])
+        var sections = stored.sections
+        sections.experiences = [seniorAcmeTutor, seniorAcmeEngineer]
+        let edited = CV(id: stored.id, title: stored.title, personal: stored.personal, sections: sections)
+        #expect(stored.holding(contentOf: edited).draft == nil)
     }
 
     @Test("a duplicate keeps the draft with the content")

@@ -40,8 +40,11 @@ public struct DraftBlock: Hashable, Sendable {
     /// - a section whose rows are all the same keeps its marks;
     /// - a row found among the old rows keeps the marks that every old row equal to it had, unless the edit made
     ///   more rows of that value than there were (a copy: the copies cannot be told from the original);
-    /// - a row with a new value takes the place of the old row at its position only when the number of rows is the
-    ///   same and that old row's value lost a row (an edit in place); it keeps the marks of the values it did not change;
+    /// - a row that matches no old row takes the place of the old row at its position only for an unambiguous edit
+    ///   in place: the section has as many rows as before, that row is the only one matching no old row, and every
+    ///   other row is the old row at the same position (nothing moved, was inserted or deleted); it keeps the marks of
+    ///   the values it did not change. With two or more such rows (two roles edited at once, or one edited and the
+    ///   others swapped) the old row of each cannot be told, so none takes a mark;
     /// - every other mark is dropped.
     func anchored(from old: CVSections, to new: CVSections) -> DraftBlock? {
         var moved: [ValuePlace: ValueOrigin] = [:]
@@ -61,6 +64,9 @@ public struct DraftBlock: Hashable, Sendable {
             }
             let oldRows = Dictionary(grouping: before.indices, by: { before[$0] })
             let newCounts = Dictionary(grouping: after.indices, by: { after[$0] }).mapValues(\.count)
+            let unmatched = after.indices.filter { oldRows[after[$0]] == nil }
+            let editedInPlace = after.count == before.count && unmatched.count == 1
+                && after.indices.allSatisfy { $0 == unmatched[0] || after[$0] == before[$0] }
             for (index, row) in after.enumerated() {
                 for field in fields {
                     if let sources = oldRows[row] {
@@ -68,8 +74,7 @@ public struct DraftBlock: Hashable, Sendable {
                         let found = sources.map { oldMarks(field, $0) }
                         guard let first = found.first, let origin = first, found.allSatisfy({ $0 == origin }) else { continue }
                         moved[.entry(field, index: index)] = origin
-                    } else if after.count == before.count, newCounts[before[index], default: 0] < oldRows[before[index], default: []].count,
-                              field.value(in: old, at: index) == field.value(in: new, at: index) {
+                    } else if editedInPlace, field.value(in: old, at: index) == field.value(in: new, at: index) {
                         moved[.entry(field, index: index)] = oldMarks(field, index)
                     }
                 }
