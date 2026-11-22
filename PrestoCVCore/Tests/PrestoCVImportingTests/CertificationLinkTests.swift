@@ -648,6 +648,46 @@ struct CertificationLinkTests {
         #expect(Coverage.lost(result).isEmpty)
     }
 
+    /// A summary as wide as the page, then certifications whose dates stand in a column of their own, on the left or on
+    /// the right, on the baseline of the title, one row every `pitch` points.
+    private func importedWithADateColumn(_ titles: [String], dateLeft: Bool, dateSize: Double, pitch: Double) async throws -> ImportResult {
+        try await importedPDF { sketch in
+            sketch.put("Summary", x: 46, y: 110, size: 11, bold: true)
+            sketch.put("Developer with eight years of experience building mobile apps for banks, shops and public services", x: 46, y: 128, size: 9.5)
+            sketch.put("Leads small teams, writes clear code and tests, and works closely with designers and product owners", x: 46, y: 142, size: 9.5)
+            sketch.put("Certifications", x: 46, y: 170, size: 11, bold: true)
+            for (index, title) in titles.enumerated() {
+                let y = 190 + Double(index) * pitch
+                sketch.put(title, x: dateLeft ? 90 : 46, y: y, size: 9.5, bold: true)
+                sketch.put("\(2021 + index)", x: dateLeft ? 46 : 480, y: y + 9.5 - dateSize, size: dateSize)
+            }
+        }
+    }
+
+    @Test("In a PDF, a date in a column of its own keeps the row of its title: the next certification set solid under it is a certification of its own", arguments: [
+        ["First Certificate", "Swift Basics", "Advanced Swift"],
+        ["Erstes Zertifikat", "Swift-Grundlagen", "Fortgeschrittenes Swift"],
+        ["Primo Certificato", "Fondamenti di Swift", "Swift Avanzato"],
+    ])
+    func dateColumnKeepsTheRow(titles: [String]) async throws {
+        // Set solid (the rows as far apart as the font is large) and single-spaced, the date as large as the title or
+        // larger: the page analysis joins two rows only when they share half the height of the smaller, drawn on each other
+        for dateLeft in [true, false] {
+            for dateSize in [9.5, 12] {
+                for pitch in [9.5, 11.4] {
+                    let result = try await importedWithADateColumn(titles, dateLeft: dateLeft, dateSize: dateSize, pitch: pitch)
+                    let layout = "date left \(dateLeft), date size \(dateSize), pitch \(pitch)"
+                    #expect(result.cv.certifications.map(\.name.value) == titles, "\(layout)")
+                    #expect(result.cv.certifications.map { $0.year?.value } == [2021, 2022, 2023], "\(layout)")
+                    #expect(result.cv.certifications.allSatisfy { $0.issuer == nil && $0.description == nil && $0.check == nil }, "\(layout)")
+                    #expect(result.unplaced.isEmpty, "\(layout)")
+                    #expect(result.ungrounded.isEmpty)
+                    #expect(Coverage.lost(result).isEmpty, "\(layout)")
+                }
+            }
+        }
+    }
+
     @Test("A sentence with commas under a certification is its description: a comma before words in lower case names no issuer", arguments: [
         "Covers Swift, testing and deployment.", "Behandelt Swift, das Testen und die Auslieferung.", "Tratta Swift, i test e il rilascio.",
     ])
