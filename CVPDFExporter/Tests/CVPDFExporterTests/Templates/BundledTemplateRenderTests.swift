@@ -99,7 +99,7 @@ struct BundledTemplateRenderTests {
                     CVItem(title: Field.firstInterest), CVItem(title: Field.secondInterest),
                 ], order: 6),
                 CVSection(id: CVSection.socialID, type: .custom, title: "Online Profiles", items: [CVItem(
-                    title: Field.platform, subtitle: Field.profileURL, url: Field.profileURL
+                    title: Field.platform, url: Field.profileURL
                 )], order: 7),
             ],
             metadata: DocumentMetadata(language: "en")
