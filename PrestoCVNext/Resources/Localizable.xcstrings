@@ -7255,37 +7255,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Es gibt keinen Text zum Lesen. Fügen Sie den Text Ihres Lebenslaufs ein."
+            "value" : "Es gibt keinen Text zum Lesen. Fügen Sie den Text Ihres Lebenslaufs ein oder wählen Sie ein PDF aus, das Text enthält."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "There is no text to read. Paste the text of your CV."
+            "value" : "There is no text to read. Paste the text of your CV, or choose a PDF that contains text."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No hay texto que leer. Pega el texto de tu CV."
+            "value" : "No hay texto que leer. Pega el texto de tu CV o elige un PDF que contenga texto."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il n’y a pas de texte à lire. Collez le texte de votre CV."
+            "value" : "Il n’y a pas de texte à lire. Collez le texte de votre CV ou choisissez un PDF qui contient du texte."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Non c’è testo da leggere. Incolla il testo del tuo CV."
+            "value" : "Non c’è testo da leggere. Incolla il testo del tuo CV o scegli un PDF che contiene testo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não há texto para ler. Cola o texto do teu CV."
+            "value" : "Não há texto para ler. Cola o texto do teu CV ou escolhe um PDF que contenha texto."
           }
         }
       }
@@ -7378,37 +7378,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieses PDF ist ein Scan und enthält keinen Text zum Lesen. Fügen Sie stattdessen den Text Ihres Lebenslaufs ein."
+            "value" : "Dieses PDF enthält keinen Text zum Lesen. Es ist vielleicht ein Scan oder ein Foto. Fügen Sie stattdessen den Text Ihres Lebenslaufs ein."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This PDF is a scan and has no text to read. Paste the text of your CV instead."
+            "value" : "This PDF has no text to read. It may be a scan or a photo. Paste the text of your CV instead."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este PDF es un escaneo y no tiene texto que leer. Pega en su lugar el texto de tu CV."
+            "value" : "Este PDF no tiene texto que leer. Puede ser un escaneo o una foto. Pega en su lugar el texto de tu CV."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce PDF est un scan et ne contient pas de texte à lire. Collez plutôt le texte de votre CV."
+            "value" : "Ce PDF ne contient pas de texte à lire. C’est peut-être un scan ou une photo. Collez plutôt le texte de votre CV."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo PDF è una scansione e non contiene testo da leggere. Incolla invece il testo del tuo CV."
+            "value" : "Questo PDF non contiene testo da leggere. Forse è una scansione o una foto. Incolla invece il testo del tuo CV."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este PDF é uma digitalização e não tem texto para ler. Cola antes o texto do teu CV."
+            "value" : "Este PDF não tem texto para ler. Pode ser uma digitalização ou uma fotografia. Cola antes o texto do teu CV."
           }
         }
       }
@@ -7501,37 +7501,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Text ist länger als ein Lebenslauf. Fügen Sie nur den Lebenslauf ein."
+            "value" : "Das ist länger als ein Lebenslauf. Fügen Sie nur den Lebenslauf ein oder wählen Sie ein kleineres PDF aus."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This text is longer than a CV. Paste only the CV."
+            "value" : "This is longer than a CV. Paste only the CV, or choose a smaller PDF."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este texto es más largo que un CV. Pega solo el CV."
+            "value" : "Esto es más largo que un CV. Pega solo el CV o elige un PDF más pequeño."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce texte est plus long qu’un CV. Collez seulement le CV."
+            "value" : "C’est plus long qu’un CV. Collez seulement le CV ou choisissez un PDF plus petit."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo testo è più lungo di un CV. Incolla solo il CV."
+            "value" : "Questo è più lungo di un CV. Incolla solo il CV o scegli un PDF più piccolo."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este texto é mais longo do que um CV. Cola só o CV."
+            "value" : "Isto é mais longo do que um CV. Cola só o CV ou escolhe um PDF mais pequeno."
           }
         }
       }
@@ -7583,37 +7583,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dieser Text lässt sich nicht lesen. Fügen Sie den Text Ihres Lebenslaufs noch einmal ein."
+            "value" : "Das lässt sich nicht lesen. Fügen Sie den Text Ihres Lebenslaufs noch einmal ein oder wählen Sie ein anderes PDF aus."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "This text cannot be read. Paste the text of your CV again."
+            "value" : "This cannot be read. Paste the text of your CV again, or choose another PDF."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este texto no se puede leer. Vuelve a pegar el texto de tu CV."
+            "value" : "Esto no se puede leer. Vuelve a pegar el texto de tu CV o elige otro PDF."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce texte ne peut pas être lu. Collez de nouveau le texte de votre CV."
+            "value" : "Ce contenu ne peut pas être lu. Collez de nouveau le texte de votre CV ou choisissez un autre PDF."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Questo testo non si può leggere. Incolla di nuovo il testo del tuo CV."
+            "value" : "Non si può leggere. Incolla di nuovo il testo del tuo CV o scegli un altro PDF."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este texto não pode ser lido. Cola de novo o texto do teu CV."
+            "value" : "Isto não pode ser lido. Cola de novo o texto do teu CV ou escolhe outro PDF."
           }
         }
       }
@@ -7624,37 +7624,201 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fügen Sie den Text Ihres Lebenslaufs ein. PrestoCV liest ihn und bringt jeden Teil an seinen Platz."
+            "value" : "Fügen Sie den Text Ihres Lebenslaufs ein oder wählen Sie ein PDF aus. PrestoCV liest Ihren Lebenslauf und bringt jeden Teil an seinen Platz."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Paste the text of your CV. PrestoCV reads it and puts each part in its place."
+            "value" : "Paste the text of your CV, or choose a PDF. PrestoCV reads it and puts each part in its place."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pega el texto de tu CV. PrestoCV lo lee y pone cada parte en su sitio."
+            "value" : "Pega el texto de tu CV o elige un PDF. PrestoCV lo lee y pone cada parte en su sitio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Collez le texte de votre CV. PrestoCV le lit et range chaque partie à sa place."
+            "value" : "Collez le texte de votre CV ou choisissez un PDF. PrestoCV le lit et range chaque partie à sa place."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Incolla il testo del tuo CV. PrestoCV lo legge e mette ogni parte al suo posto."
+            "value" : "Incolla il testo del tuo CV o scegli un PDF. PrestoCV lo legge e mette ogni parte al suo posto."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cola o texto do teu CV. O PrestoCV lê-o e põe cada parte no seu lugar."
+            "value" : "Cola o texto do teu CV ou escolhe um PDF. O PrestoCV lê-o e põe cada parte no seu lugar."
+          }
+        }
+      }
+    },
+    "import.pdf.button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF auswählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a PDF"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir un PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir un PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli un PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher um PDF"
+          }
+        }
+      }
+    },
+    "import.pdf.button.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet Dateien, um ein PDF Ihres Lebenslaufs auszuwählen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens Files to pick a PDF of your CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Archivos para elegir un PDF de tu CV"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre Fichiers pour choisir un PDF de votre CV"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apre File per scegliere un PDF del tuo CV"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre a app Ficheiros para escolher um PDF do teu CV"
+          }
+        }
+      }
+    },
+    "import.pdf.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein PDF, das Text enthält, etwa eines, das aus einer Textverarbeitung gespeichert wurde. Ein Scan oder ein Foto enthält keinen Text zum Lesen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A PDF that contains text, such as one saved from a word processor. A scan or a photo has no text to read."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF que contenga texto, como uno guardado desde un procesador de textos. Un escaneo o una foto no tiene texto que leer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF qui contient du texte, comme un PDF enregistré depuis un traitement de texte. Un scan ou une photo ne contient pas de texte à lire."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un PDF che contiene testo, come uno salvato da un programma di videoscrittura. Una scansione o una foto non contiene testo da leggere."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um PDF que contenha texto, como um guardado a partir de um processador de texto. Uma digitalização ou uma fotografia não tem texto para ler."
+          }
+        }
+      }
+    },
+    "import.pdf.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oder ein PDF"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or a PDF"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O un PDF"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou un PDF"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oppure un PDF"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou um PDF"
           }
         }
       }
@@ -7952,37 +8116,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Der Text wird auf diesem Gerät gelesen. Er wird nirgendwohin gesendet."
+            "value" : "Ihr Lebenslauf wird auf diesem Gerät gelesen. Er wird nirgendwohin gesendet."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The text is read on this device. It is not sent anywhere."
+            "value" : "Your CV is read on this device. It is not sent anywhere."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El texto se lee en este dispositivo. No se envía a ningún sitio."
+            "value" : "Tu CV se lee en este dispositivo. No se envía a ningún sitio."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le texte est lu sur cet appareil. Il n’est envoyé nulle part."
+            "value" : "Votre CV est lu sur cet appareil. Il n’est envoyé nulle part."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Il testo viene letto su questo dispositivo. Non viene inviato da nessuna parte."
+            "value" : "Il tuo CV viene letto su questo dispositivo. Non viene inviato da nessuna parte."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O texto é lido neste dispositivo. Não é enviado para lado nenhum."
+            "value" : "O teu CV é lido neste dispositivo. Não é enviado para lado nenhum."
           }
         }
       }

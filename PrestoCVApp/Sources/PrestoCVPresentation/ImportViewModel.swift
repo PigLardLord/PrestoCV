@@ -36,8 +36,15 @@ public final class ImportViewModel {
 
     // MARK: - Intents
 
-    /// The strings the person pasted, one per line, in place of the text. A paste of nothing changes nothing.
-    public func paste(_ strings: [String]) {
+    /// What the person pasted: the PDFs and the strings of the clipboard's items. A PDF, such as one copied in Files, goes
+    /// to the import as a PDF, like a file, and the text stays as it was: it wins over strings pasted with it, as it is
+    /// the whole document. Otherwise the strings take the place of the text, one per line. A paste of nothing changes
+    /// nothing.
+    public func paste(_ strings: [String], pdfs: [Data]) {
+        if let pdf = pdfs.first {
+            importPDF(pdf)
+            return
+        }
         let pasted = strings.joined(separator: "\n")
         guard !pasted.isEmpty else { return }
         text = pasted
@@ -47,13 +54,6 @@ public final class ImportViewModel {
         guard canImportText else { return }
         let text = text, importer = importer
         start(from: .pasted, releasing: nil) { try await importer.importCV(fromText: text) }
-    }
-
-    /// A PDF the person pasted, such as one copied in Files: it goes to the import as a PDF, like a file.
-    public func importPDF(_ data: Data) {
-        guard status != .importing else { return }
-        let importer = importer
-        start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
     }
 
     /// A PDF file the person chose or opened in the app. The port receives it first. If an import runs, the file is not
@@ -74,6 +74,15 @@ public final class ImportViewModel {
             try Task.checkCancellation()
             return try await importer.importCV(fromPDF: data)
         }
+    }
+
+    /// The system could not hand over the file the person chose: the screen tells them, as for a file it could not read.
+    /// While an import runs nothing changes.
+    public func fileNotOpened() {
+        guard status != .importing else { return }
+        source = .file
+        result = nil
+        status = .failed(.fileNotRead)
     }
 
     /// The import running stops, with nothing to tell; its late result is dropped.
@@ -99,6 +108,12 @@ public final class ImportViewModel {
     }
 
     // MARK: - Running
+
+    private func importPDF(_ data: Data) {
+        guard status != .importing else { return }
+        let importer = importer
+        start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
+    }
 
     private func start(from source: ImportSource, releasing release: (@Sendable () -> Void)?,
                        _ work: @escaping @MainActor () async throws -> ImportOutcome) {

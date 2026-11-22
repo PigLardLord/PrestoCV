@@ -39,6 +39,8 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
             // composition's LookNamesTests checks that those codes and these keys are the same set.
             dynamicKeyPrefixes: ["design.", "fonts.", "palette."],
+            // The hint of "Choose a PDF" names the system's Files app, whose name keeps its capital.
+            properNamesOfKey: ["import.pdf.button.hint": ["Archivos", "Fichiers", "File", "Ficheiros"]],
             nonKeyLiterals: [
                 "native": "the code of a language level, which ProficiencyPicker words (R13)",
                 "designsOwn": "the end of the accessibility identifier of the look picker's item for the design's own (LookName)",
