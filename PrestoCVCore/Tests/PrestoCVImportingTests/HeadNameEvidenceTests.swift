@@ -260,4 +260,39 @@ struct HeadNameEvidenceTests {
         #expect(result.cv.person.name?.value == "Anna Weber")
         #expect(result.cv.person.name?.check == nil)
     }
+
+    // MARK: What is no rival
+
+    /// A head with the lines after its name's contacts, and whether the name is read as sure.
+    struct AfterTheContacts: Sendable, CustomTestStringConvertible {
+        let kind: String
+        let language: String
+        let head: String
+        let isNameSure: Bool
+        var testDescription: String { "\(kind), \(language)" }
+    }
+
+    static let afterTheContacts: [AfterTheContacts] = [
+        AfterTheContacts(kind: "a known place and availability", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nBerlin Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a known place and availability", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nMünchen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a known place and availability", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nRoma Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nNorthgate Holdings Ltd\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nWeber Pflegedienst GmbH\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nRossi Assistenza S.r.l.\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nWORK EXPERIENCE\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nBERUFSERFAHRUNG\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nESPERIENZE LAVORATIVE\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a job title with a line under it", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSenior Nurse\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nMaria Jones\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Müller\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Bianchi\nSviluppatore software", isNameSure: false),
+    ]
+
+    @Test("A name-shaped line after the contacts is a rival only when nothing says it is a place, an organisation, a heading or a job title", arguments: afterTheContacts)
+    func lineAfterTheContactsIsARivalOnlyAsAPerson(row: AfterTheContacts) throws {
+        let result = try importing(text: row.head)
+        let name = try #require(result.cv.person.name)
+        #expect(name.value.hasPrefix("Anna"))
+        #expect((name.check == nil) == row.isNameSure)
+    }
 }

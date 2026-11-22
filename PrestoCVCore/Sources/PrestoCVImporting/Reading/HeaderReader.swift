@@ -413,8 +413,11 @@ enum HeaderReader {
         }
         // Ranking and certainty apart (#328): a title under a line after the closing block gains that line no evidence of the
         // name, but it still tells that the line could have been it, so it keeps an unmarked name to be checked.
+        // Only a line that nothing says is something else is such a rival: not a place, an organisation, a school, a role or
+        // a heading ("Berlin Germany / Open to relocation").
+        let personLike = Dictionary(uniqueKeysWithValues: readings.map { ($0.index, !isNotAPerson($0.name.text)) })
         let titledAfterTheClosing = indices.filter { index in
-            guard let closing, candidates[index].block.index > closing else { return false }
+            guard let closing, candidates[index].block.index > closing, personLike[index] == true else { return false }
             return !candidates[index].followsContact && hasTitle(under: index, in: candidates, readings: indices)
         }
         let first = candidates.indices.first { !candidates[$0].followsContact }
@@ -438,6 +441,13 @@ enum HeaderReader {
         let isSure = best.doubt == 0 && !hasTitledRival
             && (isOnlyMarked || (isPlainlyFirst && titledAfterTheClosing.subtracting([best.index]).isEmpty))
         return HeadName(reading: best, isSure: isSure, rivals: rivals)
+    }
+
+    /// Whether the word lists say a line in the shape of a name is something other than a person: a line made only of known
+    /// places, an organisation, a school, a role or a section's heading.
+    private static func isNotAPerson(_ text: String) -> Bool {
+        Places.isPlaceOnly(text) || EntryVocabulary.isOrganisation(text) || EntryVocabulary.isSchool(text)
+            || EntryVocabulary.isRole(text) || SectionVocabulary.kind(ofHeading: text) != nil
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
