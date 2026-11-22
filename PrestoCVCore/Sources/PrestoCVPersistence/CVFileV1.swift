@@ -271,6 +271,8 @@ extension CVFileV1 {
         case .certificationName: "certifications.name"
         case .certificationIssuer: "certifications.issuer"
         case .certificationIssued: "certifications.issued"
+        case .certificationLink: "certifications.link"
+        case .certificationDescription: "certifications.description"
         case .profilePlatform: "profiles.platform"
         case .profileLink: "profiles.link"
         case .interest: "interests"
