@@ -268,6 +268,116 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    // MARK: Gaps and continuations (round 2)
+
+    @Test("Blank lines between the data rows of one table keep the header's columns", arguments: [
+        ("Experience", "| Employer | Role | Period |", "Chief Wizard", "Quillon Brae", "Growth Hacker", "Fennick Mere"),
+        ("Berufserfahrung", "| Unternehmen | Rolle | Zeitraum |", "Hofnarr", "Quillon Brae", "Wolkenflüsterer", "Fennick Mere"),
+        ("Esperienza", "| Datore di lavoro | Ruolo | Periodo |", "Stregone", "Quillon Brae", "Domatore di nuvole", "Fennick Mere"),
+    ])
+    func blankLinesBetweenRows(_ heading: String, _ header: String, _ roleA: String, _ employerA: String,
+                               _ roleB: String, _ employerB: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|
+        | \(employerA) | \(roleA) | 2020 – 2022 |
+
+        | \(employerB) | \(roleB) | 2018 – 2020 |
+
+        | Ostrel Vane | Zorn | 2016 – 2018 |
+
+        Planner at Harbor Systems, 2015 – 2017
+        - Drew up plans
+
+        | Role | Employer | Period |
+        |---|---|---|
+        | Dock Hand | Mirelle Bay | 2012 – 2015 |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == [roleA, roleB, "Zorn", "Planner", "Dock Hand"])
+        #expect(jobs.map { $0.employer?.value } == [employerA, employerB, "Ostrel Vane", "Harbor Systems", "Mirelle Bay"])
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2016, 2015, 2012])
+        #expect(jobs.map { $0.details.map(\.value) } == [[], [], [], ["Drew up plans"], []])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
+    @Test("Bullets and an undated line under a table row stay that job's details", arguments: [
+        ("Experience", "| Period | Employer | Role | Tasks |", "Teaching Assistant", "Northgate Academy",
+         "Helped with reading", "Covered two classes"),
+        ("Berufserfahrung", "| Zeitraum | Unternehmen | Rolle | Aufgaben |", "Mechatroniker", "Beispiel Werke",
+         "Wartung der Pumpen", "Schichtleitung am Wochenende"),
+        ("Esperienza", "| Periodo | Datore di lavoro | Ruolo | Mansioni |", "Tecnico", "Esempio Impianti",
+         "Controllo delle pompe", "Turni nel fine settimana"),
+    ])
+    func continuation(_ heading: String, _ header: String, _ role: String, _ employer: String,
+                      _ bullet: String, _ line: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|---|
+        | 2020 – 2022 | \(employer) | \(role) | Supported pupils |
+        - \(bullet)
+        - Ran a club
+        \(line)
+        | 2018 – 2020 | Riverside School | Tutor | Ran workshops |
+        - Kept the registers
+        Planner at Harbor Systems, 2015 – 2017
+        - Drew up plans
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 3)
+        #expect(jobs.map { $0.role?.value } == [role, "Tutor", "Planner"])
+        #expect(jobs.map { $0.employer?.value } == [employer, "Riverside School", "Harbor Systems"])
+        #expect(jobs.map { $0.details.map(\.value) } == [
+            ["Supported pupils", bullet, "Ran a club", line],
+            ["Ran workshops", "Kept the registers"],
+            ["Drew up plans"],
+        ])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
+    @Test("A single-cell row inside a table continues the job above and the table goes on")
+    func singleCellRow() throws {
+        let result = try importText("""
+        Experience
+        | Period | Employer | Role |
+        |---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant |
+        | Supported more pupils |
+        | 2018 – 2020 | Riverside School | Tutor |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 2)
+        #expect(jobs.map { $0.role?.value } == ["Teaching Assistant", "Tutor"])
+        #expect(jobs.map { $0.employer?.value } == ["Northgate Academy", "Riverside School"])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Supported more pupils"], []])
+        #expect(jobs.allSatisfy { $0.check == nil })
+        #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
+    @Test("A row the header does not explain keeps the bullets under it, flagged with it")
+    func bulletUnderUnexplainedRow() throws {
+        let result = try importText("""
+        Experience
+        | Alpha | Beta | Gamma |
+        |---|---|---|
+        | Teaching Assistant | Northgate Academy | 2020 – 2022 |
+        - Supported pupils
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 1)
+        #expect(jobs.first?.details.map(\.value) == ["Supported pupils"])
+        #expect(jobs.first?.check != nil)
+        #expect(result.unplaced.isEmpty)
+        noLoss(result)
+    }
+
     // MARK: Header words in each language
 
     @Test("The header words of each language", arguments: [

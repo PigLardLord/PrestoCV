@@ -551,6 +551,15 @@ enum EntryReader {
         case columns([Line])
         /// The lines read by their dates; `true` where they are rows of a table the header does not explain.
         case ordinary([Line], Bool)
+
+        /// The part with one more line of description: a mapped part gets it as a line with no label, which the
+        /// labelled reading keeps as a detail of the entry open above.
+        func appending(_ line: Line) -> TablePart {
+            switch self {
+            case .columns(let rows): return .columns(rows + [line])
+            case .ordinary(let held, let isDoubtful): return .ordinary(held + [line], isDoubtful)
+            }
+        }
     }
 
     /// Cuts a section's lines into its tables and the lines between them. A Markdown table's header row is markup,
@@ -581,8 +590,16 @@ enum EntryReader {
                 table += 1
                 continue
             }
-            let isRow = inTable && !line.block.followsGap && line.block.index == previous + 1
-                && (line.cells.count > 1 || line.cells.count == names.count)
+            // A row follows the one before; a blank line between two rows keeps the table where the cell count matches
+            let isRow = inTable && line.block.index == previous + 1
+                && (line.block.followsGap ? line.cells.count > 1 && line.cells.count == names.count
+                    : line.cells.count > 1 || line.cells.count == names.count)
+            if !isRow, inTable, continues(line, after: result.last, ofTable: rowsOfTable == table) {
+                // A line with no date right under a row is that job's description, not an entry of its own
+                previous = line.block.index
+                result[result.count - 1] = result[result.count - 1].appending(line)
+                continue
+            }
             guard isRow else {
                 inTable = false
                 add(line, isDoubtful: false)
@@ -611,6 +628,16 @@ enum EntryReader {
             }
         }
         return result
+    }
+
+    /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
+    private static func continues(_ line: Line, after last: TablePart?, ofTable current: Bool) -> Bool {
+        guard !line.block.followsGap, line.period == nil, line.label == nil, !line.isDurationOnly else { return false }
+        switch last {
+        case .columns?: return current
+        case .ordinary(_, let isDoubtful)?: return isDoubtful
+        case nil: return false
+        }
     }
 
     /// The entries read from a table whose columns the vocabulary does not name are marked for the person to check.
