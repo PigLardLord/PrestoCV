@@ -1,6 +1,5 @@
 import DiagnosticLogging
 import Foundation
-import PrestoCVApplication
 import PrestoCVImporting
 import PrestoCVWorkflowPorts
 import Synchronization
@@ -18,10 +17,10 @@ import Synchronization
 /// - `readPDF(of:)` reads within the size bound, from the path `receive` captured, and only the file of the identity it
 ///   captured: a path that names another file by then is not read.
 /// - A copy an earlier run left (the app ended while a file waited, or before the system handed it the URL) is deleted
-///   once, when the adapter is made, whether or not any import follows: each regular file directly in a copy folder whose
-///   creation date is older than `leftoverAge`. A copy the system made for this run is seconds old when it waits for its
-///   URL to be handed over, so no sweep ever takes a file on its way, whichever window it is for. The sweep never runs
-///   again, so it never takes a file this run has received.
+///   when the adapter is made, whether or not any import follows, by a rule that reads no clock: a regular file directly
+///   in a copy folder goes at the second launch that finds it, under the same name and file. A copy the system made
+///   for this run is new to it, so no sweep takes a file on its way, whichever window it is for, however the clock
+///   moves. The sweep never runs again, so it never takes a file this run has received.
 /// - `logging(to:)` gives an adapter over the same received files and copies left over, writing to another log: the
 ///   process makes one, and each part that holds files uses its own log.
 public final class ImportFileAdapter: ImportFileReading {
@@ -65,30 +64,24 @@ public final class ImportFileAdapter: ImportFileReading {
     private let logger: any DiagnosticLogger
     private let holdings: Holdings
 
-    /// How old a copy in a copy folder must be to be one an earlier run left. A copy the system made for this run waits
-    /// seconds for its URL to be handed over (a window's callback can run after another window's import ended), so an
-    /// hour never reaches a copy in use; a copy left by a run that ended is deleted at the next launch, however long
-    /// after.
-    public static let leftoverAge: TimeInterval = 3_600
-
-    /// Deletes the copies an earlier run left, once: the regular files directly in the copy folders that were created
-    /// more than `leftoverAge` before `clock` says now. A folder that cannot be listed, and a copy that cannot be deleted,
-    /// is logged, and the others go on.
+    /// Deletes the copies an earlier run left, once: those directly in the copy folders that the last launch found too,
+    /// as its record at `record` says. A launch that finds no record, or cannot read it, deletes nothing; it is logged,
+    /// and the copies found now go at the next launch.
     ///
-    /// - Parameter copyFolders: the folders the system puts the copy of an opened file in; only a file directly inside
-    ///   one of them is ever deleted.
+    /// - Parameters:
+    ///   - copyFolders: the folders the system puts the copy of an opened file in; only a file directly inside one of
+    ///     them is ever deleted. With none, nothing is read, written or logged.
+    ///   - record: where the sweep keeps the copies a launch found, in a folder of the app's own that is no copy folder;
+    ///     the folder is made when it is missing.
     public init(
-        files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, clock: any TimeSource,
-        logger: any DiagnosticLogger
+        files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, record: URL, logger: any DiagnosticLogger
     ) {
         self.files = files
         self.copyFolders = copyFolders
         self.maximumBytes = maximumBytes
         self.logger = logger
         holdings = Holdings()
-        Self.deleteLeftovers(
-            in: copyFolders, of: files, olderThan: clock.now().addingTimeInterval(-Self.leftoverAge), logger: logger
-        )
+        Self.deleteLeftovers(in: copyFolders, of: files, record: record, logger: logger)
     }
 
     private init(
@@ -204,12 +197,19 @@ public final class ImportFileAdapter: ImportFileReading {
         return failures
     }
 
-    /// Deletes each regular file directly in the folders created before `cutoff`, by the same rule as a received file's
-    /// copies (still the file, never a link, a folder or what lies in one). A folder that is not there holds none; one
-    /// that cannot be listed, and a file that cannot be deleted, is logged.
+    /// Lists the folders, writes the record of the copies found now that the last launch's record does not name, and
+    /// only then deletes those it names, by the same rule as a received file's copies (still the file, never a link, a
+    /// folder or what lies in one). A launch that cannot write the record deletes nothing, so a record never names a
+    /// file number that a delete freed; and a copy deleted now is left out of it, so a new file that takes that number
+    /// under the same name is new to the next launch. A folder that is not there holds none; one that cannot be
+    /// listed, and a copy that cannot be deleted, is logged.
     private static func deleteLeftovers(
-        in folders: [URL], of files: any ImportFileSystem, olderThan cutoff: Date, logger: any DiagnosticLogger
+        in folders: [URL], of files: any ImportFileSystem, record: URL, logger: any DiagnosticLogger
     ) {
+        guard !folders.isEmpty else { return }
+        let lastFound = recalled(from: record, of: files, logger: logger)
+        var newlyFound: [CopiesRecord.Copy] = []
+        var leftovers: [(url: URL, identity: FileIdentity)] = []
         for folder in folders {
             let entries: [URL]
             do {
@@ -219,14 +219,70 @@ public final class ImportFileAdapter: ImportFileReading {
                 continue
             }
             for entry in entries.sorted(by: { $0.path < $1.path }) {
-                guard let identity = files.identity(ofResolved: entry),
-                      let created = files.creationDate(ofResolved: entry), created < cutoff else { continue }
-                do {
-                    try files.remove(entry, identity: identity)
-                } catch {
-                    logger.error(.importing, "import.file.copyNotDeleted", .error(error))
+                guard let identity = files.identity(ofResolved: entry) else { continue }
+                let copy = CopiesRecord.Copy(name: entry.lastPathComponent, device: identity.device, file: identity.file)
+                if lastFound.contains(copy) {
+                    leftovers.append((entry, identity))
+                } else {
+                    newlyFound.append(copy)
                 }
             }
         }
+        guard remember(newlyFound, at: record, of: files, logger: logger) else { return }
+        for leftover in leftovers {
+            do {
+                try files.remove(leftover.url, identity: leftover.identity)
+            } catch {
+                logger.error(.importing, "import.file.copyNotDeleted", .error(error))
+            }
+        }
+    }
+
+    /// The copies the last launch found, as its record says; none, logged, when there is no record or it cannot be read.
+    private static func recalled(
+        from record: URL, of files: any ImportFileSystem, logger: any DiagnosticLogger
+    ) -> Set<CopiesRecord.Copy> {
+        let read: FileRead?
+        do {
+            read = try files.contents(of: record, atMost: CopiesRecord.maximumBytes)
+        } catch {
+            logger.error(.importing, "import.file.copiesRecordNotRead", .error(error))
+            return []
+        }
+        switch read {
+        case nil:
+            logger.notice(.importing, "import.file.copiesRecordMissing")
+            return []
+        case .aboveTheLimit?:
+            logger.error(.importing, "import.file.copiesRecordNotRead", .token("reason", "tooLarge"))
+            return []
+        case .bytes(let data)?:
+            do throws(CopiesRecord.Problem) {
+                return Set(try CopiesRecord.decoded(from: data).copies)
+            } catch {
+                logger.error(.importing, "import.file.copiesRecordNotRead", .token("reason", error.reason))
+                return []
+            }
+        }
+    }
+
+    /// Writes the first copies found as the record for the next launch; false, logged, when it is not written.
+    private static func remember(
+        _ copies: [CopiesRecord.Copy], at record: URL, of files: any ImportFileSystem, logger: any DiagnosticLogger
+    ) -> Bool {
+        let data: Data
+        do throws(CopiesRecord.Problem) {
+            data = try CopiesRecord(copies: Array(copies.prefix(CopiesRecord.maximumCopies))).encoded()
+        } catch {
+            logger.error(.importing, "import.file.copiesRecordNotWritten", .token("reason", error.reason))
+            return false
+        }
+        do {
+            try files.store(data, at: record)
+        } catch {
+            logger.error(.importing, "import.file.copiesRecordNotWritten", .error(error))
+            return false
+        }
+        return true
     }
 }

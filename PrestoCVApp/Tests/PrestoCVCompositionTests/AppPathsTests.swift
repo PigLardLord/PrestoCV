@@ -9,7 +9,7 @@ struct AppPathsTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("AppPathsTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    @Test("The store, the designs, the trace, its copies and the export's share are derived from the root and the temporary folder")
+    @Test("The store, the designs, the trace, its copies, the export's share and the record of import copies are derived from the root and the temporary folder")
     func derived() {
         let root = URL(filePath: "/base/PrestoCVNext", directoryHint: .isDirectory)
         let temporary = URL(filePath: "/tmp/x", directoryHint: .isDirectory)
@@ -19,6 +19,7 @@ struct AppPathsTests {
         #expect(paths.trace.path == "/base/PrestoCVNext/Diagnostics")
         #expect(paths.traceShare.path == "/tmp/x/DiagnosticsShare")
         #expect(paths.exportShare.path == "/tmp/x/ExportShare")
+        #expect(paths.importCopiesRecord.path == "/tmp/x/ImportCopies/found.json")
     }
 
     @Test("The five folders are distinct, and none is the legacy store, Application Support/PrestoCV/CVs")
@@ -73,6 +74,8 @@ struct AppPathsTests {
         let folders = AppPaths.importCopies(temporary: temporary, documents: documents, bundleID: "app.example")
 
         #expect(folders.map(\.path) == ["/tmp/x/app.example-Inbox", "/base/Documents/Inbox"])
+        let record = AppPaths(root: URL(filePath: "/base/PrestoCVNext"), temporary: temporary).importCopiesRecord
+        #expect(!folders.contains(record.deletingLastPathComponent()), "The sweep's record is never in a copy folder")
     }
 
     @Test("With no bundle id only the inbox in Documents is a copy folder", arguments: [nil, ""] as [String?])

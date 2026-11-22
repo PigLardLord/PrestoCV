@@ -8,7 +8,6 @@ import Android
 #elseif canImport(Darwin)
 import Darwin
 #endif
-import PrestoCVApplication
 import PrestoCVImportFiles
 import PrestoCVWorkflowPorts
 import Synchronization
@@ -452,76 +451,102 @@ struct ImportFileAdapterTests {
 
     // MARK: Copies left by an earlier run
 
-    @Test("a copy an earlier run left goes when the adapter is made, in both copy folders, with no import")
-    func oldCopyGoesAtTheLaunch() throws {
-        let world = try World()
-        defer { world.scratch.remove() }
-        let inbox = try world.scratch.file("left.pdf", in: world.scratch.inbox)
-        let documents = try world.scratch.file("left.pdf", in: world.scratch.documentsInbox)
-        world.files.age(inbox, by: 2 * 3_600)
-        world.files.age(documents, by: 25 * 3_600)
+    @Test("a copy goes at the second launch that finds it, in both copy folders, with no import; the first logs that it has no record")
+    func copyGoesAtTheSecondLaunchThatFindsIt() throws {
+        let scratch = try Scratch()
+        defer { scratch.remove() }
+        try scratch.file("left.pdf", in: scratch.inbox)
+        try scratch.file("left.pdf", in: scratch.documentsInbox)
+
+        let world = World(launchingIn: scratch)
+        #expect(try scratch.names(in: scratch.inbox) == ["left.pdf"])
+        #expect(try scratch.names(in: scratch.documentsInbox) == ["left.pdf"])
+        #expect(world.files.calls.removed.isEmpty)
+        #expect(world.logger.events == ["import.file.copiesRecordMissing"])
 
         _ = world.nextLaunch()
-
-        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
-        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == [])
+        #expect(try scratch.names(in: scratch.inbox) == [])
+        #expect(try scratch.names(in: scratch.documentsInbox) == [])
         #expect(world.files.calls.removed.map(\.lastPathComponent) == ["left.pdf", "left.pdf"])
+        #expect(world.logger.events == ["import.file.copiesRecordMissing"])
     }
 
-    @Test("a young copy no file was received for survives the launch, and the next launch sweeps it once it is old")
-    func youngCopySurvivesTheLaunch() throws {
+    @Test("a copy that arrives between two launches survives the first launch that finds it and goes at the next")
+    func newCopySurvivesItsFirstLaunch() throws {
         let world = try World()
         defer { world.scratch.remove() }
-        let young = try world.scratch.file("young.pdf", in: world.scratch.inbox)
-        world.files.age(young, by: ImportFileAdapter.leftoverAge - 60)
+        try world.scratch.file("new.pdf", in: world.scratch.inbox)
+        try world.scratch.file("new.pdf", in: world.scratch.documentsInbox)
 
         _ = world.nextLaunch()
-        #expect(try world.scratch.names(in: world.scratch.inbox) == ["young.pdf"])
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["new.pdf"])
+        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == ["new.pdf"])
         #expect(world.files.calls.removed.isEmpty)
 
-        world.files.age(young, by: ImportFileAdapter.leftoverAge + 60)
         _ = world.nextLaunch()
         #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == [])
+        #expect(world.logger.events.isEmpty)
     }
 
-    @Test("a fresh copy that is there at the launch and handed over after another window's import ended is not deleted")
-    func freshCopyDeliveredLate() async throws {
+    @Test("a copy's dates make no leftover: one dated years back, as after a clock moved forward, is read and goes only at its release")
+    func datesDoNotMakeALeftover() async throws {
         let world = try World()
         defer { world.scratch.remove() }
-        let later = try world.scratch.file("later.pdf", in: world.scratch.inbox, "%PDF-1.7 later")
+        let copy = try world.scratch.file("dated.pdf", in: world.scratch.inbox, "%PDF-1.7 dated")
+        try world.scratch.date(copy, Date(timeIntervalSince1970: 1_000_000_000))
+
         let launch = world.nextLaunch()
-        let first = try world.scratch.file("first.pdf", in: world.scratch.inbox)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["dated.pdf"])
+        let file = launch.receive(copy)
+        #expect(try await launch.readPDF(of: file) == Data("%PDF-1.7 dated".utf8))
+        launch.release(file)
 
-        let windowA = launch.receive(first)
-        _ = try await launch.readPDF(of: windowA)
-        launch.release(windowA)
-        #expect(try world.scratch.names(in: world.scratch.inbox) == ["later.pdf"])
-
-        let windowB = launch.receive(later)
-        let data = try await launch.readPDF(of: windowB)
-        #expect(data == Data("%PDF-1.7 later".utf8))
-        launch.release(windowB)
         #expect(try world.scratch.names(in: world.scratch.inbox) == [])
         world.expectBalanced()
     }
 
-    @Test("a copy received in this run is never deleted by a sweep, however old it is: only its own release deletes it")
+    @Test("a copy there at the launch and handed to one window after another window's import ended is not deleted")
+    func copyDeliveredLateToAnotherWindow() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let later = try world.scratch.file("later.pdf", in: world.scratch.inbox, "%PDF-1.7 later")
+        let launch = world.nextLaunch()
+        let windowA = launch.logging(to: RecordingLogger())
+        let first = try world.scratch.file("first.pdf", in: world.scratch.inbox)
+
+        let fileA = windowA.receive(first)
+        _ = try await windowA.readPDF(of: fileA)
+        windowA.release(fileA)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["later.pdf"])
+
+        let fileB = launch.receive(later)
+        #expect(try await launch.readPDF(of: fileB) == Data("%PDF-1.7 later".utf8))
+        launch.release(fileB)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        world.expectBalanced()
+    }
+
+    @Test("nothing is swept after the launch, also by an adapter made with logging(to:): a received copy goes only at its own release")
     func receivedCopyIsNeverSwept() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let launch = world.nextLaunch()
-        let listedAtLaunch = world.files.calls.events.filter { $0.hasPrefix("list ") }.count
+        let callsAtLaunch = world.files.calls.events.count
+        let window = launch.logging(to: RecordingLogger())
         let held = try world.scratch.file("held.pdf", in: world.scratch.inbox)
-        world.files.age(held, by: 30 * 24 * 3_600)
         let other = try world.scratch.file("other.pdf", in: world.scratch.inbox)
 
         let waiting = launch.receive(held)
-        let read = launch.receive(other)
-        _ = try await launch.readPDF(of: read)
-        launch.release(read)
+        let read = window.receive(other)
+        _ = try await window.readPDF(of: read)
+        window.release(read)
 
         #expect(try world.scratch.names(in: world.scratch.inbox) == ["held.pdf"])
-        #expect(world.files.calls.events.filter { $0.hasPrefix("list ") }.count == listedAtLaunch)
+        let sweepCalls = world.files.calls.events.dropFirst(callsAtLaunch).filter {
+            $0.hasPrefix("list ") || $0.hasPrefix("contents ") || $0.hasPrefix("store ")
+        }
+        #expect(sweepCalls == [])
         launch.release(waiting)
         #expect(try world.scratch.names(in: world.scratch.inbox) == [])
         world.expectBalanced()
@@ -538,10 +563,10 @@ struct ImportFileAdapterTests {
         let nested = try world.scratch.file("cv.pdf", in: folder)
         let link = world.scratch.inbox.appendingPathComponent("link.pdf")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: mine)
-        let pipe = try world.scratch.pipe("pipe", in: world.scratch.inbox)
-        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        for url in [mine, documents, nested, link, pipe, copy] { world.files.age(url, by: 2 * 3_600) }
+        try world.scratch.pipe("pipe", in: world.scratch.inbox)
+        try world.scratch.file("cv.pdf", in: world.scratch.inbox)
 
+        _ = world.nextLaunch()
         _ = world.nextLaunch()
 
         #expect(try world.scratch.names(in: world.scratch.inbox) == ["link.pdf", "pipe", "sub"])
@@ -551,14 +576,116 @@ struct ImportFileAdapterTests {
         #expect(world.files.calls.removed.map(\.lastPathComponent) == ["cv.pdf"])
     }
 
-    @Test("a copy that cannot be deleted at the launch is logged with its code, and the others still go")
+    @Test("a copy is known by its name and its file: a new file under the same name, or the same file under a new name, is a new copy")
+    func newFileOrNewNameIsANewCopy() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let replaced = try world.scratch.file("cv.pdf", in: world.scratch.inbox, "%PDF-1.7 first")
+        let renamed = try world.scratch.file("old.pdf", in: world.scratch.documentsInbox)
+        _ = world.nextLaunch()
+
+        try world.scratch.replace(replaced, with: "%PDF-1.7 second")
+        try FileManager.default.moveItem(at: renamed, to: world.scratch.documentsInbox.appendingPathComponent("new.pdf"))
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"])
+        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == ["new.pdf"])
+        #expect(world.files.calls.removed.isEmpty)
+
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        #expect(try world.scratch.names(in: world.scratch.documentsInbox) == [])
+    }
+
+    @Test("a copy a launch deletes is left out of its record: the same name and file found again, as when a file number is reused, is a new copy")
+    func deletedCopyIsForgotten() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+        // A second name outside the copy folders keeps the file, and its number, after the copy's name is deleted
+        let kept = world.scratch.chosen.appendingPathComponent("kept.pdf")
+        try FileManager.default.linkItem(at: copy, to: kept)
+        _ = world.nextLaunch()
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+
+        try FileManager.default.linkItem(at: kept, to: copy)
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"], "The file under that name is new to this launch")
+
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        #expect(FileManager.default.fileExists(atPath: kept.path))
+    }
+
+    @Test("a record that cannot be trusted deletes nothing and is logged with its reason; the launch writes a new one", arguments: BadRecord.allCases)
+    func untrustedRecordDeletesNothing(_ bad: BadRecord) throws {
+        let scratch = try Scratch()
+        defer { scratch.remove() }
+        let copy = try scratch.file("cv.pdf", in: scratch.inbox)
+        let identity = try #require(scratch.identity(of: copy))
+        try FileManager.default.createDirectory(
+            at: scratch.record.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try bad.contents(naming: identity).write(to: scratch.record)
+
+        let world = World(launchingIn: scratch)
+        #expect(try scratch.names(in: scratch.inbox) == ["cv.pdf"])
+        #expect(world.logger.events == ["import.file.copiesRecordNotRead"])
+        let reasons = world.logger.entries("import.file.copiesRecordNotRead").map { $0.value("reason") }
+        #expect(reasons == [.token(bad.reason)])
+
+        _ = world.nextLaunch()
+        #expect(try scratch.names(in: scratch.inbox) == [])
+    }
+
+    @Test("a launch that cannot write its record deletes nothing and logs it; the next launch that can deletes the copy")
+    func unwrittenRecordDeletesNothing() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+        _ = world.nextLaunch()
+
+        world.files.failStores(true)
+        _ = world.nextLaunch()
+        let logged = world.logger.entries("import.file.copiesRecordNotWritten").map { $0.value("error") }
+        #expect(logged == [.error(type: "ImportFileError", code: "EACCES")])
+        #expect(world.files.calls.removed.isEmpty)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"])
+
+        world.files.failStores(false)
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+    }
+
+    @Test("a record whose folder is a file is neither read nor written, each logged with its code, and nothing is deleted")
+    func recordUnderAFileDeletesNothing() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+        let folder = world.scratch.record.deletingLastPathComponent()
+        try FileManager.default.removeItem(at: folder)
+        _ = FileManager.default.createFile(atPath: folder.path, contents: Data())
+
+        _ = world.nextLaunch()
+        _ = world.nextLaunch()
+
+        let notRead = world.logger.entries("import.file.copiesRecordNotRead").map { $0.value("error") }
+        let notWritten = world.logger.entries("import.file.copiesRecordNotWritten").map { $0.value("error") }
+        #expect(notRead == Array(repeating: .error(type: "ImportFileError", code: "ENOTDIR"), count: 2))
+        #expect(notWritten == Array(repeating: .error(type: "ImportFileError", code: "ENOTDIR"), count: 2))
+        #expect(world.files.calls.removed.isEmpty)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"])
+    }
+
+    @Test("a copy that cannot be deleted at a launch is logged with its code, and the others are still tried")
     func failedLaunchDeletionDoesNotStopTheOthers() throws {
         let world = try World(faults: .init(removeFails: true))
         defer { world.scratch.remove() }
         for (name, folder) in [("a.pdf", world.scratch.inbox), ("b.pdf", world.scratch.inbox), ("c.pdf", world.scratch.documentsInbox)] {
-            world.files.age(try world.scratch.file(name, in: folder), by: 2 * 3_600)
+            try world.scratch.file(name, in: folder)
         }
 
+        _ = world.nextLaunch()
         _ = world.nextLaunch()
 
         #expect(world.files.calls.removed.map(\.lastPathComponent).sorted() == ["a.pdf", "b.pdf", "c.pdf"])
@@ -571,20 +698,52 @@ struct ImportFileAdapterTests {
     func unlistedCopyFolderIsLogged() throws {
         let world = try World()
         defer { world.scratch.remove() }
-        world.files.age(try world.scratch.file("old.pdf", in: world.scratch.documentsInbox), by: 2 * 3_600)
+        try world.scratch.file("old.pdf", in: world.scratch.documentsInbox)
         try FileManager.default.removeItem(at: world.scratch.inbox)
         _ = FileManager.default.createFile(atPath: world.scratch.inbox.path, contents: Data())
 
         _ = world.nextLaunch()
+        _ = world.nextLaunch()
 
         let logged = world.logger.entries("import.file.copiesNotListed").map { $0.value("error") }
-        #expect(logged == [.error(type: "ImportFileError", code: "ENOTDIR")])
+        #expect(logged == Array(repeating: .error(type: "ImportFileError", code: "ENOTDIR"), count: 2))
         #expect(try world.scratch.names(in: world.scratch.documentsInbox) == [])
 
         try FileManager.default.removeItem(at: world.scratch.inbox)
         let before = world.logger.entries("import.file.copiesNotListed").count
         _ = world.nextLaunch()
         #expect(world.logger.entries("import.file.copiesNotListed").count == before)
+    }
+
+    @Test("an adapter with no copy folder, as on the Mac, reads, writes and logs nothing at its launch")
+    func noCopyFolderNoRecord() throws {
+        let scratch = try Scratch()
+        defer { scratch.remove() }
+        let files = SpyFiles()
+        let logger = RecordingLogger()
+
+        _ = ImportFileAdapter(files: files, copyFolders: [], maximumBytes: 1_000, record: scratch.record, logger: logger)
+
+        #expect(files.calls.events == [])
+        #expect(logger.events == [])
+        #expect(scratch.kind(of: scratch.record.deletingLastPathComponent()) == nil)
+    }
+
+    @Test("a record keeps the first 1,000 copies found, of the longest names: they go at the next launch, the last one a launch later")
+    func recordIsBounded() throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        // 255 bytes, the longest name a Linux file system takes, of a character the record writes in six
+        let names = (1_000...2_000).map { String(repeating: "\u{1}", count: 247) + "\($0).pdf" }
+        for name in names { try world.scratch.file(name, in: world.scratch.inbox) }
+        _ = world.nextLaunch()
+
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [names[1_000]])
+        #expect(world.logger.events.isEmpty)
+
+        _ = world.nextLaunch()
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
     }
 
     @Test("adapters made with logging(to:) share their received files, each with its own log")
@@ -642,11 +801,42 @@ struct ImportFileAdapterTests {
 
 // MARK: - Test doubles
 
-/// The instant every test launches at; a copy is as old as the spy says (10 seconds unless a test ages it).
-private let launchInstant = Date(timeIntervalSince1970: 1_800_000_000)
+/// A record the sweep must not trust, each naming the copy it would otherwise delete.
+enum BadRecord: CaseIterable, Sendable {
+    case notJSON, fieldMissing, newerVersion, tooManyCopies, nameTooLong, tooLarge
 
-private struct AtLaunch: TimeSource {
-    func now() -> Date { launchInstant }
+    /// The reason the launch logs for it.
+    var reason: String {
+        switch self {
+        case .notJSON, .fieldMissing, .tooManyCopies, .nameTooLong: "notARecord"
+        case .newerVersion: "unknownVersion"
+        case .tooLarge: "tooLarge"
+        }
+    }
+
+    func contents(naming copy: FileIdentity) -> Data {
+        let entry = #"{"name":"cv.pdf","device":\#(copy.device),"file":\#(copy.file)}"#
+        switch self {
+        case .notJSON:
+            return Data("cv.pdf".utf8)
+        case .fieldMissing:
+            return Data(#"{"schemaVersion":1}"#.utf8)
+        case .newerVersion:
+            return Data(#"{"schemaVersion":2,"copies":[\#(entry)]}"#.utf8)
+        case .tooManyCopies:
+            // 1,001 copies, one more than a record holds
+            let others = (1...1_000).map { #"{"name":"\#($0).pdf","device":0,"file":\#($0)}"# }
+            return Data(#"{"schemaVersion":1,"copies":[\#(([entry] + others).joined(separator: ","))]}"#.utf8)
+        case .nameTooLong:
+            // 1,025 bytes, one more than a name in a record holds
+            let long = #"{"name":"\#(String(repeating: "a", count: 1_021)).pdf","device":0,"file":1}"#
+            return Data(#"{"schemaVersion":1,"copies":[\#(entry),\#(long)]}"#.utf8)
+        case .tooLarge:
+            // A record it could read, made one byte longer than it reads by spaces JSON allows
+            let record = #"{"schemaVersion":1,"copies":[\#(entry)]}"#
+            return Data((record + String(repeating: " ", count: (8 << 20) + 1 - record.utf8.count)).utf8)
+        }
+    }
 }
 
 /// A value shared with a closure that runs on another thread.
@@ -707,8 +897,7 @@ private final class SpyFiles: ImportFileSystem {
     private let faults: Faults
     private let recorded = Mutex(Calls())
     private let hooks = Mutex(Hooks())
-    /// How long before the launch each file (by its resolved path) was created.
-    private let ages = Mutex<[String: TimeInterval]>([:])
+    private let storesFail = Mutex(false)
 
     init(_ faults: Faults = Faults()) {
         self.faults = faults
@@ -716,10 +905,9 @@ private final class SpyFiles: ImportFileSystem {
 
     var calls: Calls { recorded.withLock { $0 } }
 
-    /// Says that the file at `url` was created `seconds` before the launch.
-    func age(_ url: URL, by seconds: TimeInterval) {
-        let path = system.resolve(url).path
-        ages.withLock { $0[path] = seconds }
+    /// From now on, every store fails with EACCES, or none does.
+    func failStores(_ fails: Bool) {
+        storesFail.withLock { $0 = fails }
     }
 
     /// Runs after each read, outside every lock of the spy.
@@ -751,13 +939,6 @@ private final class SpyFiles: ImportFileSystem {
         return system.identity(ofResolved: url)
     }
 
-    func creationDate(ofResolved url: URL) -> Date? {
-        record("created", url)
-        guard system.creationDate(ofResolved: url) != nil else { return nil }
-        let age = ages.withLock { $0[url.path] } ?? 10
-        return launchInstant.addingTimeInterval(-age)
-    }
-
     func read(_ url: URL, identity: FileIdentity, atMost limit: Int) throws(ImportFileError) -> FileRead {
         record("read", url) { $0.reads.append(url) }
         if faults.cancelDuringRead { withUnsafeCurrentTask { $0?.cancel() } }
@@ -771,6 +952,17 @@ private final class SpyFiles: ImportFileSystem {
         return try system.entries(in: folder)
     }
 
+    func contents(of url: URL, atMost limit: Int) throws(ImportFileError) -> FileRead? {
+        record("contents", url)
+        return try system.contents(of: url, atMost: limit)
+    }
+
+    func store(_ data: Data, at url: URL) throws(ImportFileError) {
+        record("store", url)
+        if storesFail.withLock({ $0 }) { throw ImportFileError.system(EACCES) }
+        try system.store(data, at: url)
+    }
+
     func remove(_ url: URL, identity: FileIdentity) throws(ImportFileError) {
         record("remove", url) { $0.removed.append(url) }
         hooks.withLock { $0.onRemove }?(url)
@@ -778,7 +970,11 @@ private final class SpyFiles: ImportFileSystem {
         try system.remove(url, identity: identity)
     }
 
-    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void = { _ in }) {
+    private func record(_ call: String, _ url: URL) {
+        record(call, url) { _ in }
+    }
+
+    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void) {
         recorded.withLock { calls in
             change(&calls)
             calls.events.append("\(call) \(url.lastPathComponent)")
@@ -794,8 +990,18 @@ private struct World {
     let maximumBytes: Int
     let adapter: ImportFileAdapter
 
+    /// The app launched in a new container, after an earlier launch that found its copy folders empty.
     init(maximumBytes: Int = 1_000, faults: SpyFiles.Faults = SpyFiles.Faults()) throws {
         let scratch = try Scratch()
+        _ = ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: scratch.copyFolders, maximumBytes: maximumBytes,
+            record: scratch.record, logger: RecordingLogger()
+        )
+        self.init(launchingIn: scratch, maximumBytes: maximumBytes, faults: faults)
+    }
+
+    /// The app launched in `scratch` as it is, with no record when no launch came before.
+    init(launchingIn scratch: Scratch, maximumBytes: Int = 1_000, faults: SpyFiles.Faults = SpyFiles.Faults()) {
         let files = SpyFiles(faults)
         let logger = RecordingLogger()
         self.scratch = scratch
@@ -803,15 +1009,17 @@ private struct World {
         self.logger = logger
         self.maximumBytes = maximumBytes
         adapter = ImportFileAdapter(
-            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, clock: AtLaunch(), logger: logger
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, record: scratch.record,
+            logger: logger
         )
     }
 
-    /// The adapter of the app launched again, over the same folders, file system and log: it sweeps what the folders
-    /// hold now that is old.
+    /// The adapter of the app launched again, over the same folders, record, file system and log: it sweeps the copies
+    /// the last launch found too.
     func nextLaunch() -> ImportFileAdapter {
         ImportFileAdapter(
-            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, clock: AtLaunch(), logger: logger
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, record: scratch.record,
+            logger: logger
         )
     }
 

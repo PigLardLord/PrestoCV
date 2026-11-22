@@ -20,6 +20,8 @@ struct Scratch {
     let documentsInbox: URL
     /// A folder of the person's own files, outside the container.
     let chosen: URL
+    /// Where the sweep keeps its record of the copies a launch found, in a folder of the app's own that is not made yet.
+    let record: URL
 
     var copyFolders: [URL] { [inbox, documentsInbox] }
 
@@ -30,6 +32,7 @@ struct Scratch {
         documents = container.appendingPathComponent("Documents", isDirectory: true)
         documentsInbox = documents.appendingPathComponent("Inbox", isDirectory: true)
         chosen = root.appendingPathComponent("Files", isDirectory: true)
+        record = container.appendingPathComponent("tmp/ImportCopies/found.json", isDirectory: false)
         for folder in [inbox, documentsInbox, chosen] {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
@@ -58,6 +61,15 @@ struct Scratch {
         let beside = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
         try Data(text.utf8).write(to: beside)
         guard rename(beside.path, url.path) == 0 else { throw SystemCallFailed(call: "rename", code: errno) }
+    }
+
+    /// Dates the file at `url` to `date`: its modification date, and on Apple platforms its creation date too.
+    func date(_ url: URL, _ date: Date) throws {
+        var attributes: [FileAttributeKey: Any] = [.modificationDate: date]
+        #if canImport(Darwin)
+        attributes[.creationDate] = date
+        #endif
+        try FileManager.default.setAttributes(attributes, ofItemAtPath: url.path)
     }
 
     /// Makes a named pipe: a reader that opens it without O_NONBLOCK waits for a writer that never comes.

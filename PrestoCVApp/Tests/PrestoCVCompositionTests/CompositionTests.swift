@@ -93,7 +93,7 @@ struct CompositionTests {
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
             settlement: TraceSettlement(),
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
-            importFiles: Composition.importFiles(copyFolders: copyFolders, logger: log),
+            importFiles: Composition.importFiles(copyFolders: copyFolders, record: paths.importCopiesRecord, logger: log),
             compileRules: compileRules,
             designs: designs,
             makeGate: makeGate,

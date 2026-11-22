@@ -60,8 +60,9 @@ extension ImportFileError: LoggableError {
     }
 }
 
-/// What the import's file adapter asks of the file system and of the platform's access to a chosen file. The device's
-/// is `SystemImportFiles`; the tests wrap it to record the calls and to fail on purpose.
+/// What the import's file adapter asks of the file system and of the platform's access to a chosen file, and where its
+/// sweep keeps its record. The device's is `SystemImportFiles`; the tests wrap it to record the calls and to fail on
+/// purpose.
 public protocol ImportFileSystem: Sendable {
     /// Starts security-scoped access to a chosen file. True when access started; it is then stopped exactly once.
     func startAccess(_ url: URL) -> Bool
@@ -71,10 +72,6 @@ public protocol ImportFileSystem: Sendable {
     func resolve(_ url: URL) -> URL
     /// The identity of a resolved path, when it names a regular file; nil for anything else or for no file.
     func identity(ofResolved url: URL) -> FileIdentity?
-    /// When the regular file at a resolved path was created (on Apple platforms its birth time, which a copy that keeps
-    /// the source's modification date does not inherit; elsewhere the inode's change time); nil for anything else or for
-    /// no file.
-    func creationDate(ofResolved url: URL) -> Date?
     /// The bytes of the file at `url`, read into memory (never mapped) through one descriptor that does not follow a
     /// link and does not wait on a pipe. Throws `notTheFile` when the opened file is not a regular file of `identity`.
     /// Reads at most `limit` bytes and one more, whatever size the file states.
@@ -85,4 +82,11 @@ public protocol ImportFileSystem: Sendable {
     /// What lies directly in `folder`, by the folder's path and each entry's name, in no set order: files, links, folders
     /// and anything else alike. None when the folder is not there; anything else that stops the listing is thrown.
     func entries(in folder: URL) throws(ImportFileError) -> [URL]
+    /// The bytes of the regular file at `url`, read like `read` but of whatever regular file is there: nil when nothing
+    /// is at the path; `notTheFile` when what is there is not a regular file (a link is not followed).
+    func contents(of url: URL, atMost limit: Int) throws(ImportFileError) -> FileRead?
+    /// Writes `data` whole as the file at `url`, making its folder when it is missing (not the folders above it): it is
+    /// written beside, then renamed over the path, so a reader finds the old file or the new one, and a link there is
+    /// replaced, never followed.
+    func store(_ data: Data, at url: URL) throws(ImportFileError)
 }

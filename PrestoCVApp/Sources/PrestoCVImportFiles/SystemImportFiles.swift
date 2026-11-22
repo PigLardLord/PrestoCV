@@ -37,17 +37,6 @@ public struct SystemImportFiles: ImportFileSystem {
         return FileIdentity(status)
     }
 
-    public func creationDate(ofResolved url: URL) -> Date? {
-        var status = stat()
-        guard lstat(url.path, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return nil }
-        #if canImport(Darwin)
-        let time = status.st_birthtimespec
-        #else
-        let time = status.st_ctim
-        #endif
-        return Date(timeIntervalSince1970: Double(time.tv_sec) + Double(time.tv_nsec) / 1_000_000_000)
-    }
-
     public func read(_ url: URL, identity: FileIdentity, atMost limit: Int) throws(ImportFileError) -> FileRead {
         try readFile(at: url.path, identity: identity, atMost: limit)
     }
@@ -58,6 +47,14 @@ public struct SystemImportFiles: ImportFileSystem {
 
     public func entries(in folder: URL) throws(ImportFileError) -> [URL] {
         try folderEntries(at: folder)
+    }
+
+    public func contents(of url: URL, atMost limit: Int) throws(ImportFileError) -> FileRead? {
+        try fileContents(at: url.path, atMost: limit)
+    }
+
+    public func store(_ data: Data, at url: URL) throws(ImportFileError) {
+        try storeFile(data, at: url)
     }
 }
 
@@ -111,6 +108,56 @@ private func readFile(at path: String, identity: FileIdentity, atMost limit: Int
         data.append(contentsOf: buffer[0..<count])
     }
     return data.count > limit ? .aboveTheLimit : .bytes(data)
+}
+
+/// The regular file at the path, read through `readFile`, which checks that the file it opens is the one looked at.
+private func fileContents(at path: String, atMost limit: Int) throws(ImportFileError) -> FileRead? {
+    var status = stat()
+    guard lstat(path, &status) == 0 else {
+        let code = errno
+        if code == ENOENT { return nil }
+        throw ImportFileError.system(code)
+    }
+    guard (status.st_mode & S_IFMT) == S_IFREG else { throw ImportFileError.notTheFile }
+    return try readFile(at: path, identity: FileIdentity(status), atMost: limit)
+}
+
+/// Makes the folder when it is missing, writes the data whole to a file beside the path, then renames it over the path.
+/// A file left beside by a write that failed is overwritten by the next one.
+private func storeFile(_ data: Data, at url: URL) throws(ImportFileError) {
+    let folder = url.deletingLastPathComponent().path
+    if mkdir(folder, 0o700) != 0 {
+        let code = errno
+        guard code == EEXIST else { throw ImportFileError.system(code) }
+    }
+    let path = url.path
+    let beside = path + ".writing"
+    let descriptor = open(beside, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0o600)
+    guard descriptor >= 0 else { throw ImportFileError.system(errno) }
+    if let code = writeAll(data, to: descriptor) {
+        close(descriptor)
+        throw ImportFileError.system(code)
+    }
+    guard close(descriptor) == 0 else { throw ImportFileError.system(errno) }
+    guard rename(beside, path) == 0 else { throw ImportFileError.system(errno) }
+}
+
+/// Writes every byte, again after an interruption; the `errno` of a write that failed, or nil.
+private func writeAll(_ data: Data, to descriptor: Int32) -> Int32? {
+    data.withUnsafeBytes { bytes -> Int32? in
+        guard let start = bytes.baseAddress else { return nil }
+        var written = 0
+        while written < bytes.count {
+            let count = write(descriptor, start + written, bytes.count - written)
+            if count < 0 {
+                let code = errno
+                if code == EINTR { continue }
+                return code
+            }
+            written += count
+        }
+        return nil
+    }
 }
 
 /// Moves the file aside under a name of its own, checks that what moved is the received file, then deletes it; anything
