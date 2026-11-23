@@ -265,7 +265,7 @@ enum EntryReader {
     }
 
     /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
-    /// piece itself, that reads as an organisation or is no recognised place (four unknown words are a name, not a
+    /// piece itself, that reads as an organisation or is no recognised place, by the lists or by its shape (four unknown words are a name, not a
     /// city). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds", a title above
     /// "Acme Ltd" and "Leiter für Logistik" above "Beispiel Nord Süd West" keep it. A short name no list knows ("Acme")
     /// has the shape of a place and is no evidence either way.
@@ -278,8 +278,8 @@ enum EntryReader {
     private static func canHoldEmployer(_ segment: Segment) -> Bool {
         switch segment.part {
         case .secondary: true
-        case .unknown, .location: !hasPlaceShape(segment.piece)
-        case .primary, .address: false
+        case .unknown: !hasPlaceShape(segment.piece)
+        case .primary, .address, .location: false
         }
     }
 

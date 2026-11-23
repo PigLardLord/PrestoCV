@@ -331,6 +331,24 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.location?.value } == [nil])
     }
 
+    @Test("A weak connector before an organisation splits beside a postal-code place", arguments: [
+        ("Entwickler", "für", "Beispiel GmbH", "10115 Berlin"), ("Sviluppatore", "per", "Esempio Srl", "00184 Roma"),
+        ("Desarrollador", "para", "Ejemplo S.L.", "28013 Madrid"),
+    ])
+    func weakConnectorBesideAPostalCodePlace(role: String, connector: String, employer: String, place: String) {
+        let title = "\(role) \(connector) \(employer)"
+        for layout in ["\(title), \(place)", "\(title)\n\(place)", "\(title)\t\t\(place)", "\(title) | \(place)"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [place], "\(layout)")
+        }
+    }
+
     @Test("A weak connector before an organisation reads as a connector, with a place after a comma", arguments: [
         ("Developer for Acme Ltd, Leeds", "Developer", "Acme Ltd", "Leeds"),
         ("Entwickler für Beispiel GmbH, Berlin", "Entwickler", "Beispiel GmbH", "Berlin"),
