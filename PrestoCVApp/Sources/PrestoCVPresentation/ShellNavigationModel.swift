@@ -47,8 +47,13 @@ public final class ShellNavigationModel {
     /// The export sheet over the open CV, nil when none is open. It goes with the editor it was opened over.
     public private(set) var exportSheet: ExportSheetViewModel?
 
+    /// The import the detail shows in place of a CV, nil when it shows none. It goes, stopped, when anything else opens
+    /// or the person goes back to the list, and a pasted text goes with it (decision 9 of #404).
+    public private(set) var importer: ImportViewModel?
+
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
+    @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -85,9 +90,9 @@ public final class ShellNavigationModel {
         return editor?.storedReference ?? reference
     }
 
-    /// The column a compact screen shows: the detail when something is open, otherwise the list. A regular screen shows
-    /// both columns whatever this says.
-    public var preferredColumn: ShellColumn { detail == nil ? .sidebar : .detail }
+    /// The column a compact screen shows: the detail when something is open, the import too, otherwise the list. A
+    /// regular screen shows both columns whatever this says.
+    public var preferredColumn: ShellColumn { detail == nil && importer == nil ? .sidebar : .detail }
 
     /// Whether the person can leave the open editor now. While they cannot, the view offers no way back, and a selection
     /// stays where it was (`open(_:)` and `deselect()` say why).
@@ -96,13 +101,16 @@ public final class ShellNavigationModel {
     /// - Parameters:
     ///   - makeEditor: Makes the editor of what the detail opens.
     ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
+    ///   - makeImporter: Makes the import the detail shows (`showImport()`).
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
     public init(
         makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel,
-        makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?, backgroundTime: any BackgroundTime
+        makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?,
+        makeImporter: @escaping @MainActor () -> ImportViewModel, backgroundTime: any BackgroundTime
     ) {
         self.makeEditor = makeEditor
         self.makeExportSheet = makeExportSheet
+        self.makeImporter = makeImporter
         self.backgroundTime = backgroundTime
     }
 
@@ -132,13 +140,26 @@ public final class ShellNavigationModel {
         return .left
     }
 
-    /// Closes what the detail shows, so that the list shows, unless the editor's text cannot be stored as it is.
+    /// Closes what the detail shows, so that the list shows, unless the editor's text cannot be stored as it is. A
+    /// running import stops.
     @discardableResult
     public func deselect() -> LeaveVerdict {
-        guard detail != nil else { return .left }
+        guard detail != nil || importer != nil else { return .left }
         if let status = blockingStatus { return .stayed(status) }
         letGo()
         detail = nil
+        return .left
+    }
+
+    /// Shows the import in the detail, in place of what was open, as `open(_:)` does: the editor that was open stays
+    /// when its text cannot be stored as it is. While the import shows, the same import stays, with its text.
+    @discardableResult
+    public func showImport() -> LeaveVerdict {
+        guard importer == nil else { return .left }
+        if let status = blockingStatus { return .stayed(status) }
+        letGo()
+        detail = nil
+        importer = makeImporter()
         return .left
     }
 
@@ -195,12 +216,12 @@ public final class ShellNavigationModel {
         prune()
     }
 
-    /// What the window shows. A first run shows the welcome until something is open; a store that was used, or could not
-    /// be read, shows the split view, whose list says why. An editor left with text the store does not have shows the
-    /// split view too, on a first run as well: only its list shows the notice with Open and Retry. Once Retry stores a
-    /// first draft, the welcome shows again until the first run is read again and finds the stored CV.
+    /// What the window shows. A first run shows the welcome until something is open, the import too; a store that was
+    /// used, or could not be read, shows the split view, whose list says why. An editor left with text the store does not
+    /// have shows the split view too, on a first run as well: only its list shows the notice with Open and Retry. Once
+    /// Retry stores a first draft, the welcome shows again until the first run is read again and finds the stored CV.
     public func screen(for firstRun: FirstRunState) -> ShellScreen {
-        if detail != nil || !keptEditors.isEmpty { return .split }
+        if detail != nil || importer != nil || !keptEditors.isEmpty { return .split }
         switch firstRun {
         case .loading: return .loading
         case .firstRun: return .welcome
@@ -252,10 +273,12 @@ public final class ShellNavigationModel {
         return status
     }
 
-    /// Closes the export sheet of the open editor, then hands the editor to its `saveNow()` and keeps it alive until that
-    /// ended; when that did not store its text, the editor is kept (`landed(_:)`). Every caller reads what the detail
-    /// opened before it changes the detail.
+    /// Stops and drops the import, closes the export sheet of the open editor, then hands the editor to its `saveNow()`
+    /// and keeps it alive until that ended; when that did not store its text, the editor is kept (`landed(_:)`). Every
+    /// caller reads what the detail opened before it changes the detail.
     private func letGo() {
+        importer?.cancel()
+        importer = nil
         closeExport()
         guard let left = editor else { return }
         let start = detail ?? .blank
