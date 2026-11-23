@@ -431,6 +431,51 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("An employer, a role and a period on three lines under a table row head the next entry, whole", arguments: [
+        ("Experience", "| Period | Employer | Role |", "Northgate Academy", "Teaching Assistant",
+         "Harbor Systems Ltd", "Planner", "2015 – 2017"),
+        ("Berufserfahrung", "| Zeitraum | Unternehmen | Rolle |", "Beispiel Werke", "Mechatroniker",
+         "Hafen Systeme GmbH", "Planer", "2015 – 2017"),
+        ("Esperienza", "| Periodo | Datore di lavoro | Ruolo |", "Esempio Impianti", "Tecnico",
+         "Porto Sistemi SRL", "Pianificatore", "2015 – 2017"),
+    ])
+    func threeLineHeadingBeforeADatedEntry(_ heading: String, _ header: String, _ employer: String, _ role: String,
+                                           _ nextEmployer: String, _ nextRole: String, _ period: String) throws {
+        let result = try importText("""
+        \(heading)
+        \(header)
+        |---|---|---|
+        | 2020 – 2022 | \(employer) | \(role) |
+        \(nextEmployer)
+        \(nextRole)
+        \(period)
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.role?.value } == [role, nextRole])
+        #expect(jobs.map { $0.employer?.value } == [employer, nextEmployer])
+        #expect(jobs.map { $0.details.map(\.value) } == [[], []])
+        noLoss(result)
+    }
+
+    @Test("An undated line under a table row stays its detail when a blank line parts it from the dated entry")
+    func detailBeforeAGap() throws {
+        let result = try importText("""
+        Experience
+        | Period | Employer | Role |
+        |---|---|---|
+        | 2020 – 2022 | Northgate Academy | Teaching Assistant |
+        Covered two classes
+
+        Harbor Systems Ltd
+        Planner
+        2015 – 2017
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.employer?.value } == ["Northgate Academy", "Harbor Systems Ltd"])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Covered two classes"], []])
+        noLoss(result)
+    }
+
     // MARK: Header words in each language
 
     @Test("The header words of each language", arguments: [

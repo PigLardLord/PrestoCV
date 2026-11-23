@@ -595,8 +595,7 @@ enum EntryReader {
             let isRow = inTable && line.block.isTableRow && line.block.index == previous + 1
                 && (line.block.followsGap ? line.cells.count > 1 && line.cells.count == names.count
                     : line.cells.count > 1 || line.cells.count == names.count)
-            let next = place + 1 < lines.count ? lines[place + 1] : nil
-            if !isRow, inTable, continues(line, before: next, after: result.last, ofTable: rowsOfTable == table) {
+            if !isRow, inTable, continues(lines, at: place, after: result.last, ofTable: rowsOfTable == table) {
                 // A line with no date right under a row is that job's description, not an entry of its own
                 previous = line.block.index
                 result[result.count - 1] = result[result.count - 1].appending(line)
@@ -633,20 +632,33 @@ enum EntryReader {
     }
 
     /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
-    /// A line the dated entry right below it can take as its heading is not a detail: it names that entry's employer.
+    /// The undated lines up to the next dated line are that entry's heading when the ordinary reader can take them
+    /// so (no bullet, no prose, no gap, no table row): none of them is a detail, they name its employer and role.
     private static func continues(
-        _ line: Line, before next: Line?, after last: TablePart?, ofTable current: Bool
+        _ lines: [Line], at place: Int, after last: TablePart?, ofTable current: Bool
     ) -> Bool {
+        let line = lines[place]
         guard !line.block.followsGap, line.period == nil, line.label == nil, !line.isDurationOnly else { return false }
-        if let next, !next.block.followsGap, !next.block.isTableRow, next.period != nil, !next.isBullet, !line.isBullet,
-           !line.isProse {
-            return false
-        }
+        if headsADatedEntry(lines, from: place) { return false }
         switch last {
         case .columns?: return current
         case .ordinary(_, let isDoubtful)?: return isDoubtful
         case nil: return false
         }
+    }
+
+    /// Whether the run of undated lines from `start` ends, with no gap between, at a dated line that can take it as
+    /// its heading.
+    private static func headsADatedEntry(_ lines: [Line], from start: Int) -> Bool {
+        var place = start
+        while place < lines.count {
+            let line = lines[place]
+            if line.block.followsGap || line.block.isTableRow || line.isBullet || line.isProse { return false }
+            if line.period != nil { return place > start }
+            if line.label != nil || line.isDurationOnly { return false }
+            place += 1
+        }
+        return false
     }
 
     /// The entries read from a table whose columns the vocabulary does not name are marked for the person to check.
