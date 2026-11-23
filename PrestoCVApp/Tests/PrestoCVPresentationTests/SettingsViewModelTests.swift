@@ -50,6 +50,17 @@ struct SettingsViewModelTests {
         #expect(settings.groups.first == SettingsGroup(kind: .support, rows: []))
         #expect(settings.supportAddress == "//help")
     }
+
+    @Test("a link the composition could not make leaves its row out, and Legal with it")
+    func missingLinksLeaveTheirRowsOut() {
+        let settings = SettingsViewModel(
+            supportAddress: "help@example.org", privacyPolicy: nil, sourceCode: nil, version: "1.1", build: "140",
+            appName: "PrestoCV"
+        )
+
+        #expect(settings.groups.map(\.kind) == [.support, .openSource, .about])
+        #expect(settings.groups[1].rows == [.openSourceStatement, .licences])
+    }
 }
 
 private extension SettingsRow {
