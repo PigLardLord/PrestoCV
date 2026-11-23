@@ -7,20 +7,41 @@ import PrestoCVPresentation
 /// Every public member of the Settings sheet and of the Licences screen, each with its type spelled out. It compiles only
 /// while each type is the presentation's own.
 @MainActor
-func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesViewModel) async {
+func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesViewModel, diagnostics: DiagnosticsViewModel) async {
+    await settings.appear()
     let _: String = settings.appName + settings.supportAddress
     for group in settings.groups as [SettingsGroup] {
         switch group.kind {
-        case .support, .legal, .openSource, .about: break
+        case .support, .legal, .openSource, .about, .diagnostics: break
         }
         for row in group.rows as [SettingsRow] {
             switch row {
             case .contactSupport(let link), .privacyPolicy(let link), .sourceCode(let link): let _: URL = link
-            case .openSourceStatement, .licences: break
+            case .openSourceStatement, .licences, .diagnostics: break
             case .version(let text), .build(let text): let _: String = text
             }
         }
     }
+    await diagnostics.load()
+    switch diagnostics.state as DiagnosticsState {
+    case .loading, .empty, .listed: break
+    }
+    for row in diagnostics.rows as [DiagnosticsRow] {
+        let _: UUID = row.id
+        let _: Date = row.started
+        switch row.kind as DiagnosticsRow.Kind {
+        case .aiDraft, .textImport: break
+        }
+        switch row.outcome as DiagnosticsRow.Outcome {
+        case .finished, .failed, .cancelled, .unfinished: break
+        }
+        await diagnostics.select(row.id)
+    }
+    let chosen: UUID? = diagnostics.selection
+    let _: String = diagnostics.summary
+    let _: [URL] = diagnostics.shareFiles
+    await diagnostics.finish()
+    _ = chosen
     await licences.load()
     switch licences.state as LicencesState {
     case .loading, .loaded, .failed: break
@@ -46,11 +67,13 @@ struct SettingsSurfaceTests {
         let settings = SettingsViewModel(
             supportAddress: "help@example.org", privacyPolicy: try #require(URL(string: "https://example.org/privacy.html")),
             sourceCode: try #require(URL(string: "https://example.org/source.html")), version: "1.1", build: "140",
-            appName: "PrestoCV"
+            appName: "PrestoCV", diagnostics: DiagnosticsFake()
         )
         let licences = LicencesViewModel(reading: NoticesFake([]))
 
-        await useEveryPublicMember(of: settings, licences: licences)
+        await useEveryPublicMember(
+            of: settings, licences: licences, diagnostics: DiagnosticsViewModel(reading: DiagnosticsFake(runs: [.run(1, at: 0)]))
+        )
 
         #expect(licences.state == .failed)
     }

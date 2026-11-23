@@ -20,7 +20,8 @@ public final class ScreenFactory {
     private let editing: EditCVWorkflow
     /// What the list edits through: `editing`, or the wrapper the composition gives it.
     private let listEditing: any CVEditing
-    private let importing: ImportCVWorkflow
+    /// What the import screens read through: the workflow, or the wrapper the composition gives it.
+    private let importing: any CVImporting
     private let importFiles: any ImportFileReading
     private let exportFiles: any ExportFileSharing
     private let exporter: any CVExporting
@@ -55,6 +56,8 @@ public final class ScreenFactory {
     ///   - languageDetector: Reads the language of the words of a CV that keeps none, for the export sheets (#407).
     ///   - wrapListEditing: Gives the list's editing from the workflow: the composition gives it back as it is, and a UI test's
     ///     launch fixture wraps it.
+    ///   - wrapImport: Gives the import screens' reading from the workflow: the composition gives it back as it is, and a UI
+    ///     test's launch fixture replaces it.
     ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
     ///   - appLanguage: The language of the app: the PDF's in the shell's export sheets when a CV keeps no language and
     ///     its words tell none.
@@ -63,13 +66,13 @@ public final class ScreenFactory {
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exportFiles: any ExportFileSharing, exporter: any CVExporting, lookOptions: any LookOptionsProviding,
         languages: [ExportLanguage], languageDetector: any CVLanguageDetecting,
-        wrapListEditing: (any CVEditing) -> any CVEditing, backgroundTime: any BackgroundTime,
-        appLanguage: ExportLanguage
+        wrapListEditing: (any CVEditing) -> any CVEditing, wrapImport: (any CVImporting) -> any CVImporting,
+        backgroundTime: any BackgroundTime, appLanguage: ExportLanguage
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
         editing = EditCVWorkflow(repository: repository, ids: ids)
         listEditing = wrapListEditing(editing)
-        importing = ImportCVWorkflow(importer: importer, ids: ids)
+        importing = wrapImport(ImportCVWorkflow(importer: importer, ids: ids))
         self.importFiles = importFiles
         self.exportFiles = exportFiles
         self.exporter = exporter
@@ -142,13 +145,12 @@ public final class ScreenFactory {
                     Task { await editor.changeLook(to: look, parts: parts) }
                 }
             )
-        }, backgroundTime: backgroundTime)
+        }, makeImporter: { self.makeImport() }, backgroundTime: backgroundTime)
     }
 
-    /// The first run and the ways to start another CV. It does not offer the import while the app has no import screen
-    /// (step 5-13 adds the screen and the choice), so that no choice leads nowhere.
+    /// The first run and the ways to start another CV, the import first: the shell shows the import (`showImport()`).
     public func makeFirstRun() -> FirstRunViewModel {
-        FirstRunViewModel(browsing: browsing, editing: editing, offersImport: false)
+        FirstRunViewModel(browsing: browsing, editing: editing, offersImport: true)
     }
 
     /// The import of a CV the person already has: a text, a pasted PDF or a PDF file.
