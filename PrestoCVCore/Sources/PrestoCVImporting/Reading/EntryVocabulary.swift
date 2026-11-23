@@ -347,14 +347,16 @@ extension EntryVocabulary {
 
     /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
     /// positive sign of a sentence, which no noun phrase of a skills list has. The pronoun must be written as one
-    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals) and followed by a word that does not start with a
-    /// capital ("I led", never the numeral of "I Corinthians study").
-    static func startsWithSubject(_ text: String) -> Bool {
+    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals). A capitalised next word is a name ("I Corinthians
+    /// study") only when `capitalisedNextIsAName` says the line is a list of three or more items; in a line of two
+    /// clauses it is a brand used as a verb ("I Google suppliers, compare quotes"). Trade-off: a two-item list that
+    /// starts with a numeral ("I Corinthians study, choir singing.") stays whole as text not imported.
+    static func startsWithSubject(_ text: String, capitalisedNextIsAName: Bool) -> Bool {
         let words = text.words
         guard let first = words.first, subjectPronouns.contains(first.folded) else { return false }
         let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy(\.isLowercase)
         let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
-        return isWrittenAsAWord && !nextStartsWithACapital
+        return isWrittenAsAWord && !(nextStartsWithACapital && capitalisedNextIsAName)
     }
 
     private static let subjectPronouns: Set<String> = Set([

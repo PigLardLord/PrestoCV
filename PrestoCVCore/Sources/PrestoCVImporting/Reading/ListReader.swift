@@ -74,7 +74,7 @@ enum ListReader {
     /// list of those stays a list.
     private static func isSentence(_ content: Piece, parts: [Piece]) -> Bool {
         content.text.hasSuffix(".") && !content.text.hasSuffix("..") && content.words.count > maxSkillWords
-            && parts.contains { $0.words.count >= 3 && EntryVocabulary.startsWithSubject($0.text) }
+            && parts.contains { $0.words.count >= 3 && EntryVocabulary.startsWithSubject($0.text, capitalisedNextIsAName: parts.count >= 3) }
     }
 
     private static func hasOtherSeparator(_ content: Piece) -> Bool {

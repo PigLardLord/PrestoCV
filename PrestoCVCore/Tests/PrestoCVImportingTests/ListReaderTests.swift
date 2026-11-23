@@ -131,6 +131,16 @@ struct ListReaderTests {
         #expect(found.unplaced.map(\.text) == [line])
     }
 
+    @Test("A sentence whose verb is a capitalised brand stays whole", arguments: [
+        "I Google suppliers, compare quotes and negotiate contracts.",
+        "We Slack clients, track orders and close tickets.",
+    ])
+    func sentenceWithABrandVerb(line: String) {
+        let found = read("Skills\n\(line)")
+        #expect(found.cv.skills.isEmpty)
+        #expect(found.unplaced.map(\.text) == [line])
+    }
+
     @Test("A list whose first item starts like a pronoun is still a list", arguments: [
         ("EU project management, grant writing, budget planning.",
          ["EU project management", "grant writing", "budget planning."]),
