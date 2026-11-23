@@ -107,7 +107,7 @@ enum EntryVocabulary {
             // A lower-case word opens a head only when it is one ("diploma in nursing", not "led the move") or a name
             // particle before a recognised employer or school ("von Linden GmbH", "di Rossi S.r.l.")
             let opensAHead = isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))
-                || nameParticles.contains(folded)
+                || (nameParticles.contains(folded) && endsAtOrganisation(rest))
             return namesAHead && opensAHead ? .strong : .none
         }
         if namesAHead { return .strong }
@@ -123,6 +123,12 @@ enum EntryVocabulary {
         if text.contains(where: { "|·•—–,/".contains($0) }) || text.contains(" - ") { return true }
         let words = text.words
         return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
+    }
+
+    /// Whether a name ends at its company or school word, with no prose after it ("von Linden GmbH", not "von Muster GmbH ausgezeichnet").
+    private static func endsAtOrganisation(_ text: Substring) -> Bool {
+        guard let last = text.split(separator: " ").last else { return false }
+        return isOrganisation(String(last)) || isSchool(String(last))
     }
 
     /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").

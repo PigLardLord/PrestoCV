@@ -325,6 +325,24 @@ struct BulletEntryTests {
         #expect(found.cv.experience.map { $0.period?.value.start.year } == [2021, 2018])
     }
 
+    @Test("An award line that starts with a particle and ends in prose stays a detail of the entry above")
+    func particleAwardIsADetail() throws {
+        let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n• 2019 – von Muster GmbH ausgezeichnet", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].role?.value == "Elektriker")
+        #expect(found.cv.experience[0].employer?.value == "Beispiel GmbH")
+        #expect(found.cv.experience[0].period?.value.start.year == 2021)
+        #expect(found.cv.experience[0].details.map(\.value) == ["Ich habe die Installationen geprüft.", "2019 – von Muster GmbH ausgezeichnet"])
+    }
+
+    @Test("A role and an employer with a particle, in a section that also holds a sentence, are a second entry")
+    func particleEmployerAfterRole() throws {
+        let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n• 2019 – Mechaniker – von Linden GmbH", kind: .experience)
+        #expect(found.cv.experience.map { $0.employer?.value } == ["Beispiel GmbH", "von Linden GmbH"])
+        #expect(found.cv.experience.map { $0.role?.value } == ["Elektriker", "Mechaniker"])
+        #expect(found.cv.experience.map { $0.period?.value.start.year } == [2021, 2019])
+    }
+
     @Test("The reviewed input: a course with a placement count under it")
     func placementCount() throws {
         let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\nI completed the practical training.\n• 2000 – hours of placement", kind: .education)
