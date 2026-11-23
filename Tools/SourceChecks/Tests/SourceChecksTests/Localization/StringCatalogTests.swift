@@ -27,14 +27,16 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
             // German also names the website a CV of the released app lost "Website".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
-            // the designs "Minimal" and "Modern" and the fonts "System" as English does. German, French and Italian say
-            // "Build", German and French "Version", German "Support", French "Licences", and French and Italian "Open source".
+            // the designs "Minimal" and "Modern" and the fonts "System" as English does. An alert's "OK" reads the same in all
+            // but Spanish. German, French and Italian say "Build", German and French "Version", German "Support", French
+            // "Licences", and French and Italian "Open source".
             sameInSomeLanguages: [
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
                 "editor.entry.title.certification": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
+                "import.error.ok": ["de", "fr", "it", "pt"],
                 "legacyImport.detail.website": ["de"],
                 "settings.about.build": ["de", "fr", "it"], "settings.about.version": ["de", "fr"],
                 "settings.support.header": ["de"], "settings.licences.title": ["fr"], "settings.openSource.licences": ["fr"],

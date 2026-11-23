@@ -44,10 +44,12 @@ private final class ShellModels: ObservableObject {
     let report: LegacyImportReportViewModel
     let settings: SettingsViewModel
     let licences: LicencesViewModel
+    let diagnostics: DiagnosticsViewModel
 
     init(screens: ScreenFactory, settings factory: SettingsFactory) {
         settings = factory.makeSettings()
         licences = factory.makeLicences()
+        diagnostics = factory.makeDiagnostics()
         firstRun = screens.makeFirstRun()
         let untitled = String(localized: "shell.untitled")
         // The order and the punctuation of a title and its number are the translation's
@@ -77,7 +79,7 @@ private struct ReadyShell: View {
     var body: some View {
         ShellView(
             shell: models.shell, list: models.list, firstRun: models.firstRun, report: models.report,
-            settings: models.settings, licences: models.licences
+            settings: models.settings, licences: models.licences, diagnostics: models.diagnostics
         )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")

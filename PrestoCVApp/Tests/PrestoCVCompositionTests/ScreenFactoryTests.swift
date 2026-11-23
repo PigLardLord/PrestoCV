@@ -141,7 +141,7 @@ struct ScreenFactoryTests {
         #expect(shell.screen(for: firstRun.state) == .split)
     }
 
-    @Test("On an empty store the first run offers the examples, then blank, and no import while the app has no import screen")
+    @Test("On an empty store the first run offers the import, then the examples, then blank")
     func firstRunWithExamples() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -151,15 +151,16 @@ struct ScreenFactoryTests {
         await firstRun.load()
 
         #expect(firstRun.state == .firstRun)
-        guard firstRun.entries.count == 2, case .examples(let examples) = firstRun.entries[0] else {
-            Issue.record("expected the examples, then blank, got \(firstRun.entries)")
+        guard firstRun.entries.count == 3, firstRun.entries[0] == .importCV,
+              case .examples(let examples) = firstRun.entries[1] else {
+            Issue.record("expected the import, then the examples, then blank, got \(firstRun.entries)")
             return
         }
         #expect(examples.count == 2)
         #expect(firstRun.entries.last == .blank)
     }
 
-    @Test("Without a Samples folder the first run says the examples are unavailable and still offers blank")
+    @Test("Without a Samples folder the first run says the examples are unavailable and still offers the import and blank")
     func firstRunWithoutExamples() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
@@ -167,7 +168,7 @@ struct ScreenFactoryTests {
 
         await firstRun.load()
 
-        #expect(firstRun.entries == [.examplesIssue(.unavailable), .blank])
+        #expect(firstRun.entries == [.importCV, .examplesIssue(.unavailable), .blank])
     }
 
     @Test("Blank and an example give a draft under an id of the composition's source, and store nothing")
@@ -346,8 +347,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"]), legacyImport: .nothing
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -374,8 +375,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"]), legacyImport: .nothing
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -408,8 +409,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"]), legacyImport: .nothing
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
@@ -438,8 +439,8 @@ struct ScreenFactoryTests {
             samples: InMemorySampleCVSource([]), ids: SequentialIDGenerator(), clock: SteppingClock(),
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
-            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, backgroundTime: NoBackgroundTime(),
-            appLanguage: .preferred(["en"]), legacyImport: .nothing
+            languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
+            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
         let shell = factory.makeShell(
