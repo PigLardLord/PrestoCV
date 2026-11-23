@@ -476,6 +476,47 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    private func teacherThen(_ tail: String) throws -> [ImportedExperience] {
+        try importText("""
+        Experience
+        | Role | Employer | Period |
+        |---|---|---|
+        | Teacher | City School | 2018 – 2020 |
+        \(tail)
+        """).cv.experience
+    }
+
+    private func years(_ start: Int, _ end: Int) -> ImportedPeriod {
+        ImportedPeriod(start: YearMonth(year: start, month: nil), end: .date(YearMonth(year: end, month: nil)))
+    }
+
+    @Test("A two-line heading right above a date alone goes with the dated entry, not the table row")
+    func headingOfTwoLinesBeforeADate() throws {
+        let jobs = try teacherThen("Harbor Systems GmbH\nPlanner\n2015 – 2017")
+        #expect(jobs.map { $0.employer?.value } == ["City School", "Harbor Systems GmbH"])
+        #expect(jobs.map { $0.role?.value } == ["Teacher", "Planner"])
+        #expect(jobs.map { $0.period?.value } == [years(2018, 2020), years(2015, 2017)])
+        #expect(jobs.map { $0.details.map(\.value) } == [[], []])
+    }
+
+    @Test("Only the lines just before the date are its heading; the earlier ones stay the table row's details")
+    func detailsThenHeading() throws {
+        let jobs = try teacherThen("Supported pupils\nCovered two classes\nHarbor Systems Ltd\nPlanner, 2015 – 2017")
+        #expect(jobs.map { $0.employer?.value } == ["City School", "Harbor Systems Ltd"])
+        #expect(jobs.map { $0.role?.value } == ["Teacher", "Planner"])
+        #expect(jobs.map { $0.period?.value } == [years(2018, 2020), years(2015, 2017)])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Supported pupils", "Covered two classes"], []])
+    }
+
+    @Test("A blank line parts the table row's detail from the heading of the dated entry")
+    func detailThenGapThenHeading() throws {
+        let jobs = try teacherThen("Supported pupils\n\nHarbor Systems Ltd\nPlanner, 2015 – 2017")
+        #expect(jobs.map { $0.employer?.value } == ["City School", "Harbor Systems Ltd"])
+        #expect(jobs.map { $0.role?.value } == ["Teacher", "Planner"])
+        #expect(jobs.map { $0.period?.value } == [years(2018, 2020), years(2015, 2017)])
+        #expect(jobs.map { $0.details.map(\.value) } == [["Supported pupils"], []])
+    }
+
     // MARK: Header words in each language
 
     @Test("The header words of each language", arguments: [

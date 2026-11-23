@@ -632,8 +632,9 @@ enum EntryReader {
     }
 
     /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
-    /// The undated lines up to the next dated line are that entry's heading when the ordinary reader can take them
-    /// so (no bullet, no prose, no gap, no table row): none of them is a detail, they name its employer and role.
+    /// The undated lines just before the next dated line are that entry's heading when the ordinary reader can take
+    /// them so (no bullet, no prose, no gap, no table row): none of them is a detail, they name its employer and role.
+    /// The lines before those are still the row's.
     private static func continues(
         _ lines: [Line], at place: Int, after last: TablePart?, ofTable current: Bool
     ) -> Bool {
@@ -647,14 +648,18 @@ enum EntryReader {
         }
     }
 
-    /// Whether the run of undated lines from `start` ends, with no gap between, at a dated line that can take it as
-    /// its heading.
+    /// Whether the line at `start`, with the undated lines after it, is the heading of the dated line that ends the run
+    /// with no gap between: the employer above a dated line that holds the role, or the employer and the role above a
+    /// dated line that is only a period.
     private static func headsADatedEntry(_ lines: [Line], from start: Int) -> Bool {
         var place = start
         while place < lines.count {
             let line = lines[place]
             if line.block.followsGap || line.block.isTableRow || line.isBullet || line.isProse { return false }
-            if line.period != nil { return place > start }
+            if let period = line.period {
+                let isPeriodAlone = line.cells.count == 1 && line.cells[0].trimmed().text == period.piece.text
+                return place > start && place - start <= (isPeriodAlone ? 2 : 1)
+            }
             if line.label != nil || line.isDurationOnly { return false }
             place += 1
         }
