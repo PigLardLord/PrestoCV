@@ -125,13 +125,6 @@ enum HeaderReader {
             } else if let tail = reading.split?.tail {
                 findings.unplace(tail, in: candidate.section)
             }
-            // No title under the name: a role right above it, in the same block of the head, is the title
-            if findings.cv.person.title == nil, reading.index > 0, !taken.contains(reading.index - 1),
-               isTitleAbove(reading.index, in: candidates) {
-                let whole = wholeTitle(from: reading.index - 1, in: candidates, document: findings.document)
-                findings.cv.person.title = title(whole, with: reading.split?.credentials ?? [], couldBeTheName: false)
-                taken.formUnion(whole.indices)
-            }
         }
         if findings.cv.person.location == nil,
            let index = candidates.indices.first(where: { !taken.contains($0) && looksLikePlace(candidates[$0], beside: contactBlocks) }) {
@@ -476,16 +469,7 @@ enum HeaderReader {
             let mark = isMarked(reading.index) ? 4 : 0
             let title = titled.contains(reading.index) ? 3 : 0
             let position = reading.index == first ? 2 : 0
-            return mark + title + position - (Places.isPlaceOnly(reading.name.text) ? 3 : 0) - (isTitleAboveAName(reading) ? 3 : 0)
-        }
-        // A role above a line with the shape of a name that no list doubts is that name's title ("Web Developer / Anna Weber"),
-        // when the role line holds evidence of a title: a role word that is never a surname, or a qualified role. A role word
-        // that may be a surname ("Anna Planner / Community Outreach") is no such evidence, and the first line stays the name.
-        func isTitleAboveAName(_ reading: NameReading) -> Bool {
-            guard reading.doubt > 0, EntryVocabulary.hasTitleEvidence(reading.name.text), indices.contains(reading.index + 1),
-                  candidates[reading.index + 1].section == candidates[reading.index].section,
-                  candidates[reading.index + 1].block.index == candidates[reading.index].block.index + 1 else { return false }
-            return readings.first { $0.index == reading.index + 1 }.map { $0.doubt == 0 } ?? false
+            return mark + title + position - (Places.isPlaceOnly(reading.name.text) ? 3 : 0)
         }
         let best = readings.max { (evidence($0), -$0.doubt, -$0.index) < (evidence($1), -$1.doubt, -$1.index) }
         guard let best else { return nil }
@@ -524,13 +508,6 @@ enum HeaderReader {
         guard let next = titleLine(under: index, in: candidates) else { return false }
         guard readings.contains(next) else { return true }
         return EntryVocabulary.isRole(candidates[next].piece.text) && titleLine(under: next, in: candidates) == nil
-    }
-
-    /// Whether the line right above the one at `index` is a title that names a role, in the same section.
-    private static func isTitleAbove(_ index: Int, in candidates: [Candidate]) -> Bool {
-        let above = candidates[index - 1]
-        return above.section == candidates[index].section && !above.followsContact && looksLikeTitle(above)
-            && EntryVocabulary.isRole(above.piece.text)
     }
 
     /// The line under the one at `index`, in the same section, when it reads as a title.
