@@ -28,11 +28,11 @@ struct RootView: View {
             #if DEBUG
             // A Debug build launched for the UI tests shares through a stand-in they can read, and is handed a PDF as if
             // another app opened it
-            ReadyShell(screens: composition.screens, inbox: opened.inbox)
+            ReadyShell(screens: composition.screens, settings: composition.settings, inbox: opened.inbox)
                 .environment(\.sharesWithStandIn, composition.sharesWithStandIn)
                 .modifier(OpenedFileDelivery(fixture: composition.openedFile, inbox: opened.inbox))
             #else
-            ReadyShell(screens: composition.screens, inbox: opened.inbox)
+            ReadyShell(screens: composition.screens, settings: composition.settings, inbox: opened.inbox)
             #endif
         case .failed(let failure):
             CompositionFailedView(failure: failure, retry: holder.retry)
@@ -59,8 +59,12 @@ private final class ShellModels: ObservableObject {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let settings: SettingsViewModel
+    let licences: LicencesViewModel
 
-    init(screens: ScreenFactory) {
+    init(screens: ScreenFactory, settings factory: SettingsFactory) {
+        settings = factory.makeSettings()
+        licences = factory.makeLicences()
         firstRun = screens.makeFirstRun()
         list = screens.makeCVList(
             untitled: String(localized: "shell.untitled"),
@@ -82,13 +86,16 @@ private struct ReadyShell: View {
     /// The window's inbox, told once the shell is there
     let inbox: OpenedFileInbox
 
-    init(screens: ScreenFactory, inbox: OpenedFileInbox) {
-        _models = StateObject(wrappedValue: ShellModels(screens: screens))
+    init(screens: ScreenFactory, settings: SettingsFactory, inbox: OpenedFileInbox) {
+        _models = StateObject(wrappedValue: ShellModels(screens: screens, settings: settings))
         self.inbox = inbox
     }
 
     var body: some View {
-        ShellView(shell: models.shell, list: models.list, firstRun: models.firstRun)
+        ShellView(
+            shell: models.shell, list: models.list, firstRun: models.firstRun, settings: models.settings,
+            licences: models.licences
+        )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.ready")
             .task { inbox.shellReady(models.shell) }
