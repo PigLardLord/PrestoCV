@@ -33,7 +33,7 @@ public final class FirstRunViewModel {
     @ObservationIgnored private let editing: any CVEditing
     @ObservationIgnored private let offersImport: Bool
 
-    /// `offersImport` is false while the app has no import screen, so no choice leads nowhere.
+    /// `offersImport` puts the import first among the ways to start; it is false where no import screen can follow.
     public init(browsing: any CVBrowsing, editing: any CVEditing, offersImport: Bool) {
         self.browsing = browsing
         self.editing = editing

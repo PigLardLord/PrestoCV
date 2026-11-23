@@ -52,6 +52,9 @@ public final class Composition {
     /// Gives the store the screens write through from the composition's own. A launch gives it back as it is; in a Debug
     /// build a UI test's fixture wraps it.
     typealias WrapStore = @MainActor (any CVRepository) -> any CVRepository
+    /// Gives the import the screens read through from the workflow. A launch gives it back as it is; in a Debug build a UI
+    /// test's fixture replaces it.
+    typealias WrapImport = @MainActor (any CVImporting) -> any CVImporting
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -85,6 +88,7 @@ public final class Composition {
         let prepare: @MainActor () throws(CompositionFailure) -> Void
         let wrapListEditing: WrapListEditing
         let wrapStore: WrapStore
+        let wrapImport: WrapImport
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
@@ -148,7 +152,7 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
-        settings = SettingsFactory(facts: inputs.settings)
+        settings = SettingsFactory(facts: inputs.settings, trace: trace.access)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
@@ -163,7 +167,7 @@ public final class Composition {
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
             languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
-            wrapListEditing: inputs.wrapListEditing, backgroundTime: inputs.backgroundTime,
+            wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, backgroundTime: inputs.backgroundTime,
             appLanguage: inputs.appLanguage
         )
     }
@@ -297,6 +301,7 @@ public final class Composition {
         let wrapListEditing: WrapListEditing
         let sharesWithStandIn: Bool
         let wrapStore: WrapStore
+        let wrapImport: WrapImport
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
@@ -334,6 +339,12 @@ public final class Composition {
         wrapListEditing = { fixtures.listEditing($0) }
         sharesWithStandIn = fixtures.sharesWithStandIn
         wrapStore = { fixtures.store($0) }
+        wrapImport = { fixtures.importing($0) }
+        // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
+        // left alone here, and `make` fails the launch through `check`.
+        if rejected == nil, fixtures.passesCheck(paths) {
+            await fixtures.seedTrace(into: paths)
+        }
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
@@ -344,8 +355,9 @@ public final class Composition {
         wrapListEditing = { $0 }
         sharesWithStandIn = false
         wrapStore = { $0 }
+        wrapImport = { $0 }
         #endif
-        return await make(Inputs(
+        let state = await make(Inputs(
             paths: paths,
             clock: SystemTimeSource(),
             ids: UUIDGenerator(),
@@ -374,12 +386,19 @@ public final class Composition {
             prepare: prepare,
             wrapListEditing: wrapListEditing,
             wrapStore: wrapStore,
+            wrapImport: wrapImport,
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             settings: bundledSettings()
         ))
+        #if DEBUG
+        // A launch with the invented runs returns once its trace has settled, so that a UI test that sees the first screen
+        // knows what the gate did with them: a closed gate has purged them. The fixture's distribution answers at once.
+        if fixtures.storesTraceRuns { await settlement.previous()?.value }
+        #endif
+        return state
     }
 
     /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of
