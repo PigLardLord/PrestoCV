@@ -304,6 +304,18 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture of the other window outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test stores two invented runs of the diagnostics before the trace chain starts; no Release build may be able to.
+    @Test("The fixture of the invented trace runs is read only by Debug builds")
+    func theFixtureOfTheInventedTraceRunsIsReadOnlyInDebugBuilds() {
+        let names = ["traceRunsArgument", "storesTraceRuns", "InventedTraceRuns", "seedTrace"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture of the invented trace runs outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// Where the new app keeps its data is decided in one place, so a second folder cannot appear unnoticed.
     @Test("Only AppPaths asks the system for a folder in the composition")
     func onlyAppPathsAsksForFolders() throws {

@@ -152,7 +152,7 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
-        settings = SettingsFactory(facts: inputs.settings)
+        settings = SettingsFactory(facts: inputs.settings, trace: trace.access)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
@@ -340,6 +340,11 @@ public final class Composition {
         sharesWithStandIn = fixtures.sharesWithStandIn
         wrapStore = { fixtures.store($0) }
         wrapImport = { fixtures.importing($0) }
+        // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
+        // left alone here, and `make` fails the launch through `check`.
+        if rejected == nil, fixtures.passesCheck(paths) {
+            await fixtures.seedTrace(into: paths)
+        }
         #else
         paths = device
         gate = .asking(AppTransactionDistribution())
@@ -352,7 +357,7 @@ public final class Composition {
         wrapStore = { $0 }
         wrapImport = { $0 }
         #endif
-        return await make(Inputs(
+        let state = await make(Inputs(
             paths: paths,
             clock: SystemTimeSource(),
             ids: UUIDGenerator(),
@@ -388,6 +393,12 @@ public final class Composition {
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             settings: bundledSettings()
         ))
+        #if DEBUG
+        // A launch with the invented runs returns once its trace has settled, so that a UI test that sees the first screen
+        // knows what the gate did with them: a closed gate has purged them. The fixture's distribution answers at once.
+        if fixtures.storesTraceRuns { await settlement.previous()?.value }
+        #endif
+        return state
     }
 
     /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of
