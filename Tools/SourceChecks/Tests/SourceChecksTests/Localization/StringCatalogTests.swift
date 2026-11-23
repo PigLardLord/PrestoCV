@@ -24,14 +24,14 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
-            // German also names the website a CV of the released app lost "Website".
+            // German writes "Website" and "Link" as English does, Italian and Portuguese "Link", and French "Description" and
+            // "Certification". German also names the website a CV of the released app lost "Website".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
             // the designs "Minimal" and "Modern" and the fonts "System" as English does. An alert's "OK" reads the same in all
             // but Spanish. German, French and Italian say "Build", German and French "Version", German "Support", French
             // "Licences", and French and Italian "Open source".
             sameInSomeLanguages: [
-                "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
+                "editor.field.website": ["de"], "editor.field.link": ["de", "it", "pt"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
                 "editor.entry.title.certification": ["fr"],
