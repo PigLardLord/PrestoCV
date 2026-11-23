@@ -188,6 +188,14 @@ struct DateReaderTests {
         #expect(DateReader.periods(in: text).isEmpty)
     }
 
+    @Test("A dotted range with a k before punctuation or a rate is pay, no period", arguments: [
+        "10.20 – 12.20k/year", "10.20 – 12.20k, gross", "10.20 – 12.20k/month", "10.20 – 12.20k)",
+        "10.20 – 12.20 k/year", "10.20 – 12.20k.",
+    ])
+    func kBeforePunctuationIsAUnit(text: String) {
+        #expect(DateReader.periods(in: text).isEmpty)
+    }
+
     @Test("A slash range is a period whatever word follows, the words of a unit included", arguments: [
         "09/19 – 08/21 K-12 Teacher", "09/19 – 08/21 k8s platform", "09/19 – 08/21 % of revenue",
         "09/19 – 08/21 % des Umsatzes", "09/19 – 08/21 % del fatturato", "09/19 – 08/21 % du chiffre d'affaires",

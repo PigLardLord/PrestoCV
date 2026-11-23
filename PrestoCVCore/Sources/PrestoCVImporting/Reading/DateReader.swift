@@ -230,9 +230,18 @@ enum DateReader {
         return false
     }
 
-    /// A "k" is a unit as a token of its own; joined to a mark, a digit or letters that follow ("K-12", "k8s") it begins a word.
+    /// A "k" is a unit before punctuation, a rate or a space; it begins a word only when a letter or digit follows it
+    /// directly ("k8s") or a hyphen and then a letter or digit ("K-12").
     private static func joinsTheNext(index: Int, in tokens: [Token]) -> Bool {
-        index + 1 < tokens.count && !tokens[index + 1].spaced
+        guard index + 1 < tokens.count, !tokens[index + 1].spaced else { return false }
+        switch tokens[index + 1].kind {
+        case .word, .number: return true
+        case .mark("-"):
+            guard index + 2 < tokens.count, !tokens[index + 2].spaced else { return false }
+            if case .mark = tokens[index + 2].kind { return false }
+            return true
+        case .mark: return false
+        }
     }
 
     private static let currencySigns: Set<Character> = ["€", "$", "£", "¥"]

@@ -61,6 +61,7 @@ struct ShortYearImportTests {
         "Salaire 10.50 – 12.50 EUR brut", "Salario 10.50 – 12.50 EUR bruto", "Salário 10.50 – 12.50 EUR líquido",
         "10.50 – 12.50 EUR net", "10.50 – 12.50 EUR netto", "10.50 – 12.50 EUR netti", "10.50 – 12.50 EUR neto",
         "3.50 – 4.50 EUR gross", "10.50 – 12.50", "3.50 – 4.50",
+        "10.20 – 12.20k/year", "10.20 – 12.20k, gross", "10.20 – 12.20k/month",
     ])
     func payWithAWordIsADetail(line: String) throws {
         let found = try imported("""
