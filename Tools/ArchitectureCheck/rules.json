@@ -118,6 +118,7 @@
    "PrestoCV/PrestoCVApp.swift",
    "PrestoCV/App/AppEnvironment.swift",
    "PrestoCVApp/Sources/PrestoCVComposition/Composition.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/InventedTraceRuns.swift",
    "PrestoCVApp/Sources/PrestoCVComposition/TraceChain.swift"
   ],
   "modules": [
