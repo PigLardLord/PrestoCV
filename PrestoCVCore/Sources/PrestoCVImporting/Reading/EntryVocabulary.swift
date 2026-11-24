@@ -125,10 +125,26 @@ enum EntryVocabulary {
         return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
     }
 
-    /// Whether a name ends at its company or school word, with no prose after it ("von Linden GmbH", not "von Muster GmbH ausgezeichnet").
+    /// Whether a name ends at its company or school word, with no prose after it: the word is the last one, or a part in
+    /// parentheses or a capitalised part after a separator follows it ("von Linden GmbH", "von Linden UG (haftungsbeschränkt)",
+    /// "von Linden GmbH, Berlin"), never prose ("von Muster GmbH ausgezeichnet", "von Muster GmbH, ausgezeichnet").
     private static func endsAtOrganisation(_ text: Substring) -> Bool {
-        guard let last = text.split(separator: " ").last else { return false }
-        return isOrganisation(String(last)) || isSchool(String(last))
+        let tokens = text.split(separator: " ")
+        for (index, token) in tokens.enumerated() where isOrganisation(String(token)) || isSchool(String(token)) {
+            let after = tokens.dropFirst(index + 1)
+            guard let next = after.first else { return true }
+            if next.hasPrefix("(") { return true }
+            let part: Substring?
+            if token.hasSuffix(",") {
+                part = next
+            } else if next.count == 1, "–—-|·/".contains(next) {
+                part = after.dropFirst().first
+            } else {
+                continue
+            }
+            if part?.first?.isUppercase ?? true { return true }
+        }
+        return false
     }
 
     /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
