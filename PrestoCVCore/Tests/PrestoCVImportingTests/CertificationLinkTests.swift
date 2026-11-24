@@ -147,6 +147,15 @@ struct CertificationLinkTests {
         #expect(found.unplaced.isEmpty)
     }
 
+    @Test("A line of a date and an address is no date alone: it gives no year to the certification above, and its address is not lost")
+    func dateWithAddressIsNoDateAlone() throws {
+        let found = read("Certifications\nSwift Basics\n2024 https://academy.example/c/123")
+        let certification = try #require(found.cv.certifications.first)
+        #expect(found.cv.certifications.count == 1)
+        #expect(certification.year == nil)
+        #expect(certification.link != nil || !found.unplaced.isEmpty)
+    }
+
     @Test("The punctuation around an address is no text of the line: the address is still the whole of it", arguments: [
         "https://academy.example/achievement.", "(https://academy.example/achievement)", "Verify: https://academy.example/achievement.",
         "<https://academy.example/achievement>", "https://academy.example/achievement;",
@@ -987,7 +996,9 @@ struct CertificationLinkTests {
         #expect(checked(result) == [
             ReviewItem(field: .certification(0), reason: .descriptionOrEntryUnsure, text: "Advanced Swift Concurrency (Level 2) — Example Academy"),
         ])
-        #expect(result.unplaced.map(\.text) == ["2024", "https://academy.example/orphan"])
+        // The year on its own line under a certification without one is its year; the link after it joins nothing
+        #expect(result.cv.certifications.map { $0.year?.value } == [2024, nil, 2024])
+        #expect(result.unplaced.map(\.text) == ["https://academy.example/orphan"])
         #expect(result.ungrounded.isEmpty)
         #expect(Coverage.lost(result).isEmpty)
     }
