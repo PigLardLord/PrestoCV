@@ -666,9 +666,11 @@ final class Scanner: SyntaxVisitor {
 
     private static func hasAttribute(_ name: String, _ attributes: AttributeListSyntax) -> Bool {
         attributes.contains { attribute in
-            // Also module-qualified: `@_Concurrency.MainActor` is `@MainActor`.
-            guard let written = attribute.as(AttributeSyntax.self)?.attributeName.trimmedDescription else { return false }
-            return written == name || written.hasSuffix("." + name)
+            // Also module-qualified: `@_Concurrency.MainActor` is `@MainActor`. Compared by name tokens, so that whitespace and
+            // comments inside the written name never matter.
+            guard let attributeName = attribute.as(AttributeSyntax.self)?.attributeName else { return false }
+            let components = attributeName.tokens(viewMode: .sourceAccurate).filter { $0.tokenKind != .period }
+            return components.last?.text == name
         }
     }
 

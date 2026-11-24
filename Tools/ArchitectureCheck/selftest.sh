@@ -643,9 +643,16 @@ r19_flag "a module-qualified @MainActor task closure inside an actor" \
   'actor A { func f(_ u: URL) { Task { @_Concurrency.MainActor in _ = try? Data(contentsOf: u) } } }' "R19m"
 r19_flag "a module-qualified @MainActor function inside an actor" \
   'actor A { func f(_ u: URL) { @_Concurrency.MainActor func g() { _ = try? Data(contentsOf: u) }; g() } }' "R19m"
+r19_flag "a spaced module-qualified @MainActor task closure inside an actor" \
+  'actor A { func f(_ u: URL) { Task { @_Concurrency . MainActor in _ = try? Data(contentsOf: u) } } }' "R19m"
+r19_flag "a spaced module-qualified @MainActor function inside an actor" \
+  'actor A { func f(_ u: URL) { @_Concurrency . MainActor func g() { _ = try? Data(contentsOf: u) }; g() } }' "R19m"
+r19_flag "a comment inside a module-qualified @MainActor task closure" \
+  'actor A { func f(_ u: URL) { Task { @_Concurrency./* x */MainActor in _ = try? Data(contentsOf: u) } } }' "R19m"
 r19_flag "a module-qualified MainActor.run inside a @concurrent function" \
   '@concurrent func f() async { await _Concurrency.MainActor.run { Thread.sleep(forTimeInterval: 3) } }' "R19m mainActorLongWork"
 r19_clean "a call in a module-qualified @concurrent function" '@_Concurrency.concurrent func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }'
+r19_clean "a call in a spaced module-qualified @concurrent function" '@_Concurrency . concurrent func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }'
 r19_clean "a call in a @concurrent function" '@concurrent func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }'
 r19_clean "a call in a closure of a @concurrent function" \
   '@concurrent func f(_ u: URL) async throws { let g = { try Data(contentsOf: u) }; _ = try g() }'
