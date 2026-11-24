@@ -70,9 +70,9 @@ public final class ShellNavigationModel {
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
     /// Holds a file opened in the app while its question shows, and lets go one no import takes (`receive(file:)`).
-    @ObservationIgnored let files: any ImportFileReading
+    @ObservationIgnored let files: FileHolder
     /// The file the question is about, held from its arrival until the person answers; nil while none is asked.
-    @ObservationIgnored private var heldFile: ReceivedFile?
+    @ObservationIgnored private var heldFile: FileHold?
     /// Waits for the editor's copy to end when a file arrived during it (`receive(file:)`); nil while none waits.
     @ObservationIgnored private var waitingForCopy: Task<Void, Never>?
     @ObservationIgnored private let backgroundTime: any BackgroundTime
@@ -136,13 +136,13 @@ public final class ShellNavigationModel {
         self.makeEditor = makeEditor
         self.makeExportSheet = makeExportSheet
         self.makeImporter = makeImporter
-        self.files = files
+        self.files = FileHolder(files: files)
         self.backgroundTime = backgroundTime
     }
 
     isolated deinit {
         waitingForCopy?.cancel()
-        if let heldFile { files.release(heldFile) }
+        if let heldFile { files.letGo(heldFile) }
     }
 
     /// The scene became active, or stopped being active. On its way to the background a scene is inactive first, and from
@@ -330,21 +330,27 @@ public final class ShellNavigationModel {
     /// answer given meanwhile could not be carried out. The file is held with no question, and decided again as on
     /// arrival once the copy ended: it goes the ordinary way when the editor's text can then be stored, and the
     /// question shows otherwise.
-    public func receive(file url: URL) {
+    /// - Returns: The end of the receive of the import or of the shell's hold, after which a part that handed the file
+    ///   over may let its own hold go; nil when nothing received it.
+    @discardableResult
+    public func receive(file url: URL) -> FileReceipt? {
         if let held = heldFile {
-            guard !url.namesTheSameFile(as: held.url) else { return }
-            heldFile = files.receive(url)
-            files.release(held)
-            return
+            guard !url.namesTheSameFile(as: held.url) else { return held.receipt }
+            let newer = files.hold(url)
+            heldFile = newer
+            files.letGo(held)
+            return newer.receipt
         }
         switch showImport() {
         case .left:
-            importer?.importFile(at: url)
+            return importer?.importFile(at: url)
         case .stayed:
-            heldFile = files.receive(url)
+            let hold = files.hold(url)
+            heldFile = hold
             closeExport()
             review?.closeSheet()
             decideHeldFile()
+            return hold.receipt
         }
     }
 
@@ -365,8 +371,8 @@ public final class ShellNavigationModel {
         heldFile = nil
         switch showImport() {
         case .left:
-            importer?.importFile(at: held.url)
-            files.release(held)
+            let taken = importer?.importFile(at: held.url)
+            files.letGo(held, after: taken)
         case .stayed(let status):
             heldFile = held
             question = .keepEditingOrDiscard(status)
@@ -398,8 +404,8 @@ public final class ShellNavigationModel {
         question = nil
         dropEditor()
         showImport()
-        importer?.importFile(at: held.url)
-        files.release(held)
+        let taken = importer?.importFile(at: held.url)
+        files.letGo(held, after: taken)
     }
 
     /// The question goes, and the file held for it is let go.
@@ -409,7 +415,7 @@ public final class ShellNavigationModel {
         guard let held = heldFile else { return }
         heldFile = nil
         question = nil
-        files.release(held)
+        files.letGo(held)
     }
 
     // MARK: Leaving

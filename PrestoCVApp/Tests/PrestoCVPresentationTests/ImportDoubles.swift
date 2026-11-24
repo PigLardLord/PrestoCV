@@ -65,7 +65,8 @@ struct ReceivedRecord: Sendable {
 }
 
 /// The file port, scripted: every read gives the same answer after a gate a test can close. The hooks run on the main
-/// actor inside a read (before its gate) and inside a release, as the caller's code can. It records each received file
+/// actor inside a read (before its gate) and inside a release, as the caller's code can, and the release ends after its
+/// hook. It records each received file
 /// by its id, and what it saw go wrong: a release while the file's read runs, a read after the release.
 final class FileReadingFake: ImportFileReading {
     let gate = Gate()
@@ -93,7 +94,7 @@ final class FileReadingFake: ImportFileReading {
         }
     }
 
-    func receive(_ url: URL) -> ReceivedFile {
+    func receive(_ url: URL) async -> ReceivedFile {
         let file = ReceivedFile(id: issued.withLock { $0 += 1; return $0 }, url: url)
         records.withLock { $0[file.id] = ReceivedRecord(file: file) }
         return file
@@ -111,7 +112,7 @@ final class FileReadingFake: ImportFileReading {
         return try answer.withLock { $0 }.get()
     }
 
-    func release(_ file: ReceivedFile) {
+    func release(_ file: ReceivedFile) async {
         events.withLock { $0.append(.released(file.url)) }
         records.withLock {
             guard var record = $0[file.id] else { return }
@@ -119,7 +120,7 @@ final class FileReadingFake: ImportFileReading {
             if record.reads > record.readEnded { record.violations.append("released while its read runs") }
             $0[file.id] = record
         }
-        if let hook = whenReleased.withLock({ $0 }) { MainActor.assumeIsolated { hook(file.url) } }
+        if let hook = whenReleased.withLock({ $0 }) { await hook(file.url) }
     }
 }
 

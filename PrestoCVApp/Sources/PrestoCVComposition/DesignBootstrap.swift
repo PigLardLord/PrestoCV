@@ -37,7 +37,7 @@ struct DesignBootstrap: Sendable {
     /// The clock the time of the sync is measured on
     let clock: any Clock<Duration>
 
-    func run() async throws(CompositionFailure) -> Designs {
+    @concurrent func run() async throws(CompositionFailure) -> Designs {
         let stopwatch = Stopwatch(started: clock)
         let missing = try await sync(stopwatch)
         let defaultDesign: ValidatedDesign, listed: [DesignManifest]
@@ -61,7 +61,7 @@ struct DesignBootstrap: Sendable {
 
     /// The listed designs the store can read, in the store's order. A design it cannot read is left out and counted in the
     /// log, so one damaged package does not stop the launch; the default design was read already.
-    private func readable(
+    @concurrent private func readable(
         _ listed: [DesignManifest], defaultDesign: ValidatedDesign, _ stopwatch: Stopwatch
     ) async throws(CompositionFailure) -> [ValidatedDesign] {
         var readable: [ValidatedDesign] = []
@@ -84,7 +84,7 @@ struct DesignBootstrap: Sendable {
     }
 
     /// Runs the sync and logs what it did. Returns what to blame if the store then has no default design.
-    private func sync(_ stopwatch: Stopwatch) async throws(CompositionFailure) -> Missing {
+    @concurrent private func sync(_ stopwatch: Stopwatch) async throws(CompositionFailure) -> Missing {
         let report: SyncReport
         do {
             report = try await SyncBundledDesigns(source: source, validator: DesignPackageValidator(), gate: gate, store: store)()

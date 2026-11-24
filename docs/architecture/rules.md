@@ -297,3 +297,24 @@ The pure targets, which R2 holds too (the domain, application, published-languag
 **Enforced by:**
 - **checker:** the detectors `appleOnlyImport` and `bundleAccess`, and `fullFoundation` as a warning (`warningDetectors` in `rules.json`), in every target whose rules list R18. A module-qualified name, such as `Foundation.Bundle`, is checked like a bare one.
 - **CI:** the Android job of the `CI` workflow builds every target that builds on Linux for `aarch64-unknown-linux-android28`, with the Swift SDK for Android; on a pull request its steps run on a Linux computer and write the commit status `Android (local) · CI`. It catches what no detector sees, such as a C library imported under one platform's name: the file stores import `Glibc`, `Darwin` or `Android`.
+
+## R19. Long work never runs on the main actor
+
+([ADR 0039](adr/0039-keep-long-work-off-the-main-actor.md))
+
+Long work is work whose time grows with the person's data or waits on the outside world: reading or writing files (a file received from Files or another app included), reading an imported text or PDF, rendering, printing or reading a PDF, encoding or decoding the stored CVs, detecting a language, the on-device model, the network, image work, and sorting or searching that grows with the data. It never runs on the main actor, where it freezes the interface.
+
+- **Main-actor code** (the views, the view models and the main-actor parts of the composition root) starts long work only by awaiting an `async` workflow port, in a task the view model can cancel, and publishes the result back on the main actor. A `Task { … }` started there inherits the main actor: synchronous long work inside it still blocks the interface.
+- **Every function requirement of a workflow port is `async`.** A synchronous requirement is allowed only when it is quick: it builds a value in memory, does no I/O, and its time does not grow with the person's data. Each one is listed in `rules.json` under `quickRequirements`, with that reason.
+- **The targets that implement the workflow ports leave the caller's actor explicitly:** every `async` function that no actor isolates is marked `@concurrent`. Today a `nonisolated` `async` function leaves its caller's actor by default; with `NonisolatedNonsendingByDefault` on, it would run on the caller's, the main actor for a view model. `@concurrent` keeps it off whatever the setting.
+- **Main-actor targets call no known blocking API outside a `@concurrent` function or an actor:** none of the APIs in `rules.json` under `longWorkCalls` (Foundation's synchronous file reads and writes and `FileManager`'s changes to files and folders, the JSON and property-list coders, opening a PDF document, NaturalLanguage, sleeping).
+- **Work that an Apple framework allows only on the main thread** (WebKit's web views, UIKit's printing) runs there in steps that await between them. Each case is an exception in `rules.json` that cites ADR 0039.
+
+**Why.** The released app read a pasted CV on the main actor and froze for up to about 3 s (#333). Swift 6's complete checking (R9) checks data races, not time: a synchronous call from a view model, a `Task { … }` that inherits the main actor, and a `nonisolated` `async` function under `NonisolatedNonsendingByDefault` all compile without a warning.
+
+**Enforced by:**
+- **checker:** the detector `synchronousPortRequirement` in the workflow-port target (R19p): a function requirement of a protocol that is not `async` and not in `quickRequirements`; a key that matches no requirement is a problem.
+- **checker:** the detector `concurrentByDefault` in the targets that implement the workflow ports (R19c): an `async` function without `@concurrent` that is not in an actor (or an extension of one), not isolated to a global actor and has no `isolated` parameter; `nonisolated(nonsending)` always fails.
+- **checker:** the detector `mainActorLongWork` in the presentation, composition and new-app targets (R19m): a call to an API in `longWorkCalls`, outside a `@concurrent` function or an actor. A module-qualified name is checked like a bare one.
+- **test:** each workflow has a test that calls it from the main actor, and a test double of its long step records that it did not run on the main thread.
+- **review:** long work that no list names.

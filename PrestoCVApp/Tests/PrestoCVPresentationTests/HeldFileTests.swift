@@ -30,6 +30,13 @@ struct HeldFileTests {
             shell = editing.shell(exports: exports, imports: imports)
         }
 
+        /// Waits until every file call the shell and its import asked so far ended: the port runs them off the main
+        /// actor (R19).
+        func settled() async {
+            await shell.files.settled()
+            await shell.importer?.files.settled()
+        }
+
         /// A stored CV open in the editor, whose edit another window's save made conflict.
         func conflictingEditor() async throws -> (cv: CV, editor: EditorViewModel) {
             let cv = try await editing.storedCV()
@@ -66,6 +73,7 @@ struct HeldFileTests {
         let (_, editor) = try await world.conflictingEditor()
 
         world.shell.receive(file: Self.file)
+        await world.settled()
 
         #expect(world.shell.question == .keepEditingOrDiscard(.conflict))
         #expect(world.shell.editor === editor, "the person stays in the CV until they answer")
@@ -81,6 +89,7 @@ struct HeldFileTests {
         let editor = try await world.failedEditor()
 
         world.shell.receive(file: Self.file)
+        await world.settled()
 
         #expect(world.shell.question == .keepEditingOrDiscard(.failed))
         #expect(world.shell.editor === editor)
@@ -95,6 +104,7 @@ struct HeldFileTests {
         world.shell.receive(file: Self.file)
 
         world.shell.keepEditing()
+        await world.settled()
 
         #expect(world.shell.question == nil)
         #expect(world.shell.editor === editor)
@@ -151,6 +161,7 @@ struct HeldFileTests {
     func discardDuringACopyKeepsTheFileHeld() async throws {
         let world = World()
         let (editor, copying) = try await discardTappedDuringACopy(world)
+        await world.settled()
 
         #expect(world.shell.question == nil, "no question is left for the dialog's close to answer as keep editing")
         #expect(world.shell.editor === editor, "the editor the copy belongs to is not dropped under it")
@@ -190,8 +201,10 @@ struct HeldFileTests {
 
         #expect(world.shell.question == .keepEditingOrDiscard(editor.saveStatus))
         #expect(world.shell.editor === editor)
+        await world.settled()
         #expect(world.imports.files.recorded.isEmpty, "the file waits for the answer")
         world.shell.keepEditing()
+        await world.settled()
         #expect(world.imports.files.recorded == [.released(Self.file)])
         #expect(world.imports.files.problems(ended: true).isEmpty)
     }
@@ -208,6 +221,7 @@ struct HeldFileTests {
         world.shell.keepEditing()
         await world.editing.editing.duplicateGate.open()
         await copying.value
+        await world.settled()
 
         #expect(world.shell.question == nil)
         #expect(world.shell.editor === editor)
@@ -230,6 +244,7 @@ struct HeldFileTests {
     func fileDuringACopyAsksNothing() async throws {
         let world = World()
         let (editor, copying) = try await fileDuringACopy(world)
+        await world.settled()
 
         #expect(world.shell.question == nil, "an answer given during the copy could not be carried out")
         #expect(world.shell.editor === editor)
@@ -269,8 +284,10 @@ struct HeldFileTests {
 
         #expect(world.shell.question == .keepEditingOrDiscard(editor.saveStatus))
         #expect(world.shell.editor === editor)
+        await world.settled()
         #expect(world.imports.files.recorded.isEmpty, "the file waits for the answer")
         world.shell.keepEditing()
+        await world.settled()
         #expect(world.imports.files.recorded == [.released(Self.file)])
         #expect(world.imports.files.problems(ended: true).isEmpty)
     }
@@ -292,6 +309,8 @@ struct HeldFileTests {
         let copying = Task { await editor.saveAsCopy() }
         await waitUntil("the copy to wait at the store") { await editing.editing.duplicateGate.waiting == 1 }
         shell?.receive(file: Self.file)
+        let holder = try #require(shell?.files)
+        await holder.settled()
         try #require(imports.files.received.count == 1)
         weak let probe = shell
 
@@ -299,6 +318,8 @@ struct HeldFileTests {
 
         let gone = probe == nil
         #expect(gone)
+        await waitUntil("the held file let go") { imports.files.released(Self.file) > 0 }
+        await holder.settled()
         #expect(imports.files.recorded == [.released(Self.file)])
         await editing.editing.duplicateGate.open()
         await copying.value
@@ -313,6 +334,7 @@ struct HeldFileTests {
         let (_, copying) = try await fileDuringACopy(world)
 
         world.shell.receive(file: Self.other)
+        await world.settled()
 
         #expect(world.shell.question == nil)
         #expect(world.imports.files.received.map(\.file.url) == [Self.file, Self.other])
@@ -335,6 +357,7 @@ struct HeldFileTests {
         files.whenReleased.withLock { $0 = { _ in probe.heldWhenReleased.append(files.received.count) } }
 
         world.shell.discardAndImport()
+        await world.settled()
 
         #expect(probe.heldWhenReleased.first == 2, "the import had received its own hold when the shell let go")
     }
@@ -346,6 +369,7 @@ struct HeldFileTests {
         world.shell.receive(file: Self.file)
 
         world.shell.receive(file: Self.other)
+        await world.settled()
 
         #expect(world.shell.question == .keepEditingOrDiscard(.conflict))
         #expect(world.imports.files.received.map(\.file.url) == [Self.file, Self.other])
@@ -366,6 +390,7 @@ struct HeldFileTests {
         world.shell.receive(file: Self.file)
 
         world.shell.receive(file: same)
+        await world.settled()
 
         #expect(world.imports.files.received.count == 1)
         #expect(world.imports.files.recorded.isEmpty)
@@ -434,6 +459,7 @@ struct HeldFileTests {
         try #require(editor.saveStatus == .saved)
 
         world.shell.deselect()
+        await world.settled()
 
         #expect(world.shell.question == nil)
         #expect(world.imports.files.recorded == [.released(Self.file)])
@@ -453,6 +479,8 @@ struct HeldFileTests {
         editor.type(\.fullName, "Mara Ellison Lowe")
         await editor.saveNow()
         shell?.receive(file: Self.file)
+        let holder = try #require(shell?.files)
+        await holder.settled()
         try #require(imports.files.received.count == 1)
         weak let probe = shell
 
@@ -460,6 +488,8 @@ struct HeldFileTests {
 
         let gone = probe == nil
         #expect(gone)
+        await waitUntil("the held file let go") { imports.files.released(Self.file) > 0 }
+        await holder.settled()
         #expect(imports.files.recorded == [.released(Self.file)])
         #expect(imports.files.problems(ended: true).isEmpty)
     }

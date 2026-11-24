@@ -573,6 +573,84 @@ setup; src 'let x = 1'
 rules_edit extend targets.0.allowedImports '["Glibc","Darwin","Android"]'
 printf '| Target | Layer | Platforms | May import |\n|---|---|---|---|\n| `Pure` | adapter | all | Foundation, Glibc, Darwin, Android |\n| `Other` | x | all | Foundation |\n' > "$ROOT/modules.md"
 expect "modules.md: Android is a module name, as Glibc and Darwin are" 0 "" --modules "$ROOT/modules.md"
+# --- R19: long work stays off the main actor (ADR 0039)
+r19_setup() {   # the Pure target has the three R19 rules only; $1 is the quickRequirements object
+  setup
+  rules_edit set rules.R19p '["synchronousPortRequirement"]'
+  rules_edit set rules.R19c '["concurrentByDefault"]'
+  rules_edit set rules.R19m '["mainActorLongWork"]'
+  rules_edit set targets.name=Pure.rules '["R19p","R19c","R19m"]'
+  rules_edit set quickRequirements "${1:-{\}}"
+  rules_edit set longWorkCalls '["Data(contentsOf:)","String(contentsOfFile:)",".write(to:)",".removeItem(at:)","Thread.sleep()",
+    "JSONDecoder()","NLTagger()","PDFDocument(url:)"]'
+}
+r19_flag() { r19_setup "${4:-}"; src "$2"; expect "R19: $1" 1 "$3"; }
+r19_clean() { r19_setup "${3:-}"; src "$2"; expect "R19: $1" 0 ""; }
+# R19p: a requirement of a protocol is async, or listed as quick with its reason
+r19_flag "a synchronous requirement is refused" 'protocol P { func a() }' "R19p synchronousPortRequirement"
+r19_flag "a throwing synchronous requirement is refused" 'protocol P { func a() throws }' "R19p synchronousPortRequirement"
+r19_flag "the key carries the labels" 'protocol P { func b(_ x: Int, with y: Int) }' "P.b\(_:with:\) is not async"
+r19_clean "an async requirement passes" 'protocol P { func a() async }'
+r19_clean "an async throwing requirement passes" 'protocol P { func a() async throws -> Int }'
+r19_clean "a stored requirement is not a function" 'protocol P { var x: Int { get } }'
+r19_clean "a function of an extension of a protocol is not a requirement" $'protocol P { func a() async }\nextension P { func b() {} }'
+r19_clean "a listed quick requirement passes" 'protocol P { func a() }' '{"P.a()":"in memory"}'
+r19_clean "a listed quick requirement with labels passes" 'protocol P { func b(_ x: Int, with y: Int) }' '{"P.b(_:with:)":"in memory"}'
+r19_flag "a listed requirement of another protocol does not pass" 'protocol Q { func a() }' "Q.a\(\) is not async" '{"P.a()":"in memory"}'
+r19_clean "a requirement in a DEBUG branch is exempt" $'#if DEBUG\nprotocol P { func a() }\n#endif'
+r19_flag "a quickRequirements key that matches nothing is stale" 'protocol P { func a() async }' \
+  "quickRequirements lists P.gone\(\), which matches no synchronous requirement" '{"P.gone()":"in memory"}'
+r19_setup; src 'protocol P { func a() }'; rules_edit set targets.name=Pure.rules '["R19c","R19m"]'
+expect "R19: a target without R19p may declare a synchronous requirement" 0 ""
+# R19c: an async function that no actor isolates leaves its caller's actor on purpose
+r19_flag "an async method of a struct" 'struct S { func f() async {} }' "R19c concurrentByDefault"
+r19_flag "an async free function" 'func f() async throws {}' "R19c concurrentByDefault"
+r19_flag "an async method of a class" 'final class C { func f() async {} }' "R19c concurrentByDefault"
+r19_flag "nonisolated(nonsending) is refused" 'nonisolated(nonsending) func f() async {}' "nonisolated\(nonsending\)"
+r19_flag "nonisolated in an actor leaves the actor's isolation" 'actor A { nonisolated func f() async {} }' "R19c concurrentByDefault"
+r19_clean "@concurrent passes" '@concurrent func f() async {}'
+r19_clean "@concurrent on a method passes" 'struct S { @concurrent func f() async throws {} }'
+r19_clean "a function that is not async passes" 'struct S { func f() {} }'
+r19_clean "an async function of an actor passes" 'actor A { func f() async {} }'
+r19_clean "an async function of an extension of an actor passes" $'actor A {}\nextension A { func f() async {} }'
+r19_clean "a function on the main actor passes" '@MainActor func f() async {}'
+r19_clean "a function of a main-actor type passes" '@MainActor struct S { func f() async {} }'
+r19_clean "a function of an extension on the main actor passes" $'struct S {}\n@MainActor extension S { func f() async {} }'
+r19_clean "a function on a global actor of the target passes" $'@globalActor struct G { static let shared = X() }\n@G func f() async {}'
+r19_clean "an isolated parameter passes" 'func f(_ a: isolated A) async {}'
+r19_clean "an async requirement is not a function with a body" 'protocol P { func a() async }'
+r19_clean "an async function in a DEBUG branch is exempt" $'#if DEBUG\nfunc f() async {}\n#endif'
+r19_flag "an async function in the else of a DEBUG branch is checked" $'#if DEBUG\nlet x = 1\n#else\nfunc f() async {}\n#endif' "R19c concurrentByDefault"
+# R19m: a call that blocks its thread runs in a @concurrent function or an actor
+r19_flag "Data(contentsOf:) on the main actor" 'func f(_ u: URL) throws { _ = try Data(contentsOf: u) }' "R19m mainActorLongWork"
+r19_flag "a module-qualified Data(contentsOf:)" 'func f(_ u: URL) throws { _ = try Foundation.Data(contentsOf: u) }' "R19m mainActorLongWork"
+r19_flag "an explicit init call" 'func f(_ u: URL) throws { _ = try Data.init(contentsOf: u) }' "R19m mainActorLongWork"
+r19_flag "String(contentsOfFile:) with more arguments" 'func f(_ p: String) throws { _ = try String(contentsOfFile: p, encoding: .utf8) }' "R19m"
+r19_flag "a member call on any value" 'func f(_ d: Data, _ u: URL) throws { try d.write(to: u) }' "R19m mainActorLongWork"
+r19_flag "a member call on a chain" 'func f(_ u: URL) throws { try FileManager.default.removeItem(at: u) }' "R19m mainActorLongWork"
+r19_flag "a type member call" 'func f() { Thread.sleep(forTimeInterval: 1) }' "R19m mainActorLongWork"
+r19_flag "a module-qualified type member call" 'func f() { Foundation.Thread.sleep(forTimeInterval: 1) }' "R19m mainActorLongWork"
+r19_flag "a coder" 'func f() { _ = JSONDecoder() }' "R19m mainActorLongWork"
+r19_flag "a call in a closure of a view model" 'final class M { func f(_ u: URL) { run { _ = try? Data(contentsOf: u) } } }' "R19m"
+r19_flag "a call in an async function that is not @concurrent" 'func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }' "R19m mainActorLongWork"
+r19_clean "a call in a @concurrent function" '@concurrent func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }'
+r19_clean "a call in a closure of a @concurrent function" \
+  '@concurrent func f(_ u: URL) async throws { let g = { try Data(contentsOf: u) }; _ = try g() }'
+r19_clean "a call in an actor" 'actor A { func f(_ u: URL) throws { _ = try Data(contentsOf: u) } }'
+r19_clean "a call in an extension of an actor" $'actor A {}\nextension A { func f(_ u: URL) throws { _ = try Data(contentsOf: u) } }'
+r19_clean "a call in a DEBUG branch" $'#if DEBUG\nfunc f(_ u: URL) throws { _ = try Data(contentsOf: u) }\n#endif'
+r19_clean "a call that no entry lists" 'func f() { _ = Data(count: 3) }'
+r19_clean "a label that no entry lists" 'func f(_ u: URL) throws { _ = try Data(referencing: u) }'
+r19_clean "a name inside a string" 'let s = "Data(contentsOf:)"'
+r19_clean "a call with the same name on another type" 'func f(_ u: URL) throws { _ = try Other.Data(contentsOf: u) }'
+setup; src 'func f(_ u: URL) throws { _ = try Data(contentsOf: u) }'
+expect "R19: a target without R19m may call it" 0 ""
+r19_setup; rules_edit set longWorkCalls '["Data(contentsOf"]'; src 'let x = 1'
+expect "R19: an entry of longWorkCalls that cannot be read is a problem" 1 "longWorkCalls: cannot read the entry Data\(contentsOf"
+r19_setup; src 'func f(_ u: URL) throws { _ = try Data(contentsOf: u) }'
+"$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline > "$ROOT/out.txt" 2>&1
+if grep -q '|R19m|mainActorLongWork|' "$ROOT/baseline.json"; then pass=$((pass+1)); echo "ok   R19: a violation can be baselined"
+else fail=$((fail+1)); echo "FAIL R19: a violation did not enter the baseline"; sed 's/^/     /' "$ROOT/out.txt"; fi
 # --- baseline: occurrences, stability, monotonicity
 setup; src 'func a() { fatalError("x") }'
 "$CHECK" "$ROOT" --rules "$ROOT/rules.json" --baseline "$ROOT/baseline.json" --adr-dir "$ROOT/adr" --write-baseline >/dev/null

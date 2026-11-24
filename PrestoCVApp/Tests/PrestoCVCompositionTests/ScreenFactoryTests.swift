@@ -5,7 +5,7 @@ import PrestoCVApplication
 import PrestoCVCoreTestSupport
 import PrestoCVDomain
 import PrestoCVPersistence
-import PrestoCVPresentation
+@testable import PrestoCVPresentation
 import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
@@ -550,6 +550,7 @@ struct ScreenFactoryTests {
 
         screen.importFile(at: copy)
         await Self.ended(screen)
+        await screen.files.settled()                        // the file is let go off the main actor, after the import (R19)
 
         #expect(screen.status == .failed(.unreadable))
         #expect(!FileManager.default.fileExists(atPath: copy.path), "the system's copy is deleted")
@@ -568,6 +569,7 @@ struct ScreenFactoryTests {
 
         screen.importFile(at: file)
         await Self.ended(screen)
+        await screen.files.settled()                        // the file is let go off the main actor, after the import (R19)
 
         #expect(screen.status == .failed(.unreadable))
         #expect(FileManager.default.fileExists(atPath: file.path), "a file the person chose is theirs")

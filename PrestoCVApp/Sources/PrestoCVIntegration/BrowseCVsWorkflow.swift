@@ -14,15 +14,15 @@ public struct BrowseCVsWorkflow: CVBrowsing {
         self.repository = LaunchIssues(store: repository); sampleSource = samples; self.ids = ids
     }
 
-    public func list() async throws(EditFailure) -> CVListing {
+    @concurrent public func list() async throws(EditFailure) -> CVListing {
         do { return try await ListCVs(repository: repository)() } catch { throw EditFailure(error) }
     }
 
-    public func onboarding() async throws(EditFailure) -> OnboardingState {
+    @concurrent public func onboarding() async throws(EditFailure) -> OnboardingState {
         do { return try await DetermineOnboarding(repository: repository)() } catch { throw EditFailure(error) }
     }
 
-    public func samples() async throws(EditFailure) -> [CV] {
+    @concurrent public func samples() async throws(EditFailure) -> [CV] {
         do { return try await StartFromSample(samples: sampleSource, ids: ids).available() } catch { throw EditFailure(error) }
     }
 

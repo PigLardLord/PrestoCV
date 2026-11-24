@@ -141,6 +141,7 @@ public final class Composition {
         let exporter: any CVExporting
         let lookOptions: any LookOptionsProviding
         let languages: [ExportLanguage]
+        let exportFiles: ExportFileAdapter
     }
 
     private init(
@@ -164,13 +165,12 @@ public final class Composition {
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
         )
-        let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
         let importFiles = inputs.importFiles.logging(to: trace.logger)
         screens = ScreenFactory(
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: parts.exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
-            languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
+            languageDetector: DetectedCVLanguage(DetectDocumentLanguage(reader: NaturalLanguageTextReader())),
             wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, backgroundTime: inputs.backgroundTime,
             appLanguage: inputs.appLanguage
         )
@@ -225,7 +225,7 @@ public final class Composition {
             return .failed(error)
         }
         do {
-            try inputs.paths.create()
+            try await inputs.paths.create()
         } catch {
             return .failed(CompositionFailure(error))
         }
@@ -264,14 +264,7 @@ public final class Composition {
         let renderer = renderer(rules: rules)
         let inspector = PDFKitInspector()
         let headings = HeadingsCatalog(source: BundleHeadingTableSource())
-        let gateHeadings: Headings
-        let languages: [String]
-        do throws(HeadingsCatalog.Failure) {
-            gateHeadings = try headings.headings(for: GateFixture.document.language)
-            languages = try headings.supportedLanguages()
-        } catch {
-            throw CompositionFailure(error)
-        }
+        let (gateHeadings, languages) = try await read(headings, gate: GateFixture.document.language)
         let store = FileDesignStore(directory: inputs.paths.designs, validator: DesignPackageValidator(), lockWait: .standard)
         let designs = try await DesignBootstrap(
             store: store, source: inputs.designs, gate: inputs.makeGate(renderer, inspector, gateHeadings), logger: logger,
@@ -286,8 +279,27 @@ public final class Composition {
                 headings: headings, policy: .standard
             ),
             lookOptions: CatalogLookOptions(installed: designs.installed, defaultDesign: designs.defaultDesign),
-            languages: languages.compactMap(ExportLanguage.init)
+            languages: languages.compactMap(ExportLanguage.init),
+            exportFiles: await exportFiles(root: inputs.paths.exportShare, logger: logger)
         )
+    }
+
+    /// The headings the gate renders with, in `language`, and the languages a PDF can be written in. Reading and decoding
+    /// the tables waits for the file system, so it runs off the main actor (R19) while the app shows that it is loading.
+    @concurrent nonisolated static func read(
+        _ headings: HeadingsCatalog, gate language: String
+    ) async throws(CompositionFailure) -> (gate: Headings, languages: [String]) {
+        do throws(HeadingsCatalog.Failure) {
+            return (try headings.headings(for: language), try headings.supportedLanguages())
+        } catch {
+            throw CompositionFailure(error)
+        }
+    }
+
+    /// The export's file adapter. Making it removes the PDFs an earlier launch left to share, which waits for the file
+    /// system, so it is made off the main actor (R19).
+    @concurrent private nonisolated static func exportFiles(root: URL, logger: any DiagnosticLogger) async -> ExportFileAdapter {
+        ExportFileAdapter(root: root, logger: logger)
     }
 
     /// Assembles the app for this launch. A Debug build reads the fixtures its launch arguments ask for; a Release build
@@ -434,8 +446,13 @@ public final class Composition {
             version: info["CFBundleShortVersionString"] as? String ?? "",
             build: info["CFBundleVersion"] as? String ?? "",
             appName: info["CFBundleDisplayName"] as? String ?? "PrestoCV",
-            notices: { try Data(contentsOf: notices) }
+            notices: { try await readNotices(at: notices) }
         )
+    }
+
+    /// The bytes of the notices file, read off the main actor (R19): the Settings sheet waits for them.
+    @concurrent private nonisolated static func readNotices(at url: URL) async throws -> Data {
+        try Data(contentsOf: url)
     }
 }
 

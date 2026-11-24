@@ -52,8 +52,37 @@
    "appleOnlyImport",
    "bundleAccess",
    "fullFoundation"
+  ],
+  "R19p": [
+   "synchronousPortRequirement"
+  ],
+  "R19c": [
+   "concurrentByDefault"
+  ],
+  "R19m": [
+   "mainActorLongWork"
   ]
  },
+ "quickRequirements": {
+  "CVBrowsing.startFromSample(_:)": "Builds the sample's starting point in memory.",
+  "CVEditing.new()": "Makes an empty CV in memory; nothing is read or written.",
+  "CVEditing.autosaveWriter(startingFrom:)": "Makes the writer object; the saving itself is async.",
+  "LookOptionsProviding.options()": "Returns the catalog's look options held in memory."
+ },
+ "longWorkCalls": [
+  "Data(contentsOf:)", "Data(contentsOfFile:)", "String(contentsOf:)", "String(contentsOfFile:)",
+  "FileHandle(forReadingFrom:)", "FileHandle(forWritingTo:)", "FileHandle(forUpdating:)",
+  "FileHandle(forReadingAtPath:)", "FileHandle(forWritingAtPath:)", ".write(to:)",
+  ".createDirectory(at:)", ".createDirectory(atPath:)", ".removeItem(at:)", ".removeItem(atPath:)",
+  ".copyItem(at:)", ".copyItem(atPath:)", ".moveItem(at:)", ".moveItem(atPath:)", ".replaceItemAt()",
+  ".replaceItem(at:)", ".contentsOfDirectory(at:)", ".contentsOfDirectory(atPath:)",
+  "JSONDecoder()", "JSONEncoder()", "PropertyListDecoder()", "PropertyListEncoder()",
+  "JSONSerialization.jsonObject()", "JSONSerialization.data()",
+  "PropertyListSerialization.propertyList()", "PropertyListSerialization.data()",
+  "PDFDocument(data:)", "PDFDocument(url:)", "CGPDFDocument()",
+  "NLLanguageRecognizer()", "NLTagger()", "NLTokenizer()", "NLLanguageRecognizer.dominantLanguage()",
+  "Thread.sleep()", "sleep(_:)", "usleep(_:)"
+ ],
  "warningDetectors": [
   "fullFoundation"
  ],
@@ -761,7 +790,8 @@
     "R13",
     "R14",
     "R17",
-    "R18"
+    "R18",
+    "R19p"
    ]
   },
   {
@@ -788,7 +818,8 @@
     "R13",
     "R14",
     "R17",
-    "R18"
+    "R18",
+    "R19c"
    ]
   },
   {
@@ -797,6 +828,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "PrestoCVIntegration",
     "PrestoCVWorkflowPorts",
     "PrestoCVApplication",
@@ -851,7 +883,8 @@
     "R14",
     "R5",
     "R17",
-    "R18"
+    "R18",
+    "R19m"
    ],
    "requiredImportAccess": {
     "PrestoCVDomain": "internal",
@@ -877,7 +910,8 @@
     "R9",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R19c"
    ]
   },
   {
@@ -914,7 +948,8 @@
     "R9",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R19c"
    ]
   },
   {
@@ -924,6 +959,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "Glibc",
     "Darwin",
     "Android",
@@ -977,7 +1013,9 @@
     "R9",
     "R13",
     "R14",
-    "R17"
+    "R17",
+    "R19c",
+    "R19m"
    ]
   },
   {
@@ -986,6 +1024,7 @@
    "allowedImports": [
     "Testing",
     "Foundation",
+    "Synchronization",
     "Observation",
     "WebKit",
     "PrestoCVComposition",
@@ -1281,7 +1320,8 @@
     "R7",
     "R9",
     "R14",
-    "R17"
+    "R17",
+    "R19m"
    ]
   },
   {
@@ -1300,7 +1340,8 @@
     "R9",
     "R11",
     "R14",
-    "R17"
+    "R17",
+    "R19m"
    ]
   },
   {
@@ -1317,7 +1358,8 @@
     "R7",
     "R9",
     "R14",
-    "R17"
+    "R17",
+    "R19m"
    ]
   },
   {
@@ -1341,7 +1383,8 @@
     "R7",
     "R9",
     "R14",
-    "R17"
+    "R17",
+    "R19m"
    ]
   },
   {

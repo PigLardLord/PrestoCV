@@ -37,13 +37,13 @@ struct AppPathsTests {
     }
 
     @Test("Creating makes the root and the store, once, and the trace and design folders are left to their stores")
-    func creates() throws {
+    func creates() async throws {
         let base = Self.base()
         defer { try? FileManager.default.removeItem(at: base) }
         let paths = AppPaths(root: base.appendingPathComponent("PrestoCVNext"), temporary: base)
 
-        try paths.create()
-        try paths.create()
+        try await paths.create()
+        try await paths.create()
 
         var isDirectory: ObjCBool = false
         #expect(FileManager.default.fileExists(atPath: paths.store.path, isDirectory: &isDirectory) && isDirectory.boolValue)
@@ -52,7 +52,7 @@ struct AppPathsTests {
     }
 
     @Test("A root under a file fails with a typed error")
-    func failsUnderAFile() throws {
+    func failsUnderAFile() async throws {
         let base = Self.base()
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: base) }
@@ -60,7 +60,7 @@ struct AppPathsTests {
         try Data("x".utf8).write(to: file)
         let paths = AppPaths(root: file.appendingPathComponent("PrestoCVNext"), temporary: base)
 
-        #expect(throws: AppPaths.Failure.storeUnavailable) { try paths.create() }
+        await #expect(throws: AppPaths.Failure.storeUnavailable) { try await paths.create() }
     }
 
     // MARK: Import copies

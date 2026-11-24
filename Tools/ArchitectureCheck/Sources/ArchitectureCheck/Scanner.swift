@@ -36,6 +36,11 @@ final class Scanner: SyntaxVisitor {
     /// The imports of the file, and whether it declares or extends a view model (R5).
     private var importDecls: [ImportDeclSyntax] = []
     private var declaresViewModel = false
+    /// R19: the actors and global actors of the file's target, the blocking calls, and the synchronous port requirements that
+    /// are quick. `syncRequirements` lists every synchronous function requirement of a protocol in the file, as
+    /// `Protocol.name(label:)`, so that the checker can refuse a quick requirement that no longer exists.
+    private let concurrency: ConcurrencyIndex, longWorkCalls: [LongWorkCall], quickRequirements: Set<String>
+    private(set) var syncRequirements: [String] = []
 
     static let ambientTypes: Set<String> = ["Bundle", "FileManager", "UserDefaults", "ProcessInfo", "NotificationCenter"]
     static let ambientMembers: [String: Set<String>] = [
@@ -67,13 +72,17 @@ final class Scanner: SyntaxVisitor {
     ]
 
     init(tree: SourceFileSyntax, file: String, infrastructureTypes: Set<String>, viewTypes: Set<String> = [],
-         memberTypes: [String: TypeMembers] = [:], serviceSuffixes: [String] = [], dependencySuffixes: [String] = []) {
+         memberTypes: [String: TypeMembers] = [:], serviceSuffixes: [String] = [], dependencySuffixes: [String] = [],
+         concurrency: ConcurrencyIndex = ConcurrencyIndex(), longWorkCalls: [LongWorkCall] = [], quickRequirements: Set<String> = []) {
         converter = SourceLocationConverter(fileName: file, tree: tree)
         self.infrastructureTypes = infrastructureTypes
         self.viewTypes = viewTypes
         self.memberTypes = memberTypes
         self.serviceSuffixes = serviceSuffixes
         self.dependencySuffixes = dependencySuffixes
+        self.concurrency = concurrency
+        self.longWorkCalls = longWorkCalls
+        self.quickRequirements = quickRequirements
         super.init(viewMode: .sourceAccurate)
     }
 
@@ -197,6 +206,7 @@ final class Scanner: SyntaxVisitor {
     // MARK: Calls, members, references
 
     override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
+        checkLongWork(node)
         let args = node.arguments
         var callee: String?, member: String?
         if let path = Self.unqualifiedPath(node.calledExpression) {           // "" = implicit member (.foo)
@@ -626,6 +636,92 @@ final class Scanner: SyntaxVisitor {
             if Scanner.hasSuffix(n, in: scanner.dependencySuffixes) || scanner.infrastructureTypes.contains(n) { found("names a \(n)") }
             return .visitChildren
         }
+    }
+
+    // MARK: Long work (R19)
+
+    /// A function requirement of a protocol is `async`, or listed as quick (R19p); an `async` function that no actor isolates
+    /// leaves its caller's actor on purpose, with `@concurrent` (R19c).
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        guard !Self.isInDebugBranch(node) else { return .visitChildren }
+        let isAsync = node.signature.effectSpecifiers?.asyncSpecifier != nil
+        if let proto = Self.enclosingTypeDecl(of: node)?.as(ProtocolDeclSyntax.self) {
+            guard !isAsync else { return .visitChildren }
+            let labels = node.signature.parameterClause.parameters.map { Self.name($0.firstName) + ":" }.joined()
+            let requirement = "\(Self.name(proto.name)).\(Self.name(node.name))(\(labels))"
+            syncRequirements.append(requirement)
+            if !quickRequirements.contains(requirement) {
+                hit("synchronousPortRequirement", "\(requirement) is not async: make it async, or list it under quickRequirements with the reason it is quick", node)
+            }
+            return .visitChildren
+        }
+        guard isAsync else { return .visitChildren }
+        if node.modifiers.contains(where: { $0.name.text == "nonisolated" && $0.detail?.detail.text == "nonsending" }) {
+            hit("concurrentByDefault", "nonisolated(nonsending) runs on the caller's actor: mark the function @concurrent", node)
+        } else if !Self.hasAttribute("concurrent", node.attributes), !isIsolated(node) {
+            hit("concurrentByDefault", "\(Self.name(node.name)) is async and no actor isolates it: mark it @concurrent, so that it leaves its caller's actor whatever the setting", node)
+        }
+        return .visitChildren
+    }
+
+    private static func hasAttribute(_ name: String, _ attributes: AttributeListSyntax) -> Bool {
+        attributes.contains { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == name }
+    }
+
+    /// The nearest type, extension or protocol a declaration is a member of.
+    private static func enclosingTypeDecl(of node: some SyntaxProtocol) -> Syntax? {
+        var current = node.parent
+        while let n = current {
+            if n.is(StructDeclSyntax.self) || n.is(ClassDeclSyntax.self) || n.is(EnumDeclSyntax.self) || n.is(ActorDeclSyntax.self)
+                || n.is(ProtocolDeclSyntax.self) || n.is(ExtensionDeclSyntax.self) { return n }
+            current = n.parent
+        }
+        return nil
+    }
+
+    /// Whether an actor isolates the function: it is declared in an actor, in an extension of one of the target's actors, or
+    /// in or on a type or function marked with a global actor; or it takes an `isolated` parameter. `nonisolated` takes the
+    /// function out of its type's isolation, but not out of its own attribute or parameter.
+    private func isIsolated(_ function: FunctionDeclSyntax) -> Bool {
+        if function.signature.parameterClause.parameters.contains(where: { $0.type.trimmedDescription.hasPrefix("isolated ") }) { return true }
+        if hasGlobalActor(function.attributes) { return true }
+        if function.modifiers.contains(where: { $0.name.text == "nonisolated" }) { return false }
+        var current = function.parent
+        while let n = current {
+            if n.is(ActorDeclSyntax.self) { return true }
+            if let e = n.as(ExtensionDeclSyntax.self), concurrency.actors.contains(Self.typeName(e.extendedType) ?? "") { return true }
+            if let d = n.as(StructDeclSyntax.self), hasGlobalActor(d.attributes) { return true }
+            if let d = n.as(ClassDeclSyntax.self), hasGlobalActor(d.attributes) { return true }
+            if let d = n.as(EnumDeclSyntax.self), hasGlobalActor(d.attributes) { return true }
+            if let e = n.as(ExtensionDeclSyntax.self), hasGlobalActor(e.attributes) { return true }
+            if let f = n.as(FunctionDeclSyntax.self), hasGlobalActor(f.attributes) { return true }
+            current = n.parent
+        }
+        return false
+    }
+
+    private func hasGlobalActor(_ attributes: AttributeListSyntax) -> Bool {
+        attributes.contains { attribute in
+            guard let name = attribute.as(AttributeSyntax.self)?.attributeName.trimmedDescription else { return false }
+            return concurrency.globalActors.contains(name)
+        }
+    }
+
+    /// A call of `longWorkCalls` runs on the main actor unless it is in a `@concurrent` function or in an actor.
+    private func checkLongWork(_ node: FunctionCallExprSyntax) {
+        guard let call = longWorkCalls.first(where: { $0.matches(node) }), !isOffTheMainActor(node), !Self.isInDebugBranch(node) else { return }
+        hit("mainActorLongWork", "\(call.text) blocks the thread that runs it: call it from a @concurrent function or an actor, which a port reaches", node)
+    }
+
+    private func isOffTheMainActor(_ node: some SyntaxProtocol) -> Bool {
+        var current = node.parent
+        while let n = current {
+            if n.is(ActorDeclSyntax.self) { return true }
+            if let e = n.as(ExtensionDeclSyntax.self), concurrency.actors.contains(Self.typeName(e.extendedType) ?? "") { return true }
+            if let f = n.as(FunctionDeclSyntax.self), Self.hasAttribute("concurrent", f.attributes) { return true }
+            current = n.parent
+        }
+        return false
     }
 
     // MARK: Declarations
