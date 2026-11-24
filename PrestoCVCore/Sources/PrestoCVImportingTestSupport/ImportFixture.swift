@@ -62,8 +62,11 @@ public struct ImportFixture: Sendable {
         ImportedLanguage.scripted(name, level: level, levelWords: levelWords, heading: heading)
     }
 
-    public func certification(_ name: Sourced<String>, issuer: Sourced<String>? = nil, year: Sourced<Int>? = nil) -> ImportedCertification {
-        ImportedCertification.scripted(name, issuer: issuer, year: year)
+    public func certification(
+        _ name: Sourced<String>, issuer: Sourced<String>? = nil, year: Sourced<Int>? = nil, link: Sourced<WebLink>? = nil,
+        description: Sourced<String>? = nil, check: CheckReason? = nil
+    ) -> ImportedCertification {
+        ImportedCertification.scripted(name, issuer: issuer, year: year, link: link, description: description, check: check)
     }
 
     /// Text that fits no field, quoted from `piece`.

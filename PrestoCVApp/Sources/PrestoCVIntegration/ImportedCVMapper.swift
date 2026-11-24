@@ -63,7 +63,8 @@ public struct ImportedCVMapper: Sendable {
                 issued = PartialDate(year: year.value)
                 if issued == nil { notes.drop(.certificationYear(index + 1), .yearUnreadable, String(year.value)) }
             }
-            return Certification(name: certification.name.value, issuer: certification.issuer?.value ?? "", issued: issued)
+            return Certification(name: certification.name.value, issuer: certification.issuer?.value ?? "", issued: issued,
+                                 link: certification.link?.value, description: certification.description?.value ?? "")
         }
         sections.setInterests(imported.interests.map(\.value))
 
@@ -169,7 +170,7 @@ private extension ReviewItem {
     var isAboutAPeriod: Bool {
         switch field {
         case .experiencePeriod, .educationPeriod: true
-        case .name, .title, .location, .summary, .experience, .education, .language: false
+        case .name, .title, .location, .summary, .experience, .education, .language, .certification: false
         }
     }
 }
