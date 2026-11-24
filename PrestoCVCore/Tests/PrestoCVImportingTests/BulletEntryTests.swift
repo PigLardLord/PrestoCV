@@ -396,4 +396,67 @@ struct BulletEntryTests {
         let found = read("Education\n• 2021 Leeds College\n• 2012 Leeds High School", kind: .education)
         #expect(found.cv.education.map { $0.school?.value } == ["Leeds College", "Leeds High School"])
     }
+
+    // MARK: A word of a head counts only in the head's own part
+
+    fileprivate struct Experience: CustomTestStringConvertible, Sendable {
+        let language: String
+        let heading: String
+        let first: String
+        let sentence: String
+        let second: String
+        let lines: [String]
+        var testDescription: String { language }
+    }
+
+    fileprivate static let experiences: [Experience] = [
+        Experience(
+            language: "German", heading: "Berufserfahrung", first: "• 2021 – Elektriker – Beispiel GmbH, Erfurt",
+            sentence: "Ich habe die Installationen geprüft.", second: "• 2015 – 2019 – Monteur – Muster AG, Jena",
+            lines: [
+                "2019 – Von Muster GmbH ausgezeichnet", "2019 – Auszeichnung für Elektriker", "2019 – Auszeichnung für Muster GmbH",
+                "2000 – Prüfungen durchgeführt, dokumentiert", "2000 – Prüfungen durchgeführt – dokumentiert",
+            ]),
+        Experience(
+            language: "English", heading: "Work Experience", first: "• 2021 – Electrician – Example Ltd, Leeds",
+            sentence: "I checked the installations.", second: "• 2015 – 2019 – Plumber – Sample Ltd, York",
+            lines: [
+                "2019 – Award for Electrician", "2019 – Muster Ltd named supplier of the year",
+                "2000 – Inspections carried out, documented",
+            ]),
+        Experience(
+            language: "Italian", heading: "Esperienza professionale", first: "• 2021 – Elettricista – Esempio S.r.l., Torino",
+            sentence: "Ho controllato gli impianti.", second: "• 2015 – 2019 – Idraulico – Campione S.r.l., Milano",
+            lines: [
+                "2019 – Premio per Elettricista", "2019 – Rossi S.r.l. premiata per la qualità",
+                "2000 – Ispezioni svolte, documentate",
+            ]),
+    ]
+
+    @Test("A line whose role or company word stands inside prose, or whose parts are only separated by a comma, is a detail", arguments: experiences)
+    fileprivate func proseAroundAHeadWordIsADetail(_ experience: Experience) {
+        for line in experience.lines {
+            let last = read([experience.heading, experience.first, experience.sentence, "• " + line].joined(separator: "\n"), kind: .experience)
+            #expect(last.cv.experience.count == 1, "\(line) last")
+            guard last.cv.experience.count >= 1 else { continue }
+            #expect(last.cv.experience[0].details.map(\.value) == [experience.sentence, line], "\(line) last")
+            let between = read([experience.heading, experience.first, experience.sentence, "• " + line, experience.second].joined(separator: "\n"), kind: .experience)
+            #expect(between.cv.experience.count == 2, "\(line) between")
+            guard between.cv.experience.count >= 1 else { continue }
+            #expect(between.cv.experience[0].details.map(\.value) == [experience.sentence, line], "\(line) between")
+        }
+    }
+
+    @Test("The real one-line entries stay entries in a section that also holds a sentence", arguments: [
+        ("• 2019 – Elektriker – Muster GmbH, München", "Elektriker", "Muster GmbH"),
+        ("• 2019 – Elektriker – Siemens, München", "Elektriker", "Siemens"),
+        ("• 2019 – Electrician – Example Ltd, Leeds", "Electrician", "Example Ltd"),
+        ("• 2019 – Elettricista – Esempio S.r.l., Torino", "Elettricista", "Esempio S.r.l."),
+    ])
+    func realEntriesStayEntries(_ line: String, _ role: String, _ employer: String) throws {
+        let found = read("Berufserfahrung\n• 2021 – Monteur – Beispiel AG, Jena\nIch habe die Installationen geprüft.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 2)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Monteur", role])
+        #expect(found.cv.experience.map { $0.employer?.value } == ["Beispiel AG", employer])
+    }
 }

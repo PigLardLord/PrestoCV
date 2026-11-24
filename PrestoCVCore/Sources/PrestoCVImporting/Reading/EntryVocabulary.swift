@@ -103,54 +103,37 @@ enum EntryVocabulary {
             return words.count == 2 && isRole(String(words[1])) ? .strong : .none
         }
         if opening.isNumber { return namesAHead ? .strong : .none }
+        // A word that names a role, a school or an employer counts only where a head puts it: in a part of its own between the
+        // separators, among words that are names or modifiers, never inside prose. Punctuation alone is no evidence.
+        let structured = hasHeadStructure(rest)
         if !(lead.first?.isUppercase ?? false) {
             // A lower-case word opens a head only when it is one ("diploma in nursing", not "led the move") or a name
-            // particle before a recognised employer or school ("von Linden GmbH", "di Rossi S.r.l.")
+            // particle before an employer or a school ("von Linden GmbH", "di Rossi S.r.l.")
             let opensAHead = isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))
-                || (nameParticles.contains(folded) && endsAtOrganisation(rest))
-            return namesAHead && opensAHead ? .strong : .none
+                || nameParticles.contains(folded)
+            return structured && opensAHead ? .strong : .none
         }
-        if namesAHead { return .strong }
-        // A capitalised word after a separator is a head only when it has a head's shape; a count with its verb
-        // ("2000 – Prüfungen durchgeführt") has a lower-case word after its noun and no further part
+        if structured { return .strong }
+        // Prose around a head word ("Auszeichnung für Elektriker", "Von Muster GmbH ausgezeichnet") never heads an entry
+        if namesAHead { return .weak }
+        // A single word, or words that are all capitalised ("Corso Croce Rossa"), after a separator is a head; a capitalised
+        // noun followed by lower-case words ("Prüfungen durchgeführt") is a count with its verb
         return separated && hasHeadShape(rest) ? .strong : .weak
     }
 
-    /// Whether a text reads as a head by its shape: one word, words that are all capitalised ("Corso Croce Rossa"), or a
-    /// further part after a separator ("Course – School"). A capitalised noun followed by lower-case words ("Prüfungen
-    /// durchgeführt") is a count with its verb.
+    /// Whether a text is one word or words that are all capitalised.
     private static func hasHeadShape(_ text: Substring) -> Bool {
-        if text.contains(where: { "|·•—–,/".contains($0) }) || text.contains(" - ") { return true }
         let words = text.words
         return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
     }
 
-    /// Whether a name ends at its company or school word, with no prose after it: the word is the last one, a part in
-    /// parentheses follows it ("von Linden UG (haftungsbeschränkt)"), or a comma or a separator leads to parts that are each
-    /// a known place or a role ("von Linden GmbH, Berlin", "von Linden GmbH – Elektriker, Berlin"). Anything else after it
-    /// is prose, capitalised or not ("von Muster GmbH ausgezeichnet", "von Muster GmbH, Auszeichnung für Elektriker").
-    private static func endsAtOrganisation(_ text: Substring) -> Bool {
-        let tokens = text.split(separator: " ")
-        for token in tokens where isOrganisation(String(token)) || isSchool(String(token)) {
-            // From the comma that closes the word, if any
-            var rest = text[(token.hasSuffix(",") ? text.index(before: token.endIndex) : token.endIndex)...].drop(while: \.isWhitespace)
-            if rest.hasPrefix("("), let close = rest.firstIndex(of: ")") {
-                rest = rest[rest.index(after: close)...].drop(while: \.isWhitespace)
-            }
-            guard let mark = rest.first else { return true }
-            guard mark == "," || ("–—-|·/".contains(mark) && rest.dropFirst().first == " ") else { continue }
-            let part = rest.dropFirst().drop(while: \.isWhitespace)
-            if Places.isPlaceOnly(String(part)) || partsArePlacesOrRoles(part) { return true }
-        }
-        return false
-    }
-
-    /// Whether the parts of a text, between its commas and separators, are each a known place or a role whose own words have
-    /// a head's shape ("Elektriker, Berlin", "Senior Elektriker – Berlin"); neighbouring parts may make one place together, as
-    /// a city and its region do ("Elektriker, Boston, MA"). A role named inside prose ("Auszeichnung für Elektriker") is not
-    /// one: the punctuation around a part never gives it a head's shape.
-    private static func partsArePlacesOrRoles(_ text: Substring) -> Bool {
-        // Each part with whether a comma (not a dash or a bar) stands before it: only commas join a city and its region
+    /// Whether a text is a head by its structure: parts between its separators, each a place, a part that names a role, a
+    /// degree, a school or an employer (see `namesAHeadWord`), a capitalised title or name that
+    /// no word names (the first part, or the part straight after a role: "Elektriker – Siemens"), or a last city after an
+    /// employer that a role opened; at least one part names a head. A comma joins only a city and its region ("Boston, MA"),
+    /// never the parts of a head.
+    private static func hasHeadStructure(_ text: Substring) -> Bool {
+        // Each part with whether a comma (not a dash or a bar) stands before it
         var parts: [String] = []
         var afterComma: [Bool] = []
         var current = ""
@@ -169,21 +152,75 @@ enum EntryVocabulary {
         afterComma.append(comma)
         guard parts.allSatisfy({ !$0.words.isEmpty }) else { return false }
         var index = 0
+        var named = false
+        var opened = false
+        var closed = false
+        var nameMayFollow = false
         while index < parts.count {
-            // The longest run of parts from here, joined by commas only, that reads as one place, else this part alone as a role
+            // The longest run of parts from here, joined by commas only, that reads as one place
             var reach = index
             while reach + 1 < parts.count, afterComma[reach + 1] { reach += 1 }
-            if let last = (index...reach).reversed().first(where: {
-                isOnePlace(parts[index...$0])
-            }) {
+            if let last = (index...reach).reversed().first(where: { isOnePlace(parts[index...$0]) }) {
                 index = last + 1
-            } else if isRole(parts[index]), parts[index].words.count == 1 || parts[index].words.allSatisfy({ $0.first?.isUppercase ?? false }) {
+                nameMayFollow = false
+            } else if let kind = namesAHeadWord(parts[index]) {
+                named = true
+                if kind == .opening { opened = true } else { closed = true }
+                nameMayFollow = kind == .opening && !closed
+                index += 1
+            } else if parts[index].split(separator: " ").allSatisfy({ isModifier($0) }),
+                      nameMayFollow || index == 0 || (closed && opened && index == parts.count - 1) {
+                // A title that no word names ("Operatrice – Clinica Esempio"), the name of the employer or school after a role,
+                // or the city after a school or an employer that a role opened
+                if index == 0 { opened = true }
+                nameMayFollow = index == 0
                 index += 1
             } else {
                 return false
             }
         }
-        return true
+        return named
+    }
+
+    private enum HeadPart {
+        /// A role or a degree: the school or the employer follows
+        case opening
+        /// A school or an employer
+        case closing
+    }
+
+    /// The words that join a head word to what qualifies it ("Diploma in nursing", "Elektriker für Hochspannung").
+    private static let connectors: Set<String> = Set([
+        "of", "in", "at", "for", "di", "de", "del", "della", "dello", "dei", "en", "für", "im", "am", "bei", "und", "and", "e", "et", "y",
+    ].map(\.folded))
+
+    /// Whether a part names a role, a degree, a school or an employer where a head puts it: before the word of the head only
+    /// names and modifiers ("Senior Elektriker", "Leeds College"), after it nothing, names and modifiers, or a connector
+    /// that leads to its qualifier ("Corso di infermieristica", "Leeds College of Nursing"). A word of a head inside prose
+    /// ("Auszeichnung für Elektriker", "Muster Ltd named supplier") is not one.
+    private static func namesAHeadWord(_ part: String) -> HeadPart? {
+        var text = part
+        while let open = text.firstIndex(of: "("), let close = text[open...].firstIndex(of: ")") {
+            text.removeSubrange(open...close)
+        }
+        let words = text.split(separator: " ")
+        for (index, word) in words.enumerated() {
+            let word = String(word)
+            let closing = isOrganisation(word) || isSchool(word)
+            guard closing || isRole(word) || isDegree(word) else { continue }
+            guard words[..<index].allSatisfy({ isModifier($0) }) else { continue }
+            let after = words[(index + 1)...]
+            if let next = after.first, !isModifier(next), !connectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
+            if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
+            return closing ? .closing : .opening
+        }
+        return nil
+    }
+
+    /// Whether a word is part of a name: capitalised, a particle ("von", "di"), or not a letter ("&", "(").
+    private static func isModifier(_ word: Substring) -> Bool {
+        guard let first = word.first else { return true }
+        return first.isUppercase || !first.isLetter || nameParticles.contains(word.folded)
     }
 
     /// Whether comma-joined parts make one place: a single part that is a place, or several where each part but the last is a
