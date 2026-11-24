@@ -17,6 +17,7 @@ import PrestoCVExportFiles
 import PrestoCVImportFiles
 import PrestoCVImporting
 import PrestoCVImportingPDFKit
+import PrestoCVLegacyLeftovers
 import PrestoCVIntegration
 import PrestoCVPersistence
 import PrestoCVPresentation
@@ -55,6 +56,9 @@ public final class Composition {
     /// Gives the import the screens read through from the workflow. A launch gives it back as it is; in a Debug build a UI
     /// test's fixture replaces it.
     typealias WrapImport = @MainActor (any CVImporting) -> any CVImporting
+    /// Makes what removes the files the released app left, over the launch's log. The composition calls it once, after the
+    /// log is made, so a test gives a cleaner it can read.
+    typealias MakeLegacyLeftovers = @Sendable (any DiagnosticLogger) -> any LegacyLeftoversCleaning
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -99,6 +103,8 @@ public final class Composition {
         let sharesWithStandIn: Bool
         /// The store of the released app, whose CVs the launch moves into the new store before any screen reads it
         let legacyStore: any LegacyStore
+        /// What removes the files of the released app that hold nothing the person wrote, once its import has gone through
+        let legacyLeftovers: MakeLegacyLeftovers
         /// What the Settings sheet shows about the app, read from its bundle
         let settings: SettingsFactory.Facts
     }
@@ -228,6 +234,7 @@ public final class Composition {
         let repository = FileCVRepository(directory: inputs.paths.store, clock: inputs.clock)
         let importer = ImportLegacyStore(source: inputs.legacyStore, target: repository)
         let outcome = await importLegacy(with: importer)
+        await cleanLeftovers(after: outcome, with: inputs.legacyLeftovers(trace.logger))
         let legacyImport = LegacyImportAtLaunch(
             outcome: outcome, review: LegacyImportReview(outcome: outcome, importer: importer),
             reminder: LegacyReportMarker(file: inputs.paths.legacyReportOff)
@@ -254,6 +261,15 @@ public final class Composition {
         } catch {
             return .failed(error)
         }
+    }
+
+    /// Removes what the released app left that holds nothing the person wrote, after an import that ran with nothing left
+    /// out: no file failed, and the store was not erased. After a failed import, or one with a failure, nothing is removed,
+    /// and the next launch decides again. The removals run off the main actor (R19), and nothing reads them: the launch goes
+    /// on when they end.
+    static func cleanLeftovers(after outcome: LegacyImportOutcome, with cleaner: any LegacyLeftoversCleaning) async {
+        guard case .ran(let report) = outcome, report.failures.isEmpty, !report.storeErased else { return }
+        await cleaner.clean()
     }
 
     /// Makes the one renderer, inspector and headings, syncs the bundled designs into the design store through a gate
@@ -310,6 +326,7 @@ public final class Composition {
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
+        let leftovers: LegacyLeftoverPaths
         #if DEBUG
         // A fixture that cannot be read, or a fixture folder that fails its check, fails the launch inside `make` before
         // the trace chain starts: nothing is made, and nothing is purged.
@@ -326,6 +343,7 @@ public final class Composition {
         gate = fixtures.distribution.map { .asking(GivenDistribution(given: $0)) } ?? .debug
         samples = fixtures.samples(bundled: bundled, paths: paths)
         legacy = fixtures.legacyStore(device: AppPaths.legacyStoreOnDevice(), paths: paths)
+        leftovers = fixtures.legacyLeftovers(device: AppPaths.legacyLeftoversOnDevice(), paths: paths)
         check = { () throws(CompositionFailure) in
             if let rejected { throw rejected }
             do throws(LaunchFixtures.Failure) {
@@ -355,6 +373,7 @@ public final class Composition {
         gate = .asking(AppTransactionDistribution())
         samples = bundled
         legacy = AppPaths.legacyStoreOnDevice()
+        leftovers = AppPaths.legacyLeftoversOnDevice()
         check = {}
         prepare = {}
         wrapListEditing = { $0 }
@@ -396,6 +415,7 @@ public final class Composition {
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
+            legacyLeftovers: { LegacyLeftoversAdapter(paths: leftovers, logger: $0) },
             settings: bundledSettings()
         ))
         #if DEBUG

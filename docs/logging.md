@@ -150,6 +150,16 @@ The export sheet writes the PDF to a file of its own for the system's share shee
 
 The `export.share.*` events name no path and no file name: the file's name holds the person's name.
 
+### The released app's leftovers (category `legacy`)
+
+After an import that left nothing out, the launch removes the released app's design files, their cache and its export settings, which hold nothing the person wrote.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `legacy.leftovers.notRemoved` | error | `of` (`templates`, `templateCache` or `exportPreferences`), `error` | A file the released app left, with nothing the person wrote in it, could not be removed after the import; the next launch tries again. |
+
+The event names a kind of file and a code, never a path.
+
 ## The trace of a test build
 
 A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.

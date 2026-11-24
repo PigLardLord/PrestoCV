@@ -2,6 +2,7 @@
 import DiagnosticTrace
 import Foundation
 import PrestoCVApplication
+import PrestoCVLegacyLeftovers
 import Testing
 @testable import PrestoCVComposition
 
@@ -276,6 +277,22 @@ struct LaunchFixturesTests {
         let paths = fixtures.paths(device: Self.device, fresh: Self.fresh)
 
         #expect(fixtures.legacyStore(device: device, paths: paths).path == "/tmp/t/PrestoCVNextFixture-legacy/Legacy")
+    }
+
+    @Test("The leftovers to remove are the device's, or for a fixture folder ones in it, so a fixture never removes the released app's")
+    func legacyLeftoversFolder() {
+        let device = LegacyLeftoverPaths(applicationSupport: URL(filePath: "/support", directoryHint: .isDirectory))
+        var fixtures = LaunchFixtures()
+        #expect(fixtures.legacyLeftovers(device: device, paths: Self.device) == device)
+
+        fixtures.storage = .named("legacy")
+        let paths = fixtures.paths(device: Self.device, fresh: Self.fresh)
+        let leftovers = fixtures.legacyLeftovers(device: device, paths: paths)
+
+        let base = "/tmp/t/PrestoCVNextFixture-legacy/LegacySupport"
+        #expect(leftovers.templates.path == base + "/PrestoCV/Templates")
+        #expect(leftovers.templateCache.path == base + "/TemplateCache")
+        #expect(leftovers.exportPreferences.path == base + "/PrestoCV/export-preferences.json")
     }
 
     @Test("The seed is written as files in the store folder, which it makes")
