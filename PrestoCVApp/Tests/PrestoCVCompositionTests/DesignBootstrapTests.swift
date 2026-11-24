@@ -169,6 +169,26 @@ struct DesignBootstrapTests {
         #expect(unreadable.value("leftOut") == .count(1))
     }
 
+    @Test("A bundled design whose package is damaged in the store is written again at the next launch and offered, default or not",
+          arguments: [["professional"], ["modern"], ["minimal", "modern", "professional"]])
+    func damagedBundledDesignIsRepaired(damaged: Set<String>) async throws {
+        let shipped = try await BundleDesignSource().bundledPackages().map { try DesignPackageValidator().validate($0.data) }
+        let store = SpyDesignStore(installed: shipped, origins: Dictionary(uniqueKeysWithValues: Self.bundled.map { ($0, .bundled) }), unreadable: damaged)
+        let gate = FakeRenderingGate()
+        let logger = RecordingLogger()
+
+        let designs = try await Self.bootstrap(store: store, gate: gate, logger: logger).run()
+
+        #expect(designs.installed.map(\.manifest.id) == Self.bundled)
+        #expect(designs.defaultDesign.id == "professional")
+        #expect(await gate.verified == Self.bundled.filter(damaged.contains))
+        let synced = try #require(logger.entry("designs.synced"))
+        #expect(synced.level == .info)
+        #expect(synced.value("repaired") == .count(damaged.count))
+        #expect(synced.value("unchanged") == .count(Self.bundled.count - damaged.count))
+        #expect(logger.entry("designs.unreadable") == nil)
+    }
+
     @Test("A cancelled source is designSyncInterrupted")
     func cancelledSource() async {
         let failure = await Self.failure(of: Self.bootstrap(store: InMemoryDesignStore(), source: CancelledBundledSource(), gate: FakeRenderingGate()))
@@ -220,8 +240,8 @@ struct DesignBootstrapTests {
         let synced = try #require(logger.entry("designs.synced"))
         #expect(synced.level == .info)
         #expect(synced.category == .designs)
-        let counts = ["installed", "upgraded", "unchanged", "adopted", "rejected", "notRendered", "failed", "conflicts"].map { synced.value($0) }
-        #expect(counts == [.count(3), .count(0), .count(0), .count(0), .count(0), .count(0), .count(0), .count(0)])
+        let counts = ["installed", "upgraded", "unchanged", "adopted", "repaired", "rejected", "notRendered", "failed", "conflicts"].map { synced.value($0) }
+        #expect(counts == [.count(3), .count(0), .count(0), .count(0), .count(0), .count(0), .count(0), .count(0), .count(0)])
         #expect(synced.value("elapsed") == .duration(Self.step))
         #expect(logger.events == ["designs.synced"])
     }
@@ -280,4 +300,5 @@ private actor HeldStore: DesignStore {
     func design(id: String) async throws -> ValidatedDesign? { try await store.design(id: id) }
     func installedOrigins() async throws -> [String: DesignOrigin] { try await store.installedOrigins() }
     func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.adoptAsBundled(design) }
+    func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.replaceBundled(design) }
 }

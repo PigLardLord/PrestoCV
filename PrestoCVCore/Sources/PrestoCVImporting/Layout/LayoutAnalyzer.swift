@@ -93,6 +93,7 @@ enum LayoutAnalyzer {
             rawLine.firstCellBold = line.cells.first?.isBold ?? false
             rawLine.firstWordWidth = line.cells.first?.words.first?.frame.width
             rawLine.columnRight = rightEdges[entry.column]
+            rawLine.cellLooks = line.cells.map(\.look)
             raw.append(rawLine)
             previous = entry
         }
@@ -113,6 +114,20 @@ enum LayoutAnalyzer {
 
         var text: String { words.map(\.text).joined(separator: " ") }
         var fontSize: Double { words.map(\.fontSize).max() ?? 0 }
+        /// Where the cell's main text starts and its size. The main size is the one that holds most of the cell's letters
+        /// and digits, and the text starts at the first word in that size that holds one: so a small marker beside the
+        /// name, an icon font's glyph or a bullet before it changes neither. Nil when no word holds a letter or a digit, or
+        /// when two sizes hold as many: the cell then tells neither where its text stands nor how large it is.
+        var look: SourceBlock.CellLook? {
+            let text = words.map { word in (word: word, letters: word.text.count { $0.isLetter || $0.isNumber }) }
+                .filter { $0.letters > 0 }
+            var letters: [Double: Int] = [:]
+            for entry in text { letters[entry.word.fontSize, default: 0] += entry.letters }
+            let ranked = letters.sorted { $0.value > $1.value }
+            guard let main = ranked.first, ranked.dropFirst().first?.value != main.value,
+                  let start = text.first(where: { $0.word.fontSize == main.key }) else { return nil }
+            return SourceBlock.CellLook(x: start.word.frame.x, fontSize: main.key)
+        }
         var isBold: Bool { words.allSatisfy(\.isBold) }
     }
 
