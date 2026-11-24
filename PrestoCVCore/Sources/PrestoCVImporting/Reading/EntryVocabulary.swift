@@ -174,7 +174,7 @@ enum EntryVocabulary {
             var reach = index
             while reach + 1 < parts.count, afterComma[reach + 1] { reach += 1 }
             if let last = (index...reach).reversed().first(where: {
-                Places.isPlaceOnly(parts[index...$0].joined(separator: ", "))
+                isOnePlace(parts[index...$0])
             }) {
                 index = last + 1
             } else if isRole(parts[index]), parts[index].words.count == 1 || parts[index].words.allSatisfy({ $0.first?.isUppercase ?? false }) {
@@ -184,6 +184,13 @@ enum EntryVocabulary {
             }
         }
         return true
+    }
+
+    /// Whether comma-joined parts make one place: a single part that is a place, or several where the city part (all but the
+    /// last) is itself a place and the last is a country or region, so "Auszeichnung, Deutschland" is no place.
+    private static func isOnePlace(_ parts: ArraySlice<String>) -> Bool {
+        guard parts.count > 1, let region = parts.last else { return Places.isPlaceOnly(parts.joined(separator: ", ")) }
+        return Places.isCountryOrRegion(region) && Places.isPlaceOnly(parts.dropLast().joined(separator: ", "))
     }
 
     /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
