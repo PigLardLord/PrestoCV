@@ -51,6 +51,8 @@ public enum ReviewedField: Hashable, Sendable {
     /// The n-th language of the text, which the draft does not hold; its words are in the text not imported.
     case languageNotKept(Int)
     case certificationYear(Int)
+    /// The position in the draft's certifications.
+    case certification(Int)
 }
 
 /// Why a value should be checked.
@@ -75,4 +77,6 @@ public enum ReviewReason: Hashable, Sendable, CaseIterable {
     case locationNotKept
     /// The certification's year is no year the draft can hold.
     case yearUnreadable
+    /// A line may be the certification's description or a certification of its own.
+    case descriptionOrEntryUnsure
 }
