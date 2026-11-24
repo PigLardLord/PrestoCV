@@ -581,9 +581,8 @@ struct BulletEntryTests {
         #expect(found.cv.experience[0].details.map(\.value) == ["I checked the installations.", String(line.dropFirst(2))])
     }
 
-    @Test("A municipality, a bank or a university after a joining word is an institution and keeps the entry", arguments: [
+    @Test("A municipality or a university after a joining word is an institution and keeps the entry", arguments: [
         "• 2019 – Impiegato presso Comune di Esempio",
-        "• 2019 – Banca di Esempio, Milano",
         "• 2019 – Designer bei Universität der Künste",
     ])
     func institutionByItselfIsAnEntry(_ line: String) throws {
@@ -591,12 +590,19 @@ struct BulletEntryTests {
         #expect(found.cv.experience.count == 2)
     }
 
-    @Test("A trade noun that is also an institution noun, or a purpose connector after a role, gives no head: a detail of the entry above", arguments: [
+    @Test("A trade noun or a bank noun that is also an institution noun, or a purpose connector after a role, gives no head: a detail of the entry above", arguments: [
         "• 2019 – Tecnico per Banco di Prova",
         "• 2019 – Tecnico per Camera di Combustione",
         "• 2019 – Electrician for Foundation of Buildings",
         "• 2019 – Elektriker für Akademie der Wartung",
         "• 2019 – Camera di combustione",
+        "• 2019 – Bank of Capacitors",
+        "• 2019 – Electrician at Bank of Capacitors",
+        "• 2019 – Banque de Données",
+        "• 2019 – Banca de Inversión",
+        "• 2019 – Elektriker bei Bank der Werkstatt",
+        "• 2019 – Banca di Esempio, Milano",
+        "• 2019 – Electrician at Bank of Esempio",
     ])
     func tradeNounAfterPurposeConnectorIsADetail(_ line: String) throws {
         let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
@@ -609,7 +615,6 @@ struct BulletEntryTests {
         "• 2019 – Tecnico presso Università degli Studi di Esempio",
         "• 2019 – Ingénieur chez Université de la Ville",
         "• 2019 – Impiegato presso Comune di Esempio",
-        "• 2019 – Electrician at Bank of Esempio",
     ])
     func employerConnectorKeepsTheEntry(_ line: String) throws {
         let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)

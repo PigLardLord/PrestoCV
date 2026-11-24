@@ -527,19 +527,19 @@ enum EntryVocabulary {
     private static let institutionWords: Set<String> = Set([
         // English
         "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic",
-        "association", "ministry", "bank", "company",
+        "association", "ministry", "company",
         // Italian
         "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica",
-        "associazione", "ministero", "banca", "comune", "azienda", "società",
+        "associazione", "ministero", "comune", "azienda", "società",
         // Spanish
         "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica",
         "asociación", "ministerio", "municipio", "ayuntamiento", "empresa", "sociedad",
         // French
         "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique",
-        "association", "ministère", "banque", "mairie", "entreprise", "société",
+        "association", "ministère", "mairie", "entreprise", "société",
         // German
         "schule", "gymnasium", "akademie", "institut", "fakultät", "konservatorium", "krankenhaus", "klinik", "klinikum",
-        "stiftung", "verein", "ministerium", "bank", "gemeinde", "stadtverwaltung", "unternehmen",
+        "stiftung", "verein", "ministerium", "gemeinde", "stadtverwaltung", "unternehmen",
         // Portuguese
         "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica",
         "associação", "ministério", "prefeitura", "empresa", "sociedade",
