@@ -633,6 +633,12 @@ r19_flag "a module-qualified type member call" 'func f() { Foundation.Thread.sle
 r19_flag "a coder" 'func f() { _ = JSONDecoder() }' "R19m mainActorLongWork"
 r19_flag "a call in a closure of a view model" 'final class M { func f(_ u: URL) { run { _ = try? Data(contentsOf: u) } } }' "R19m"
 r19_flag "a call in an async function that is not @concurrent" 'func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }' "R19m mainActorLongWork"
+r19_flag "MainActor.run inside a @concurrent function" \
+  '@concurrent func f() async { await MainActor.run { Thread.sleep(forTimeInterval: 3) } }' "R19m mainActorLongWork"
+r19_flag "an explicit @MainActor task closure inside an actor" \
+  'actor A { func f() { Task { @MainActor in Thread.sleep(forTimeInterval: 3) } } }' "R19m mainActorLongWork"
+r19_flag "an explicit @MainActor closure inside a @concurrent function" \
+  '@concurrent func f() async { let g = { @MainActor in Thread.sleep(forTimeInterval: 3) }; await g() }' "R19m mainActorLongWork"
 r19_clean "a call in a @concurrent function" '@concurrent func f(_ u: URL) async throws { _ = try Data(contentsOf: u) }'
 r19_clean "a call in a closure of a @concurrent function" \
   '@concurrent func f(_ u: URL) async throws { let g = { try Data(contentsOf: u) }; _ = try g() }'

@@ -716,12 +716,26 @@ final class Scanner: SyntaxVisitor {
     private func isOffTheMainActor(_ node: some SyntaxProtocol) -> Bool {
         var current = node.parent
         while let n = current {
+            // The nearest execution boundary decides: a closure that runs on the main actor, or a function marked with it,
+            // is main-actor work whatever actor or @concurrent function surrounds it.
+            if let c = n.as(ClosureExprSyntax.self), let attributes = c.signature?.attributes, Self.hasAttribute("MainActor", attributes) { return false }
+            if let call = n.as(FunctionCallExprSyntax.self), Self.isMainActorRun(call) { return false }
+            if let f = n.as(FunctionDeclSyntax.self) {
+                if Self.hasAttribute("concurrent", f.attributes) { return true }
+                if Self.hasAttribute("MainActor", f.attributes) { return false }
+            }
             if n.is(ActorDeclSyntax.self) { return true }
             if let e = n.as(ExtensionDeclSyntax.self), concurrency.actors.contains(Self.typeName(e.extendedType) ?? "") { return true }
-            if let f = n.as(FunctionDeclSyntax.self), Self.hasAttribute("concurrent", f.attributes) { return true }
             current = n.parent
         }
         return false
+    }
+
+    /// `MainActor.run { … }`, also module-qualified: its closure runs on the main actor.
+    private static func isMainActorRun(_ call: FunctionCallExprSyntax) -> Bool {
+        guard let member = call.calledExpression.as(MemberAccessExprSyntax.self), member.declName.baseName.text == "run" else { return false }
+        let base = member.base?.trimmedDescription ?? ""
+        return base == "MainActor" || base.hasSuffix(".MainActor")
     }
 
     // MARK: Declarations
