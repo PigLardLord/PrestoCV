@@ -136,7 +136,7 @@ enum CertificationReader {
     ///    organisation, or the only part left, the first web address is the link, a label of a link is left out, and the
     ///    rest is text not imported. One that may as well be the description of the certification above is marked to check.
     ///
-    /// Before these branches, a line of dates alone is the year of a certification (#461): it waits for the certification
+    /// Before these branches, a line of dates alone (and no web address: the address is read by the branches) is the year of a certification (#461): it waits for the certification
     /// below it, or dates the one above it when that one has no year; the certification it dates below it takes its year.
     private static func read(_ block: SourceBlock, in section: Section, walk: inout Walk, into findings: inout Findings)
         -> OpenCertification? {
@@ -148,7 +148,7 @@ enum CertificationReader {
         let cells = section.cells(of: block, in: findings.document)
         guard !cells.isEmpty else { return nil }
         let line = CertificationLine(block: block, cells: cells)
-        if let dates = datesAlone(line.split), dateLine(block, dates, &walk, section, &findings) { return nil }
+        if line.addresses.isEmpty, let dates = datesAlone(line.split), dateLine(block, dates, &walk, section, &findings) { return nil }
         if var open, open.isRightAbove, line.addresses.isEmpty, completeCertification(at: open.index, with: line.split, section, &findings) {
             open.statesIssuerOrYear = true
             open.isRightAbove = false
