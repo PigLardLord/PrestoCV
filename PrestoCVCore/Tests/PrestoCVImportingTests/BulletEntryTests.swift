@@ -521,4 +521,27 @@ struct BulletEntryTests {
         let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\nI finished 1000 hours of training.\n\(line)", kind: .education)
         #expect(found.cv.education.count == 2)
     }
+
+    @Test("A capitalised duty joined like prose is no name: German nouns, or another language, stay a detail of the job above", arguments: [
+        "• 2019 – Elektriker für Prüfung und Wartung der Anlagen",
+        "• 2019 – Elektriker für Prüfung und Wartung von Anlagen",
+        "• 2019 – Tecnico per Installazione e Manutenzione degli Impianti",
+    ])
+    func capitalisedDutyIsADetail(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.map(\.value) == ["I checked the installations.", String(line.dropFirst(2))])
+    }
+
+    @Test("A degree or a role with a capitalised name qualifier is an entry in a mixed section", arguments: [
+        ("Ausbildung", "• 2014 – Diplom in Technik und Wirtschaft – Hochschule Esempio, Berlin", Section.education),
+        ("Esperienza professionale", "• 2020 – Infermiere presso Ospedale San Esempio, Milano", Section.experience),
+    ])
+    fileprivate func capitalisedNameIsAnEntry(_ heading: String, _ line: String, _ section: Section) throws {
+        let first = section == .education ? "• 2021 – Nursing course – Leeds College, Leeds" : "• 2021 – Electrician – Example Ltd, Leeds"
+        let found = read("\(heading)\n\(first)\nI finished the work in June.\n\(line)", kind: section == .education ? .education : .experience)
+        #expect((section == .education ? found.cv.education.count : found.cv.experience.count) == 2)
+    }
+
+    fileprivate enum Section { case education, experience }
 }

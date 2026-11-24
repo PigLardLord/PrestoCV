@@ -239,7 +239,8 @@ enum EntryVocabulary {
         guard let first = words.first, let last = words.last else { return false }
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
-           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }) {
+           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
+           readsAsAName(words, capitalised: capitalised) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
@@ -247,6 +248,30 @@ enum EntryVocabulary {
             return word.first?.isLowercase == true && !determiners.contains(folded) && !connectors.contains(folded)
                 && !elidedArticles.contains(where: folded.hasPrefix)
         }
+    }
+
+    /// Whether capitalised words read as a name and not as a duty joined like prose ("Prüfung und Wartung der Anlagen",
+    /// German capitalises its nouns): no lower-case article or determiner, except a particle right after another one
+    /// ("van der"), and at most one run of joining words or particles between the capitalised words. A joining word that
+    /// is also a contracted article ("delle", "du") joins and does not count as an article.
+    private static func readsAsAName(_ words: [Substring], capitalised: (Substring) -> Bool) -> Bool {
+        var runs = 0
+        var previousWasLower = false
+        var previousFolded = ""
+        for word in words {
+            let folded = word.folded
+            if capitalised(word) {
+                previousWasLower = false
+            } else {
+                if !previousWasLower { runs += 1 }
+                let article = determiners.contains(folded) && !connectors.contains(folded)
+                let afterParticle = previousWasLower && nameParticles.contains(previousFolded)
+                if article && !afterParticle { return false }
+                previousWasLower = true
+            }
+            previousFolded = folded
+        }
+        return runs <= 1
     }
 
     /// The articles and determiners of the six languages: a short subject that holds one is prose.
