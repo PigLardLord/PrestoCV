@@ -665,7 +665,11 @@ final class Scanner: SyntaxVisitor {
     }
 
     private static func hasAttribute(_ name: String, _ attributes: AttributeListSyntax) -> Bool {
-        attributes.contains { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == name }
+        attributes.contains { attribute in
+            // Also module-qualified: `@_Concurrency.MainActor` is `@MainActor`.
+            guard let written = attribute.as(AttributeSyntax.self)?.attributeName.trimmedDescription else { return false }
+            return written == name || written.hasSuffix("." + name)
+        }
     }
 
     /// The nearest type, extension or protocol a declaration is a member of.
