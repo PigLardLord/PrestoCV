@@ -459,4 +459,40 @@ struct BulletEntryTests {
         #expect(found.cv.experience.map { $0.role?.value } == ["Monteur", role])
         #expect(found.cv.experience.map { $0.employer?.value } == ["Beispiel AG", employer])
     }
+
+    // MARK: The words that join a head word to its qualifier
+
+    @Test("A course head joined to its qualifier by a preposition is an education entry", arguments: [
+        ("Formazione", "• 2021 – Corso per OSS – FormaOSS, Milano", "A settembre 2021 ho completato le 1.000 ore di tirocinio.", "Corso per OSS", "FormaOSS", "Milano", 2021),
+        ("Formation", "• 2019 – Cours pour adultes – Greta, Lyon", "J'ai terminé la formation en juin.", "Cours pour adultes", "Greta", "Lyon", 2019),
+        ("Formación", "• 2018 – Curso para docentes – Instituto Cervantes, Madrid", "Completé el curso en junio.", "Curso para docentes", "Instituto Cervantes", "Madrid", 2018),
+        ("Formação", "• 2017 – Curso em enfermagem – Senac, São Paulo", "Concluí o curso em junho.", "Curso em enfermagem", "Senac", "São Paulo", 2017),
+        ("Formação", "• 2016 – Curso do Senac – Instituto Exemplo, Lisboa", "Concluí o curso em junho.", "Curso do Senac", "Instituto Exemplo", "Lisboa", 2016),
+        ("Formazione", "• 2015 – Corso degli infermieri – Istituto Esempio, Torino", "Ho completato il corso a giugno.", "Corso degli infermieri", "Istituto Esempio", "Torino", 2015),
+        ("Formation", "• 2014 – Diplôme du Conservatoire – Lycée Exemple, Lyon", "J'ai terminé le cours en juin.", "Diplôme du Conservatoire", "Lycée Exemple", "Lyon", 2014),
+    ] as [(String, String, String, String, String, String, Int)])
+    func joinedCourseHeads(_ heading: String, _ line: String, _ sentence: String, _ degree: String, _ school: String, _ place: String, _ year: Int) throws {
+        let found = read("\(heading)\n\(line)\n\(sentence)", kind: .education)
+        try #require(found.cv.education.count == 1)
+        let entry = found.cv.education[0]
+        #expect(entry.degree?.value == degree)
+        #expect(entry.school?.value == school)
+        #expect(entry.location?.value == place)
+        #expect(entry.period?.value.start.year == year)
+        #expect(found.unplaced.isEmpty)
+    }
+
+    @Test("A role joined to its employer by a preposition is an experience entry", arguments: [
+        ("Esperienza professionale", "• 2020 – Infermiere presso Ospedale Esempio, Milano", "Assistenza ai pazienti in reparto.", 2020),
+        ("Expérience professionnelle", "• 2020 – Infirmier chez Exemple SARL, Lyon", "Soins aux patients en service.", 2020),
+        ("Experiencia profesional", "• 2020 – Enfermero en Hospital Ejemplo, Madrid", "Atención a los pacientes en planta.", 2020),
+        ("Experiência profissional", "• 2020 – Enfermeiro no Hospital Exemplo, Lisboa", "Cuidados aos pacientes na enfermaria.", 2020),
+    ] as [(String, String, String, Int)])
+    func joinedRoleHeads(_ heading: String, _ line: String, _ sentence: String, _ year: Int) throws {
+        let found = read("\(heading)\n\(line)\n\(sentence)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].period?.value.start.year == year)
+        #expect(found.cv.experience[0].details.map(\.value) == [sentence])
+        #expect(found.unplaced.isEmpty)
+    }
 }

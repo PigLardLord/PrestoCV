@@ -191,7 +191,18 @@ enum EntryVocabulary {
 
     /// The words that join a head word to what qualifies it ("Diploma in nursing", "Elektriker für Hochspannung").
     private static let connectors: Set<String> = Set([
-        "of", "in", "at", "for", "di", "de", "del", "della", "dello", "dei", "en", "für", "im", "am", "bei", "und", "and", "e", "et", "y",
+        // English
+        "of", "in", "at", "for", "on", "with", "and",
+        // Italian
+        "di", "del", "della", "dello", "dei", "degli", "delle", "per", "presso", "con", "a", "nel", "nella", "nei", "nelle", "e",
+        // Spanish
+        "de", "en", "para", "por", "con", "y",
+        // French
+        "du", "des", "pour", "chez", "avec", "à", "au", "aux", "et",
+        // German
+        "für", "im", "am", "bei", "und", "mit", "von", "zum", "zur",
+        // Portuguese
+        "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "e",
     ].map(\.folded))
 
     /// Whether a part names a role, a degree, a school or an employer where a head puts it: before the word of the head only
