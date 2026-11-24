@@ -165,18 +165,34 @@ extension LegacyImportOutcome {
     public var failed: Int? {
         switch self {
         case .ran(let report) where report.storeErased: nil
-        case .ran(let report): report.failures.filter(\.reason.leavesTheCVOut).count
+        case .ran(let report): report.failures.filter { $0.reason.leftOut != nil }.count
         case .failed: nil
+        }
+    }
+
+    /// Whether legacy CVs may be missing from the new store: the run left some out, or failed before it knew them. Such a
+    /// launch never welcomes the person as new, even with an empty store: their CVs are not gone, only not imported.
+    public var mayLeaveCVsOut: Bool {
+        switch self {
+        case .ran: (self.failed ?? 0) > 0
+        case .failed: true
         }
     }
 }
 
+/// Why a legacy CV is missing from the new store, as the person can act on it: its file is damaged, or the new store could
+/// not keep it.
+public enum LegacyLeftOut: Sendable, Hashable, CaseIterable {
+    case damaged, notSaved
+}
+
 extension LegacyImportFailure.Reason {
-    /// Whether the CV is missing from the new store, rather than stored with its legacy file left in place.
-    var leavesTheCVOut: Bool {
+    /// Why the CV is missing from the new store; nil when it is stored and only its legacy file stayed.
+    public var leftOut: LegacyLeftOut? {
         switch self {
-        case .invalid, .unreadable, .notStored, .didNotReadBack: true
-        case .sourceNotRemoved, .sourceChanged: false
+        case .invalid, .unreadable: .damaged
+        case .notStored, .didNotReadBack: .notSaved
+        case .sourceNotRemoved, .sourceChanged: nil
         }
     }
 }

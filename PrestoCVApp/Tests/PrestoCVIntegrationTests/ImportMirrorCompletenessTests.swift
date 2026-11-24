@@ -47,7 +47,8 @@ private let mapped: [String: Destination] = [
     "experience[].role": inCV, "experience[].employer": inCV, "experience[].location": inCV, "experience[].details[]": inCV,
     "education[].degree": inCV, "education[].school": inCV, "education[].details[]": inCV,
     "skills[]": inCV, "languages[].name": inCVOrListed, "languages[].level": inCV,
-    "certifications[].name": inCV, "certifications[].issuer": inCV, "interests[]": inCV,
+    "certifications[].name": inCV, "certifications[].issuer": inCV, "certifications[].link": inCV,
+    "certifications[].description": inCV, "interests[]": inCV,
 ]
 
 private let reported: [String: Destination] = [
@@ -55,7 +56,7 @@ private let reported: [String: Destination] = [
     "person.links[].heading": { _, _ in true },   // the heading a second website is listed under: the address is checked
     "languages[].heading": { _, _ in true },   // the heading a language the CV cannot take is listed under: its name is checked
     "education[].heading": { _, _ in true },   // the heading a study's place is listed under: the place is checked
-    "experience[].check": checkReported, "education[].check": checkReported,
+    "experience[].check": checkReported, "education[].check": checkReported, "certifications[].check": checkReported,
     "experience[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .experience) },
     "education[].period": { field, outcome in periodKeptOrReported(field, outcome, section: .education) },
     "education[].location": { field, outcome in outcome.notImported.contains(field.value) },

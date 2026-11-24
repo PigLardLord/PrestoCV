@@ -177,19 +177,24 @@ public final class CVListViewModel {
     // MARK: - Rows
 
     private func showRows() {
-        let titles = listed.map { (id: $0.id.raw.uuidString, title: Self.title(of: $0)) }
-        let labels = CVTitle.labels(for: titles, untitled: untitled, numbered: numbered)
+        let labels = Self.labels(of: listed, untitled: untitled, numbered: numbered)
         rows = listed.map { cv in
             CVRow(
-                reference: CVReference(id: cv.id), label: labels[cv.id.raw.uuidString] ?? untitled, title: cv.title,
+                reference: CVReference(id: cv.id), label: labels[cv.id] ?? untitled, title: cv.title,
                 subtitle: CVSubtitle.text(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle) ?? "",
                 lastSaved: cv.updatedAt ?? cv.createdAt, language: cv.language?.tag
             )
         }
     }
 
-    private static func title(of cv: CV) -> CVTitle {
-        CVTitle(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle)
+    /// The label each CV of a listing shows in the list: no two alike (the domain's `CVTitle.labels`). The import report
+    /// names the CVs with it too.
+    static func labels(of cvs: [CV], untitled: String, numbered: @MainActor (String, Int) -> String) -> [CVID: String] {
+        let titles = cvs.map { cv in
+            (id: cv.id.raw.uuidString, title: CVTitle(name: cv.title, person: cv.personal.fullName, role: cv.personal.professionalTitle))
+        }
+        let labels = CVTitle.labels(for: titles, untitled: untitled, numbered: numbered)
+        return Dictionary(cvs.map { ($0.id, labels[$0.id.raw.uuidString] ?? untitled) }, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: - Kept editors
