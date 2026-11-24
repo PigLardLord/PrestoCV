@@ -1,4 +1,5 @@
-/// Reads certifications: a name, the issuer when the line names one, and the year a date of the line states.
+/// Reads certifications: a name, the issuer when the line names one, the year a date of the line states, and the link and
+/// the description the lines under it give (#283).
 enum CertificationReader {
 
     /// The separators a line of a certification is cut at.
@@ -12,7 +13,7 @@ enum CertificationReader {
     }
 
     /// A line of a section: its parts, cut at the separators, and the year its last date states.
-    private struct Line {
+    struct Line {
         var parts: [Piece] = []
         var year: Sourced<Int>?
         /// How many dates the line holds, whether one of them is a period with an end, and whether one of them shares its
@@ -71,9 +72,9 @@ enum CertificationReader {
         }
     }
 
-    /// Reads each line of the section as a certification, or as the issuer of the one above it. A line of dates alone is
-    /// the year of the certification it dates: the one below it when the section starts with such a line (the dates come
-    /// first), the one above it otherwise (#461).
+    /// Reads each line of the section as a certification, or as the issuer, the link or the description of the one above it. A
+    /// line of dates alone is the year of the certification it dates: the one below it when the section starts with such a
+    /// line (the dates come first), the one above it otherwise (#461).
     static func read(_ section: Section, into findings: inout Findings) {
         var walk = Walk(datesFirst: startsWithDates(section, findings.document, findings.consumedBlocks))
         for block in section.blocks {
@@ -95,7 +96,7 @@ enum CertificationReader {
     /// and, when the dates come first, the line of dates that waits for the certification below it.
     private struct Walk {
         let datesFirst: Bool
-        var above: Int?
+        var above: OpenCertification?
         var waiting: Waiting?
     }
 
@@ -113,43 +114,67 @@ enum CertificationReader {
         line.parts.isEmpty ? line.year : nil
     }
 
-    /// Decides what a block is, by the first branch that holds. The result is the index of the certification it made, which
-    /// the next block may complete, or nil when the next block cannot complete anything. The link to the block above is also
-    /// cut by a table header, by a block with no cell, by a line that completed the one above, and, in the caller, by a block
-    /// another reader consumed:
+    /// Decides what a block is, by the first branch that holds. The result is the certification the lines under it may go
+    /// on with, or nil when they go on with none. The link to the certification above is cut by a table header, by a block
+    /// with no cell, by a line that is no certification, and, in the caller, by a block another reader consumed:
     /// 1. a table header is left out as markup;
     /// 2. a block with no cell has nothing to read;
-    /// 3. a block whose first part starts with an issuer lead ("Issued by", "Rilasciato da", ...) followed by at most six
-    ///    words, while the block above made a certification that has no issuer and does not state a year the line also
-    ///    states, is that certification's issuer (and its year, when it has none); the rest of the line is text not imported.
-    ///    The line must also have an unambiguous year: no date, or one single date (not a period) that is a part of its
-    ///    own, between the separators, with no part beside the lead, so that "Issued by Red Cross, 2021, expires 2024",
-    ///    "..., 2021–2024" or "Issued by Red Cross expires 2024" is an entry of its own: a date of other text never
-    ///    becomes the year of the certification above;
+    /// 3. a block with no web address whose first part starts with an issuer lead ("Issued by", "Rilasciato da", ...)
+    ///    followed by at most six words, right under the line of a certification that has no issuer and does not state a
+    ///    year the line also states, is that certification's issuer (and its year, when it has none); the rest of the line
+    ///    is text not imported. The line must also have an unambiguous year: no date, or one single date (not a period)
+    ///    that is a part of its own, between the separators, with no part beside the lead, so that "Issued by Red Cross,
+    ///    2021, expires 2024", "..., 2021–2024" or "Issued by Red Cross expires 2024" is an entry of its own: a date of
+    ///    other text never becomes the year of the certification above;
     ///    A certification whose line had a second part after a comma ("First Aid, Level 2") took that lone part as its
     ///    issuer, so it has one, and a lead line below it stays an entry of its own: the safe, visible split;
-    /// 4. a block with no part is text not imported;
-    /// 5. anything else is a certification of its own: the first part is the name, the issuer is the part that reads as an
-    ///    organisation, or the only part left, and the rest is text not imported.
-    private static func read(_ block: SourceBlock, in section: Section, walk: inout Walk, into findings: inout Findings) -> Int? {
-        let above = walk.above
+    /// 4. a line that is the link or the description of the certification above, by the rules of `CertificationLine`
+    ///    (split rather than merge), goes on with it, and a description that only its words placed there marks that
+    ///    certification to check; a line of web addresses with no certification above is text not imported;
+    /// 5. a block with no part is text not imported;
+    /// 6. anything else is a certification of its own: the first part is the name, the issuer is the part that reads as an
+    ///    organisation, or the only part left, the first web address is the link, a label of a link is left out, and the
+    ///    rest is text not imported. One that may as well be the description of the certification above is marked to check.
+    ///
+    /// Before these branches, a line of dates alone is the year of a certification (#461): it waits for the certification
+    /// below it, or dates the one above it when that one has no year; the certification it dates below it takes its year.
+    private static func read(_ block: SourceBlock, in section: Section, walk: inout Walk, into findings: inout Findings)
+        -> OpenCertification? {
+        let open = walk.above
         if block.kind == .tableHeader {
             findings.leaveOut(block, .markup)
             return nil
         }
         let cells = section.cells(of: block, in: findings.document)
         guard !cells.isEmpty else { return nil }
-        let line = Line(cells)
-        if let dates = datesAlone(line), dateLine(block, dates, &walk, section, &findings) { return nil }
-        if let above, completeCertification(at: above, with: line, section, &findings) { return nil }
-        guard let name = line.parts.first else {
-            findings.unplace(block, in: section)
-            return nil
+        let line = CertificationLine(block: block, cells: cells)
+        if let dates = datesAlone(line.split), dateLine(block, dates, &walk, section, &findings) { return nil }
+        if var open, open.isRightAbove, line.addresses.isEmpty, completeCertification(at: open.index, with: line.split, section, &findings) {
+            open.statesIssuerOrYear = true
+            open.isRightAbove = false
+            return open
         }
-        add(name, line, waiting: walk.waiting, section, &findings)
-        if let waiting = walk.waiting, line.year != nil { findings.unplace(waiting.block, in: section) }
-        walk.waiting = nil
-        return findings.cv.certifications.count - 1
+        switch line.role(after: open) {
+        case .link(var open):
+            addLink(line, to: open.index, section, &findings)
+            open.isRightAbove = false
+            return open
+        case .description(var open, let check):
+            addDescription(line, to: open.index, &findings)
+            if let check { findings.cv.certifications[open.index].check = check }
+            open.isRightAbove = false
+            return open
+        case .unplaced:
+            for cell in cells { findings.unplace(cell, in: section) }
+            return nil
+        case .entry(let check):
+            let entry = addEntry(line, check: check, waiting: walk.waiting, section, &findings)
+            if entry != nil {
+                if let waiting = walk.waiting, line.split.year != nil { findings.unplace(waiting.block, in: section) }
+                walk.waiting = nil
+            }
+            return entry
+        }
     }
 
     /// A line of dates alone: it waits for the certification below it (a line that waited already is text not imported) or
@@ -159,10 +184,10 @@ enum CertificationReader {
         let owner = section.dateOwners[block.index] ?? (walk.datesFirst ? .below : .above)
         if owner == .below {
             if let waiting = walk.waiting { findings.unplace(waiting.block, in: section) }
-            walk.waiting = (block, year, walk.above)
+            walk.waiting = (block, year, walk.above?.index)
             return true
         }
-        guard let above = walk.above, findings.cv.certifications[above].year == nil else { return false }
+        guard let above = walk.above?.index, findings.cv.certifications[above].year == nil else { return false }
         findings.cv.certifications[above].year = year
         return true
     }
@@ -179,7 +204,51 @@ enum CertificationReader {
         return true
     }
 
-    /// Branch 5: a certification of its own.
+    /// Branch 4: the line's first address is the link of the certification above, unless it has one; its labels are left
+    /// out, and any other address stays visible as text not imported.
+    private static func addLink(_ line: CertificationLine, to index: Int, _ section: Section, _ findings: inout Findings) {
+        var addresses = line.addresses[...]
+        if findings.cv.certifications[index].link == nil, let first = addresses.popFirst() {
+            findings.cv.certifications[index].link = first.link.address
+        }
+        for label in line.labels { findings.leaveOut(label, .categoryLabel) }
+        for address in addresses { findings.unplace(address.piece, in: section) }
+    }
+
+    /// Branch 4: the line goes on with the description of the certification above, on a line of its own.
+    private static func addDescription(_ line: CertificationLine, to index: Int, _ findings: inout Findings) {
+        let previous = findings.cv.certifications[index].description
+        let texts = (previous.map { [$0.value] } ?? []) + line.cells.map(\.text)
+        findings.cv.certifications[index].description = Sourced(value: texts.joined(separator: "\n"), spans: (previous?.spans ?? []) + line.cells.map(\.span))
+    }
+
+    /// Branches 5 and 6: a certification of its own, with the reason to check it if any, or text not imported when the line
+    /// has no part. The certification is open for the lines under it.
+    private static func addEntry(
+        _ line: CertificationLine, check: CheckReason?, waiting: Waiting?, _ section: Section, _ findings: inout Findings
+    )
+        -> OpenCertification? {
+        var split = line.split
+        // On a line with an address, a part can be the label of the link: "Swift Basics – Verify: https://…"
+        let labels = line.addresses.isEmpty ? [] : split.parts.filter { CertificationLinkLabel.isLabel($0.text) }
+        split.parts.removeAll { labels.contains($0) }
+        guard let name = split.parts.first else {
+            findings.unplace(line.block, in: section)
+            return nil
+        }
+        add(name, split, waiting: waiting, section, &findings)
+        let index = findings.cv.certifications.count - 1
+        findings.cv.certifications[index].link = line.addresses.first?.link.address
+        findings.cv.certifications[index].check = check
+        for label in line.labels + labels { findings.leaveOut(label, .categoryLabel) }
+        for address in line.addresses.dropFirst() { findings.unplace(address.piece, in: section) }
+        let certification = findings.cv.certifications[index]
+        return OpenCertification(index: index, title: line.block, titleIsSentence: line.readsAsSentence,
+                                 statesIssuerOrYear: certification.issuer != nil || certification.year != nil,
+                                 startsWithTheName: line.block.cells.first?.lowerBound == name.span.lowerBound)
+    }
+
+    /// Branch 6: a certification of its own, its name, issuer and year.
     private static func add(
         _ name: Piece, _ line: Line, waiting: Waiting?, _ section: Section, _ findings: inout Findings
     ) {

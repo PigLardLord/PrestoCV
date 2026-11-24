@@ -13,6 +13,8 @@ struct ImportReview: Hashable, Sendable, Codable {
             case experience(Int)
             case education(Int)
             case language
+            /// A certification, counted from one as the editor lists it.
+            case certification(Int)
         }
 
         enum Reason: Hashable, Sendable, Codable {
@@ -32,6 +34,8 @@ struct ImportReview: Hashable, Sendable, Codable {
             case languageLevels
             /// The place of a study: the CV has no field for it, so it is kept in the text not imported.
             case placeNotKept
+            /// A line under a certification may be its description or a certification of its own.
+            case descriptionOrEntry
         }
 
         let field: Field
@@ -48,6 +52,7 @@ struct ImportReview: Hashable, Sendable, Codable {
             case .experience: return "import.review.field.experience"
             case .education: return "import.review.field.education"
             case .language: return "import.review.field.language"
+            case .certification: return "import.review.field.certification"
             }
         }
 
@@ -61,6 +66,7 @@ struct ImportReview: Hashable, Sendable, Codable {
             case .languageNotAdded: return "import.review.reason.language"
             case .languageLevels: return "import.review.reason.levels"
             case .placeNotKept: return "import.review.reason.place"
+            case .descriptionOrEntry: return "import.review.reason.description"
             }
         }
     }
