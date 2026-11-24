@@ -150,13 +150,30 @@ enum EntryVocabulary {
     /// a city and its region do ("Elektriker, Boston, MA"). A role named inside prose ("Auszeichnung für Elektriker") is not
     /// one: the punctuation around a part never gives it a head's shape.
     private static func partsArePlacesOrRoles(_ text: Substring) -> Bool {
-        let parts = text.replacingOccurrences(of: " - ", with: " – ").split { ",|·•—–/".contains($0) }
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        guard !parts.isEmpty, parts.allSatisfy({ !$0.words.isEmpty }) else { return false }
+        // Each part with whether a comma (not a dash or a bar) stands before it: only commas join a city and its region
+        var parts: [String] = []
+        var afterComma: [Bool] = []
+        var current = ""
+        var comma = false
+        for character in text.replacingOccurrences(of: " - ", with: " – ") {
+            if ",|·•—–/".contains(character) {
+                parts.append(current.trimmingCharacters(in: .whitespaces))
+                afterComma.append(comma)
+                current = ""
+                comma = character == ","
+            } else {
+                current.append(character)
+            }
+        }
+        parts.append(current.trimmingCharacters(in: .whitespaces))
+        afterComma.append(comma)
+        guard parts.allSatisfy({ !$0.words.isEmpty }) else { return false }
         var index = 0
         while index < parts.count {
-            // The longest run of parts from here that reads as one place, else this part alone as a role
-            if let last = (index..<parts.count).reversed().first(where: {
+            // The longest run of parts from here, joined by commas only, that reads as one place, else this part alone as a role
+            var reach = index
+            while reach + 1 < parts.count, afterComma[reach + 1] { reach += 1 }
+            if let last = (index...reach).reversed().first(where: {
                 Places.isPlaceOnly(parts[index...$0].joined(separator: ", "))
             }) {
                 index = last + 1

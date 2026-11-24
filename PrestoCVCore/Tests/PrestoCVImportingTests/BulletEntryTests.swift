@@ -363,6 +363,7 @@ struct BulletEntryTests {
         "2019 – von Muster GmbH – Auszeichnung für Elektriker, Berlin",
         "2019 – von Muster GmbH, Auszeichnung, Elektriker",
         "2019 – von Muster GmbH – Auszeichnung – Elektriker",
+        "2019 – von Muster GmbH – Auszeichnung – Deutschland – Elektriker",
         "2019 – von Muster GmbH, Auszeichnung für Elektriker, Boston, MA",
         "2019 – von Muster GmbH, Elektriker, Auszeichnung, Boston, MA",
     ])
