@@ -19,6 +19,7 @@ public enum ReviewItemMapping {
         case .periodOpenEnd: .periodOpenEnd
         case .levelNotCEFR: .levelNotCEFR
         case .levelsDiffer: .levelsDiffer
+        case .descriptionOrEntryUnsure: .descriptionOrEntryUnsure
         }
     }
 
@@ -33,6 +34,7 @@ public enum ReviewItemMapping {
         case .education(let index): .education(index + 1)
         case .educationPeriod(let index): .educationPeriod(index + 1)
         case .language(let index): .language(index + 1)
+        case .certification(let index): .certification(index + 1)
         }
     }
 
