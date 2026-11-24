@@ -727,4 +727,35 @@ struct EntryReaderTests {
         #expect(result.reviewList.contains(ReviewItem(field: .experience(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
         #expect(result.reviewList.contains(ReviewItem(field: .education(0), reason: .locationByPosition, text: "Curitiba, Paraná, Brasil")))
     }
+
+    // MARK: A description line with a connector (#313)
+
+    private func described(_ lines: [String], datesFirst: Bool) throws -> ImportResult {
+        let head = datesFirst ? ["2020 – 2024", "Developer at Acme Ltd"] : ["Developer at Acme Ltd", "2020 – 2024"]
+        let text = (["Anna Weber", "person@example.com", "", "Experience"] + head + lines).joined(separator: "\n")
+        return try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText(text)
+    }
+
+    @Test("A description line with a connector is one detail, the connector kept", arguments: [
+        ["Trained an engineer at Client Ltd"],
+        ["Trained an engineer at Client Ltd", "Answered calls for Partner Ltd"],
+        ["Answered calls for Partner Ltd"],
+        ["Rispondeva alle chiamate per Partner Ltd"],
+        ["Beriet Kunden für Partner Ltd"],
+    ], [true, false])
+    func connectorLineIsOneDetail(lines: [String], datesFirst: Bool) throws {
+        let result = try described(lines, datesFirst: datesFirst)
+        let entry = try #require(result.cv.experience.first)
+        #expect(entry.role?.value == "Developer", "\(lines)")
+        #expect(entry.employer?.value == "Acme Ltd", "\(lines)")
+        #expect(entry.details.map(\.value) == lines, "\(lines) dates first: \(datesFirst)")
+        #expect(Coverage.lost(result).isEmpty, "\(lines)")
+    }
+
+    @Test("A head line whose parts are the role and the employer is not a detail")
+    func headLineStaysApart() throws {
+        let result = try described([], datesFirst: false)
+        let entry = try #require(result.cv.experience.first)
+        #expect(entry.details.isEmpty)
+    }
 }

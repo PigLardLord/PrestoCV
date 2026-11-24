@@ -350,6 +350,31 @@ struct FileDesignStoreOriginTests {
         }
     }
 
+    @Test("a bundled design whose package file is damaged on disk is written again by the next sync, and an import is left alone")
+    func damagedPackageIsRepaired() async throws {
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir), gate = FakeRenderingGate()
+            let mine = try DesignStoreContract.design(id: "mine")
+            try await store.save(mine)
+            let packages = [("clean", try DesignStoreContract.package(id: "clean")), ("bold", try DesignStoreContract.package(id: "bold"))]
+            func sync() async throws -> SyncReport { try await SyncBundledDesigns(source: FixedBundledSource(packages: packages), gate: gate, store: store)() }
+            _ = try await sync()
+            let files = try FileManager.default.contentsOfDirectory(at: dir.appendingPathComponent("Designs"), includingPropertiesForKeys: nil)
+            for file in files where file.lastPathComponent.hasPrefix("clean.") || file.lastPathComponent.hasPrefix("mine.") {
+                try Data("damaged".utf8).write(to: file)
+            }
+            await #expect(throws: FileDesignStoreError.self) { _ = try await store.design(id: "clean") }
+
+            let repair = try await sync()
+
+            #expect(repair.repaired == ["clean"] && repair.unchanged == ["bold"] && repair.failed.isEmpty)
+            #expect(try await store.design(id: "clean") == DesignStoreContract.design(id: "clean"))
+            await #expect(throws: FileDesignStoreError.self) { _ = try await store.design(id: "mine") }
+            #expect(try await store.installedOrigins() == ["clean": .bundled, "bold": .bundled, "mine": .imported])
+            #expect(try await FileDesignStore(directory: dir).design(id: "clean") != nil)
+        }
+    }
+
     @Test("an import shadowing a bundled design through the file store is refused, and the bundled design still upgrades")
     func importShadowingThroughTheFileStore() async throws {
         try await inTemporaryStore { dir in
