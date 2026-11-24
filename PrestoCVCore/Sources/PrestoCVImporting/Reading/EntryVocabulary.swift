@@ -240,7 +240,7 @@ enum EntryVocabulary {
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
            words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
-           readsAsAName(words, capitalised: capitalised) {
+           readsAsAName(words, capitalised: capitalised) || namesAnInstitution(words) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
@@ -248,6 +248,12 @@ enum EntryVocabulary {
             return word.first?.isLowercase == true && !determiners.contains(folded) && !connectors.contains(folded)
                 && !elidedArticles.contains(where: folded.hasPrefix)
         }
+    }
+
+    /// Whether words are a school or an employer read by the head rule ("Universität der Künste"): such a name keeps its
+    /// articles, which a duty read as a name would not.
+    private static func namesAnInstitution(_ words: [Substring]) -> Bool {
+        namesAHeadWord(words.joined(separator: " ")) == .closing
     }
 
     /// Whether capitalised words read as a name and not as a duty joined like prose ("Prüfung und Wartung der Anlagen",

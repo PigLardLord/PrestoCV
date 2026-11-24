@@ -526,6 +526,7 @@ struct BulletEntryTests {
         "• 2019 – Elektriker für Prüfung und Wartung der Anlagen",
         "• 2019 – Elektriker für Prüfung und Wartung von Anlagen",
         "• 2019 – Tecnico per Installazione e Manutenzione degli Impianti",
+        "• 2019 – Elektriker für Wartung der Anlagen bei Muster GmbH",
     ])
     func capitalisedDutyIsADetail(_ line: String) throws {
         let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
@@ -541,6 +542,18 @@ struct BulletEntryTests {
         let first = section == .education ? "• 2021 – Nursing course – Leeds College, Leeds" : "• 2021 – Electrician – Example Ltd, Leeds"
         let found = read("\(heading)\n\(first)\nI finished the work in June.\n\(line)", kind: section == .education ? .education : .experience)
         #expect((section == .education ? found.cv.education.count : found.cv.experience.count) == 2)
+    }
+
+    @Test("A qualifier that is itself a school or an employer name passes with its articles", arguments: [
+        ("• 2019 – Designer bei Universität der Künste", "Designer", "Universität der Künste"),
+        ("• 2018 – Tecnico presso Università degli Studi di Esempio", "Tecnico", "Università degli Studi di Esempio"),
+        ("• 2017 – Ingénieur chez Université de la Ville", "Ingénieur", "Université de la Ville"),
+    ] as [(String, String, String)])
+    func institutionNameWithArticleIsAnEntry(_ line: String, _ role: String, _ employer: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 2)
+        #expect(found.cv.experience[1].role?.value == role)
+        #expect(found.cv.experience[1].employer?.value == employer)
     }
 
     fileprivate enum Section { case education, experience }
