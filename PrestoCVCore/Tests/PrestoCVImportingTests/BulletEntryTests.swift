@@ -556,5 +556,25 @@ struct BulletEntryTests {
         #expect(found.cv.experience[1].employer?.value == employer)
     }
 
+    // MARK: Head evidence does bounded work
+
+    @Test("A bullet with thousands of joined words is a detail of the entry above, not a second entry")
+    func overlongBulletIsADetail() throws {
+        let line = "• 2019 – Designer bei " + String(repeating: "GmbH für ", count: 4_000) + "GmbH"
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.count == 2)
+    }
+
+    @Test("A text longer than a head can be gives no evidence of one")
+    func overCapTextIsNoEvidence() {
+        let head = "Nursing course – Leeds College, Leeds"
+        #expect(EntryVocabulary.headEvidence(after: head) == .strong)
+        let long = "Nursing course – " + String(repeating: "Leeds ", count: 60) + "College, Leeds"
+        #expect(EntryVocabulary.headEvidence(after: long) != .strong)
+        let wide = "Nursing course – Leeds College, " + String(repeating: "Leeds, ", count: 60) + "Leeds"
+        #expect(EntryVocabulary.headEvidence(after: wide) != .strong)
+    }
+
     fileprivate enum Section { case education, experience }
 }

@@ -81,10 +81,17 @@ enum EntryVocabulary {
         case strong
     }
 
+    /// The longest head, in characters and in words ("Bachelor of Science in Computer Engineering – University of Leeds, Leeds"
+    /// has 76 and 12): what follows a bullet's year beyond it gives no evidence of a head.
+    private static let maxHeadCharacters = 160
+    private static let maxHeadWords = 24
+
     /// What the text after a bullet's year says, with or without a date separator: a head (a title, a school, an
     /// employer, a degree) makes an entry, a count ("2000 – hours of placement", "1200 Stunden Praktikum") or a
     /// sentence ("2019 led the move", "2019 I led the move") a detail. When the evidence is unclear it is a detail.
     static func headEvidence(after text: String) -> HeadEvidence {
+        // A head is short: a longer text is prose or a list, never scanned, so the work per bullet is constant
+        guard text.count <= maxHeadCharacters, text.words.count <= maxHeadWords else { return .none }
         var rest = Substring(text)
         var separated = false
         while let first = rest.first, first == " " || "|·•—–-,:/".contains(first) {
@@ -250,10 +257,18 @@ enum EntryVocabulary {
         }
     }
 
-    /// Whether words are a school or an employer read by the head rule ("Universität der Künste"): such a name keeps its
-    /// articles, which a duty read as a name would not.
+    /// Whether words are a school or an employer name ("Universität der Künste"): a school or organisation word with only names
+    /// and modifiers before it, after it only capitalised words, particles, joining words and articles, ending on a capitalised
+    /// word. Such a name keeps its articles, which a duty read as a name would not. One pass, no recursion.
     private static func namesAnInstitution(_ words: [Substring]) -> Bool {
-        namesAHeadWord(words.joined(separator: " ")) == .closing
+        guard let last = words.last, last.first?.isUppercase == true,
+              let head = words.firstIndex(where: { isSchool(String($0)) || isOrganisation(String($0)) }),
+              words[..<head].allSatisfy({ isModifier($0) }) else { return false }
+        return words[(head + 1)...].allSatisfy { word in
+            let folded = word.folded
+            return word.first.map { $0.isUppercase || !$0.isLetter } == true || nameParticles.contains(folded)
+                || connectors.contains(folded) || determiners.contains(folded)
+        }
     }
 
     /// Whether capitalised words read as a name and not as a duty joined like prose ("Prüfung und Wartung der Anlagen",
