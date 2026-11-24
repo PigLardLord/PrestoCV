@@ -223,10 +223,55 @@ enum EntryVocabulary {
             let after = words[(index + 1)...]
             if let next = after.first, !isModifier(next), !connectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
             if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
+            if let next = after.first, !isModifier(next) {
+                let qualifier = connectors.contains(next.folded) ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
+                guard isReadableQualifier(qualifier) else { continue }
+            }
             return closing ? .closing : .opening
         }
         return nil
     }
+
+    /// Whether what follows a joining word is read as a qualifier and not as prose: a name (capitalised words and name
+    /// particles, joining words only between capitalised words) or a short subject of at most two lower-case words, none an
+    /// article, a determiner or a joining word. The qualifier is read, never trusted: a doubtful one is prose.
+    private static func isReadableQualifier(_ words: [Substring]) -> Bool {
+        guard let first = words.first, let last = words.last else { return false }
+        func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
+        if capitalised(first), capitalised(last),
+           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }) {
+            return true
+        }
+        return words.count <= 2 && words.allSatisfy { word in
+            let folded = word.folded
+            return word.first?.isLowercase == true && !determiners.contains(folded) && !connectors.contains(folded)
+                && !elidedArticles.contains(where: folded.hasPrefix)
+        }
+    }
+
+    /// The articles and determiners of the six languages: a short subject that holds one is prose.
+    private static let determiners: Set<String> = Set([
+        // English
+        "a", "an", "the", "all", "any", "each", "every", "some", "this", "that", "these", "those", "my", "our", "your", "his", "her", "its", "their",
+        // Spanish
+        "el", "la", "los", "las", "un", "una", "unos", "unas", "lo", "al", "del", "este", "esta", "estos", "estas", "mi", "mis", "su", "sus",
+        "nuestro", "nuestra", "todo", "toda", "todos", "todas",
+        // French
+        "le", "les", "une", "ce", "cet", "cette", "ces", "mon", "ma", "mes", "son", "sa", "ses", "notre", "nos", "leur", "leurs", "tout",
+        "tous", "toute", "toutes", "du", "des", "au", "aux",
+        // German
+        "der", "die", "das", "den", "dem", "ein", "eine", "einen", "einem", "einer", "eines", "aller", "alle", "allen", "alles",
+        "diese", "dieser", "dieses", "diesen", "mein", "meine", "unser", "unsere", "jede", "jeder", "jedes",
+        // Italian
+        "il", "gli", "i", "uno", "questo", "questa", "questi", "queste", "mio", "mia", "miei", "mie", "tutti", "tutte", "tutto",
+        "ogni", "dei", "degli", "delle", "dello", "della", "nel", "nella", "nei", "nelle", "alla", "alle", "allo",
+        // Portuguese
+        "o", "os", "as", "um", "uma", "uns", "umas", "estes", "estas", "meu", "minha", "meus", "minhas", "pelo", "pela", "pelos", "pelas",
+        "ao", "aos", "do", "da", "dos", "das", "no", "na", "nos", "nas",
+    ].map(\.folded))
+
+    /// The articles that lose their vowel before a vowel ("l'", "all'", "un'"): a lower-case word that starts so is prose.
+    private static let elidedArticles = ["l'", "all'", "dell'", "nell'", "sull'", "dall'", "un'", "quest'", "d'", "qu'", "l\u{2019}", "d\u{2019}"]
 
     /// Whether a word is part of a name: capitalised, a particle ("von", "di"), or not a letter ("&", "(").
     private static func isModifier(_ word: Substring) -> Bool {

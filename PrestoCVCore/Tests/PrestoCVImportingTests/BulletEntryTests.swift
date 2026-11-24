@@ -495,4 +495,30 @@ struct BulletEntryTests {
         #expect(found.cv.experience[0].details.map(\.value) == [sentence])
         #expect(found.unplaced.isEmpty)
     }
+
+    @Test("A joining word does not make the prose after it a head: the line stays a detail of the entry above", arguments: [
+        "• 2019 – Electrician with responsibility for testing all installations",
+        "• 2019 – Consulente per la crescita dei clienti",
+        "• 2018 – Elektriker mit Verantwortung für die Prüfung aller Anlagen",
+        "• 2018 – Infirmier chez les clients de la région pour les soins",
+        "• 2018 – Enfermero para los pacientes de la planta",
+        "• 2018 – Enfermeiro com responsabilidade pelos pacientes da enfermaria",
+        "• 2018 – Electrician for the testing of installations",
+    ])
+    func proseAfterAJoiningWordIsADetail(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.map(\.value) == ["I checked the installations.", String(line.dropFirst(2))])
+    }
+
+    @Test("A qualifier that is a name or a short subject keeps a joined head an entry", arguments: [
+        "• 2016 – Bachelor of Science in Computer Engineering – University of Leeds, Leeds",
+        "• 2015 – Master in business administration – Bocconi University, Milano",
+        "• 2014 – Diploma in Gestione delle Risorse Umane – Istituto Esempio, Torino",
+        "• 2013 – Diploma in nursing – St Mary's Hospital School, Leeds",
+    ])
+    func nameOrShortSubjectQualifier(_ line: String) throws {
+        let found = read("Education\n• 2021 – Nursing course – Leeds College, Leeds\nI finished 1000 hours of training.\n\(line)", kind: .education)
+        #expect(found.cv.education.count == 2)
+    }
 }
