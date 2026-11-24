@@ -335,10 +335,12 @@ struct BulletEntryTests {
         #expect(found.cv.experience[0].details.map(\.value) == ["Ich habe die Installationen geprüft.", "2019 – von Muster GmbH ausgezeichnet"])
     }
 
-    @Test("An employer with a particle and a qualifier or a place after its company word is a second entry", arguments: [
+    @Test("An employer with a particle and a qualifier, a place or a role after its company word is a second entry", arguments: [
         ("• 2019 – von Linden UG (haftungsbeschränkt)", "von Linden UG (haftungsbeschränkt)", nil),
         ("• 2019 – von Linden GmbH, Berlin", "von Linden GmbH", "Berlin"),
         ("• 2019 – von Linden GmbH & Co. KG", "von Linden GmbH & Co. KG", nil),
+        ("• 2019 – von Linden GmbH, 99084 Erfurt", "von Linden GmbH", "99084 Erfurt"),
+        ("• 2019 – von Linden GmbH – Elektriker", "von Linden GmbH", nil),
     ] as [(String, String, String?)])
     func particleEmployerWithQualifier(_ line: String, _ employer: String, _ place: String?) throws {
         let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n\(line)", kind: .experience)
@@ -348,11 +350,15 @@ struct BulletEntryTests {
         #expect(found.cv.experience.first?.details.map(\.value) == ["Ich habe die Installationen geprüft."])
     }
 
-    @Test("An award line with prose after a comma behind the company word stays a detail of the entry above")
-    func particleAwardAfterCommaIsADetail() throws {
-        let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n• 2019 – von Muster GmbH, ausgezeichnet", kind: .experience)
+    @Test("An award line with prose or a noun after a comma or a separator behind the company word stays a detail of the entry above", arguments: [
+        "2019 – von Muster GmbH, ausgezeichnet",
+        "2019 – von Muster GmbH, Auszeichnung",
+        "2019 – von Muster GmbH – Auszeichnung",
+    ])
+    func particleAwardAfterSeparatorIsADetail(_ award: String) throws {
+        let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n• \(award)", kind: .experience)
         try #require(found.cv.experience.count == 1)
-        #expect(found.cv.experience[0].details.map(\.value) == ["Ich habe die Installationen geprüft.", "2019 – von Muster GmbH, ausgezeichnet"])
+        #expect(found.cv.experience[0].details.map(\.value) == ["Ich habe die Installationen geprüft.", award])
     }
 
     @Test("A role and an employer with a particle, in a section that also holds a sentence, are a second entry")

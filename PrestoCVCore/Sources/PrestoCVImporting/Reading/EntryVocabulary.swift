@@ -125,24 +125,22 @@ enum EntryVocabulary {
         return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
     }
 
-    /// Whether a name ends at its company or school word, with no prose after it: the word is the last one, or a part in
-    /// parentheses or a capitalised part after a separator follows it ("von Linden GmbH", "von Linden UG (haftungsbeschränkt)",
-    /// "von Linden GmbH, Berlin"), never prose ("von Muster GmbH ausgezeichnet", "von Muster GmbH, ausgezeichnet").
+    /// Whether a name ends at its company or school word, with no prose after it: the word is the last one, a part in
+    /// parentheses follows it ("von Linden UG (haftungsbeschränkt)"), or a comma or a separator leads to a known place or a
+    /// role ("von Linden GmbH, Berlin", "von Linden GmbH – Elektriker"). Anything else after it is prose, capitalised or not
+    /// ("von Muster GmbH ausgezeichnet", "von Muster GmbH, Auszeichnung").
     private static func endsAtOrganisation(_ text: Substring) -> Bool {
         let tokens = text.split(separator: " ")
-        for (index, token) in tokens.enumerated() where isOrganisation(String(token)) || isSchool(String(token)) {
-            let after = tokens.dropFirst(index + 1)
-            guard let next = after.first else { return true }
-            if next.hasPrefix("(") { return true }
-            let part: Substring?
-            if token.hasSuffix(",") {
-                part = next
-            } else if next.count == 1, "–—-|·/".contains(next) {
-                part = after.dropFirst().first
-            } else {
-                continue
+        for token in tokens where isOrganisation(String(token)) || isSchool(String(token)) {
+            // From the comma that closes the word, if any
+            var rest = text[(token.hasSuffix(",") ? text.index(before: token.endIndex) : token.endIndex)...].drop(while: \.isWhitespace)
+            if rest.hasPrefix("("), let close = rest.firstIndex(of: ")") {
+                rest = rest[rest.index(after: close)...].drop(while: \.isWhitespace)
             }
-            if part?.first?.isUppercase ?? true { return true }
+            guard let mark = rest.first else { return true }
+            guard mark == "," || ("–—-|·/".contains(mark) && rest.dropFirst().first == " ") else { continue }
+            let part = rest.dropFirst().drop(while: \.isWhitespace)
+            if Places.isPlaceOnly(String(part)) || (isRole(String(part)) && hasHeadShape(part)) { return true }
         }
         return false
     }
