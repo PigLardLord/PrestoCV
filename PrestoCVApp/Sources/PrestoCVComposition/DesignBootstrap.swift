@@ -14,7 +14,9 @@ extension LogCategory {
 /// - With no default design to give, the launch fails: `designStoreUnavailable` when the store could not be read or could
 ///   not save the default design, `bundledDesignsUnavailable` when the bundle could not be read or its default design was
 ///   refused.
-/// - A design the store lists but cannot read is left out (`designs.unreadable`), and the launch goes on with the others. A
+/// - A bundled design the store lists but cannot read is written again by the sync (`repaired`), after the bundled package
+///   validates and renders, and so is offered. A design the person installed is never replaced.
+/// - A design the store lists but cannot read, and the sync did not repair, is left out (`designs.unreadable`), and the launch goes on with the others. A
 ///   default design the store cannot read fails the launch with `designStoreUnavailable`.
 /// - A cancelled launch is `designSyncInterrupted`, even when the cancellation is seen only once a store step returns (the
 ///   file store's lock wait does not end early when its caller is cancelled). The designs saved before it stay saved, so
@@ -99,6 +101,7 @@ struct DesignBootstrap: Sendable {
         logger.log(LogEntry(level: leftOut ? .notice : .info, category: .designs, event: "designs.synced", fields: [
             .count("installed", report.installed.count), .count("upgraded", report.upgraded.count),
             .count("unchanged", report.unchanged.count), .count("adopted", report.adopted.count),
+            .count("repaired", report.repaired.count),
             .count("rejected", report.rejected.count), .count("notRendered", report.notRendered.count),
             .count("failed", report.failed.count), .count("conflicts", report.conflicts.count),
             .duration("elapsed", stopwatch.elapsed),

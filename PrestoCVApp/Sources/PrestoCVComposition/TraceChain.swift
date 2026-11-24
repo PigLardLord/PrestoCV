@@ -94,8 +94,8 @@ private final class TurnGate: TraceGate {
 struct TraceAccess: Sendable {
     /// Whether the trace records on this launch, once the build has its answer
     let isOn: @Sendable () async -> Bool
-    /// The stored runs, and the copies of their files to share
-    let reader: any TraceReading
+    /// The stored runs, and the copies of their files to share, each holder's in a folder of their own
+    let reader: any TraceReading & TraceSharing
 }
 
 /// Whether the trace records on this launch. A Debug build always records, unless a UI test gives the store's answer;

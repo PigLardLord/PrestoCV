@@ -16,6 +16,7 @@ struct AppPathsTests {
         let paths = AppPaths(root: root, temporary: temporary)
         #expect(paths.store.path == "/base/PrestoCVNext/Store")
         #expect(paths.designs.path == "/base/PrestoCVNext/Designs")
+        #expect(paths.legacyReportOff.path == "/base/PrestoCVNext/LegacyReportOff")
         #expect(paths.trace.path == "/base/PrestoCVNext/Diagnostics")
         #expect(paths.traceShare.path == "/tmp/x/DiagnosticsShare")
         #expect(paths.exportShare.path == "/tmp/x/ExportShare")
