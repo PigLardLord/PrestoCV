@@ -569,6 +569,28 @@ struct BulletEntryTests {
         #expect(found.cv.experience[1].employer?.value == employer)
     }
 
+    @Test("A title-case duty after a role, or a sector word as the head word, is a detail whatever its words", arguments: [
+        "• 2019 – Tecnico per Manutenzione degli Impianti",
+        "• 2019 – Electrician for Maintenance of Plants",
+        "• 2019 – Bau von Anlagen",
+        "• 2019 – Studio degli impianti",
+    ])
+    func titleCaseDutyIsADetail(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.map(\.value) == ["I checked the installations.", String(line.dropFirst(2))])
+    }
+
+    @Test("A municipality, a bank or a university after a joining word is an institution and keeps the entry", arguments: [
+        "• 2019 – Impiegato presso Comune di Esempio",
+        "• 2019 – Banca di Esempio, Milano",
+        "• 2019 – Designer bei Universität der Künste",
+    ])
+    func institutionByItselfIsAnEntry(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        #expect(found.cv.experience.count == 2)
+    }
+
     // MARK: Head evidence does bounded work
 
     @Test("A bullet with thousands of joined words is a detail of the entry above, not a second entry")

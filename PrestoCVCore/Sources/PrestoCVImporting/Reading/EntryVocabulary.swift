@@ -228,11 +228,14 @@ enum EntryVocabulary {
             guard closing || isRole(word) || isDegree(word) else { continue }
             guard words[..<index].allSatisfy({ isModifier($0) }) else { continue }
             let after = words[(index + 1)...]
+            // A sector or activity word ("Bau", "Studio") followed by a connector is no head word: it opens a duty
+            if closing, !isRole(word), !isDegree(word), !legalForms.contains(word.folded), !namesInstitutionByItself(word.folded),
+               let next = after.first, connectors.contains(next.folded) || next.folded.hasPrefix("d'") { continue }
             if let next = after.first, !isModifier(next), !connectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
             if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
             if let next = after.first, !isModifier(next) {
                 let qualifier = connectors.contains(next.folded) ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
-                guard isReadableQualifier(qualifier) else { continue }
+                guard isReadableQualifier(qualifier, afterRole: isRole(word)) else { continue }
             }
             return closing ? .closing : .opening
         }
@@ -242,12 +245,15 @@ enum EntryVocabulary {
     /// Whether what follows a joining word is read as a qualifier and not as prose: a name (capitalised words and name
     /// particles, joining words only between capitalised words) or a short subject of at most two lower-case words, none an
     /// article, a determiner or a joining word. The qualifier is read, never trusted: a doubtful one is prose.
-    private static func isReadableQualifier(_ words: [Substring]) -> Bool {
+    /// After a role a name that holds a lower-case word (a joining word, a particle, an article) is a name only when it names an
+    /// institution: "Maintenance of Plants" is as much a duty as a name. Capitalised words only ("Ospedale San Esempio") read as
+    /// a name, and so does any qualifier after a degree ("Technik und Wirtschaft").
+    private static func isReadableQualifier(_ words: [Substring], afterRole: Bool) -> Bool {
         guard let first = words.first, let last = words.last else { return false }
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
            words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
-           (readsAsAName(words, capitalised: capitalised) && !readsAsASectorDuty(words)) || namesAnInstitution(words) {
+           (readsAsAName(words, capitalised: capitalised) && !(afterRole && words.contains { !capitalised($0) })) || namesAnInstitution(words) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
@@ -255,14 +261,6 @@ enum EntryVocabulary {
             return word.first?.isLowercase == true && !determiners.contains(folded) && !connectors.contains(folded)
                 && !elidedArticles.contains(where: folded.hasPrefix)
         }
-    }
-
-    /// Whether a qualifier opens with a sector or activity word and holds a contracted article ("Studio degli Impianti",
-    /// "Bau der Anlagen"): it reads as a duty as much as a name, so it is a name only if it names an institution by itself.
-    private static func readsAsASectorDuty(_ words: [Substring]) -> Bool {
-        guard let first = words.first, isOrganisation(String(first)) || isSchool(String(first)),
-              !namesInstitutionByItself(first.folded) else { return false }
-        return words.contains { determiners.contains($0.folded) && connectors.contains($0.folded) && $0.first?.isLowercase == true }
     }
 
     /// Whether words are a school or an employer name ("Universität der Künste"): a school or organisation word with only names
@@ -522,22 +520,22 @@ enum EntryVocabulary {
     private static let institutionWords: Set<String> = Set([
         // English
         "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic", "foundation",
-        "association", "ministry", "chamber",
+        "association", "ministry", "chamber", "bank", "company",
         // Italian
         "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica", "fondazione",
-        "associazione", "ministero", "camera",
+        "associazione", "ministero", "camera", "banca", "comune", "azienda", "società",
         // Spanish
         "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica", "fundación",
-        "asociación", "ministerio", "cámara",
+        "asociación", "ministerio", "cámara", "banco", "municipio", "ayuntamiento", "empresa", "sociedad",
         // French
         "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique", "fondation",
-        "association", "ministère", "chambre",
+        "association", "ministère", "chambre", "banque", "mairie", "entreprise", "société",
         // German
         "schule", "gymnasium", "akademie", "institut", "fakultät", "konservatorium", "krankenhaus", "klinik", "klinikum",
-        "stiftung", "verein", "ministerium", "kammer",
+        "stiftung", "verein", "ministerium", "kammer", "bank", "gemeinde", "stadtverwaltung", "unternehmen",
         // Portuguese
         "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica", "fundação",
-        "associação", "ministério", "câmara",
+        "associação", "ministério", "câmara", "banco", "prefeitura", "empresa", "sociedade",
     ].map(\.folded))
 
     private static let institutionStems = [
