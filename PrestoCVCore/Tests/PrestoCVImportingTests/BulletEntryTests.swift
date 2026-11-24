@@ -343,6 +343,9 @@ struct BulletEntryTests {
         ("• 2019 – von Linden GmbH – Elektriker", "von Linden GmbH", nil),
         ("• 2019 – von Linden GmbH, Elektriker, Berlin", "von Linden GmbH", "Berlin"),
         ("• 2019 – von Linden GmbH – Elektriker, Berlin", "von Linden GmbH", "Berlin"),
+        ("• 2019 – von Linden GmbH, Elektriker, Boston, MA", "von Linden GmbH", "Boston, MA"),
+        ("• 2019 – von Linden GmbH – Elektriker – Boston, MA", "von Linden GmbH", "Boston, MA"),
+        ("• 2019 – von Linden GmbH, Boston, MA – Elektriker", "von Linden GmbH", "Boston, MA"),
     ] as [(String, String, String?)])
     func particleEmployerWithQualifier(_ line: String, _ employer: String, _ place: String?) throws {
         let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n\(line)", kind: .experience)
@@ -360,6 +363,8 @@ struct BulletEntryTests {
         "2019 – von Muster GmbH – Auszeichnung für Elektriker, Berlin",
         "2019 – von Muster GmbH, Auszeichnung, Elektriker",
         "2019 – von Muster GmbH – Auszeichnung – Elektriker",
+        "2019 – von Muster GmbH, Auszeichnung für Elektriker, Boston, MA",
+        "2019 – von Muster GmbH, Elektriker, Auszeichnung, Boston, MA",
     ])
     func particleAwardAfterSeparatorIsADetail(_ award: String) throws {
         let found = read("Max Beispiel\nBerufserfahrung\n• 2021 – Elektriker – Beispiel GmbH\nIch habe die Installationen geprüft.\n• \(award)", kind: .experience)

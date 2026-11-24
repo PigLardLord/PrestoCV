@@ -145,17 +145,28 @@ enum EntryVocabulary {
         return false
     }
 
-    /// Whether every part of a text, between its commas and separators, is a known place or a role whose own words have a
-    /// head's shape ("Elektriker, Berlin", "Senior Elektriker – Berlin"). A role named inside prose ("Auszeichnung für
-    /// Elektriker") is not one: the punctuation around a part never gives it a head's shape.
+    /// Whether the parts of a text, between its commas and separators, are each a known place or a role whose own words have
+    /// a head's shape ("Elektriker, Berlin", "Senior Elektriker – Berlin"); neighbouring parts may make one place together, as
+    /// a city and its region do ("Elektriker, Boston, MA"). A role named inside prose ("Auszeichnung für Elektriker") is not
+    /// one: the punctuation around a part never gives it a head's shape.
     private static func partsArePlacesOrRoles(_ text: Substring) -> Bool {
         let parts = text.replacingOccurrences(of: " - ", with: " – ").split { ",|·•—–/".contains($0) }
             .map { $0.trimmingCharacters(in: .whitespaces) }
-        return !parts.isEmpty && parts.allSatisfy { part in
-            let words = part.words
-            return !words.isEmpty && (Places.isPlaceOnly(part)
-                || (isRole(part) && (words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false })))
+        guard !parts.isEmpty, parts.allSatisfy({ !$0.words.isEmpty }) else { return false }
+        var index = 0
+        while index < parts.count {
+            // The longest run of parts from here that reads as one place, else this part alone as a role
+            if let last = (index..<parts.count).reversed().first(where: {
+                Places.isPlaceOnly(parts[index...$0].joined(separator: ", "))
+            }) {
+                index = last + 1
+            } else if isRole(parts[index]), parts[index].words.count == 1 || parts[index].words.allSatisfy({ $0.first?.isUppercase ?? false }) {
+                index += 1
+            } else {
+                return false
+            }
         }
+        return true
     }
 
     /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
