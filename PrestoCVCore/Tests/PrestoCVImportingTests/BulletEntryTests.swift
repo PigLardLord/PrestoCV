@@ -591,6 +591,31 @@ struct BulletEntryTests {
         #expect(found.cv.experience.count == 2)
     }
 
+    @Test("A trade noun that is also an institution noun, or a purpose connector after a role, gives no head: a detail of the entry above", arguments: [
+        "• 2019 – Tecnico per Banco di Prova",
+        "• 2019 – Tecnico per Camera di Combustione",
+        "• 2019 – Electrician for Foundation of Buildings",
+        "• 2019 – Elektriker für Akademie der Wartung",
+        "• 2019 – Camera di combustione",
+    ])
+    func tradeNounAfterPurposeConnectorIsADetail(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.count == 2)
+    }
+
+    @Test("An employer connector after a role keeps the entry for a joined institution name", arguments: [
+        "• 2019 – Designer bei Universität der Künste",
+        "• 2019 – Tecnico presso Università degli Studi di Esempio",
+        "• 2019 – Ingénieur chez Université de la Ville",
+        "• 2019 – Impiegato presso Comune di Esempio",
+        "• 2019 – Electrician at Bank of Esempio",
+    ])
+    func employerConnectorKeepsTheEntry(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        #expect(found.cv.experience.count == 2)
+    }
+
     // MARK: Head evidence does bounded work
 
     @Test("A bullet with thousands of joined words is a detail of the entry above, not a second entry")

@@ -212,6 +212,10 @@ enum EntryVocabulary {
         "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "e",
     ].map(\.folded))
 
+    /// Connectors that introduce an employer and nothing else. "en", "em", "na", "de", "di", "for", "per" and the like also
+    /// introduce a field or a duty ("Técnico em Enfermagem"), so Spanish and Portuguese have none.
+    private static let employerConnectors: Set<String> = Set(["at", "presso", "bei", "chez"].map(\.folded))
+
     /// Whether a part names a role, a degree, a school or an employer where a head puts it: before the word of the head only
     /// names and modifiers ("Senior Elektriker", "Leeds College"), after it nothing, names and modifiers, or a connector
     /// that leads to its qualifier ("Corso di infermieristica", "Leeds College of Nursing"). A word of a head inside prose
@@ -234,8 +238,10 @@ enum EntryVocabulary {
             if let next = after.first, !isModifier(next), !connectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
             if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
             if let next = after.first, !isModifier(next) {
-                let qualifier = connectors.contains(next.folded) ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
-                guard isReadableQualifier(qualifier, afterRole: isRole(word)) else { continue }
+                let joined = connectors.contains(next.folded)
+                let qualifier = joined ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
+                let employer = joined && employerConnectors.contains(next.folded)
+                guard isReadableQualifier(qualifier, afterRole: isRole(word), afterEmployerConnector: employer) else { continue }
             }
             return closing ? .closing : .opening
         }
@@ -247,13 +253,14 @@ enum EntryVocabulary {
     /// article, a determiner or a joining word. The qualifier is read, never trusted: a doubtful one is prose.
     /// After a role a name that holds a lower-case word (a joining word, a particle, an article) is a name only when it names an
     /// institution: "Maintenance of Plants" is as much a duty as a name. Capitalised words only ("Ospedale San Esempio") read as
-    /// a name, and so does any qualifier after a degree ("Technik und Wirtschaft").
-    private static func isReadableQualifier(_ words: [Substring], afterRole: Bool) -> Bool {
+    /// a name, and so does any qualifier after a degree ("Technik und Wirtschaft"). After a role that is so only when the
+    /// connector introduces an employer and nothing else (`employerConnectors`): "Tecnico per Banco di Prova" is a duty.
+    private static func isReadableQualifier(_ words: [Substring], afterRole: Bool, afterEmployerConnector: Bool) -> Bool {
         guard let first = words.first, let last = words.last else { return false }
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
            words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
-           (readsAsAName(words, capitalised: capitalised) && !(afterRole && words.contains { !capitalised($0) })) || namesAnInstitution(words) {
+           (readsAsAName(words, capitalised: capitalised) && !(afterRole && words.contains { !capitalised($0) })) || (namesAnInstitution(words) && (!afterRole || afterEmployerConnector)) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
@@ -515,27 +522,27 @@ enum EntryVocabulary {
         "fakultät", "campus", "uni", "tu", "hs", "eth", "epfl", "kollegschule", "volkshochschule",
     ].map(\.folded))
 
-    /// Nouns that name an institution by themselves, in the six languages (schools, hospitals, foundations, associations,
-    /// ministries, chambers). Narrower than `schoolWords` and `organisationWords`, which also hold sector and activity words.
+    /// Nouns that name an institution by themselves, in the six languages (schools, hospitals, associations,
+    /// ministries). Narrower than `schoolWords` and `organisationWords`, which also hold sector and activity words.
     private static let institutionWords: Set<String> = Set([
         // English
-        "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic", "foundation",
-        "association", "ministry", "chamber", "bank", "company",
+        "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic",
+        "association", "ministry", "bank", "company",
         // Italian
-        "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica", "fondazione",
-        "associazione", "ministero", "camera", "banca", "comune", "azienda", "società",
+        "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica",
+        "associazione", "ministero", "banca", "comune", "azienda", "società",
         // Spanish
-        "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica", "fundación",
-        "asociación", "ministerio", "cámara", "banco", "municipio", "ayuntamiento", "empresa", "sociedad",
+        "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica",
+        "asociación", "ministerio", "municipio", "ayuntamiento", "empresa", "sociedad",
         // French
-        "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique", "fondation",
-        "association", "ministère", "chambre", "banque", "mairie", "entreprise", "société",
+        "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique",
+        "association", "ministère", "banque", "mairie", "entreprise", "société",
         // German
         "schule", "gymnasium", "akademie", "institut", "fakultät", "konservatorium", "krankenhaus", "klinik", "klinikum",
-        "stiftung", "verein", "ministerium", "kammer", "bank", "gemeinde", "stadtverwaltung", "unternehmen",
+        "stiftung", "verein", "ministerium", "bank", "gemeinde", "stadtverwaltung", "unternehmen",
         // Portuguese
-        "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica", "fundação",
-        "associação", "ministério", "câmara", "banco", "prefeitura", "empresa", "sociedade",
+        "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica",
+        "associação", "ministério", "prefeitura", "empresa", "sociedade",
     ].map(\.folded))
 
     private static let institutionStems = [
