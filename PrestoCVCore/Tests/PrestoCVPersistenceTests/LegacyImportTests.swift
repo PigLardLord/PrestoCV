@@ -606,3 +606,31 @@ struct LegacyImportOutcomeTests {
         #expect(LegacyImportOutcome.failed(.storeUnavailable(.cannotList)).failed == nil)
     }
 }
+
+@Suite("Why a legacy CV is missing from the new store")
+struct LegacyLeftOutTests {
+    @Test("a damaged file and a CV the store could not keep are left out; a stored CV whose file stayed is not")
+    func causes() {
+        let reasons: [LegacyImportFailure.Reason] = [
+            .invalid(.json), .unreadable, .notStored(.storeUnavailable(.cannotLock)), .didNotReadBack,
+            .sourceNotRemoved(.storeUnavailable(.cannotLock)), .sourceChanged,
+        ]
+        #expect(reasons.map(\.leftOut) == [.damaged, .damaged, .notSaved, .notSaved, nil, nil])
+    }
+
+    @Test("a launch that left CVs out, or never knew them, may leave CVs out; one that stored all or was erased may not")
+    func mayLeaveCVsOut() {
+        var leftOut = LegacyImportReport()
+        leftOut.failures = [LegacyImportFailure(key: key("a"), reason: .unreadable)]
+        var kept = LegacyImportReport()
+        kept.failures = [LegacyImportFailure(key: key("b"), reason: .sourceChanged)]
+        var erased = LegacyImportReport()
+        erased.storeErased = true
+
+        #expect(LegacyImportOutcome.ran(leftOut).mayLeaveCVsOut)
+        #expect(LegacyImportOutcome.failed(.storeUnavailable(.cannotList)).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(kept).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(erased).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(LegacyImportReport()).mayLeaveCVsOut)
+    }
+}

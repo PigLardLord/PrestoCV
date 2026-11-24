@@ -252,6 +252,9 @@ enum EntryReader {
         var isMarked: Bool
         /// A place whose start no rule tells: the person checks it.
         var isUnsure = false
+        /// The segment is what follows a connector, and this is the span of what comes before it: a line parted at "at"
+        /// stays one line where its parts are details (#313).
+        var followsConnectorOf: SourceSpan?
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
@@ -292,7 +295,7 @@ enum EntryReader {
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
-                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true) : classify(part, kind: kind)
+                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true, followsConnectorOf: role.span) : classify(part, kind: kind)
                     }
             }
         }
@@ -433,7 +436,7 @@ enum EntryReader {
         let places = locationGroups(locations, in: findings.document)
         let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
-        let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
+        let details = lines(of: extra, in: findings.document) + draft.body.flatMap(\.cells).map { $0.quote() }
         // Lines that may be another entry's come first, then a line that may be a heading: either may also be why the parts
         // were read by their order
         let takesADoubtfulHeading = (draft.head + [draft.anchor].compactMap { $0 } + draft.tail + draft.body)
@@ -468,6 +471,19 @@ enum EntryReader {
             findings.cv.education.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
         }
+    }
+
+    /// One quote for each line of the leftover segments: the two sides of a connector are one detail, the connector kept.
+    private static func lines(of segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
+        var runs: [(first: Piece, last: Piece)] = []
+        for segment in segments {
+            if let before = segment.followsConnectorOf, let index = runs.lastIndex(where: { $0.last.span == before }) {
+                runs[index].last = segment.piece
+            } else {
+                runs.append((segment.piece, segment.piece))
+            }
+        }
+        return runs.map { $0.first.span == $0.last.span ? $0.first.quote() : covering($0.first, $0.last, in: document) }
     }
 
     private static func unplace(_ values: [Sourced<String>], in section: Section, _ findings: inout Findings) {

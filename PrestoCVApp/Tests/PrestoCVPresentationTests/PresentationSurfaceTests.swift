@@ -96,6 +96,28 @@ func useEveryPublicMember(of look: LookViewModel) async {
 }
 
 @MainActor
+func useEveryPublicMember(of report: LegacyImportReportViewModel) async {
+    await report.load()
+    let _: LegacyReportState = report.state
+    let _: Bool = report.isPresented || report.isBusy
+    for row in report.leftOut + report.toCheck as [LegacyReportRow] {
+        let _: CVReference = row.id
+        let _: String = row.label
+        let _: [LegacyDetail] = row.details
+    }
+    for line in report.notImported as [NotImportedCount] {
+        let _: NotImportedCause = line.cause
+        let _: Int = line.count
+    }
+    let _: Int = report.notImportedTotal
+    let _: LegacyImportNotice? = report.notice
+    report.remindsNoMore = true
+    await report.confirm()
+    report.close()
+    report.hideNotice()
+}
+
+@MainActor
 func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     let reference: CVReference? = shell.selection
     let column: ShellColumn = shell.preferredColumn
@@ -108,6 +130,10 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
     switch screen { case .loading, .welcome, .split: break }
     let _: Bool = shell.canLeave
     let _: CVRow? = shell.selectedRow(in: rows)
+    verdicts.append(shell.showImport())
+    verdicts.append(shell.start(at: StartDestination?.none))
+    let importer: ImportViewModel? = shell.importer
+    shell.importStatusChanged()
     shell.reconcile(with: rows)
     shell.sceneChanged(isActive: false)
     shell.sceneChanged(isActive: true)
@@ -130,7 +156,7 @@ func useEveryPublicMember(of shell: ShellNavigationModel, rows: [CVRow]) async {
             let _: [StatusAction] = status.statusActions
         }
     }
-    _ = (reference, detail, editor)
+    _ = (reference, detail, editor, importer)
 }
 
 func useEveryPublicMember(of chrome: EditorChrome) {
