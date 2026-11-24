@@ -272,7 +272,8 @@ struct LaunchFixtures: Equatable, Sendable {
     /// a root that resolves to somewhere outside the temporary folder.
     private static func requirePlainFolders(of paths: AppPaths) throws(Failure) {
         let temporary = paths.temporary.standardizedFileURL.path
-        for folder in [paths.store, paths.designs, paths.trace, legacyFolder(of: paths), legacySupport(of: paths)] {
+        let legacyApp = LegacyLeftoverPaths(applicationSupport: legacySupport(of: paths)).appFolder
+        for folder in [paths.store, paths.designs, paths.trace, legacyFolder(of: paths), legacyApp] {
             var url = folder.standardizedFileURL
             while url.path.hasPrefix(temporary + "/") {
                 if isLink(url) { throw .unsafeFolder }

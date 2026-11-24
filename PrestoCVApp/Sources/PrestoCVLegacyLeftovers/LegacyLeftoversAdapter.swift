@@ -10,6 +10,8 @@ extension LogCategory {
 /// Where the released app kept the files that hold nothing the person wrote, derived from Application Support by one rule.
 /// The CVs, their `Quarantine` and the unsaved edits live beside them and are never named here.
 public struct LegacyLeftoverPaths: Sendable, Equatable {
+    /// The released app's own folder directly under Application Support: the folder of the design files and the settings
+    public let appFolder: URL
     /// The released app's design files: a folder
     public let templates: URL
     /// The cache of those designs: a folder directly under Application Support
@@ -19,6 +21,7 @@ public struct LegacyLeftoverPaths: Sendable, Equatable {
 
     public init(applicationSupport: URL) {
         let app = applicationSupport.appendingPathComponent("PrestoCV", isDirectory: true)
+        appFolder = app
         templates = app.appendingPathComponent("Templates", isDirectory: true)
         templateCache = applicationSupport.appendingPathComponent("TemplateCache", isDirectory: true)
         exportPreferences = app.appendingPathComponent("export-preferences.json", isDirectory: false)
@@ -28,6 +31,11 @@ public struct LegacyLeftoverPaths: Sendable, Equatable {
 /// The kind of failure a removal gave, by a code; never a path.
 struct LegacyLeftoverError: Error, Equatable, LoggableError {
     let logCode: StaticString
+
+    /// A folder on the way to the item is a link, so the item is left alone.
+    init(linkedFolder: ()) {
+        logCode = "linkedFolder"
+    }
 
     init(_ error: any Error) {
         guard let cocoa = error as? CocoaError else {
@@ -51,6 +59,8 @@ struct LegacyLeftoverError: Error, Equatable, LoggableError {
 ///
 /// - It removes exactly three paths, the ones in `LegacyLeftoverPaths`, and nothing else: never a path it lists or derives.
 /// - A path that is a link is removed as the link, never its target.
+/// - A folder on the way to a path, below Application Support, that is a link is never followed: what lies under it stays,
+///   and the skip is logged by the kind and a code.
 /// - A path that is not there counts as removed, so it runs again at each launch with no mark of its own.
 /// - A removal that fails is logged by its kind (`templates`, `templateCache`, `exportPreferences`) and a code, never a
 ///   path, and the others still go.
@@ -65,14 +75,24 @@ public struct LegacyLeftoversAdapter: LegacyLeftoversCleaning {
 
     @concurrent
     public func clean() async {
-        delete(paths.templates, of: "templates")
-        delete(paths.templateCache, of: "templateCache")
-        delete(paths.exportPreferences, of: "exportPreferences")
+        delete(paths.templates, below: [paths.appFolder], of: "templates")
+        delete(paths.templateCache, below: [], of: "templateCache")
+        delete(paths.exportPreferences, below: [paths.appFolder], of: "exportPreferences")
     }
 
-    /// Deletes a folder, a file or a link; one already gone counts as deleted.
-    private func delete(_ url: URL, of kind: StaticString) {
+    /// Deletes a folder, a file or a link, once the folders above it (`below`, from the top) are known to be real folders:
+    /// removing follows a link in the middle of a path. One already gone counts as deleted.
+    private func delete(_ url: URL, below folders: [URL], of kind: StaticString) {
         do {
+            for folder in folders {
+                let type = try FileManager.default.attributesOfItem(atPath: folder.path)[.type] as? FileAttributeType
+                guard type != .typeSymbolicLink else {
+                    logger.error(
+                        .legacy, "legacy.leftovers.notRemoved", .token("of", kind), .error(LegacyLeftoverError(linkedFolder: ()))
+                    )
+                    return
+                }
+            }
             try FileManager.default.removeItem(at: url)
         } catch {
             let failure = LegacyLeftoverError(error)

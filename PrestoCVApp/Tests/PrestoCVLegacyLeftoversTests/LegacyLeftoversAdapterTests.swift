@@ -86,6 +86,27 @@ struct LegacyLeftoversAdapterTests {
         #expect(world.logger.entries.isEmpty)
     }
 
+    @Test("a link as the folder of the design files and the settings is not followed: they stay, the cache goes, and it is logged")
+    func aLinkedParentIsSkipped() async throws {
+        let world = try World()
+        defer { world.remove() }
+        try world.write("mine", at: "Elsewhere/Templates/design.json")
+        try world.write("mine", at: "Elsewhere/export-preferences.json")
+        try world.write("cache", at: "TemplateCache/professional.png")
+        try world.link(world.support.appendingPathComponent("PrestoCV"), to: "Elsewhere")
+
+        await world.adapter.clean()
+
+        #expect(try world.read("Elsewhere/Templates/design.json") == "mine")
+        #expect(try world.read("Elsewhere/export-preferences.json") == "mine")
+        #expect(world.exists(world.paths.templateCache) == false)
+        let entries = world.logger.entries("legacy.leftovers.notRemoved")
+        #expect(entries.count == 2)
+        #expect(entries.map { $0.value("of") } == [.token("templates"), .token("exportPreferences")])
+        #expect(entries.allSatisfy { $0.value("error") == .error(type: "LegacyLeftoverError", code: "linkedFolder") })
+        #expect(entries.allSatisfy { !$0.line.contains(world.support.lastPathComponent) }, "never a path")
+    }
+
     // MARK: A removal that fails
 
     @Test("one removal that fails is logged by its kind, and the other two still go")
