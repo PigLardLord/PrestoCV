@@ -126,9 +126,9 @@ enum EntryVocabulary {
     }
 
     /// Whether a name ends at its company or school word, with no prose after it: the word is the last one, a part in
-    /// parentheses follows it ("von Linden UG (haftungsbeschränkt)"), or a comma or a separator leads to a known place or a
-    /// role ("von Linden GmbH, Berlin", "von Linden GmbH – Elektriker"). Anything else after it is prose, capitalised or not
-    /// ("von Muster GmbH ausgezeichnet", "von Muster GmbH, Auszeichnung").
+    /// parentheses follows it ("von Linden UG (haftungsbeschränkt)"), or a comma or a separator leads to parts that are each
+    /// a known place or a role ("von Linden GmbH, Berlin", "von Linden GmbH – Elektriker, Berlin"). Anything else after it
+    /// is prose, capitalised or not ("von Muster GmbH ausgezeichnet", "von Muster GmbH, Auszeichnung für Elektriker").
     private static func endsAtOrganisation(_ text: Substring) -> Bool {
         let tokens = text.split(separator: " ")
         for token in tokens where isOrganisation(String(token)) || isSchool(String(token)) {
@@ -140,9 +140,22 @@ enum EntryVocabulary {
             guard let mark = rest.first else { return true }
             guard mark == "," || ("–—-|·/".contains(mark) && rest.dropFirst().first == " ") else { continue }
             let part = rest.dropFirst().drop(while: \.isWhitespace)
-            if Places.isPlaceOnly(String(part)) || (isRole(String(part)) && hasHeadShape(part)) { return true }
+            if Places.isPlaceOnly(String(part)) || partsArePlacesOrRoles(part) { return true }
         }
         return false
+    }
+
+    /// Whether every part of a text, between its commas and separators, is a known place or a role whose own words have a
+    /// head's shape ("Elektriker, Berlin", "Senior Elektriker – Berlin"). A role named inside prose ("Auszeichnung für
+    /// Elektriker") is not one: the punctuation around a part never gives it a head's shape.
+    private static func partsArePlacesOrRoles(_ text: Substring) -> Bool {
+        let parts = text.replacingOccurrences(of: " - ", with: " – ").split { ",|·•—–/".contains($0) }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        return !parts.isEmpty && parts.allSatisfy { part in
+            let words = part.words
+            return !words.isEmpty && (Places.isPlaceOnly(part)
+                || (isRole(part) && (words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false })))
+        }
     }
 
     /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
