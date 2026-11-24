@@ -247,7 +247,7 @@ enum EntryVocabulary {
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
            words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
-           readsAsAName(words, capitalised: capitalised) || namesAnInstitution(words) {
+           (readsAsAName(words, capitalised: capitalised) && !readsAsASectorDuty(words)) || namesAnInstitution(words) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
@@ -257,12 +257,20 @@ enum EntryVocabulary {
         }
     }
 
+    /// Whether a qualifier opens with a sector or activity word and holds a contracted article ("Studio degli Impianti",
+    /// "Bau der Anlagen"): it reads as a duty as much as a name, so it is a name only if it names an institution by itself.
+    private static func readsAsASectorDuty(_ words: [Substring]) -> Bool {
+        guard let first = words.first, isOrganisation(String(first)) || isSchool(String(first)),
+              !namesInstitutionByItself(first.folded) else { return false }
+        return words.contains { determiners.contains($0.folded) && connectors.contains($0.folded) && $0.first?.isLowercase == true }
+    }
+
     /// Whether words are a school or an employer name ("Universität der Künste"): a school or organisation word with only names
     /// and modifiers before it, after it only capitalised words, particles, joining words and articles, ending on a capitalised
     /// word. Such a name keeps its articles, which a duty read as a name would not. One pass, no recursion.
     private static func namesAnInstitution(_ words: [Substring]) -> Bool {
         guard let last = words.last, last.first?.isUppercase == true,
-              let head = words.firstIndex(where: { isSchool(String($0)) || isOrganisation(String($0)) }),
+              let head = words.firstIndex(where: { namesInstitutionByItself($0.folded) }),
               words[..<head].allSatisfy({ isModifier($0) }) else { return false }
         return words[(head + 1)...].allSatisfy { word in
             let folded = word.folded
@@ -375,6 +383,12 @@ enum EntryVocabulary {
         if legalForms.contains(where: { form in words.contains(form) }) { return true }
         if dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
         return words.contains { organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix) }
+    }
+
+    /// Whether a folded word names an institution by itself, so that "Universität der Künste" is a name and "Bau der Anlagen"
+    /// is not: only the nouns of ``institutionWords`` and ``institutionStems``, never a sector word, an activity or an adjective.
+    private static func namesInstitutionByItself(_ word: String) -> Bool {
+        institutionWords.contains(word) || institutionStems.contains(where: word.hasPrefix)
     }
 
     /// Whether a piece reads as a school or a university.
@@ -502,6 +516,33 @@ enum EntryVocabulary {
         "conservatory", "iis", "itis", "ipsia", "ies", "iut", "insa", "faculdade", "facultad", "faculté", "facoltà",
         "fakultät", "campus", "uni", "tu", "hs", "eth", "epfl", "kollegschule", "volkshochschule",
     ].map(\.folded))
+
+    /// Nouns that name an institution by themselves, in the six languages (schools, hospitals, foundations, associations,
+    /// ministries, chambers). Narrower than `schoolWords` and `organisationWords`, which also hold sector and activity words.
+    private static let institutionWords: Set<String> = Set([
+        // English
+        "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic", "foundation",
+        "association", "ministry", "chamber",
+        // Italian
+        "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica", "fondazione",
+        "associazione", "ministero", "camera",
+        // Spanish
+        "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica", "fundación",
+        "asociación", "ministerio", "cámara",
+        // French
+        "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique", "fondation",
+        "association", "ministère", "chambre",
+        // German
+        "schule", "gymnasium", "akademie", "institut", "fakultät", "konservatorium", "krankenhaus", "klinik", "klinikum",
+        "stiftung", "verein", "ministerium", "kammer",
+        // Portuguese
+        "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica", "fundação",
+        "associação", "ministério", "câmara",
+    ].map(\.folded))
+
+    private static let institutionStems = [
+        "universit", "hochschul", "fachhochschul", "politecnic", "gymnasi", "berufsschul", "fachschul", "krankenh",
+    ].map(\.folded)
 
     private static let schoolStems = ["universit", "hochschul", "politecnic", "fachschul", "berufsschul", "gymnasi"].map(\.folded)
 

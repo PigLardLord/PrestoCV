@@ -544,6 +544,19 @@ struct BulletEntryTests {
         #expect((section == .education ? found.cv.education.count : found.cv.experience.count) == 2)
     }
 
+    @Test("A duty that opens with a sector or activity word is no institution name, even with an article and a capitalised noun", arguments: [
+        "• 2019 – Elektriker für Bau und Wartung der Anlagen",
+        "• 2019 – Elektriker für Bau der Anlagen",
+        "• 2019 – Elektriker für Technische Prüfung der Anlagen",
+        "• 2019 – Tecnico per Studio degli Impianti",
+        "• 2019 – Lagerist für Logistik der Lager",
+    ])
+    func sectorWordDutyIsADetail(_ line: String) throws {
+        let found = read("Experience\n• 2021 – Electrician – Example Ltd\nI checked the installations.\n\(line)", kind: .experience)
+        try #require(found.cv.experience.count == 1)
+        #expect(found.cv.experience[0].details.map(\.value) == ["I checked the installations.", String(line.dropFirst(2))])
+    }
+
     @Test("A qualifier that is itself a school or an employer name passes with its articles", arguments: [
         ("• 2019 – Designer bei Universität der Künste", "Designer", "Universität der Künste"),
         ("• 2018 – Tecnico presso Università degli Studi di Esempio", "Tecnico", "Università degli Studi di Esempio"),
