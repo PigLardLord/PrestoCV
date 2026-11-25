@@ -139,6 +139,9 @@ private let notPrinted: [String: String] = [
     "design.fonts": "resolved by the export workflow into the fonts",
     "language.tag": "the language of the document is an argument of the export",
     "sections.certifications[].issued.month": "the document prints a certification date as a year",
+    "draft.origins": "which values the import wrote and the person has not confirmed: never printed",
+    "draft.notPlaced[].text": "a text the import could not place, for the person to place or drop: never printed",
+    "draft.notPlaced[].heading": "the heading the text had in the imported CV: never printed",
 ]
 
 // MARK: Blank fields
@@ -267,6 +270,17 @@ struct MirrorCompletenessTests {
     func nothingIsInvented() {
         let cv = Fixtures.fullCV()
         #expect(inventedLeaves(cv, mapped(cv)).isEmpty, "\(inventedLeaves(cv, mapped(cv)))")
+    }
+
+    @Test("the draft never reaches the document: the CV maps to the same document without it, and no draft text is printed")
+    func theDraftIsNeverPrinted() throws {
+        let cv = Fixtures.fullCV()
+        let draft = try #require(cv.draft)
+        let withoutDraft = CV(id: cv.id, title: cv.title, personal: cv.personal, sections: cv.sections, design: cv.design, language: cv.language)
+        #expect(mapped(cv) == mapped(withoutDraft))
+        let draftTexts = draft.notPlaced.flatMap { [$0.text] + [$0.heading].compactMap { $0 } }
+        let printedTexts = leaves(mapped(cv)).map(\.value)
+        #expect(draftTexts.count == 2 && draftTexts.allSatisfy { text in !printedTexts.contains { $0.contains(text) } }, "\(draftTexts)")
     }
 
     @Test("a leaf the tables do not know fails the check")

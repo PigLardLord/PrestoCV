@@ -174,7 +174,8 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
             let stored = cv.stored(revision: cv.revision + 1, at: now())
             let written = CV(id: stored.id, revision: stored.revision, createdAt: existing.createdAt, updatedAt: stored.updatedAt, title: stored.title,
-                             personal: stored.personal, sections: stored.sections, design: stored.design, language: stored.language)
+                             personal: stored.personal, sections: stored.sections, design: stored.design, language: stored.language,
+                             draft: stored.draft)
             try write(written)
             return try current(cv.id) ?? written
         }

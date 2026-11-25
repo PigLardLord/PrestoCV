@@ -66,6 +66,22 @@ enum Places {
 
     private static let countryNames: Set<String> = Set((countries + nations).map { $0.words.map { $0.folded }.joined(separator: " ") })
 
+    /// Whether a piece is a place named in the shape of a name, then a country or a region with no comma: "Potsdam Germany",
+    /// "Hessen Deutschland", "Umbria Italia". The part before is one to three capitalised words that no list needs to know.
+    /// A US state ends no such place ("Denzel Washington"), and a code ("MD") is no region here.
+    static func endsInCountryOrRegion(_ text: String) -> Bool {
+        let words = text.words
+        guard (2...5).contains(words.count) else { return false }
+        return (1...min(3, words.count - 1)).contains { tailCount in
+            let head = words.dropLast(tailCount)
+            let tail = words.suffix(tailCount).map { $0.folded }.joined(separator: " ")
+            return head.count <= 3 && head.allSatisfy { $0.first?.isUppercase == true && $0.allSatisfy { $0.isLetter || $0 == "-" } }
+                && (countryNames.contains(tail) || lands.contains(tail))
+        }
+    }
+
+    private static let lands: Set<String> = Set((provinces + laender).map { $0.words.map { $0.folded }.joined(separator: " ") })
+
     /// A city of one to three words, then a state, a province or a country: "Akron, OH", "Austin, Texas", "Calgary, Alberta".
     /// The states are no places by themselves: "Virginia Woolf" and "Denzel Washington" are names.
     private static func hasRegionTail(_ text: String) -> Bool {
