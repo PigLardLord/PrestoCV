@@ -241,6 +241,26 @@ struct ShortYearImportTests {
         #expect(found.reviewList.contains { $0.field == .experience(1) && $0.reason == .entryBoundsUnsure })
     }
 
+    @Test("A software-version line does not stop dated bullets with a head from being entries")
+    func softwareVersionLineKeepsBulletEntries() throws {
+        let found = try imported("""
+        Berufserfahrung
+        Unity 9.10 – 9.12
+        • 2019 – 2021 Elektriker – Beispiel GmbH, Erfurt
+        • 2015 – 2018 Maurer – Muster AG, Jena
+        """)
+        let roles = found.cv.experience.map { $0.role?.value }
+        #expect(roles.contains("Elektriker"))
+        #expect(roles.contains("Maurer"))
+        let first = try #require(found.cv.experience.first { $0.role?.value == "Elektriker" })
+        let second = try #require(found.cv.experience.first { $0.role?.value == "Maurer" })
+        #expect(first.employer?.value == "Beispiel GmbH")
+        #expect(first.period?.value.start == YearMonth(year: 2019, month: nil))
+        #expect(first.period?.value.end == .date(YearMonth(year: 2021, month: nil)))
+        #expect(second.employer?.value == "Muster AG")
+        #expect(second.period?.value.start == YearMonth(year: 2015, month: nil))
+    }
+
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
         ("K-12 Teacher", "K-12"), ("k8s platform", "k8s"), ("% of revenue", "of revenue"),
         ("% des Umsatzes", "Umsatzes"), ("% del fatturato", "fatturato"), ("% du chiffre", "chiffre"),

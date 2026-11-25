@@ -218,9 +218,10 @@ enum EntryReader {
     }
 
     /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
-    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
+    /// (a period read only as a software range counts as no date) and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
     private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
-        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        // A period read only through the software-range fallback is no date: it must not veto the bullets
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil && !$0.periodReadsASoftwareRange }) else { return false }
         return usable.contains(where: { $0.headEvidence == .strong })
     }
 
