@@ -125,7 +125,7 @@ enum LanguageVocabulary {
             "proficient", "listening", "reading", "writing", "speaking", "spoken interaction", "spoken production",
         ],
         .it: [
-            "scolastico", "fluente", "ottimo", "buono", "discreto", "sufficiente", "elementare", "base", "bilingue", "eccellente",
+            "scolastico", "fluente", "ottimo", "ottima", "ottime", "buono", "discreto", "sufficiente", "elementare", "base", "bilingue", "eccellente",
             "capacità di lettura", "capacità di scrittura", "capacità di espressione orale", "comprensione", "parlato", "scritto",
         ],
         .de: [
