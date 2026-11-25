@@ -122,6 +122,14 @@ public enum CVRepositoryContract {
         let b = try await repo.create(CV(id: CVID(UUID(uuidString: "33333333-3333-3333-3333-333333333333")!), personal: PersonalDetails(fullName: "B")))
         var a2 = a; a2.rename("touched"); let a3 = try await repo.update(a2)
         guard try await repo.list().cvs.map(\.id) == [a3.id, b.id] else { throw Failure(description: "list must be sorted by last change") }
+
+        // The draft is stored with the CV, and an update keeps it.
+        let drafted = FixtureCV.full(id: CVID(UUID(uuidString: "44444444-4444-4444-4444-444444444444")!))
+        var d1 = try await repo.create(drafted); d1.rename("Imported")
+        let d2 = try await repo.update(d1)
+        guard drafted.draft != nil, d2.draft == drafted.draft, try await repo.load(drafted.id).draft == drafted.draft else {
+            throw Failure(description: "create, update and load must keep the draft")
+        }
     }
 }
 
@@ -132,13 +140,14 @@ public struct InMemorySampleCVSource: SampleCVSource {
     public func samples() async throws(RepositoryError) -> [CV] { cvs }
 }
 
-/// A CV with every field populated, so completeness tests (mappers, persistence) see every leaf.
+/// A CV with every field populated, so completeness tests (mappers, persistence) see every leaf. Its draft marks some
+/// values as imported, in the person's details and in two sections, and keeps one text the import could not place.
 public enum FixtureCV {
     public static func full(id: CVID = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)) -> CV {
         func link(_ s: String) -> WebLink { WebLink(s)! }
         let period = Period(start: PartialDate(year: 2019, month: 3)!, end: .current)!
         let ended = Period(start: PartialDate(year: 2012, month: 9)!, end: .date(PartialDate(year: 2015, month: 7)!))!
-        return CV(
+        var cv = CV(
             id: id,
             title: "iOS roles",
             personal: PersonalDetails(fullName: "Ada Lovelace", professionalTitle: "iOS Engineer", email: EmailAddress("ada@example.com"),
@@ -157,6 +166,12 @@ public enum FixtureCV {
             design: DesignChoice(design: "modern", palette: "ocean", fonts: "classic"),
             language: DocumentLanguage("it")
         )
+        let marked: [ValuePlace] = [.personal(.fullName), .personal(.professionalTitle), .personal(.email), .personal(.summary),
+                                    .entry(.experienceRole, index: 0), .entry(.experienceCompany, index: 0),
+                                    .entry(.skillName, index: 0), .entry(.skillName, index: 1), .entry(.interest, index: 1)]
+        try! cv.setDraft(DraftBlock(origins: Dictionary(uniqueKeysWithValues: marked.map { ($0, .imported) }),
+                                    notPlaced: [NotPlacedText(text: "Volunteer at the chess club", heading: "Other")!]))
+        return cv
     }
 }
 

@@ -197,7 +197,7 @@ enum EntryVocabulary {
     }
 
     /// The words that join a head word to what qualifies it ("Diploma in nursing", "Elektriker für Hochspannung").
-    private static let connectors: Set<String> = Set([
+    private static let headConnectors: Set<String> = Set([
         // English
         "of", "in", "at", "for", "on", "with", "and",
         // Italian
@@ -234,11 +234,11 @@ enum EntryVocabulary {
             let after = words[(index + 1)...]
             // A sector or activity word ("Bau", "Studio") followed by a connector is no head word: it opens a duty
             if closing, !isRole(word), !isDegree(word), !legalForms.contains(word.folded), !namesInstitutionByItself(word.folded),
-               let next = after.first, connectors.contains(next.folded) || next.folded.hasPrefix("d'") { continue }
-            if let next = after.first, !isModifier(next), !connectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
+               let next = after.first, headConnectors.contains(next.folded) || next.folded.hasPrefix("d'") { continue }
+            if let next = after.first, !isModifier(next), !headConnectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
             if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
             if let next = after.first, !isModifier(next) {
-                let joined = connectors.contains(next.folded)
+                let joined = headConnectors.contains(next.folded)
                 let qualifier = joined ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
                 let employer = joined && employerConnectors.contains(next.folded)
                 guard isReadableQualifier(qualifier, afterRole: isRole(word), afterEmployerConnector: employer) else { continue }
@@ -259,13 +259,13 @@ enum EntryVocabulary {
         guard let first = words.first, let last = words.last else { return false }
         func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
         if capitalised(first), capitalised(last),
-           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || connectors.contains($0.folded) }),
+           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || headConnectors.contains($0.folded) }),
            (readsAsAName(words, capitalised: capitalised) && !(afterRole && words.contains { !capitalised($0) })) || (namesAnInstitution(words) && (!afterRole || afterEmployerConnector)) {
             return true
         }
         return words.count <= 2 && words.allSatisfy { word in
             let folded = word.folded
-            return word.first?.isLowercase == true && !determiners.contains(folded) && !connectors.contains(folded)
+            return word.first?.isLowercase == true && !determiners.contains(folded) && !headConnectors.contains(folded)
                 && !elidedArticles.contains(where: folded.hasPrefix)
         }
     }
@@ -280,7 +280,7 @@ enum EntryVocabulary {
         return words[(head + 1)...].allSatisfy { word in
             let folded = word.folded
             return word.first.map { $0.isUppercase || !$0.isLetter } == true || nameParticles.contains(folded)
-                || connectors.contains(folded) || determiners.contains(folded)
+                || headConnectors.contains(folded) || determiners.contains(folded)
         }
     }
 
@@ -298,7 +298,7 @@ enum EntryVocabulary {
                 previousWasLower = false
             } else {
                 if !previousWasLower { runs += 1 }
-                let article = determiners.contains(folded) && !connectors.contains(folded)
+                let article = determiners.contains(folded) && !headConnectors.contains(folded)
                 let afterParticle = previousWasLower && nameParticles.contains(previousFolded)
                 if article && !afterParticle { return false }
                 previousWasLower = true
@@ -384,10 +384,51 @@ enum EntryVocabulary {
     /// Whether a piece reads as an organisation: a legal form, or a word of a hospital, a firm or an institution.
     static func isOrganisation(_ text: String) -> Bool {
         let words = text.words.map { $0.folded }
-        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
-        if legalForms.contains(where: { form in words.contains(form) }) { return true }
-        if dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        if hasLegalForm(text) { return true }
         return words.contains { organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix) }
+    }
+
+    /// Whether the vocabulary explains a whole line, so that the line denotes no person: it carries a legal form, opens with
+    /// a word of an organisation or a school, has such a word before a connector ("Ospedale di Erfurt"), or every one of its
+    /// words is a role, a role modifier, an organisation or school word, a connector or a known place ("Senior Nurse",
+    /// "Head Cook"). One word no list explains ("Priya Cook", "Luca Fabbro") leaves the line a possible person: a surname
+    /// may be a trade, a firm's word or a school's.
+    static func explainsWholeLine(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard !words.isEmpty else { return false }
+        if hasLegalForm(text) { return true }
+        let folded = words.map { $0.folded }
+        let namesAnInstitution = { (word: String) in isOrganisation(word) || isSchool(word) }
+        if namesAnInstitution(words[0]) { return true }
+        if folded.indices.dropLast().contains(where: { namesAnInstitution(words[$0]) && connectors.contains(folded[$0 + 1]) }) { return true }
+        // A place word explains a word only after a role or an institution word, never as the first one: a given name may be
+        // a city too ("Charlotte Baker"), and nothing outside the ambiguous word then says it is a place (#328).
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            let followsARoleOrInstitution = words[..<index].contains { isRole($0) || namesAnInstitution($0) }
+            return connectors.contains(folded[index]) || roleModifiers.contains(folded[index]) || isRole(word)
+                || namesAnInstitution(word) || (followsARoleOrInstitution && Places.isPlaceOnly(word))
+        }
+    }
+
+    /// The words that qualify a role without being one.
+    private static let roleModifiers: Set<String> = Set([
+        "senior", "junior", "head", "chief", "lead", "assistant", "deputy", "vice", "general", "associate", "trainee", "acting",
+        "leitende", "leitender", "leitung", "stellvertretende", "stellvertretender", "oberarzt", "erste", "erster", "kaufmännische",
+        "capo", "vice", "primo", "prima", "aiuto", "responsabile", "junior", "jefe", "jefa", "adjunto", "adjunta", "chef", "adjoint",
+    ].map(\.folded))
+
+    /// The words that join the parts of a role or an organisation.
+    private static let connectors: Set<String> = Set([
+        "of", "the", "and", "for", "at", "in", "&", "für", "der", "die", "das", "und", "des", "di", "del", "della", "dei", "delle",
+        "e", "ed", "de", "la", "le", "el", "y", "du", "et", "da", "do", "dos", "das", "per", "al", "alla", "zu", "zur", "zum", "im",
+    ].map(\.folded))
+
+    /// Whether a piece carries a legal form ("GmbH", "Ltd", "S.r.l.", "Inc.").
+    private static func hasLegalForm(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        return legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) })
     }
 
     /// Whether a folded word names an institution by itself, so that "Universität der Künste" is a name and "Bau der Anlagen"
