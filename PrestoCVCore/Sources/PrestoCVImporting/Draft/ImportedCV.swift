@@ -60,6 +60,9 @@ public enum CheckReason: String, Hashable, Sendable, CaseIterable {
     case levelNotCEFR
     /// A Europass grid that gives the language different levels.
     case levelsDiffer
+    /// A line under a certification that only its words, not the layout, made the certification's description; or a line
+    /// that reads as such a description and became a certification of its own (#283).
+    case descriptionOrEntryUnsure
 }
 
 // MARK: - The imported CV
@@ -111,6 +114,9 @@ public struct ImportedExperience: Hashable, Sendable {
     public var details: [Sourced<String>] = []
     /// Why the person should check the entry as a whole.
     public var check: CheckReason?
+    /// The heading of the section the job stands in, as the CV writes it; nil when the section has none. A date the CV
+    /// cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 public struct ImportedEducation: Hashable, Sendable {
@@ -141,6 +147,15 @@ public struct ImportedCertification: Hashable, Sendable {
     public var name: Sourced<String>
     public var issuer: Sourced<String>?
     public var year: Sourced<Int>?
+    /// The web address the text gives for the certification, in its line or on a line of its own under it.
+    public var link: Sourced<WebLink>?
+    /// The sentences under the certification that tell what it is, in order.
+    public var description: Sourced<String>?
+    /// Why the person should check the certification as a whole.
+    public var check: CheckReason?
+    /// The heading of the section the certification stands in, as the CV writes it; nil when the section has none. A year
+    /// the CV cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 // MARK: - What was not imported
@@ -214,9 +229,12 @@ extension ImportedCV {
             add("languages[\(index)].levelWords", language.levelWords)
         }
         for (index, certification) in certifications.enumerated() {
+            addCheck("certifications[\(index)].check", certification.check)
             add("certifications[\(index)].name", certification.name)
             add("certifications[\(index)].issuer", certification.issuer)
             add("certifications[\(index)].year", certification.year, as: String.init)
+            add("certifications[\(index)].link", certification.link, as: \.value)
+            add("certifications[\(index)].description", certification.description)
         }
         for (index, interest) in interests.enumerated() { add("interests[\(index)]", interest) }
         return fields
@@ -251,8 +269,9 @@ extension ImportedLink {
 
 extension ImportedExperience {
     package static func scripted(role: Sourced<String>?, employer: Sourced<String>?, location: Sourced<String>?,
-                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?) -> ImportedExperience {
-        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check)
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?,
+                                 heading: String? = nil) -> ImportedExperience {
+        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check, heading: heading)
     }
 }
 
@@ -273,8 +292,11 @@ extension ImportedLanguage {
 }
 
 extension ImportedCertification {
-    package static func scripted(_ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?) -> ImportedCertification {
-        ImportedCertification(name: name, issuer: issuer, year: year)
+    package static func scripted(
+        _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?,
+        check: CheckReason?, heading: String? = nil
+    ) -> ImportedCertification {
+        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description, check: check, heading: heading)
     }
 }
 

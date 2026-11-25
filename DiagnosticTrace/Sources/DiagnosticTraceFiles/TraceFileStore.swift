@@ -59,11 +59,12 @@ extension LogCategory {
 /// the ten newest runs, and the session's events. The folder is made on the first write, so a build whose gate stays
 /// closed has none. It is excluded from backup, and its files are protected while the device is locked: before every launch's
 /// first write the store applies that to the folder, also to one that exists already, and writes nothing if it cannot.
-/// The copies made to share are removed when the store starts, so a launch that was killed leaves none behind.
+/// The copies made to share are in a folder per holder, and the copies of `TraceReading`, a single set, in one of their own;
+/// all of them are removed when the store starts, so a launch that was killed leaves none behind.
 ///
 /// `save` returns at once: the files are written by one task, which writes only the latest state of each run and replaces
 /// each file whole. A failure is logged and never reaches the caller.
-public final class TraceFileStore: TraceStoring, TraceReading {
+public final class TraceFileStore: TraceStoring, TraceReading, TraceSharing {
     private let queue = PendingWrites()
     private let writer: TraceFileWriter
     private let wake: AsyncStream<Void>.Continuation
@@ -116,12 +117,24 @@ public final class TraceFileStore: TraceStoring, TraceReading {
 
     public func shareCopies(of id: UUID) async throws -> [URL] {
         await writer.drain()
-        return try await writer.shareCopies(of: id)
+        return try await writer.shareCopies(of: id, in: Self.singleSet)
     }
 
     public func discardCopies() async {
-        await writer.discardCopies()
+        await writer.discardCopies(in: Self.singleSet)
     }
+
+    public func shareCopies(of id: UUID, for holder: UUID) async throws -> [URL] {
+        await writer.drain()
+        return try await writer.shareCopies(of: id, in: holder.uuidString)
+    }
+
+    public func discardCopies(for holder: UUID) async {
+        await writer.discardCopies(in: holder.uuidString)
+    }
+
+    /// The folder of the single set of copies of `TraceReading`, a name that is never a holder's id
+    private static let singleSet = "Copies"
 
     /// Removes every stored run, the session events and the copies, and drops what was saved and not written yet. The app
     /// calls it when the trace may not record on this install, so that CV content left by an earlier install does not stay.
@@ -186,12 +199,12 @@ private actor TraceFileWriter {
 
     // MARK: Starting and purging
 
-    /// Removes the copies an earlier launch left, once, before anything else is done. Every entry point calls it first, so
-    /// that it can never remove the copies of this launch.
+    /// Removes the copies an earlier launch left, every holder's, once, before anything else is done. Every entry point calls
+    /// it first, so that it can never remove the copies of this launch.
     func startUp() {
         guard !started else { return }
         started = true
-        removeCopies()
+        removeCopies(at: shareDirectory)
     }
 
     func purge() {
@@ -199,7 +212,7 @@ private actor TraceFileWriter {
         _ = queue.take()
         sessionEvents = nil
         folderIsProtected = false
-        removeCopies()
+        removeCopies(at: shareDirectory)
         remove(directory)
     }
 
@@ -322,46 +335,50 @@ private actor TraceFileWriter {
         }
     }
 
-    /// Copies of the run's document and summary, and of the session's events when there are any, in a protected folder. A
-    /// failure removes the copies already made.
-    func shareCopies(of id: UUID) throws -> [URL] {
+    /// Copies of the run's document and summary, and of the session's events when there are any, in one set's protected
+    /// folder inside the protected folder of the copies. They replace that set's earlier copies, and no other set's. A
+    /// failure removes the copies of the set already made.
+    func shareCopies(of id: UUID, in set: String) throws -> [URL] {
         started = true
         guard let (run, summary) = storedRuns().first(where: { $0.0.id == id }) else { throw TraceStoreError.missingRun }
+        let folder = shareDirectory.appendingPathComponent(set, isDirectory: true)
         do {
-            removeCopies()
-            try files.createDirectory(at: shareDirectory, withIntermediateDirectories: true)
+            removeCopies(at: folder)
+            try files.createDirectory(at: folder, withIntermediateDirectories: true)
             try protection.protect(shareDirectory)
+            try protection.protect(folder)
             var copies = [
-                try copy(Data(contentsOf: directory.appendingPathComponent(run.fileStem + ".json")), as: run.fileStem + ".json"),
-                try copy(Data(summary.utf8), as: run.fileStem + ".txt"),
+                try copy(Data(contentsOf: directory.appendingPathComponent(run.fileStem + ".json")), as: run.fileStem + ".json", into: folder),
+                try copy(Data(summary.utf8), as: run.fileStem + ".txt", into: folder),
             ]
             let events = directory.appendingPathComponent(TraceSessionLog.fileName)
             if files.fileExists(atPath: events.path) {
-                copies.append(try copy(Data(contentsOf: events), as: TraceSessionLog.fileName))
+                copies.append(try copy(Data(contentsOf: events), as: TraceSessionLog.fileName, into: folder))
             }
             return copies
         } catch {
             logger.error(.trace, "trace.shareFailed", .error(TraceStoreError.share))
-            removeCopies()
+            removeCopies(at: folder)
             throw TraceStoreError.share
         }
     }
 
-    private func copy(_ data: Data, as name: String) throws -> URL {
-        let file = shareDirectory.appendingPathComponent(name)
+    private func copy(_ data: Data, as name: String, into folder: URL) throws -> URL {
+        let file = folder.appendingPathComponent(name)
         try data.write(to: file, options: Self.writingOptions)
         return file
     }
 
-    func discardCopies() {
+    /// Removes one set's copies, and no other set's.
+    func discardCopies(in set: String) {
         started = true
-        removeCopies()
+        removeCopies(at: shareDirectory.appendingPathComponent(set, isDirectory: true))
     }
 
-    private func removeCopies() {
-        guard files.fileExists(atPath: shareDirectory.path) else { return }
+    private func removeCopies(at folder: URL) {
+        guard files.fileExists(atPath: folder.path) else { return }
         do {
-            try files.removeItem(at: shareDirectory)
+            try files.removeItem(at: folder)
         } catch {
             logger.error(.trace, "trace.shareFailed", .error(TraceStoreError.share))
         }
