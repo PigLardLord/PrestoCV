@@ -1,6 +1,6 @@
 # 0039. Keep long work off the main actor
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 - **Related:** [ADR 0006](0006-enforce-architecture-mechanically.md), [R5](../rules.md#r5-views-render-view-models-present-neither-decides), [R9](../rules.md#r9-swift-6-complete-concurrency-checking-no-escape-hatches), R19 (added with this decision), issue #333
 
