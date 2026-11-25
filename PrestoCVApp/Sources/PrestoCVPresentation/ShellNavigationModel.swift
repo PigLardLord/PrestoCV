@@ -66,6 +66,17 @@ public final class ShellNavigationModel {
     /// `discardAndImport()`), or until the editor goes.
     public private(set) var question: OpenedFileQuestion?
 
+    /// Whether Settings shows in a sheet over the shell. The view binds its sheet to it; `receive(file:)` clears it.
+    public var showsSettings = false
+
+    /// Whether the sheet of the ways to start a CV shows over the shell. The view binds its sheet to it; `receive(file:)`
+    /// clears it.
+    public var showsNewCV = false
+
+    /// The report of the released app's import, which `receive(file:)` closes as Not now does when it shows over the
+    /// shell. Set by the composition; nil where no report exists.
+    @ObservationIgnored public var legacyReport: LegacyImportReportViewModel?
+
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
@@ -322,7 +333,7 @@ public final class ShellNavigationModel {
     /// it, and reads the file; while it reads another, the file is let go (one import at a time).
     ///
     /// An editor whose text cannot be stored as it is keeps the person in it, and the shell holds the file and asks
-    /// whether to keep editing or to discard the edits and import it (`question`). The sheets over the editor close, so
+    /// whether to keep editing or to discard the edits and import it (`question`). The sheets over the editor and over the shell close, so
     /// that the question shows. While it shows, a newer file takes the place of the one held, which is let go, and the
     /// same file opened again is held once.
     ///
@@ -331,6 +342,7 @@ public final class ShellNavigationModel {
     /// arrival once the copy ended: it goes the ordinary way when the editor's text can then be stored, and the
     /// question shows otherwise.
     public func receive(file url: URL) {
+        closeSheetsOverTheShell()
         if let held = heldFile {
             guard !url.namesTheSameFile(as: held.url) else { return }
             heldFile = files.receive(url)
@@ -346,6 +358,15 @@ public final class ShellNavigationModel {
             review?.closeSheet()
             decideHeldFile()
         }
+    }
+
+    /// A file handed over by another app is the person's newest request: Settings, the sheet of the ways to start a CV
+    /// and the import's report, which cover the shell, close, so that the import or the question shows. The report
+    /// closes as Not now does, which keeps the old copies and the reminder for the next launch.
+    private func closeSheetsOverTheShell() {
+        showsSettings = false
+        showsNewCV = false
+        legacyReport?.close()
     }
 
     /// Decides what to do with the file held: waits while the editor's copy runs, then imports it the ordinary way when

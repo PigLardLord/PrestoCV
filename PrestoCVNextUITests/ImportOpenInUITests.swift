@@ -109,6 +109,29 @@ final class ImportOpenInUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(edited.waitForExistence(timeout: 30), "The CV that was open is stored with what was typed")
     }
 
+    /// A PDF opened while Settings covers the shell closes the sheet, so that the import is seen.
+    @MainActor
+    func testOpenedPDFClosesSettings() throws {
+        let app = try launch(seeded: true, holdingTheRead: false)
+        let name = fullName(in: app)
+        XCTAssertTrue(waitUntil(name, holds: "Emily Carter"), "The PDF opened at launch is in the editor")
+        if isCompact(app) {
+            app.backButton.tap()
+        }
+        let settings = app.buttons["settings.open"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 30))
+        settings.tap()
+        let done = app.buttons["settings.done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 30), "Settings is open")
+
+        // Back from the background, the window is handed the PDF again, as when another app opens it there
+        XCUIDevice.shared.press(.home)
+        app.activate()
+
+        XCTAssertTrue(done.waitForNonExistence(timeout: 30), "The PDF closes Settings")
+        XCTAssertTrue(waitUntil(name, holds: "Emily Carter"), "The import's draft opens in the editor")
+    }
+
     /// A PDF opened on the first run shows the import in place of the ways to start, reading it, with its Cancel and the
     /// text box covered.
     @MainActor

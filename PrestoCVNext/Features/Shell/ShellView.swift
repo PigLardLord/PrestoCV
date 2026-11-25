@@ -9,7 +9,7 @@ import SwiftUI
 /// list it shows what the import of the released app's CVs left out, while the report's model presents it. The gear in
 /// the sidebar's bar opens Settings in a sheet.
 struct ShellView: View {
-    let shell: ShellNavigationModel
+    @Bindable var shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
     let report: LegacyImportReportViewModel
@@ -18,8 +18,6 @@ struct ShellView: View {
     let diagnostics: DiagnosticsViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
-    @State private var addingCV = false
-    @State private var showingSettings = false
     /// The way to start chosen in the "+" sheet, opened when the sheet has closed.
     @State private var chosenInSheet: StartChoice?
 
@@ -52,11 +50,11 @@ struct ShellView: View {
             )
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
-                        Button { showingSettings = true } label: { Label("settings.open", systemImage: "gearshape") }
+                        Button { shell.showsSettings = true } label: { Label("settings.open", systemImage: "gearshape") }
                             .accessibilityIdentifier("settings.open")
                     }
                     ToolbarItem(placement: .primaryAction) {
-                        Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
+                        Button { shell.showsNewCV = true } label: { Label("shell.add", systemImage: "plus") }
                             .accessibilityIdentifier("shell.add")
                     }
                 }
@@ -68,13 +66,13 @@ struct ShellView: View {
         }
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $addingCV, onDismiss: startChosenInSheet) {
+        .sheet(isPresented: $shell.showsNewCV, onDismiss: startChosenInSheet) {
             NewCVSheet(firstRun: firstRun) { choice in
                 chosenInSheet = choice
-                addingCV = false
+                shell.showsNewCV = false
             }
         }
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $shell.showsSettings) {
             SettingsView(settings: settings, licences: licences, diagnostics: diagnostics)
         }
         .sheet(item: exportSheet) { sheet in
