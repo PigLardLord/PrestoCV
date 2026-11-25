@@ -22,6 +22,7 @@ struct SkillGroupTransitionTests {
     static let german = Words(skills: "Fähigkeiten", languages: "Sprachen", trade: "Schweißen", firstLanguage: "Deutsch", skillAfter: "Pünktlichkeit", languageAfter: "Spanisch")
     static let italian = Words(skills: "Competenze", languages: "Lingue", trade: "Saldatura", firstLanguage: "Italiano", skillAfter: "Puntualità", languageAfter: "Tedesco")
     static let spanish = Words(skills: "Habilidades", languages: "Idiomas", trade: "Soldadura", firstLanguage: "Español", skillAfter: "Puntualidad", languageAfter: "Alemán")
+    static let portuguese = Words(skills: "Competências", languages: "Línguas", trade: "Soldagem", firstLanguage: "Português", skillAfter: "Pontualidade", languageAfter: "Alemão")
     static let french = Words(skills: "Compétences", languages: "Langues", trade: "Soudure", firstLanguage: "Français", skillAfter: "Ponctualité", languageAfter: "Allemand")
 
     /// A line after the first language, in the language of the CV, and whether it opens the skills again.
@@ -113,6 +114,7 @@ struct SkillGroupTransitionTests {
         (german, "Muttersprache", "Sonstige", "Spanisch B2", "Spanisch"),
         (italian, "Madrelingua", "Altre", "Tedesco B2", "Tedesco"),
         (spanish, "Nativo", "Otro", "Alemán B2", "Alemán"),
+        (portuguese, "Nativo", "Outro", "Alemão B2", "Alemão"),
         (french, "Langue maternelle", "Autres", "Allemand B2", "Allemand"),
     ]
 
