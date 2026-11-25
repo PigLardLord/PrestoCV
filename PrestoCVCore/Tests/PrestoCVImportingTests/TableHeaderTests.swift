@@ -335,6 +335,25 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("A short bar line after a blank line is no row of the table: the next four-cell row is not read by its header")
+    func headingAfterAGapEndsTheTable() throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        | Selected work | 2018 – 2020 |
+        | 2015 – 2017 | Harbor Systems | Planner | Drew up plans |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.first?.employer?.value == "Northgate Academy")
+        #expect(jobs.first?.role?.value == "Teaching Assistant")
+        #expect(jobs.last?.period?.value.start.year == 2015)
+        #expect(jobs.last?.employer?.value != "2015 – 2017")
+        noLoss(result)
+    }
+
     @Test("Bullets and an undated line under a table row stay that job's details", arguments: [
         ("Experience", "| Period | Employer | Role | Tasks |", "Teaching Assistant", "Northgate Academy",
          "Helped with reading", "Covered two classes"),
