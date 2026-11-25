@@ -665,6 +665,9 @@ r19_flag "a nonisolated computed property of an actor" 'actor A { nonisolated va
 r19_flag "a closure in a nonisolated member of an actor" 'actor A { nonisolated func f(_ u: URL) { run { _ = try? Data(contentsOf: u) } } }' "R19m mainActorLongWork"
 r19_flag "a synchronous designated initializer of an actor" 'actor A { init(_ u: URL) { _ = try? Data(contentsOf: u) } }' "R19m mainActorLongWork"
 r19_flag "the deinitializer of an actor" 'actor A { deinit { Thread.sleep(forTimeInterval: 1) } }' "R19m mainActorLongWork"
+r19_flag "a synchronous delegating initializer of an actor" 'actor A { init() {}; init(_ u: URL) { self.init(); _ = try? Data(contentsOf: u) } }' "R19m mainActorLongWork"
+r19_clean "an isolated deinitializer of an actor" 'actor A { isolated deinit { Thread.sleep(forTimeInterval: 1) } }'
+r19_flag "an isolated deinitializer of a main-actor class" '@MainActor final class C { isolated deinit { Thread.sleep(forTimeInterval: 1) } }' "R19m mainActorLongWork"
 r19_clean "an async initializer of an actor is isolated" 'actor A { init(_ u: URL) async { _ = try? Data(contentsOf: u) } }'
 r19_clean "a @concurrent nonisolated member of an actor" 'actor A { @concurrent nonisolated func f(_ u: URL) async throws -> Data { try Data(contentsOf: u) } }'
 r19_clean "a call in a DEBUG branch" $'#if DEBUG\nfunc f(_ u: URL) throws { _ = try Data(contentsOf: u) }\n#endif'

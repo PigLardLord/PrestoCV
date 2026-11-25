@@ -740,8 +740,9 @@ final class Scanner: SyntaxVisitor {
     }
 
     /// A member that is not isolated to its actor: `nonisolated` (also `nonisolated(unsafe)`) or `static` (or `class`) functions,
-    /// properties (their accessors with them) and subscripts, a synchronous designated initializer (SE-0327: it runs on the caller's executor; an `async`
-    /// or `convenience` one is isolated) and a deinitializer (it runs on the thread that releases the last reference).
+    /// properties (their accessors with them) and subscripts, a synchronous initializer (SE-0327: it runs on the caller's executor, a delegating one too;
+    /// an `async` one is isolated) and a deinitializer (it runs on the thread that releases the last reference), unless it is an `isolated deinit`
+    /// (SE-0371), which runs on its actor.
     private static func runsOnCallersExecutor(_ node: Syntax) -> Bool {
         func unisolated(_ modifiers: DeclModifierListSyntax) -> Bool {
             modifiers.contains { ["nonisolated", "static", "class"].contains($0.name.text) }
@@ -749,10 +750,8 @@ final class Scanner: SyntaxVisitor {
         if let f = node.as(FunctionDeclSyntax.self) { return unisolated(f.modifiers) }
         if let v = node.as(VariableDeclSyntax.self) { return unisolated(v.modifiers) }
         if let s = node.as(SubscriptDeclSyntax.self) { return unisolated(s.modifiers) }
-        if node.is(DeinitializerDeclSyntax.self) { return true }
-        if let i = node.as(InitializerDeclSyntax.self) {
-            return unisolated(i.modifiers) || (i.signature.effectSpecifiers?.asyncSpecifier == nil && !i.modifiers.contains { $0.name.text == "convenience" })
-        }
+        if let d = node.as(DeinitializerDeclSyntax.self) { return !d.modifiers.contains { $0.name.text == "isolated" } }
+        if let i = node.as(InitializerDeclSyntax.self) { return unisolated(i.modifiers) || i.signature.effectSpecifiers?.asyncSpecifier == nil }
         return false
     }
 
