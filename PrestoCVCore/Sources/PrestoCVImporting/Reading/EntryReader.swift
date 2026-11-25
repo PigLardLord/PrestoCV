@@ -21,6 +21,9 @@ enum EntryReader {
         var durations: [Piece] = []
         /// The line is only a duration: LinkedIn's total of a company's roles.
         var isDurationOnly = false
+        /// What a bullet that opens with a period says of itself: a head after the period ("• 2021 – Course – School",
+        /// "• 2021 Leeds College") or not (a count, a sentence).
+        var headEvidence = EntryVocabulary.HeadEvidence.none
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
@@ -88,13 +91,15 @@ enum EntryReader {
         }
         if !isProse && !line.isDurationOnly {
             let anchorCells = line.label == .period ? line.labelValue : cells
-            line.period = anchorPeriod(in: anchorCells, isBullet: isBullet)
+            var anchor = anchorPeriod(in: anchorCells, isBullet: isBullet)
             // A range after a software name ("Unity 9.10 – 9.12") is a period unless the line itself says it is a duty:
             // split rather than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
-            if line.period == nil, !isBullet, !isDutyLine(text) {
-                line.period = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
-                line.periodReadsASoftwareRange = line.period != nil
+            if anchor == nil, !isBullet, !isDutyLine(text) {
+                anchor = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
+                line.periodReadsASoftwareRange = anchor != nil
             }
+            line.period = anchor.map { ($0.0, $0.1) }
+            line.headEvidence = anchor?.evidence ?? .none
         }
         return line
     }
@@ -117,10 +122,18 @@ enum EntryReader {
         return (label, value.isEmpty ? [] : [value])
     }
 
+    /// What the text after a bullet's period says: nothing but the period, another cell, or a head (see
+    /// `EntryVocabulary.headEvidence`). A count ("2000 hours of training", "2000 – hours of placement") and a year
+    /// with prose ("2019 led the move to the cloud") are no head, so they are details.
+    private static func headEvidence(after: String, laterCells: [Piece]) -> EntryVocabulary.HeadEvidence {
+        guard after.isEmpty || laterCells.isEmpty else { return .strong }
+        return EntryVocabulary.headEvidence(after: after)
+    }
+
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool, readsSoftwareRanges: Bool = false) -> (Piece, ImportedPeriod)? {
-        for cell in cells {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool, readsSoftwareRanges: Bool = false) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
+        for (cellIndex, cell) in cells.enumerated() {
             for match in DateReader.periods(in: cell.text, readsSoftwareRanges: readsSoftwareRanges) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
                 // The text after the period as a string of its own: a range read in it indexes that string
@@ -129,7 +142,8 @@ enum EntryReader {
                 let closesCell = after.isEmpty || after.first.map { "|·•—–-,):/]*".contains($0) } == true
                     || DurationReader.ranges(in: after).first?.lowerBound == after.startIndex
                 if isBullet ? before.isEmpty : (opensCell || closesCell) {
-                    return (cell.sub(match.range), match.period)
+                    let evidence = isBullet ? headEvidence(after: after, laterCells: Array(cells[(cellIndex + 1)...])) : .none
+                    return (cell.sub(match.range), match.period, evidence)
                 }
             }
         }
@@ -144,8 +158,15 @@ enum EntryReader {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
-        let isOnlyBullets = usable.allSatisfy { $0.isBullet }
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
+        let onlyBullets = usable.allSatisfy { $0.isBullet }
+        let bulletsAreEntries = bulletsAreEntries(usable)
+        // A section of bullets only reads as it always did: every dated bullet is an entry. In a section that mixes bullets
+        // with other lines, a bullet is an entry only when a head follows its year; anything unclear is a detail
+        let anchors = usable.indices.filter { index in
+            guard usable[index].period != nil else { return false }
+            guard usable[index].isBullet, !onlyBullets else { return true }
+            return bulletsAreEntries && usable[index].headEvidence == .strong
+        }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
         // Which lines belong to which date, read both ways over the whole section
@@ -194,6 +215,13 @@ enum EntryReader {
             drafts.append(draft)
         }
         return drafts
+    }
+
+    /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
+    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
+    private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        return usable.contains(where: { $0.headEvidence == .strong })
     }
 
     /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").
@@ -267,6 +295,9 @@ enum EntryReader {
         var isMarked: Bool
         /// A place whose start no rule tells: the person checks it.
         var isUnsure = false
+        /// The segment is what follows a connector, and this is the span of what comes before it: a line parted at "at"
+        /// stays one line where its parts are details (#313).
+        var followsConnectorOf: SourceSpan?
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
@@ -307,7 +338,7 @@ enum EntryReader {
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
-                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true) : classify(part, kind: kind)
+                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true, followsConnectorOf: role.span) : classify(part, kind: kind)
                     }
             }
         }
@@ -448,7 +479,7 @@ enum EntryReader {
         let places = locationGroups(locations, in: findings.document)
         let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
-        let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
+        let details = lines(of: extra, in: findings.document) + draft.body.flatMap(\.cells).map { $0.quote() }
         // Lines that may be another entry's come first, then a line that may be a heading: either may also be why the parts
         // were read by their order
         let takesADoubtfulHeading = (draft.head + [draft.anchor].compactMap { $0 } + draft.tail + draft.body)
@@ -466,6 +497,7 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
+            entry.heading = findings.heading(of: section)
             guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.experience.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
@@ -482,6 +514,19 @@ enum EntryReader {
             findings.cv.education.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
         }
+    }
+
+    /// One quote for each line of the leftover segments: the two sides of a connector are one detail, the connector kept.
+    private static func lines(of segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
+        var runs: [(first: Piece, last: Piece)] = []
+        for segment in segments {
+            if let before = segment.followsConnectorOf, let index = runs.lastIndex(where: { $0.last.span == before }) {
+                runs[index].last = segment.piece
+            } else {
+                runs.append((segment.piece, segment.piece))
+            }
+        }
+        return runs.map { $0.first.span == $0.last.span ? $0.first.quote() : covering($0.first, $0.last, in: document) }
     }
 
     private static func unplace(_ values: [Sourced<String>], in section: Section, _ findings: inout Findings) {
@@ -635,6 +680,7 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
+                entry.heading = findings.heading(of: section)
                 entry.check = doubtful.contains(place) ? .headingUnsure : nil
                 findings.cv.experience.append(entry)
             case .education:

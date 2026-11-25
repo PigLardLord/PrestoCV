@@ -45,7 +45,14 @@
 ///    school, stays in the text not imported. So does a degree over a school line that names a degree of its own in any
 ///    part ("University of Leipzig — Master of Science, 2014", "University of Leipzig, MSc Physics"): that line is a
 ///    study of its own, and the line above it is not its name.
-/// 4. Anything else goes with the line before it, a line already taken as noise too; the lines before the first line
+/// 4. A line that holds nothing but dates ("2019 – 2021") has no shape of its own: it belongs to the entry beside it, and
+///    takes that entry's kind, so that the entry reader sees the period with the line it dates. It goes to the neighbour
+///    that has no date of its own before one that has ("Certified Scrum Master — Scrum Alliance, 2021" over "2015 – 2017"
+///    over "MSc Physics" dates the MSc). Between two alike, a section that starts with such a line puts its dates first
+///    (each belongs to the entry below it) and any other puts them after (each belongs to the entry above it); the last
+///    line of a section goes to the entry above it whichever way ("Certified Scrum Master — Scrum Alliance" over
+///    "2019 – 2021" is a certification of 2021, not a certification and a study with no name).
+/// 5. Anything else goes with the line before it, a line already taken as noise too; the lines before the first line
 ///    with evidence go with that line. A section with no evidence at all keeps the kind of its heading, as before: read
 ///    as studies under a heading of studies, left in the text not imported under a heading that joins the two kinds.
 enum StudiesAndCertifications {
@@ -63,14 +70,21 @@ enum StudiesAndCertifications {
             return shape(of: section.cells(of: block, in: document), joined: joined)
         }
         var evidence = shapes.map { $0?.kind }
+        var partners: [Int: Int] = [:]
         for index in shapes.indices.dropFirst() {
             guard let above = shapes[index - 1], let below = shapes[index] else { continue }
             if above.schoolDecides, below.namesASchool {
                 evidence[index - 1] = .education
+                partners[index - 1] = index
+                partners[index] = index - 1
             } else if below.schoolOnly, above.bare, above.kind != .unknown {
                 evidence[index - 1] = .education
+                partners[index - 1] = index
+                partners[index] = index - 1
             }
         }
+        let owned = giveDateLinesToTheirEntry(&evidence, shapes, partners: partners)
+        let owners = Dictionary(uniqueKeysWithValues: owned.map { (section.blocks[$0.key].index, $0.value) })
         guard let first = evidence.compactMap({ $0 }).first else { return [section] }
         var runs: [Section] = []
         var current = first
@@ -78,15 +92,82 @@ enum StudiesAndCertifications {
             current = found ?? current
             if var last = runs.last, last.kind == current {
                 last.blocks.append(block)
+                last.dateOwners[block.index] = owners[block.index]
                 runs[runs.count - 1] = last
             } else {
                 var run = section
                 run.kind = current
                 run.blocks = [block]
+                run.dateOwners = [:]
+                run.dateOwners[block.index] = owners[block.index]
                 runs.append(run)
             }
         }
         return runs
+    }
+
+    /// Rule 4: a line of dates alone takes the kind of the entry it dates. Both neighbours are looked at, with what each
+    /// already shows: a neighbour with a date of its own, or one that an earlier date line took, is dated already, so the
+    /// line goes to the neighbour that is not ("Certified Scrum Master — Scrum Alliance, 2021" over "2015 – 2017" over
+    /// "MSc Physics"). An entry of two lines (a degree over its school, `partners`) is one neighbour: it is dated when
+    /// either line is. When both are alike the section decides: dates first, the line belongs to the entry below it, and
+    /// otherwise to the one above. A line with no entry below it (the last of the section) goes to the one above it, and a
+    /// line with none above it to the one below. A neighbour that shows no kind is not an entry; with none left, the line
+    /// keeps the kind its own period shows. So does a line between the degree and the school of one study ("Master of
+    /// Science" over "2010 – 2014" over "University of Leipzig"): the dates are that study's, see `datesInsideAStudy`.
+    /// The result says which neighbour each line took, by its position in the section, for the reader of its run.
+    private static func giveDateLinesToTheirEntry(
+        _ evidence: inout [SectionKind?], _ shapes: [Shape?], partners: [Int: Int]
+    ) -> [Int: Section.DateOwner] {
+        var owners: [Int: Section.DateOwner] = [:]
+        guard let first = shapes.lazy.compactMap({ $0 }).first else { return owners }
+        let datesFirst = first.datesOnly
+        var taken = Set<Int>()
+        func isFree(_ line: Int) -> Bool {
+            let lines = [line] + (partners[line].map { [$0] } ?? [])
+            return !lines.contains { shapes[$0]?.dated == true || taken.contains($0) }
+        }
+        for index in shapes.indices where shapes[index]?.datesOnly == true {
+            let above = entry(at: index - 1, shapes, evidence)
+            let below = entry(at: index + 1, shapes, evidence)
+            let neighbour: Int
+            switch (above, below) {
+            case (nil, nil): continue
+            case (let only?, nil), (nil, let only?): neighbour = only
+            case (let up?, let down?):
+                if isFree(up) != isFree(down) {
+                    neighbour = isFree(up) ? up : down
+                } else if !datesFirst, datesInsideAStudy(at: index, shapes, evidence) {
+                    continue
+                } else {
+                    neighbour = datesFirst ? down : up
+                }
+            }
+            if let kind = evidence[neighbour] {
+                evidence[index] = kind
+                taken.insert(neighbour)
+                if let partner = partners[neighbour] { taken.insert(partner) }
+                owners[index] = neighbour > index ? .below : .above
+            }
+        }
+        return owners
+    }
+
+    /// The index of a line that is an entry of some kind: not a date line itself, with a kind.
+    private static func entry(at index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Int? {
+        guard shapes.indices.contains(index), let shape = shapes[index], !shape.datesOnly, evidence[index] != nil else { return nil }
+        return index
+    }
+
+    /// Whether the line of dates at `index` stands between the degree and the school of one study: the line above names a
+    /// degree and nothing else (no school, issuer or date, and no certification), the line below names a school and no
+    /// degree, and no line of dates follows. Any other pair is two entries, and the section's direction decides.
+    private static func datesInsideAStudy(at index: Int, _ shapes: [Shape?], _ evidence: [SectionKind?]) -> Bool {
+        guard shapes.indices.contains(index + 1), let above = shapes[index - 1], let below = shapes[index + 1],
+            !below.datesOnly, !below.dated, below.namesASchool, evidence[index + 1] == .education,
+            above.bare, !above.namesASchool, evidence[index - 1] == .education || evidence[index - 1] == .unknown
+        else { return false }
+        return !(shapes.indices.contains(index + 2) && shapes[index + 2]?.datesOnly == true)
     }
 
     /// What a line shows by its own words.
@@ -103,12 +184,25 @@ enum StudiesAndCertifications {
         /// The line names a school and no degree in any of its parts, with or without dates: it settles a degree just
         /// above it (rule 3).
         var namesASchool = false
+        /// The line holds dates and no other word (rule 4).
+        var datesOnly = false
+        /// The line holds a date.
+        var dated = false
     }
 
     private static func shape(of cells: [Piece], joined: Bool) -> Shape? {
         guard !cells.isEmpty else { return nil }
         let text = cells.map(\.text).joined(separator: " — ")
         let dates = DateReader.periods(in: text)
+        var shape = byItsWords(cells, text: text, dates: dates, joined: joined)
+        shape.dated = !dates.isEmpty
+        shape.datesOnly = !dates.isEmpty && !text.indices.contains { index in
+            text[index].isLetter && !dates.contains { $0.range.contains(index) }
+        }
+        return shape
+    }
+
+    private static func byItsWords(_ cells: [Piece], text: String, dates: [DateMatch], joined: Bool) -> Shape {
         let hasIssuer = cells.flatMap { $0.split(by: Separators.strong) }.dropFirst().contains { part in
             part.text.contains(where: \.isLetter)
         }

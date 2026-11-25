@@ -61,6 +61,10 @@ enum ImportGrounding {
                 var kept = ImportedCertification(name: name)
                 kept.issuer = keep(certification.issuer, "certification issuer", quote)
                 kept.year = keep(certification.year, "certification year", isYear)
+                kept.link = keep(certification.link, "certification link", isLink)
+                kept.description = keep(certification.description, "certification description", quote)
+                kept.check = certification.check
+                kept.heading = certification.heading
                 return kept
             }
             return cv

@@ -14,6 +14,14 @@ import PrestoCVWorkflowPorts
 /// let go only when both have released it. The exporter, the export share's file port, the look options and the languages
 /// are the composition's too: every look picker offers the same installed designs, every export sheet renders through the
 /// one renderer, and every share writes its PDF under the one folder the launch cleared.
+/// What the launch's import of the released app's store did, the report's reading of it and removal of the old copies it
+/// kept, and whether the report shows again.
+struct LegacyImportAtLaunch: Sendable {
+    let outcome: LegacyImportOutcome
+    let review: any LegacyImportReviewing
+    let reminder: any LegacyReportReminding
+}
+
 @MainActor
 public final class ScreenFactory {
     private let browsing: BrowseCVsWorkflow
@@ -38,6 +46,7 @@ public final class ScreenFactory {
     private let editorClock: any Clock<Duration>
     /// The time the system grants the shell to store its editors once the app leaves the foreground.
     private let backgroundTime: any BackgroundTime
+    private let legacyImport: LegacyImportAtLaunch
     /// The editors made and not yet released. The factory never keeps one alive.
     private var editors: [WeakEditor] = []
     /// How many editors the factory has made: each one is known by its number, which is never reused.
@@ -61,15 +70,18 @@ public final class ScreenFactory {
     ///   - backgroundTime: The time the system grants the shell to store its editors once the app leaves the foreground.
     ///   - appLanguage: The language of the app: the PDF's in the shell's export sheets when a CV keeps no language and
     ///     its words tell none.
+    ///   - legacyImport: What the launch's import of the released app's store did: the first run and the import report
+    ///     read it.
     init(
         repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, clock: any TimeSource,
         editorClock: any Clock<Duration>, importer: any CVTextImporting, importFiles: any ImportFileReading,
         exportFiles: any ExportFileSharing, exporter: any CVExporting, lookOptions: any LookOptionsProviding,
         languages: [ExportLanguage], languageDetector: any CVLanguageDetecting,
         wrapListEditing: (any CVEditing) -> any CVEditing, wrapImport: (any CVImporting) -> any CVImporting,
-        backgroundTime: any BackgroundTime, appLanguage: ExportLanguage
+        backgroundTime: any BackgroundTime, appLanguage: ExportLanguage, legacyImport: LegacyImportAtLaunch
     ) {
-        browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids)
+        browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids, legacyImport: legacyImport.outcome)
+        self.legacyImport = legacyImport
         editing = EditCVWorkflow(repository: repository, ids: ids)
         listEditing = wrapListEditing(editing)
         importing = wrapImport(ImportCVWorkflow(importer: importer, ids: ids))
@@ -118,8 +130,10 @@ public final class ScreenFactory {
         list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String,
         fileNamePattern: @escaping @Sendable (ExportLanguage) -> String
     ) -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
+        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start, shellTold in
             self.makeEditor(start: start, copyTitle: copyTitle, storeChanged: {
+                // The shell first, so that the import's review has ended when the list shows the CV
+                shellTold()
                 Task {
                     await list?.load()
                     await firstRun?.load()
@@ -151,6 +165,19 @@ public final class ScreenFactory {
     /// The first run and the ways to start another CV, the import first: the shell shows the import (`showImport()`).
     public func makeFirstRun() -> FirstRunViewModel {
         FirstRunViewModel(browsing: browsing, editing: editing, offersImport: true)
+    }
+
+    /// The report of what the launch's import of the released app's store left out.
+    /// - Parameters:
+    ///   - untitled: The view's words for a CV with no title, as the list's (R13).
+    ///   - numbered: How the view numbers a title that reads like another's, as the list's (R13).
+    public func makeLegacyImportReport(
+        untitled: String, numbered: @escaping @MainActor (String, Int) -> String
+    ) -> LegacyImportReportViewModel {
+        LegacyImportReportViewModel(
+            reviewing: legacyImport.review, reminder: legacyImport.reminder, browsing: browsing, untitled: untitled,
+            numbered: numbered
+        )
     }
 
     /// The import of a CV the person already has: a text, a pasted PDF or a PDF file.

@@ -20,6 +20,7 @@ struct ReviewItemMappingTests {
             (.name, .name), (.title, .title), (.location, .location), (.summary, .summary),
             (.experience(0), .experience(1)), (.experiencePeriod(2), .experiencePeriod(3)),
             (.education(0), .education(1)), (.educationPeriod(1), .educationPeriod(2)), (.language(4), .language(5)),
+            (.certification(2), .certification(3)),
         ]
         for (core, port) in cases { #expect(ReviewItemMapping.field(core) == port) }
     }

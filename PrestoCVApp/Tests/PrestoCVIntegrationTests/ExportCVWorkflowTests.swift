@@ -132,6 +132,14 @@ struct ExportCVWorkflowTests {
         #expect(text(of: outcome).localizedCaseInsensitiveContains(headings.skills))
     }
 
+    @Test("a current job ends with the word for the present in the language of the export, not the CV's own (#363)",
+          arguments: ["it", "en", "de", "fr", "es", "pt"])
+    func currentJobEndsWithThePresentOfTheLanguage(tag: String) async throws {
+        let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: tag)
+        let outcome = try await workflow().export(Fixtures.fullCV(), language: language(tag))
+        #expect(text(of: outcome).contains("03/2019 – \(headings.present)"), "\(tag): \(text(of: outcome))")
+    }
+
     @Test("a regional tag finds the table of its language")
     func regionalTag() async throws {
         let outcome = try await workflow().export(Fixtures.fullCV(), language: language("pt-BR"))
