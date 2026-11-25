@@ -17,8 +17,6 @@ enum EntryReader {
         let isProse: Bool
         /// The period that anchors an entry, where the line states one prominently.
         var period: (piece: Piece, value: ImportedPeriod)?
-        /// The period reads as a software version range too ("Unity 9.10 – 9.12"): the lines around it say which.
-        var isSoftwareRange = false
         /// The durations LinkedIn computes.
         var durations: [Piece] = []
         /// The line is only a duration: LinkedIn's total of a company's roles.
@@ -89,12 +87,18 @@ enum EntryReader {
         if !isProse && !line.isDurationOnly {
             let anchorCells = line.label == .period ? line.labelValue : cells
             line.period = anchorPeriod(in: anchorCells, isBullet: isBullet)
-            if line.period == nil, let found = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true) {
-                line.period = found
-                line.isSoftwareRange = true
+            // A range after a software name ("Unity 9.10 – 9.12") is a period unless the line itself says it is a duty:
+            // split rather than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
+            if line.period == nil, !isBullet, !isDutyLine(text) {
+                line.period = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
             }
         }
         return line
+    }
+
+    /// A bullet or a dash line: a duty, where a software range is a version and not a period.
+    private static func isDutyLine(_ text: String) -> Bool {
+        text.first.map { "•·▪◦‣*-–—".contains($0) } == true
     }
 
     /// A Europass row: its label in the first cell, or before a colon.
@@ -131,27 +135,12 @@ enum EntryReader {
 
     // MARK: Entries by their dates
 
-    /// A line that is only a software version range ("Python 3.10 – 3.12") is a detail when nothing plain follows it: the
-    /// last line, a bullet, or another such range. Followed by a plain line (a role, a place) it is a period: split rather
-    /// than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
-    private static func demotingSoftwareRanges(_ lines: [Line]) -> [Line] {
-        var result = lines
-        for index in result.indices where result[index].isSoftwareRange {
-            let next = index + 1 < result.count ? result[index + 1] : nil
-            if next == nil || next?.isBody == true || next?.isSoftwareRange == true {
-                result[index].period = nil
-                result[index].isSoftwareRange = false
-            }
-        }
-        return result
-    }
-
     private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) throws -> [Draft] {
         // A table's row of column names heads no entry: it stays visible
         for line in lines where isColumnHeader(line) {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
-        let usable = demotingSoftwareRanges(lines.filter { !$0.isDurationOnly && !isColumnHeader($0) })
+        let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
         let isOnlyBullets = usable.allSatisfy { $0.isBullet }
         let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }

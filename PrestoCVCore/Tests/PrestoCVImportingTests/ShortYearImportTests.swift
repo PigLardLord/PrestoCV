@@ -77,7 +77,7 @@ struct ShortYearImportTests {
     }
 
     @Test("A version range is a detail of its entry: no period, no extra entry", arguments: [
-        "Python 3.10 – 3.12", "Django 3.10-3.12", "Version 3.10 – 3.12",
+        "Version 3.10 – 3.12", "v3.10 – v3.12",
     ])
     func versionRangeIsADetail(line: String) throws {
         let found = try imported("""
@@ -157,6 +157,50 @@ struct ShortYearImportTests {
         #expect(second.period?.value.end == .date(YearMonth(year: toYear, month: toMonth)))
         #expect(text(of: first).contains("Beispiel"))
         #expect(text(of: second).contains("Unity"))
+    }
+
+    @Test("A job headed by a role at a software-named employer keeps its entry before a bullet and at the section end", arguments: [
+        ("Developer at Unity 9.10 – 9.12", 2010, 9, 2012, 9, true), ("Developer at Unity 9.10 – 9.12", 2010, 9, 2012, 9, false),
+        ("Developer at Unity 09/10 – 09/12", 2010, 9, 2012, 9, true), ("Developer at Unity 09/10 – 09/12", 2010, 9, 2012, 9, false),
+        ("Developer at Unity 09/2010 – 09/2012", 2010, 9, 2012, 9, true), ("Developer at Unity 09/2010 – 09/2012", 2010, 9, 2012, 9, false),
+        ("Developer at Unity 9.2010 – 9.2012", 2010, 9, 2012, 9, true), ("Developer at Unity 9.2010 – 9.2012", 2010, 9, 2012, 9, false),
+        ("Unity 9.10 – 9.12", 2010, 9, 2012, 9, true), ("Unity 9.10 – 9.12", 2010, 9, 2012, 9, false),
+    ] as [(String, Int, Int, Int, Int, Bool)])
+    func headingAtASoftwareNamedEmployerKeepsItsPeriod(line: String, fromYear: Int, fromMonth: Int, toYear: Int, toMonth: Int, beforeABullet: Bool) throws {
+        let found = try imported("""
+        Berufserfahrung
+        Beispiel AG 10.21 – heute
+        Leiter Buchhaltung, Hamburg
+        \(line)
+        \(beforeABullet ? "• Built gameplay systems" : "")
+        """)
+        #expect(found.cv.experience.count == 2)
+        let first = try #require(found.cv.experience.first)
+        let second = try #require(found.cv.experience.last)
+        #expect(first.period?.value.start == YearMonth(year: 2021, month: 10))
+        #expect(first.period?.value.end == .current)
+        #expect(text(of: first).contains("Beispiel"))
+        #expect(!text(of: first).contains("Unity"))
+        #expect(second.period?.value.start == YearMonth(year: fromYear, month: fromMonth))
+        #expect(second.period?.value.end == .date(YearMonth(year: toYear, month: toMonth)))
+        #expect(text(of: second).contains("Unity"))
+        #expect(text(of: second).contains("Developer") || line.hasPrefix("Unity"))
+    }
+
+    @Test("A software range in a duty line is a detail of its entry, no extra entry", arguments: [
+        "• Python 3.10 – 3.12", "- Django 3.10-3.12", "– Python 3.10 – 3.12", "• Migrated to v3.10 – v3.12",
+    ])
+    func versionRangeInADutyIsADetail(line: String) throws {
+        let found = try imported("""
+        Berufserfahrung
+        09/19 – 08/21    Entwickler, Muster GmbH, Berlin
+        \(line)
+        """)
+        #expect(found.cv.experience.count == 1)
+        let entry = try #require(found.cv.experience.first)
+        #expect(entry.period?.value.start == YearMonth(year: 2019, month: 9))
+        #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+        #expect(text(of: entry).contains("3.1"))
     }
 
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
