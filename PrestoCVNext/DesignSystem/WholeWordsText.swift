@@ -9,12 +9,17 @@ import SwiftUI
 ///
 /// It takes its font, weight, colour and alignment from the modifiers around it, as a `Text` does.
 struct WholeWordsText: View {
-    private let resource: LocalizedStringResource
+    private let content: Content
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(_ resource: LocalizedStringResource) {
-        self.resource = resource
+        content = .resource(resource)
+    }
+
+    /// A text the person wrote, shown as it is and never looked up.
+    init(verbatim text: String) {
+        content = .verbatim(text)
     }
 
     var body: some View {
@@ -41,9 +46,20 @@ struct WholeWordsText: View {
 
     /// The text in the language the view shows, so that the words measured are the words shown.
     private var resolved: String {
-        var resource = resource
-        resource.locale = locale
-        return String(localized: resource)
+        switch content {
+        case .resource(let resource):
+            var resource = resource
+            resource.locale = locale
+            return String(localized: resource)
+        case .verbatim(let text):
+            return text
+        }
+    }
+
+    /// A text of the app, looked up in the language the view shows, or one the person wrote.
+    private enum Content {
+        case resource(LocalizedStringResource)
+        case verbatim(String)
     }
 }
 
