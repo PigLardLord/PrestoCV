@@ -247,6 +247,11 @@ enum ContactReader {
 
     // MARK: Web addresses
 
+    /// The web addresses in a piece of text, each with its range there: a certification's line holds its link (#283).
+    static func webAddresses(in piece: Piece) -> [(link: ImportedLink, range: Range<String.Index>)] {
+        tokenRanges(in: piece.text).compactMap { range in link(piece.sub(range)).map { ($0, range) } }
+    }
+
     /// The ranges of the text's words, without the brackets and punctuation around them.
     private static func tokenRanges(in text: String) -> [Range<String.Index>] {
         var ranges: [Range<String.Index>] = []

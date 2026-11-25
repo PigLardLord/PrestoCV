@@ -53,6 +53,7 @@ struct TraceOnFailureTests {
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
             legacyStore: EmptyLegacyStore(),
+            legacyLeftovers: { _ in NoLeftovers() },
             settings: CompositionTests.settings
         )
     }
