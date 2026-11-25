@@ -2,6 +2,7 @@
 import DiagnosticTrace
 import Foundation
 import PrestoCVApplication
+import PrestoCVLegacyLeftovers
 import PrestoCVWorkflowPorts
 
 /// What a UI test asks of a Debug build through its launch arguments, parsed once into a typed value (R13: codes, not
@@ -180,6 +181,12 @@ struct LaunchFixtures: Equatable, Sendable {
         storage == .device ? device : Self.legacyFolder(of: paths)
     }
 
+    /// What the launch removes of the released app's leftovers: the device's, or for a fixture folder a folder in it, so that
+    /// a launch with a fixture never touches the files of the released app.
+    func legacyLeftovers(device: LegacyLeftoverPaths, paths: AppPaths) -> LegacyLeftoverPaths {
+        storage == .device ? device : LegacyLeftoverPaths(applicationSupport: Self.legacySupport(of: paths))
+    }
+
     /// What the list edits through: the editing it is given, or with the fixture one that fails its renames two at a time.
     func listEditing(_ editing: any CVEditing) -> any CVEditing {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
@@ -265,7 +272,8 @@ struct LaunchFixtures: Equatable, Sendable {
     /// a root that resolves to somewhere outside the temporary folder.
     private static func requirePlainFolders(of paths: AppPaths) throws(Failure) {
         let temporary = paths.temporary.standardizedFileURL.path
-        for folder in [paths.store, paths.designs, paths.trace, legacyFolder(of: paths)] {
+        let legacyApp = LegacyLeftoverPaths(applicationSupport: legacySupport(of: paths)).appFolder
+        for folder in [paths.store, paths.designs, paths.trace, legacyFolder(of: paths), legacyApp] {
             var url = folder.standardizedFileURL
             while url.path.hasPrefix(temporary + "/") {
                 if isLink(url) { throw .unsafeFolder }
@@ -274,6 +282,11 @@ struct LaunchFixtures: Equatable, Sendable {
         }
         let resolvedTemporary = paths.temporary.resolvingSymlinksInPath().path
         guard paths.root.resolvingSymlinksInPath().path.hasPrefix(resolvedTemporary + "/") else { throw .unsafeFolder }
+    }
+
+    /// The fixture's stand-in for the released app's Application Support: the folders the cleanup removes lie in it.
+    private static func legacySupport(of paths: AppPaths) -> URL {
+        paths.root.appendingPathComponent("LegacySupport", isDirectory: true)
     }
 
     private static func legacyFolder(of paths: AppPaths) -> URL {
