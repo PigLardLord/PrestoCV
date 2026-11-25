@@ -240,12 +240,25 @@ enum HeaderReader {
 
     /// The details whose value a form may give after its label with no colon: a closed set of values (a nationality, a
     /// gender, a marital status, a birth date) or the form's own name labels. The other labels start job titles and
-    /// names ("City Planner", "Web Developer", "Mobile Developer"), so they are read only with a colon or a column.
+    /// names ("City Planner", "Web Developer", "Mobile Developer"), so they are read only with a colon or a column. A
+    /// value that does not look like the label's own ("Gender Pay Analyst") leaves the line to be a title.
     private static func isReadByPosition(_ label: EntryVocabulary.PersonalLabel, value: Piece) -> Bool {
         switch label {
-        case .name, .firstName, .lastName, .nationality, .maritalStatus, .gender: true
+        case .name, .firstName, .lastName: !startsWithNameLabel(value.text)
+        case .nationality, .maritalStatus, .gender: EntryVocabulary.looksLikeValue(value.text, of: label)
         case .birth: value.text.contains(where: \.isNumber)
         case .address, .phone, .email, .web, .fax, .other: false
+        }
+    }
+
+    /// Whether a value starts with another label of the name ("Nome(s) Anna Weber" after "Apelido(s) /"): the label read
+    /// was a part of a longer one, and what follows is not yet the name.
+    private static func startsWithNameLabel(_ text: String) -> Bool {
+        wordEnds(of: text).contains { end in
+            switch EntryVocabulary.personalLabel(String(text[..<end])) {
+            case .name, .firstName, .lastName: true
+            default: false
+            }
         }
     }
 

@@ -171,4 +171,66 @@ struct LabelledDetailTests {
         #expect(found.cv.person.title == nil)
         #expect(shown(found).contains("Nationality German"))
     }
+
+    @Test("In a personal section, a title that starts with a label's word stays the title", arguments: [
+        "Gender Pay Analyst", "Sex Education Teacher", "Marital Status Coordinator", "Nationality Law Associate", "Geschlecht Berater",
+    ])
+    func titleInAPersonalSection(_ title: String) {
+        let found = header("""
+        Personal information
+        Anna Weber
+        \(title)
+        E-mail person@example.com
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title?.value == title)
+        #expect(!shown(found).contains(title))
+    }
+
+    @Test("In a form inferred from bare labels, a title that starts with a label's word is not a detail")
+    func titleInAFormOfBareLabels() {
+        let found = header("""
+        Anna Weber
+        Gender Pay Analyst
+        Date of birth
+        Address(es)
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title?.value == "Gender Pay Analyst")
+    }
+
+    @Test("The values of the closed details are read by position", arguments: [
+        "Gender Female", "Sesso F", "Geschlecht männlich", "Sexo Masculino", "Sexe Féminin", "Sexo Feminino",
+        "Marital status Married", "Stato civile Coniugata", "Familienstand ledig", "Estado civil Soltera", "État civil Célibataire", "Estado civil Casada",
+        "Nationality German", "Cittadinanza Tedesca", "Staatsangehörigkeit deutsch", "Nacionalidad Alemana", "Nationalité Allemande",
+        "Nacionalidade Alemã",
+    ])
+    func closedDetails(_ line: String) {
+        let found = header("""
+        Personal information
+        Anna Weber
+        \(line)
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title == nil)
+        #expect(shown(found).contains(line))
+    }
+
+    @Test("A compound name label of the six languages, with bracketed plurals and any slash spacing, gives the whole name", arguments: [
+        "Surname(s) / First name(s)", "Surname(s)/First name(s)", "Surname(s) /First name(s)",
+        "Cognome(i) / Nome(i)", "Cognome(i)/Nome(i)",
+        "Nachname(n) / Vorname(n)", "Nachname(n)/Vorname(n)",
+        "Apellido(s) / Nombre(s)", "Apellido(s)/Nombre(s)", "Apellido(s) /Nombre(s)",
+        "Nom(s) / Prénom(s)", "Nom(s)/Prénom(s)", "Nom(s) /Prénom(s)",
+        "Apelido(s) / Nome(s)", "Apelido(s)/Nome(s)", "Apelido(s) /Nome(s)",
+    ])
+    func compoundNameLabel(_ label: String) {
+        let found = header("""
+        Personal information
+        \(label) Anna Weber
+        E-mail person@example.com
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.name?.check == nil)
+    }
 }

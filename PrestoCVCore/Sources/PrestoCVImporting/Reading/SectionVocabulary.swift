@@ -74,7 +74,7 @@ enum SectionVocabulary {
         return pluralMarks.reduce(text) { $0.replacing($1, with: "") }
     }
 
-    private static let pluralMarks = ["(s)", "(i)", "(es)"]
+    private static let pluralMarks = ["(s)", "(i)", "(es)", "(n)", "(en)"]
 
     private static let joiningWords: Set<String> = ["and", "e", "und", "y", "et", "s"]
 
