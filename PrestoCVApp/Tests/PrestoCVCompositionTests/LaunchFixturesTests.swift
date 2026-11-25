@@ -2,6 +2,7 @@
 import DiagnosticTrace
 import Foundation
 import PrestoCVApplication
+import PrestoCVLegacyLeftovers
 import Testing
 @testable import PrestoCVComposition
 
@@ -278,6 +279,22 @@ struct LaunchFixturesTests {
         #expect(fixtures.legacyStore(device: device, paths: paths).path == "/tmp/t/PrestoCVNextFixture-legacy/Legacy")
     }
 
+    @Test("The leftovers to remove are the device's, or for a fixture folder ones in it, so a fixture never removes the released app's")
+    func legacyLeftoversFolder() {
+        let device = LegacyLeftoverPaths(applicationSupport: URL(filePath: "/support", directoryHint: .isDirectory))
+        var fixtures = LaunchFixtures()
+        #expect(fixtures.legacyLeftovers(device: device, paths: Self.device) == device)
+
+        fixtures.storage = .named("legacy")
+        let paths = fixtures.paths(device: Self.device, fresh: Self.fresh)
+        let leftovers = fixtures.legacyLeftovers(device: device, paths: paths)
+
+        let base = "/tmp/t/PrestoCVNextFixture-legacy/LegacySupport"
+        #expect(leftovers.templates.path == base + "/PrestoCV/Templates")
+        #expect(leftovers.templateCache.path == base + "/TemplateCache")
+        #expect(leftovers.exportPreferences.path == base + "/PrestoCV/export-preferences.json")
+    }
+
     @Test("The seed is written as files in the store folder, which it makes")
     func writesTheSeed() throws {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("Seed-\(UUID().uuidString)", isDirectory: true)
@@ -393,6 +410,33 @@ struct LaunchFixturesTests {
             return
         }
         #expect(try Self.entries(target).isEmpty, "Nothing was written through the link")
+    }
+
+    /// Apple only, like the other composition tests: the launch fixtures are compiled in Debug builds of the app.
+    @MainActor
+    @Test("The released app's folder inside the fixture's Application Support that is a link fails the launch, and nothing is removed there", .printsForReal)
+    func linkedLegacyAppFolder() async throws {
+        let target = try Self.target()
+        try Data("mine".utf8).write(to: target.appendingPathComponent("export-preferences.json"))
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        let support = root.appendingPathComponent("LegacySupport", isDirectory: true)
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: support.appendingPathComponent("PrestoCV"), withDestinationURL: target)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: target)
+        }
+
+        let state = await Composition.launch(
+            arguments: try Self.arguments(storage: name), settlement: TraceSettlement(), backgroundTime: NoBackgroundTime()
+        )
+
+        guard case .failed(.launchFixturesRejected) = state else {
+            Issue.record("expected failed, got \(state)")
+            return
+        }
+        #expect(try Self.entries(target) == ["export-preferences.json"], "Nothing was removed through the link")
     }
 
     @MainActor

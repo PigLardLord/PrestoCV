@@ -467,13 +467,16 @@ enum HeaderReader {
         } ?? false
     }
 
-    /// Whether a line reads as a sentence and not as a title, by its shape alone: after its first word it has a short
-    /// function word in lower case (a preposition or an article: "to", "for", "für", "a", "al") and another word in lower
-    /// case ("Open to relocation", "Willing to travel", "Disponibile a trasferte", "Bereit für einen Umzug"). A title has
-    /// no such pair: its words are nouns ("Dental hygienist"), or capitalised around a short connector ("Head of Sales").
+    /// Whether a line reads as a sentence and not as a title, by its shape alone: right after its first word it has a short
+    /// function word in lower case (a preposition or an article: "to", "for", "für", "a", "al"), and another word in lower
+    /// case after that ("Open to relocation", "Willing to travel", "Disponibile a trasferte", "Bereit für einen Umzug"). A
+    /// title has no such opening: its words are nouns ("Dental hygienist"), capitalised around a short connector ("Head of
+    /// Sales"), or a noun phrase before the function word ("Dental hygienist in training", #549).
     private static func readsAsASentence(_ text: String) -> Bool {
-        let lower = text.words.dropFirst().filter { $0.first(where: \.isLetter)?.isLowercase == true }
-        return lower.count >= 2 && lower.contains { $0.count(where: \.isLetter) <= 3 }
+        let rest = text.words.dropFirst()
+        let isLower = { (word: Substring) in word.first(where: \.isLetter)?.isLowercase == true }
+        guard let opening = rest.first, isLower(opening), opening.count(where: \.isLetter) <= 3 else { return false }
+        return rest.dropFirst().contains(where: isLower)
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,

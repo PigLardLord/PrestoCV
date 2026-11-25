@@ -254,6 +254,7 @@ enum CertificationReader {
     ) {
         var certification = ImportedCertification(name: name.quote())
         certification.year = line.year ?? waiting?.year
+        certification.heading = findings.heading(of: section)
         let rest = line.parts.dropFirst()
         let issuer = rest.first { EntryVocabulary.isOrganisation($0.text) || EntryVocabulary.isSchool($0.text) } ?? (rest.count == 1 ? rest.first : nil)
         certification.issuer = issuer?.quote()

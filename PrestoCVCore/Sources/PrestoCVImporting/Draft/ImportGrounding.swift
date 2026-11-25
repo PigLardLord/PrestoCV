@@ -64,6 +64,7 @@ enum ImportGrounding {
                 kept.link = keep(certification.link, "certification link", isLink)
                 kept.description = keep(certification.description, "certification description", quote)
                 kept.check = certification.check
+                kept.heading = certification.heading
                 return kept
             }
             return cv

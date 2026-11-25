@@ -1,4 +1,5 @@
 import Foundation
+import PrestoCVLegacyLeftovers
 
 /// Where the new app keeps its files, decided here and nowhere else (R4, ADR 0008). The root is a folder of its own,
 /// `PrestoCVNext`, under Application Support: never the legacy `PrestoCV/CVs`, whose flat `cv_<uuid>.json` files the
@@ -46,6 +47,12 @@ struct AppPaths: Equatable, Sendable {
     static func legacyStoreOnDevice() -> URL {
         URL.applicationSupportDirectory.appendingPathComponent("PrestoCV", isDirectory: true)
             .appendingPathComponent("CVs", isDirectory: true)
+    }
+
+    /// What the released app left in its Application Support that holds nothing the person wrote, which the launch removes
+    /// once the import has gone through: derived from the same folder as the legacy store.
+    static func legacyLeftoversOnDevice() -> LegacyLeftoverPaths {
+        LegacyLeftoverPaths(applicationSupport: URL.applicationSupportDirectory)
     }
 
     /// The folders where the system puts the copy of a file opened in the app: `<bundle id>-Inbox` in the temporary folder

@@ -1,4 +1,5 @@
 import Foundation
+import PrestoCVLegacyLeftovers
 import Testing
 @testable import PrestoCVComposition
 
@@ -35,6 +36,20 @@ struct AppPathsTests {
             #expect(!folder.hasPrefix(legacy))
         }
         #expect(paths.root.lastPathComponent == "PrestoCVNext")
+    }
+
+    @Test("The leftovers of the released app are named under the same Application Support as its CVs, never under the new root")
+    func legacyLeftoversOnDevice() {
+        let leftovers = AppPaths.legacyLeftoversOnDevice()
+        let support = URL.applicationSupportDirectory
+        let root = AppPaths.onDevice().root.standardizedFileURL.path
+
+        #expect(leftovers.templates.standardizedFileURL.path == support.appendingPathComponent("PrestoCV/Templates").standardizedFileURL.path)
+        #expect(leftovers.templateCache.standardizedFileURL.path == support.appendingPathComponent("TemplateCache").standardizedFileURL.path)
+        #expect(leftovers.exportPreferences.lastPathComponent == "export-preferences.json")
+        for url in [leftovers.templates, leftovers.templateCache, leftovers.exportPreferences] {
+            #expect(!url.standardizedFileURL.path.hasPrefix(root))
+        }
     }
 
     @Test("Creating makes the root and the store, once, and the trace and design folders are left to their stores")

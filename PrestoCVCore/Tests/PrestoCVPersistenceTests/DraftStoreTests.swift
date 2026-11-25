@@ -19,7 +19,7 @@ let corruptDrafts: [(draft: String, reason: String)] = [
     (#"{"version":0,"origins":[],"notPlaced":[{"text":"Chess"}]}"#, "draft version"),
     (#"{"version":1,"origins":[],"notPlaced":[]}"#, "draft empty"),
     (#"{"version":1,"origins":[{"field":"personal.age","origin":\#(imported)}],"notPlaced":[]}"#, "draft field"),
-    (#"{"version":1,"origins":[{"field":"certifications.link","entry":0,"origin":\#(imported)}],"notPlaced":[]}"#, "draft field"),
+    (#"{"version":1,"origins":[{"field":"certifications.url","entry":0,"origin":\#(imported)}],"notPlaced":[]}"#, "draft field"),
     (#"{"version":1,"origins":[{"field":"personal.fullName","origin":{"kind":"cloud"}}],"notPlaced":[]}"#, "draft origin"),
     (#"{"version":1,"origins":[{"field":"personal.fullName","entry":0,"origin":\#(imported)}],"notPlaced":[]}"#, "draft place"),
     (#"{"version":1,"origins":[{"field":"experiences.role","origin":\#(imported)}],"notPlaced":[]}"#, "draft place"),
@@ -55,7 +55,8 @@ struct DraftStoreTests {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         var cv = FixtureCV.full()
         let origins: [ValuePlace: ValueOrigin] = [.personal(.website): .imported, .entry(.interest, index: 1): .imported,
-                                                  .entry(.profileLink, index: 0): .imported, .entry(.certificationIssued, index: 0): .imported]
+                                                  .entry(.profileLink, index: 0): .imported, .entry(.certificationIssued, index: 0): .imported,
+                                                  .entry(.certificationLink, index: 0): .imported, .entry(.certificationDescription, index: 0): .imported]
         try cv.setDraft(DraftBlock(origins: origins, notPlaced: [try #require(NotPlacedText(text: "Plays the organ.", heading: nil))]))
         let saved = try await repo(dir).create(cv)
         #expect(try await repo(dir).load(saved.id).draft == cv.draft)
