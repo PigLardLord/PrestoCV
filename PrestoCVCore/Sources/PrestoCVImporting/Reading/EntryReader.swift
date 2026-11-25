@@ -290,7 +290,11 @@ enum EntryReader {
     /// Whether a name reads as an organisation: by the lists, or a school-word name of three or more capitalised words
     /// ("Institut für Informatik"); a school word alone ("für Grundschule") is a title's tail.
     private static func namesAnOrganisation(_ name: String) -> Bool {
-        EntryVocabulary.isOrganisation(name)
+        // A tail that reads as a name only through its particle and holds nothing but generic vocabulary ("Systems and
+        // Integration") is a title's tail: it never displaces the employer beside it.
+        if EntryVocabulary.hasLinkingParticle(name), !EntryVocabulary.isOrganisationBeyondGenericWords(name),
+           !EntryVocabulary.isSchool(name) { return false }
+        return EntryVocabulary.isOrganisation(name)
             || EntryVocabulary.isSchool(name) && name.words.count >= 3 && EntryVocabulary.isCapitalisedName(name)
     }
 

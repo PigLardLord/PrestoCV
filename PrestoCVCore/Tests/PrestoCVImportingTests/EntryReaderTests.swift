@@ -352,6 +352,23 @@ struct EntryReaderTests {
         }
     }
 
+    @Test("A functional title whose tail only reads as a name through a particle stays whole beside a short employer, in every layout", arguments: [
+        "Manager for Systems and Integration", "Lead for Research and Development",
+    ])
+    func weakConnectorBeforeAParticleTailBesideAShortEmployer(title: String) {
+        for layout in ["\(title)\nAcme", "\(title), Acme", "\(title)\t\tAcme", "\(title) | Acme"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [nil], "\(layout)")
+            #expect(found.cv.experience.map(\.check) == [.roleOrEmployerByOrder], "\(layout)")
+        }
+    }
+
     @Test("A weak connector in a title with organisation vocabulary stays whole beside an employer of four unknown words", arguments: [
         ("Lead for Systems", "Example North South West"), ("Leiter für Logistik", "Beispiel Nord Süd West"),
         ("Responsabile per la logistica", "Esempio Nord Sud Ovest"), ("Jefe para Logística", "Ejemplo Norte Sur Oeste"),

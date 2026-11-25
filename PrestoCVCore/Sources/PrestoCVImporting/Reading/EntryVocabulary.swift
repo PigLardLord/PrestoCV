@@ -194,6 +194,26 @@ enum EntryVocabulary {
         "supermarché", "negozio", "tienda", "magasin", "loja",
     ].map(\.folded))
 
+    /// The organisation words that also end a functional title ("Manager for Systems and Integration", "Lead for Logistics and
+    /// Services"): alone they do not make a name an employer.
+    private static let genericOrganisationWords: Set<String> = Set([
+        "labs", "solutions", "systems", "services", "consulting", "technologies", "partners", "logistik", "logistica", "logística",
+        "logistique", "werk", "werke", "bau", "elektro", "handwerk",
+    ].map(\.folded))
+
+    /// Whether a piece reads as an organisation by a legal form or by a word that is not generic vocabulary.
+    static func isOrganisationBeyondGenericWords(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        if legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        return words.contains { !genericOrganisationWords.contains($0) && (organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix)) }
+    }
+
+    /// Whether a name holds a lowercase linking particle between its capitalised words ("Systems and Integration").
+    static func hasLinkingParticle(_ text: String) -> Bool {
+        text.words.contains { linkingParticles.contains($0.lowercased()) || $0.first?.isLowercase == true && $0.contains("'") }
+    }
+
     private static let organisationStems = ["elektrotechn", "krankenh", "ospedal"].map(\.folded)
 
     private static let schoolWords: Set<String> = Set([
