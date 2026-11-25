@@ -5,44 +5,17 @@ import SwiftUI
 /// ways on the status offers (`SaveStatus.statusActions`). The line under the title says where the text stands; when the
 /// status changes, VoiceOver hears that line's words and then the notice's, which name the ways on (`spoken(in:)`), so
 /// that a person who cannot see the hidden Back button learns how to go on. While a reload or a copy runs, the ways on
-/// wait (`isReplacing`). Where the form is short of room, the notice takes at most a quarter of the editor's height and
-/// scrolls inside (`EditorChrome`).
+/// wait (`isReplacing`). It stands first among the notices above the form, which share one cap (`EditorNotices`).
 struct StatusNotice: View {
     let editor: EditorViewModel
-    /// The editor's height, 0 while it is not known yet.
-    let editorHeight: Double
     /// Closes the editor without storing its text.
     let discard: () -> Void
-    @Environment(\.isCompactHeight) private var isCompactHeight
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.locale) private var locale
-    /// The notice's own height, which the cap never exceeds.
-    @State private var fullHeight: Double = 0
 
     var body: some View {
         if editor.saveStatus.blocksLeaving {
-            placed
+            notice
         }
-    }
-
-    @ViewBuilder
-    private var placed: some View {
-        let chrome = EditorChrome(isCompactHeight: isCompactHeight, isAccessibilitySize: dynamicTypeSize.isAccessibilitySize)
-        if let height = chrome.noticeHeight(fullHeight: fullHeight, editorHeight: editorHeight) {
-            ScrollView { measured }
-                .scrollBounceBehavior(.basedOnSize)
-                .scrollIndicatorsFlash(onAppear: true)
-                .frame(height: height)
-        } else {
-            measured
-        }
-    }
-
-    private var measured: some View {
-        notice
-            .padding(.horizontal, Spacing.medium)
-            .readableWidth()
-            .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { fullHeight = $0 }
     }
 
     private var notice: some View {
