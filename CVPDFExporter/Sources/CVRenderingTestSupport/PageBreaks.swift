@@ -93,22 +93,23 @@ public enum PageBreaks {
     ///
     /// A page break may also print only one line of a wrapped node twice, so no second whole copy exists. A shown line
     /// is left over when the text without it still places every node; a left-over line that is a part of a node's text
-    /// (three characters or more, so a hyphen or a bullet is none) is a duplicate of the first node that holds it. Only
-    /// a line no longer than the spare text can be left over, and each distinct line is tried once on a complete print,
-    /// so a correct print, whose spare is a few bullets, costs next to nothing.
+    /// (three characters or more, so a hyphen or a bullet is none) is a duplicate of the first node that holds it. Any
+    /// copy of a repeated line may be the extra one ("Duty 1" printed before and after the node it starts), so each copy
+    /// is tried until one is left over. Only a line no longer than the spare text can be left over, and it is tried on a
+    /// complete print only, so a correct print, whose spare is a few bullets, costs next to nothing.
     private static func duplicated(in lines: [String], expected: [String]) -> [String] {
         let text = lines.joined(separator: "\n")
         let whole = duplicatedWhole(in: text, expected: expected)
         let spare = key(text).unicodeScalars.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
-        var tried = Set<String>(), parts = Set<String>()
+        var leftOver = Set<String>(), parts = Set<String>()
         for (index, line) in lines.enumerated() {
             let k = key(line), size = k.unicodeScalars.count
-            guard size >= 3, size <= spare, tried.insert(k).inserted,
+            guard size >= 3, size <= spare, !leftOver.contains(k),
                   let node = expected.first(where: { key($0).contains(k) }) else { continue }
             var rest = lines
             rest.remove(at: index)
             let report = DocumentCompleteness.report(in: rest.joined(separator: "\n"), expected: expected)
-            if report.missing.isEmpty || report.budgetExhausted { parts.insert(node) }
+            if report.missing.isEmpty || report.budgetExhausted { leftOver.insert(k); parts.insert(node) }
         }
         var seen = Set<String>()
         return expected.filter { (whole.contains($0) || parts.contains($0)) && seen.insert($0).inserted }

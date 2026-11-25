@@ -223,6 +223,19 @@ struct PageBreaksTests {
         #expect(faults == [.duplicated([duty])])
     }
 
+    @Test("the first line of a wrapped node repeated after the whole node is duplicated content of that node")
+    func repeatedFirstLineAfterTheNode() {
+        let duty = "Duty 1 of the role, long enough to wrap onto a second line."
+        let document = RenderedDocument(html: "", textNodes: [duty])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 700),
+            Self.line("to wrap onto a second line.", page: 0, y: 686),
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 500),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.duplicated([duty])])
+    }
+
     @Test("text no node holds, as bullets and separators, a hyphen inside a node, and identical nodes printed as often as held are not duplicated")
     func noFalseDuplicate() {
         let document = RenderedDocument(html: "", textNodes: ["Front-end developer", "Duty one of the role", "Duty one of the role"])
