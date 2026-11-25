@@ -181,7 +181,7 @@ enum EntryVocabulary {
 
     private static let organisationWords: Set<String> = Set([
         "hospital", "ospedale", "krankenhaus", "klinik", "klinikum", "clinica", "clínica", "clinique", "hôpital", "hospital",
-        "bank", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
+        "bank", "cassa", "caisse", "sparkasse", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
         "hotel", "restaurant", "ristorante", "restaurante", "café", "cafe", "bar", "pizzeria", "bäckerei", "panificio",
         "cabinet", "kanzlei", "étude", "eletro", "elettro", "atelier", "werkstatt", "officina", "taller", "oficina",
         "labs", "solutions", "systems", "services", "consulting", "technologies", "partners",
@@ -230,6 +230,28 @@ enum EntryVocabulary {
 
     /// The connectors that also occur inside a title ("Teacher for Special Needs"): read only when nothing else can hold the employer.
     static let weakConnectors = [" para ", " für ", " for ", " per "]
+
+    /// The lowercase words that link the capitalised words of an organisation's name: "Bank of Scotland", "Cassa di Risparmio",
+    /// "Banco do Brasil", "Institut für Informatik". An elided one ("d'Épargne", "l'Avenir") is a particle with its noun.
+    static let linkingParticles: Set<String> = [
+        "of", "and", "for", "de", "del", "della", "di", "da", "do", "dos", "das", "du", "des", "la", "le", "el", "van", "von", "der",
+        "den", "für", "zu", "zur", "zum", "y", "e", "et", "en", "d'", "l'", "dell'", "all'",
+    ]
+
+    /// Whether every word of a name starts with a capital, a lowercase linking particle between two capitalised words being
+    /// one too: "Bank of Scotland" is a name, "Systems integration" is a title's tail.
+    static func isCapitalisedName(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard words.first?.first?.isUppercase == true else { return false }
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            if word.first?.isUppercase == true { return true }
+            if linkingParticles.contains(word.lowercased()) { return index + 1 < words.count && words[index + 1].first?.isUppercase == true }
+            guard let apostrophe = word.firstIndex(where: { $0 == "'" || $0 == "\u{2019}" }) else { return false }
+            let particle = word[...apostrophe].lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+            return linkingParticles.contains(particle) && word[word.index(after: apostrophe)...].first?.isUppercase == true
+        }
+    }
 
     // MARK: The labels of the formato europeo and the Europass
 

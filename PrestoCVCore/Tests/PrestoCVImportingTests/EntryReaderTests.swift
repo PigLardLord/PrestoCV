@@ -333,6 +333,25 @@ struct EntryReaderTests {
         }
     }
 
+    @Test("A lowercase linking particle inside a capitalised employer name keeps the name whole beside an unknown city, in every layout", arguments: [
+        ("Developer", "Bank of Scotland"), ("Sviluppatore", "Cassa di Risparmio"), ("Conseiller", "Caisse d'Épargne"),
+        ("Desenvolvedor", "Banco do Brasil"), ("Entwickler", "Institut für Informatik"), ("Analyst", "Banco de España"),
+    ])
+    func weakConnectorBeforeAnEmployerWithAParticle(role: String, employer: String) {
+        let connector = role == "Entwickler" ? "für" : "for"
+        for layout in ["\(role) \(connector) \(employer)\nLeeds", "\(role) \(connector) \(employer), Leeds",
+                       "\(role) \(connector) \(employer)\t\tLeeds", "\(role) \(connector) \(employer) | Leeds"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"], "\(layout)")
+        }
+    }
+
     @Test("A weak connector in a title with organisation vocabulary stays whole beside an employer of four unknown words", arguments: [
         ("Lead for Systems", "Example North South West"), ("Leiter für Logistik", "Beispiel Nord Süd West"),
         ("Responsabile per la logistica", "Esempio Nord Sud Ovest"), ("Jefe para Logística", "Ejemplo Norte Sur Oeste"),

@@ -282,9 +282,16 @@ enum EntryReader {
         for connector in EntryVocabulary.weakConnectors {
             guard let range = piece.text.firstRange(of: connector) else { continue }
             let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
-            if EntryVocabulary.isOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && head.words.allSatisfy { $0.first?.isUppercase == true }) { return true }
+            if namesAnOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && EntryVocabulary.isCapitalisedName(head)) { return true }
         }
         return false
+    }
+
+    /// Whether a name reads as an organisation: by the lists, or a school-word name of three or more capitalised words
+    /// ("Institut für Informatik"); a school word alone ("für Grundschule") is a title's tail.
+    private static func namesAnOrganisation(_ name: String) -> Bool {
+        EntryVocabulary.isOrganisation(name)
+            || EntryVocabulary.isSchool(name) && name.words.count >= 3 && EntryVocabulary.isCapitalisedName(name)
     }
 
     /// A short name no list knows ("Acme") fills the employer slot when the weak connector's own employer is no name by
@@ -326,7 +333,7 @@ enum EntryReader {
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
                 // A weak connector splits only before an organisation ("Developer for Acme Ltd"); "for Special Needs" is a title.
-                if EntryVocabulary.weakConnectors.contains(connector), !EntryVocabulary.isOrganisation(employerHead(employer)) { continue }
+                if EntryVocabulary.weakConnectors.contains(connector), !namesAnOrganisation(employerHead(employer)) { continue }
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
                 return [Segment(piece: role, part: .primary, isMarked: true)]
