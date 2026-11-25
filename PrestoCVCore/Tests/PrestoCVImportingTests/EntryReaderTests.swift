@@ -369,6 +369,36 @@ struct EntryReaderTests {
         }
     }
 
+    @Test("A generic particle tail with no competing employer still splits at the weak connector, and the person checks it", arguments: [
+        ("Developer for Systems and Services", "Developer", "Systems and Services"),
+        ("Entwickler für Logistik und Bau", "Entwickler", "Logistik und Bau"),
+    ])
+    func weakConnectorBeforeAParticleTailWithoutACompetingEmployer(title: String, role: String, employer: String) {
+        // Split rather than merge: the words after the connector may be a real employer without a legal form, so they are kept as the
+        // employer and the entry is flagged; the whole text is never hidden inside the role.
+        let found = read("""
+        Experience
+        \(title)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [nil])
+        #expect(found.cv.experience.map(\.check) != [nil])
+        // A known place beside it stays a place, and the split stays flagged.
+        for layout in ["\(title)\nBerlin", "\(title), Berlin", "\(title)\t\tBerlin", "\(title) | Berlin"] {
+            let beside = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(beside.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(beside.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(beside.cv.experience.map { $0.location?.value } == ["Berlin"], "\(layout)")
+            #expect(beside.cv.experience.map(\.check) != [nil], "\(layout)")
+        }
+    }
+
     @Test("A weak connector in a title with organisation vocabulary stays whole beside an employer of four unknown words", arguments: [
         ("Lead for Systems", "Example North South West"), ("Leiter für Logistik", "Beispiel Nord Süd West"),
         ("Responsabile per la logistica", "Esempio Nord Sud Ovest"), ("Jefe para Logística", "Ejemplo Norte Sur Oeste"),

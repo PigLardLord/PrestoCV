@@ -252,6 +252,9 @@ enum EntryReader {
         var isMarked: Bool
         /// A place whose start no rule tells: the person checks it.
         var isUnsure = false
+        /// A weak connector split the entry before words with no legal form ("for Systems and Services"): the split keeps every
+        /// word, and the person checks which part is the role.
+        var isGuessedSplit = false
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
@@ -282,17 +285,18 @@ enum EntryReader {
         for connector in EntryVocabulary.weakConnectors {
             guard let range = piece.text.firstRange(of: connector) else { continue }
             let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
-            if namesAnOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && EntryVocabulary.isCapitalisedName(head)) { return true }
+            if namesAnOrganisation(head, asCompetingEmployer: true) && (hasLegalForm(head) || head.words.count >= 2 && EntryVocabulary.isCapitalisedName(head)) { return true }
         }
         return false
     }
 
     /// Whether a name reads as an organisation: by the lists, or a school-word name of three or more capitalised words
     /// ("Institut für Informatik"); a school word alone ("für Grundschule") is a title's tail.
-    private static func namesAnOrganisation(_ name: String) -> Bool {
+    private static func namesAnOrganisation(_ name: String, asCompetingEmployer: Bool = false) -> Bool {
         // A tail that reads as a name only through its particle and holds nothing but generic vocabulary ("Systems and
-        // Integration") is a title's tail: it never displaces the employer beside it.
-        if EntryVocabulary.hasLinkingParticle(name), !EntryVocabulary.isOrganisationBeyondGenericWords(name),
+        // Integration") is a title's tail: it never displaces the employer beside it. With no employer beside it, it still splits
+        // (flagged), because a real employer without a legal form must not be hidden inside the title.
+        if asCompetingEmployer, EntryVocabulary.hasLinkingParticle(name), !EntryVocabulary.isOrganisationBeyondGenericWords(name),
            !EntryVocabulary.isSchool(name) { return false }
         return EntryVocabulary.isOrganisation(name)
             || EntryVocabulary.isSchool(name) && name.words.count >= 3 && EntryVocabulary.isCapitalisedName(name)
@@ -340,9 +344,11 @@ enum EntryReader {
                 if EntryVocabulary.weakConnectors.contains(connector), !namesAnOrganisation(employerHead(employer)) { continue }
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
+                let guessed = EntryVocabulary.weakConnectors.contains(connector)
+                    && !hasLegalForm(employerHead(employer))
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
-                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true) : classify(part, kind: kind)
+                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true, isGuessedSplit: guessed) : classify(part, kind: kind)
                     }
             }
         }
@@ -496,7 +502,7 @@ enum EntryReader {
             || (draft.inheritsADoubtfulHeading && secondary?.piece == draft.inheritedEmployer)
         let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
             : takesADoubtfulHeading ? .headingUnsure
-            : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
+            : (byOrder || secondary?.isGuessedSplit == true) && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
             var entry = ImportedExperience()
