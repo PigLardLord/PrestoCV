@@ -324,7 +324,9 @@ struct TableHeaderTests {
         let jobs = result.cv.experience
         #expect(jobs.count == 4)
         #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015, 2012])
-        #expect(jobs.map { $0.check == nil } == [true, false, true, true])
+        // A short row the header cannot place leaves the rows after it flagged; a long one does not
+        let isShort = odd == "| Tutor | Riverside School | 2018 – 2020 |"
+        #expect(jobs.map { $0.check == nil } == [true, false, !isShort, !isShort])
         let after = Array(jobs.suffix(2))
         #expect(after.map { $0.employer?.value } == ["Harbor Systems", "Quillon Brae"])
         #expect(after.map { $0.role?.value } == ["Planner", "Chief Wizard"])
@@ -353,7 +355,8 @@ struct TableHeaderTests {
         let jobs = result.cv.experience
         #expect(jobs.count == 3)
         #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015])
-        #expect(jobs.map { $0.check == nil } == [true, false, true])
+        // A short row the header cannot place leaves the rows after it flagged; a long one does not
+        #expect(jobs.map { $0.check == nil } == [true, false, odd == "| Tutor | Riverside School | Extra | 2018 – 2020 | Ran workshops |"])
         let last = try #require(jobs.last)
         #expect(last.employer?.value == "Harbor Systems")
         #expect(last.role?.value == "Planner")
@@ -424,6 +427,50 @@ struct TableHeaderTests {
         #expect(job.role?.value == "Planner")
         #expect(job.check != nil)
         #expect(jobs.first?.employer?.value == "Northgate Academy")
+        noLoss(result)
+    }
+
+    @Test("A heading with a word no list names, after a blank line, leaves the row after it flagged, whatever its column order",
+          arguments: [
+              "| Selected work | 2018 – 2020 | Responsibilities |",
+              "| Freelance | 2018 – 2020 | Clients |",
+          ])
+    func unlistedHeadingAfterAGap(_ heading: String) throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        \(heading)
+        | Planner | Harbor Systems | 2015 – 2017 | Drew up plans |
+        """)
+        let jobs = result.cv.experience
+        let job = try #require(jobs.first { $0.period?.value.start.year == 2015 })
+        #expect(job.check != nil)
+        #expect(jobs.first?.employer?.value == "Northgate Academy")
+        #expect(jobs.first?.check == nil)
+        noLoss(result)
+    }
+
+    @Test("After a short row the header cannot place, the full rows keep the header's mapping and are flagged until the next header")
+    func rowsAfterAShortRowAreFlagged() throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        | Tutor | 2018 – 2020 | Ran workshops |
+        | Harbor Systems | Planner | 2015 – 2017 | Drew up plans |
+        | Quillon Brae | Chief Wizard | 2012 – 2014 | Brewed potions |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 4)
+        #expect(jobs.map { $0.check == nil } == [true, false, false, false])
+        let after = Array(jobs.suffix(2))
+        #expect(after.map { $0.employer?.value } == ["Harbor Systems", "Quillon Brae"])
+        #expect(after.map { $0.role?.value } == ["Planner", "Chief Wizard"])
         noLoss(result)
     }
 

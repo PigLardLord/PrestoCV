@@ -26,6 +26,9 @@ enum EntryReader {
         var labelValue: [Piece] = []
         /// The line is a cell of a table row: only the row's first cell opens an entry.
         var opensRow: Bool?
+        /// The line is a mapped row of a table that had a short row the header could not place before it: the mapping
+        /// is kept, but the person is asked to check it.
+        var isToCheck = false
 
         var isBody: Bool { isBullet || isProse }
     }
@@ -583,6 +586,7 @@ enum EntryReader {
         var rowsOfTable = -1
         var lastRowWasMapped = true
         var headerIsDistrusted = false
+        var afterUnplacedShortRow = false
         for (place, line) in lines.enumerated() {
             if line.block.kind == .tableHeader {
                 findings.leaveOut(line.block, .markup)
@@ -590,6 +594,7 @@ enum EntryReader {
                 inTable = true
                 lastRowWasMapped = true
                 headerIsDistrusted = false
+                afterUnplacedShortRow = false
                 previous = line.block.index
                 table += 1
                 continue
@@ -615,6 +620,8 @@ enum EntryReader {
             }
             previous = line.block.index
             if isHeadingAfterAGap(line, names) { headerIsDistrusted = true }
+            let wasAfterUnplacedShortRow = afterUnplacedShortRow
+            if line.block.followsGap, line.cells.count < names.count { afterUnplacedShortRow = true }
             guard names.contains(where: { $0 != nil }), line.cells.count == names.count,
                   !headerIsDistrusted, !contradictsHeader(line, names) else {
                 lastRowWasMapped = false
@@ -629,6 +636,7 @@ enum EntryReader {
                 part.label = names[column]
                 part.labelValue = [cell]
                 part.opensRow = !opened
+                part.isToCheck = wasAfterUnplacedShortRow
                 opened = true
                 rows.append(part)
             }
@@ -641,6 +649,10 @@ enum EntryReader {
         }
         return result
     }
+
+    // A short row after a gap that the header cannot place may be the heading of a new table, whatever its words: the rows
+    // after it stay mapped by the header (an omitted cell is the likelier reading) but are flagged until the next header,
+    // so a value may land in a wrong field only where the person is asked to check it.
 
     /// Whether a row's own content contradicts the header: the header has a period column, and a cell that is a period
     /// on its own stands in another column than the header's, or than where one omitted or extra cell puts it. Such a row is never mapped by the header; read by its dates, it is the
@@ -741,6 +753,8 @@ enum EntryReader {
         // The entries that hold a line that may be a heading the vocabulary does not know (#454), by their place
         var doubtful: Set<Int> = []
         var currentIsDoubtful = false
+        var toCheck: Set<Int> = []
+        var currentIsToCheck = false
         var pendingLabel: EntryVocabulary.EntryLabel?
         var pendingIsDoubtful = false
         for line in lines {
@@ -764,15 +778,19 @@ enum EntryReader {
                 || (label == .school && current.contains { $0.0 == .school }))
             if opensEntry && !current.isEmpty {
                 if currentIsDoubtful { doubtful.insert(entries.count) }
+                if currentIsToCheck { toCheck.insert(entries.count) }
                 entries.append(current)
                 current = []
                 currentIsDoubtful = false
+                currentIsToCheck = false
             }
             current.append((label, values))
             currentIsDoubtful = currentIsDoubtful || rowIsDoubtful
+            currentIsToCheck = currentIsToCheck || line.isToCheck
         }
         if !current.isEmpty {
             if currentIsDoubtful { doubtful.insert(entries.count) }
+            if currentIsToCheck { toCheck.insert(entries.count) }
             entries.append(current)
         }
 
@@ -826,7 +844,7 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
-                entry.check = doubtful.contains(place) ? .headingUnsure : nil
+                entry.check = doubtful.contains(place) ? .headingUnsure : (toCheck.contains(place) ? .roleOrEmployerByOrder : nil)
                 findings.cv.experience.append(entry)
             case .education:
                 var entry = ImportedEducation()
@@ -836,7 +854,7 @@ enum EntryReader {
                 entry.period = period
                 entry.details = details
                 entry.heading = findings.heading(of: section)
-                entry.check = doubtful.contains(place) ? .headingUnsure : nil
+                entry.check = doubtful.contains(place) ? .headingUnsure : (toCheck.contains(place) ? .roleOrEmployerByOrder : nil)
                 findings.cv.education.append(entry)
             }
         }
