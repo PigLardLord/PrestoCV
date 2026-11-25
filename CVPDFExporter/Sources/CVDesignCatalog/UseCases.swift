@@ -134,6 +134,9 @@ public struct SyncReport: Equatable, Sendable {
     /// not rendered, unless it appeared while this design rendered: then the store kept it
     /// (`ConditionalSave.keptImported`).
     public internal(set) var conflicts: [String] = []
+    /// Written again, with the same version as the bundled design: the sync installed it, and the store listed it but could
+    /// not read it. The bundled package was valid and rendered first. Counted in no other list.
+    public internal(set) var repaired: [String] = []
 }
 
 /// Brings the designs that ship with the app into the store, at every launch. Each bundled package is validated, then
@@ -151,10 +154,13 @@ public struct SyncReport: Equatable, Sendable {
 ///   which compares again under the store's lock, and the report states what the store did: a design the store kept
 ///   because it became the same or a newer version is `unchanged`, and is never overwritten by the older one. A design
 ///   that an import saved meanwhile is kept as well, and is a `conflict`: the sync replaces only what it installed.
-/// - The installed designs and their recorded origins are listed once, and only their manifests are compared. An installed
-///   design is never read, so one whose file is damaged does not stop the sync while the bundled design is unchanged. The one
-///   exception is a design with no recorded origin and the bundled design's version: the store reads it to adopt it, and
-///   a store that cannot reports it as `failed`.
+/// - The installed designs and their recorded origins are listed once, and their manifests are compared. A design recorded as
+///   bundled whose bundled version is not newer is read once: if the store cannot read it, the sync repairs it
+///   (`repaired`). The bundled package was validated first and renders through the gate, and `DesignStore.replaceBundled`
+///   writes it whatever the versions, only over a design recorded as bundled; a gate that refuses leaves the damaged design
+///   as it is (`notRendered`), and a store that fails to write is `failed`. A design the sync did not install is never read
+///   or repaired. The other exception to listing only is a design with no recorded origin and the bundled design's version:
+///   the store reads it to adopt it, and a store that cannot reports it as `failed`.
 /// - A package fails on its own: the validator refuses it (`rejected`), the gate refuses it or fails (`notRendered`), or
 ///   the store fails to save it (`failed`). The other packages still sync.
 /// - What stops the sync: a store that cannot list its designs (`DesignCatalogError.storeUnavailable`), a source that
@@ -182,12 +188,16 @@ public struct SyncBundledDesigns: Sendable {
                 continue
             }
             let id = design.manifest.id, version = design.manifest.version
+            var repairing = false
             if let installed = versions[id] {
                 switch origins[id] {
                 case .bundled?:
                     if version <= installed {
-                        report.unchanged.append(id)
-                        continue
+                        guard try await isUnreadable(id) else {
+                            report.unchanged.append(id)
+                            continue
+                        }
+                        repairing = true
                     }
                 case nil where version == installed:
                     do {
@@ -212,6 +222,10 @@ public struct SyncBundledDesigns: Sendable {
                 report.notRendered.append(id)
                 continue
             }
+            if repairing {
+                try await repair(design, into: &report)
+                continue
+            }
             let outcome: ConditionalSave
             do { outcome = try await store.saveIfNewer(design) } catch let cancellation as CancellationError { throw cancellation } catch {
                 report.failed.append(id)
@@ -227,6 +241,24 @@ public struct SyncBundledDesigns: Sendable {
             versions[id] = max(version, versions[id] ?? version)
         }
         return report
+    }
+
+    /// Whether the store lists the design but cannot read it. Only a cancellation passes through.
+    private func isUnreadable(_ id: String) async throws -> Bool {
+        do { _ = try await store.design(id: id) } catch let cancellation as CancellationError { throw cancellation } catch { return true }
+        return false
+    }
+
+    /// Writes the bundled design again over the installed one, which cannot be read. The bundled package rendered first.
+    private func repair(_ design: ValidatedDesign, into report: inout SyncReport) async throws {
+        let id = design.manifest.id
+        do {
+            if try await store.replaceBundled(design) { report.repaired.append(id) } else { report.conflicts.append(id) }
+        } catch let cancellation as CancellationError {
+            throw cancellation
+        } catch {
+            report.failed.append(id)
+        }
     }
 
     /// The installed versions and the recorded origins, by identifier.

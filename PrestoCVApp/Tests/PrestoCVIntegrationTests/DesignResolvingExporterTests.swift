@@ -73,6 +73,7 @@ private actor HeldDesignStore: DesignStore {
     func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { try await store.saveIfNewer(design) }
     func installedOrigins() async throws -> [String: DesignOrigin] { try await store.installedOrigins() }
     func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.adoptAsBundled(design) }
+    func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.replaceBundled(design) }
 }
 
 /// Two installed designs that differ in stylesheet, default palette and default fonts.
