@@ -282,6 +282,37 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"])
     }
 
+    @Test("An organisation word followed by a lowercase word is no employer name: the title stays whole beside a short employer", arguments: [
+        "Lead for Systems integration", "Leiter für Klinikum logistik", "Responsabile per Studio vendite",
+    ])
+    func weakConnectorBesideAnOrganisationWordAndALowercaseWord(title: String) {
+        for layout in ["\(title)\nAcme", "\(title), Acme", "\(title)\t\tAcme", "\(title) | Acme"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector before a name of capitalised words keeps the short part a place", arguments: [
+        ("Engineer at Northwind | Berlin", "Engineer", "Northwind", "Berlin"),
+        ("Developer for Acme Ltd | Leeds", "Developer", "Acme Ltd", "Leeds"),
+        ("Leiter für Klinikum Beispiel | Berlin", "Leiter", "Klinikum Beispiel", "Berlin"),
+    ])
+    func weakConnectorBeforeCapitalisedWords(line: String, role: String, employer: String, place: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [place])
+    }
+
     @Test("A weak connector inside a title stays whole beside an employer no list knows, in every layout", arguments: [
         "Teacher for Special Needs", "Lehrer für Grundschule", "Responsabile per le vendite", "Profesor para adultos",
     ])

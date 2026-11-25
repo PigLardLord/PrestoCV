@@ -282,7 +282,7 @@ enum EntryReader {
         for connector in EntryVocabulary.weakConnectors {
             guard let range = piece.text.firstRange(of: connector) else { continue }
             let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
-            if EntryVocabulary.isOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && head.first?.isUppercase == true) { return true }
+            if EntryVocabulary.isOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && head.words.allSatisfy { $0.first?.isUppercase == true }) { return true }
         }
         return false
     }
