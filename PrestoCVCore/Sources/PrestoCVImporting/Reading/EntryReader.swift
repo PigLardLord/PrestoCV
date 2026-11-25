@@ -272,13 +272,27 @@ enum EntryReader {
     private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
         let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
         let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
-        return (afterComma + inOthers).contains { canHoldEmployer($0) }
+        let ownEmployerIsNamed = namesAnEmployer(after: piece)
+        return (afterComma + inOthers).contains { canHoldEmployer($0, shortNameCounts: !ownEmployerIsNamed) }
     }
 
-    private static func canHoldEmployer(_ segment: Segment) -> Bool {
+    /// Whether what follows a weak connector in the piece is a name on its own: a legal form or two capitalised words ("for Acme Ltd",
+    /// "für Klinikum Beispiel"). One word ("for Systems", "für Logistik") may be the end of a title.
+    private static func namesAnEmployer(after piece: Piece) -> Bool {
+        for connector in EntryVocabulary.weakConnectors {
+            guard let range = piece.text.firstRange(of: connector) else { continue }
+            let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
+            if EntryVocabulary.isOrganisation(head) && (hasLegalForm(head) || head.words.count >= 2 && head.first?.isUppercase == true) { return true }
+        }
+        return false
+    }
+
+    /// A short name no list knows ("Acme") fills the employer slot when the weak connector's own employer is no name by
+    /// itself; beside a named employer it is read as a place ("Developer for Acme Ltd | Leeds").
+    private static func canHoldEmployer(_ segment: Segment, shortNameCounts: Bool) -> Bool {
         switch segment.part {
         case .secondary: true
-        case .unknown: !hasPlaceShape(segment.piece)
+        case .unknown: shortNameCounts || !hasPlaceShape(segment.piece)
         case .primary, .address, .location: false
         }
     }
