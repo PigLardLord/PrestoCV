@@ -86,8 +86,22 @@ enum ListReader {
         guard let space = item.text.firstIndex(of: " "),
               languages.contains(where: { joiningWords[$0] == String(item.text[..<space]) }) else { return item }
         let rest = item.sub(item.text.index(after: space)..<item.text.endIndex).trimmed()
-        return rest.text.isEmpty ? item : rest
+        return rest.text.isEmpty || isElectronicTerm(prefix: item.text[..<space], rest: rest.text) ? item : rest
     }
+
+    /// A one-letter "e" followed by a word that names an electronic service ("e commerce", "e learning", "e mail")
+    /// is the prefix of a term written with a space, not a joining word.
+    private static func isElectronicTerm(prefix: Substring, rest: String) -> Bool {
+        guard prefix.count == 1 else { return false }
+        let first = rest.split(separator: " ").first.map { $0.lowercased() } ?? ""
+        return electronicWords.contains(first)
+    }
+
+    private static let electronicWords: Set<String> = [
+        "commerce", "learning", "mail", "business", "government", "health", "banking", "procurement",
+        "invoicing", "payment", "payments", "signature", "trading", "shopping", "billing", "marketplace",
+        "book", "books", "sports", "voting", "democracy", "participation", "tendering",
+    ]
 
     private static let separators = [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"]
     /// The word that joins the last item of a list, by language: a one-letter one is also the first word of a name in

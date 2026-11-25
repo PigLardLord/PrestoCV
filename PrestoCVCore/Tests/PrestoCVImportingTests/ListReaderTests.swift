@@ -205,6 +205,37 @@ struct ListReaderTests {
         #expect(read("Hobbys\nKlettern, Kochen, e commerce").cv.interests.map(\.value) == ["Klettern", "Kochen", "e commerce"])
     }
 
+    @Test("An electronic-prefix term written with a space keeps its e under a heading whose joining word is e, in skills and interests", arguments: [
+        ("Competenze", "Marketing, vendite, e commerce", ["Marketing", "vendite", "e commerce"]),
+        ("Competenze", "Marketing, vendite, e learning", ["Marketing", "vendite", "e learning"]),
+        ("Competenze", "Marketing, vendite, e mail", ["Marketing", "vendite", "e mail"]),
+        ("Compet\u{ea}ncias", "Marketing, vendas, e commerce", ["Marketing", "vendas", "e commerce"]),
+        ("Compet\u{ea}ncias", "Marketing, vendas, e business", ["Marketing", "vendas", "e business"]),
+        ("Compet\u{ea}ncias", "Marketing, vendas, e government", ["Marketing", "vendas", "e government"]),
+    ])
+    func electronicPrefixKeepsItsE(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
+    }
+
+    @Test("An electronic-prefix term in the interests keeps its e, and a real joiner is still removed", arguments: [
+        ("Interessi", "Escursioni, cucina, e commerce", ["Escursioni", "cucina", "e commerce"]),
+        ("Interessi", "Escursioni, cucina, e learning", ["Escursioni", "cucina", "e learning"]),
+        ("Interessi", "Escursioni, cucina, e viaggi", ["Escursioni", "cucina", "viaggi"]),
+        ("Interesses", "Caminhadas, culin\u{e1}ria, e commerce", ["Caminhadas", "culin\u{e1}ria", "e commerce"]),
+        ("Interesses", "Caminhadas, culin\u{e1}ria, e viagens", ["Caminhadas", "culin\u{e1}ria", "viagens"]),
+    ])
+    func electronicPrefixInInterests(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.interests.map(\.value) == expected)
+    }
+
+    @Test("A real joiner before a word that is not an electronic term is still removed", arguments: [
+        ("Competenze", "Java, Python, e Swift", ["Java", "Python", "Swift"]),
+        ("Compet\u{ea}ncias", "Java, Python, e Swift", ["Java", "Python", "Swift"]),
+    ])
+    func realJoinerStillRemoved(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
+    }
+
     @Test("A sentence with a contracted subject stays whole as text not imported, in the languages that have one", arguments: [
         ("Skills", "I've led teams, written reports and trained staff."),
         ("Skills", "I\u{2019}ve led teams, written reports and trained staff."),
