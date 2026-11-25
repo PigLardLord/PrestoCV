@@ -93,6 +93,26 @@ struct ShortYearImportTests {
         #expect(text(of: entry).contains("3.12"))
     }
 
+    @Test("Two employers whose dates follow the company name stay two entries")
+    func employerBeforeShortDatesKeepsBoundaries() throws {
+        let found = try imported("""
+        Berufserfahrung
+        Beispiel AG 10.21 – heute
+        Leiter Buchhaltung, Hamburg
+        Muster GmbH 9.19 – 8.21
+        Verkäufer, Berlin
+        """)
+        #expect(found.cv.experience.count == 2)
+        let first = try #require(found.cv.experience.first)
+        let second = try #require(found.cv.experience.last)
+        #expect(first.period?.value.start == YearMonth(year: 2021, month: 10))
+        #expect(first.period?.value.end == .current)
+        #expect(second.period?.value.start == YearMonth(year: 2019, month: 9))
+        #expect(second.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+        #expect(text(of: first).contains("Beispiel"))
+        #expect(text(of: second).contains("Muster"))
+    }
+
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
         ("K-12 Teacher", "K-12"), ("k8s platform", "k8s"), ("% of revenue", "of revenue"),
         ("% des Umsatzes", "Umsatzes"), ("% del fatturato", "fatturato"), ("% du chiffre", "chiffre"),

@@ -201,6 +201,14 @@ struct DateReaderTests {
         #expect(DateReader.periods(in: text).isEmpty)
     }
 
+    @Test("A dotted range with no sign of a version is a period, whatever word stands before it", arguments: [
+        "Acme 9.19 – 8.21", "Muster GmbH 9.19 – 8.21", "Acme GmbH 9.10 – 9.12",
+    ])
+    func rangeWithoutVersionEvidenceIsAPeriod(text: String) throws {
+        let (_, period) = try #require(firstPeriod(text))
+        #expect(period.start.month != nil)
+    }
+
     @Test("A word that introduces a date does not make a dotted range a version", arguments: [
         "seit 9.19 – 8.21", "from 9.19 – 8.21", "since 9.19 – heute",
     ])

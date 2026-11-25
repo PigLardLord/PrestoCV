@@ -149,9 +149,9 @@ enum DateReader {
     /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
     /// The written form tells a period from pay. A slash is written only in dates, so a slash range is a period whatever
     /// follows. A dot is written in both, so a dotted range is a period unless a unit stands beside it ("3.50–4.50%",
-    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range: an unpadded one-digit major after a
-    /// word that is no introducer of a date ("Python 3.10 – 3.12", "v3.10 – 3.12"). A range with neither is a period
-    /// whatever its years, as "09/60 – 08/65" is.
+    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range with positive evidence
+    /// (see `isVersion`: "v3.10 – 3.12", "Version 3.10 – 3.12", "Python 3.10 – 3.12"). A range with neither is a period
+    /// whatever its years, as "09/60 – 08/65" and "Acme 9.19 – 8.21" are.
     private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
         guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
               let (first, firstEnd) = shortDate(at: index, in: tokens),
@@ -160,7 +160,7 @@ enum DateReader {
            (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
             let dotted = isDotted(from: index, to: secondEnd, in: tokens)
             if dotted {
-                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, in: tokens) { return nil }
+                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, to: secondEnd, in: tokens) { return nil }
             } else if isPercent(rightAfter: secondEnd, in: tokens) {
                 return nil
             }
@@ -178,11 +178,21 @@ enum DateReader {
         return false
     }
 
-    /// A one-digit number right after a word that does not introduce a date: a product and its version.
-    private static func isVersion(at index: Int, in tokens: [Token]) -> Bool {
-        guard index > 0, case .number(_, 1) = tokens[index].kind, case .word = tokens[index - 1].kind else { return false }
-        return prefixWord(at: index - 1, in: tokens) == nil
+    /// A one-digit number that reads as a version, only on positive evidence (split rather than merge: a wrong split is
+    /// visible, a wrong merge loses a job): a "v" glued to it ("v3.10"), a version word before it ("Version", "versione",
+    /// "versión", "versão"), or one major on both sides ("Python 3.10 – 3.12") after a word that is no organisation and
+    /// no introducer of a date. "Muster GmbH 9.19 – 8.21" and "Acme 9.19 – 8.21" are periods.
+    private static func isVersion(at index: Int, to end: Int, in tokens: [Token]) -> Bool {
+        guard index > 0, case .number(let major, 1) = tokens[index].kind, case .word(let word) = tokens[index - 1].kind else {
+            return false
+        }
+        if word == "v", tokens[index].spaced == false { return true }
+        if versionWords.contains(word) { return true }
+        guard end >= 2, case .number(major, _) = tokens[end - 2].kind, prefixWord(at: index - 1, in: tokens) == nil else { return false }
+        return !EntryVocabulary.isOrganisation(word)
     }
+
+    private static let versionWords: Set<String> = ["version", "versione", "versao"].reduce(into: Set<String>()) { $0.insert($1.folded) }
 
     /// A percent sign written right after the last number, no space between ("3/50–4/50%").
     private static func isPercent(rightAfter index: Int, in tokens: [Token]) -> Bool {
