@@ -149,8 +149,9 @@ enum DateReader {
     /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
     /// The written form tells a period from pay. A slash is written only in dates, so a slash range is a period whatever
     /// follows. A dot is written in both, so a dotted range is a period unless a unit stands beside it ("3.50–4.50%",
-    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or its two-digit years are 1940 to 1969, which a price is and a
-    /// career start seldom is ("10.50 – 12.50").
+    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range: an unpadded one-digit major after a
+    /// word that is no introducer of a date ("Python 3.10 – 3.12", "v3.10 – 3.12"). A range with neither is a period
+    /// whatever its years, as "09/60 – 08/65" is.
     private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
         guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
               let (first, firstEnd) = shortDate(at: index, in: tokens),
@@ -159,10 +160,7 @@ enum DateReader {
            (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
             let dotted = isDotted(from: index, to: secondEnd, in: tokens)
             if dotted {
-                if isUnit(after: secondEnd, in: tokens) { return nil }
-                if (1940...1969).contains(first.year), isTwoDigit(secondEnd, in: tokens), (1940...1969).contains(second.year) {
-                    return nil
-                }
+                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, in: tokens) { return nil }
             } else if isPercent(rightAfter: secondEnd, in: tokens) {
                 return nil
             }
@@ -180,9 +178,10 @@ enum DateReader {
         return false
     }
 
-    private static func isTwoDigit(_ index: Int, in tokens: [Token]) -> Bool {
-        if case .number(_, 2) = tokens[index].kind { return true }
-        return false
+    /// A one-digit number right after a word that does not introduce a date: a product and its version.
+    private static func isVersion(at index: Int, in tokens: [Token]) -> Bool {
+        guard index > 0, case .number(_, 1) = tokens[index].kind, case .word = tokens[index - 1].kind else { return false }
+        return prefixWord(at: index - 1, in: tokens) == nil
     }
 
     /// A percent sign written right after the last number, no space between ("3/50–4/50%").

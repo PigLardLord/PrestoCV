@@ -60,7 +60,7 @@ struct ShortYearImportTests {
         "Salary 10.50 – 12.50 EUR gross", "Gehalt 10.50 – 12.50 EUR brutto", "Stipendio 10.50 – 12.50 EUR lordi",
         "Salaire 10.50 – 12.50 EUR brut", "Salario 10.50 – 12.50 EUR bruto", "Salário 10.50 – 12.50 EUR líquido",
         "10.50 – 12.50 EUR net", "10.50 – 12.50 EUR netto", "10.50 – 12.50 EUR netti", "10.50 – 12.50 EUR neto",
-        "3.50 – 4.50 EUR gross", "10.50 – 12.50", "3.50 – 4.50",
+        "3.50 – 4.50 EUR gross",
         "10.20 – 12.20k/year", "10.20 – 12.20k, gross", "10.20 – 12.20k/month",
     ])
     func payWithAWordIsADetail(line: String) throws {
@@ -74,6 +74,23 @@ struct ShortYearImportTests {
         #expect(entry.period?.value.start == YearMonth(year: 2019, month: 9))
         #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
         #expect(text(of: entry).contains(line.split(separator: " ").last.map(String.init) ?? line))
+    }
+
+    @Test("A version range is a detail of its entry: no period, no extra entry", arguments: [
+        "Python 3.10 – 3.12", "Django 3.10-3.12", "Version 3.10 – 3.12",
+    ])
+    func versionRangeIsADetail(line: String) throws {
+        let found = try imported("""
+        Berufserfahrung
+        09/19 – 08/21    Entwickler, Muster GmbH, Berlin
+        \(line)
+        """)
+        #expect(found.cv.experience.count == 1)
+        let entry = try #require(found.cv.experience.first)
+        #expect(entry.period?.value.start == YearMonth(year: 2019, month: 9))
+        #expect(entry.period?.value.end == .date(YearMonth(year: 2021, month: 8)))
+        #expect(text(of: entry).contains(line.split(separator: " ").first.map(String.init) ?? line))
+        #expect(text(of: entry).contains("3.12"))
     }
 
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [

@@ -181,11 +181,31 @@ struct DateReaderTests {
         #expect(DateReader.periods(in: text).isEmpty)
     }
 
-    @Test("A dotted range whose years fall in 1940-1969 is no period, with a unit or none", arguments: [
-        "3.50 – 4.50", "10.50 – 12.50", "10.50-12.50", "9.45 – 12.60",
+    @Test("A dotted range without a unit is a period, as its slash and four-digit forms are, whatever its years", arguments: [
+        ("09.60 – 08.65", "09/60 – 08/65", "09/1960 – 08/1965"), ("10.50 – 12.50", "10/50 – 12/50", "10/1950 – 12/1950"),
+        ("09.45 – 12.60", "09/45 – 12/60", "09/1945 – 12/1960"),
     ])
-    func dottedRangeOfThePricesYears(text: String) {
+    func dottedHistoricalRangeAgreesWithOtherForms(dotted: String, slash: String, long: String) throws {
+        let (_, fromDots) = try #require(firstPeriod(dotted))
+        let (_, fromSlash) = try #require(firstPeriod(slash))
+        let (_, fromLong) = try #require(firstPeriod(long))
+        #expect(fromDots == fromSlash)
+        #expect(fromDots == fromLong)
+    }
+
+    @Test("A dotted range that follows a product name or a v is a version range, no period", arguments: [
+        "Python 3.10 – 3.12", "Python 3.10-3.12", "Django 3.10 – 3.12", "python 3.10 – 3.12", "Swift 5.10 – 5.12",
+        "Version 3.10 – 3.12", "v3.10 – 3.12", "Python v3.10 – 3.12",
+    ])
+    func versionRangeIsNoPeriod(text: String) {
         #expect(DateReader.periods(in: text).isEmpty)
+    }
+
+    @Test("A word that introduces a date does not make a dotted range a version", arguments: [
+        "seit 9.19 – 8.21", "from 9.19 – 8.21", "since 9.19 – heute",
+    ])
+    func introducingWordKeepsThePeriod(text: String) {
+        #expect(DateReader.periods(in: text).count == 1)
     }
 
     @Test("A dotted range with a k before punctuation or a rate is pay, no period", arguments: [
