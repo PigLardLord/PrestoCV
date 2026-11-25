@@ -197,6 +197,18 @@ extension IOSPDFRendererTests {
     }
 
     @MainActor
+    @Suite("#558 · where the text of the bundled designs lands",
+           .enabled(if: LayoutRecording.folder != nil, "records only, with RECORD_LAYOUTS set"))
+    struct Layout {
+        @Test("records where every line of each bundled design lands, in the folder RECORD_LAYOUTS names",
+              arguments: ["minimal", "modern", "professional"], LayoutDocument.allCases)
+        func bundled(design: String, document: LayoutDocument) async throws {
+            let folder = try #require(LayoutRecording.folder)
+            try await IOSPDFRendererTests.checks().recordLayout(design: design, document: document, into: folder)
+        }
+    }
+
+    @MainActor
     @Suite("#78 · the step budget")
     struct StepBudget {
         @Test("real documents use at most 10% of the budget")

@@ -29,6 +29,8 @@ public enum NativeCheckFailure: Error, Equatable {
     case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
     /// A design's page-break document of `summaryLines` profile lines needed more pages than `PageBreakDocument.page` keeps.
     case pageBreakDocumentTruncated(design: String, summaryLines: Int, requiredPages: Int)
+    /// A design's layout document needed more pages than its page setup keeps.
+    case layoutDocumentTruncated(design: String, document: LayoutDocument, requiredPages: Int)
 }
 
 /// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
@@ -187,10 +189,7 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
     /// blank page, no line cut by a page's edge or hidden in its margin, every text node and no line outside its page; and
     /// the page count is the PDF's own.
     public func pageBreaks(design name: String, body: PageBreakDocument.Body) async throws {
-        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
-            throw NativeCheckFailure.fixtureLacks(name)
-        }
-        let design = try DesignPackageValidator().validate(package.data)
+        let design = try await Self.bundledDesign(name)
         try await pageBreaks(name, stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
                              fonts: design.manifest.defaultFonts, body: body)
     }
@@ -226,6 +225,31 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, body: body, faults: faults) }
     }
 
+    // MARK: Layout
+
+    /// #558: the layout of the bundled design `name` in `document`, in the design's default palette and fonts, as this
+    /// renderer prints it on this platform and OS version.
+    public func layoutReference(design name: String, document: LayoutDocument) async throws -> LayoutReference {
+        let design = try await Self.bundledDesign(name)
+        let rendered = try document.rendered(stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
+                                             fonts: design.manifest.defaultFonts)
+        let pdf = try await renderer.render(html: rendered.html, page: document.page)
+        guard !pdf.truncated else {
+            throw NativeCheckFailure.layoutDocumentTruncated(design: name, document: document, requiredPages: pdf.requiredPages)
+        }
+        guard let layout = inspector.layout(of: pdf.data) else { throw NativeCheckFailure.unreadablePDF }
+        guard layout.pages.count == pdf.pageCount else {
+            throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
+        }
+        return LayoutReference(platform: .running, osVersion: .running, design: name, document: document, layout: layout)
+    }
+
+    /// #558: writes the layout of the bundled design `name` in `document` into `folder`, in the folder of this platform
+    /// and OS version.
+    public func recordLayout(design name: String, document: LayoutDocument, into folder: URL) async throws {
+        try LayoutRecording.write(try await layoutReference(design: name, document: document), into: folder)
+    }
+
     // MARK: Step budget
 
     /// The completeness search on real documents (the fixture and the two separation designs) finds every node and uses
@@ -248,6 +272,14 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
     }
 
     // MARK: Helpers
+
+    /// The bundled design `name`, validated.
+    private static func bundledDesign(_ name: String) async throws -> ValidatedDesign {
+        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
+            throw NativeCheckFailure.fixtureLacks(name)
+        }
+        return try DesignPackageValidator().validate(package.data)
+    }
 
     private static var injectingScript: String { "<script>document.querySelector('main').append('INJECTED')</script>" }
 

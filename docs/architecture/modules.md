@@ -297,7 +297,8 @@ The store also records each design's origin, `bundled` (installed by the catalog
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
   - `MinimalPDFInspector`;
-  - `PageBreaks`, which reads in a PDF's layout a page that ends with a section title or holds no text (#467).
+  - `PageBreaks`, which reads in a PDF's layout a page that ends with a section title or holds no text (#467);
+  - the layouts of #558: `LayoutDocument` (the contract fixture on A4 and a page-break document, printed in each bundled design), `LayoutReference` (a layout with its platform, OS version, design and document, written and read as JSON in points rounded to 0.01, one folder per platform and OS version, and which folder a run of a version reads) and `LayoutComparison` (a layout against its reference: the page count, then the lines matched by their text in order, each on its page and within a tolerance of 0.5 pt by default).
 - **`CVRenderingNativeTestSupport`** (iOS and macOS) holds what both native renderers' tests share: `NativeRendererChecks`, the loopback listener that counts connections, and `DrawnPDF`, which draws PDFs with CoreText. It may import `CVRendering`, `CVRenderingTestSupport`, `CVRenderingPDFKitInspector`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings`, `CVBundledDesigns` (the page-break check prints the bundled designs), CoreGraphics, CoreText, Foundation, Network, PDFKit, Synchronization and WebKit (the listener's control page).
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation. `BundledDesignsPreviewTests` prints an English sample with each bundled design, in the design's default palette and font scheme, and stores the first page as the design's preview when `UPDATE_PREVIEWS=1`; it imports `CVDocumentModel`, `CVDesignCatalog`, `CVBundledDesigns` and `CVBundledHeadings`. They run the checks of `NativeRendererChecks`, one line each:
   - a field the renderer drops is reported missing;
@@ -306,7 +307,8 @@ The store also records each design's origin, `bundled` (installed by the catalog
   - link annotations: macOS keeps one per link, whose destinations are the builder's `href`s, and iOS keeps none. Each platform's test fails if that changes;
   - the fixture's PDF has no geometry violation;
   - page breaks (#467): each bundled design prints a CV whose experience section falls at every height of a page's foot with no section title alone at the foot and no blank page;
-  - the step budget above.
+  - the step budget above;
+  - layouts (#558): with `RECORD_LAYOUTS` set to a folder (`TEST_RUNNER_RECORD_LAYOUTS` for `xcodebuild`), each bundled design's `LayoutDocument`s are printed and their layouts written there (`LayoutRecording`); without it the suite does not run. The checks that compare a print with stored references wait for the owner's choice of tolerance (#558).
 - The completeness and geometry tests of every bundled design wait for the bundled designs of the new stack.
 
 **Separate package `CVPDFExporterExamples`** holds the demos. The library package contains no executables (R14).
