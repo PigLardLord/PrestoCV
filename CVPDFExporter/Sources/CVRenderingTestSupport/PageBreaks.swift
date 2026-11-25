@@ -69,9 +69,9 @@ public enum PageBreaks {
             let box = layout.pages[line.pageIndex]
             return !(line.box.maxY <= box.y + margin || line.box.y >= box.maxY - margin)
         }
-        let text = shown.map(\.text).joined(separator: "\n")
+        let lines = shown.map(\.text), text = lines.joined(separator: "\n")
         let missing = DocumentCompleteness.missing(in: text, expected: document.textNodes)
-        let excess = missing.isEmpty ? duplicated(in: text, expected: document.textNodes) : []
+        let excess = missing.isEmpty ? duplicated(in: lines, expected: document.textNodes) : []
         let violations = GeometricCompleteness.violations(in: layout, minimumGlyphHeight: GeometricCompleteness.minimumGlyphHeight)
         return faults(in: layout, starts: starts, margin: margin) + (missing.isEmpty ? [] : [.missing(missing)])
             + (excess.isEmpty ? [] : [.duplicated(excess)]) + (violations.isEmpty ? [] : [.geometry(violations)])
@@ -89,9 +89,32 @@ public enum PageBreaks {
     /// reads as an extra print. Here that text belongs to the two nodes, so no copy of "Go" fits in it. A copy fits only
     /// in text that no node needs, so the search runs only where the text has that much more than the nodes and the node
     /// matches more often than held. It runs on a complete print only: with a node missing, no placement holds every node.
-    /// A search stopped by its budget counts the node as duplicated, so the check fails closed. A line printed twice that
-    /// is only part of a node is no whole node, and this check does not name it.
-    private static func duplicated(in text: String, expected: [String]) -> [String] {
+    /// A search stopped by its budget counts the node as duplicated, so the check fails closed.
+    ///
+    /// A page break may also print only one line of a wrapped node twice, so no second whole copy exists. A shown line
+    /// is left over when the text without it still places every node; a left-over line that is a part of a node's text
+    /// (three characters or more, so a hyphen or a bullet is none) is a duplicate of the first node that holds it. Only
+    /// a line no longer than the spare text can be left over, and each distinct line is tried once on a complete print,
+    /// so a correct print, whose spare is a few bullets, costs next to nothing.
+    private static func duplicated(in lines: [String], expected: [String]) -> [String] {
+        let text = lines.joined(separator: "\n")
+        let whole = duplicatedWhole(in: text, expected: expected)
+        let spare = key(text).unicodeScalars.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
+        var tried = Set<String>(), parts = Set<String>()
+        for (index, line) in lines.enumerated() {
+            let k = key(line), size = k.unicodeScalars.count
+            guard size >= 3, size <= spare, tried.insert(k).inserted,
+                  let node = expected.first(where: { key($0).contains(k) }) else { continue }
+            var rest = lines
+            rest.remove(at: index)
+            let report = DocumentCompleteness.report(in: rest.joined(separator: "\n"), expected: expected)
+            if report.missing.isEmpty || report.budgetExhausted { parts.insert(node) }
+        }
+        var seen = Set<String>()
+        return expected.filter { (whole.contains($0) || parts.contains($0)) && seen.insert($0).inserted }
+    }
+
+    private static func duplicatedWhole(in text: String, expected: [String]) -> [String] {
         let printed = Array(key(text).unicodeScalars)
         let spare = printed.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
         let held = Dictionary(expected.map { (key($0), 1) }, uniquingKeysWith: +)

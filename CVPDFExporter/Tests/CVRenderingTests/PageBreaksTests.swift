@@ -194,4 +194,58 @@ struct PageBreaksTests {
         let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
         #expect(faults.isEmpty)
     }
+
+    @Test("only the first line of a wrapped node repeated at a page break is duplicated content of that node")
+    func repeatedFirstLine() {
+        let duty = "Duty 1 of the role, long enough to wrap onto a second line."
+        let other = "Skill 1 with a long name"
+        let document = RenderedDocument(html: "", textNodes: [other, duty])
+        let layout = PDFLayout(pages: [a4Page, a4Page], lines: [
+            Self.line(other, page: 0, y: 740),
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 700),
+            Self.line("Duty 1 of the role, long enough", page: 1, y: 700),
+            Self.line("to wrap onto a second line.", page: 1, y: 686),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.duplicated([duty])])
+    }
+
+    @Test("only the second line of a wrapped node repeated is duplicated content of that node")
+    func repeatedLastLine() {
+        let duty = "Duty 1 of the role, long enough to wrap onto a second line."
+        let document = RenderedDocument(html: "", textNodes: [duty])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 700),
+            Self.line("to wrap onto a second line.", page: 0, y: 686),
+            Self.line("to wrap onto a second line.", page: 0, y: 500),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.duplicated([duty])])
+    }
+
+    @Test("text no node holds, as bullets and separators, a hyphen inside a node, and identical nodes printed as often as held are not duplicated")
+    func noFalseDuplicate() {
+        let document = RenderedDocument(html: "", textNodes: ["Front-end developer", "Duty one of the role", "Duty one of the role"])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("\u{2022}", page: 0, y: 700), Self.line("Duty one of the role", page: 0, y: 700),
+            Self.line("\u{2022}", page: 0, y: 680), Self.line("Duty one of the role", page: 0, y: 680),
+            Self.line("-", page: 0, y: 660), Self.line("|", page: 0, y: 640), Self.line("-", page: 0, y: 620),
+            Self.line("Front-end developer", page: 0, y: 600),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults.isEmpty)
+    }
+
+    @Test("a node beside a longer node that starts with it is not duplicated, whatever line the longer one wraps at or the order of the lines")
+    func prefixNodesInAnyOrder() {
+        let document = RenderedDocument(html: "", textNodes: ["Experience", "Experience with X"])
+        let orders: [[String]] = [["Experience", "Experience with X"], ["Experience with", "X", "Experience"],
+                                  ["Experience", "Experience", "with X"], ["Experience with X", "Experience"]]
+        for order in orders {
+            let lines = order.enumerated().map { Self.line($1, page: 0, y: 700 - Double($0) * 14) }
+            let faults = PageBreaks.faults(of: document, printedAs: PDFLayout(pages: [a4Page], lines: lines),
+                                           starts: [], page: .a4)
+            #expect(faults.isEmpty, "\(order)")
+        }
+    }
 }
