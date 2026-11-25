@@ -228,9 +228,11 @@ struct ListReaderTests {
         #expect(read("\(heading)\n\(line)").cv.interests.map(\.value) == expected)
     }
 
-    @Test("A real joiner before a word that is not an electronic term is still removed", arguments: [
+    @Test("A real joiner is still removed, before a word that is not an electronic term or under a heading whose joining word is not e", arguments: [
         ("Competenze", "Java, Python, e Swift", ["Java", "Python", "Swift"]),
         ("Compet\u{ea}ncias", "Java, Python, e Swift", ["Java", "Python", "Swift"]),
+        ("Habilidades", "Marketing, ventas, y business", ["Marketing", "ventas", "business"]),
+        ("Habilidades", "Marketing, ventas, y commerce", ["Marketing", "ventas", "commerce"]),
     ])
     func realJoinerStillRemoved(heading: String, line: String, expected: [String]) {
         #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)

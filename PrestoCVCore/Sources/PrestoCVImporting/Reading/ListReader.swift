@@ -89,10 +89,11 @@ enum ListReader {
         return rest.text.isEmpty || isElectronicTerm(prefix: item.text[..<space], rest: rest.text) ? item : rest
     }
 
-    /// A one-letter "e" followed by a word that names an electronic service ("e commerce", "e learning", "e mail")
-    /// is the prefix of a term written with a space, not a joining word.
+    /// The joining word "e" (Italian, Portuguese) followed by a word that names an electronic service
+    /// ("e commerce", "e learning", "e mail") is the prefix of a term written with a space, not a joining word.
+    /// Any other joining word ("y business" under a Spanish heading) is still a joiner.
     private static func isElectronicTerm(prefix: Substring, rest: String) -> Bool {
-        guard prefix.count == 1 else { return false }
+        guard prefix == "e" else { return false }
         let first = rest.split(separator: " ").first.map { $0.lowercased() } ?? ""
         return electronicWords.contains(first)
     }
