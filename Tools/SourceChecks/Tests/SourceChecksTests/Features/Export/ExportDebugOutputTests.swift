@@ -21,6 +21,7 @@ struct ExportDebugOutputTests {
     /// Where the pasteboard is used on purpose, and why: the person asks for the copy with a tap.
     private static let copyOnTap = [
         "PrestoCV/Features/Import/Views/ImportReviewSheet.swift": "the Copy button of the text the import could not place",
+        "PrestoCVNext/Platform/Pasteboard.swift": "the copy that the Copy button of an import's review asks for, of the text the import could not place",
     ]
 
     /// The functions that write to the console or to a standard stream: Swift's, Foundation's and C's

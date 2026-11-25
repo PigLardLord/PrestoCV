@@ -15,6 +15,9 @@ struct NewCVSheet: View {
                     .padding(Spacing.large)
                     .readableWidth()
             }
+            // On a wide screen the empty list beside it offers the same choices
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("start.sheet")
             .navigationTitle(Text("start.title"))
             .inlineNavigationTitle()
             .toolbar {
