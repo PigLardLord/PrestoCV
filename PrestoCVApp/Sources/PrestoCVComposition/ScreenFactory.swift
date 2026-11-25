@@ -130,8 +130,10 @@ public final class ScreenFactory {
         list: CVListViewModel, firstRun: FirstRunViewModel, copyTitle: @escaping @MainActor (String) -> String,
         fileNamePattern: @escaping @Sendable (ExportLanguage) -> String
     ) -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start in
+        ShellNavigationModel(makeEditor: { [weak list, weak firstRun] start, shellTold in
             self.makeEditor(start: start, copyTitle: copyTitle, storeChanged: {
+                // The shell first, so that the import's review has ended when the list shows the CV
+                shellTold()
                 Task {
                     await list?.load()
                     await firstRun?.load()

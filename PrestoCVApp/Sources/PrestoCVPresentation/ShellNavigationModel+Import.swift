@@ -19,11 +19,11 @@ extension ShellNavigationModel {
         open(imported)
     }
 
-    /// Opens the draft of an import in the editor, through the path of any draft: the import is told it was opened, so
-    /// its draft is not opened again, and goes. Like any draft, it is not in the list, so a change of the list leaves
-    /// it open, and the editor stores it when the person leaves it, edited or not (decision 6 of #404).
+    /// Opens the draft of an import in the editor, through the path of any draft, with the import's review: the import is
+    /// told it was opened, so its draft is not opened again, and goes. Like any draft, it is not in the list, so a change
+    /// of the list leaves it open, and the editor stores it when the person leaves it, edited or not (decision 6 of #404).
     func open(_ imported: ImportedDraft) {
         importer?.opened()
-        open(imported.start)
+        open(imported.start, review: imported.review)
     }
 }

@@ -226,9 +226,15 @@ struct Editing {
     /// The calls of the editors' `storeChanged`.
     let storesTold = CallCount()
 
-    func editor(_ start: EditorStart) -> EditorViewModel {
+    func editor(_ start: EditorStart) -> EditorViewModel { editor(start, alsoTelling: {}) }
+
+    /// An editor whose `storeChanged` tells `hook` too, after it was counted.
+    func editor(_ start: EditorStart, alsoTelling hook: @escaping @MainActor () -> Void) -> EditorViewModel {
         EditorViewModel(start: start, editing: editing, clock: self.clock, pause: .seconds(1),
-                        copyTitle: { "Copy of " + $0 }, storeChanged: { [storesTold] in storesTold.count += 1 })
+                        copyTitle: { "Copy of " + $0 }, storeChanged: { [storesTold] in
+                            storesTold.count += 1
+                            hook()
+                        })
     }
 
     /// A CV in the store with invented values: titled "Design roles", in Italian.
@@ -258,7 +264,7 @@ struct Editing {
     /// screens on the fakes of `imports`, with the system's background time seen by `time`.
     func shell(time: BackgroundTimeSpy = BackgroundTimeSpy(), exports: ShellExports = ShellExports(),
                imports: ImportWorld = ImportWorld()) -> ShellNavigationModel {
-        ShellNavigationModel(makeEditor: { editor($0) }, makeExportSheet: { exports.sheet(for: $0) },
+        ShellNavigationModel(makeEditor: { editor($0, alsoTelling: $1) }, makeExportSheet: { exports.sheet(for: $0) },
                              makeImporter: { imports.model() }, backgroundTime: time)
     }
 }

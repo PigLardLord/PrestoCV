@@ -51,7 +51,15 @@ public final class ShellNavigationModel {
     /// or the person goes back to the list, and a pasted text goes with it (decision 9 of #404).
     public private(set) var importer: ImportViewModel?
 
-    @ObservationIgnored private let makeEditor: @MainActor (EditorStart) -> EditorViewModel
+    /// The review of the import whose draft the editor shows, nil for any other CV. It ends once that editor stored a
+    /// change the person made, and goes with the editor when anything else opens; it outlives its end for a sheet open
+    /// over it.
+    public private(set) var review: ImportReviewViewModel?
+
+    /// The import's review while its sheet is open, for the view to show the sheet.
+    public var reviewSheet: ImportReviewViewModel? { review.flatMap { $0.isSheetShown ? $0 : nil } }
+
+    @ObservationIgnored private let makeEditor: @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
     @ObservationIgnored private let backgroundTime: any BackgroundTime
@@ -99,12 +107,13 @@ public final class ShellNavigationModel {
     public var canLeave: Bool { blockingStatus == nil }
 
     /// - Parameters:
-    ///   - makeEditor: Makes the editor of what the detail opens.
+    ///   - makeEditor: Makes the editor of what the detail opens, which calls the hook it is given as it calls its
+    ///     `storeChanged`.
     ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
     ///   - makeImporter: Makes the import the detail shows (`showImport()`).
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
     public init(
-        makeEditor: @escaping @MainActor (EditorStart) -> EditorViewModel,
+        makeEditor: @escaping @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel,
         makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?,
         makeImporter: @escaping @MainActor () -> ImportViewModel, backgroundTime: any BackgroundTime
     ) {
@@ -131,12 +140,25 @@ public final class ShellNavigationModel {
     /// nothing; a draft is new each time, so it always replaces. Opening a CV whose editor was left and still stores it,
     /// or is kept, gets that editor back. The editor that was open stays when its text cannot be stored as it is.
     @discardableResult
-    public func open(_ start: EditorStart) -> LeaveVerdict {
+    public func open(_ start: EditorStart) -> LeaveVerdict { open(start, review: nil) }
+
+    /// Opens `start` as `open(_:)` does, with the review of the import it comes from, if any. The review ends at the
+    /// editor's first write the store took that held a change the person made: a draft has nothing another save could
+    /// change before it is stored, and a store of the draft as it was imported, as the list's read or the app leaving
+    /// the foreground makes, leaves the review shown. The hook holds this review only, so that a late write of an editor
+    /// left behind ends no other; while the shell shows this review, its editor is the one made here.
+    @discardableResult
+    func open(_ start: EditorStart, review: ImportReview?) -> LeaveVerdict {
         if case .stored(let reference) = start, reference == selection { return .left }
         if let status = blockingStatus { return .stayed(status) }
         letGo()
         detail = start
-        editor = takeBack(start) ?? makeEditor(start)
+        let shown = review.map(ImportReviewViewModel.init(review:))
+        self.review = shown
+        editor = takeBack(start) ?? makeEditor(start) { [weak self, weak shown] in
+            guard let shown, self?.review === shown, self?.editor?.storedAChange == true else { return }
+            shown.editorStored()
+        }
         return .left
     }
 
@@ -262,6 +284,7 @@ public final class ShellNavigationModel {
         guard let editor, editor.canBeDiscarded else { return }
         self.editor = nil
         detail = nil
+        review = nil
     }
 
     // MARK: Leaving
@@ -273,13 +296,15 @@ public final class ShellNavigationModel {
         return status
     }
 
-    /// Stops and drops the import, closes the export sheet of the open editor, then hands the editor to its `saveNow()`
+    /// Stops and drops the import, closes the export sheet of the open editor and drops its review, then hands the editor
+    /// to its `saveNow()`
     /// and keeps it alive until that ended; when that did not store its text, the editor is kept (`landed(_:)`). Every
     /// caller reads what the detail opened before it changes the detail.
     private func letGo() {
         importer?.cancel()
         importer = nil
         closeExport()
+        review = nil
         guard let left = editor else { return }
         let start = detail ?? .blank
         editor = nil

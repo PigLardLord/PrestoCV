@@ -9,7 +9,7 @@ extension EditorViewModel {
     public func setDocumentLanguage(_ tag: String?) async {
         let language = tag.flatMap(DocumentLanguage.init)
         guard tag == nil || language != nil else { return }
-        await restyle { writer, content in try await writer.setDocumentLanguage(language, of: content) }
+        await restyle(byThePerson: true) { writer, content in try await writer.setDocumentLanguage(language, of: content) }
     }
 
     /// Keeps the language the words were found in, by its tag, only if the CV still keeps none once the changes asked
@@ -17,7 +17,7 @@ extension EditorViewModel {
     /// once it is fixed (#407). A tag that names no language changes nothing.
     public func keepFoundLanguage(_ tag: String) async {
         guard let language = DocumentLanguage(tag) else { return }
-        await restyle { [self] writer, content in
+        await restyle(byThePerson: false) { [self] writer, content in
             guard held?.language == nil else { return nil }
             return try await writer.setDocumentLanguage(language, of: content)
         }
@@ -27,19 +27,23 @@ extension EditorViewModel {
     /// writer of the open CV stores it, or keeps it for the first write; the text is not written.
     public func changeLook(to shown: EditorLook, parts: Set<LookPart>) async {
         guard let change = LookChange(shown: shown, parts: parts) else { return }
-        await restyle { writer, content in try await writer.changeLook(change, of: content) }
+        await restyle(byThePerson: true) { writer, content in try await writer.changeLook(change, of: content) }
     }
 
     /// Runs `change` on the writer of the open CV, after any replacement that runs, and holds the CV it gives back; a
     /// change that gives back nil changed nothing, and leaves a failure shown as it is. The CV passed is the one the
-    /// form stands on: the writer takes the look and the language it keeps, never this one's.
-    private func restyle(_ change: @escaping @MainActor (any CVAutosaveWriting, CV) async throws -> CV?) async {
+    /// form stands on: the writer takes the look and the language it keeps, never this one's. `byThePerson` says
+    /// whether the person asked for the change, which the review of an import waits for once it is stored.
+    private func restyle(
+        byThePerson: Bool, _ change: @escaping @MainActor (any CVAutosaveWriting, CV) async throws -> CV?
+    ) async {
         await replace { [self] in
             guard let writer, let base else { return }
             do {
                 guard let changed = try await change(writer, form.applied(to: base)) else { return }
                 restyled = changed
                 changeFailure = nil
+                writerTookAChangeOfStyle(byThePerson: byThePerson)
             } catch {
                 changeFailed(error)
             }
