@@ -11,6 +11,7 @@ public struct UnavailableStore: DesignStore {
     public func installedDesigns() async throws -> [DesignManifest] { throw Failure() }
     public func installedOrigins() async throws -> [String: DesignOrigin] { throw Failure() }
     public func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { throw Failure() }
+    public func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { throw Failure() }
 }
 
 /// A bundled source that is cancelled while it is read.
@@ -37,9 +38,10 @@ public actor SpyDesignStore: DesignStore {
     public struct Failure: Error {}
     private var designs: [String: ValidatedDesign]
     private var origins: [String: DesignOrigin]
-    private let savesFailFor: Set<String>, unreadable: Set<String>, listingFails: Bool, cancelling: Set<Operation>
+    private var unreadable: Set<String>
+    private let savesFailFor: Set<String>, listingFails: Bool, cancelling: Set<Operation>
     /// The operations of the port, so that a test can cancel one of them.
-    public enum Operation: Sendable, CaseIterable { case save, saveIfNewer, design, installedDesigns, installedOrigins, adoptAsBundled }
+    public enum Operation: Sendable, CaseIterable { case save, saveIfNewer, design, installedDesigns, installedOrigins, adoptAsBundled, replaceBundled }
     /// The identifiers saved, in order; a save that failed is not recorded.
     public private(set) var savedIDs: [String] = []
 
@@ -98,6 +100,17 @@ public actor SpyDesignStore: DesignStore {
         if savesFailFor.contains(id) { throw Failure() }
         guard designs[id] == design, origins[id] != .imported else { return false }
         origins[id] = .bundled
+        return true
+    }
+    /// Replacing fails for the identifiers whose saves fail, and makes a design that was unreadable readable.
+    public func replaceBundled(_ design: ValidatedDesign) async throws -> Bool {
+        let id = design.manifest.id
+        if cancelling.contains(.replaceBundled) { throw CancellationError() }
+        if savesFailFor.contains(id) { throw Failure() }
+        guard designs[id] != nil, origins[id] == .bundled else { return false }
+        designs[id] = design
+        unreadable.remove(id)
+        savedIDs.append(id)
         return true
     }
 }

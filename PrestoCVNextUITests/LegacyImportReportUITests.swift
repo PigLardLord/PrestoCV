@@ -146,7 +146,11 @@ final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
         let row = element("legacyImport.row", in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 30))
 
-        row.swipeDown(velocity: .fast)
+        // A pull to the foot of the screen, held before it ends: a short swipe on the row moves the sheet about 30 pt, and
+        // whether iOS then closes it depends on the speed at release (0 of 8 slow swipes closed it, 6 of 8 fast ones)
+        let from = row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let foot = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
+        from.press(forDuration: 0.1, thenDragTo: foot, withVelocity: .default, thenHoldForDuration: 0.5)
         XCTAssertTrue(waitUntilGone(row), "The sheet closes")
 
         XCTAssertTrue(element("legacyImport.row", in: try relaunch(app)).waitForExistence(timeout: 30), "The sheet is back")

@@ -24,13 +24,15 @@ public enum SaveVerdict: Hashable, Sendable {
     case textTooLong(CVTextField)
     /// A section has more than `CVLimits.maxEntriesPerSection` entries.
     case tooManyEntries(CVSection)
-    /// All the texts together are above `CVLimits.maxTotalTextBytes`.
+    /// All the texts together are above `CVLimits.maxTotalTextBytes`, or the draft's not-placed texts are above the
+    /// limits of one text or of one section (`CVLimits`): they are not printed, so no field is named for them.
     case cvTooLarge
 }
 
 extension CV {
-    /// The save rule and the size limits, in this order: enough content, each text, each section, the whole CV. The first
-    /// that fails is the reason. Text is never cut to fit.
+    /// The save rule and the size limits, in this order: enough content, each text, each section, the draft's not-placed
+    /// texts, the whole CV. The first that fails is the reason. Text is never cut to fit. The draft is not content: it
+    /// never makes a CV savable, but its texts count in the limits.
     public func saveCheck() -> SaveVerdict {
         guard hasEnoughContent else { return .notEnoughContent }
         let p = personal, s = sections
@@ -53,9 +55,16 @@ extension CV {
                                          (.languages, s.languages.count), (.certifications, s.certifications.count),
                                          (.profiles, s.profiles.count), (.interests, s.interests.count)]
         if let (section, _) = sizes.first(where: { $0.1 > CVLimits.maxEntriesPerSection }) { return .tooManyEntries(section) }
+        let notPlaced = draft?.notPlaced ?? []
+        let draftTexts = notPlaced.map(\.text) + notPlaced.compactMap(\.heading)
+        if notPlaced.count > CVLimits.maxEntriesPerSection
+            || draftTexts.contains(where: { $0.utf8.count > CVLimits.maxTextBytes || $0.count > CVLimits.maxTextCharacters }) {
+            return .cvTooLarge
+        }
         // The addresses and the language tag count too: they are printed. Each has its own bound, so no field is named for them.
+        // The draft's texts count as well: they are stored with the CV.
         let others = [p.email?.value, p.phone?.value, p.website?.value, language?.tag].compactMap { $0 }
-            + s.certifications.compactMap { $0.link?.value } + s.profiles.map { $0.link.value }
+            + s.certifications.compactMap { $0.link?.value } + s.profiles.map { $0.link.value } + draftTexts
         let total = texts.reduce(0) { $0 + $1.text.utf8.count } + others.reduce(0) { $0 + $1.utf8.count }
         return total > CVLimits.maxTotalTextBytes ? .cvTooLarge : .ok
     }
