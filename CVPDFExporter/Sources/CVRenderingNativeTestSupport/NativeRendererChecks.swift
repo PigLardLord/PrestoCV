@@ -213,13 +213,13 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
             guard !pdf.truncated else {
                 throw NativeCheckFailure.pageBreakDocumentTruncated(design: name, summaryLines: lines, requiredPages: pdf.requiredPages)
             }
-            guard let layout = inspector.layout(of: pdf.data), let text = inspector.text(of: pdf.data) else {
+            guard let layout = inspector.layout(of: pdf.data) else {
                 throw NativeCheckFailure.unreadablePDF
             }
             guard layout.pages.count == pdf.pageCount else {
                 throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
             }
-            let found = PageBreaks.faults(of: document, printedAs: layout, text: text, starts: PageBreakDocument.startLines(headings),
+            let found = PageBreaks.faults(of: document, printedAs: layout, starts: PageBreakDocument.startLines(headings),
                                           page: PageBreakDocument.page)
             if !found.isEmpty { faults[lines] = found }
         }

@@ -116,9 +116,44 @@ struct PageBreaksTests {
             Self.line("Experience", page: 0, y: 40),
             textLine("Skill 199 with a long name", page: 1, PDFBox(x: 500, y: 400, width: 100, height: 12), glyphHeight: 10),
         ])
-        let faults = PageBreaks.faults(of: document, printedAs: layout, text: "Alex Example\nExperience\nSkill 199 with a long name",
+        let faults = PageBreaks.faults(of: document, printedAs: layout,
                                        starts: Self.starts, page: .a4)
         #expect(faults == [.startSplit(page: 0, line: "Experience"), .missing(["Skill 200 with a long name"]),
                            .geometry([.outsidePage(page: 1, text: "Skill 199 with a long name")])])
+    }
+
+    @Test("two expected identical nodes of which one prints, beside the clipped copy the next page also prints, lack one: the copy is not a second print")
+    func clippedCopyIsNotAnOccurrence() {
+        let document = RenderedDocument(html: "", textNodes: ["Skill 1 with a long name", "Skill 1 with a long name"])
+        let layout = PDFLayout(pages: [a4Page, a4Page], lines: [
+            Self.line("Skill 1 with a long name", page: 0, y: 22),
+            Self.line("Skill 1 with a long name", page: 1, y: 792),
+            Self.line("Line 1 of a profile that fills the page.", page: 0, y: 760),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.missing(["Skill 1 with a long name"])])
+    }
+
+    @Test("an expected node that two visible lines print is duplicated content")
+    func visibleDuplicate() {
+        let document = RenderedDocument(html: "", textNodes: ["Skill 1 with a long name"])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Skill 1 with a long name", page: 0, y: 700),
+            Self.line("Skill 1 with a long name", page: 0, y: 500),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.duplicated(["Skill 1 with a long name"])])
+    }
+
+    @Test("a node printed once on its page and once more as the clipped copy beside it, with the same count of nodes, is complete and not duplicated")
+    func clippedCopyIsNoDuplicate() {
+        let document = RenderedDocument(html: "", textNodes: ["Skill 1 with a long name", "Line 1 of a profile that fills the page."])
+        let layout = PDFLayout(pages: [a4Page, a4Page], lines: [
+            Self.line("Line 1 of a profile that fills the page.", page: 0, y: 760),
+            Self.line("Skill 1 with a long name", page: 0, y: 22),
+            Self.line("Skill 1 with a long name", page: 1, y: 792),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults.isEmpty)
     }
 }

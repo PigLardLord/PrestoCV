@@ -14,6 +14,8 @@ public enum PageBreakFault: Sendable, Equatable {
     case hidden(page: Int, text: String)
     /// The document's text nodes that the PDF's text lacks (`DocumentCompleteness`).
     case missing([String])
+    /// Expected text nodes that more visible lines print than the document holds: duplicated content.
+    case duplicated([String])
     /// Lines outside their page or too small to read (`GeometricCompleteness`).
     case geometry([GeometryViolation])
 }
@@ -56,14 +58,33 @@ public enum PageBreaks {
         }
     }
 
-    /// Every fault of `document` printed as `layout`, whose text is `text`: the page faults above, the text nodes it
-    /// lacks, and the lines `GeometricCompleteness` rejects.
-    public static func faults(of document: RenderedDocument, printedAs layout: PDFLayout, text: String, starts: [String],
+    /// Every fault of `document` printed as `layout`: the page faults above, the text nodes the visible lines lack, the
+    /// nodes they print more often than the document holds, and the lines `GeometricCompleteness` rejects. Only the lines
+    /// a page shows count: the copy a page clips in its margin is neither a node's print nor a duplicate of it, and a
+    /// line in a margin that no page prints is not shown, so it counts for nothing.
+    public static func faults(of document: RenderedDocument, printedAs layout: PDFLayout, starts: [String],
                               page: PageSetup) -> [PageBreakFault] {
-        let missing = DocumentCompleteness.missing(in: text, expected: document.textNodes)
+        let margin = page.verticalMarginPoints
+        let shown = layout.lines.filter { line in
+            let box = layout.pages[line.pageIndex]
+            return !(line.box.maxY <= box.y + margin || line.box.y >= box.maxY - margin)
+        }
+        let missing = DocumentCompleteness.missing(in: shown.map(\.text).joined(separator: "\n"), expected: document.textNodes)
+        let excess = duplicated(in: shown, expected: document.textNodes)
         let violations = GeometricCompleteness.violations(in: layout, minimumGlyphHeight: GeometricCompleteness.minimumGlyphHeight)
-        return faults(in: layout, starts: starts, margin: page.verticalMarginPoints)
-            + (missing.isEmpty ? [] : [.missing(missing)]) + (violations.isEmpty ? [] : [.geometry(violations)])
+        return faults(in: layout, starts: starts, margin: margin) + (missing.isEmpty ? [] : [.missing(missing)])
+            + (excess.isEmpty ? [] : [.duplicated(excess)]) + (violations.isEmpty ? [] : [.geometry(violations)])
+    }
+
+    /// The expected nodes that more shown lines print, whole, than the document holds, in the order the document has them.
+    private static func duplicated(in shown: [PDFTextLine], expected: [String]) -> [String] {
+        let printed = Dictionary(shown.map { (key($0.text), 1) }, uniquingKeysWith: +)
+        let held = Dictionary(expected.map { (key($0), 1) }, uniquingKeysWith: +)
+        var seen = Set<String>()
+        return expected.filter { node in
+            let k = key(node)
+            return seen.insert(k).inserted && printed[k, default: 0] > held[k, default: 0]
+        }
     }
 
     private static func key(_ text: String) -> String { text.filter { !$0.isWhitespace }.lowercased() }
