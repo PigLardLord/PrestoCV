@@ -304,6 +304,37 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("A row of another size after a blank line stays in the table: it is flagged and the rows after it keep the header",
+          arguments: [
+              "| Tutor | Riverside School | 2018 – 2020 |",
+              "| Tutor | Riverside School | 2018 – 2020 | Ran workshops | Part time |",
+          ])
+    func oddRowAfterAGap(_ odd: String) throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        \(odd)
+        | Harbor Systems | Planner | 2015 – 2017 | Drew up plans |
+
+        | Quillon Brae | Chief Wizard | 2012 – 2015 | Brewed potions |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 4)
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015, 2012])
+        #expect(jobs.map { $0.check == nil } == [true, false, true, true])
+        let after = Array(jobs.suffix(2))
+        #expect(after.map { $0.employer?.value } == ["Harbor Systems", "Quillon Brae"])
+        #expect(after.map { $0.role?.value } == ["Planner", "Chief Wizard"])
+        #expect(after.map { $0.location?.value } == [nil, nil])
+        #expect(after.map { $0.details.map(\.value) } == [["Drew up plans"], ["Brewed potions"]])
+        #expect(jobs.first?.employer?.value == "Northgate Academy")
+        #expect(jobs.first?.role?.value == "Teaching Assistant")
+        noLoss(result)
+    }
+
     @Test("Bullets and an undated line under a table row stay that job's details", arguments: [
         ("Experience", "| Period | Employer | Role | Tasks |", "Teaching Assistant", "Northgate Academy",
          "Helped with reading", "Covered two classes"),

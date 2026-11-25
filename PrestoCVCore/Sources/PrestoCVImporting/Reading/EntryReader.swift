@@ -591,9 +591,10 @@ enum EntryReader {
                 continue
             }
             // A row is written between the table's bars and follows the one before; a blank line between two rows keeps
-            // the table where the cell count matches. Cells set apart by tabs or a wide gap are a line of their own.
+            // the table whatever the cell count, and a size other than the header's is flagged below. Cells set apart
+            // by tabs or a wide gap are a line of their own.
             let isRow = inTable && line.block.isTableRow && line.block.index == previous + 1
-                && (line.block.followsGap ? line.cells.count > 1 && line.cells.count == names.count
+                && (line.block.followsGap ? line.cells.count > 1
                     : line.cells.count > 1 || line.cells.count == names.count)
             if !isRow, inTable, continues(lines, at: place, after: result.last, ofTable: rowsOfTable == table) {
                 // A line with no date right under a row is that job's description, not an entry of its own
