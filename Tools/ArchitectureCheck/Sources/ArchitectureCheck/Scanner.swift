@@ -730,9 +730,28 @@ final class Scanner: SyntaxVisitor {
                 if Self.hasAttribute("concurrent", f.attributes) { return true }
                 if Self.hasAttribute("MainActor", f.attributes) { return false }
             }
+            // An actor isolates only what is isolated to it: a member that runs on its caller's executor is no boundary.
+            if Self.runsOnCallersExecutor(n) { return false }
             if n.is(ActorDeclSyntax.self) { return true }
             if let e = n.as(ExtensionDeclSyntax.self), concurrency.actors.contains(Self.typeName(e.extendedType) ?? "") { return true }
             current = n.parent
+        }
+        return false
+    }
+
+    /// A member that is not isolated to its actor: `nonisolated` (also `nonisolated(unsafe)`) or `static` (or `class`) functions,
+    /// properties (their accessors with them) and subscripts, a synchronous designated initializer (SE-0327: it runs on the caller's executor; an `async`
+    /// or `convenience` one is isolated) and a deinitializer (it runs on the thread that releases the last reference).
+    private static func runsOnCallersExecutor(_ node: Syntax) -> Bool {
+        func unisolated(_ modifiers: DeclModifierListSyntax) -> Bool {
+            modifiers.contains { ["nonisolated", "static", "class"].contains($0.name.text) }
+        }
+        if let f = node.as(FunctionDeclSyntax.self) { return unisolated(f.modifiers) }
+        if let v = node.as(VariableDeclSyntax.self) { return unisolated(v.modifiers) }
+        if let s = node.as(SubscriptDeclSyntax.self) { return unisolated(s.modifiers) }
+        if node.is(DeinitializerDeclSyntax.self) { return true }
+        if let i = node.as(InitializerDeclSyntax.self) {
+            return unisolated(i.modifiers) || (i.signature.effectSpecifiers?.asyncSpecifier == nil && !i.modifiers.contains { $0.name.text == "convenience" })
         }
         return false
     }
