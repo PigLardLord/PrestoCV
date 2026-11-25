@@ -106,4 +106,30 @@ struct SkillGroupTransitionTests {
         #expect(found.cv.skills.map(\.value) == ["Welding"])
         #expect(found.cv.languages.map(\.name.value) == ["Spanish", "French", "German"])
     }
+
+    /// A languages section with its own heading that groups native and other languages: the label is no skills heading.
+    static let groupedLanguages: [(Words, String, String, String, String)] = [
+        (english, "Native", "Other", "German B2", "German"),
+        (german, "Muttersprache", "Sonstige", "Spanisch B2", "Spanisch"),
+        (italian, "Madrelingua", "Altre", "Tedesco B2", "Tedesco"),
+        (spanish, "Nativo", "Otro", "Alemán B2", "Alemán"),
+        (french, "Langue maternelle", "Autres", "Allemand B2", "Allemand"),
+    ]
+
+    @Test("A languages section that groups native and other languages keeps the names and the levels", arguments: groupedLanguages)
+    func groupedLanguagesStay(words: Words, native: String, other: String, entry: String, name: String) throws {
+        let found = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("""
+        \(words.skills)
+        \(words.trade)
+
+        \(words.languages)
+        \(words.firstLanguage)
+        \(native)
+        \(other)
+        \(entry)
+        """)
+        #expect(found.cv.skills.map(\.value) == [words.trade])
+        #expect(found.cv.languages.map(\.name.value) == [words.firstLanguage, name])
+        #expect(found.cv.languages.last?.level != nil)
+    }
 }

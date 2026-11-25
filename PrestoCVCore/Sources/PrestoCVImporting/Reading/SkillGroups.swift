@@ -34,8 +34,13 @@ enum SkillGroups {
     /// (a known one, or a line naming a group of skills) that shows no language evidence. A language the lists know, a
     /// level (a CEFR one, a word of a level, a native speaker's statement) written with or without punctuation, is a
     /// language's line and stays in the languages ("Englisch gute Kenntnisse", "Gute Kenntnisse").
-    static func reopensSkills(_ text: String) -> Bool {
-        (isLabel(text) || namesGroupOfSkills(text)) && !showsLanguageEvidence(text)
+    ///
+    /// A label as generic as "Other" or "Native" groups of languages too ("Native / English / Other / German B2"), so the
+    /// line that follows is read: when it is a language's line, the label groups languages and the section goes on.
+    static func reopensSkills(_ text: String, following next: String? = nil) -> Bool {
+        guard (isLabel(text) || namesGroupOfSkills(text)) && !showsLanguageEvidence(text) else { return false }
+        guard let next, !next.trimmingCharacters(in: Self.trimmed).isEmpty else { return true }
+        return !showsLanguageEvidence(next)
     }
 
     /// Whether a line is a language's: the one rule that settles a line holding a language name or a level and a skills
