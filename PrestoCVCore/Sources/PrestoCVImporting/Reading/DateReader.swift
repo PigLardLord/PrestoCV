@@ -151,7 +151,7 @@ enum DateReader {
     /// follows. A dot is written in both, so a dotted range is a period unless a unit stands beside it ("3.50–4.50%",
     /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range with positive evidence
     /// (see `isVersion`: "v3.10 – 3.12", "Version 3.10 – 3.12", "Python 3.10 – 3.12"). A range with neither is a period
-    /// whatever its years, as "09/60 – 08/65" and "Acme 9.19 – 8.21" are.
+    /// whatever its years, as "09/60 – 08/65" and "Acme 9.10 – 9.12" are.
     private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
         guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
               let (first, firstEnd) = shortDate(at: index, in: tokens),
@@ -180,8 +180,8 @@ enum DateReader {
 
     /// A one-digit number that reads as a version, only on positive evidence (split rather than merge: a wrong split is
     /// visible, a wrong merge loses a job): a "v" glued to it ("v3.10"), a version word before it ("Version", "versione",
-    /// "versión", "versão"), or one major on both sides ("Python 3.10 – 3.12") after a word that is no organisation and
-    /// no introducer of a date. "Muster GmbH 9.19 – 8.21" and "Acme 9.19 – 8.21" are periods.
+    /// "versión", "versão"), or one major on both sides after the name of a software product or language ("Python 3.10 – 3.12").
+    /// Any other word before it ("Muster GmbH 9.19 – 8.21", "Acme 9.10 – 9.12") leaves a period.
     private static func isVersion(at index: Int, to end: Int, in tokens: [Token]) -> Bool {
         guard index > 0, case .number(let major, 1) = tokens[index].kind, case .word(let word) = tokens[index - 1].kind else {
             return false
@@ -189,8 +189,17 @@ enum DateReader {
         if word == "v", tokens[index].spaced == false { return true }
         if versionWords.contains(word) { return true }
         guard end >= 2, case .number(major, _) = tokens[end - 2].kind, prefixWord(at: index - 1, in: tokens) == nil else { return false }
-        return !EntryVocabulary.isOrganisation(word)
+        return softwareNames.contains(word)
     }
+
+    /// Software products and languages that carry a version range ("Python 3.10 – 3.12"). A narrow list: any other word
+    /// before an ambiguous range is an employer or a place, and the range is its period.
+    private static let softwareNames: Set<String> = [
+        "python", "django", "flask", "swift", "swiftui", "java", "kotlin", "node", "nodejs", "php", "ruby", "rails", "go",
+        "rust", "scala", "perl", "ios", "ipados", "macos", "watchos", "tvos", "android", "windows", "ubuntu", "debian",
+        "linux", "angular", "react", "vue", "net", "dotnet", "postgres", "postgresql", "mysql", "mariadb", "mongodb",
+        "redis", "docker", "kubernetes", "xcode", "gradle", "laravel", "symfony", "spring", "unity", "unreal",
+    ].reduce(into: Set<String>()) { $0.insert($1.folded) }
 
     private static let versionWords: Set<String> = ["version", "versione", "versao"].reduce(into: Set<String>()) { $0.insert($1.folded) }
 

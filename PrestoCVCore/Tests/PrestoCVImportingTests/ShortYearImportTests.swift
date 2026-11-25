@@ -113,6 +113,29 @@ struct ShortYearImportTests {
         #expect(text(of: second).contains("Muster"))
     }
 
+    @Test("An employer with no legal form and a two-year job stays its own entry", arguments: [
+        ("Acme 9.10 – 9.12", 2010, 9, 2012, 9), ("Acme 09/10 – 09/12", 2010, 9, 2012, 9),
+        ("Acme 09/2010 – 09/2012", 2010, 9, 2012, 9), ("Acme 9.2010 – 9.2012", 2010, 9, 2012, 9),
+    ])
+    func twoYearJobAtAnUnformedEmployer(line: String, fromYear: Int, fromMonth: Int, toYear: Int, toMonth: Int) throws {
+        let found = try imported("""
+        Berufserfahrung
+        Beispiel AG 10.21 – heute
+        Leiter Buchhaltung, Hamburg
+        \(line)
+        Verkäufer, Berlin
+        """)
+        #expect(found.cv.experience.count == 2)
+        let first = try #require(found.cv.experience.first)
+        let second = try #require(found.cv.experience.last)
+        #expect(first.period?.value.start == YearMonth(year: 2021, month: 10))
+        #expect(first.period?.value.end == .current)
+        #expect(second.period?.value.start == YearMonth(year: fromYear, month: fromMonth))
+        #expect(second.period?.value.end == .date(YearMonth(year: toYear, month: toMonth)))
+        #expect(text(of: first).contains("Beispiel"))
+        #expect(text(of: second).contains("Acme"))
+    }
+
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
         ("K-12 Teacher", "K-12"), ("k8s platform", "k8s"), ("% of revenue", "of revenue"),
         ("% des Umsatzes", "Umsatzes"), ("% del fatturato", "fatturato"), ("% du chiffre", "chiffre"),
