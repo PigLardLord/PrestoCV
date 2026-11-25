@@ -36,6 +36,18 @@ struct LanguageVarietyTests {
             "secção", "secções",
             // The tu forms, Portugal's way to address the person: the app, as 1.0, says "você" ("seu", "sua").
             "tu", "teu", "tua", "teus", "tuas",
+            // The verbs' tu forms, which address the person as "tu" as the pronouns do, in a text with no pronoun:
+            // in the present ("podes"), the present subjunctive ("não envies"), the future subjunctive and the
+            // personal infinitive ("se precisares", "antes de o enviares") and the past ("o que fizeste"). The app
+            // says "você pode", "não envie", "se precisar", "antes de enviá-lo" and "o que você fez". A tu form that
+            // is also another word is no marker: the imperatives "confirma" and "troca" are also "ele confirma" and
+            // "ele troca", "precisas" is also "datas precisas", "escolhas" also "as escolhas" and "deste" also
+            // "deste currículo". "estás" is matched with its accent, so "estas datas" is no match.
+            "podes", "tens", "queres", "sabes", "estás", "vais", "deves", "consegues", "preferes",
+            "possas", "tenhas", "queiras", "sejas", "faças", "precises", "envies", "esqueças",
+            "precisares", "enviares", "escolheres", "quiseres", "puderes", "tiveres", "fizeres", "fores", "estiveres",
+            "usares", "preferires",
+            "foste", "fizeste", "escolheste", "enviaste",
         ],
     ]
 
@@ -66,7 +78,17 @@ struct LanguageVarietyTests {
     @Test("A marker is found as a whole word in any case, and correct text of the app's variety has none", arguments: [
         ("Não foi possível ler o Ficheiro.", "pt", ["ficheiro"]),
         ("Toca no ecrã para abrir os teus registos.", "pt", ["ecrã", "registos", "teus"]),
+        ("Confirma cada campo antes de o enviares. Podes copiá-lo, se quiseres.", "pt",
+         ["podes", "enviares", "quiseres"]),
+        ("Se tens dúvidas, adiciona o que precisares com o nível que escolheres.", "pt",
+         ["tens", "precisares", "escolheres"]),
+        ("Não te esqueças do que fizeste nem envies o CV se não estás pronto.", "pt",
+         ["estás", "envies", "esqueças", "fizeste"]),
         ("Podéis abrirlo desde vuestro ordenador.", "es", ["podéis", "vuestro", "ordenador"]),
+        ("Confira cada campo antes de enviá-lo. Você pode copiá-lo, se quiser.", "pt", []),
+        ("Se tiver dúvidas, adicione o que precisar com o nível que escolher.", "pt", []),
+        ("O app confirma cada campo e troca o cargo pelo empregador.", "pt", []),
+        ("Datas precisas e boas escolhas: estas linhas são deste currículo.", "pt", []),
         ("Carregando seus currículos…", "pt", []),
         ("Para carregar o arquivo, toque em Arquivos na tela.", "pt", []),
         ("Excluir “%@”? O currículo salvo será excluído.", "pt", []),
