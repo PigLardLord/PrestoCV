@@ -4,14 +4,17 @@ import PrestoCVWorkflowPorts
 
 /// Listing the CVs and starting from a sample, on the use cases of the application layer. Each listing has every file the
 /// store reported it could not read since the workflow was made, that is during the launch: the store reports a file once,
-/// on the listing that sets it aside, and at launch that listing is the first-run screen's.
+/// on the listing that sets it aside, and at launch that listing is the first-run screen's. A launch whose import of the
+/// released app's CVs may have left some out is never a first run, even with an empty store: those CVs are not gone.
 public struct BrowseCVsWorkflow: CVBrowsing {
     private let repository: any CVRepository
     private let sampleSource: any SampleCVSource
     private let ids: any IDGenerator
+    private let legacyImport: LegacyImportOutcome
 
-    public init(repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator) {
-        self.repository = LaunchIssues(store: repository); sampleSource = samples; self.ids = ids
+    /// `legacyImport` is what the launch's import of the released app's CVs did.
+    public init(repository: any CVRepository, samples: any SampleCVSource, ids: any IDGenerator, legacyImport: LegacyImportOutcome) {
+        self.repository = LaunchIssues(store: repository); sampleSource = samples; self.ids = ids; self.legacyImport = legacyImport
     }
 
     @concurrent public func list() async throws(EditFailure) -> CVListing {
@@ -19,7 +22,9 @@ public struct BrowseCVsWorkflow: CVBrowsing {
     }
 
     @concurrent public func onboarding() async throws(EditFailure) -> OnboardingState {
-        do { return try await DetermineOnboarding(repository: repository)() } catch { throw EditFailure(error) }
+        let state: OnboardingState
+        do { state = try await DetermineOnboarding(repository: repository)() } catch { throw EditFailure(error) }
+        return legacyImport.mayLeaveCVsOut ? .returning : state
     }
 
     @concurrent public func samples() async throws(EditFailure) -> [CV] {

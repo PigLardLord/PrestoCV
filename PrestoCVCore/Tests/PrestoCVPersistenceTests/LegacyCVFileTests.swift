@@ -102,6 +102,13 @@ struct LegacyCVFileTests {
         #expect(Set(legacy.drops) == [.email, .phone, .website, .skillLevel, .certificationYear, .certificationLink, .profile, .documentLanguage])
     }
 
+    @Test("an address with a decomposed accent in its domain survives the import, as typed")
+    func decomposedEmailKept() throws {
+        let address = "ada@" + String(repeating: "e\u{0301}", count: 30) + ".example.com"
+        let legacy = try #require(mapped(LegacyFixtures.minimal(#""personalInfo":{"name":"A","email":"\#(address)"}"#)))
+        #expect(legacy.cv.personal.email?.value == address && !legacy.drops.contains(.email))
+    }
+
     @Test("a period that is not an unambiguous range is kept as written in the description, and reported to check, not as a drop", arguments: ["2020", "since forever", "2023 – 2020", "13/2020 – 2021", "1500 – 1600"])
     func uncertainPeriod(text: String) throws {
         let fields = #""relevant_experience":[{"title":"T","company":"C","period":"\#(text)"}]"#

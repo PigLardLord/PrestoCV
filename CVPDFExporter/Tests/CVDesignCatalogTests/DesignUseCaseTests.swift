@@ -208,12 +208,55 @@ struct SyncBundledDesignsTests {
         #expect(try await store.installedOrigins() == ["clean": .imported])
     }
 
-    @Test("an installed design is listed, never read: one that cannot be read does not stop the sync")
+    @Test("an installed bundled design the store cannot read is repaired, after the bundled package renders, and the sync goes on")
     func unreadableInstalledDesign() async throws {
         let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled], unreadable: ["clean"])
+        let gate = FakeRenderingGate()
         let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
-        let report = try await SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)()
-        #expect(report.unchanged == ["clean"] && report.installed == ["bold"])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(report.repaired == ["clean"] && report.installed == ["bold"] && report.unchanged.isEmpty)
+        #expect(report.failed.isEmpty && report.notRendered.isEmpty && report.conflicts.isEmpty)
+        #expect(await gate.verified == ["clean", "bold"])
+        #expect(try await GetDesign(store: store)(id: "clean") == (try DesignStoreContract.design(id: "clean")))
+        #expect(try await store.installedOrigins() == ["clean": .bundled, "bold": .bundled])
+        let steady = try await SyncBundledDesigns(source: source, gate: gate, store: store)()
+        #expect(steady.unchanged == ["clean", "bold"] && steady.repaired.isEmpty)
+    }
+
+    @Test("a repair is not written when the bundled package does not render")
+    func unrenderedRepair() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled], unreadable: ["clean"])
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]),
+                                                  gate: FakeRenderingGate(refusing: ["clean"]), store: store)()
+        #expect(report.notRendered == ["clean"] && report.repaired.isEmpty && report.unchanged.isEmpty)
+        await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await GetDesign(store: store)(id: "clean") }
+    }
+
+    @Test("a repair is not tried when the bundled package is rejected")
+    func rejectedRepair() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled], unreadable: ["clean"])
+        let broken = (name: "clean", data: Data("not a package".utf8))
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [broken]), gate: FakeRenderingGate(), store: store)()
+        #expect(report.rejected.map(\.name) == ["clean"] && report.repaired.isEmpty)
+    }
+
+    @Test("a design the sync did not install is never repaired, even one the store cannot read")
+    func importedUnreadableIsNotRepaired() async throws {
+        let mine = try DesignStoreContract.design(id: "clean", css: otherCSS)
+        let store = SpyDesignStore(installed: [mine], origins: ["clean": .imported], unreadable: ["clean"])
+        let gate = FakeRenderingGate()
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)()
+        #expect(report.conflicts == ["clean"] && report.repaired.isEmpty)
+        #expect(await gate.verified.isEmpty)
+        #expect(await store.savedIDs.isEmpty)
+    }
+
+    @Test("a repair the store fails is reported as failed")
+    func failedRepair() async throws {
+        let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], origins: ["clean": .bundled],
+                                   savesFailFor: ["clean"], unreadable: ["clean"])
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: FakeRenderingGate(), store: store)()
+        #expect(report.failed == ["clean"] && report.repaired.isEmpty)
     }
 
     // MARK: Designs the sync did not install
@@ -245,7 +288,7 @@ struct SyncBundledDesignsTests {
                 && report.notRendered.isEmpty && report.failed.isEmpty)
         #expect(try await GetDesign(store: store)(id: "clean") == installed)
         #expect(try await store.installedOrigins() == (isConflict ? [:] : ["clean": .bundled]))
-        #expect(await store.savedIDs.isEmpty)
+        #expect(await await store.savedIDs.isEmpty)
         #expect(await gate.verified.isEmpty)
     }
 
@@ -286,6 +329,7 @@ struct SyncBundledDesignsTests {
             func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
             func installedOrigins() async throws -> [String: DesignOrigin] { [:] }
             func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { false }
+            func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { false }
         }
         let store = Refusing()
         try await store.save(DesignStoreContract.design(id: "clean"))
@@ -391,7 +435,7 @@ struct SyncBundledDesignsTests {
         let store = SpyDesignStore(installed: [try DesignStoreContract.design(id: "clean")], cancelling: [.adoptAsBundled])
         let sync = SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")]), gate: FakeRenderingGate(), store: store)
         await #expect(throws: CancellationError.self) { _ = try await sync() }
-        #expect(await store.savedIDs.isEmpty)
+        #expect(await await store.savedIDs.isEmpty)
     }
 
     @Test("a cancellation while the source is read ends the sync in a cancellation, not in an unavailable source (#175)")
@@ -409,7 +453,7 @@ struct SyncBundledDesignsTests {
         let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
         let sync = SyncBundledDesigns(source: source, gate: FakeRenderingGate(), store: store)
         await #expect(throws: CancellationError.self) { _ = try await sync() }
-        #expect(await store.savedIDs.isEmpty)
+        #expect(await await store.savedIDs.isEmpty)
     }
 
     @Test("a source that cannot be read is reported")
@@ -499,7 +543,7 @@ struct InstallDesignTests {
         let gate = FakeRenderingGate(), store = SpyDesignStore(listingFails: true)
         let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
         await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
-        #expect(await store.savedIDs.isEmpty)
+        #expect(await await store.savedIDs.isEmpty)
         #expect(await gate.verified.isEmpty)
     }
 
@@ -516,6 +560,7 @@ struct InstallDesignTests {
             func installedDesigns() async throws -> [DesignManifest] { try await base.installedDesigns() }
             func installedOrigins() async throws -> [String: DesignOrigin] { try await base.installedOrigins() }
             func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await base.adoptAsBundled(design) }
+            func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await base.replaceBundled(design) }
         }
         let store = SyncedMeanwhile()
         let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
@@ -528,7 +573,7 @@ struct InstallDesignTests {
         let store = SpyDesignStore(savesFailFor: ["mine"]), gate = FakeRenderingGate()
         let install = InstallDesign(source: FixedBundledSource(packages: []), gate: gate, store: store)
         await #expect(throws: DesignCatalogError.storeUnavailable) { _ = try await install(DesignStoreContract.package(id: "mine")) }
-        #expect(await store.savedIDs.isEmpty)
+        #expect(await await store.savedIDs.isEmpty)
     }
 
     @Test("a cancellation while the bundled source is read, the origins are listed or the design is saved passes through unchanged")
@@ -541,7 +586,7 @@ struct InstallDesignTests {
             let store = SpyDesignStore(cancelling: [operation])
             let install = InstallDesign(source: FixedBundledSource(packages: []), gate: FakeRenderingGate(), store: store)
             await #expect(throws: CancellationError.self) { _ = try await install(DesignStoreContract.package(id: "mine")) }
-            #expect(await store.savedIDs.isEmpty)
+            #expect(await await store.savedIDs.isEmpty)
         }
     }
 

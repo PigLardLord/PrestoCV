@@ -32,6 +32,7 @@ extension ReviewedField {
         case .language(let entry): "import.review.field.language \(entry)"
         case .languageNotKept(let entry): "import.review.field.languageNotKept \(entry)"
         case .certificationYear(let entry): "import.review.field.certificationYear \(entry)"
+        case .certification(let entry): "import.review.field.certification \(entry)"
         }
     }
 }
@@ -54,6 +55,7 @@ extension ReviewReason {
         case .levelMissing: "import.review.reason.levelMissing"
         case .locationNotKept: "import.review.reason.place"
         case .yearUnreadable: "import.review.reason.year"
+        case .descriptionOrEntryUnsure: "import.review.reason.description"
         }
     }
 }

@@ -114,11 +114,11 @@ func everyImportStatus() -> [ImportStatus] {
 func everyReviewedField() -> [ReviewedField] {
     let all: [ReviewedField] = [.name, .title, .location, .summary, .experience(1), .experiencePeriod(1), .education(1),
                                 .educationPeriod(1), .educationLocation(1), .language(1), .languageNotKept(1),
-                                .certificationYear(1)]
+                                .certificationYear(1), .certification(1)]
     for field in all {
         switch field {
         case .name, .title, .location, .summary, .experience, .experiencePeriod, .education, .educationPeriod,
-             .educationLocation, .language, .languageNotKept, .certificationYear:
+             .educationLocation, .language, .languageNotKept, .certificationYear, .certification:
             break
         }
     }

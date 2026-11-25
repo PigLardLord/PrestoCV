@@ -145,11 +145,11 @@ enum ImportValues {
     static let everyField: [ImportReviewField] = {
         let all: [ImportReviewField] = [.name, .title, .location, .summary, .experience(1), .experiencePeriod(2),
                                         .education(3), .educationPeriod(4), .educationLocation(5), .language(6),
-                                        .languageNotKept(7), .certificationYear(8)]
+                                        .languageNotKept(7), .certificationYear(8), .certification(9)]
         for field in all {
             switch field {
             case .name, .title, .location, .summary, .experience, .experiencePeriod, .education, .educationPeriod,
-                 .educationLocation, .language, .languageNotKept, .certificationYear:
+                 .educationLocation, .language, .languageNotKept, .certificationYear, .certification:
                 break
             }
         }
