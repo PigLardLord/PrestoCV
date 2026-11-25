@@ -95,17 +95,16 @@ public enum PageBreaks {
     /// is left over when the text without it still places every node; a left-over line that is a part of a node's text
     /// (three characters or more, so a hyphen or a bullet is none) is a duplicate of the first node that holds it. Any
     /// copy of a repeated line may be the extra one ("Duty 1" printed before and after the node it starts), so each copy
-    /// is tried until one is left over. Only a line no longer than the spare text can be left over, and it is tried on a
-    /// complete print only, so a correct print, whose spare is a few bullets, costs next to nothing.
+    /// of a line the print holds more often than the nodes is tried until one is left over (`leftOverCandidates`). It runs
+    /// on a complete print only, so a correct print, which repeats no line more often than its nodes hold it, costs next
+    /// to nothing.
     private static func duplicated(in lines: [String], expected: [String]) -> [String] {
         let text = lines.joined(separator: "\n")
         let whole = duplicatedWhole(in: text, expected: expected)
-        let spare = key(text).unicodeScalars.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
         var leftOver = Set<String>(), parts = Set<String>()
-        for (index, line) in lines.enumerated() {
-            let k = key(line), size = k.unicodeScalars.count
-            guard size >= 3, size <= spare, !leftOver.contains(k),
-                  let node = expected.first(where: { key($0).contains(k) }) else { continue }
+        for index in leftOverCandidates(in: lines, expected: expected) {
+            let k = key(lines[index])
+            guard !leftOver.contains(k), let node = expected.first(where: { key($0).contains(k) }) else { continue }
             var rest = lines
             rest.remove(at: index)
             let report = DocumentCompleteness.report(in: rest.joined(separator: "\n"), expected: expected)
@@ -113,6 +112,27 @@ public enum PageBreaks {
         }
         var seen = Set<String>()
         return expected.filter { (whole.contains($0) || parts.contains($0)) && seen.insert($0).inserted }
+    }
+
+    /// The indices of the shown lines that may be left over: a part of a node's text, three characters or more, no
+    /// longer than the spare text, whose text the print holds more often than the nodes hold it, each node counted on its
+    /// own. A left-over copy is one more than the nodes need, so a line printed as often as held, as the duties of a
+    /// correct print that repeat word for word, is never searched however many copies there are. Like the whole-node
+    /// search, this reads disjoint matches: a copy the nodes need only across the place of the removed line is not
+    /// counted.
+    static func leftOverCandidates(in lines: [String], expected: [String]) -> [Int] {
+        let printed = Array(key(lines.joined(separator: "\n")).unicodeScalars)
+        let spare = printed.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
+        let nodes = expected.map { Array(key($0).unicodeScalars) }
+        var overPrinted = [String: Bool]()
+        return lines.indices.filter { index in
+            let k = key(lines[index]), needle = Array(k.unicodeScalars)
+            guard needle.count >= 3, needle.count <= spare, expected.contains(where: { key($0).contains(k) }) else { return false }
+            if let known = overPrinted[k] { return known }
+            let over = matches(of: needle, in: printed) > nodes.reduce(0) { $0 + matches(of: needle, in: $1) }
+            overPrinted[k] = over
+            return over
+        }
     }
 
     private static func duplicatedWhole(in text: String, expected: [String]) -> [String] {

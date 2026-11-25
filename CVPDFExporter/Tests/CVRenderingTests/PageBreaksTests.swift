@@ -1,6 +1,6 @@
 import Testing
 @testable import CVRendering
-import CVRenderingTestSupport
+@testable import CVRenderingTestSupport
 
 /// #467: what the native renderers' page-break check reads in the layout of a printed CV.
 @Suite("#467 · page breaks read from a layout")
@@ -234,6 +234,16 @@ struct PageBreaksTests {
         ])
         let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
         #expect(faults == [.duplicated([duty])])
+    }
+
+    @Test("a correct print of many identical nodes beside separators tries none of their lines as left over")
+    func identicalNodesTryNoLine() {
+        let duty = "Duty one of the role"
+        let expected = Array(repeating: duty, count: 60)
+        let lines = [String(repeating: "-", count: 40)] + expected
+        #expect(PageBreaks.leftOverCandidates(in: lines, expected: expected).isEmpty)
+        let layout = PDFLayout(pages: [a4Page], lines: lines.enumerated().map { Self.line($1, page: 0, y: 760 - Double($0) * 11) })
+        #expect(PageBreaks.faults(of: RenderedDocument(html: "", textNodes: expected), printedAs: layout, starts: [], page: .a4).isEmpty)
     }
 
     @Test("text no node holds, as bullets and separators, a hyphen inside a node, and identical nodes printed as often as held are not duplicated")
