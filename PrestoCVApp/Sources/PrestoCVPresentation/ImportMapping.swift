@@ -52,6 +52,7 @@ extension ReviewedField {
         case .language(let entry): self = .language(entry)
         case .languageNotKept(let entry): self = .languageNotKept(entry)
         case .certificationYear(let entry): self = .certificationYear(entry)
+        case .certification(let entry): self = .certification(entry)
         }
     }
 }
@@ -74,6 +75,7 @@ extension ReviewReason {
         case .levelMissing: self = .levelMissing
         case .locationNotKept: self = .locationNotKept
         case .yearUnreadable: self = .yearUnreadable
+        case .descriptionOrEntryUnsure: self = .descriptionOrEntryUnsure
         }
     }
 }

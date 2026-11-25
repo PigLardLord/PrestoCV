@@ -95,4 +95,15 @@ public struct SourceBlock: Hashable, Sendable {
     public let fontSize: Double?
     /// Written between a Markdown table's bars, so it belongs to a table and not to a line laid out in columns.
     public var isTableRow = false
+    /// From a PDF: where the main text of the first cell starts and how large it is, which a date or another cell beside
+    /// it, an icon before it or a small marker in it does not change. Nil when the PDF's cells are not the block's cells
+    /// one by one, when the cell tells neither, or when the cell runs on a line in another size.
+    public let firstCellLook: CellLook?
+
+    /// Where the main text of a cell of a PDF starts, and its size: the size that holds most of the cell's letters and
+    /// digits.
+    public struct CellLook: Hashable, Sendable {
+        public let x: Double
+        public let fontSize: Double
+    }
 }
