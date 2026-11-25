@@ -24,6 +24,7 @@ struct LocalizationCatalogTests {
         "export.file_name": ["es", "fr", "it"],
         "export.font.modern": ["de"],
         "field.description": ["fr"],
+        "import.review.field.certification": ["fr"],
         "section.certifications": ["fr"],
         "section.details": ["de"],
     ]

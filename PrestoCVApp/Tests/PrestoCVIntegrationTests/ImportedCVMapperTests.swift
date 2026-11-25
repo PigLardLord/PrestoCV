@@ -45,12 +45,15 @@ struct ImportedCVMapperTests {
             ],
             skills: [Skill(name: "Go"), Skill(name: "Kubernetes")],
             languages: [LanguageSkill(language: "Portuguese", proficiency: .native), LanguageSkill(language: "English", proficiency: .b2)],
-            certifications: [Certification(name: "Certified Kubernetes Administrator", issuer: "Linux Foundation", issued: date(2017))],
+            certifications: [Certification(name: "Certified Kubernetes Administrator", issuer: "Linux Foundation", issued: date(2017),
+                                           link: link("https://training.example.org/cka"),
+                                           description: "Renewed after a hands-on exam in a live cluster.")],
             profiles: [ProfileLink(platform: "LinkedIn", link: link("https://linkedin.com/in/miravaldez")),
                        ProfileLink(platform: "GitHub", link: link("https://github.com/miravaldez")),
                        ProfileLink(platform: "XING", link: link("https://xing.com/profile/Mira_Valdez"))],
             interests: ["Chess"]))
-        #expect(outcome.cv == expected)
+        // The marks of the draft are the subject of `ImportOriginsTests`
+        #expect(outcome.cv.personal == expected.personal && outcome.cv.sections == expected.sections && outcome.cv.language == expected.language)
     }
 
     @Test("an entry keeps its place in the list, and several details become one bulleted description")
@@ -72,7 +75,7 @@ struct ImportedCVMapperTests {
         let outcome = map(f) { $0.education = [f.education(degree: f.quoted("MSc"), location: f.quoted("Aveiro, Portugal"))] }
         #expect(outcome.review.contains(ImportReviewItem(field: .educationLocation(1), reason: .locationNotKept, text: "Aveiro, Portugal")))
         #expect(outcome.notImported.contains("Aveiro, Portugal"))
-        #expect(!leaves(outcome.cv).contains { $0.value.contains("Aveiro") })
+        #expect(!contentLeaves(of: outcome.cv).contains { $0.value.contains("Aveiro") })
     }
 
     @Test("the email and the phone keep the typed values the import read")
@@ -115,6 +118,19 @@ struct ImportedCVMapperTests {
         #expect(outcome.cv.sections.certifications.map(\.issued) == [date(2017), nil])
         #expect(outcome.review.contains(ImportReviewItem(field: .certificationYear(2), reason: .yearUnreadable, text: "1850")))
         #expect(outcome.notImported.contains("1850"))
+    }
+
+    @Test("a certification to check is reported at its place in the CV, with its name and issuer as the person wrote them")
+    func certificationToCheckIsReported() {
+        let f = ImportFixture(text: "Alpha Beta Example Academy")
+        let outcome = map(f) {
+            $0.certifications = [
+                f.certification(f.quoted("Alpha")),
+                f.certification(f.quoted("Beta"), issuer: f.quoted("Example Academy"), check: .descriptionOrEntryUnsure),
+            ]
+        }
+        #expect(outcome.cv.sections.certifications.map(\.name) == ["Alpha", "Beta"])
+        #expect(outcome.review == [ImportReviewItem(field: .certification(2), reason: .descriptionOrEntryUnsure, text: "Beta — Example Academy")])
     }
 
     @Test("a language without a CEFR level stays out of the CV and is listed for review and in the text not imported")

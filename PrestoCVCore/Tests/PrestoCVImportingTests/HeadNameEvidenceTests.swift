@@ -238,4 +238,169 @@ struct HeadNameEvidenceTests {
         ] + Self.experience())
         #expect(result.cv.person.name?.value == "Community Outreach")
     }
+
+    // MARK: Ranking and certainty apart
+
+    @Test("A name-shaped line with a title under it, after the name and its contacts, does not win the name, and it keeps an unmarked name to be checked")
+    func rivalAfterTheContactsKeepsTheNameFlagged() throws {
+        let first = try importing(text:
+            "Anna Weber\nNurse\nperson@example.com\nCommunity Outreach\nBuilt a scheduling application\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital"
+        )
+        #expect(first.cv.person.name?.value == "Anna Weber")
+        #expect(first.cv.person.name?.check == .nameByPosition)
+        #expect(first.cv.person.title?.value == "Nurse")
+        let second = try importing(text: "Greater Wexby\nNurse\nperson@example.com\nAnna Weber\nSenior Nurse")
+        #expect(second.cv.person.name?.value == "Greater Wexby")
+        #expect(second.cv.person.name?.check == .nameByPosition)
+    }
+
+    @Test("A line after the name and its contacts that is no rival, with no title under it, leaves the name sure")
+    func noRivalAfterTheContactsLeavesTheNameSure() throws {
+        let result = try importing(text: "Anna Weber\nNurse\nperson@example.com\nCommunity Outreach\n\n## Experience\n2019 - 2021 Nurse, Northgate Hospital")
+        #expect(result.cv.person.name?.value == "Anna Weber")
+        #expect(result.cv.person.name?.check == nil)
+    }
+
+    // MARK: What is no rival
+
+    /// A head with the lines after its name's contacts, and whether the name is read as sure.
+    struct AfterTheContacts: Sendable, CustomTestStringConvertible {
+        let kind: String
+        let language: String
+        let head: String
+        let isNameSure: Bool
+        var testDescription: String { "\(kind), \(language)" }
+    }
+
+    static let afterTheContacts: [AfterTheContacts] = [
+        AfterTheContacts(kind: "a known place and availability", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nBerlin Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a known place and availability", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nMünchen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a known place and availability", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nRoma Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nNorthgate Holdings Ltd\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nWeber Pflegedienst GmbH\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a company with a legal form", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nRossi Assistenza S.r.l.\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nWORK EXPERIENCE\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nBERUFSERFAHRUNG\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a section heading in capitals", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nESPERIENZE LAVORATIVE\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a job title with a line under it", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSenior Nurse\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nMaria Jones\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Müller\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Bianchi\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nJena Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a city no list knows and a country", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nViterbo Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nHesse Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHessen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a region and a country", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nUmbria Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nRebecca Cook\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Koch\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nLuca Medico\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nDaniel Bank\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nStefan Werk\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with an organisation word as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Banco\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nJack London\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Berlin\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Milano\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPriya Cook\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nWojciech Bäcker\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nNgozi Fabbro\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nMechthild Nurse\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nAurelio Koch\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMechthild Medico\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an organisation word as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPriya Bank\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an organisation word as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nWojciech Werk\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and an organisation word as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nAurelio Banco\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and a school word as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nNgozi College\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and a school word as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nMechthild Institut\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person with an uncommon given name and a school word as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nAurelio Liceo\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a line that is no person as a whole (Senior Nurse)", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSenior Nurse\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Head Cook)", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nHead Cook\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Beispiel GmbH)", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nBeispiel GmbH\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Ospedale di Erfurt)", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nOspedale di Erfurt\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Universität Erfurt)", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nUniversität Erfurt\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Potsdam Germany)", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a line that is no person as a whole (Hessen Deutschland)", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHessen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSarah Ireland\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nHead Chef", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nOlivia Wales\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Polen\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nPeter Frankreich\nPflegefachkraft", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Francia\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nLuca Brasile\nInfermiere", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSarah Ireland\nDental hygienist", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nWedding photographer", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Polen\nZahnarzthelfer", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nPeter Frankreich\nImker", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Francia\nOdontotecnico", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a country as surname and a title outside the role words", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nLuca Brasile\nApicoltore", isNameSure: false),
+        AfterTheContacts(kind: "a place with a country at its end, then availability prose", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nWilling to travel", isNameSure: true),
+        AfterTheContacts(kind: "a place with a country at its end, then availability prose", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nHesse Germany\nOpen to relocation for the right role", isNameSure: true),
+        AfterTheContacts(kind: "a place with a country at its end, then availability prose", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nJena Deutschland\nOffen für einen Wohnortwechsel", isNameSure: true),
+        AfterTheContacts(kind: "a place with a country at its end, then availability prose", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nViterbo Italia\nDisponibile a trasferte", isNameSure: true),
+        AfterTheContacts(kind: "a place with a country at its end, then availability prose", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nUmbria Italia\nDisponibile a spostamenti", isNameSure: true),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nCharlotte Baker\nHead Chef", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nAustin Cook\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nFlorence Miller\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nVictoria Taylor\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nSydney Smith\nSenior Nurse", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nLincoln Carter\nHead Chef", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nFlorenz Koch\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nCharlotte Bäcker\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nVictoria Fischer\nProjektleiter", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nFirenze Fabbro\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nVictoria Medico\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a titled person's name with a city as given name and an occupational surname", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nSiena Fornaio\nSviluppatore software", isNameSure: false),
+        AfterTheContacts(kind: "a place with no role under it", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nLeeds England\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nDublin Ireland\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nCardiff Wales\nOpen to relocation", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nBremen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHessen Deutschland\nBereit für einen Umzug", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nSiena Italia\nDisponibile al trasferimento", isNameSure: true),
+        AfterTheContacts(kind: "a place with no role under it", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nUmbria Italia\nDisponibile al trasferimento", isNameSure: true),
+    ]
+
+    @Test("A name-shaped line after the contacts is a rival only when nothing says it is a place, an organisation, a heading or a job title", arguments: afterTheContacts)
+    func lineAfterTheContactsIsARivalOnlyAsAPerson(row: AfterTheContacts) throws {
+        let result = try importing(text: row.head)
+        let name = try #require(result.cv.person.name)
+        #expect(name.value.hasPrefix("Anna"))
+        #expect(name.check == (row.isNameSure ? nil : .nameByPosition), "\(row.testDescription): \(row.head.replacingOccurrences(of: "\n", with: " / "))")
+    }
+
+    // MARK: A title written as a phrase, or availability prose
+
+    @Test("A name with a country as surname over a title written as a phrase, after the contacts, keeps the first name to be checked")
+    func titleWrittenAsAPhraseKeepsTheNameFlagged() throws {
+        let result = try importing(text: "Anna Weber\nNurse\nperson@example.com\nSarah Ireland\nDental hygienist in training")
+        #expect(result.cv.person.name?.value == "Anna Weber")
+        #expect(result.cv.person.name?.check == .nameByPosition)
+        #expect(result.cv.person.title?.value == "Nurse")
+    }
+
+    static let titleOrAvailability: [AfterTheContacts] = [
+        AfterTheContacts(kind: "a title written as a phrase", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nWedding photographer in training", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Polen\nStaatlich geprüfte Kosmetikerin in Ausbildung", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Francia\nIgienista dentale in formazione", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nJulien France\nHygiéniste dentaire en formation", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nLucía España\nHigienista dental en prácticas", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nPedro Portugal\nHigienista oral em formação", isNameSure: false),
+        AfterTheContacts(kind: "a role, then a phrase", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nNurse in training", isNameSure: false),
+        AfterTheContacts(kind: "a place, then availability prose", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nAvailable for relocation", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nJena Deutschland\nBereit zu einem Wohnortwechsel", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nViterbo Italia\nDisponibile a trasferirsi", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nAnnecy France\nPrête à déménager", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nBretagne France\nOuverte à la mobilité", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nAlbacete España\nDispuesta a trasladarse", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nGalicia España\nAbierta a la reubicación", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nViseu Portugal\nAberta a mudança de cidade", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nMinho Portugal\nDisponível a viajar", isNameSure: true),
+    ]
+
+    @Test("A line under a name with a country as surname leaves that line a rival unless it opens like availability prose", arguments: titleOrAvailability)
+    func titlePhraseOrAvailabilityUnderACountrySurname(row: AfterTheContacts) throws {
+        let result = try importing(text: row.head)
+        let name = try #require(result.cv.person.name)
+        #expect(name.value.hasPrefix("Anna"))
+        #expect(name.check == (row.isNameSure ? nil : .nameByPosition), "\(row.testDescription): \(row.head.replacingOccurrences(of: "\n", with: " / "))")
+    }
 }

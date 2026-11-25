@@ -30,7 +30,8 @@ read by `ContractTableTests` in `PrestoCVImportingTests` and, for the PDFs, by t
   drawn as bars, "seit 2019" and a signature, the consent to data processing, an employer before the role, the one-line
   headers of a US résumé, LinkedIn's PDF copied as text with its sidebar first, labelled personal details, an entry
   with two place lines, the notes after a language's level, a surname given by label, a course on data protection, the native level on the line under its language, languages
-  outside the vocabulary told by their level.
+  outside the vocabulary told by their level, certifications with a link and a description, one with commas, beside
+  titles that hold an address or a sentence.
 - **`scan/scan.pdf`**: a PDF with no text layer.
 - **`*.expected.json`**: the fields each fixture states, which the table compares with what the import found.
 - **`index.json`**: every fixture, its language, form and files.
