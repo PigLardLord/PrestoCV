@@ -24,6 +24,8 @@ enum EntryReader {
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
+        /// The period is a software-name range ("Unity 9.10 – 9.12") read as dates: it may be a version, to be checked.
+        var periodReadsASoftwareRange = false
 
         var isBody: Bool { isBullet || isProse }
     }
@@ -91,6 +93,7 @@ enum EntryReader {
             // split rather than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
             if line.period == nil, !isBullet, !isDutyLine(text) {
                 line.period = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
+                line.periodReadsASoftwareRange = line.period != nil
             }
         }
         return line
@@ -186,7 +189,8 @@ enum EntryReader {
                 draft.inheritedEmployer = group.employer
                 draft.inheritsADoubtfulHeading = section.doubtfulHeadings.contains(group.block)
             }
-            draft.boundsUnsure = layout.unsure.contains(position)
+            // Where the entry starts is doubtful too when its dates are a range after a software name
+            draft.boundsUnsure = layout.unsure.contains(position) || draft.anchor?.periodReadsASoftwareRange == true
             drafts.append(draft)
         }
         return drafts

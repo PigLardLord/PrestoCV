@@ -203,6 +203,44 @@ struct ShortYearImportTests {
         #expect(text(of: entry).contains("3.1"))
     }
 
+    @Test("A bare software range after an entry is split and flagged, and keeps every word", arguments: [
+        "Python 3.10 – 3.12", "Django 3.10-3.12",
+    ])
+    func bareSoftwareRangeIsFlagged(line: String) throws {
+        let found = try imported("""
+        Berufserfahrung
+        09/19 – 08/21    Entwickler, Muster GmbH, Berlin
+        \(line)
+        """)
+        let split = try #require(found.cv.experience.last)
+        #expect(found.cv.experience.count == 2)
+        #expect(split.check == .entryBoundsUnsure)
+        #expect(found.reviewList.contains { $0.field == .experience(1) && $0.reason == .entryBoundsUnsure })
+        let kept = found.cv.experience.map { text(of: $0) }.joined(separator: " | ")
+        let words = ["Entwickler", "Muster", "GmbH", "Berlin"] + line.split(separator: " ").map(String.init).filter { $0.first?.isLetter == true }
+        for word in words {
+            #expect(kept.contains(word), "\(word) lost: \(kept)")
+        }
+    }
+
+    @Test("A software-named employer heading with a dotted range is flagged and keeps its period and entries")
+    func softwareNamedEmployerHeadingIsFlagged() throws {
+        let found = try imported("""
+        Berufserfahrung
+        Beispiel AG 10.21 – heute
+        Leiter Buchhaltung, Hamburg
+        Unity 9.10 – 9.12
+        Verkäufer, Berlin
+        """)
+        #expect(found.cv.experience.count == 2)
+        let second = try #require(found.cv.experience.last)
+        #expect(second.period?.value.start == YearMonth(year: 2010, month: 9))
+        #expect(second.period?.value.end == .date(YearMonth(year: 2012, month: 9)))
+        #expect(text(of: second).contains("Unity"))
+        #expect(second.check == .entryBoundsUnsure)
+        #expect(found.reviewList.contains { $0.field == .experience(1) && $0.reason == .entryBoundsUnsure })
+    }
+
     @Test("A period followed by a lookalike of a unit keeps both ends and the description", arguments: [
         ("K-12 Teacher", "K-12"), ("k8s platform", "k8s"), ("% of revenue", "of revenue"),
         ("% des Umsatzes", "Umsatzes"), ("% del fatturato", "fatturato"), ("% du chiffre", "chiffre"),
