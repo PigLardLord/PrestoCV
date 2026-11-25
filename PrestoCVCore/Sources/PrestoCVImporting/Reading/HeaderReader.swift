@@ -242,23 +242,26 @@ enum HeaderReader {
     /// gender, a marital status, a birth date) or the form's own name labels. The other labels start job titles and
     /// names ("City Planner", "Web Developer", "Mobile Developer"), so they are read only with a colon or a column. A
     /// value that does not look like the label's own ("Gender Pay Analyst") leaves the line to be a title.
-    private static func isReadByPosition(_ label: EntryVocabulary.PersonalLabel, value: Piece) -> Bool {
+    private static func isReadByPosition(_ label: EntryVocabulary.PersonalLabel, labelText: String, value: Piece) -> Bool {
         switch label {
-        case .name, .firstName, .lastName: !startsWithNameLabel(value.text)
+        case .name, .firstName, .lastName: !continuesACompoundLabel(labelText, value: value.text)
         case .nationality, .maritalStatus, .gender: EntryVocabulary.looksLikeValue(value.text, of: label)
         case .birth: value.text.contains(where: \.isNumber)
         case .address, .phone, .email, .web, .fax, .other: false
         }
     }
 
-    /// Whether a value starts with another label of the name ("Nome(s) Anna Weber" after "Apelido(s) /"): the label read
-    /// was a part of a longer one, and what follows is not yet the name.
-    private static func startsWithNameLabel(_ text: String) -> Bool {
-        wordEnds(of: text).contains { end in
-            switch EntryVocabulary.personalLabel(String(text[..<end])) {
-            case .name, .firstName, .lastName: true
-            default: false
-            }
+    /// Whether the label read is only the start of a compound one ("Apelido(s) /" before "Nome(s) Anna Weber"), so that what
+    /// follows is not yet the name. Only the form of the text tells: the label ends with a slash, or the value starts with
+    /// a label word that carries a bracketed plural. A name that starts with a label's word ("Full name Nom Weber") is a name.
+    private static func continuesACompoundLabel(_ labelText: String, value: String) -> Bool {
+        if labelText.hasSuffix("/") || value.hasPrefix("/") { return true }
+        guard let firstWord = value.split(separator: " ").first.map(String.init), firstWord.contains("("), firstWord.hasSuffix(")") else {
+            return false
+        }
+        switch EntryVocabulary.personalLabel(firstWord) {
+        case .name, .firstName, .lastName: return true
+        default: return false
         }
     }
 
@@ -269,7 +272,10 @@ enum HeaderReader {
         for end in wordEnds(of: line.text).reversed() {
             guard let label = EntryVocabulary.personalLabel(String(line.text[..<end])) else { continue }
             let value = line.sub(end..<line.text.endIndex).trimmed()
-            if value.text.contains(where: { $0.isLetter || $0.isNumber }), isReadByPosition(label, value: value) { return (label, [value]) }
+            let labelText = String(line.text[..<end])
+            if value.text.contains(where: { $0.isLetter || $0.isNumber }), isReadByPosition(label, labelText: labelText, value: value) {
+                return (label, [value])
+            }
         }
         return nil
     }

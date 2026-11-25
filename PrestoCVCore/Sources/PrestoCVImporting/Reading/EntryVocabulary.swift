@@ -344,7 +344,8 @@ enum EntryVocabulary {
     }
 
     private static let genderValues: Set<String> = Set([
-        "male", "female", "m", "f", "man", "woman", "non-binary", "nonbinary", "diverse", "other", "x", "maschio", "femmina",
+        "male", "female", "m", "f", "w", "h", "man", "woman", "non-binary", "nonbinary", "non binary", "non binaire", "nichtbinär",
+        "nicht binär", "non binario", "no binario", "não binário", "nao binario", "diverse", "other", "x", "maschio", "femmina",
         "maschile", "femminile", "uomo", "donna", "männlich", "weiblich", "divers", "mann", "frau", "masculino", "feminino",
         "femenino", "hombre", "mujer", "masculin", "féminin", "homme", "femme", "masculina", "feminina", "m/f", "m/w", "m/w/d",
     ].map(SectionVocabulary.key))
@@ -355,17 +356,47 @@ enum EntryVocabulary {
         "convivente", "libero", "libera", "ledig", "verheiratet", "geschieden", "verwitwet", "getrennt lebend", "soltero", "soltera",
         "casado", "casada", "divorciado", "divorciada", "viudo", "viuda", "separado", "separada", "célibataire", "marié", "mariée",
         "divorcé", "divorcée", "veuf", "veuve", "séparé", "séparée", "pacsé", "pacsée", "solteiro", "solteira", "viúvo", "viúva",
+        "in partnership", "civil partnership", "in a relationship", "domestic partnership", "cohabiting", "unmarried",
+        "in unione civile", "unito civilmente", "unita civilmente", "unione civile", "in coppia", "fidanzato", "fidanzata",
+        "lebenspartnerschaft", "in partnerschaft", "eingetragene lebenspartnerschaft", "lebensgemeinschaft", "in einer beziehung", "unión libre", "pareja de hecho", "en pareja", "unión de hecho", "union libre", "en couple",
+        "concubinage", "vie maritale", "união de facto", "união estável", "união estavel", "em união de facto", "namorando",
+        "em relacionamento",
     ].map(SectionVocabulary.key))
 
     /// A nationality is one word ("German", "Tedesca"), or a few of them in a list ("German, Italian"), or a country's name
     /// of two words ("South African"); a few words of a job ("Law Associate") or a role word alone are not.
     private static func looksLikeNationality(_ text: String) -> Bool {
-        let words = SectionVocabulary.key(text).split(separator: " ").map(String.init)
-        guard (1...4).contains(words.count), !text.contains(where: \.isNumber) else { return false }
+        guard !text.contains(where: \.isNumber) else { return false }
+        let parts = nationalityParts(of: text)
+        guard (1...4).contains(parts.count) else { return false }
+        return parts.allSatisfy(isOneNationality)
+    }
+
+    /// The words of each nationality of a list, which punctuation or the language's joining word ("and", "und", "e", "y",
+    /// "et") separates. Told before the key drops the joining words.
+    private static func nationalityParts(of text: String) -> [[String]] {
+        var parts: [[String]] = []
+        for list in text.split(whereSeparator: { ",/;&".contains($0) }) {
+            var part: [String] = []
+            for token in list.split(separator: " ") {
+                if joiningNationalityWords.contains(token.folded) {
+                    parts.append(part)
+                    part = []
+                } else {
+                    part.append(SectionVocabulary.key(String(token)))
+                }
+            }
+            parts.append(part)
+        }
+        return parts.map { $0.filter { !$0.isEmpty } }.filter { !$0.isEmpty }
+    }
+
+    private static let joiningNationalityWords: Set<String> = ["and", "und", "e", "y", "et"]
+
+    /// One nationality: one word ("German"), or a country's name of two words ("South African"); a role word is not one.
+    private static func isOneNationality(_ words: [String]) -> Bool {
         if words.contains(where: nonNationalityWords.contains) { return false }
-        let parts = text.split(whereSeparator: { ",/;&".contains($0) }).map { $0.split(separator: " ").count }
-        if parts.count > 1 || words.count == 1 { return true }
-        return words.count == 2 && nationalityPrefixes.contains(words[0])
+        return words.count == 1 || (words.count == 2 && nationalityPrefixes.contains(words[0]))
     }
 
     private static let nationalityPrefixes: Set<String> = Set([

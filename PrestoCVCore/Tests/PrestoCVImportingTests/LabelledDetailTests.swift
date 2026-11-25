@@ -233,4 +233,60 @@ struct LabelledDetailTests {
         #expect(found.cv.person.name?.value == "Anna Weber")
         #expect(found.cv.person.name?.check == nil)
     }
+
+    @Test("A complete name label followed by a name that starts with a label's word gives the name", arguments: [
+        ("Full name Nom Weber", "Nom Weber"), ("Nom et prénom Nome Weber", "Nome Weber"), ("Nome completo Nome Weber", "Nome Weber"),
+        ("Nombre completo Nombre Weber", "Nombre Weber"), ("Vollständiger Name Name Weber", "Name Weber"), ("Name Cognome Weber", "Cognome Weber"),
+    ])
+    func nameStartingWithALabelWord(_ line: String, _ name: String) {
+        let found = header("""
+        Personal information
+        \(line)
+        E-mail person@example.com
+        """)
+        #expect(found.cv.person.name?.value == name)
+    }
+
+    @Test("More values of gender and marital status are the detail, never the title", arguments: [
+        "Geschlecht w", "Sexe H", "Gender Non-binary", "Gender Nonbinary", "Sexe non binaire", "Geschlecht nichtbinär",
+        "Sesso non binario", "Sexo no binario", "Sexo não binário",
+        "Marital status Civil partnership", "Stato civile Unione civile", "Familienstand Lebenspartnerschaft",
+        "Estado civil Unión libre", "État civil Union libre", "Estado civil União de facto", "Estado civil Pareja de hecho",
+    ])
+    func moreClosedValues(_ line: String) {
+        let found = header("""
+        Personal information
+        Anna Weber
+        \(line)
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title == nil)
+        #expect(shown(found).contains(line))
+    }
+
+    @Test("A nationality list, with punctuation or the language's joining word, is the detail", arguments: [
+        "Nationality German, Italian", "Nationality German and Italian", "Staatsangehörigkeit deutsch und italienisch",
+        "Cittadinanza italiana e tedesca", "Nacionalidad alemana y italiana", "Nationalité allemande et italienne",
+        "Nacionalidade alemã e italiana", "Nationality German / Italian", "Nationality German & Italian",
+    ])
+    func nationalityList(_ line: String) {
+        let found = header("""
+        Personal information
+        Anna Weber
+        \(line)
+        """)
+        #expect(found.cv.person.name?.value == "Anna Weber")
+        #expect(found.cv.person.title == nil)
+        #expect(shown(found).contains(line))
+    }
+
+    @Test("A role after a label stays the title, joined or not", arguments: ["Gender Pay Analyst", "Nationality and Visa Consultant"])
+    func roleAfterALabel(_ title: String) {
+        let found = header("""
+        Anna Weber
+        \(title)
+        E-mail person@example.com
+        """)
+        #expect(found.cv.person.title?.value == title)
+    }
 }
