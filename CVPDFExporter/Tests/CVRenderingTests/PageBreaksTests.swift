@@ -156,4 +156,42 @@ struct PageBreaksTests {
         let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
         #expect(faults.isEmpty)
     }
+
+    @Test("a node that wraps into two visible lines, both printed twice, is duplicated content")
+    func wrappedDuplicate() {
+        let duty = "Duty 1 of the role, long enough to wrap onto a second line."
+        let document = RenderedDocument(html: "", textNodes: [duty])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 700),
+            Self.line("to wrap onto a second line.", page: 0, y: 686),
+            Self.line("Duty 1 of the role, long enough", page: 0, y: 500),
+            Self.line("to wrap onto a second line.", page: 0, y: 486),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults == [.duplicated([duty])])
+    }
+
+    @Test("a node printed once beside a longer node that starts with it and wraps after it is complete and not duplicated")
+    func wrappedNodeStartingWithAnother() {
+        let document = RenderedDocument(html: "", textNodes: ["Experience", "Experience with X"])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Experience", page: 0, y: 700),
+            Self.line("Experience", page: 0, y: 680),
+            Self.line("with X", page: 0, y: 666),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults.isEmpty)
+    }
+
+    @Test("a print in another reading order than the document's, as a sidebar's, where one node's text runs across two others, is not duplicated")
+    func otherReadingOrder() {
+        let document = RenderedDocument(html: "", textNodes: ["Greg", "Go", "Officer"])
+        let layout = PDFLayout(pages: [a4Page], lines: [
+            Self.line("Go", page: 0, y: 700),
+            Self.line("Greg", page: 0, y: 680),
+            Self.line("Officer", page: 0, y: 666),
+        ])
+        let faults = PageBreaks.faults(of: document, printedAs: layout, starts: Self.starts, page: .a4)
+        #expect(faults.isEmpty)
+    }
 }

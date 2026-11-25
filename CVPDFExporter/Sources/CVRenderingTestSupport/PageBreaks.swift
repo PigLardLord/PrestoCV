@@ -14,7 +14,7 @@ public enum PageBreakFault: Sendable, Equatable {
     case hidden(page: Int, text: String)
     /// The document's text nodes that the PDF's text lacks (`DocumentCompleteness`).
     case missing([String])
-    /// Expected text nodes that more visible lines print than the document holds: duplicated content.
+    /// Expected text nodes that the visible lines print more often than the document holds them: duplicated content.
     case duplicated([String])
     /// Lines outside their page or too small to read (`GeometricCompleteness`).
     case geometry([GeometryViolation])
@@ -69,23 +69,55 @@ public enum PageBreaks {
             let box = layout.pages[line.pageIndex]
             return !(line.box.maxY <= box.y + margin || line.box.y >= box.maxY - margin)
         }
-        let missing = DocumentCompleteness.missing(in: shown.map(\.text).joined(separator: "\n"), expected: document.textNodes)
-        let excess = duplicated(in: shown, expected: document.textNodes)
+        let text = shown.map(\.text).joined(separator: "\n")
+        let missing = DocumentCompleteness.missing(in: text, expected: document.textNodes)
+        let excess = missing.isEmpty ? duplicated(in: text, expected: document.textNodes) : []
         let violations = GeometricCompleteness.violations(in: layout, minimumGlyphHeight: GeometricCompleteness.minimumGlyphHeight)
         return faults(in: layout, starts: starts, margin: margin) + (missing.isEmpty ? [] : [.missing(missing)])
             + (excess.isEmpty ? [] : [.duplicated(excess)]) + (violations.isEmpty ? [] : [.geometry(violations)])
     }
 
-    /// The expected nodes that more shown lines print, whole, than the document holds, in the order the document has them.
-    private static func duplicated(in shown: [PDFTextLine], expected: [String]) -> [String] {
-        let printed = Dictionary(shown.map { (key($0.text), 1) }, uniquingKeysWith: +)
+    /// The expected nodes that `text`, the shown lines, prints more often than the document holds them, in the order the
+    /// document has them. A node is printed once more than held when the text still gives one more copy of it a span of
+    /// its own after every expected node has taken its own, as `DocumentCompleteness` places them: a span may cross a line
+    /// end, so a node that wraps counts, and the text a longer node takes ("Experience with X") is no print of a shorter
+    /// node inside it ("Experience").
+    ///
+    /// The spans follow no order, as a design with a sidebar or two columns prints its lines in another order than the
+    /// document's. Counting a node's matches in the joined lines against its matches in the joined nodes would depend on
+    /// the order: a match across two lines ("Greg" then "Officer" holds "go") that the document's order does not join
+    /// reads as an extra print. Here that text belongs to the two nodes, so no copy of "Go" fits in it. A copy fits only
+    /// in text that no node needs, so the search runs only where the text has that much more than the nodes and the node
+    /// matches more often than held. It runs on a complete print only: with a node missing, no placement holds every node.
+    /// A search stopped by its budget counts the node as duplicated, so the check fails closed. A line printed twice that
+    /// is only part of a node is no whole node, and this check does not name it.
+    private static func duplicated(in text: String, expected: [String]) -> [String] {
+        let printed = Array(key(text).unicodeScalars)
+        let spare = printed.count - expected.reduce(0) { $0 + key($1).unicodeScalars.count }
         let held = Dictionary(expected.map { (key($0), 1) }, uniquingKeysWith: +)
         var seen = Set<String>()
         return expected.filter { node in
-            let k = key(node)
-            return seen.insert(k).inserted && printed[k, default: 0] > held[k, default: 0]
+            let k = key(node), needle = Array(k.unicodeScalars)
+            guard !needle.isEmpty, needle.count <= spare, seen.insert(k).inserted,
+                  matches(of: needle, in: printed) > held[k, default: 0] else { return false }
+            let report = DocumentCompleteness.report(in: text, expected: expected + [node])
+            return report.missing.isEmpty || report.budgetExhausted
         }
     }
 
-    private static func key(_ text: String) -> String { text.filter { !$0.isWhitespace }.lowercased() }
+    /// How many disjoint times `needle` occurs in `text`. Every match has the needle's length, so taking them from the left
+    /// gives the most.
+    private static func matches(of needle: [Unicode.Scalar], in text: [Unicode.Scalar]) -> Int {
+        var count = 0, start = 0
+        while start + needle.count <= text.count {
+            let found = text[start..<start + needle.count].elementsEqual(needle)
+            count += found ? 1 : 0; start += found ? needle.count : 1
+        }
+        return count
+    }
+
+    /// A text as `DocumentCompleteness` compares it: lower case, without whitespace.
+    private static func key(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.lowercased().unicodeScalars.filter { !$0.properties.isWhitespace }))
+    }
 }
