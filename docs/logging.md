@@ -133,7 +133,7 @@ Every launch brings the designs that ship with the app into the design store bef
 
 | Event | Level | Fields | When |
 |---|---|---|---|
-| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
+| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `repaired` (a bundled design the store listed but could not read, written again), `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
 | `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the launch goes on with the designs installed before, if the default design is among them. |
 | `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync or while the store was read. The designs saved before it stay saved, so the next launch does not render them again. |
 | `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read were left out of the launch; the launch goes on with the others. |
@@ -149,6 +149,16 @@ The export sheet writes the PDF to a file of its own for the system's share shee
 | `export.share.notRemoved` | error | `of` (`share` or `leftover`), `error` | The folder of a share, or one an earlier launch left, could not be removed; the next launch tries again. |
 
 The `export.share.*` events name no path and no file name: the file's name holds the person's name.
+
+### The released app's leftovers (category `legacy`)
+
+After an import that left nothing out, the launch removes the released app's design files, their cache and its export settings, which hold nothing the person wrote.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `legacy.leftovers.notRemoved` | error | `of` (`templates`, `templateCache` or `exportPreferences`), `error` | A file the released app left, with nothing the person wrote in it, could not be removed after the import; the next launch tries again. |
+
+The event names a kind of file and a code, never a path.
 
 ## The trace of a test build
 

@@ -48,6 +48,8 @@ struct ImportedCVMapperTests {
 
     ## Zertifikate
     - Elektrofachkraft – TÜV Beispiel (2020)
+    Überprüfen: https://tuev.example.com/elektrofachkraft
+    Prüfung mit sehr gutem Ergebnis bestanden.
 
     ## Hobbys
     Klettern, Fotografie
@@ -87,6 +89,8 @@ struct ImportedCVMapperTests {
         #expect(cv.certifications.map(\.name) == ["Elektrofachkraft"])
         #expect(cv.certifications.map(\.issuer) == ["TÜV Beispiel"])
         #expect(cv.certifications.map(\.year) == [2020])
+        #expect(cv.certifications.map(\.url) == ["https://tuev.example.com/elektrofachkraft"])
+        #expect(cv.certifications.map(\.description) == ["Prüfung mit sehr gutem Ergebnis bestanden."])
         #expect(cv.interests == ["Klettern", "Fotografie"])
         #expect(cv.documentLanguage == "de")
     }
@@ -312,6 +316,21 @@ struct ImportedCVMapperTests {
         #expect(draft.review.items.filter { $0.reason == .heading }.map(\.field) == [.experience(1)], "\(draft.review.items)")
     }
 
+    @Test("A description that only its words put under a certification keeps the description and lists the certification to check")
+    func certificationToCheck() throws {
+        let draft = ImportedCVMapper().map(try importedText("""
+        Tobias Renn
+        tobias.renn@example.com
+
+        Certifications
+        First Certificate
+        Introduction to machine learning.
+        """))
+
+        #expect(draft.cv.certifications.map(\.description) == ["Introduction to machine learning."])
+        #expect(draft.review.items == [ImportReview.Item(field: .certification(1), reason: .descriptionOrEntry, text: "First Certificate")])
+    }
+
     @Test("Every reason and field of the review has a text in the string catalog")
     func reviewIsWorded() {
         let items = [
@@ -321,6 +340,7 @@ struct ImportedCVMapperTests {
             ImportReview.Item(field: .language, reason: .byPosition, text: ""), ImportReview.Item(field: .experience(2), reason: .entryBounds, text: ""),
             ImportReview.Item(field: .education(2), reason: .placeNotKept, text: ""),
             ImportReview.Item(field: .experience(3), reason: .heading, text: ""),
+            ImportReview.Item(field: .certification(1), reason: .descriptionOrEntry, text: ""),
         ]
         for item in items {
             #expect(item.fieldKey.localized != item.fieldKey, "\(item.fieldKey) is missing from the string catalog")

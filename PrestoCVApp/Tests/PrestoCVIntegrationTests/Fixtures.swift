@@ -3,7 +3,8 @@ import PrestoCVDomain
 
 /// Every field of a CV populated with a value of its own, so that a value found in the document can only come from its
 /// field. No two values of the whole CV are equal (`MirrorCompletenessTests` checks it) and no integer is 1, the document's
-/// schema version. The free text carries white space around it, which the mapper trims.
+/// schema version. The free text carries white space around it, which the mapper trims. The draft block marks two values
+/// as imported and keeps one text the import could not place: none of it is printed.
 enum Fixtures {
     static let id = CVID(UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
 
@@ -49,6 +50,13 @@ enum Fixtures {
             profiles: [ProfileLink(platform: padded("GitHub"), link: link("https://github.com/ada"))],
             interests: ["Poetry", "Chess"]
         )
-        return CV(id: id, title: "My private list name", personal: personal, sections: sections, design: design, language: language)
+        var cv = CV(id: id, title: "My private list name", personal: personal, sections: sections, design: design, language: language)
+        guard let unplaced = NotPlacedText(text: "Sang in the cathedral choir", heading: "Elsewhere") else { preconditionFailure("fixture draft") }
+        do {
+            try cv.setDraft(DraftBlock(origins: [.personal(.fullName): .imported, .entry(.skillName, index: 1): .imported], notPlaced: [unplaced]))
+        } catch {
+            preconditionFailure("fixture draft: \(error)")
+        }
+        return cv
     }
 }

@@ -34,6 +34,26 @@ struct AutosaveWriterTests {
         #expect(result.revision == start.revision + 3)
     }
 
+    @Test("a row edited and then another row changed into its old value: the write and a reload show no imported mark on either")
+    func editedRowDoesNotGetItsMarkBack() async throws {
+        let a = Experience(role: "Engineer", company: "Acme"), b = Experience(role: "Tutor", company: "Acme")
+        let c = Experience(role: "Senior Tutor", company: "Acme")
+        var base = Invented.cv("Ada", id: workflow.new().id)
+        base.setSections(CVSections(experiences: [a, b]))
+        try base.setDraft(DraftBlock(origins: [.entry(.experienceRole, index: 0): .imported], notPlaced: []))
+        let start = try await workflow.save(base)
+        let writer = workflow.autosaveWriter(startingFrom: start)
+
+        var edited = start
+        edited.setSections(CVSections(experiences: [c, b]))
+        edited.setSections(CVSections(experiences: [c, a]))
+        try await writer.write(edited)
+
+        let result = try await workflow.load(start.id)
+        #expect(result.sections.experiences == [c, a])
+        #expect(result.draft == nil)
+    }
+
     @Test("a look and a language chosen before the first write are written with it (not-stored start)")
     func changesThenWriteOfNewCV() async throws {
         let draft = Invented.cv("Ada", id: workflow.new().id)

@@ -464,7 +464,7 @@ enum HeaderReader {
     /// evidence, neither a mark of any kind nor a title ("Anna Weber / person@example.com / Community Outreach", the last
     /// line the largest); nor does a heading of the first level under a line in the shape of a name, in any column ("Anna
     /// Weber / Nurse / # University Projects"). Such a line stays one that could be the name, so the name is to be checked
-    /// unless a mark of its own makes it sure. A line made only of known places above it, or a piece after a contact,
+    /// unless a mark of its own makes it sure: a title under it still keeps an unmarked name flagged (#328). A line made only of known places above it, or a piece after a contact,
     /// takes no evidence away.
     private static func headName(of candidates: [Candidate], closedAt closing: Int?, in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
@@ -478,6 +478,17 @@ enum HeaderReader {
         }
         let titled = indices.filter {
             !candidates[$0].followsContact && !gainsNoEvidence($0) && hasTitle(under: $0, in: candidates, readings: indices)
+        }
+        // Ranking and certainty apart (#328): a title under a line after the closing block gains that line no evidence of the
+        // name, but it still tells that the line could have been it, so it keeps an unmarked name to be checked.
+        // Only a line that nothing says is something else is such a rival: not a place, an organisation, a school, a role or
+        // a heading ("Berlin Germany / Open to relocation").
+        let personLike = Dictionary(uniqueKeysWithValues: readings.map { reading in
+            (reading.index, !isNotAPerson(reading.name.text, titledAsARole: hasRoleUnder(reading.index, in: candidates)))
+        })
+        let titledAfterTheClosing = indices.filter { index in
+            guard let closing, candidates[index].block.index > closing, personLike[index] == true else { return false }
+            return !candidates[index].followsContact && hasTitle(under: index, in: candidates, readings: indices)
         }
         let first = candidates.indices.first { !candidates[$0].followsContact }
         func isMarked(_ index: Int) -> Bool {
@@ -496,8 +507,44 @@ enum HeaderReader {
         let hasOwnTitle = titleLine(under: best.index, in: candidates).map { !indices.contains($0) } ?? false
         let isOnlyMarked = isMarked(best.index) && !rivals.contains(where: isMarked)
         let isPlainlyFirst = best.index == first && (hasOwnTitle || rivals.isEmpty)
-        let isSure = (isOnlyMarked || isPlainlyFirst) && best.doubt == 0 && titled.subtracting([best.index]).isEmpty
+        let hasTitledRival = !titled.subtracting([best.index]).isEmpty
+        let isSure = best.doubt == 0 && !hasTitledRival
+            && (isOnlyMarked || (isPlainlyFirst && titledAfterTheClosing.subtracting([best.index]).isEmpty))
         return HeadName(reading: best, isSure: isSure, rivals: rivals)
+    }
+
+    /// Whether the evidence about the whole line says that a line in the shape of a name is no person. In this order:
+    /// 1. a line made only of known places, or a section's heading, is no person;
+    /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person, unless the line
+    ///    under it is a title, a recognised role or any line that is no sentence: that is evidence outside the ambiguous
+    ///    word, and "Sarah Ireland / Dental hygienist" is a person; under "Open to relocation" it is a place (#328);
+    /// 3. a line the role, organisation and school vocabulary explains as a whole is no person ("Senior Nurse",
+    ///    "Beispiel GmbH", "Ospedale di Erfurt"). One such word is no evidence: "Priya Cook" stays a possible person.
+    /// A line with no evidence either way is a possible person: a needless check costs less than a wrong sure name.
+    private static func isNotAPerson(_ text: String, titledAsARole: Bool) -> Bool {
+        Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil
+            || (!titledAsARole && Places.endsInCountryOrRegion(text))
+            || EntryVocabulary.explainsWholeLine(text)
+    }
+
+    /// Whether the line under the one at `index` is a title: a recognised role, or a line that is not a sentence. A title
+    /// outside every list ("Dental hygienist") is still no sentence, and that is evidence outside the ambiguous words.
+    private static func hasRoleUnder(_ index: Int, in candidates: [Candidate]) -> Bool {
+        titleLine(under: index, in: candidates).map {
+            EntryVocabulary.isRole(candidates[$0].piece.text) || !readsAsASentence(candidates[$0].piece.text)
+        } ?? false
+    }
+
+    /// Whether a line reads as a sentence and not as a title, by its shape alone: right after its first word it has a short
+    /// function word in lower case (a preposition or an article: "to", "for", "für", "a", "al"), and another word in lower
+    /// case after that ("Open to relocation", "Willing to travel", "Disponibile a trasferte", "Bereit für einen Umzug"). A
+    /// title has no such opening: its words are nouns ("Dental hygienist"), capitalised around a short connector ("Head of
+    /// Sales"), or a noun phrase before the function word ("Dental hygienist in training", #549).
+    private static func readsAsASentence(_ text: String) -> Bool {
+        let rest = text.words.dropFirst()
+        let isLower = { (word: Substring) in word.first(where: \.isLetter)?.isLowercase == true }
+        guard let opening = rest.first, isLower(opening), opening.count(where: \.isLetter) <= 3 else { return false }
+        return rest.dropFirst().contains(where: isLower)
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
