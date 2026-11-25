@@ -770,3 +770,31 @@ enum EntryVocabulary {
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",
     ].map(SectionVocabulary.key))
 }
+
+// MARK: - Sentences
+
+extension EntryVocabulary {
+
+    /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
+    /// positive sign of a sentence, which no noun phrase of a skills list has. The pronoun must be written as one
+    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals). A capitalised next word is a name ("I Corinthians
+    /// study") only when `capitalisedNextIsAName` says the line is a list of three or more items; in a line of two
+    /// clauses it is a brand used as a verb ("I Google suppliers, compare quotes"). Trade-off: a two-item list that
+    /// starts with a numeral ("I Corinthians study, choir singing.") stays whole as text not imported.
+    static func startsWithSubject(_ text: String, capitalisedNextIsAName: Bool) -> Bool {
+        let words = text.words
+        guard let first = words.first, subjectPronouns.contains(first.folded) || first.lowercased() == "n\u{f3}s"
+        else { return false }
+        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy { $0.isLowercase || $0 == "'" || $0 == "\u{2019}" }
+        let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
+        return isWrittenAsAWord && !(nextStartsWithACapital && capitalisedNextIsAName)
+    }
+
+    /// The subjects of the six languages, with the contracted ones of English and French ("I've", "J'ai"); the
+    /// Portuguese "n\u{f3}s" is matched with its accent in `startsWithSubject`, as its folded form is a preposition.
+    private static let subjectPronouns: Set<String> = Set([
+        "i", "we", "ich", "wir", "io", "noi", "yo", "nosotros", "nosotras", "je", "nous", "eu",
+        "i've", "i'm", "i'd", "i'll", "we've", "we're", "we'd", "we'll",
+        "j'ai", "j'avais", "j'\u{e9}tais",
+    ].map(\.folded))
+}
