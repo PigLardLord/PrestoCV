@@ -582,12 +582,14 @@ enum EntryReader {
         var table = 0
         var rowsOfTable = -1
         var lastRowWasMapped = true
+        var headerIsDistrusted = false
         for (place, line) in lines.enumerated() {
             if line.block.kind == .tableHeader {
                 findings.leaveOut(line.block, .markup)
                 names = line.cells.map { EntryVocabulary.entryLabel($0.text) }
                 inTable = true
                 lastRowWasMapped = true
+                headerIsDistrusted = false
                 previous = line.block.index
                 table += 1
                 continue
@@ -612,8 +614,9 @@ enum EntryReader {
                 continue
             }
             previous = line.block.index
+            if isHeadingAfterAGap(line, names) { headerIsDistrusted = true }
             guard names.contains(where: { $0 != nil }), line.cells.count == names.count,
-                  !contradictsHeader(line, names) else {
+                  !headerIsDistrusted, !contradictsHeader(line, names) else {
                 lastRowWasMapped = false
                 add(line, isDoubtful: true)
                 continue
@@ -653,6 +656,25 @@ enum EntryReader {
             column != periodColumn && column != explained && isPeriodAlone(cell)
         }
     }
+
+    /// Whether a bar line after a blank line, one cell short of the header, names a column of its own (`Selected work |
+    /// 2018 – 2020 | Summary`): it is the heading of a new section, not an employer-less row, so the header is no longer
+    /// trusted and the rows after it are read without it, flagged. A short row with no such cell stays a flagged row of the table.
+    private static func isHeadingAfterAGap(_ line: Line, _ names: [EntryVocabulary.EntryLabel?]) -> Bool {
+        guard line.block.followsGap, line.cells.count < names.count else { return false }
+        return line.cells.contains {
+            EntryVocabulary.entryLabel($0.text) != nil || headingWords.contains(SectionVocabulary.key($0.text))
+        }
+    }
+
+    /// Words a column or section heading uses for its text column, which the entry labels do not name. A row of data
+    /// and a heading cannot otherwise be told apart by their cells, so a short row with none of these stays a row.
+    private static let headingWords: Set<String> = [
+        "summary", "notes", "note", "details", "description", "highlights", "overview",
+        "riepilogo", "sintesi", "dettagli", "descrizione",
+        "zusammenfassung", "notizen", "beschreibung",
+        "resumen", "notas", "detalles", "descripcion", "resume", "resumo", "detalhes", "descricao",
+    ]
 
     private static func isPeriodAlone(_ cell: Piece) -> Bool {
         let text = cell.text.trimmingCharacters(in: .whitespaces)

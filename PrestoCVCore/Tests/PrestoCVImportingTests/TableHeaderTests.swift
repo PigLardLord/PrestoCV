@@ -402,6 +402,31 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("A dated three-cell heading after a blank line is not kept as a short row: the four-cell row after it is not read by the old header",
+          arguments: [
+              "| Harbor Systems | Planner | 2015 – 2017 | Drew up plans |",
+              "| Harbor Systems | 2015 – 2017 | Planner | Drew up plans |",
+              "| 2015 – 2017 | Harbor Systems | Planner | Drew up plans |",
+          ])
+    func datedHeadingOfThreeCellsAfterAGap(_ next: String) throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        | Selected work | 2018 – 2020 | Summary |
+        \(next)
+        """)
+        let jobs = result.cv.experience
+        let job = try #require(jobs.first { $0.period?.value.start.year == 2015 })
+        #expect(job.employer?.value == "Harbor Systems")
+        #expect(job.role?.value == "Planner")
+        #expect(job.check != nil)
+        #expect(jobs.first?.employer?.value == "Northgate Academy")
+        noLoss(result)
+    }
+
     @Test("A row whose date is not in the header's period column is not read by the header, and the rows after it still are")
     func dateInTheWrongColumn() throws {
         let result = try importText("""
