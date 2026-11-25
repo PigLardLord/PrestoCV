@@ -366,4 +366,41 @@ struct HeadNameEvidenceTests {
         #expect(name.value.hasPrefix("Anna"))
         #expect(name.check == (row.isNameSure ? nil : .nameByPosition), "\(row.testDescription): \(row.head.replacingOccurrences(of: "\n", with: " / "))")
     }
+
+    // MARK: A title written as a phrase, or availability prose
+
+    @Test("A name with a country as surname over a title written as a phrase, after the contacts, keeps the first name to be checked")
+    func titleWrittenAsAPhraseKeepsTheNameFlagged() throws {
+        let result = try importing(text: "Anna Weber\nNurse\nperson@example.com\nSarah Ireland\nDental hygienist in training")
+        #expect(result.cv.person.name?.value == "Anna Weber")
+        #expect(result.cv.person.name?.check == .nameByPosition)
+        #expect(result.cv.person.title?.value == "Nurse")
+    }
+
+    static let titleOrAvailability: [AfterTheContacts] = [
+        AfterTheContacts(kind: "a title written as a phrase", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nWedding photographer in training", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nHans Polen\nStaatlich geprüfte Kosmetikerin in Ausbildung", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nMarco Francia\nIgienista dentale in formazione", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nJulien France\nHygiéniste dentaire en formation", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nLucía España\nHigienista dental en prácticas", isNameSure: false),
+        AfterTheContacts(kind: "a title written as a phrase", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nPedro Portugal\nHigienista oral em formação", isNameSure: false),
+        AfterTheContacts(kind: "a role, then a phrase", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nTom England\nNurse in training", isNameSure: false),
+        AfterTheContacts(kind: "a place, then availability prose", language: "English", head: "Anna Weber\nNurse\nperson@example.com\nPotsdam Germany\nAvailable for relocation", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "German", head: "Anna Weber\nPflegefachkraft\nperson@example.com\nJena Deutschland\nBereit zu einem Wohnortwechsel", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Italian", head: "Anna Rossi\nInfermiera\nperson@example.com\nViterbo Italia\nDisponibile a trasferirsi", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nAnnecy France\nPrête à déménager", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "French", head: "Anna Moreau\nInfirmière\nperson@example.com\nBretagne France\nOuverte à la mobilité", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nAlbacete España\nDispuesta a trasladarse", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Spanish", head: "Anna García\nEnfermera\nperson@example.com\nGalicia España\nAbierta a la reubicación", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nViseu Portugal\nAberta a mudança de cidade", isNameSure: true),
+        AfterTheContacts(kind: "a place, then availability prose", language: "Portuguese", head: "Anna Costa\nEnfermeira\nperson@example.com\nMinho Portugal\nDisponível a viajar", isNameSure: true),
+    ]
+
+    @Test("A line under a name with a country as surname leaves that line a rival unless it opens like availability prose", arguments: titleOrAvailability)
+    func titlePhraseOrAvailabilityUnderACountrySurname(row: AfterTheContacts) throws {
+        let result = try importing(text: row.head)
+        let name = try #require(result.cv.person.name)
+        #expect(name.value.hasPrefix("Anna"))
+        #expect(name.check == (row.isNameSure ? nil : .nameByPosition), "\(row.testDescription): \(row.head.replacingOccurrences(of: "\n", with: " / "))")
+    }
 }
