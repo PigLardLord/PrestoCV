@@ -12,6 +12,11 @@ fi
 # The CI container runs in the C locale, and Swift Build 6.4 cannot read a translated `ld` banner
 # (swiftlang/swift-build#1934), so a computer set to another language runs the checks in the C locale too.
 export LC_ALL=C
+# Swift's tools leave folders in the temporary folder, and some tests leave theirs: the run keeps its
+# temporary files in a folder of its own and removes it at the end.
+run_tmp="$(mktemp -d)"
+trap 'rm -rf "$run_tmp"' EXIT
+export TMPDIR="$run_tmp"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 Tools/check-toolchain.sh || exit 1
@@ -30,8 +35,7 @@ if [ $# -gt 0 ]; then
     echo "check-linux: error: '$1' is not a commit" >&2
     exit 2
   fi
-  base_baseline="$(mktemp)"
-  trap 'rm -f "$base_baseline"' EXIT
+  base_baseline="$run_tmp/base-baseline.json"
   git show "$1:Tools/ArchitectureCheck/baseline.json" > "$base_baseline" 2> /dev/null || echo '[]' > "$base_baseline"
   against=(--against "$base_baseline")
 fi
