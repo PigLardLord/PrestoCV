@@ -46,13 +46,15 @@ struct DateMatch: Equatable {
 /// "since" forms ("seit", "dal", "desde", "depuis", "ab").
 enum DateReader {
 
-    static func periods(in text: some StringProtocol) -> [DateMatch] {
+    /// `readsSoftwareRanges` reads "Unity 9.10 – 9.12" as a period instead of a software version range: the caller that can see
+    /// the lines around it decides which of the two it is.
+    static func periods(in text: some StringProtocol, readsSoftwareRanges: Bool = false) -> [DateMatch] {
         let string = String(text)
         let tokens = tokenize(string)
         var matches: [DateMatch] = []
         var index = 0
         while index < tokens.count {
-            if let (period, end) = period(at: index, in: tokens) {
+            if let (period, end) = period(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) {
                 matches.append(DateMatch(range: tokens[index].range.lowerBound..<tokens[end].range.upperBound, period: period))
                 index = end + 1
             } else {
@@ -109,7 +111,7 @@ enum DateReader {
     // MARK: Periods
 
     /// The period that starts at a token, and the index of its last token.
-    private static func period(at start: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
+    private static func period(at start: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> (ImportedPeriod, Int)? {
         var index = start
         var prefix: Prefix?
         if let (found, next) = prefixWord(at: index, in: tokens) {
@@ -122,7 +124,7 @@ enum DateReader {
            date(at: index, in: tokens) == nil {
             return (ImportedPeriod(start: YearMonth(year: end.year, month: month.month), end: .date(end)), endIndex)
         }
-        if let found = shortRange(at: index, in: tokens) { return found }
+        if let found = shortRange(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) { return found }
         guard let (first, firstEnd) = date(at: index, in: tokens) else { return nil }
         if let next = connector(after: firstEnd, in: tokens) {
             if let (second, secondEnd) = rangeEnd(at: next, in: tokens) {
@@ -142,7 +144,7 @@ enum DateReader {
         }
         // A prefix that only reads as "from" with a range is not part of a single date
         let quoteStart = prefix == nil ? start : index
-        if quoteStart != start { return period(at: index, in: tokens) }
+        if quoteStart != start { return period(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) }
         return (ImportedPeriod(start: first, end: nil), firstEnd)
     }
 
@@ -152,7 +154,7 @@ enum DateReader {
     /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range with positive evidence
     /// (see `isVersion`: "v3.10 – 3.12", "Version 3.10 – 3.12", "Python 3.10 – 3.12"). A range with neither is a period
     /// whatever its years, as "09/60 – 08/65" and "Acme 9.10 – 9.12" are.
-    private static func shortRange(at index: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
+    private static func shortRange(at index: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> (ImportedPeriod, Int)? {
         guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
               let (first, firstEnd) = shortDate(at: index, in: tokens),
               let next = connector(after: firstEnd, in: tokens) else { return nil }
@@ -160,7 +162,7 @@ enum DateReader {
            (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
             let dotted = isDotted(from: index, to: secondEnd, in: tokens)
             if dotted {
-                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, to: secondEnd, in: tokens) { return nil }
+                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, to: secondEnd, in: tokens, readsSoftwareRanges: readsSoftwareRanges) { return nil }
             } else if isPercent(rightAfter: secondEnd, in: tokens) {
                 return nil
             }
@@ -182,14 +184,14 @@ enum DateReader {
     /// visible, a wrong merge loses a job): a "v" glued to it ("v3.10"), a version word before it ("Version", "versione",
     /// "versión", "versão"), or one major on both sides after the name of a software product or language ("Python 3.10 – 3.12").
     /// Any other word before it ("Muster GmbH 9.19 – 8.21", "Acme 9.10 – 9.12") leaves a period.
-    private static func isVersion(at index: Int, to end: Int, in tokens: [Token]) -> Bool {
+    private static func isVersion(at index: Int, to end: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> Bool {
         guard index > 0, case .number(let major, 1) = tokens[index].kind, case .word(let word) = tokens[index - 1].kind else {
             return false
         }
         if word == "v", tokens[index].spaced == false { return true }
         if versionWords.contains(word) { return true }
         guard end >= 2, case .number(major, _) = tokens[end - 2].kind, prefixWord(at: index - 1, in: tokens) == nil else { return false }
-        return softwareNames.contains(word)
+        return !readsSoftwareRanges && softwareNames.contains(word)
     }
 
     /// Software products and languages that carry a version range ("Python 3.10 – 3.12"). A narrow list: any other word

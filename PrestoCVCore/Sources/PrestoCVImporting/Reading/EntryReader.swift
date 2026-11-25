@@ -17,6 +17,8 @@ enum EntryReader {
         let isProse: Bool
         /// The period that anchors an entry, where the line states one prominently.
         var period: (piece: Piece, value: ImportedPeriod)?
+        /// The period reads as a software version range too ("Unity 9.10 – 9.12"): the lines around it say which.
+        var isSoftwareRange = false
         /// The durations LinkedIn computes.
         var durations: [Piece] = []
         /// The line is only a duration: LinkedIn's total of a company's roles.
@@ -85,7 +87,12 @@ enum EntryReader {
             line.labelValue = value
         }
         if !isProse && !line.isDurationOnly {
-            line.period = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
+            let anchorCells = line.label == .period ? line.labelValue : cells
+            line.period = anchorPeriod(in: anchorCells, isBullet: isBullet)
+            if line.period == nil, let found = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true) {
+                line.period = found
+                line.isSoftwareRange = true
+            }
         }
         return line
     }
@@ -105,9 +112,9 @@ enum EntryReader {
 
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod)? {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool, readsSoftwareRanges: Bool = false) -> (Piece, ImportedPeriod)? {
         for cell in cells {
-            for match in DateReader.periods(in: cell.text) {
+            for match in DateReader.periods(in: cell.text, readsSoftwareRanges: readsSoftwareRanges) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
                 // The text after the period as a string of its own: a range read in it indexes that string
                 let after = String(cell.text[match.range.upperBound...].trimmingSpaces())
@@ -124,12 +131,27 @@ enum EntryReader {
 
     // MARK: Entries by their dates
 
+    /// A line that is only a software version range ("Python 3.10 – 3.12") is a detail when nothing plain follows it: the
+    /// last line, a bullet, or another such range. Followed by a plain line (a role, a place) it is a period: split rather
+    /// than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
+    private static func demotingSoftwareRanges(_ lines: [Line]) -> [Line] {
+        var result = lines
+        for index in result.indices where result[index].isSoftwareRange {
+            let next = index + 1 < result.count ? result[index + 1] : nil
+            if next == nil || next?.isBody == true || next?.isSoftwareRange == true {
+                result[index].period = nil
+                result[index].isSoftwareRange = false
+            }
+        }
+        return result
+    }
+
     private static func entries(of lines: [Line], section: Section, kind: Kind, findings: inout Findings) throws -> [Draft] {
         // A table's row of column names heads no entry: it stays visible
         for line in lines where isColumnHeader(line) {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
-        let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
+        let usable = demotingSoftwareRanges(lines.filter { !$0.isDurationOnly && !isColumnHeader($0) })
         let isOnlyBullets = usable.allSatisfy { $0.isBullet }
         let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
