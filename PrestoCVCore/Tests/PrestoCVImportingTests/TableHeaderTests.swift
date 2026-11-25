@@ -354,6 +354,51 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("A three-cell heading after a blank line ends the table: the four-cell row after it, in another order, is not read by the header")
+    func headingOfThreeCellsAfterAGap() throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        | Selected work | Period | Summary |
+        | 2015 – 2017 | Harbor Systems | Planner | Drew up plans |
+        """)
+        let jobs = result.cv.experience
+        let job = jobs.first { $0.period?.value.start.year == 2015 }
+        #expect(job != nil)
+        #expect(job?.employer?.value != "2015 – 2017")
+        #expect(job?.role?.value != "Harbor Systems")
+        #expect(job?.employer?.value == "Harbor Systems")
+        #expect(job?.role?.value == "Planner")
+        #expect(jobs.first?.employer?.value == "Northgate Academy")
+        noLoss(result)
+    }
+
+    @Test("A row whose date is not in the header's period column is not read by the header, and the rows after it still are")
+    func dateInTheWrongColumn() throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+        | 2015 – 2017 | Harbor Systems | Planner | Drew up plans |
+        | Riverside School | Tutor | 2018 – 2020 | Ran workshops |
+        """)
+        let jobs = result.cv.experience
+        let odd = jobs.first { $0.period?.value.start.year == 2015 }
+        #expect(odd?.employer?.value != "2015 – 2017")
+        #expect(odd?.role?.value != "Harbor Systems")
+        #expect(odd?.employer?.value == "Harbor Systems")
+        #expect(odd?.role?.value == "Planner")
+        let last = jobs.first { $0.period?.value.start.year == 2018 }
+        #expect(last?.employer?.value == "Riverside School")
+        #expect(last?.role?.value == "Tutor")
+        #expect(last?.details.map(\.value) == ["Ran workshops"])
+        noLoss(result)
+    }
+
     @Test("Bullets and an undated line under a table row stay that job's details", arguments: [
         ("Experience", "| Period | Employer | Role | Tasks |", "Teaching Assistant", "Northgate Academy",
          "Helped with reading", "Covered two classes"),

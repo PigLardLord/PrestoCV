@@ -581,11 +581,13 @@ enum EntryReader {
         var previous = -1
         var table = 0
         var rowsOfTable = -1
+        var lastRowWasMapped = true
         for (place, line) in lines.enumerated() {
             if line.block.kind == .tableHeader {
                 findings.leaveOut(line.block, .markup)
                 names = line.cells.map { EntryVocabulary.entryLabel($0.text) }
                 inTable = true
+                lastRowWasMapped = true
                 previous = line.block.index
                 table += 1
                 continue
@@ -597,6 +599,7 @@ enum EntryReader {
             let isRow = inTable && line.block.isTableRow && line.block.index == previous + 1
                 && (line.block.followsGap ? line.cells.count > 1 && abs(line.cells.count - names.count) <= 1
                     : line.cells.count > 1 || line.cells.count == names.count)
+                && !(line.block.followsGap || !lastRowWasMapped ? contradictsHeader(line, names) : false)
             if !isRow, inTable, continues(lines, at: place, after: result.last, ofTable: rowsOfTable == table) {
                 // A line with no date right under a row is that job's description, not an entry of its own
                 previous = line.block.index
@@ -609,10 +612,13 @@ enum EntryReader {
                 continue
             }
             previous = line.block.index
-            guard names.contains(where: { $0 != nil }), line.cells.count == names.count else {
+            guard names.contains(where: { $0 != nil }), line.cells.count == names.count,
+                  !contradictsHeader(line, names) else {
+                lastRowWasMapped = false
                 add(line, isDoubtful: true)
                 continue
             }
+            lastRowWasMapped = true
             var opened = false
             var rows: [Line] = []
             for (column, cell) in line.cells.enumerated() where !cell.text.isEmpty {
@@ -631,6 +637,23 @@ enum EntryReader {
             }
         }
         return result
+    }
+
+    /// Whether a row's own content contradicts the header: the header has a period column, and a cell that is a period
+    /// on its own stands in another column. Such a row is never mapped by the header; read by its dates, it is the
+    /// safe way to fail, whatever the row's size. Right under a mapped row it is only flagged; after a gap or an
+    /// unmapped row it ends the table.
+    private static func contradictsHeader(_ line: Line, _ names: [EntryVocabulary.EntryLabel?]) -> Bool {
+        guard let periodColumn = names.firstIndex(of: .period) else { return false }
+        return line.cells.enumerated().contains { column, cell in
+            column != periodColumn && isPeriodAlone(cell)
+        }
+    }
+
+    private static func isPeriodAlone(_ cell: Piece) -> Bool {
+        let text = cell.text.trimmingCharacters(in: .whitespaces)
+        guard let match = DateReader.periods(in: text).first else { return false }
+        return text[match.range].trimmingCharacters(in: .whitespaces) == text
     }
 
     /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
