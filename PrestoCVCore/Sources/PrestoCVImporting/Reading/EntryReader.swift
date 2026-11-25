@@ -640,13 +640,17 @@ enum EntryReader {
     }
 
     /// Whether a row's own content contradicts the header: the header has a period column, and a cell that is a period
-    /// on its own stands in another column. Such a row is never mapped by the header; read by its dates, it is the
+    /// on its own stands in another column than the header's, or than where one omitted or extra cell puts it. Such a row is never mapped by the header; read by its dates, it is the
     /// safe way to fail, whatever the row's size. Right under a mapped row it is only flagged; after a gap or an
     /// unmapped row it ends the table.
     private static func contradictsHeader(_ line: Line, _ names: [EntryVocabulary.EntryLabel?]) -> Bool {
         guard let periodColumn = names.firstIndex(of: .period) else { return false }
+        // A row one cell shorter or longer than the header is flagged anyway; its period cell is where one omitted
+        // (or one extra) cell before it puts it, so that is no contradiction.
+        let shift = line.cells.count - names.count
+        let explained = abs(shift) == 1 ? periodColumn + shift : periodColumn
         return line.cells.enumerated().contains { column, cell in
-            column != periodColumn && isPeriodAlone(cell)
+            column != periodColumn && column != explained && isPeriodAlone(cell)
         }
     }
 

@@ -335,6 +335,32 @@ struct TableHeaderTests {
         noLoss(result)
     }
 
+    @Test("A row one cell short or long whose period cell sits where the missing or extra cell explains it stays in the table",
+          arguments: [
+              "| Tutor | 2018 – 2020 | Ran workshops |",
+              "| Tutor | Riverside School | Extra | 2018 – 2020 | Ran workshops |",
+          ])
+    func shiftedPeriodAfterAGap(_ odd: String) throws {
+        let result = try importText("""
+        Experience
+        | Employer | Role | Period | Tasks |
+        |---|---|---|---|
+        | Northgate Academy | Teaching Assistant | 2020 – 2022 | Supported pupils |
+
+        \(odd)
+        | Harbor Systems | Planner | 2015 – 2017 | Drew up plans |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.count == 3)
+        #expect(jobs.map { $0.period?.value.start.year } == [2020, 2018, 2015])
+        #expect(jobs.map { $0.check == nil } == [true, false, true])
+        let last = try #require(jobs.last)
+        #expect(last.employer?.value == "Harbor Systems")
+        #expect(last.role?.value == "Planner")
+        #expect(last.details.map(\.value) == ["Drew up plans"])
+        noLoss(result)
+    }
+
     @Test("A short bar line after a blank line is no row of the table: the next four-cell row is not read by its header")
     func headingAfterAGapEndsTheTable() throws {
         let result = try importText("""
