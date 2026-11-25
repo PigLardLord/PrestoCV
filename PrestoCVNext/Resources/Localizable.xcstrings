@@ -8848,6 +8848,47 @@
         }
       }
     },
+    "import.review.field.certification %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification %lld"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zertifikat %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificación %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certification %lld"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificazione %lld"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Certificação %lld"
+          }
+        }
+      }
+    },
     "import.review.field.certificationYear %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9459,6 +9500,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "As linhas junto a estas datas podem pertencer à entrada anterior ou seguinte: verifique-as."
+          }
+        }
+      }
+    },
+    "import.review.reason.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This may be one certification with its description, or two certifications: check it."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist vielleicht ein Zertifikat mit seiner Beschreibung, oder es sind zwei Zertifikate: Prüfen Sie es."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puede ser una certificación con su descripción, o dos certificaciones: revísala."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il s’agit peut-être d’une certification avec sa description, ou de deux certifications : vérifiez-la."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potrebbe essere una certificazione con la sua descrizione, oppure due certificazioni: controllala."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pode ser uma certificação com sua descrição, ou duas certificações: verifique-a."
           }
         }
       }
