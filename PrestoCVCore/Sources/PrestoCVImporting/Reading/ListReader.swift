@@ -49,22 +49,23 @@ enum ListReader {
                         content = rest
                     }
                 }
-                items += listItems(of: content)
+                items += listItems(of: content, languages: section.languages)
             }
         }
         return items
     }
 
     /// The items of one cell. Prose is one item, whatever commas it has. In a list of commas, a last item that
-    /// starts with a lowercase joining word loses it ("A, B, and C"); every other item is kept as written.
-    private static func listItems(of content: Piece) -> [Piece] {
+    /// starts with a lowercase joining word of the heading's languages loses it ("A, B, and C"); every other item is
+    /// kept as written, so an "e commerce" under an English heading stays a name.
+    private static func listItems(of content: Piece, languages: Set<CVLanguage>) -> [Piece] {
         let commas = content.text.filter { $0 == "," }.count
         if content.words.count > 12 && !content.text.contains(";") && commas < 3 { return [content] }
         let parts = content.split(by: separators)
         guard parts.count >= 3, !hasOtherSeparator(content) else {
             return isSentence(content, parts: parts) ? [content] : parts
         }
-        let items = Array(parts.dropLast()) + [withoutJoiningWord(parts[parts.count - 1])]
+        let items = Array(parts.dropLast()) + [withoutJoiningWord(parts[parts.count - 1], languages: languages)]
         return isSentence(content, parts: items) ? [content] : items
     }
 
@@ -81,15 +82,19 @@ enum ListReader {
         separators.dropFirst(2).contains { content.text.contains($0) }
     }
 
-    private static func withoutJoiningWord(_ item: Piece) -> Piece {
+    private static func withoutJoiningWord(_ item: Piece, languages: Set<CVLanguage>) -> Piece {
         guard let space = item.text.firstIndex(of: " "),
-              joiningWords.contains(String(item.text[..<space])) else { return item }
+              languages.contains(where: { joiningWords[$0] == String(item.text[..<space]) }) else { return item }
         let rest = item.sub(item.text.index(after: space)..<item.text.endIndex).trimmed()
         return rest.text.isEmpty ? item : rest
     }
 
     private static let separators = [", ", ",", "; ", ";", " • ", "•", " · ", "·", " | ", "|", " / ", "\t"]
-    private static let joiningWords: Set<String> = ["and", "und", "e", "y", "et"]
+    /// The word that joins the last item of a list, by language: a one-letter one is also the first word of a name in
+    /// another language ("e commerce"), so it counts only under a heading of its own language.
+    private static let joiningWords: [CVLanguage: String] = [
+        .en: "and", .de: "und", .it: "e", .pt: "e", .es: "y", .fr: "et",
+    ]
     private static let maxSkillWords = 6
 }
 

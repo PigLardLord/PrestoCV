@@ -353,13 +353,18 @@ extension EntryVocabulary {
     /// starts with a numeral ("I Corinthians study, choir singing.") stays whole as text not imported.
     static func startsWithSubject(_ text: String, capitalisedNextIsAName: Bool) -> Bool {
         let words = text.words
-        guard let first = words.first, subjectPronouns.contains(first.folded) else { return false }
-        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy(\.isLowercase)
+        guard let first = words.first, subjectPronouns.contains(first.folded) || first.lowercased() == "n\u{f3}s"
+        else { return false }
+        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy { $0.isLowercase || $0 == "'" || $0 == "\u{2019}" }
         let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
         return isWrittenAsAWord && !(nextStartsWithACapital && capitalisedNextIsAName)
     }
 
+    /// The subjects of the six languages, with the contracted ones of English and French ("I've", "J'ai"); the
+    /// Portuguese "n\u{f3}s" is matched with its accent in `startsWithSubject`, as its folded form is a preposition.
     private static let subjectPronouns: Set<String> = Set([
         "i", "we", "ich", "wir", "io", "noi", "yo", "nosotros", "nosotras", "je", "nous", "eu",
+        "i've", "i'm", "i'd", "i'll", "we've", "we're", "we'd", "we'll",
+        "j'ai", "j'avais", "j'\u{e9}tais",
     ].map(\.folded))
 }

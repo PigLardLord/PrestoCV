@@ -186,6 +186,42 @@ struct ListReaderTests {
         #expect(read("Hobbys\nKlettern, E Commerce, Y Combinator").cv.interests.map(\.value) == ["Klettern", "E Commerce", "Y Combinator"])
     }
 
+    @Test("A one-letter joining word of another language than the heading's is a name's first word, in skills and interests", arguments: [
+        ("Skills", "Marketing, sales, e commerce", ["Marketing", "sales", "e commerce"]),
+        ("Skills", "Strategy, sales, y combinator", ["Strategy", "sales", "y combinator"]),
+        ("Competenze", "Marketing, vendite, y combinator", ["Marketing", "vendite", "y combinator"]),
+        ("Conocimientos informáticos", "Marketing, ventas, e commerce", ["Marketing", "ventas", "e commerce"]),
+        ("Kenntnisse", "Marketing, Vertrieb, e commerce", ["Marketing", "Vertrieb", "e commerce"]),
+    ])
+    func joiningLetterOfAnotherLanguage(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
+    }
+
+    @Test("A joining word of the heading's language is dropped in the interests too, and another language's is kept")
+    func joiningWordInInterests() {
+        #expect(read("Interests\nHiking, cooking, e commerce").cv.interests.map(\.value) == ["Hiking", "cooking", "e commerce"])
+        #expect(read("Interests\nHiking, cooking, and travel").cv.interests.map(\.value) == ["Hiking", "cooking", "travel"])
+        #expect(read("Interessi\nEscursioni, cucina, e viaggi").cv.interests.map(\.value) == ["Escursioni", "cucina", "viaggi"])
+        #expect(read("Hobbys\nKlettern, Kochen, e commerce").cv.interests.map(\.value) == ["Klettern", "Kochen", "e commerce"])
+    }
+
+    @Test("A sentence with a contracted subject stays whole as text not imported, in the languages that have one", arguments: [
+        ("Skills", "I've led teams, written reports and trained staff."),
+        ("Skills", "I\u{2019}ve led teams, written reports and trained staff."),
+        ("Skills", "I'm leading teams, writing reports and training staff."),
+        ("Skills", "We've led teams, written reports and trained staff."),
+        ("Skills", "We're leading teams, writing reports and training staff."),
+        ("Skills", "I'd led teams, written reports and trained staff."),
+        ("Comp\u{e9}tences", "J'ai dirig\u{e9} des \u{e9}quipes, r\u{e9}dig\u{e9} des rapports et form\u{e9} le personnel."),
+        ("Comp\u{e9}tences", "J\u{2019}ai dirig\u{e9} des \u{e9}quipes, r\u{e9}dig\u{e9} des rapports et form\u{e9} le personnel."),
+        ("Compet\u{ea}ncias", "N\u{f3}s lideramos equipas, escrevemos relat\u{f3}rios e formamos colegas."),
+    ])
+    func sentenceWithAContractedSubject(heading: String, line: String) throws {
+        let result = try ImportCV(pdfReader: ScriptedPDFReader(), limits: .standard).importText("\(heading)\n\(line)")
+        #expect(result.cv.skills.isEmpty)
+        #expect(result.unplaced.map(\.text) == [line])
+    }
+
     @Test("A list that a source cut short with dots is still a list")
     func cutShortList() {
         let found = read("Compétences\nPrise de commandes, gestion des stocks, service à la clientèle...")
