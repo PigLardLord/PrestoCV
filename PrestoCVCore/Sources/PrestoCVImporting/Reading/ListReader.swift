@@ -94,8 +94,9 @@ enum ListReader {
     /// Any other joining word ("y business" under a Spanish heading) is still a joiner.
     private static func isElectronicTerm(prefix: Substring, rest: String) -> Bool {
         guard prefix == "e" else { return false }
-        let first = rest.split(separator: " ").first.map { $0.lowercased() } ?? ""
-        return electronicWords.contains(first)
+        // Only the letters count: the closing mark of the last item ("e commerce.") is not part of the word.
+        let word = rest.split(separator: " ").first.map { $0.lowercased() } ?? ""
+        return electronicWords.contains(String(word.prefix { $0.isLetter }))
     }
 
     private static let electronicWords: Set<String> = [

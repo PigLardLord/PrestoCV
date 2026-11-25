@@ -238,6 +238,25 @@ struct ListReaderTests {
         #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
     }
 
+    @Test("An electronic-prefix term followed by a closing mark keeps its e, in skills and interests, and a real joiner before a final full stop is removed", arguments: [
+        ("Competenze", "Marketing, vendite, e commerce.", ["Marketing", "vendite", "e commerce."]),
+        ("Competenze", "Marketing, vendite, e commerce!", ["Marketing", "vendite", "e commerce!"]),
+        ("Compet\u{ea}ncias", "Marketing, vendas, e mail.", ["Marketing", "vendas", "e mail."]),
+        ("Competenze", "Java, Python, e Swift.", ["Java", "Python", "Swift."]),
+    ])
+    func electronicPrefixBeforeClosingMark(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.skills.map(\.value) == expected)
+    }
+
+    @Test("An electronic-prefix term followed by a full stop keeps its e in the interests", arguments: [
+        ("Interessi", "Escursioni, cucina, e learning.", ["Escursioni", "cucina", "e learning."]),
+        ("Interesses", "Caminhadas, culin\u{e1}ria, e commerce.", ["Caminhadas", "culin\u{e1}ria", "e commerce."]),
+        ("Interessi", "Escursioni, cucina, e viaggi.", ["Escursioni", "cucina", "viaggi."]),
+    ])
+    func electronicPrefixBeforeClosingMarkInInterests(heading: String, line: String, expected: [String]) {
+        #expect(read("\(heading)\n\(line)").cv.interests.map(\.value) == expected)
+    }
+
     @Test("A sentence with a contracted subject stays whole as text not imported, in the languages that have one", arguments: [
         ("Skills", "I've led teams, written reports and trained staff."),
         ("Skills", "I\u{2019}ve led teams, written reports and trained staff."),
