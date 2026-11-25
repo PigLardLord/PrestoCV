@@ -14,7 +14,10 @@ fi
 export LC_ALL=C
 # Swift's tools leave folders in the temporary folder, and some tests leave theirs: the run keeps its
 # temporary files in a folder of its own and removes it at the end.
-run_tmp="$(mktemp -d)"
+if ! run_tmp="$(mktemp -d)"; then
+  echo "check-linux: error: cannot create a temporary folder in '${TMPDIR:-/tmp}'" >&2
+  exit 1
+fi
 trap 'rm -rf "$run_tmp"' EXIT
 export TMPDIR="$run_tmp"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
