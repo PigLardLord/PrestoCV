@@ -52,7 +52,8 @@ struct ImportedCVMapperTests {
                        ProfileLink(platform: "GitHub", link: link("https://github.com/miravaldez")),
                        ProfileLink(platform: "XING", link: link("https://xing.com/profile/Mira_Valdez"))],
             interests: ["Chess"]))
-        #expect(outcome.cv == expected)
+        // The marks of the draft are the subject of `ImportOriginsTests`
+        #expect(outcome.cv.personal == expected.personal && outcome.cv.sections == expected.sections && outcome.cv.language == expected.language)
     }
 
     @Test("an entry keeps its place in the list, and several details become one bulleted description")
@@ -74,7 +75,7 @@ struct ImportedCVMapperTests {
         let outcome = map(f) { $0.education = [f.education(degree: f.quoted("MSc"), location: f.quoted("Aveiro, Portugal"))] }
         #expect(outcome.review.contains(ImportReviewItem(field: .educationLocation(1), reason: .locationNotKept, text: "Aveiro, Portugal")))
         #expect(outcome.notImported.contains("Aveiro, Portugal"))
-        #expect(!leaves(outcome.cv).contains { $0.value.contains("Aveiro") })
+        #expect(!contentLeaves(of: outcome.cv).contains { $0.value.contains("Aveiro") })
     }
 
     @Test("the email and the phone keep the typed values the import read")
