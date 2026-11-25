@@ -215,6 +215,11 @@ public protocol DesignStore: Sendable {
     /// only the record. Returns whether the installed design equals `design` and is now recorded as bundled: false when
     /// no design has the identifier, the installed one differs from `design` in any way, or an import made it.
     func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool
+    /// Replaces the installed design with `design`, whatever the versions, and records its origin as `bundled`. It is
+    /// the sync's repair: it replaces even a design whose package cannot be read. It replaces only a design recorded as
+    /// bundled, and the store checks that under its lock. Returns whether it replaced: false, with nothing written, when
+    /// no design has the identifier, or the installed one is an import or has no recorded origin.
+    func replaceBundled(_ design: ValidatedDesign) async throws -> Bool
 }
 
 /// Proves that a design renders a fixture document without losing content (ADR 0011). Owned by the

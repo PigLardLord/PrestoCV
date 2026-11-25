@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The open CV: one form in the order the PDF shows it, stored by itself as the person types, with the line that says
 /// where the text stands, and Export once the CV is open. While the text cannot be stored as it is, a notice above the
-/// form says what to do and offers the ways out (#402, decision 8). It waits while the CV is read, and says so when it
+/// form says what to do and offers the ways out (#402, decision 8); under it, the draft of an import says what to check
+/// and copy, and opens its review (#404). It waits while the CV is read, and says so when it
 /// cannot be, with a way to close it. VoiceOver is told of each change in one announcement, queued after what it is
 /// saying: where the status settled and, while the person cannot leave, what to do and the ways on
 /// (`SaveStatus.spoken(in:)`), then the problems met that the status does not name. A row the person adds comes into
@@ -13,6 +14,8 @@ struct EditorView: View {
     @Bindable var editor: EditorViewModel
     /// The CV's name as the list shows it, or "New CV" for a draft.
     let title: Text
+    /// The review of the import whose draft this is, nil for any other CV.
+    let review: ImportReviewViewModel?
     /// Opens the export of this CV.
     let export: () -> Void
     /// Closes the editor without storing its text.
@@ -21,7 +24,7 @@ struct EditorView: View {
     @FocusState private var rowFocus: RowFocus?
     /// The row just added, while the focus is in it: the only row the form brings back into view when its room shrinks.
     @State private var newRow: RowID?
-    /// The editor's height, for the notice's cap where the form is short of room.
+    /// The editor's height, for the notices' cap where the form is short of room.
     @State private var height: Double = 0
     @Environment(\.locale) private var locale
 
@@ -58,7 +61,7 @@ struct EditorView: View {
             )
         case .open:
             VStack(spacing: 0) {
-                StatusNotice(editor: editor, editorHeight: height, discard: discard)
+                EditorNotices(editor: editor, review: review, editorHeight: height, discard: discard)
                 form
             }
             .onGeometryChange(for: Double.self) { Double($0.size.height) } action: { height = $0 }
