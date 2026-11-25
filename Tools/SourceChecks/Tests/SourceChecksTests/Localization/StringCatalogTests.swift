@@ -34,7 +34,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "editor.field.website": ["de"], "editor.field.link": ["de", "it", "pt"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
-                "editor.entry.title.certification": ["fr"],
+                "editor.entry.title.certification": ["fr"], "import.review.field.certification %lld": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
                 "import.error.ok": ["de", "fr", "it", "pt"],
                 "legacyImport.detail.website": ["de"],
@@ -94,6 +94,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.certification \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
                 #"legacyImport.row.label \(name) \(details)"#: ValueTypes(
                     ["%@", "%@"], "a row's label and its details as a list are Strings"),
