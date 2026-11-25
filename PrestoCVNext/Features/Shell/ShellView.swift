@@ -18,8 +18,6 @@ struct ShellView: View {
     let diagnostics: DiagnosticsViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
-    /// The way to start chosen in the "+" sheet, opened when the sheet has closed.
-    @State private var chosenInSheet: StartChoice?
 
     var body: some View {
         screen
@@ -67,10 +65,7 @@ struct ShellView: View {
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $shell.showsNewCV, onDismiss: startChosenInSheet) {
-            NewCVSheet(firstRun: firstRun) { choice in
-                chosenInSheet = choice
-                shell.showsNewCV = false
-            }
+            NewCVSheet(firstRun: firstRun) { choice in shell.choose(choice) }
         }
         .sheet(isPresented: $shell.showsSettings) {
             SettingsView(settings: settings, licences: licences, diagnostics: diagnostics)
@@ -160,9 +155,7 @@ struct ShellView: View {
     }
 
     private func startChosenInSheet() {
-        guard let chosenInSheet else { return }
-        self.chosenInSheet = nil
-        start(chosenInSheet)
+        if let choice = shell.sheetDismissed() { start(choice) }
     }
 
     /// The system selects a row, and clears the selection when the person goes back. The model may keep the open CV (its

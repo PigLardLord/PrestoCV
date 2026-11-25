@@ -114,4 +114,54 @@ struct HeldFileSheetsTests {
         #expect(!held.shell.showsSettings && !held.shell.showsNewCV)
         #expect(held.shell.importer != nil)
     }
+
+    @Test("a file opened while the report still reads its CVs keeps it closed: it never shows over the import")
+    func fileHoldsTheReportClosedThroughItsLoad() async throws {
+        let browsing = Browsing()
+        let ada = try await browsing.stored(title: "Ada")
+        let reminder = ReminderFake()
+        let report = LegacyImportReportViewModel(
+            reviewing: ReviewingFake(drops: [ada.id: [.look]]), reminder: reminder, browsing: browsing.browsing,
+            untitled: Browsing.untitled, numbered: { "\($0) (\($1))" }
+        )
+        let held = HeldFileTests.World()
+        held.shell.legacyReport = report
+        await browsing.browsing.listGate.close()
+        let loading = Task { await report.load() }
+        await waitUntil("the report to wait for the list") { await browsing.browsing.listGate.waiting == 1 }
+
+        held.shell.receive(file: Self.file)
+        await browsing.browsing.listGate.open()
+        await loading.value
+
+        #expect(report.state == .hidden)
+        #expect(!report.isPresented)
+        #expect(held.shell.importer != nil)
+        #expect(await reminder.remindsAgain(), "the old copies and the reminder stay, as when closed by hand")
+    }
+
+    @Test("the choice made in the new-CV sheet starts once the sheet has gone, and only once")
+    func choiceStartsAfterTheSheet() {
+        let held = HeldFileTests.World()
+        held.shell.showsNewCV = true
+
+        held.shell.choose(.blank)
+
+        #expect(!held.shell.showsNewCV)
+        #expect(held.shell.sheetDismissed() == .blank)
+        #expect(held.shell.sheetDismissed() == nil)
+    }
+
+    @Test("a file opened between the choice and the sheet's dismissal keeps the import: no draft replaces it")
+    func fileDropsTheChoiceOfTheSheet() {
+        let held = HeldFileTests.World()
+        held.shell.showsNewCV = true
+        held.shell.choose(.blank)
+
+        held.shell.receive(file: Self.file)
+
+        #expect(held.shell.importer != nil)
+        #expect(held.shell.sheetDismissed() == nil)
+        #expect(held.shell.importer != nil)
+    }
 }

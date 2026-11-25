@@ -40,6 +40,9 @@ public final class LegacyImportReportViewModel {
     /// The write of the choice not to be reminded, after the sheet closed.
     @ObservationIgnored var storingChoice: Task<Void, Never>?
     @ObservationIgnored private var loaded = false
+    /// The report was dismissed for this launch (`dismissForTheLaunch()`): it does not show, though its load is still
+    /// reading.
+    @ObservationIgnored private var dismissedForTheLaunch = false
     @ObservationIgnored private let reviewing: any LegacyImportReviewing
     @ObservationIgnored private let reminder: any LegacyReportReminding
     @ObservationIgnored private let browsing: any CVBrowsing
@@ -78,7 +81,7 @@ public final class LegacyImportReportViewModel {
         let labels = CVListViewModel.labels(of: listing.cvs, untitled: untitled, numbered: numbered)
         leftOut = rows(of: listing.cvs, with: summary.drops.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
         toCheck = rows(of: listing.cvs, with: summary.toCheck.mapValues { $0.map(LegacyDetail.init) }, labels: labels)
-        guard !leftOut.isEmpty || !toCheck.isEmpty, await reminder.remindsAgain() else { return }
+        guard !leftOut.isEmpty || !toCheck.isEmpty, await reminder.remindsAgain(), !dismissedForTheLaunch else { return }
         state = .review
     }
 
@@ -110,6 +113,13 @@ public final class LegacyImportReportViewModel {
         case .hidden, .removing, .removed:
             break
         }
+    }
+
+    /// Closes the report as Not now does, and holds it closed for this launch: a load still reading when this is called does
+    /// not show it afterwards. The old copies and the reminder stay for the next launch, as when the person closes it.
+    public func dismissForTheLaunch() {
+        dismissedForTheLaunch = true
+        close()
     }
 
     /// Hides the notice for this launch.
