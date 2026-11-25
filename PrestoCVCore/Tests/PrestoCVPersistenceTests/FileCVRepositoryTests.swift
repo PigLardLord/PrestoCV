@@ -109,6 +109,7 @@ struct FileRepositoryTests {
         #expect(loaded == saved)
         #expect(loaded.personal == FixtureCV.full().personal && loaded.sections == FixtureCV.full().sections)
         #expect(loaded.design == FixtureCV.full().design && loaded.language == FixtureCV.full().language && loaded.title == FixtureCV.full().title)
+        #expect(loaded.draft == FixtureCV.full().draft && loaded.draft != nil)
     }
 
     @Test("mixed directory: healthy listed, corrupt quarantined with a reason, newer schema untouched")

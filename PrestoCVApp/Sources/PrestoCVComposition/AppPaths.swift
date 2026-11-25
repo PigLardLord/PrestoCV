@@ -15,6 +15,8 @@ struct AppPaths: Equatable, Sendable {
     var store: URL { root.appendingPathComponent("Store", isDirectory: true) }
     /// The installed designs: their store makes its own folders inside, on the launch's first sync
     var designs: URL { root.appendingPathComponent("Designs", isDirectory: true) }
+    /// The mark that the person asked not to see the report of the released app's import again (`LegacyReportMarker`)
+    var legacyReportOff: URL { root.appendingPathComponent("LegacyReportOff", isDirectory: false) }
     /// The runs of the trace, made by its store on the first run the gate lets through
     var trace: URL { root.appendingPathComponent("Diagnostics", isDirectory: true) }
     /// The copies of a run made to share

@@ -137,14 +137,14 @@ public actor FileDesignStore: DesignStore {
     // MARK: DesignStore
 
     @discardableResult public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ImportSave {
-        switch try await saveEntry(design, as: .imported, onlyIfNewer: false) {
+        switch try await saveEntry(design, as: .imported, mode: .anyway) {
         case .keptOtherOrigin: .keptBundled
         case .installed, .upgraded, .keptInstalled: .saved
         }
     }
 
     public func saveIfNewer(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ConditionalSave {
-        switch try await saveEntry(design, as: .bundled, onlyIfNewer: true) {
+        switch try await saveEntry(design, as: .bundled, mode: .onlyIfNewer) {
         case .installed: .installed
         case .upgraded: .upgraded
         case .keptInstalled: .keptInstalled
@@ -153,24 +153,36 @@ public actor FileDesignStore: DesignStore {
     }
 
     private enum Written { case installed, upgraded, keptInstalled, keptOtherOrigin }
+    /// Which installed designs a write replaces. `anyway` and `onlyIfNewer` also install a design that is not there.
+    private enum Mode {
+        /// An import: replaces any design that is not recorded as bundled.
+        case anyway
+        /// The sync: replaces a bundled design of an older version.
+        case onlyIfNewer
+        /// The repair: replaces a bundled design of any version, and installs nothing.
+        case replaceBundled
+    }
 
     /// The one write path, which records the design's `origin`. The installed design is judged inside the exclusive lock
     /// that the write holds, and a save never replaces a design of the other origin: an import leaves an installed bundled
     /// design alone, and a bundled save leaves alone one that the store did not record as bundled (`keptOtherOrigin`).
-    /// With `onlyIfNewer`, an installed design of the same or a newer version is left alone as well.
-    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, onlyIfNewer: Bool) async throws(FileDesignStoreError) -> Written {
+    /// With `onlyIfNewer`, an installed design of the same or a newer version is left alone as well. With `replaceBundled`, only a design recorded as bundled is written, whatever its version.
+    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, mode: Mode) async throws(FileDesignStoreError) -> Written {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
         let outcome = try await withLock(exclusive: true) { () throws(FileDesignStoreError) -> Written in
             let entries = try readIndex()
             let installed = entries.first { $0.manifest.id == id }
-            if let installed {
-                if onlyIfNewer {
+            switch mode {
+            case .anyway:
+                if installed?.origin == .bundled { return .keptOtherOrigin }
+            case .onlyIfNewer:
+                if let installed {
                     guard installed.origin == .bundled else { return .keptOtherOrigin }
                     if design.manifest.version <= installed.manifest.version { return .keptInstalled }
-                } else if installed.origin == .bundled {
-                    return .keptOtherOrigin
                 }
+            case .replaceBundled:
+                guard installed?.origin == .bundled else { return .keptOtherOrigin }
             }
             try removeUnlistedFiles(keeping: entries, for: id)
             let generation = (installed?.generation ?? 0) + 1
@@ -230,6 +242,15 @@ public actor FileDesignStore: DesignStore {
         }
         guard let adopted else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
         return adopted
+    }
+
+    /// Replaces a design recorded as bundled whatever the versions and whether or not its file can be read: the write
+    /// path never reads the installed file, only the index.
+    public func replaceBundled(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> Bool {
+        switch try await saveEntry(design, as: .bundled, mode: .replaceBundled) {
+        case .upgraded: true
+        case .installed, .keptInstalled, .keptOtherOrigin: false
+        }
     }
 
     /// The origins the store has recorded, by identifier, for the designs it lists. A design whose entry has no origin has none.

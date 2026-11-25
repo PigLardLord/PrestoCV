@@ -64,19 +64,21 @@ final class FirstRunUITests: RuntimeIssueFailingTestCase {
 
     // MARK: The welcome
 
-    /// The welcome comes first and then the ways to start: the examples, then blank last. The import is not offered while
-    /// the app has no import screen, and the list does not show.
+    /// The welcome comes first and then the ways to start: the import, the examples, then blank last. The list does not
+    /// show.
     @MainActor
     func testAnEmptyStoreShowsTheWelcomeAndTheWaysToStart() throws {
         let app = try launch()
 
         let title = element("firstRun.title", in: app)
         XCTAssertTrue(title.waitForExistence(timeout: 30))
+        let importing = app.buttons["start.import"]
         let examples = app.buttons["start.examples"]
         let blank = app.buttons["start.blank"]
+        XCTAssertTrue(importing.exists)
         XCTAssertTrue(examples.exists)
         XCTAssertTrue(blank.exists)
-        XCTAssertFalse(app.buttons["start.import"].exists)
+        XCTAssertLessThan(importing.frame.minY, examples.frame.minY, "The import leads")
         XCTAssertLessThan(examples.frame.minY, blank.frame.minY, "Blank is last")
         XCTAssertEqual(firstOf("firstRun.title", "start.examples", in: app), "firstRun.title", "The welcome comes first")
         XCTAssertFalse(element("shell.sidebar.empty", in: app).exists)
@@ -236,7 +238,7 @@ final class FirstRunUITests: RuntimeIssueFailingTestCase {
         let cancel = app.buttons["start.cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["start.examples"].exists)
-        XCTAssertFalse(app.buttons["start.import"].exists)
+        XCTAssertTrue(app.buttons["start.import"].exists)
         XCTAssertFalse(element("firstRun.title", in: app).exists)
         cancel.tap()
         XCTAssertTrue(add.waitForExistence(timeout: 30))
