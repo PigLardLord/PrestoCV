@@ -539,7 +539,7 @@ enum EntryVocabulary {
 
     private static let organisationWords: Set<String> = Set([
         "hospital", "ospedale", "krankenhaus", "klinik", "klinikum", "clinica", "clínica", "clinique", "hôpital", "hospital",
-        "bank", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
+        "bank", "cassa", "caisse", "sparkasse", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
         "hotel", "restaurant", "ristorante", "restaurante", "café", "cafe", "bar", "pizzeria", "bäckerei", "panificio",
         "cabinet", "kanzlei", "étude", "eletro", "elettro", "atelier", "werkstatt", "officina", "taller", "oficina",
         "labs", "solutions", "systems", "services", "consulting", "technologies", "partners",
@@ -551,6 +551,26 @@ enum EntryVocabulary {
         "lar", "ehpad", "apotheke", "farmacia", "pharmacie", "farmácia", "supermarkt", "supermercato", "supermercado",
         "supermarché", "negozio", "tienda", "magasin", "loja",
     ].map(\.folded))
+
+    /// The organisation words that also end a functional title ("Manager for Systems and Integration", "Lead for Logistics and
+    /// Services"): alone they do not make a name an employer.
+    private static let genericOrganisationWords: Set<String> = Set([
+        "labs", "solutions", "systems", "services", "consulting", "technologies", "partners", "logistik", "logistica", "logística",
+        "logistique", "werk", "werke", "bau", "elektro", "handwerk",
+    ].map(\.folded))
+
+    /// Whether a piece reads as an organisation by a legal form or by a word that is not generic vocabulary.
+    static func isOrganisationBeyondGenericWords(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        if legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        return words.contains { !genericOrganisationWords.contains($0) && (organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix)) }
+    }
+
+    /// Whether a name holds a lowercase linking particle between its capitalised words ("Systems and Integration").
+    static func hasLinkingParticle(_ text: String) -> Bool {
+        text.words.contains { linkingParticles.contains($0.lowercased()) || $0.first?.isLowercase == true && $0.contains("'") }
+    }
 
     private static let organisationStems = ["elektrotechn", "krankenh", "ospedal"].map(\.folded)
 
@@ -612,6 +632,31 @@ enum EntryVocabulary {
 
     /// "Role at Employer" in the six languages: the role is before, the employer after.
     static let roleEmployerConnectors = [" at ", " @ ", " presso ", " bei ", " en ", " chez ", " na ", " no ", " em ", " para ", " für ", " for ", " per "]
+
+    /// The connectors that also occur inside a title ("Teacher for Special Needs"): read only when nothing else can hold the employer.
+    static let weakConnectors = [" para ", " für ", " for ", " per "]
+
+    /// The lowercase words that link the capitalised words of an organisation's name: "Bank of Scotland", "Cassa di Risparmio",
+    /// "Banco do Brasil", "Institut für Informatik". An elided one ("d'Épargne", "l'Avenir") is a particle with its noun.
+    static let linkingParticles: Set<String> = [
+        "of", "and", "for", "de", "del", "della", "di", "da", "do", "dos", "das", "du", "des", "la", "le", "el", "van", "von", "der",
+        "den", "für", "zu", "zur", "zum", "y", "e", "et", "en", "d'", "l'", "dell'", "all'",
+    ]
+
+    /// Whether every word of a name starts with a capital, a lowercase linking particle between two capitalised words being
+    /// one too: "Bank of Scotland" is a name, "Systems integration" is a title's tail.
+    static func isCapitalisedName(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard words.first?.first?.isUppercase == true else { return false }
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            if word.first?.isUppercase == true { return true }
+            if linkingParticles.contains(word.lowercased()) { return index + 1 < words.count && words[index + 1].first?.isUppercase == true }
+            guard let apostrophe = word.firstIndex(where: { $0 == "'" || $0 == "\u{2019}" }) else { return false }
+            let particle = word[...apostrophe].lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+            return linkingParticles.contains(particle) && word[word.index(after: apostrophe)...].first?.isUppercase == true
+        }
+    }
 
     // MARK: The labels of the formato europeo and the Europass
 
@@ -808,4 +853,32 @@ enum EntryVocabulary {
         "currículum", "currículo", "curriculum vitae et studiorum", "cv europass", "mein lebenslauf", "my cv", "il mio cv",
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",
     ].map(SectionVocabulary.key))
+}
+
+// MARK: - Sentences
+
+extension EntryVocabulary {
+
+    /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
+    /// positive sign of a sentence, which no noun phrase of a skills list has. The pronoun must be written as one
+    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals). A capitalised next word is a name ("I Corinthians
+    /// study") only when `capitalisedNextIsAName` says the line is a list of three or more items; in a line of two
+    /// clauses it is a brand used as a verb ("I Google suppliers, compare quotes"). Trade-off: a two-item list that
+    /// starts with a numeral ("I Corinthians study, choir singing.") stays whole as text not imported.
+    static func startsWithSubject(_ text: String, capitalisedNextIsAName: Bool) -> Bool {
+        let words = text.words
+        guard let first = words.first, subjectPronouns.contains(first.folded) || first.lowercased() == "n\u{f3}s"
+        else { return false }
+        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy { $0.isLowercase || $0 == "'" || $0 == "\u{2019}" }
+        let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
+        return isWrittenAsAWord && !(nextStartsWithACapital && capitalisedNextIsAName)
+    }
+
+    /// The subjects of the six languages, with the contracted ones of English and French ("I've", "J'ai"); the
+    /// Portuguese "n\u{f3}s" is matched with its accent in `startsWithSubject`, as its folded form is a preposition.
+    private static let subjectPronouns: Set<String> = Set([
+        "i", "we", "ich", "wir", "io", "noi", "yo", "nosotros", "nosotras", "je", "nous", "eu",
+        "i've", "i'm", "i'd", "i'll", "we've", "we're", "we'd", "we'll",
+        "j'ai", "j'avais", "j'\u{e9}tais",
+    ].map(\.folded))
 }
