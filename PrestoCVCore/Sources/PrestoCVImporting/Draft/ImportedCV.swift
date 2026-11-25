@@ -114,6 +114,9 @@ public struct ImportedExperience: Hashable, Sendable {
     public var details: [Sourced<String>] = []
     /// Why the person should check the entry as a whole.
     public var check: CheckReason?
+    /// The heading of the section the job stands in, as the CV writes it; nil when the section has none. A date the CV
+    /// cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 public struct ImportedEducation: Hashable, Sendable {
@@ -150,6 +153,9 @@ public struct ImportedCertification: Hashable, Sendable {
     public var description: Sourced<String>?
     /// Why the person should check the certification as a whole.
     public var check: CheckReason?
+    /// The heading of the section the certification stands in, as the CV writes it; nil when the section has none. A year
+    /// the CV cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 // MARK: - What was not imported
@@ -263,8 +269,9 @@ extension ImportedLink {
 
 extension ImportedExperience {
     package static func scripted(role: Sourced<String>?, employer: Sourced<String>?, location: Sourced<String>?,
-                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?) -> ImportedExperience {
-        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check)
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?,
+                                 heading: String? = nil) -> ImportedExperience {
+        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check, heading: heading)
     }
 }
 
@@ -287,9 +294,9 @@ extension ImportedLanguage {
 extension ImportedCertification {
     package static func scripted(
         _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?,
-        check: CheckReason?
+        check: CheckReason?, heading: String? = nil
     ) -> ImportedCertification {
-        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description, check: check)
+        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description, check: check, heading: heading)
     }
 }
 

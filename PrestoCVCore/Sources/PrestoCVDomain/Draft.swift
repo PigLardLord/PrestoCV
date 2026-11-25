@@ -123,7 +123,7 @@ public enum EntryField: Hashable, Sendable, CaseIterable {
     case educationDegree, educationSchool, educationPeriod, educationDescription
     case skillName
     case languageName, languageProficiency
-    case certificationName, certificationIssuer, certificationIssued
+    case certificationName, certificationIssuer, certificationIssued, certificationLink, certificationDescription
     case profilePlatform, profileLink
     case interest
 
@@ -134,7 +134,7 @@ public enum EntryField: Hashable, Sendable, CaseIterable {
         case .educationDegree, .educationSchool, .educationPeriod, .educationDescription: .education
         case .skillName: .skills
         case .languageName, .languageProficiency: .languages
-        case .certificationName, .certificationIssuer, .certificationIssued: .certifications
+        case .certificationName, .certificationIssuer, .certificationIssued, .certificationLink, .certificationDescription: .certifications
         case .profilePlatform, .profileLink: .profiles
         case .interest: .interests
         }

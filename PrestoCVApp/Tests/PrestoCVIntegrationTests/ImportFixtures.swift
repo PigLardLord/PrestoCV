@@ -93,7 +93,7 @@ enum FullImport {
             f.experience(
                 role: f.quoted("Staff Engineer"), employer: f.quoted("Northwind Labs"), location: f.quoted("Hamburg, Germany"),
                 period: f.sourced(ImportedPeriod(start: yearMonth(2019, 3), end: .date(yearMonth(2021, 5))), quoting: "03/2019 - 05/2021", reading: .period),
-                details: [f.quoted("Led the migration to containers"), f.quoted("Cut build times by half")], check: .entryBoundsUnsure),
+                details: [f.quoted("Led the migration to containers"), f.quoted("Cut build times by half")], check: .entryBoundsUnsure, heading: "Experience"),
             f.experience(
                 role: f.quoted("Junior Developer"), employer: f.quoted("Tailspin Works"),
                 period: f.sourced(ImportedPeriod(start: yearMonth(2015), end: .unstated), quoting: "2015 -", reading: .period, check: .periodOpenEnd),
@@ -116,7 +116,7 @@ enum FullImport {
             f.certification(f.quoted("Certified Kubernetes Administrator"), issuer: f.quoted("Linux Foundation"),
                             year: f.sourced(2017, quoting: "2017", reading: .year),
                             link: f.sourced(link("https://training.example.org/cka"), quoting: "https://training.example.org/cka"),
-                            description: f.quoted("Renewed after a hands-on exam in a live cluster."), check: .descriptionOrEntryUnsure),
+                            description: f.quoted("Renewed after a hands-on exam in a live cluster."), check: .descriptionOrEntryUnsure, heading: "Certifications"),
         ]
         cv.interests = [f.quoted("Chess")]
         return f.result(cv, language: .en, unplaced: [f.unplaced("Volunteering at the harbour clean-up.")])

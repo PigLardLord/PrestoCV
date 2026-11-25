@@ -42,9 +42,11 @@ public struct ImportFixture: Sendable {
 
     public func experience(
         role: Sourced<String>? = nil, employer: Sourced<String>? = nil, location: Sourced<String>? = nil,
-        period: Sourced<ImportedPeriod>? = nil, details: [Sourced<String>] = [], check: CheckReason? = nil
+        period: Sourced<ImportedPeriod>? = nil, details: [Sourced<String>] = [], check: CheckReason? = nil, heading: String? = nil
     ) -> ImportedExperience {
-        ImportedExperience.scripted(role: role, employer: employer, location: location, period: period, details: details, check: check)
+        ImportedExperience.scripted(
+            role: role, employer: employer, location: location, period: period, details: details, check: check, heading: heading
+        )
     }
 
     public func education(
@@ -64,9 +66,9 @@ public struct ImportFixture: Sendable {
 
     public func certification(
         _ name: Sourced<String>, issuer: Sourced<String>? = nil, year: Sourced<Int>? = nil, link: Sourced<WebLink>? = nil,
-        description: Sourced<String>? = nil, check: CheckReason? = nil
+        description: Sourced<String>? = nil, check: CheckReason? = nil, heading: String? = nil
     ) -> ImportedCertification {
-        ImportedCertification.scripted(name, issuer: issuer, year: year, link: link, description: description, check: check)
+        ImportedCertification.scripted(name, issuer: issuer, year: year, link: link, description: description, check: check, heading: heading)
     }
 
     /// Text that fits no field, quoted from `piece`.
