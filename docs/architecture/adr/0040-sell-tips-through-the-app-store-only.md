@@ -8,14 +8,14 @@
 
 - **PrestoCV is free, and every feature works without paying** (#197). Some people want to say thank you to the developer, and #213 asks for a way to do it: three tips of €1.99, €4.99 and €9.99, with a thank-you. #505 places it in Settings, as the row "Support PrestoCV".
 - **Apple's rules for a payment made inside the app.** The App Review Guidelines ask that a payment made inside an app go through In-App Purchase (3.1.1), and they keep collecting donations for approved nonprofits (3.2.2). PrestoCV's developer is a person, not a nonprofit, so what the app sells is a tip, not a donation. On the US storefront only, the guidelines also allow a link to another way of paying.
-- **Selling makes the developer a trader** under the EU Digital Services Act (#269). The App Store then shows the developer's trader details on the product page in the EU. The status is switched in App Store Connect when the tips ship.
+- **The maintainer assessed that selling tips makes the developer a trader** under the EU Digital Services Act (#269). The status is a self-assessment that each developer declares in App Store Connect; Apple names in-app purchases among the signs of a trader, but no rule makes the status follow from a sale alone. A trader's contact details show on the product page in the EU. The maintainer switches the status when the tips ship.
 - **Selling needs the Paid Applications Agreement** and the developer's bank and tax details in App Store Connect. They block the sale, not the code.
 - **The maintainer decided on 2026-11-26:** the tips ship inside version 1.1; they are named "Small tip", "Medium tip" and "Large tip"; a tip gives no mark or badge; the screen's introduction is neutral; the link to another way of paying on the US storefront is not in 1.1 and is listed for 1.2 (#569).
 
 ## Decision
 
 - **Tips are three consumable In-App Purchases,** at the price points of €1.99, €4.99 and €9.99, bought with StoreKit 2 from one screen, reached from the "Support PrestoCV" row of Settings. The App Store shows each person the price of their own storefront.
-- **A tip unlocks nothing.** No feature, design, badge, mark or text changes after a tip, and no code asks whether a person has tipped. So nothing is stored about a tip, and there is nothing to restore.
+- **A tip unlocks nothing.** The tip screen thanks the person right after a completed purchase, and that thank-you leaves with the screen. No feature, design, badge, mark or lasting text changes after a tip, and no code asks whether a person has tipped. So nothing is stored about a tip, and there is nothing to restore.
 - **The word is "tip" in every language** (de Trinkgeld, es propina, fr pourboire, it mancia, pt gorjeta), never "donation". The screen says that a tip unlocks nothing and that it is a payment to the developer, not a donation.
 - **No link, button or text in the app leads to another way of paying,** on any storefront, in version 1.1. The US storefront link of #569 amends this decision first, in its own ADR or an amendment of this one.
 - **The tips are offered only on their own screen.** No prompt, banner, reminder or badge elsewhere asks for one.
