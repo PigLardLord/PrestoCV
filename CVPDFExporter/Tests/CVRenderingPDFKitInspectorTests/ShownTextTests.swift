@@ -92,7 +92,9 @@ struct ShownTextTests {
     /// predefined CMap writes vertically), `/F3` (a Type 0 font whose embedded CMap writes vertically) and `/F4` (a
     /// Type 0 font that writes across), and Type 0 fonts whose embedded CMap writes vertically by its program only
     /// (`/F5`), is built on a predefined vertical CMap (`/F6`) or on an embedded one (`/F7`), or writes across (`/F8`),
-    /// and one whose program uses a vertical CMap with a comment between its name and `usecmap` (`/F10`).
+    /// and one whose program uses a vertical CMap with a comment between its name and `usecmap` (`/F10`). The Type 0
+    /// fonts `/F11` to `/F15` name their CMap: `/F11` the predefined `V`, `/F12` one the scan does not know, `/F13` the
+    /// predefined `H`; `/F14` and `/F15` embed one built on a CMap the scan does not know and on `H`.
     static func pageShowing(_ content: String) -> Data {
         let cid = "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>"
         let cmap = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /Custom def /WMode 1 def "
@@ -105,9 +107,11 @@ struct ShownTextTests {
             + "usecmap /CMapName /Commented def 1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange "
             + "<0000> <FFFF> 0 endcidrange endcmap CMapName currentdict /CMap defineresource pop end end"
         let font = { (cmap: Int) in "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding \(cmap) 0 R /DescendantFonts [7 0 R] >>" }
+        let named = { (cmap: String) in "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /\(cmap) /DescendantFonts [7 0 R] >>" }
         return handWritten([
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 9 0 R "
-                + "/F4 11 0 R /F5 12 0 R /F6 14 0 R /F7 16 0 R /F8 18 0 R /F10 20 0 R >> >> /Contents 4 0 R >>",
+                + "/F4 11 0 R /F5 12 0 R /F6 14 0 R /F7 16 0 R /F8 18 0 R /F10 20 0 R /F11 22 0 R /F12 23 0 R /F13 24 0 R "
+                + "/F14 25 0 R /F15 27 0 R >> >> /Contents 4 0 R >>",
             stream(content),
             helvetica,
             "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-V /DescendantFonts [7 0 R] >>",
@@ -122,6 +126,9 @@ struct ShownTextTests {
             font(17), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap 13 0 R "),
             font(19), stream(across, "/Type /CMap /CMapName /Across \(cid) "),
             font(21), stream(commented, "/Type /CMap /CMapName /Commented \(cid) "),
+            named("V"), named("Custom"), named("H"),
+            font(26), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /Custom "),
+            font(28), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /H "),
         ])
     }
 
@@ -199,18 +206,29 @@ struct ShownTextTests {
                 "mode 1 in the program only, a base named -V, an embedded vertical base, a CMap writing across, the first again, a commented base")
     }
 
-    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one named -V, or an open string, with a name's # escapes read")
+    @Test("a CMap a font or its base names writes across only when its name is H or ends in -H")
+    func namedCMaps() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F11 9 Tf 100 700 Td <0001> Tj ET BT /F12 9 Tf 100 600 Td <0001> Tj ET "
+            + "BT /F13 9 Tf 100 500 Td <0001> Tj ET BT /F14 9 Tf 100 400 Td <0001> Tj ET BT /F15 9 Tf 100 300 Td <0001> Tj ET"))
+        #expect(runs == [ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 500), size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 300), size: 9)],
+                "the predefined V, a name the scan does not know, the predefined H, a base it does not know, a base named H")
+    }
+
+    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one not named H or -H, or an open string, with a name's # escapes read")
     func cmapPrograms() {
         let vertical = ["/WMode 1 def", "/WMode\n1 def", "<</WMode 1>>", "/WMode 0.0 def", "/WMode", "/WMode 0 def /WMode 1 def",
                         "/UniJIS-UCS2-V usecmap", "/Identity-V % its base CMap\nusecmap", "/WMode % the mode\n1 def",
                         "(100%) pop /WMode 1 def", "<~9j%~> pop /WMode 1 def", "dup usecmap", "usecmap",
                         "(not closed /WMode 0 def", "<00 /WMode 0 def", "<~9j /WMode 0 def", "/Identity#2DV usecmap",
-                        "/#57Mode 1 def", "/WMod#65 1 def", "/Identity#2dV usecmap"]
+                        "/#57Mode 1 def", "/WMod#65 1 def", "/Identity#2dV usecmap", "/Custom usecmap", "/V usecmap",
+                        "/Custom#2V usecmap", "/Custom-H2 usecmap", "/#48V usecmap"]
         let across = ["/WMode 0 def", "<</WMode 0>>", "/UniJIS-UCS2-H usecmap", "/CMapName /Custom-V def", "/WMode0 1", "",
                       "% a comment: /WMode 1", "<</WMode 0>> % /UniJIS-UCS2-V usecmap", "/Identity-H % its base\rusecmap",
                       "/WMode % the mode\r0 def", "/WMode % the mode\u{0C}0 def", "(/WMode 1) pop", "(a \\) /WMode 1) pop",
                       "((a) /WMode 1) pop", "<2F574D6F6465> pop /WMode 0 def", "<~/WMode 1~> pop", "/#57Mode 0 def",
-                      "/Identity#2DH usecmap", "/Custom#2V usecmap", "/Custom-V#", "/#WMode 1", "/#+7Mode 1"]
+                      "/Identity#2DH usecmap", "/Custom-V#", "/#WMode 1", "/#+7Mode 1", "/H usecmap", "/#48 usecmap"]
         for program in vertical { #expect(CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
         for program in across { #expect(!CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
     }

@@ -162,11 +162,12 @@ private func setting(of name: UnsafePointer<CChar>, in stream: CGPDFContentStrea
     return (kind != "Type3", kind != "Type0" || !mayWriteVertically(dictionary, cmaps: &cmaps))
 }
 
-/// Whether the Type 0 font `font` may write vertically: its CMap is a predefined one whose name ends in `-V`, or an
-/// embedded one that may. `cmaps` keeps the answer for each embedded CMap, which a page's content sets again and again.
+/// Whether the Type 0 font `font` may write vertically: its CMap is named, by a name `writesAcross(cmapNamed:)` does
+/// not know as horizontal, or it is an embedded one that may. `cmaps` keeps the answer for each embedded CMap, which a
+/// page's content sets again and again.
 private func mayWriteVertically(_ font: CGPDFDictionaryRef, cmaps: inout [CGPDFStreamRef: Bool]) -> Bool {
     var name: UnsafePointer<CChar>?
-    if CGPDFDictionaryGetName(font, "Encoding", &name), let name { return String(cString: name).hasSuffix("-V") }
+    if CGPDFDictionaryGetName(font, "Encoding", &name), let name { return !writesAcross(cmapNamed: String(cString: name)) }
     var cmap: CGPDFStreamRef?
     guard CGPDFDictionaryGetStream(font, "Encoding", &cmap), let cmap else { return false }
     if let known = cmaps[cmap] { return known }
@@ -176,20 +177,29 @@ private func mayWriteVertically(_ font: CGPDFDictionaryRef, cmaps: inout [CGPDFS
 }
 
 /// Whether the embedded CMap `cmap` may write vertically: its dictionary gives a writing mode other than 0, its
-/// program may set one (`CMapProgram`), or it is built on (`/UseCMap`) a CMap whose name ends in `-V` or an embedded
-/// one that may. A CMap whose program the scan cannot read, or a chain of CMaps longer than `depth`, may.
+/// program may set one (`CMapProgram`), or it is built on (`/UseCMap`) a named CMap not known as horizontal or an
+/// embedded one that may. A CMap whose program the scan cannot read, or a chain of CMaps longer than `depth`, may.
 private func mayWriteVertically(_ cmap: CGPDFStreamRef, within depth: Int) -> Bool {
     guard depth > 0, let info = CGPDFStreamGetDictionary(cmap) else { return true }
     var mode: CGPDFObjectRef?
     var value: CGPDFInteger = 0
     if CGPDFDictionaryGetObject(info, "WMode", &mode), !(CGPDFDictionaryGetInteger(info, "WMode", &value) && value == 0) { return true }
     var baseName: UnsafePointer<CChar>?
-    if CGPDFDictionaryGetName(info, "UseCMap", &baseName), let baseName, String(cString: baseName).hasSuffix("-V") { return true }
+    if CGPDFDictionaryGetName(info, "UseCMap", &baseName), let baseName, !writesAcross(cmapNamed: String(cString: baseName)) {
+        return true
+    }
     var base: CGPDFStreamRef?
     if CGPDFDictionaryGetStream(info, "UseCMap", &base), let base, mayWriteVertically(base, within: depth - 1) { return true }
     var format = CGPDFDataFormat.raw
     guard let program = CGPDFStreamCopyData(cmap, &format), format == .raw else { return true }
     return CMapProgram(program as Data).mayWriteVertically
+}
+
+/// Whether the CMap named `name` writes across for sure: it is a predefined horizontal CMap, which is named `H` or by a
+/// name that ends in `-H` (ISO 32000-1, table 118). Any other name may write vertically: a predefined vertical CMap
+/// (`V`, or a name that ends in `-V`), or one the scan does not know, which a renderer may still find.
+private func writesAcross(cmapNamed name: String) -> Bool {
+    name == "H" || name.hasSuffix("-H")
 }
 
 /// The words of a CMap program, which is PostScript, split at white space and delimiters. A comment (from `%` to the
@@ -306,12 +316,15 @@ struct CMapProgram {
     }
 
     /// Whether the program may set writing mode 1: a string it opens is never closed, a `/WMode` it holds is followed
-    /// by anything but `0`, or a `usecmap` it holds is not right after a name, or is after one that ends in `-V`.
+    /// by anything but `0`, or a `usecmap` it holds is not right after a name, or is after one that
+    /// `writesAcross(cmapNamed:)` does not know as horizontal.
     var mayWriteVertically: Bool {
         !isWhole || words.indices.contains { index in
             switch words[index] {
             case "/WMode": index + 1 == words.endIndex || words[index + 1] != "0"
-            case "usecmap": index == words.startIndex || !words[index - 1].hasPrefix("/") || words[index - 1].hasSuffix("-V")
+            case "usecmap":
+                index == words.startIndex || !words[index - 1].hasPrefix("/")
+                    || !writesAcross(cmapNamed: String(words[index - 1].dropFirst()))
             default: false
             }
         }
