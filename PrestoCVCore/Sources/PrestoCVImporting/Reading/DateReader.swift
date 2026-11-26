@@ -46,13 +46,15 @@ struct DateMatch: Equatable {
 /// "since" forms ("seit", "dal", "desde", "depuis", "ab").
 enum DateReader {
 
-    static func periods(in text: some StringProtocol) -> [DateMatch] {
+    /// `readsSoftwareRanges` reads "Unity 9.10 – 9.12" as a period instead of a software version range: the caller that can see
+    /// the lines around it decides which of the two it is.
+    static func periods(in text: some StringProtocol, readsSoftwareRanges: Bool = false) -> [DateMatch] {
         let string = String(text)
         let tokens = tokenize(string)
         var matches: [DateMatch] = []
         var index = 0
         while index < tokens.count {
-            if let (period, end) = period(at: index, in: tokens) {
+            if let (period, end) = period(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) {
                 matches.append(DateMatch(range: tokens[index].range.lowerBound..<tokens[end].range.upperBound, period: period))
                 index = end + 1
             } else {
@@ -109,7 +111,7 @@ enum DateReader {
     // MARK: Periods
 
     /// The period that starts at a token, and the index of its last token.
-    private static func period(at start: Int, in tokens: [Token]) -> (ImportedPeriod, Int)? {
+    private static func period(at start: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> (ImportedPeriod, Int)? {
         var index = start
         var prefix: Prefix?
         if let (found, next) = prefixWord(at: index, in: tokens) {
@@ -122,9 +124,10 @@ enum DateReader {
            date(at: index, in: tokens) == nil {
             return (ImportedPeriod(start: YearMonth(year: end.year, month: month.month), end: .date(end)), endIndex)
         }
+        if let found = shortRange(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) { return found }
         guard let (first, firstEnd) = date(at: index, in: tokens) else { return nil }
         if let next = connector(after: firstEnd, in: tokens) {
-            if let (second, secondEnd) = date(at: next, in: tokens) {
+            if let (second, secondEnd) = rangeEnd(at: next, in: tokens) {
                 let ordered = (second.year, second.month ?? 0) >= (first.year, first.month ?? 0)
                 if ordered { return (ImportedPeriod(start: first, end: .date(second)), secondEnd) }
             }
@@ -141,9 +144,149 @@ enum DateReader {
         }
         // A prefix that only reads as "from" with a range is not part of a single date
         let quoteStart = prefix == nil ? start : index
-        if quoteStart != start { return period(at: index, in: tokens) }
+        if quoteStart != start { return period(at: index, in: tokens, readsSoftwareRanges: readsSoftwareRanges) }
         return (ImportedPeriod(start: first, end: nil), firstEnd)
     }
+
+    /// A range that starts with a two-digit year, "09/19 – 08/21" or "10/21 – heute": a two-digit year is a date only here.
+    /// The written form tells a period from pay. A slash is written only in dates, so a slash range is a period whatever
+    /// follows. A dot is written in both, so a dotted range is a period unless a unit stands beside it ("3.50–4.50%",
+    /// "10.50–12.50 €/hour", "10.50 – 12.50 EUR gross") or it is a version range with positive evidence
+    /// (see `isVersion`: "v3.10 – 3.12", "Version 3.10 – 3.12", "Python 3.10 – 3.12"). A range with neither is a period
+    /// whatever its years, as "09/60 – 08/65" and "Acme 9.10 – 9.12" are.
+    private static func shortRange(at index: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> (ImportedPeriod, Int)? {
+        guard !followsNumber(index, in: tokens), !isUnit(before: index, in: tokens),
+              let (first, firstEnd) = shortDate(at: index, in: tokens),
+              let next = connector(after: firstEnd, in: tokens) else { return nil }
+        if let (second, secondEnd) = rangeEnd(at: next, in: tokens),
+           (second.year, second.month ?? 0) >= (first.year, first.month ?? 0) {
+            let dotted = isDotted(from: index, to: secondEnd, in: tokens)
+            if dotted {
+                if isUnit(after: secondEnd, in: tokens) || isVersion(at: index, to: secondEnd, in: tokens, readsSoftwareRanges: readsSoftwareRanges) { return nil }
+            } else if isPercent(rightAfter: secondEnd, in: tokens) {
+                return nil
+            }
+            return (ImportedPeriod(start: first, end: .date(second)), secondEnd)
+        }
+        guard let currentEnd = currentWords(at: next, in: tokens) else { return nil }
+        return (ImportedPeriod(start: first, end: .current), currentEnd)
+    }
+
+    /// A dot between the digits of the first date or of the last one.
+    private static func isDotted(from index: Int, to end: Int, in tokens: [Token]) -> Bool {
+        for mark in [tokens[index + 1].kind, tokens[end - 1].kind] {
+            if case .mark(".") = mark { return true }
+        }
+        return false
+    }
+
+    /// A one-digit number that reads as a version, only on positive evidence (split rather than merge: a wrong split is
+    /// visible, a wrong merge loses a job): a "v" glued to it ("v3.10"), a version word before it ("Version", "versione",
+    /// "versión", "versão"), or one major on both sides after the name of a software product or language ("Python 3.10 – 3.12").
+    /// Any other word before it ("Muster GmbH 9.19 – 8.21", "Acme 9.10 – 9.12") leaves a period.
+    private static func isVersion(at index: Int, to end: Int, in tokens: [Token], readsSoftwareRanges: Bool) -> Bool {
+        guard index > 0, case .number(let major, 1) = tokens[index].kind, case .word(let word) = tokens[index - 1].kind else {
+            return false
+        }
+        if word == "v", tokens[index].spaced == false { return true }
+        if versionWords.contains(word) { return true }
+        guard end >= 2, case .number(major, _) = tokens[end - 2].kind, prefixWord(at: index - 1, in: tokens) == nil else { return false }
+        return !readsSoftwareRanges && softwareNames.contains(word)
+    }
+
+    /// Software products and languages that carry a version range ("Python 3.10 – 3.12"). A narrow list: any other word
+    /// before an ambiguous range is an employer or a place, and the range is its period.
+    private static let softwareNames: Set<String> = [
+        "python", "django", "flask", "swift", "swiftui", "java", "kotlin", "node", "nodejs", "php", "ruby", "rails", "go",
+        "rust", "scala", "perl", "ios", "ipados", "macos", "watchos", "tvos", "android", "windows", "ubuntu", "debian",
+        "linux", "angular", "react", "vue", "net", "dotnet", "postgres", "postgresql", "mysql", "mariadb", "mongodb",
+        "redis", "docker", "kubernetes", "xcode", "gradle", "laravel", "symfony", "spring", "unity", "unreal",
+    ].reduce(into: Set<String>()) { $0.insert($1.folded) }
+
+    private static let versionWords: Set<String> = ["version", "versione", "versao"].reduce(into: Set<String>()) { $0.insert($1.folded) }
+
+    /// A percent sign written right after the last number, no space between ("3/50–4/50%").
+    private static func isPercent(rightAfter index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count, case .mark("%") = tokens[index + 1].kind else { return false }
+        return !tokens[index + 1].spaced
+    }
+
+    /// A number unit right before the token: a currency sign or code.
+    private static func isUnit(before index: Int, in tokens: [Token]) -> Bool {
+        guard index > 0 else { return false }
+        switch tokens[index - 1].kind {
+        case .mark(let mark): return currencySigns.contains(mark)
+        case .word(let word): return currencyWords.contains(word)
+        case .number: return false
+        }
+    }
+
+    /// A number unit right after the token, spaced or not: a percent sign, "k", a currency sign or code that no number
+    /// follows, a rate mark and its time word ("/h", "/ hour", "/Std.") or a rate phrase ("per hour", "pro Stunde",
+    /// "all'ora", "l'heure", "por hora"). A word that only follows the range ("HR Manager") is none.
+    private static func isUnit(after index: Int, in tokens: [Token]) -> Bool {
+        var next = index + 1
+        guard next < tokens.count else { return false }
+        switch tokens[next].kind {
+        case .mark(let mark) where mark == "%": return true
+        case .word("k"): return !joinsTheNext(index: next, in: tokens)
+        case .word(let word) where ratePhrases.contains(word): return true
+        case .mark(let mark) where currencySigns.contains(mark): return endsTheAmount(after: next, in: tokens)
+        case .word(let word) where currencyWords.contains(word): return endsTheAmount(after: next, in: tokens)
+        default: break
+        }
+        switch tokens[next].kind {
+        case .mark("/"): next += 1
+        case .word(let word) where rateIntroducers.contains(word): next += 1
+        default: return false
+        }
+        guard next < tokens.count, case .word(let word) = tokens[next].kind else { return false }
+        return rateWords.contains(word)
+    }
+
+    /// A currency right after a range is its unit; a number after it opens an amount of its own ("EUR 5 million budget").
+    private static func endsTheAmount(after index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count, case .number = tokens[index + 1].kind else { return true }
+        return false
+    }
+
+    /// A "k" is a unit before punctuation, a rate or a space; it begins a word only when a letter or digit follows it
+    /// directly ("k8s") or a hyphen and then a letter or digit ("K-12").
+    private static func joinsTheNext(index: Int, in tokens: [Token]) -> Bool {
+        guard index + 1 < tokens.count, !tokens[index + 1].spaced else { return false }
+        switch tokens[index + 1].kind {
+        case .word, .number: return true
+        case .mark("-"):
+            guard index + 2 < tokens.count, !tokens[index + 2].spaced else { return false }
+            if case .mark = tokens[index + 2].kind { return false }
+            return true
+        case .mark: return false
+        }
+    }
+
+    private static let currencySigns: Set<Character> = ["€", "$", "£", "¥"]
+    private static let currencyWords: Set<String> = [
+        "eur", "euro", "euros", "usd", "chf", "gbp", "dollar", "dollars", "pounds"
+    ]
+    private static let rateIntroducers: Set<String> = ["per", "pro", "all'", "l'", "por"]
+    private static let ratePhrases: Set<String> = ["all'ora", "all'ore", "l'heure", "l'ora"].reduce(into: Set<String>()) {
+        $0.insert($1.folded)
+    }
+    private static let rateWords: Set<String> = [
+        "h", "hr", "hrs", "hour", "hours", "std", "stunde", "stunden", "ora", "ore", "heure", "heures", "hora", "horas",
+        "month", "monat", "mese", "mois", "mes", "year", "jahr", "anno", "annee", "ano",
+    ]
+
+    /// The end date of a range, as a date or a two-digit date, after the words of an expected end ("expected 06/2024").
+    private static func rangeEnd(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
+        var start = index
+        if index < tokens.count, case .word(let word) = tokens[index].kind, expectedWords.contains(word) { start += 1 }
+        return date(at: start, in: tokens) ?? shortDate(at: start, in: tokens)
+    }
+
+    private static let expectedWords: Set<String> = [
+        "expected", "voraussichtlich", "previsto", "prevista", "prevu", "prevue", "esperado", "esperada",
+    ].reduce(into: Set<String>()) { $0.insert($1.folded) }
 
     private enum Prefix { case since, from }
 
@@ -199,6 +342,26 @@ enum DateReader {
             return (YearMonth(year: first, month: second), afterSecond)
         }
         return (YearMonth(year: first, month: nil), index)
+    }
+
+    /// A month and a two-digit year, "09/19" or "09.19", that no other number touches.
+    private static func shortDate(at index: Int, in tokens: [Token]) -> (YearMonth, Int)? {
+        guard index < tokens.count, case .number(let month, let monthDigits) = tokens[index].kind, monthDigits <= 2, (1...12).contains(month),
+              let (value, digits, end) = numberAfterSeparator(index, in: tokens, separators: ["/", "."]), digits == 2,
+              numberAfterSeparator(end, in: tokens, separators: ["/", "."]) == nil else { return nil }
+        let year = value < twoDigitPivot ? 2000 + value : 1900 + value
+        return isYear(year) ? (YearMonth(year: year, month: month), end) : nil
+    }
+
+    /// Two-digit years from 00 up to this are 20xx, the others 19xx. Stated here and nowhere else; no clock is read.
+    /// A two-digit year maps 00-29 to 20xx and 30-99 to 19xx, then passes the same year bounds (`isYear`) as a four-digit
+    /// year, so 30 to 39 give 1930 to 1939 and are not read, as "08/1930" is not.
+    private static let twoDigitPivot = 30
+
+    private static func followsNumber(_ index: Int, in tokens: [Token]) -> Bool {
+        guard index >= 2, case .mark(let mark) = tokens[index - 1].kind, ["/", ".", "-"].contains(mark), !tokens[index].spaced else { return false }
+        if case .number = tokens[index - 2].kind { return true }
+        return false
     }
 
     private static func numberAfterSeparator(_ index: Int, in tokens: [Token], separators: Set<Character> = ["/", ".", "-"]) -> (Int, Int, Int)? {
