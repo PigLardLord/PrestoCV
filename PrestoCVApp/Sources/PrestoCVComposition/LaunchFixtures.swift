@@ -1,4 +1,5 @@
 #if DEBUG
+import CVDesignCatalog
 import DiagnosticTrace
 import Foundation
 import PrestoCVApplication
@@ -32,6 +33,11 @@ import PrestoCVWorkflowPorts
 ///   It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextOpenedFile <linkedin>`: each time a window becomes active, it is handed the PDF of the corpus of that
 ///   name, which only a Debug build carries, as if another app opened it there. It writes nothing, so it needs no folder.
+/// - `-PrestoCVNextReadyDesigns`: the bundled designs are accepted without the renders that check them (`AcceptedDesigns`),
+///   so that a UI test that is not about the designs or the first launch does not wait for those renders on every launch of
+///   an empty folder. The sync, its validator and the design store stay the real ones. It needs one of the two storage
+///   arguments, as the seed does, so that the device's own design store never holds a design that no render checked. A
+///   named folder keeps its designs for the next launch, which then finds them unchanged and does not check them either.
 struct LaunchFixtures: Equatable, Sendable {
     enum Storage: Equatable, Sendable { case device, empty, named(String) }
 
@@ -61,6 +67,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case otherWindowWithoutFolder
         case unreadableOpenedFile
         case traceRunsWithoutFolder
+        case readyDesignsWithoutFolder
         case seedUnwritable
         /// The fixture folder, or a folder inside it, is a link, or leads out of the temporary folder
         case unsafeFolder
@@ -78,6 +85,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let holdImportArgument = "-PrestoCVNextHoldImport"
     static let openedFileArgument = "-PrestoCVNextOpenedFile"
     static let traceRunsArgument = "-PrestoCVNextTraceRuns"
+    static let readyDesignsArgument = "-PrestoCVNextReadyDesigns"
     private static let prefix = "-PrestoCVNext"
 
     var storage: Storage = .device
@@ -102,6 +110,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var openedFile: OpenedFile?
     /// Two invented runs of the diagnostics are stored before the app starts
     var storesTraceRuns = false
+    /// The bundled designs are accepted without the renders that check them
+    var acceptsBundledDesigns = false
 
     /// Reads the arguments the process was launched with (the first is the program).
     static func parse(_ arguments: [String]) throws(Failure) -> LaunchFixtures {
@@ -151,6 +161,8 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableOpenedFile
                 }
                 fixtures.openedFile = file
+            case readyDesignsArgument:
+                fixtures.acceptsBundledDesigns = true
             case _ where argument.hasPrefix(prefix):
                 fixtures.unknownArguments.append(argument)
             default:
@@ -170,6 +182,7 @@ struct LaunchFixtures: Equatable, Sendable {
         if fixtures.failsRenamesInPairs && fixtures.storage == .device { throw .failuresWithoutFolder }
         if fixtures.otherWindow != nil && fixtures.storage == .device { throw .otherWindowWithoutFolder }
         if fixtures.storesTraceRuns && fixtures.storage == .device { throw .traceRunsWithoutFolder }
+        if fixtures.acceptsBundledDesigns && fixtures.storage == .device { throw .readyDesignsWithoutFolder }
         return fixtures
     }
 
@@ -216,6 +229,12 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What a window is handed as if another app opened it: the PDF of that name among `resources`, the bundle's.
     func openedFileFixture(in resources: URL) -> OpenedFileFixture? {
         openedFile.map { OpenedFileFixture(file: resources.appendingPathComponent("\($0.rawValue).pdf")) }
+    }
+
+    /// What checks a bundled design before the sync saves it: the gate it is given, or with the fixture one that accepts
+    /// every design without rendering it.
+    func designGate(_ gate: any DesignRenderingGate) -> any DesignRenderingGate {
+        acceptsBundledDesigns ? AcceptedDesigns() : gate
     }
 
     /// What the app stores through: the store it is given, or with the fixture one that another window changes once.

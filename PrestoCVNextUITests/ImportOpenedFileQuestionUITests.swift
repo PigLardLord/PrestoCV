@@ -131,7 +131,7 @@ final class ImportOpenedFileQuestionUITests: RuntimeIssueFailingTestCase {
             """
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try JSONEncoder().encode(["\(identity).cv.json": cv]).base64EncodedString(),
             "-PrestoCVNextOtherWindow", "conflict",
             "-PrestoCVNextOpenedFile", "linkedin",

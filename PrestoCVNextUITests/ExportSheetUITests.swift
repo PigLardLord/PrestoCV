@@ -137,7 +137,7 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
     private func launch(_ cv: StoredCV, largestText: Bool) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try seed(cv),
         ]
         if largestText {

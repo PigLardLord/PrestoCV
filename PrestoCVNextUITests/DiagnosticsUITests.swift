@@ -29,7 +29,9 @@ final class DiagnosticsUITests: RuntimeIssueFailingTestCase {
         distribution: String, traceRuns: Bool = false, storage: [String] = ["-PrestoCVNextEmptyStorage"]
     ) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += storage + ["-PrestoCVNextSeed", try seed(), "-PrestoCVNextDistribution", distribution]
+        app.launchArguments += storage + [
+            "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try seed(), "-PrestoCVNextDistribution", distribution,
+        ]
         if traceRuns { app.launchArguments += ["-PrestoCVNextTraceRuns"] }
         app.launch()
         let gear = app.buttons["settings.open"]

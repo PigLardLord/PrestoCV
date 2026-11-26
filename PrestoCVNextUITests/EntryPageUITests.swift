@@ -32,7 +32,8 @@ final class EntryPageUITests: RuntimeIssueFailingTestCase {
         }
         let seed = try JSONEncoder().encode(files).base64EncodedString()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", seed,
         ]
         app.launch()
         try XCTSkipUnless(app.opensOnAPage("experiences"), "A wide screen keeps the rows in the form")
