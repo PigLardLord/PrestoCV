@@ -41,7 +41,7 @@ public final class LegacyImportReportViewModel {
     @ObservationIgnored var storingChoice: Task<Void, Never>?
     @ObservationIgnored private var loaded = false
     /// The report was dismissed for this launch (`dismissForTheLaunch()`): it does not show, though its load is still
-    /// reading.
+    /// reading or its removal still running.
     @ObservationIgnored private var dismissedForTheLaunch = false
     @ObservationIgnored private let reviewing: any LegacyImportReviewing
     @ObservationIgnored private let reminder: any LegacyReportReminding
@@ -91,14 +91,15 @@ public final class LegacyImportReportViewModel {
     }
 
     /// Removes the old copies of the CVs the sheet shows, whatever the check says; a CV the sheet does not show keeps its old
-    /// copy. The CVs whose old copy stays keep their mark. A second call while they are removed does nothing.
+    /// copy. The CVs whose old copy stays keep their mark. A second call while they are removed does nothing. When the
+    /// report was dismissed for the launch while they were removed, the copies kept do not show it again: it closes.
     public func confirm() async {
         guard state == .review else { return }
         state = .removing
         let shown = Set((leftOut + toCheck).map(\.id.id))
         let kept = await reviewing.removeOldCopies(of: shown)
         incomplete = incomplete.filter { !shown.contains($0.id) || kept.contains($0.id) }
-        state = kept.isEmpty ? .removed : .keptSome(kept.count)
+        state = kept.isEmpty ? .removed : dismissedForTheLaunch ? .hidden : .keptSome(kept.count)
     }
 
     /// Not now, Done, or the sheet pulled down. From the review it keeps the choice not to be reminded, when made. Nothing
@@ -116,7 +117,8 @@ public final class LegacyImportReportViewModel {
     }
 
     /// Closes the report as Not now does, and holds it closed for this launch: a load still reading when this is called does
-    /// not show it afterwards. The old copies and the reminder stay for the next launch, as when the person closes it.
+    /// not show it afterwards, and a removal still running closes it when it ends. The old copies and the reminder stay for
+    /// the next launch, as when the person closes it.
     public func dismissForTheLaunch() {
         dismissedForTheLaunch = true
         close()

@@ -140,6 +140,33 @@ struct HeldFileSheetsTests {
         #expect(await reminder.remindsAgain(), "the old copies and the reminder stay, as when closed by hand")
     }
 
+    @Test("a file opened while the old copies are removed closes the report when they are: it never stays over the import")
+    func fileClosesTheReportOnceTheRemovalEnds() async throws {
+        let browsing = Browsing()
+        let ada = try await browsing.stored(title: "Ada")
+        let reviewing = ReviewingFake(drops: [ada.id: [.look]], kept: [ada.id])
+        let report = LegacyImportReportViewModel(
+            reviewing: reviewing, reminder: ReminderFake(), browsing: browsing.browsing,
+            untitled: Browsing.untitled, numbered: { "\($0) (\($1))" }
+        )
+        let held = HeldFileTests.World()
+        held.shell.legacyReport = report
+        await report.load()
+        await reviewing.gate.close()
+        let removing = Task { await report.confirm() }
+        await waitUntil("the removal to wait") { await reviewing.gate.waiting == 1 }
+
+        held.shell.receive(file: Self.file)
+        #expect(report.isPresented, "nothing closes while the old copies are removed")
+        await reviewing.gate.open()
+        await removing.value
+
+        #expect(report.state == .hidden)
+        #expect(!report.isPresented)
+        #expect(held.shell.importer != nil)
+        #expect(report.isIncomplete(browsing.reference(ada)), "the CV whose old copy stays keeps its mark")
+    }
+
     @Test("the choice made in the new-CV sheet starts once the sheet has gone, and only once")
     func choiceStartsAfterTheSheet() {
         let held = HeldFileTests.World()
