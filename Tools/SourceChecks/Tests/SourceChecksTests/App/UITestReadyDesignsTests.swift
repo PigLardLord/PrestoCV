@@ -87,7 +87,7 @@ struct UITestReadyDesignsTests {
     @Test("a folder kept in a value is read through the launches that name it")
     func folderInAValue() {
         let passing = #"""
-            private func launch(storage: [String] = ["-PrestoCVNextEmptyStorage"]) {
+            private func launch(traced: Bool = false, storage: [String] = ["-PrestoCVNextEmptyStorage"]) {
                 app.launchArguments += storage + [
                     "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", seed,
                 ]
@@ -110,6 +110,68 @@ struct UITestReadyDesignsTests {
         #expect(FixtureLaunches(passing).problems().isEmpty)
         #expect(FixtureLaunches(failing).problems() == [
             "line 3: a folder in `fixture`, which a launch of this file uses without -PrestoCVNextReadyDesigns",
+        ])
+    }
+
+    @Test("a folder is followed into the values it is copied or added to and into the parameters it is passed to")
+    func folderThroughOtherValues() {
+        let copied = #"""
+            let storage = ["-PrestoCVNextStorage", folder]
+            let copied = storage
+            app.launchArguments += storage + ["-PrestoCVNextReadyDesigns"]
+            app.launchArguments += copied
+            """#
+        let added = #"""
+            let storage = ["-PrestoCVNextStorage", folder]
+            var arguments = ["-AppleLanguages", "(en)"]
+            arguments.append(contentsOf: storage)
+            app.launchArguments += arguments
+            """#
+        let passed = #"""
+            func launch(arguments: [String]) {
+                app.launchArguments += arguments
+            }
+            func testPassed() {
+                let fixture = [
+                    "-PrestoCVNextStorage", folder,
+                ]
+                launch(arguments: fixture)
+            }
+            """#
+        let passing = #"""
+            func launch(with arguments: [String]) {
+                app.launchArguments += arguments + ["-PrestoCVNextReadyDesigns"]
+            }
+            func testPassing() {
+                let storage = ["-PrestoCVNextStorage", folder]
+                let all = storage + ["-AppleLanguages", "(en)"]
+                launch(with: all)
+            }
+            """#
+
+        #expect(FixtureLaunches(copied).problems() == [
+            "line 1: a folder in `storage`, which a launch of this file uses through `copied` without -PrestoCVNextReadyDesigns",
+        ])
+        #expect(FixtureLaunches(added).problems() == [
+            "line 1: a folder in `storage`, which a launch of this file uses through `arguments` without -PrestoCVNextReadyDesigns",
+        ])
+        #expect(FixtureLaunches(passed).problems() == [
+            "line 6: a folder in `fixture`, which a launch of this file uses through `arguments` without -PrestoCVNextReadyDesigns",
+        ])
+        #expect(FixtureLaunches(passing).problems().isEmpty)
+    }
+
+    @Test("a folder in a value used where the check cannot follow it fails the check, though its other launches pass")
+    func folderBeyondTheCheck() {
+        let source = #"""
+            let storage = ["-PrestoCVNextStorage", folder]
+            app.launchArguments += storage + ["-PrestoCVNextReadyDesigns"]
+            let extended = Self.extended(storage)
+            app.launchArguments += extended
+            """#
+
+        #expect(FixtureLaunches(source).problems() == [
+            "line 3: a folder in `storage` goes where the check cannot follow it",
         ])
     }
 
