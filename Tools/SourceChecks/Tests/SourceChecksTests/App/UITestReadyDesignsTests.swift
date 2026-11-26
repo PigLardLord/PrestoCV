@@ -6,11 +6,8 @@ import Foundation
 /// A launch over an empty folder of the fixture is a first install: before its first screen the app checks every bundled
 /// design by rendering it, three designs in each of their font schemes, which takes seconds on every launch (#561). A UI
 /// test that is not about the designs or the first launch passes `-PrestoCVNextReadyDesigns`, and the app accepts the
-/// bundled designs without rendering them. So every file of the target that launches over a folder of the fixture passes
-/// it, unless it is one of the files listed here, which keep the real check on purpose and never pass it.
-///
-/// The check reads the code of the files without their comments, with the text of their strings (`SwiftCode.code`): the
-/// arguments are string literals.
+/// bundled designs without rendering them. So every launch over a folder of the fixture passes it, launch by launch
+/// (`FixtureLaunches`), unless its file is one of those listed here, which keep the real check on purpose and never pass it.
 @Suite("UI tests of the new stack - the bundled designs are accepted without their renders")
 struct UITestReadyDesignsTests {
 
@@ -44,7 +41,7 @@ struct UITestReadyDesignsTests {
 
     // MARK: - Tests
 
-    @Test("the check finds the UI tests that launch over a folder of the fixture, so a wrong folder or name does not pass it")
+    @Test("the check finds the UI tests that launch over a folder of the fixture, so a wrong folder does not pass it")
     func checkFindsTheLaunches() throws {
         let files = try Self.launchingFiles()
 
@@ -53,13 +50,13 @@ struct UITestReadyDesignsTests {
         #expect(Set(Self.realCheck.keys).isSubset(of: Set(files)), "A file listed for the real check no longer launches")
     }
 
-    @Test("every UI test that is not about the designs or the first launch accepts the bundled designs without their renders")
+    @Test("every launch of a UI test that is not about the designs or the first launch accepts the bundled designs")
     func everyOtherLaunchAcceptsTheDesigns() throws {
-        let missing = try Self.launchingFiles()
+        let problems = try Self.launchingFiles()
             .filter { Self.realCheck[$0] == nil }
-            .filter { try !Self.code($0).contains(Self.readyDesigns) }
+            .flatMap { path in FixtureLaunches(try Repository.text(path)).problems().map { "\(path) \($0)" } }
 
-        #expect(missing.isEmpty, "Pass \(Self.readyDesigns), or list the file with its reason in realCheck: \(missing)")
+        #expect(problems.isEmpty, "Pass \(Self.readyDesigns), or list the file with its reason in realCheck: \(problems)")
     }
 
     @Test("the UI tests that keep the real check of the bundled designs never skip it")
@@ -67,5 +64,80 @@ struct UITestReadyDesignsTests {
         let skipping = try Self.realCheck.keys.sorted().filter { try Self.code($0).contains(Self.readyDesigns) }
 
         #expect(skipping.isEmpty, "These files keep the real check of the designs: \(skipping)")
+    }
+
+    // MARK: - The check on sources made up for it
+
+    @Test("a second launch of a file that leaves the argument out is found, though the first one passes it")
+    func secondLaunchWithoutTheArgument() {
+        let source = #"""
+            func testFirst() {
+                app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns"]
+            }
+            func testSecond() {
+                app.launchArguments += [
+                    "-AppleLanguages", "(en)", "-PrestoCVNextStorage", folder,
+                ]
+            }
+            """#
+
+        #expect(FixtureLaunches(source).problems() == ["line 5: a launch over a folder without -PrestoCVNextReadyDesigns"])
+    }
+
+    @Test("a folder kept in a value is read through the launches that name it")
+    func folderInAValue() {
+        let passing = #"""
+            private func launch(storage: [String] = ["-PrestoCVNextEmptyStorage"]) {
+                app.launchArguments += storage + [
+                    "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", seed,
+                ]
+                if traced { app.launchArguments += ["-PrestoCVNextTraceRuns"] }
+            }
+            func testAgain() {
+                let storage = ["-PrestoCVNextStorage", "again-\(UUID().uuidString)"]
+                launch(storage: storage)
+            }
+            """#
+        let failing = #"""
+            func testIndirect() {
+                let fixture = [
+                    "-PrestoCVNextEmptyStorage",
+                ]
+                app.launchArguments += fixture + ["-PrestoCVNextSeed", seed]
+            }
+            """#
+
+        #expect(FixtureLaunches(passing).problems().isEmpty)
+        #expect(FixtureLaunches(failing).problems() == [
+            "line 3: a folder in `fixture`, which a launch of this file uses without -PrestoCVNextReadyDesigns",
+        ])
+    }
+
+    @Test("a folder the check cannot tie to a launch of its file fails the check, so no launch escapes it")
+    func folderOutOfSight() {
+        let source = #"""
+            static func fixture() -> [String] { ["-PrestoCVNextEmptyStorage"] }
+            static let shared = ["-PrestoCVNextStorage", "shared"]
+            func testElsewhere() {
+                app.launchArguments += Self.fixture() + ["-PrestoCVNextReadyDesigns"]
+                XCTAssertEqual(app.launchArguments.first, "-PrestoCVNextEmptyStorage")
+            }
+            """#
+
+        #expect(FixtureLaunches(source).problems() == [
+            "line 1: a folder the check cannot tie to a launch of this file",
+            "line 2: a folder in `shared`, which no launch of this file names",
+            "line 5: a folder the check cannot tie to a launch of this file",
+        ])
+    }
+
+    @Test("an argument in a comment neither launches nor passes")
+    func commentsDoNotCount() {
+        let source = #"""
+            // app.launchArguments += ["-PrestoCVNextEmptyStorage"]
+            app.launchArguments += ["-PrestoCVNextEmptyStorage"] // "-PrestoCVNextReadyDesigns"
+            """#
+
+        #expect(FixtureLaunches(source).problems() == ["line 2: a launch over a folder without -PrestoCVNextReadyDesigns"])
     }
 }
