@@ -82,7 +82,8 @@ struct CompositionTests {
         compileRules: @escaping Composition.CompileRules,
         designs: any BundledDesignSource = BundleDesignSource(),
         makeGate: @escaping Composition.MakeGate = { _, _, _ in FakeRenderingGate() },
-        legacyStore: any LegacyStore = EmptyLegacyStore()
+        legacyStore: any LegacyStore = EmptyLegacyStore(),
+        legacyLeftovers: @escaping Composition.MakeLegacyLeftovers = { _ in NoLeftovers() }
     ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
@@ -102,10 +103,12 @@ struct CompositionTests {
             prepare: {},
             wrapListEditing: { $0 },
             wrapStore: { $0 },
+            wrapImport: { $0 },
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
             legacyStore: legacyStore,
+            legacyLeftovers: legacyLeftovers,
             settings: Self.settings
         )
     }

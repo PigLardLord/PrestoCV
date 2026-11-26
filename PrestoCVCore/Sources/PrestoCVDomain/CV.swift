@@ -12,6 +12,8 @@ public struct CV: Hashable, Sendable {
     public private(set) var sections: CVSections
     public private(set) var design: DesignChoice?
     public private(set) var language: DocumentLanguage?
+    /// What the CV keeps of the way its values were made: never printed, not content (`DraftBlock`). Nil: no draft.
+    public private(set) var draft: DraftBlock?
 
     public init(id: CVID, title: String = "", personal: PersonalDetails = PersonalDetails(), sections: CVSections = CVSections(),
                 design: DesignChoice? = nil, language: DocumentLanguage? = nil) {
@@ -19,16 +21,18 @@ public struct CV: Hashable, Sendable {
                   design: design, language: language)
     }
 
+    /// `draft` is taken as it is: a caller that reads one from outside checks it with `setDraft(_:)`.
     package init(id: CVID, revision: Int, createdAt: Date?, updatedAt: Date?, title: String, personal: PersonalDetails,
-                 sections: CVSections, design: DesignChoice?, language: DocumentLanguage?) {
+                 sections: CVSections, design: DesignChoice?, language: DocumentLanguage?, draft: DraftBlock? = nil) {
         self.id = id; self.revision = revision; self.createdAt = createdAt; self.updatedAt = updatedAt
         self.title = TextRules.singleLine(title); self.personal = personal; self.sections = sections; self.design = design; self.language = language
+        self.draft = draft
     }
 
     /// The same content as stored by a repository at `revision`, at time `now`.
     package func stored(revision: Int, at now: Date) -> CV {
         CV(id: id, revision: revision, createdAt: createdAt ?? now, updatedAt: now, title: title, personal: personal,
-           sections: sections, design: design, language: language)
+           sections: sections, design: design, language: language, draft: draft)
     }
 
     /// "Has enough content to be saved", as `SaveRule` defines it. The size limits are not part of it: `saveCheck()` has both.
@@ -46,26 +50,46 @@ public struct CV: Hashable, Sendable {
     public var canBeSaved: Bool { saveCheck() == .ok }
 
     public mutating func rename(_ newTitle: String) { title = TextRules.singleLine(newTitle) }
-    public mutating func setPersonalDetails(_ details: PersonalDetails) { personal = details }
-    /// Every edit of the entries goes through here; the order is the one the user chose.
-    public mutating func setSections(_ newSections: CVSections) { sections = newSections }
+    /// A detail with another value loses its draft mark.
+    public mutating func setPersonalDetails(_ details: PersonalDetails) {
+        draft = draft?.keeping(personal, changedTo: details)
+        personal = details
+    }
+    /// Every edit of the entries goes through here; the order is the one the user chose. The draft's marks move with
+    /// their rows (`DraftBlock.anchored(from:to:)`).
+    public mutating func setSections(_ newSections: CVSections) {
+        draft = draft?.anchored(from: sections, to: newSections)
+        sections = newSections
+    }
     public mutating func choose(design: DesignChoice?) { self.design = design }
     public mutating func setLanguage(_ language: DocumentLanguage?) { self.language = language }
 
-    /// This CV with the text of `other`: its title, details and sections. The identity, the revision, the times, the design
-    /// and the language stay this CV's own, so that an editor's text can be written over the stored CV it started from
-    /// without undoing a look or a language chosen since.
+    /// Sets the draft block; an empty block is no draft. A mark that names an entry the sections do not have refuses
+    /// the whole block, and the CV keeps the draft it had.
+    public mutating func setDraft(_ block: DraftBlock) throws(DraftError) {
+        guard block.origins.keys.allSatisfy({ $0.isInside(sections) }) else { throw .placeOutsideSections }
+        draft = block.isEmpty ? nil : block
+    }
+
+    /// This CV with the text of `other`: its title, details and sections. The identity, the revision, the times, the design,
+    /// the language and the draft stay this CV's own, so that an editor's text can be written over the stored CV it started
+    /// from without undoing a look or a language chosen since; the draft's marks follow the new text as in `setSections(_:)`.
+    /// Marks only ever go away after the import, so a mark survives only when both keep it: this CV's marks moved to the
+    /// new text, and the marks that `other`'s own draft still holds (an `other` with no draft holds none). Comparing the
+    /// two texts alone could give a mark back to a row the person edited and then changed into the old row's value.
     public func holding(contentOf other: CV) -> CV {
         var result = self
         result.rename(other.title)
         result.setPersonalDetails(other.personal)
         result.setSections(other.sections)
+        result.draft = result.draft?.keeping(marksOf: other.draft)
         return result
     }
 
-    /// Duplication rule: the copy keeps the content and the design, not the identity or the history.
+    /// Duplication rule: the copy keeps the content, the design and the draft, not the identity or the history.
     /// The new title is composed by presentation, which knows the language (R13).
     public func duplicated(as newID: CVID, title: String) -> CV {
-        CV(id: newID, title: title, personal: personal, sections: sections, design: design, language: language)
+        CV(id: newID, revision: 0, createdAt: nil, updatedAt: nil, title: title, personal: personal, sections: sections,
+           design: design, language: language, draft: draft)
     }
 }

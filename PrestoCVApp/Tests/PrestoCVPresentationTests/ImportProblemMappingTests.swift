@@ -35,7 +35,7 @@ struct ImportProblemMappingTests {
     func everyReviewFieldHasAMirror() {
         let expected: [ReviewedField] = [.name, .title, .location, .summary, .experience(1), .experiencePeriod(2),
                                          .education(3), .educationPeriod(4), .educationLocation(5), .language(6),
-                                         .languageNotKept(7), .certificationYear(8)]
+                                         .languageNotKept(7), .certificationYear(8), .certification(9)]
         let mirrored = ImportValues.everyField.map(ReviewedField.init)
         #expect(mirrored == expected)
         #expect(Set(mirrored).count == ImportValues.everyField.count)

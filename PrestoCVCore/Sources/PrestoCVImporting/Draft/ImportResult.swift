@@ -34,6 +34,8 @@ public struct ReviewItem: Hashable, Sendable {
         case education(Int)
         case educationPeriod(Int)
         case language(Int)
+        /// A certification, by its place in the list.
+        case certification(Int)
     }
 
     public let field: Field
@@ -71,6 +73,11 @@ public struct ReviewItem: Hashable, Sendable {
         for (index, language) in cv.languages.enumerated() {
             if let words = language.levelWords, let reason = words.check {
                 items.append(ReviewItem(field: .language(index), reason: reason, text: language.name.value + " — " + words.value))
+            }
+        }
+        for (index, certification) in cv.certifications.enumerated() {
+            if let reason = certification.check {
+                items.append(ReviewItem(field: .certification(index), reason: reason, text: [certification.name.value, certification.issuer?.value].compactMap { $0 }.joined(separator: " — ")))
             }
         }
         return items

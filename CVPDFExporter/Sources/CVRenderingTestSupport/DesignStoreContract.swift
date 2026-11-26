@@ -29,6 +29,12 @@ public actor InMemoryDesignStore: DesignStore {
         origins[id] = .bundled
         return true
     }
+    public func replaceBundled(_ design: ValidatedDesign) async throws -> Bool {
+        let id = design.manifest.id
+        guard designs[id] != nil, origins[id] == .bundled else { return false }
+        designs[id] = design
+        return true
+    }
 }
 
 public struct DesignStoreContractFailure: Error, Equatable, CustomStringConvertible {
@@ -100,6 +106,25 @@ public enum DesignStoreContract {
         try check(await store.design(id: "shipped") == shipped, "a kept bundled design is not replaced")
         try check(await store.installedOrigins()["shipped"] == .bundled, "a kept bundled design stays bundled")
         try check(await store.save(mine) == .saved, "an import replaces a design an import made")
+
+        // A repair replaces a design recorded as bundled whatever the versions, and nothing else.
+        let fixed = try design(id: "fixed"), fixedOlder = try design(id: "fixed", version: "0.5.0", css: ".cv-skill{font-weight:700}")
+        let fixedNewer = try design(id: "fixed", version: "3.0.0", css: ".cv-entry-title{font-weight:600}")
+        let fixedSame = try design(id: "fixed", css: ".cv-entry-title{font-weight:600}")
+        try check(await store.replaceBundled(fixed) == false, "a design that is not installed is not replaced")
+        try check(await store.design(id: "fixed") == nil, "replacing a design that is not installed installs nothing")
+        try check(await store.saveIfNewer(fixed) == .installed, "a conditional save installs the design to repair")
+        try check(await store.replaceBundled(fixedNewer) == true, "a bundled design is replaced by a newer version")
+        try check(await store.design(id: "fixed") == fixedNewer, "a replaced design comes back unchanged")
+        try check(await store.replaceBundled(fixedOlder) == true, "a bundled design is replaced by an older version")
+        try check(await store.design(id: "fixed") == fixedOlder, "an older design replaced the newer one")
+        try check(await store.replaceBundled(fixedSame) == true, "a bundled design is replaced by the same version")
+        try check(await store.design(id: "fixed") == fixedSame, "the same version replaced the content")
+        try check(await store.installedDesigns().filter { $0.id == "fixed" } == [fixedSame.manifest], "a replaced design is listed once")
+        try check(await store.installedOrigins()["fixed"] == .bundled, "a replaced design stays bundled")
+        try check(await store.replaceBundled(bundledNewer) == false, "an imported design is not replaced")
+        try check(await store.design(id: "mine") == mine, "a design that is not replaced comes back unchanged")
+        try check(await store.installedOrigins()["mine"] == .imported, "a design that is not replaced stays imported")
     }
 
     /// A design as the validator accepts it; `preview` adds a PNG preview, which is stored too.

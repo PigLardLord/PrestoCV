@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-09-28
 - **Related:** R6, R7, R12, [ADR 0010](0010-ui-free-presentation-package.md), issues #10, #11, #12, #30, #45, #56, #99
-- **Amended:** 2026-11-07: the wait for the store lock suspends and is bounded, and ends in `storeUnavailable(.lockTimeout)` (#99) (Decision, "Revisions, timestamps and the lock" and "Which outcomes")
+- **Amended:** 2026-11-07: the wait for the store lock suspends and is bounded, and ends in `storeUnavailable(.lockTimeout)` (#99) (Decision, "Revisions, timestamps and the lock" and "Which outcomes"); 2026-11-22: an optional draft block with its own frozen version, schema still 1 (#522) (Decision, "The draft block", the outcome table, Validation)
 
 ## Context
 
@@ -21,6 +21,12 @@ The app is not released, so no user data needs migrating.
 
 - **On-disk format: `CVFileV1`.** It is a DTO, separate from the domain `CV`. Fields: `schemaVersion: 1`, `id`, `revision`, `createdAt`, `updatedAt`, and the content, with structured periods and bounded levels.
   - **The envelope is frozen:** `schemaVersion` is a top-level integer in every future version.
+- **The draft block** (#522, [ADR 0036](0036-build-the-draft-from-prepared-lines-of-each-trade.md)). The CV's `DraftBlock` is an optional top-level key, `draft: { version, origins, notPlaced }`, absent when the CV has none, so a file without a draft is written byte for byte as before and the schema stays 1.
+  - **Its envelope is frozen too:** `version` is an integer in every future draft, and every addition to the draft raises it. A key the supported version does not know is read past and not written again.
+  - **Strict:** a version other than the supported one, an empty block, an unknown field or origin, a section field without an entry or a detail with one, a place the CV does not have, a place named twice, a not-placed text or heading the text rule would change, and a text over the caps are each `corrupt` with their own reason.
+  - Origins are written sorted by field and entry, so equal drafts give equal bytes.
+  - **A mark never points at another row.** When the entries change, a mark follows an equal row; a row that matches no old row has no marks, so a row the person changed loses all of its marks and a mark never moves to another row (entries have no identity; a stable entry identity is the later way to keep the marks of the unchanged fields); in every other case, a copy, an insertion, the marks of those rows are dropped.
+  - **A mark only goes away after the import.** When an editor's text is written onto the stored CV (`holding(contentOf:)`), a mark survives only when both keep it: the stored draft's marks moved to the new text, and the marks the editor's own copy still holds (a copy with no draft holds none).
 - **Strict decoding.** Required fields are required.
   - `revision` must lie in 1…2³¹−1, so incrementing it cannot overflow.
   - Periods are built by the domain's single rule, `Period.make`; every contradictory or incomplete combination is rejected.
@@ -31,7 +37,7 @@ The app is not released, so no user data needs migrating.
 
   | Outcome | What happens |
   |---|---|
-  | Newer schema | Left untouched, reported as `upgradeRequired` |
+  | Newer schema, or a newer draft version | Left untouched, reported as `upgradeRequired` |
   | I/O failure, or a symbolic link | Left untouched, reported as `unreadable`, retried next time (for example, before first unlock) |
   | Larger than the cap (5 MB) | Not read, reported as `tooLarge` |
   | Decoding failure of a supported version | Moved to `Quarantine/` (a `N~` prefix avoids collisions), reported as `corrupt` with its reason |
@@ -102,9 +108,11 @@ The validation prototype in `Prototypes/ADRValidation/`. Swift 6.3.3, Linux. 27 
 - Rejected: `{}`, a missing `id`, a missing, zero, negative or `Int.max` revision, an out-of-range level, month 13 with a valid start, an email with a trailing newline.
 - Every invalid period shape gives a typed `PeriodError`.
 - "May 2020 – 2020" is accepted.
+- **The draft block** (product tests, `DraftStoreTests`): a schema-1 file without a draft is written again byte for byte; each invalid draft value is corrupt with its reason; a draft with no `version` is corrupt ("no draft version envelope"); a key the version does not know is dropped on rewrite.
 
 **Listing**
 - **Mixed directory:** a healthy file is listed; a corrupt file is quarantined with its reason; a newer-schema file stays byte-for-byte untouched.
+- **Newer draft version** (product tests): listed as `upgradeRequired`; load, update and delete refuse it; the file stays byte for byte; erase and erase everything reach it.
 - **Unreadable file** (mode 000): reported and left in place, then listed again once readable.
 - **Oversized file:** reported without being read.
 - **A regular file where `Quarantine/` should be:** the healthy CV is still listed, and the failure is reported.

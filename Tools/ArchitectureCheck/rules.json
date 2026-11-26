@@ -110,6 +110,7 @@
   "adr": "0032",
   "files": [
    "PrestoCVApp/Sources/PrestoCVComposition/Composition.swift",
+   "PrestoCVApp/Sources/PrestoCVComposition/InventedTraceRuns.swift",
    "PrestoCVApp/Sources/PrestoCVComposition/TraceChain.swift"
   ],
   "modules": [
@@ -927,10 +928,45 @@
    "rules": []
   },
   {
+   "name": "PrestoCVLegacyLeftovers",
+   "path": "PrestoCVApp/Sources/PrestoCVLegacyLeftovers",
+   "allowedImports": [
+    "PrestoCVWorkflowPorts",
+    "DiagnosticLogging",
+    "Foundation"
+   ],
+   "rules": [
+    "R1",
+    "R7",
+    "R9",
+    "R13",
+    "R14",
+    "R17"
+   ]
+  },
+  {
+   "name": "PrestoCVLegacyLeftoversTests",
+   "path": "PrestoCVApp/Tests/PrestoCVLegacyLeftoversTests",
+   "kind": "test",
+   "allowedImports": [
+    "Testing",
+    "Foundation",
+    "Glibc",
+    "Darwin",
+    "Android",
+    "PrestoCVLegacyLeftovers",
+    "PrestoCVWorkflowPorts",
+    "DiagnosticLogging",
+    "DiagnosticLoggingTestSupport"
+   ],
+   "rules": []
+  },
+  {
    "name": "PrestoCVComposition",
    "path": "PrestoCVApp/Sources/PrestoCVComposition",
    "allowedImports": [
     "PrestoCVExportFiles",
+    "PrestoCVLegacyLeftovers",
     "PrestoCVImportFiles",
     "PrestoCVIntegration",
     "PrestoCVPresentation",
@@ -980,7 +1016,9 @@
     "Foundation",
     "Observation",
     "WebKit",
+    "Synchronization",
     "PrestoCVComposition",
+    "PrestoCVLegacyLeftovers",
     "PrestoCVIntegration",
     "PrestoCVPresentation",
     "PrestoCVWorkflowPorts",
