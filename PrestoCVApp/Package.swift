@@ -9,6 +9,7 @@ var products: [Product] = [
     .library(name: "PrestoCVPresentation", targets: ["PrestoCVPresentation"]),
     .library(name: "PrestoCVImportFiles", targets: ["PrestoCVImportFiles"]),
     .library(name: "PrestoCVExportFiles", targets: ["PrestoCVExportFiles"]),
+    .library(name: "PrestoCVLegacyLeftovers", targets: ["PrestoCVLegacyLeftovers"]),
 ]
 var targets: [Target] = [
     .target(name: "PrestoCVWorkflowPorts", dependencies: [
@@ -41,6 +42,12 @@ var targets: [Target] = [
         "PrestoCVWorkflowPorts",
         .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     ]),
+    // What the released app left that holds nothing the person wrote: a portable outbound adapter, tested on Linux against
+    // the real file system
+    .target(name: "PrestoCVLegacyLeftovers", dependencies: [
+        "PrestoCVWorkflowPorts",
+        .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    ]),
 ]
 
 targets.append(.testTarget(name: "PrestoCVIntegrationTests", dependencies: [
@@ -67,6 +74,11 @@ targets.append(.testTarget(name: "PrestoCVExportFilesTests", dependencies: [
     .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
     .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
 ]))
+targets.append(.testTarget(name: "PrestoCVLegacyLeftoversTests", dependencies: [
+    "PrestoCVLegacyLeftovers", "PrestoCVWorkflowPorts",
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+    .product(name: "DiagnosticLoggingTestSupport", package: "DiagnosticLogging"),
+]))
 targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
     "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
@@ -78,7 +90,7 @@ targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
 #if !os(Linux)
 products.append(.library(name: "PrestoCVComposition", targets: ["PrestoCVComposition"]))
 targets.append(.target(name: "PrestoCVComposition", dependencies: [
-    "PrestoCVImportFiles", "PrestoCVExportFiles", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVImportFiles", "PrestoCVExportFiles", "PrestoCVLegacyLeftovers", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
@@ -104,7 +116,7 @@ targets.append(.target(name: "PrestoCVComposition", dependencies: [
     .product(name: "DiagnosticTraceDistribution", package: "DiagnosticTrace"),
 ]))
 targets.append(.testTarget(name: "PrestoCVCompositionTests", dependencies: [
-    "PrestoCVComposition", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVComposition", "PrestoCVLegacyLeftovers", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),

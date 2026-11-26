@@ -19,7 +19,9 @@ struct ExportDebugOutputTests {
     private static let folder = "PrestoCVNext/Features/Export"
 
     /// Where the pasteboard is used on purpose, and why: the person asks for the copy with a tap.
-    private static let copyOnTap: [String: String] = [:]
+    private static let copyOnTap = [
+        "PrestoCVNext/Platform/Pasteboard.swift": "the copy that the Copy button of an import's review asks for, of the text the import could not place",
+    ]
 
     /// The functions that write to the console or to a standard stream: Swift's, Foundation's and C's
     private static let outputFunctions = "print|debugPrint|dump|NSLog|NSLogv|puts|putchar|printf|vprintf|fputs|fputc|fprintf|vfprintf|perror"

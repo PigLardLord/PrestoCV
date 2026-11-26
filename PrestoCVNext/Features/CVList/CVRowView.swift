@@ -1,12 +1,14 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// A row of the list: the label of the CV, the person and the role under it, and the time since the last save. Its
+/// A row of the list: the label of the CV, the person and the role under it, the time since the last save, and a mark when
+/// the import of the earlier version left some of its details out (the report's view model says which). Its
 /// actions are in the context menu and among the actions of VoiceOver, in the order the view model gives; a swipe offers
 /// some of them. Rename asks for the title in an alert, starting from the stored one; delete asks first and names the CV.
 struct CVRowView: View {
     let list: CVListViewModel
     let row: CVRow
+    let incomplete: Bool
     @Environment(\.locale) private var locale
     @State private var renaming = false
     @State private var newTitle = ""
@@ -56,6 +58,16 @@ struct CVRowView: View {
                 Text("list.row.saved \(saved)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+            if incomplete {
+                Label {
+                    WholeWordsText("list.row.incomplete")
+                        .foregroundStyle(.secondary)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+                .font(.footnote)
             }
         }
     }

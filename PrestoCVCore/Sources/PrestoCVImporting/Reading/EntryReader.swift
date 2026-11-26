@@ -21,6 +21,9 @@ enum EntryReader {
         var durations: [Piece] = []
         /// The line is only a duration: LinkedIn's total of a company's roles.
         var isDurationOnly = false
+        /// What a bullet that opens with a period says of itself: a head after the period ("• 2021 – Course – School",
+        /// "• 2021 Leeds College") or not (a count, a sentence).
+        var headEvidence = EntryVocabulary.HeadEvidence.none
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
@@ -85,7 +88,9 @@ enum EntryReader {
             line.labelValue = value
         }
         if !isProse && !line.isDurationOnly {
-            line.period = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
+            let anchor = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
+            line.period = anchor.map { ($0.0, $0.1) }
+            line.headEvidence = anchor?.evidence ?? .none
         }
         return line
     }
@@ -103,10 +108,18 @@ enum EntryReader {
         return (label, value.isEmpty ? [] : [value])
     }
 
+    /// What the text after a bullet's period says: nothing but the period, another cell, or a head (see
+    /// `EntryVocabulary.headEvidence`). A count ("2000 hours of training", "2000 – hours of placement") and a year
+    /// with prose ("2019 led the move to the cloud") are no head, so they are details.
+    private static func headEvidence(after: String, laterCells: [Piece]) -> EntryVocabulary.HeadEvidence {
+        guard after.isEmpty || laterCells.isEmpty else { return .strong }
+        return EntryVocabulary.headEvidence(after: after)
+    }
+
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod)? {
-        for cell in cells {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
+        for (cellIndex, cell) in cells.enumerated() {
             for match in DateReader.periods(in: cell.text) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
                 // The text after the period as a string of its own: a range read in it indexes that string
@@ -115,7 +128,8 @@ enum EntryReader {
                 let closesCell = after.isEmpty || after.first.map { "|·•—–-,):/]*".contains($0) } == true
                     || DurationReader.ranges(in: after).first?.lowerBound == after.startIndex
                 if isBullet ? before.isEmpty : (opensCell || closesCell) {
-                    return (cell.sub(match.range), match.period)
+                    let evidence = isBullet ? headEvidence(after: after, laterCells: Array(cells[(cellIndex + 1)...])) : .none
+                    return (cell.sub(match.range), match.period, evidence)
                 }
             }
         }
@@ -130,8 +144,15 @@ enum EntryReader {
             for cell in line.cells { findings.unplace(cell, in: section) }
         }
         let usable = lines.filter { !$0.isDurationOnly && !isColumnHeader($0) }
-        let isOnlyBullets = usable.allSatisfy { $0.isBullet }
-        let anchors = usable.indices.filter { usable[$0].period != nil && (!usable[$0].isBullet || isOnlyBullets) }
+        let onlyBullets = usable.allSatisfy { $0.isBullet }
+        let bulletsAreEntries = bulletsAreEntries(usable)
+        // A section of bullets only reads as it always did: every dated bullet is an entry. In a section that mixes bullets
+        // with other lines, a bullet is an entry only when a head follows its year; anything unclear is a detail
+        let anchors = usable.indices.filter { index in
+            guard usable[index].period != nil else { return false }
+            guard usable[index].isBullet, !onlyBullets else { return true }
+            return bulletsAreEntries && usable[index].headEvidence == .strong
+        }
         guard !anchors.isEmpty else { return entriesWithoutDates(usable) }
 
         // Which lines belong to which date, read both ways over the whole section
@@ -179,6 +200,13 @@ enum EntryReader {
             drafts.append(draft)
         }
         return drafts
+    }
+
+    /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
+    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
+    private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        return usable.contains(where: { $0.headEvidence == .strong })
     }
 
     /// A table's row of column names: two cells or more, each an entry label ("Zeitraum | Schule | Abschluss").
@@ -252,47 +280,108 @@ enum EntryReader {
         var isMarked: Bool
         /// A place whose start no rule tells: the person checks it.
         var isUnsure = false
+        /// A weak connector split the entry before words with no legal form ("for Systems and Services"): the split keeps every
+        /// word, and the person checks which part is the role.
+        var isGuessedSplit = false
+        /// The segment is what follows a connector, and this is the span of what comes before it: a line parted at "at"
+        /// stays one line where its parts are details (#313).
+        var followsConnectorOf: SourceSpan?
     }
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
-        var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
-        for line in lines {
-            var removed = line.durations
-            if let period = line.period?.piece { removed.append(period) }
-            for cell in line.cells {
-                let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
-                for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
-                    segments += split(piece, kind: kind)
-                }
-            }
+        let pieces = lines.flatMap { linePieces($0) }
+        return pieces.enumerated().flatMap { index, piece in
+            let others = pieces.enumerated().filter { $0.offset != index }.map(\.element)
+            return split(piece, kind: kind, readsWeakConnectors: !otherPartHoldsEmployer(piece, others: others, kind: kind))
         }
-        return segments
+    }
+
+    /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
+    /// piece itself, that reads as an organisation or is no recognised place, by the lists or by its shape (four unknown words are a name, not a
+    /// city). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds", a title above
+    /// "Acme Ltd" and "Leiter für Logistik" above "Beispiel Nord Süd West" keep it. A short name no list knows ("Acme")
+    /// has the shape of a place and is no evidence either way.
+    private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
+        let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
+        let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
+        let ownEmployerIsNamed = namesAnEmployer(after: piece)
+        return (afterComma + inOthers).contains { canHoldEmployer($0, shortNameCounts: !ownEmployerIsNamed) }
+    }
+
+    /// Whether what follows a weak connector in the piece is a name on its own: a legal form or two capitalised words ("for Acme Ltd",
+    /// "für Klinikum Beispiel"). One word ("for Systems", "für Logistik") may be the end of a title.
+    private static func namesAnEmployer(after piece: Piece) -> Bool {
+        for connector in EntryVocabulary.weakConnectors {
+            guard let range = piece.text.firstRange(of: connector) else { continue }
+            let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
+            if namesAnOrganisation(head, asCompetingEmployer: true) && (hasLegalForm(head) || head.words.count >= 2 && EntryVocabulary.isCapitalisedName(head)) { return true }
+        }
+        return false
+    }
+
+    /// Whether a name reads as an organisation: by the lists, or a school-word name of three or more capitalised words
+    /// ("Institut für Informatik"); a school word alone ("für Grundschule") is a title's tail.
+    private static func namesAnOrganisation(_ name: String, asCompetingEmployer: Bool = false) -> Bool {
+        // A tail that reads as a name only through its particle and holds nothing but generic vocabulary ("Systems and
+        // Integration") is a title's tail: it never displaces the employer beside it. With no employer beside it, it still splits
+        // (flagged), because a real employer without a legal form must not be hidden inside the title.
+        if asCompetingEmployer, EntryVocabulary.hasLinkingParticle(name), !EntryVocabulary.isOrganisationBeyondGenericWords(name),
+           !EntryVocabulary.isSchool(name) { return false }
+        return EntryVocabulary.isOrganisation(name)
+            || EntryVocabulary.isSchool(name) && name.words.count >= 3 && EntryVocabulary.isCapitalisedName(name)
+    }
+
+    /// A short name no list knows ("Acme") fills the employer slot when the weak connector's own employer is no name by
+    /// itself; beside a named employer it is read as a place ("Developer for Acme Ltd | Leeds").
+    private static func canHoldEmployer(_ segment: Segment, shortNameCounts: Bool) -> Bool {
+        switch segment.part {
+        case .secondary: true
+        case .unknown: shortNameCounts || !hasPlaceShape(segment.piece)
+        case .primary, .address, .location: false
+        }
+    }
+
+    /// The pieces of a line without its dates and durations, cut at the strong separators.
+    private static func linePieces(_ line: Line) -> [Piece] {
+        var removed = line.durations
+        if let period = line.period?.piece { removed.append(period) }
+        return line.cells.flatMap { cell -> [Piece] in
+            let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
+            return cell.removing(ranges).flatMap { $0.split(by: Separators.strong + [" - "]) }
+        }
     }
 
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
     /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own.
-    private static func split(_ piece: Piece, kind: Kind) -> [Segment] {
+    private static func split(_ piece: Piece, kind: Kind, readsWeakConnectors: Bool) -> [Segment] {
         if piece.text.hasSuffix(")"), let open = piece.text.lastIndex(of: "("), open > piece.text.startIndex {
             let inside = piece.sub(piece.text.index(after: open)..<piece.text.index(before: piece.text.endIndex)).trimmed()
             let before = piece.sub(piece.text.startIndex..<open).trimmed()
             let looksLikePlace = (1...3).contains(inside.words.count) && inside.text.first?.isUppercase == true
                 && !inside.text.contains(where: \.isNumber) && EntryVocabulary.isOrganisation(before.text)
             if !before.isEmpty, Places.isKnownPlace(inside.text) || Places.isCountryOrRegion(inside.text) || looksLikePlace {
-                return split(before, kind: kind) + [Segment(piece: inside, part: .location, isMarked: true)]
+                return split(before, kind: kind, readsWeakConnectors: readsWeakConnectors) + [Segment(piece: inside, part: .location, isMarked: true)]
             }
         }
         if kind == .experience {
             for connector in EntryVocabulary.roleEmployerConnectors {
-                guard let range = piece.text.firstRange(of: connector) else { continue }
+                guard readsWeakConnectors || !EntryVocabulary.weakConnectors.contains(connector),
+                      let range = piece.text.firstRange(of: connector) else { continue }
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
+                // A weak connector splits only before an organisation ("Developer for Acme Ltd"); "for Special Needs" is a title.
+                if EntryVocabulary.weakConnectors.contains(connector), !namesAnOrganisation(employerHead(employer)) { continue }
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
+                let guessed = EntryVocabulary.weakConnectors.contains(connector)
+                    && !hasLegalForm(employerHead(employer))
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
-                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true) : classify(part, kind: kind)
+                        index == 0
+                            ? Segment(piece: part, part: .secondary, isMarked: true, isGuessedSplit: guessed, followsConnectorOf: role.span)
+                            : classify(part, kind: kind)
                     }
             }
         }
@@ -305,6 +394,11 @@ enum EntryReader {
                 + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
         return parts.map { classify($0, kind: kind) }
+    }
+
+    /// The text of an employer up to its first comma: what follows ("Leeds") is a place, not a part of the name.
+    private static func employerHead(_ employer: Piece) -> String {
+        employer.split(by: [", "]).first?.text ?? employer.text
     }
 
     /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the
@@ -433,7 +527,7 @@ enum EntryReader {
         let places = locationGroups(locations, in: findings.document)
         let location = places.first
         let period = draft.anchor?.period.map { periodValue($0.piece, $0.value) }
-        let details = (extra.map(\.piece) + draft.body.flatMap(\.cells)).map { $0.quote() }
+        let details = lines(of: extra, in: findings.document) + draft.body.flatMap(\.cells).map { $0.quote() }
         // Lines that may be another entry's come first, then a line that may be a heading: either may also be why the parts
         // were read by their order
         let takesADoubtfulHeading = (draft.head + [draft.anchor].compactMap { $0 } + draft.tail + draft.body)
@@ -441,7 +535,7 @@ enum EntryReader {
             || (draft.inheritsADoubtfulHeading && secondary?.piece == draft.inheritedEmployer)
         let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
             : takesADoubtfulHeading ? .headingUnsure
-            : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
+            : (byOrder || secondary?.isGuessedSplit == true) && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
             var entry = ImportedExperience()
@@ -451,6 +545,7 @@ enum EntryReader {
             entry.period = period
             entry.details = details
             entry.check = check
+            entry.heading = findings.heading(of: section)
             guard entry.role != nil || entry.employer != nil || entry.period != nil else { return unplace(details + places, in: section, &findings) }
             findings.cv.experience.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
@@ -467,6 +562,19 @@ enum EntryReader {
             findings.cv.education.append(entry)
             unplace(Array(places.dropFirst()), in: section, &findings)
         }
+    }
+
+    /// One quote for each line of the leftover segments: the two sides of a connector are one detail, the connector kept.
+    private static func lines(of segments: [Segment], in document: SourceDocument) -> [Sourced<String>] {
+        var runs: [(first: Piece, last: Piece)] = []
+        for segment in segments {
+            if let before = segment.followsConnectorOf, let index = runs.lastIndex(where: { $0.last.span == before }) {
+                runs[index].last = segment.piece
+            } else {
+                runs.append((segment.piece, segment.piece))
+            }
+        }
+        return runs.map { $0.first.span == $0.last.span ? $0.first.quote() : covering($0.first, $0.last, in: document) }
     }
 
     private static func unplace(_ values: [Sourced<String>], in section: Section, _ findings: inout Findings) {
@@ -620,6 +728,7 @@ enum EntryReader {
                 entry.location = location
                 entry.period = period
                 entry.details = details
+                entry.heading = findings.heading(of: section)
                 entry.check = doubtful.contains(place) ? .headingUnsure : nil
                 findings.cv.experience.append(entry)
             case .education:

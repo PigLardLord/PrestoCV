@@ -10,8 +10,8 @@ import PrestoCVDomain
 
 /// One stored CV file, read the one way every reader in this target uses (R12): opened once, without following a
 /// link or blocking, checked and read through that descriptor within a size cap, then decoded strictly. The outcome
-/// distinguishes what must not be touched (an I/O failure, anything but a regular file, too large, a newer schema)
-/// from what is genuinely corrupt.
+/// distinguishes what must not be touched (an I/O failure, anything but a regular file, too large, a newer schema or
+/// draft version) from what is genuinely corrupt.
 enum StoredCVFile {
     case cv(CV), absent, newer(Int), corrupt(String), unreadable, tooLarge(Int)
 
@@ -31,6 +31,13 @@ enum StoredCVFile {
             let peek = try JSONDecoder().decode(Peek.self, from: data)
             if peek.schemaVersion > CVFileV1.version { return .newer(peek.schemaVersion) }
         } catch { return .corrupt("no schemaVersion envelope") }
+        // The draft block has a frozen envelope of its own: a newer integer `version` is a draft from a newer build,
+        // which this build must not decode, rewrite or drop (#522).
+        struct DraftPeek: Decodable { struct Block: Decodable { let version: Int }; let draft: Block? }
+        do {
+            let peek = try JSONDecoder().decode(DraftPeek.self, from: data)
+            if let version = peek.draft?.version, version > CVFileV1.DraftV1.supportedVersion { return .newer(version) }
+        } catch { return .corrupt("no draft version envelope") }
         do { return .cv(try CVFileV1.decode(data).toDomain()) }
         catch let invalid as CVFileV1.Invalid { return .corrupt(invalid.reason) }
         catch { return .corrupt("not a CV file") }

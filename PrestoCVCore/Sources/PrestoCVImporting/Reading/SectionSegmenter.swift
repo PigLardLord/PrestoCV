@@ -14,6 +14,14 @@ struct Section: Equatable {
     /// entry that takes one is to be checked.
     var doubtfulHeadings: Set<Int> = []
 
+    /// Which neighbour a line of dates alone belongs to, by the index of its block, where the section was split into runs by
+    /// `StudiesAndCertifications` (#461): the reader of a run follows that choice instead of deciding again. Empty for a
+    /// section that was not split.
+    var dateOwners: [Int: DateOwner] = [:]
+
+    /// The entry a line of dates alone dates: the one above it or the one below it.
+    enum DateOwner: Equatable { case above, below }
+
     /// The kinds the heading joins ("Education & Certifications"), when it joins two or more; empty otherwise.
     var parts: Set<SectionKind> = []
 
@@ -91,6 +99,15 @@ enum SectionSegmenter {
                     kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
                     headingCouldBeTheName: opening.couldBeTheName, parts: opening.match.parts
                 ))
+                continue
+            }
+            // A group's label ("Qualities", "Trade skills") with no language in it, after a group called "Languages" that
+            // came inside the skills: the languages end there (#305)
+            if sections[sections.count - 1].kind == .languages, sections.count >= 2, sections[sections.count - 2].kind == .skills, block.kind != .listItem, block.cells.count == 1,
+               SkillGroups.reopensSkills(
+                firstCell, following: document.blocks.dropFirst(position + 1).first.map { document.text(of: $0.span) }
+               ) {
+                sections.append(Section(kind: .skills, heading: block, blocks: [], languages: []))
                 continue
             }
             // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454). One that

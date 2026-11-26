@@ -68,15 +68,373 @@ enum EntryVocabulary {
         "erzieherin", "ingenieur", "ingenieurin", "meister", "meisterin", "referent", "referentin", "assistent", "assistentin",
     ].map(\.folded)
 
+    // MARK: What follows a bullet's year
+
+    /// How sure a bullet that opens with a year is of heading an entry.
+    enum HeadEvidence {
+        /// A count, a quantity, or a sentence: a detail.
+        case none
+        /// A capitalised word and nothing else says it is a head ("• 2021 Acme"): an entry only in a section of bullets.
+        case weak
+        /// The year stands alone, a date separator comes before a head, or a word of a school, a qualification, a job or
+        /// an organisation follows it ("• 2021 Leeds College").
+        case strong
+    }
+
+    /// The longest head, in characters and in words ("Bachelor of Science in Computer Engineering – University of Leeds, Leeds"
+    /// has 76 and 12): what follows a bullet's year beyond it gives no evidence of a head.
+    private static let maxHeadCharacters = 160
+    private static let maxHeadWords = 24
+
+    /// What the text after a bullet's year says, with or without a date separator: a head (a title, a school, an
+    /// employer, a degree) makes an entry, a count ("2000 – hours of placement", "1200 Stunden Praktikum") or a
+    /// sentence ("2019 led the move", "2019 I led the move") a detail. When the evidence is unclear it is a detail.
+    static func headEvidence(after text: String) -> HeadEvidence {
+        // A head is short: a longer text is prose or a list, never scanned, so the work per bullet is constant
+        guard text.count <= maxHeadCharacters, text.words.count <= maxHeadWords else { return .none }
+        var rest = Substring(text)
+        var separated = false
+        while let first = rest.first, first == " " || "|·•—–-,:/".contains(first) {
+            if first != " " { separated = true }
+            rest = rest.dropFirst()
+        }
+        guard let opening = rest.first else { return .strong }
+        // A symbol after the year ("%", "€", a bracket) is no head
+        guard opening.isLetter || opening.isNumber, let lead = rest.words.first else { return .none }
+        let words = rest.words.map { $0.folded }
+        let folded = words[0]
+        let namesAHead = isRole(String(rest)) || isSchool(String(rest)) || isDegree(String(rest)) || isOrganisation(String(rest))
+        if countUnits.contains(folded) || sentenceOpeners.contains(folded) || folded.hasPrefix("j'") { return .none }
+        if countedNouns.contains(folded) {
+            // "2019 – Projects Manager": a job named after what it counts
+            return words.count == 2 && isRole(String(words[1])) ? .strong : .none
+        }
+        if opening.isNumber { return namesAHead ? .strong : .none }
+        // A word that names a role, a school or an employer counts only where a head puts it: in a part of its own between the
+        // separators, among words that are names or modifiers, never inside prose. Punctuation alone is no evidence.
+        let structured = hasHeadStructure(rest)
+        if !(lead.first?.isUppercase ?? false) {
+            // A lower-case word opens a head only when it is one ("diploma in nursing", not "led the move") or a name
+            // particle before an employer or a school ("von Linden GmbH", "di Rossi S.r.l.")
+            let opensAHead = isRole(String(lead)) || isSchool(String(lead)) || isDegree(String(lead)) || isOrganisation(String(lead))
+                || nameParticles.contains(folded)
+            return structured && opensAHead ? .strong : .none
+        }
+        if structured { return .strong }
+        // Prose around a head word ("Auszeichnung für Elektriker", "Von Muster GmbH ausgezeichnet") never heads an entry
+        if namesAHead { return .weak }
+        // A single word, or words that are all capitalised ("Corso Croce Rossa"), after a separator is a head; a capitalised
+        // noun followed by lower-case words ("Prüfungen durchgeführt") is a count with its verb
+        return separated && hasHeadShape(rest) ? .strong : .weak
+    }
+
+    /// Whether a text is one word or words that are all capitalised.
+    private static func hasHeadShape(_ text: Substring) -> Bool {
+        let words = text.words
+        return words.count == 1 || words.allSatisfy { $0.first?.isUppercase ?? false }
+    }
+
+    /// Whether a text is a head by its structure: parts between its separators, each a place, a part that names a role, a
+    /// degree, a school or an employer (see `namesAHeadWord`), a capitalised title or name that
+    /// no word names (the first part, or the part straight after a role: "Elektriker – Siemens"), or a last city after an
+    /// employer that a role opened; at least one part names a head. A comma joins only a city and its region ("Boston, MA"),
+    /// never the parts of a head.
+    private static func hasHeadStructure(_ text: Substring) -> Bool {
+        // Each part with whether a comma (not a dash or a bar) stands before it
+        var parts: [String] = []
+        var afterComma: [Bool] = []
+        var current = ""
+        var comma = false
+        for character in text.replacingOccurrences(of: " - ", with: " – ") {
+            if ",|·•—–/".contains(character) {
+                parts.append(current.trimmingCharacters(in: .whitespaces))
+                afterComma.append(comma)
+                current = ""
+                comma = character == ","
+            } else {
+                current.append(character)
+            }
+        }
+        parts.append(current.trimmingCharacters(in: .whitespaces))
+        afterComma.append(comma)
+        guard parts.allSatisfy({ !$0.words.isEmpty }) else { return false }
+        var index = 0
+        var named = false
+        var opened = false
+        var closed = false
+        var nameMayFollow = false
+        while index < parts.count {
+            // The longest run of parts from here, joined by commas only, that reads as one place
+            var reach = index
+            while reach + 1 < parts.count, afterComma[reach + 1] { reach += 1 }
+            if let last = (index...reach).reversed().first(where: { isOnePlace(parts[index...$0]) }) {
+                index = last + 1
+                nameMayFollow = false
+            } else if let kind = namesAHeadWord(parts[index]) {
+                named = true
+                if kind == .opening { opened = true } else { closed = true }
+                nameMayFollow = kind == .opening && !closed
+                index += 1
+            } else if parts[index].split(separator: " ").allSatisfy({ isModifier($0) }),
+                      nameMayFollow || index == 0 || (closed && opened && index == parts.count - 1) {
+                // A title that no word names ("Operatrice – Clinica Esempio"), the name of the employer or school after a role,
+                // or the city after a school or an employer that a role opened
+                if index == 0 { opened = true }
+                nameMayFollow = index == 0
+                index += 1
+            } else {
+                return false
+            }
+        }
+        return named
+    }
+
+    private enum HeadPart {
+        /// A role or a degree: the school or the employer follows
+        case opening
+        /// A school or an employer
+        case closing
+    }
+
+    /// The words that join a head word to what qualifies it ("Diploma in nursing", "Elektriker für Hochspannung").
+    private static let headConnectors: Set<String> = Set([
+        // English
+        "of", "in", "at", "for", "on", "with", "and",
+        // Italian
+        "di", "del", "della", "dello", "dei", "degli", "delle", "per", "presso", "con", "a", "nel", "nella", "nei", "nelle", "e",
+        // Spanish
+        "de", "en", "para", "por", "con", "y",
+        // French
+        "du", "des", "pour", "chez", "avec", "à", "au", "aux", "et",
+        // German
+        "für", "im", "am", "bei", "und", "mit", "von", "zum", "zur",
+        // Portuguese
+        "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "para", "por", "com", "e",
+    ].map(\.folded))
+
+    /// Connectors that introduce an employer and nothing else. "en", "em", "na", "de", "di", "for", "per" and the like also
+    /// introduce a field or a duty ("Técnico em Enfermagem"), so Spanish and Portuguese have none.
+    private static let employerConnectors: Set<String> = Set(["at", "presso", "bei", "chez"].map(\.folded))
+
+    /// Whether a part names a role, a degree, a school or an employer where a head puts it: before the word of the head only
+    /// names and modifiers ("Senior Elektriker", "Leeds College"), after it nothing, names and modifiers, or a connector
+    /// that leads to its qualifier ("Corso di infermieristica", "Leeds College of Nursing"). A word of a head inside prose
+    /// ("Auszeichnung für Elektriker", "Muster Ltd named supplier") is not one.
+    private static func namesAHeadWord(_ part: String) -> HeadPart? {
+        var text = part
+        while let open = text.firstIndex(of: "("), let close = text[open...].firstIndex(of: ")") {
+            text.removeSubrange(open...close)
+        }
+        let words = text.split(separator: " ")
+        for (index, word) in words.enumerated() {
+            let word = String(word)
+            let closing = isOrganisation(word) || isSchool(word)
+            guard closing || isRole(word) || isDegree(word) else { continue }
+            guard words[..<index].allSatisfy({ isModifier($0) }) else { continue }
+            let after = words[(index + 1)...]
+            // A sector or activity word ("Bau", "Studio") followed by a connector is no head word: it opens a duty
+            if closing, !isRole(word), !isDegree(word), !legalForms.contains(word.folded), !namesInstitutionByItself(word.folded),
+               let next = after.first, headConnectors.contains(next.folded) || next.folded.hasPrefix("d'") { continue }
+            if let next = after.first, !isModifier(next), !headConnectors.contains(next.folded), !next.folded.hasPrefix("d'") { continue }
+            if let next = after.first, isModifier(next), !after.allSatisfy({ isModifier($0) }) { continue }
+            if let next = after.first, !isModifier(next) {
+                let joined = headConnectors.contains(next.folded)
+                let qualifier = joined ? Array(after.dropFirst()) : [Substring(next.dropFirst(2))] + after.dropFirst()
+                let employer = joined && employerConnectors.contains(next.folded)
+                guard isReadableQualifier(qualifier, afterRole: isRole(word), afterEmployerConnector: employer) else { continue }
+            }
+            return closing ? .closing : .opening
+        }
+        return nil
+    }
+
+    /// Whether what follows a joining word is read as a qualifier and not as prose: a name (capitalised words and name
+    /// particles, joining words only between capitalised words) or a short subject of at most two lower-case words, none an
+    /// article, a determiner or a joining word. The qualifier is read, never trusted: a doubtful one is prose.
+    /// After a role a name that holds a lower-case word (a joining word, a particle, an article) is a name only when it names an
+    /// institution: "Maintenance of Plants" is as much a duty as a name. Capitalised words only ("Ospedale San Esempio") read as
+    /// a name, and so does any qualifier after a degree ("Technik und Wirtschaft"). After a role that is so only when the
+    /// connector introduces an employer and nothing else (`employerConnectors`): "Tecnico per Banco di Prova" is a duty.
+    private static func isReadableQualifier(_ words: [Substring], afterRole: Bool, afterEmployerConnector: Bool) -> Bool {
+        guard let first = words.first, let last = words.last else { return false }
+        func capitalised(_ word: Substring) -> Bool { word.first.map { $0.isUppercase || !$0.isLetter } ?? false }
+        if capitalised(first), capitalised(last),
+           words.allSatisfy({ capitalised($0) || nameParticles.contains($0.folded) || headConnectors.contains($0.folded) }),
+           (readsAsAName(words, capitalised: capitalised) && !(afterRole && words.contains { !capitalised($0) })) || (namesAnInstitution(words) && (!afterRole || afterEmployerConnector)) {
+            return true
+        }
+        return words.count <= 2 && words.allSatisfy { word in
+            let folded = word.folded
+            return word.first?.isLowercase == true && !determiners.contains(folded) && !headConnectors.contains(folded)
+                && !elidedArticles.contains(where: folded.hasPrefix)
+        }
+    }
+
+    /// Whether words are a school or an employer name ("Universität der Künste"): a school or organisation word with only names
+    /// and modifiers before it, after it only capitalised words, particles, joining words and articles, ending on a capitalised
+    /// word. Such a name keeps its articles, which a duty read as a name would not. One pass, no recursion.
+    private static func namesAnInstitution(_ words: [Substring]) -> Bool {
+        guard let last = words.last, last.first?.isUppercase == true,
+              let head = words.firstIndex(where: { namesInstitutionByItself($0.folded) }),
+              words[..<head].allSatisfy({ isModifier($0) }) else { return false }
+        return words[(head + 1)...].allSatisfy { word in
+            let folded = word.folded
+            return word.first.map { $0.isUppercase || !$0.isLetter } == true || nameParticles.contains(folded)
+                || headConnectors.contains(folded) || determiners.contains(folded)
+        }
+    }
+
+    /// Whether capitalised words read as a name and not as a duty joined like prose ("Prüfung und Wartung der Anlagen",
+    /// German capitalises its nouns): no lower-case article or determiner, except a particle right after another one
+    /// ("van der"), and at most one run of joining words or particles between the capitalised words. A joining word that
+    /// is also a contracted article ("delle", "du") joins and does not count as an article.
+    private static func readsAsAName(_ words: [Substring], capitalised: (Substring) -> Bool) -> Bool {
+        var runs = 0
+        var previousWasLower = false
+        var previousFolded = ""
+        for word in words {
+            let folded = word.folded
+            if capitalised(word) {
+                previousWasLower = false
+            } else {
+                if !previousWasLower { runs += 1 }
+                let article = determiners.contains(folded) && !headConnectors.contains(folded)
+                let afterParticle = previousWasLower && nameParticles.contains(previousFolded)
+                if article && !afterParticle { return false }
+                previousWasLower = true
+            }
+            previousFolded = folded
+        }
+        return runs <= 1
+    }
+
+    /// The articles and determiners of the six languages: a short subject that holds one is prose.
+    private static let determiners: Set<String> = Set([
+        // English
+        "a", "an", "the", "all", "any", "each", "every", "some", "this", "that", "these", "those", "my", "our", "your", "his", "her", "its", "their",
+        // Spanish
+        "el", "la", "los", "las", "un", "una", "unos", "unas", "lo", "al", "del", "este", "esta", "estos", "estas", "mi", "mis", "su", "sus",
+        "nuestro", "nuestra", "todo", "toda", "todos", "todas",
+        // French
+        "le", "les", "une", "ce", "cet", "cette", "ces", "mon", "ma", "mes", "son", "sa", "ses", "notre", "nos", "leur", "leurs", "tout",
+        "tous", "toute", "toutes", "du", "des", "au", "aux",
+        // German
+        "der", "die", "das", "den", "dem", "ein", "eine", "einen", "einem", "einer", "eines", "aller", "alle", "allen", "alles",
+        "diese", "dieser", "dieses", "diesen", "mein", "meine", "unser", "unsere", "jede", "jeder", "jedes",
+        // Italian
+        "il", "gli", "i", "uno", "questo", "questa", "questi", "queste", "mio", "mia", "miei", "mie", "tutti", "tutte", "tutto",
+        "ogni", "dei", "degli", "delle", "dello", "della", "nel", "nella", "nei", "nelle", "alla", "alle", "allo",
+        // Portuguese
+        "o", "os", "as", "um", "uma", "uns", "umas", "estes", "estas", "meu", "minha", "meus", "minhas", "pelo", "pela", "pelos", "pelas",
+        "ao", "aos", "do", "da", "dos", "das", "no", "na", "nos", "nas",
+    ].map(\.folded))
+
+    /// The articles that lose their vowel before a vowel ("l'", "all'", "un'"): a lower-case word that starts so is prose.
+    private static let elidedArticles = ["l'", "all'", "dell'", "nell'", "sull'", "dall'", "un'", "quest'", "d'", "qu'", "l\u{2019}", "d\u{2019}"]
+
+    /// Whether a word is part of a name: capitalised, a particle ("von", "di"), or not a letter ("&", "(").
+    private static func isModifier(_ word: Substring) -> Bool {
+        guard let first = word.first else { return true }
+        return first.isUppercase || !first.isLetter || nameParticles.contains(word.folded)
+    }
+
+    /// Whether comma-joined parts make one place: a single part that is a place, or several where each part but the last is a
+    /// place on its own and the last is a country or region. Each part is checked alone, so a capitalised word is never a city
+    /// because a region follows it: "Auszeichnung, Deutschland" and "Auszeichnung, Bayern, Deutschland" are no place.
+    private static func isOnePlace(_ parts: ArraySlice<String>) -> Bool {
+        guard parts.count > 1, let region = parts.last else { return Places.isPlaceOnly(parts.joined(separator: ", ")) }
+        return Places.isCountryOrRegion(region) && parts.dropLast().allSatisfy { Places.isPlaceOnly($0) }
+    }
+
+    /// The lower-case particles of a surname or a firm's name ("von Linden GmbH", "di Rossi S.r.l.", "de la Torre S.L.").
+    private static let nameParticles: Set<String> = Set([
+        "von", "van", "de", "di", "da", "del", "della", "dei", "degli", "du", "des", "la", "le", "el", "zu", "zur", "der", "den", "dos", "das", "do",
+    ].map(\.folded))
+
+    /// The units a number counts, in the six languages: after a year they make a count, never a head.
+    private static let countUnits: Set<String> = Set([
+        "hour", "hours", "hr", "hrs", "h", "stunde", "stunden", "std", "ora", "ore", "hora", "horas", "heure", "heures",
+        "minute", "minutes", "minuten", "minuti", "minutos", "day", "days", "tag", "tage", "tagen", "giorno", "giorni", "día", "días",
+        "jour", "jours", "dia", "dias", "week", "weeks", "woche", "wochen", "settimana", "settimane", "semana", "semanas", "semaine",
+        "semaines", "km", "kg", "m", "euro", "euros", "eur", "usd", "dollars", "dollar", "percent", "prozent", "percento",
+        "porcento", "pourcent", "pieces", "piece", "stück", "stk", "pezzi", "piezas", "pièces", "units", "unit", "unità", "unidades",
+        "unités", "einheiten", "lines", "zeilen", "righe", "líneas", "lignes", "words", "wörter", "parole", "palabras", "mots",
+    ].map(\.folded))
+
+    /// The nouns a number counts: after a year they make a count unless they name a job ("Projects Manager").
+    private static let countedNouns: Set<String> = Set([
+        "people", "persons", "persone", "personen", "personas", "personnes", "projects", "projekte", "progetti", "proyectos", "projets",
+        "clients", "client", "clienti", "clientes", "kunden", "customers", "kundinnen", "users", "nutzer", "benutzer", "utenti",
+        "usuarios", "utilisateurs", "employees", "mitarbeiter", "mitarbeitende", "dipendenti", "empleados", "employés", "patients",
+        "patienten", "pazienti", "pacientes", "cases", "fälle", "casi", "casos", "cas", "students", "schüler", "studenti",
+        "estudiantes", "étudiants", "members", "mitglieder", "membri", "miembros", "membres", "teams", "orders", "bestellungen",
+        "ordini", "pedidos", "commandes", "calls", "anrufe", "chiamate", "llamadas", "appels", "visits", "besuche", "visite", "visitas",
+        "visites", "tickets", "stores", "filialen", "negozi", "tiendas", "magasins", "sites", "events", "veranstaltungen", "eventi",
+        "eventos", "événements", "years", "jahre", "anni", "años", "ans",
+    ].map(\.folded))
+
+    /// The words that open a sentence about the person ("I led", "Ich habe", "Ho completato"): no head.
+    private static let sentenceOpeners: Set<String> = Set([
+        "i", "we", "my", "our", "ich", "wir", "mein", "meine", "unser", "unsere", "io", "noi", "ho", "abbiamo", "yo", "nosotros",
+        "hemos", "je", "nous", "mon",
+    ].map(\.folded))
+
     // MARK: Organisations and schools
 
     /// Whether a piece reads as an organisation: a legal form, or a word of a hospital, a firm or an institution.
     static func isOrganisation(_ text: String) -> Bool {
         let words = text.words.map { $0.folded }
-        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
-        if legalForms.contains(where: { form in words.contains(form) }) { return true }
-        if dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        if hasLegalForm(text) { return true }
         return words.contains { organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix) }
+    }
+
+    /// Whether the vocabulary explains a whole line, so that the line denotes no person: it carries a legal form, opens with
+    /// a word of an organisation or a school, has such a word before a connector ("Ospedale di Erfurt"), or every one of its
+    /// words is a role, a role modifier, an organisation or school word, a connector or a known place ("Senior Nurse",
+    /// "Head Cook"). One word no list explains ("Priya Cook", "Luca Fabbro") leaves the line a possible person: a surname
+    /// may be a trade, a firm's word or a school's.
+    static func explainsWholeLine(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard !words.isEmpty else { return false }
+        if hasLegalForm(text) { return true }
+        let folded = words.map { $0.folded }
+        let namesAnInstitution = { (word: String) in isOrganisation(word) || isSchool(word) }
+        if namesAnInstitution(words[0]) { return true }
+        if folded.indices.dropLast().contains(where: { namesAnInstitution(words[$0]) && connectors.contains(folded[$0 + 1]) }) { return true }
+        // A place word explains a word only after a role or an institution word, never as the first one: a given name may be
+        // a city too ("Charlotte Baker"), and nothing outside the ambiguous word then says it is a place (#328).
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            let followsARoleOrInstitution = words[..<index].contains { isRole($0) || namesAnInstitution($0) }
+            return connectors.contains(folded[index]) || roleModifiers.contains(folded[index]) || isRole(word)
+                || namesAnInstitution(word) || (followsARoleOrInstitution && Places.isPlaceOnly(word))
+        }
+    }
+
+    /// The words that qualify a role without being one.
+    private static let roleModifiers: Set<String> = Set([
+        "senior", "junior", "head", "chief", "lead", "assistant", "deputy", "vice", "general", "associate", "trainee", "acting",
+        "leitende", "leitender", "leitung", "stellvertretende", "stellvertretender", "oberarzt", "erste", "erster", "kaufmännische",
+        "capo", "vice", "primo", "prima", "aiuto", "responsabile", "junior", "jefe", "jefa", "adjunto", "adjunta", "chef", "adjoint",
+    ].map(\.folded))
+
+    /// The words that join the parts of a role or an organisation.
+    private static let connectors: Set<String> = Set([
+        "of", "the", "and", "for", "at", "in", "&", "für", "der", "die", "das", "und", "des", "di", "del", "della", "dei", "delle",
+        "e", "ed", "de", "la", "le", "el", "y", "du", "et", "da", "do", "dos", "das", "per", "al", "alla", "zu", "zur", "zum", "im",
+    ].map(\.folded))
+
+    /// Whether a piece carries a legal form ("GmbH", "Ltd", "S.r.l.", "Inc.").
+    private static func hasLegalForm(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        return legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) })
+    }
+
+    /// Whether a folded word names an institution by itself, so that "Universität der Künste" is a name and "Bau der Anlagen"
+    /// is not: only the nouns of ``institutionWords`` and ``institutionStems``, never a sector word, an activity or an adjective.
+    private static func namesInstitutionByItself(_ word: String) -> Bool {
+        institutionWords.contains(word) || institutionStems.contains(where: word.hasPrefix)
     }
 
     /// Whether a piece reads as a school or a university.
@@ -181,7 +539,7 @@ enum EntryVocabulary {
 
     private static let organisationWords: Set<String> = Set([
         "hospital", "ospedale", "krankenhaus", "klinik", "klinikum", "clinica", "clínica", "clinique", "hôpital", "hospital",
-        "bank", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
+        "bank", "cassa", "caisse", "sparkasse", "banca", "banco", "banque", "studio", "agency", "agenzia", "agentur", "agencia", "agence", "agência",
         "hotel", "restaurant", "ristorante", "restaurante", "café", "cafe", "bar", "pizzeria", "bäckerei", "panificio",
         "cabinet", "kanzlei", "étude", "eletro", "elettro", "atelier", "werkstatt", "officina", "taller", "oficina",
         "labs", "solutions", "systems", "services", "consulting", "technologies", "partners",
@@ -194,6 +552,26 @@ enum EntryVocabulary {
         "supermarché", "negozio", "tienda", "magasin", "loja",
     ].map(\.folded))
 
+    /// The organisation words that also end a functional title ("Manager for Systems and Integration", "Lead for Logistics and
+    /// Services"): alone they do not make a name an employer.
+    private static let genericOrganisationWords: Set<String> = Set([
+        "labs", "solutions", "systems", "services", "consulting", "technologies", "partners", "logistik", "logistica", "logística",
+        "logistique", "werk", "werke", "bau", "elektro", "handwerk",
+    ].map(\.folded))
+
+    /// Whether a piece reads as an organisation by a legal form or by a word that is not generic vocabulary.
+    static func isOrganisationBeyondGenericWords(_ text: String) -> Bool {
+        let words = text.words.map { $0.folded }
+        let compact = text.folded.filter { $0.isLetter || $0 == "." || $0 == " " }
+        if legalForms.contains(where: { words.contains($0) }) || dottedLegalForms.contains(where: { compact.contains($0) }) { return true }
+        return words.contains { !genericOrganisationWords.contains($0) && (organisationWords.contains($0) || organisationStems.contains(where: $0.hasPrefix)) }
+    }
+
+    /// Whether a name holds a lowercase linking particle between its capitalised words ("Systems and Integration").
+    static func hasLinkingParticle(_ text: String) -> Bool {
+        text.words.contains { linkingParticles.contains($0.lowercased()) || $0.first?.isLowercase == true && $0.contains("'") }
+    }
+
     private static let organisationStems = ["elektrotechn", "krankenh", "ospedal"].map(\.folded)
 
     private static let schoolWords: Set<String> = Set([
@@ -204,6 +582,33 @@ enum EntryVocabulary {
         "conservatory", "iis", "itis", "ipsia", "ies", "iut", "insa", "faculdade", "facultad", "faculté", "facoltà",
         "fakultät", "campus", "uni", "tu", "hs", "eth", "epfl", "kollegschule", "volkshochschule",
     ].map(\.folded))
+
+    /// Nouns that name an institution by themselves, in the six languages (schools, hospitals, associations,
+    /// ministries). Narrower than `schoolWords` and `organisationWords`, which also hold sector and activity words.
+    private static let institutionWords: Set<String> = Set([
+        // English
+        "school", "college", "academy", "institute", "faculty", "conservatory", "hospital", "clinic",
+        "association", "ministry", "company",
+        // Italian
+        "scuola", "liceo", "accademia", "istituto", "facoltà", "conservatorio", "ospedale", "clinica",
+        "associazione", "ministero", "comune", "azienda", "società",
+        // Spanish
+        "escuela", "colegio", "academia", "instituto", "facultad", "conservatorio", "hospital", "clínica",
+        "asociación", "ministerio", "municipio", "ayuntamiento", "empresa", "sociedad",
+        // French
+        "école", "lycée", "collège", "académie", "institut", "faculté", "conservatoire", "hôpital", "clinique",
+        "association", "ministère", "mairie", "entreprise", "société",
+        // German
+        "schule", "gymnasium", "akademie", "institut", "fakultät", "konservatorium", "krankenhaus", "klinik", "klinikum",
+        "stiftung", "verein", "ministerium", "gemeinde", "stadtverwaltung", "unternehmen",
+        // Portuguese
+        "escola", "liceu", "academia", "instituto", "faculdade", "conservatório", "hospital", "clínica",
+        "associação", "ministério", "prefeitura", "empresa", "sociedade",
+    ].map(\.folded))
+
+    private static let institutionStems = [
+        "universit", "hochschul", "fachhochschul", "politecnic", "gymnasi", "berufsschul", "fachschul", "krankenh",
+    ].map(\.folded)
 
     private static let schoolStems = ["universit", "hochschul", "politecnic", "fachschul", "berufsschul", "gymnasi"].map(\.folded)
 
@@ -227,6 +632,31 @@ enum EntryVocabulary {
 
     /// "Role at Employer" in the six languages: the role is before, the employer after.
     static let roleEmployerConnectors = [" at ", " @ ", " presso ", " bei ", " en ", " chez ", " na ", " no ", " em ", " para ", " für ", " for ", " per "]
+
+    /// The connectors that also occur inside a title ("Teacher for Special Needs"): read only when nothing else can hold the employer.
+    static let weakConnectors = [" para ", " für ", " for ", " per "]
+
+    /// The lowercase words that link the capitalised words of an organisation's name: "Bank of Scotland", "Cassa di Risparmio",
+    /// "Banco do Brasil", "Institut für Informatik". An elided one ("d'Épargne", "l'Avenir") is a particle with its noun.
+    static let linkingParticles: Set<String> = [
+        "of", "and", "for", "de", "del", "della", "di", "da", "do", "dos", "das", "du", "des", "la", "le", "el", "van", "von", "der",
+        "den", "für", "zu", "zur", "zum", "y", "e", "et", "en", "d'", "l'", "dell'", "all'",
+    ]
+
+    /// Whether every word of a name starts with a capital, a lowercase linking particle between two capitalised words being
+    /// one too: "Bank of Scotland" is a name, "Systems integration" is a title's tail.
+    static func isCapitalisedName(_ text: String) -> Bool {
+        let words = text.words.map(String.init)
+        guard words.first?.first?.isUppercase == true else { return false }
+        return words.indices.allSatisfy { index in
+            let word = words[index]
+            if word.first?.isUppercase == true { return true }
+            if linkingParticles.contains(word.lowercased()) { return index + 1 < words.count && words[index + 1].first?.isUppercase == true }
+            guard let apostrophe = word.firstIndex(where: { $0 == "'" || $0 == "\u{2019}" }) else { return false }
+            let particle = word[...apostrophe].lowercased().replacingOccurrences(of: "\u{2019}", with: "'")
+            return linkingParticles.contains(particle) && word[word.index(after: apostrophe)...].first?.isUppercase == true
+        }
+    }
 
     // MARK: The labels of the formato europeo and the Europass
 
@@ -339,4 +769,32 @@ enum EntryVocabulary {
         "currículum", "currículo", "curriculum vitae et studiorum", "cv europass", "mein lebenslauf", "my cv", "il mio cv",
         "il mio curriculum", "mi currículum", "mon cv", "o meu currículo", "meu currículo",
     ].map(SectionVocabulary.key))
+}
+
+// MARK: - Sentences
+
+extension EntryVocabulary {
+
+    /// Whether a text starts with a subject pronoun of the six languages ("I led", "Ich leitete", "Io gestivo"): the
+    /// positive sign of a sentence, which no noun phrase of a skills list has. The pronoun must be written as one
+    /// ("I", "Ich", never "EU", the Portuguese "eu" in capitals). A capitalised next word is a name ("I Corinthians
+    /// study") only when `capitalisedNextIsAName` says the line is a list of three or more items; in a line of two
+    /// clauses it is a brand used as a verb ("I Google suppliers, compare quotes"). Trade-off: a two-item list that
+    /// starts with a numeral ("I Corinthians study, choir singing.") stays whole as text not imported.
+    static func startsWithSubject(_ text: String, capitalisedNextIsAName: Bool) -> Bool {
+        let words = text.words
+        guard let first = words.first, subjectPronouns.contains(first.folded) || first.lowercased() == "n\u{f3}s"
+        else { return false }
+        let isWrittenAsAWord = first.count == 1 || first.dropFirst().allSatisfy { $0.isLowercase || $0 == "'" || $0 == "\u{2019}" }
+        let nextStartsWithACapital = words.dropFirst().first?.first?.isUppercase ?? false
+        return isWrittenAsAWord && !(nextStartsWithACapital && capitalisedNextIsAName)
+    }
+
+    /// The subjects of the six languages, with the contracted ones of English and French ("I've", "J'ai"); the
+    /// Portuguese "n\u{f3}s" is matched with its accent in `startsWithSubject`, as its folded form is a preposition.
+    private static let subjectPronouns: Set<String> = Set([
+        "i", "we", "ich", "wir", "io", "noi", "yo", "nosotros", "nosotras", "je", "nous", "eu",
+        "i've", "i'm", "i'd", "i'll", "we've", "we're", "we'd", "we'll",
+        "j'ai", "j'avais", "j'\u{e9}tais",
+    ].map(\.folded))
 }
