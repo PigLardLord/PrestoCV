@@ -33,7 +33,9 @@ final class ImportPasteUITests: RuntimeIssueFailingTestCase {
     private func openImport(seeded: Bool = false, holdingTheRead: Bool = false,
                             largestText: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage"]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+        ]
         if seeded {
             let cv = """
             {"schemaVersion":1,"id":"\(identity)","revision":1,
