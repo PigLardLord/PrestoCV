@@ -160,6 +160,17 @@ After an import that left nothing out, the launch removes the released app's des
 
 The event names a kind of file and a code, never a path.
 
+### The tips (category `tips`)
+
+At launch the app listens to the store's tip transactions and finishes each one it reads, verified or not, and grants nothing ([ADR 0040](architecture/adr/0040-sell-tips-through-the-app-store-only.md)).
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `tips.unfinished.finished` | info | `count` (the transactions finished), `unverified` (how many of them the store did not verify) | Once per launch, after the transactions the store still held from an earlier run have all been finished. A count of zero is logged too. |
+| `tips.update.finished` | info | `verified` (flag) | A transaction that arrived while the app ran was finished. |
+
+The events carry counts and flags only: no product, price, identifier or account.
+
 ## The trace of a test build
 
 A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.

@@ -1,0 +1,247 @@
+#if canImport(StoreKit)
+import DiagnosticLogging
+import Synchronization
+import Testing
+@testable import PrestoCVTipsStoreKit
+
+@Suite("The listener of the tip transactions")
+struct TipTransactionListenerTests {
+    @Test("every unfinished transaction is finished, verified or not, and the count is logged")
+    func unfinishedAreFinished() async {
+        let world = World(unfinished: [true, false, true])
+        let listener = world.makeListener()
+
+        listener.start()
+        let entry = await world.logger.next()
+
+        #expect(world.finishes.count == 3, "each of the three is finished, the unverified one too")
+        #expect(entry?.event.description == "tips.unfinished.finished")
+        #expect(entry?.level == .info)
+        #expect(entry?.fields == [.count("count", 3), .count("unverified", 1)])
+    }
+
+    @Test("with no unfinished transaction the count logged is zero")
+    func nothingUnfinished() async {
+        let world = World(unfinished: [])
+        let listener = world.makeListener()
+
+        listener.start()
+        let entry = await world.logger.next()
+
+        #expect(world.finishes.count == 0)
+        #expect(entry?.fields == [.count("count", 0), .count("unverified", 0)])
+    }
+
+    @Test("a transaction that arrives is finished and logged by whether it was verified", arguments: [true, false])
+    func updateIsFinished(verified: Bool) async {
+        let world = World(unfinished: [])
+        let listener = world.makeListener()
+        listener.start()
+        _ = await world.logger.next()
+
+        world.updates.send(verified: verified)
+        let entry = await world.logger.next()
+
+        #expect(world.finishes.count == 1)
+        #expect(entry?.event.description == "tips.update.finished")
+        #expect(entry?.fields == [.flag("verified", verified)])
+    }
+
+    @Test("the same transaction handed over twice is finished twice")
+    func repeatedTransactionsAreFinishedEachTime() async {
+        let world = World(unfinished: [])
+        let listener = world.makeListener()
+        listener.start()
+        _ = await world.logger.next()
+
+        world.updates.send(verified: true)
+        world.updates.send(verified: true)
+        _ = await world.logger.next()
+        _ = await world.logger.next()
+
+        #expect(world.finishes.count == 2, "a transaction the app already finished comes again, and is finished again")
+    }
+
+    @Test("the unfinished are all finished before the first update is read")
+    func unfinishedComeFirst() async {
+        let world = World(unfinished: [true, true])
+        let listener = world.makeListener()
+        world.updates.send(verified: true)
+
+        listener.start()
+        _ = await world.logger.next()
+        _ = await world.logger.next()
+
+        #expect(world.finishes.order == ["unfinished", "unfinished", "update"])
+    }
+
+    @Test("a second start does not read the feed again")
+    func startIsOnce() async {
+        let world = World(unfinished: [true])
+        let listener = world.makeListener()
+
+        listener.start()
+        listener.start()
+        _ = await world.logger.next()
+
+        #expect(world.reads.unfinished == 1, "the unfinished transactions are read once")
+        #expect(world.reads.updates == 1, "the updates are read once")
+    }
+
+    @Test("dropping the listener ends its reading of the updates")
+    func droppingEndsTheReading() async {
+        let world = World(unfinished: [])
+        var listener: TipTransactionListener? = world.makeListener()
+        listener?.start()
+        _ = await world.logger.next()
+
+        listener = nil
+
+        #expect(await world.updates.ended.next() != nil, "the stream of the updates is cancelled once the listener is gone")
+    }
+}
+
+// MARK: - The world of a test
+
+/// Feeds the test controls, and what a listener over them finished, read and logged.
+private struct World {
+    let unfinished: [Bool]
+    let logger = InboxLogger()
+    let finishes: FinishLog
+    let reads = FeedReads()
+    let updates: UpdatesFeed
+
+    init(unfinished: [Bool]) {
+        let finishes = FinishLog()
+        self.unfinished = unfinished
+        self.finishes = finishes
+        updates = UpdatesFeed(finishes: finishes)
+    }
+
+    func makeListener() -> TipTransactionListener {
+        let finishes = finishes
+        let reads = reads
+        let updates = updates
+        let items = unfinished.map { verified in
+            TipTransaction(isVerified: verified, finish: { finishes.record("unfinished") })
+        }
+        return TipTransactionListener(
+            feed: TipTransactionFeed(
+                unfinished: {
+                    reads.readUnfinished()
+                    return AsyncStream { continuation in
+                        for item in items { continuation.yield(item) }
+                        continuation.finish()
+                    }
+                },
+                updates: {
+                    reads.readUpdates()
+                    return updates.stream
+                }
+            ),
+            logger: logger
+        )
+    }
+}
+
+/// The updates the test sends, and a signal for when the listener stops reading them.
+private final class UpdatesFeed: Sendable {
+    let stream: AsyncStream<TipTransaction>
+    let ended = Inbox<Void>()
+    private let continuation: AsyncStream<TipTransaction>.Continuation
+    private let finishes: FinishLog
+
+    init(finishes: FinishLog) {
+        let ended = ended
+        let (stream, continuation) = AsyncStream<TipTransaction>.makeStream()
+        continuation.onTermination = { _ in ended.put(()) }
+        self.stream = stream
+        self.continuation = continuation
+        self.finishes = finishes
+    }
+
+    func send(verified: Bool) {
+        let finishes = finishes
+        continuation.yield(TipTransaction(isVerified: verified, finish: { finishes.record("update") }))
+    }
+}
+
+/// Which finish ran, in order.
+private final class FinishLog: Sendable {
+    private let recorded = Mutex<[String]>([])
+
+    func record(_ source: String) { recorded.withLock { $0.append(source) } }
+    var order: [String] { recorded.withLock { $0 } }
+    var count: Int { order.count }
+}
+
+/// How many times each stream was asked for.
+private final class FeedReads: Sendable {
+    private let counts = Mutex<[Int]>([0, 0])
+
+    func readUnfinished() { counts.withLock { $0[0] += 1 } }
+    func readUpdates() { counts.withLock { $0[1] += 1 } }
+    var unfinished: Int { counts.withLock { $0[0] } }
+    var updates: Int { counts.withLock { $0[1] } }
+}
+
+/// What has been put and what a caller waits for, in order. A wait that gets nothing in ten seconds gives nil, so a
+/// missing event fails the test instead of hanging it.
+private final class Inbox<Element: Sendable>: Sendable {
+    private struct State {
+        var queued: [Element] = []
+        var waiting: CheckedContinuation<Element?, Never>?
+    }
+
+    private let state = Mutex(State())
+
+    func put(_ element: Element) {
+        let waiting = state.withLock { state -> CheckedContinuation<Element?, Never>? in
+            guard let waiting = state.waiting else {
+                state.queued.append(element)
+                return nil
+            }
+            state.waiting = nil
+            return waiting
+        }
+        waiting?.resume(returning: element)
+    }
+
+    func next() async -> Element? {
+        let timer = Task {
+            do {
+                try await Task.sleep(for: .seconds(10))
+            } catch {
+                return
+            }
+            self.giveUp()
+        }
+        defer { timer.cancel() }
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Element?, Never>) in
+            let ready = state.withLock { state -> Element? in
+                guard state.queued.isEmpty else { return state.queued.removeFirst() }
+                state.waiting = continuation
+                return nil
+            }
+            if let ready { continuation.resume(returning: ready) }
+        }
+    }
+
+    private func giveUp() {
+        let waiting = state.withLock { state -> CheckedContinuation<Element?, Never>? in
+            defer { state.waiting = nil }
+            return state.waiting
+        }
+        waiting?.resume(returning: nil)
+    }
+}
+
+/// A logger the test can wait on: each entry is handed over once, in order.
+private final class InboxLogger: DiagnosticLogger {
+    private let entries = Inbox<LogEntry>()
+
+    func log(_ entry: LogEntry) { entries.put(entry) }
+
+    func next() async -> LogEntry? { await entries.next() }
+}
+#endif
