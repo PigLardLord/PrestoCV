@@ -135,7 +135,9 @@ final class ImportPDFUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func openImport(holdingTheRead: Bool = false, largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage"]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+        ]
         if holdingTheRead {
             app.launchArguments += ["-PrestoCVNextHoldImport"]
         }
