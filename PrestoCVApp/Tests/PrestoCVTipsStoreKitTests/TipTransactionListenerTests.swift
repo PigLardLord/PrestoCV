@@ -121,10 +121,11 @@ struct TipTransactionListenerTests {
         let listener = TipTransactionListener(
             feed: TipTransactionFeed(
                 unfinished: { AsyncStream { continuation in continuation.yield(held); continuation.finish() } },
-                updates: {
+                updates: { ready in
                     // Like the store's: nothing is delivered before the stream is first read.
                     let sent = Mutex(false)
                     return AsyncStream {
+                        ready()
                         subscribed.put(())
                         guard sent.withLock({ let was = $0; $0 = true; return !was }) else {
                             try? await Task.sleep(for: .seconds(60))
@@ -161,28 +162,44 @@ struct TipTransactionListenerTests {
         #expect(world.reads.updates == 1, "the updates are read once")
     }
 
-    @Test("the updates are subscribed to before the unfinished transactions are asked for, whatever the scheduling", arguments: 0..<50)
-    func updatesAreSubscribedFirst(round: Int) async {
+    @Test("the unfinished transactions are not asked for before the feed says its updates are subscribed")
+    func unfinishedWaitsForTheSubscription() async {
         let order = FinishLog()
         let logger = InboxLogger()
+        let producing = Inbox<Void>()
+        let unfinishedAsked = Inbox<Void>()
+        let gate = Inbox<Void>()
         let listener = TipTransactionListener(
             feed: TipTransactionFeed(
                 unfinished: {
                     order.record("unfinished")
+                    unfinishedAsked.put(())
                     return AsyncStream { $0.finish() }
                 },
-                updates: {
-                    order.record("updates")
-                    return AsyncStream { _ in }
+                updates: { ready in
+                    // The store's reader starts late: it subscribes only when the test lets it.
+                    AsyncStream { continuation in
+                        let producer = Task {
+                            producing.put(())
+                            _ = await gate.next()
+                            order.record("subscribed")
+                            ready()
+                        }
+                        continuation.onTermination = { _ in producer.cancel() }
+                    }
                 }
             ),
             logger: logger
         )
 
         listener.start()
+        _ = await producing.next()
+        let askedEarly = await unfinishedAsked.next(within: .milliseconds(200))
+        gate.put(())
         _ = await logger.next()
 
-        #expect(order.order == ["updates", "unfinished"], "round \(round): the drain does not wait for the subscription, the listener does")
+        #expect(askedEarly == nil, "the drain does not begin while the updates reader is not subscribed")
+        #expect(order.order == ["subscribed", "unfinished"])
     }
 
     @Test("dropping the listener ends its reading of the updates even while a finish is suspended and ignores cancellation")
@@ -197,7 +214,7 @@ struct TipTransactionListenerTests {
         var listener: TipTransactionListener? = TipTransactionListener(
             feed: TipTransactionFeed(
                 unfinished: { AsyncStream { continuation in continuation.yield(held); continuation.finish() } },
-                updates: { updates.stream }
+                updates: { ready in ready(); return updates.stream }
             ),
             logger: InboxLogger()
         )
@@ -257,8 +274,9 @@ private struct World {
                         continuation.finish()
                     }
                 },
-                updates: {
+                updates: { ready in
                     reads.readUpdates()
+                    ready()
                     return updates.stream
                 }
             ),
@@ -308,7 +326,7 @@ private final class FeedReads: Sendable {
     var updates: Int { counts.withLock { $0[1] } }
 }
 
-/// What has been put and what a caller waits for, in order. A wait that gets nothing in ten seconds gives nil, so a
+/// What has been put and what a caller waits for, in order. A wait that gets nothing in ten seconds (or the time given) gives nil, so a
 /// missing event fails the test instead of hanging it.
 private final class Inbox<Element: Sendable>: Sendable {
     private struct State {
@@ -330,10 +348,12 @@ private final class Inbox<Element: Sendable>: Sendable {
         waiting?.resume(returning: element)
     }
 
-    func next() async -> Element? {
+    func next() async -> Element? { await next(within: .seconds(10)) }
+
+    func next(within limit: Duration) async -> Element? {
         let timer = Task {
             do {
-                try await Task.sleep(for: .seconds(10))
+                try await Task.sleep(for: limit)
             } catch {
                 return
             }
