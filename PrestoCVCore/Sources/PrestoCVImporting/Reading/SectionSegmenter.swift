@@ -101,6 +101,15 @@ enum SectionSegmenter {
                 ))
                 continue
             }
+            // A group's label ("Qualities", "Trade skills") with no language in it, after a group called "Languages" that
+            // came inside the skills: the languages end there (#305)
+            if sections[sections.count - 1].kind == .languages, sections.count >= 2, sections[sections.count - 2].kind == .skills, block.kind != .listItem, block.cells.count == 1,
+               SkillGroups.reopensSkills(
+                firstCell, following: document.blocks.dropFirst(position + 1).first.map { document.text(of: $0.span) }
+               ) {
+                sections.append(Section(kind: .skills, heading: block, blocks: [], languages: []))
+                continue
+            }
             // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454). One that
             // may as well be the employer of a job stays in the jobs and the studies, where its entry is to be checked; one
             // with a word of an entry opens nothing elsewhere either, as no other section reads roles or employers (#466)

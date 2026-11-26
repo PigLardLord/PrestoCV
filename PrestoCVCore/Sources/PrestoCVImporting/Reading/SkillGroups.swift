@@ -1,0 +1,104 @@
+import Foundation
+
+/// The labels that group the lines of a skills section: "Qualities", "Soft skill", "Trade skills". A group's label is
+/// structure, not a skill, and one that names a group of skills ends a section of languages the group came after (#305).
+enum SkillGroups {
+
+    /// Whether a line alone is the label of a group of qualities or of the rest of a list, as the vocabulary knows them.
+    static func isLabel(_ text: String) -> Bool {
+        labels.contains(SectionVocabulary.key(text.trimmingCharacters(in: Self.trimmed)))
+    }
+
+    /// Whether a short line names a group of skills by one of the words for skills at its start or its end ("Trade
+    /// skills", "Competenze di mestiere"). No digit, no punctuation or dash inside ("Englisch – gute Kenntnisse" is a language's level), at most `maximumWords` words.
+    static func namesGroupOfSkills(_ text: String) -> Bool {
+        let line = text.trimmingCharacters(in: Self.trimmed)
+        guard !line.isEmpty, !line.contains(where: { $0.isNumber || ",;:.|/()[]–—-".contains($0) }),
+              line.words.count >= 2, line.words.count <= maximumWords else { return false }
+        let words = SectionVocabulary.key(line).split(separator: " ").map(String.init)
+        guard let first = words.first, let last = words.last else { return false }
+        return skillsWords.contains(first) || skillsWords.contains(last)
+    }
+
+    /// Whether a line names a group of skills by a word for skills that is not also a word of a level. Such a line is a
+    /// group's label even when it holds a language name ("Spanish cooking skills", "Competenze di inglese"). "Kenntnisse"
+    /// is both a skills word and a level word, and a language's level in "Englisch gute Kenntnisse", so it does not count:
+    /// the language wins, as the first round of #305 required.
+    private static func namesGroupByPureSkillsWord(_ text: String) -> Bool {
+        guard namesGroupOfSkills(text) else { return false }
+        let words = SectionVocabulary.key(text.trimmingCharacters(in: Self.trimmed)).split(separator: " ").map(String.init)
+        return [words.first, words.last].contains { $0.map { skillsWords.contains($0) && !levelSkillsWords.contains($0) } ?? false }
+    }
+
+    /// Whether a line ends a group of languages that came inside the skills and opens the skills again: a group's label
+    /// (a known one, or a line naming a group of skills) that shows no language evidence. A language the lists know, a
+    /// level (a CEFR one, a word of a level, a native speaker's statement) written with or without punctuation, is a
+    /// language's line and stays in the languages ("Englisch gute Kenntnisse", "Gute Kenntnisse").
+    ///
+    /// A label as generic as "Other" or "Native" groups of languages too ("Native / English / Other / German B2"), so the
+    /// line that follows is read: when it is a language's line, the label groups languages and the section goes on.
+    static func reopensSkills(_ text: String, following next: String? = nil) -> Bool {
+        guard (isLabel(text) || namesGroupOfSkills(text)) && !showsLanguageEvidence(text) else { return false }
+        guard let next, !next.trimmingCharacters(in: Self.trimmed).isEmpty else { return true }
+        return !showsLanguageEvidence(next)
+    }
+
+    /// Whether a line is a language's: the one rule that settles a line holding a language name or a level and a skills
+    /// word, in this order. (1) A language name with any level evidence anywhere in the line is a language, whatever else
+    /// the line holds, "skills" included ("French conversational skills"). (2) Otherwise a line with a pure skills word is
+    /// a group's label, even with a language name ("Spanish cooking skills"). (3) Otherwise a level on its own, or a
+    /// language name, is a language's line.
+    private static func showsLanguageEvidence(_ text: String) -> Bool {
+        let line = text.trimmingCharacters(in: Self.trimmed)
+        if namesLanguage(line) && showsLevelEvidence(line) { return true }
+        if namesGroupByPureSkillsWord(line) { return false }
+        let key = SectionVocabulary.key(line)
+        if LanguageVocabulary.isNativeStatement(line) || SkillLevelWords.isLevel(line) || LanguageReader.statesCEFRLevel(line)
+            || LanguageVocabulary.levelKeys.contains(key) { return true }
+        return namesLanguage(line)
+    }
+
+    private static func namesLanguage(_ line: String) -> Bool {
+        line.words.contains { LanguageVocabulary.isName(String($0)) }
+    }
+
+    /// Whether a line holds a level anywhere: a CEFR level, a native speaker's statement, a word or a phrase of a level.
+    private static func showsLevelEvidence(_ line: String) -> Bool {
+        if LanguageReader.statesCEFRLevel(line) || LanguageReader.isNative(line) { return true }
+        let padded = " " + SectionVocabulary.key(line) + " "
+        let phrases = LanguageVocabulary.levelKeys + SkillLevelWords.keys
+        return phrases.contains { padded.contains(" " + $0 + " ") }
+    }
+
+    private static let maximumWords = 3
+    private static let trimmed = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-–•"))
+
+    /// The words for skills, in the six languages.
+    private static let skillsWords: Set<String> = Set([
+        "skills", "skill", "competencies", "competences",
+        "competenze", "competenza", "abilità",
+        "kenntnisse", "fähigkeiten", "kompetenzen", "skills",
+        "habilidades", "competencias", "destrezas",
+        "compétences", "aptitudes",
+        "competências", "habilidades",
+    ].map(SectionVocabulary.key))
+
+    /// The words for skills that are also words of a level.
+    private static let levelSkillsWords: Set<String> = Set(["kenntnisse"].map(SectionVocabulary.key))
+
+    /// The labels that group qualities and the rest, by language.
+    private static let labels: Set<String> = Set([
+        // English
+        "qualities", "personal qualities", "strengths", "key strengths", "soft skill", "other", "others", "miscellaneous", "personal traits",
+        // Italiano
+        "qualità", "qualità personali", "punti di forza", "altro", "altri", "altre", "varie", "soft skill",
+        // Deutsch
+        "eigenschaften", "persönliche eigenschaften", "stärken", "sonstiges", "weitere", "weiteres", "sonstige", "soft skill",
+        // Español
+        "cualidades", "cualidades personales", "fortalezas", "otros", "otras", "otro", "varios",
+        // Français
+        "qualités", "qualités personnelles", "points forts", "autres", "autre", "divers",
+        // Português
+        "qualidades", "qualidades pessoais", "pontos fortes", "outros", "outras", "outro", "diversos",
+    ].map(SectionVocabulary.key))
+}
