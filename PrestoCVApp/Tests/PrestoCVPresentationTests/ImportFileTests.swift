@@ -32,13 +32,59 @@ struct ImportFileTests {
         let world = ImportWorld()
         let model = world.model()
 
-        model.importPDF(ImportValues.pdf)
+        model.paste([], pdfs: [ImportValues.pdf])
         await waitUntil("the draft") { model.status == .ready }
 
         #expect(world.importer.pdfs.withLock { $0 } == [ImportValues.pdf])
         #expect(world.importer.texts.withLock { $0 }.isEmpty)
         #expect(world.files.recorded.isEmpty)
         #expect(model.source == .file && model.result?.review.source == .file)
+    }
+
+    @Test("a PDF pasted with strings wins over them: the first PDF is imported, and the text stays as it was typed")
+    func aPastedPDFWinsOverTheStringsPastedWithIt() async {
+        let world = ImportWorld()
+        let model = world.model()
+        model.text = "typed before"
+        let second = Data("%PDF-1.7 second".utf8)
+
+        model.paste(["Ada Ferro"], pdfs: [ImportValues.pdf, second])
+        await waitUntil("the draft") { model.status == .ready }
+
+        #expect(world.importer.pdfs.withLock { $0 } == [ImportValues.pdf])
+        #expect(world.importer.texts.withLock { $0 }.isEmpty)
+        #expect(model.text == "typed before")
+    }
+
+    @Test("a file the system could not hand over is fileNotRead, keeps the text and reaches neither port")
+    func aFileNotOpenedIsFileNotRead() async {
+        let world = ImportWorld()
+        let model = world.model()
+        model.text = "typed before"
+
+        model.fileNotOpened()
+
+        #expect(model.status == .failed(.fileNotRead))
+        #expect(model.source == .file)
+        #expect(model.text == "typed before")
+        #expect(world.importer.calls == 0)
+        #expect(world.files.recorded.isEmpty)
+        model.clearProblem()
+        #expect(model.status == .idle && model.source == nil)
+    }
+
+    @Test("a file not handed over while an import runs changes nothing, and the import goes on")
+    func aFileNotOpenedWhileRunningChangesNothing() async {
+        let world = ImportWorld()
+        let model = world.model()
+        model.text = "Ada Ferro"
+        await world.hold(model) { $0.importText() }
+
+        model.fileNotOpened()
+        #expect(model.status == .importing && model.source == .pasted)
+        await world.importer.gate.open()
+
+        await waitUntil("the draft") { model.status == .ready }
     }
 
     @Test("a file that could not be read, or is too large to read, is its own problem and reaches no import",
