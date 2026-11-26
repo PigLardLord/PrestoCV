@@ -1,12 +1,15 @@
 import CVRenderingTestSupport
 import Foundation
 import Synchronization
+import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
 
 /// What listens to the tips, for the launches that do not look at the store.
 struct NoTips: TipsListening {
     func start() {}
+    var canPay: Bool { false }
+    func offers() async throws(TipFailure) -> [TipOffer] { [] }
 }
 
 /// What listens to the tips, and counts its starts.
@@ -15,6 +18,8 @@ final class CountingTips: TipsListening {
     var started: Int { starts.withLock { $0 } }
 
     func start() { starts.withLock { $0 += 1 } }
+    var canPay: Bool { false }
+    func offers() async throws(TipFailure) -> [TipOffer] { [] }
 }
 
 /// The listening to the store's tip transactions, at the launch.

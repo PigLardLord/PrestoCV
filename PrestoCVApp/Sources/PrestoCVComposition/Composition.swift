@@ -171,7 +171,7 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
-        settings = SettingsFactory(facts: inputs.settings, trace: trace.access)
+        settings = SettingsFactory(facts: inputs.settings, trace: trace.access, tips: tips)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
@@ -343,6 +343,7 @@ public final class Composition {
         let wrapStore: WrapStore
         let wrapImport: WrapImport
         let wrapGate: WrapGate
+        let makeTips: MakeTips
         let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
@@ -384,6 +385,10 @@ public final class Composition {
         wrapStore = { fixtures.store($0) }
         wrapImport = { fixtures.importing($0) }
         wrapGate = { fixtures.designGate($0) }
+        makeTips = { logger in
+            guard let given = fixtures.tips else { return StoreKitTips(logger: logger) }
+            return GivenTips(given: given)
+        }
         // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
         // left alone here, and `make` fails the launch through `check`.
         if rejected == nil, fixtures.passesCheck(paths) {
@@ -402,6 +407,7 @@ public final class Composition {
         wrapStore = { $0 }
         wrapImport = { $0 }
         wrapGate = { $0 }
+        makeTips = { StoreKitTips(logger: $0) }
         #endif
         let state = await make(Inputs(
             paths: paths,
@@ -440,7 +446,7 @@ public final class Composition {
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             legacyLeftovers: { LegacyLeftoversAdapter(paths: leftovers, logger: $0) },
-            makeTips: { StoreKitTips(logger: $0) },
+            makeTips: makeTips,
             settings: bundledSettings()
         ))
         #if DEBUG

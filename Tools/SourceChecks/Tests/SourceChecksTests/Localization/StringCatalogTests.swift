@@ -46,10 +46,12 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // composition's LookNamesTests checks that those codes and these keys are the same set.
             dynamicKeyPrefixes: ["design.", "fonts.", "palette."],
             // The hint of "Choose a PDF" names the system's Files app, whose name keeps its capital; the name of
-            // the app's licence is one no translation changes.
+            // the app's licence and the name of the store are ones no translation changes.
             properNamesOfKey: [
                 "import.pdf.button.hint": ["Archivos", "Fichiers", "File", "Arquivos"],
                 "settings.openSource.statement": ["Apache"],
+                "settings.tips.loading": ["App", "Store"],
+                "settings.tips.unreachable": ["App", "Store"],
             ],
             nonKeyLiterals: [
                 "native": "the code of a language level, which ProficiencyPicker words (R13)",

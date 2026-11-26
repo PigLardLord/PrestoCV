@@ -7,19 +7,35 @@ import PrestoCVPresentation
 /// Every public member of the Settings sheet and of the Licences screen, each with its type spelled out. It compiles only
 /// while each type is the presentation's own.
 @MainActor
-func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesViewModel, diagnostics: DiagnosticsViewModel) async {
+func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesViewModel, diagnostics: DiagnosticsViewModel, tips: TipJarViewModel) async {
     await settings.appear()
     let _: String = settings.appName + settings.supportAddress
     for group in settings.groups as [SettingsGroup] {
         switch group.kind {
-        case .support, .legal, .openSource, .about, .diagnostics: break
+        case .support, .tips, .legal, .openSource, .about, .diagnostics: break
         }
         for row in group.rows as [SettingsRow] {
             switch row {
             case .contactSupport(let link), .privacyPolicy(let link), .sourceCode(let link): let _: URL = link
-            case .openSourceStatement, .licences, .diagnostics: break
+            case .openSourceStatement, .licences, .tips, .diagnostics: break
             case .version(let text), .build(let text): let _: String = text
             }
+        }
+    }
+    await tips.load()
+    await tips.retry()
+    switch tips.state as TipJarState {
+    case .loading: break
+    case .offers(let rows):
+        for row in rows as [TipRow] {
+            let _: String = row.price
+            switch row.size as TipRow.Size {
+            case .small, .medium, .large: let _: TipRow.Size = row.id
+            }
+        }
+    case .unavailable(let reason):
+        switch reason as TipUnavailability {
+        case .notAllowed, .unreachable, .noOffers, .failed: break
         }
     }
     await diagnostics.load()
@@ -72,7 +88,8 @@ struct SettingsSurfaceTests {
         let licences = LicencesViewModel(reading: NoticesFake([]))
 
         await useEveryPublicMember(
-            of: settings, licences: licences, diagnostics: DiagnosticsViewModel(reading: DiagnosticsFake(runs: [.run(1, at: 0)]))
+            of: settings, licences: licences, diagnostics: DiagnosticsViewModel(reading: DiagnosticsFake(runs: [.run(1, at: 0)])),
+            tips: TipJarViewModel(selling: StubTips(canPay: true, result: .success([])))
         )
 
         #expect(licences.state == .failed)
