@@ -44,7 +44,7 @@ extension URL {
 /// An index listing one design `x`, whose manifest has the given JSON fields replaced. Schema 2 unless told otherwise.
 private func index(_ fields: [String: String] = [:], generation: Int = 1, schemaVersion: Int = 2) -> String {
     var manifest = ["id": "\"x\"", "name": "\"X\"", "version": "\"1.0.0\"", "description": "\"\"", "defaultPalette": "\"ink\"",
-                    "defaultFonts": "\"system\"", "markupContract": "1"]
+                    "defaultFonts": "\"system\"", "markupContract": "\(MarkupContract.version)"]
     manifest.merge(fields) { $1 }
     let body = manifest.sorted { $0.key < $1.key }.map { "\"\($0.key)\":\($0.value)" }.joined(separator: ",")
     return #"{"schemaVersion":\#(schemaVersion),"designs":[{"generation":\#(generation),"manifest":{\#(body)}}]}"#
@@ -69,7 +69,8 @@ private let badIndexes: [(String, FileDesignStoreError)] = {
     cases.append((index(["name": quoted("a\\u202eb")]), .indexCorrupt("entries")))
     cases.append((index(["description": quoted(String(repeating: "d", count: 501))]), .indexCorrupt("entries")))
     cases.append((index(["description": quoted("a\\u0000b")]), .indexCorrupt("entries")))
-    cases.append((index(["markupContract": "2"]), .indexCorrupt("entries")))
+    cases.append((index(["markupContract": "\(MarkupContract.version + 1)"]), .indexCorrupt("entries")))
+    cases.append((index(["markupContract": "0"]), .indexCorrupt("entries")))
     // Typed fields fail to decode, like any other malformed entry.
     cases.append((index(["version": quoted("1.0")]), .indexCorrupt("not an index")))
     cases.append((index(["version": "1"]), .indexCorrupt("not an index")))
@@ -193,6 +194,31 @@ struct FileDesignStoreTests {
             try Data(index(["name": quoted(name), "description": quoted(description), "version": quoted("12.0.3")]).utf8).write(to: dir.index)
             let manifests = try await store.installedDesigns()
             #expect(manifests.map(\.id) == ["x"] && manifests.map(\.name) == [name] && manifests.map(\.version.text) == ["12.0.3"])
+        }
+    }
+
+    @Test("an entry written for an older markup contract is listed, its design is refused when read, and a newer bundled version replaces it (#467)")
+    func olderContract() async throws {
+        try #require(MarkupContract.version > 1, "no contract is older than the first")
+        try await inTemporaryStore { dir in
+            let store = FileDesignStore(directory: dir)
+            _ = try await store.saveIfNewer(DesignStoreContract.design(id: "clean"))
+            // The store as a previous version of the app left it: the design and its entry target contract 1.
+            func older(_ object: [String: Any]) -> [String: Any] {
+                var object = object, manifest = object["manifest"] as? [String: Any] ?? [:]
+                manifest["markupContract"] = 1
+                object["manifest"] = manifest
+                return object
+            }
+            try dir.index.rewriteIndexEntries(older)
+            let package = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: dir.file("clean"))) as? [String: Any])
+            try JSONSerialization.data(withJSONObject: older(package)).write(to: dir.file("clean"))
+            #expect(try await store.installedDesigns().map(\.markupContract) == [1])
+            let error = await #expect(throws: FileDesignStoreError.self) { _ = try await store.design(id: "clean") }
+            guard case .designRejected(id: "clean", _)? = error else { Issue.record("\(String(describing: error))"); return }
+            let newer = try DesignStoreContract.design(id: "clean", version: "1.1.0")
+            #expect(try await store.saveIfNewer(newer) == .upgraded)
+            #expect(try await store.design(id: "clean") == newer)
         }
     }
 
