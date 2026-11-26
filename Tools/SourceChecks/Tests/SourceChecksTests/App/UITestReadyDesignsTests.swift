@@ -175,6 +175,33 @@ struct UITestReadyDesignsTests {
         ])
     }
 
+    @Test("a folder before a colon that names nothing there, as a dictionary key or in a branch, fails the check")
+    func folderBeforeAColon() {
+        let key = #"""
+            func launch(values: [[String]: Int]) {
+                app.launchArguments += values.keys.flatMap { $0 }
+            }
+            func testKey() {
+                let storage = ["-PrestoCVNextStorage", folder]
+                app.launchArguments += storage + ["-PrestoCVNextReadyDesigns"]
+                launch(values: [storage: 1])
+            }
+            """#
+        let branch = #"""
+            func launch(arguments: [String]) {
+                app.launchArguments += arguments
+            }
+            func testBranch() {
+                let storage = ["-PrestoCVNextStorage", folder]
+                app.launchArguments += storage + ["-PrestoCVNextReadyDesigns"]
+                launch(arguments: traced ? storage: [])
+            }
+            """#
+
+        #expect(FixtureLaunches(key).problems() == ["line 7: a folder in `storage` goes where the check cannot follow it"])
+        #expect(FixtureLaunches(branch).problems() == ["line 7: a folder in `storage` goes where the check cannot follow it"])
+    }
+
     @Test("a folder the check cannot tie to a launch of its file fails the check, so no launch escapes it")
     func folderOutOfSight() {
         let source = #"""

@@ -122,10 +122,32 @@ struct FixtureLaunches {
         }
         if !receiving.isEmpty { return .into(receiving.map(\.target)) }
         let end = position + name.unicodeScalars.count
-        if Self.matches(":", in: skeleton, at: end), !Self.matches("::", in: skeleton, at: end) { return .declared }
+        if Self.matches(":", in: skeleton, at: end), !Self.matches("::", in: skeleton, at: end), namesSomething(at: position) {
+            return .declared
+        }
         if Self.operatorEnd(in: skeleton, after: end) != nil { return .declared }
         if let label = label(ofArgumentAt: position, endingAt: end), let names = parameters[label] { return .into(names) }
         return .unknown
+    }
+
+    /// Whether the name at `position`, followed by a colon, names something there: a binding (`let storage: [String]`), a
+    /// parameter (`func launch(with storage: [String])`) or an argument's label (`launch(storage: storage)`). Before a
+    /// colon a name can also be a dictionary key or a branch of a condition, which are uses.
+    private func namesSomething(at position: Int) -> Bool {
+        guard let before = previousNonBlank(before: position) else { return false }
+        guard Self.isIdentifier(skeleton[before]) else { return startsAnItem(at: position) }
+        var start = before
+        while start > 0, Self.isIdentifier(skeleton[start - 1]) { start -= 1 }
+        let word = String(String.UnicodeScalarView(skeleton[start...before]))
+        return word == "let" || word == "var" || startsAnItem(at: start)
+    }
+
+    /// Whether `position` starts an item of a list in parentheses, a parameter or an argument
+    private func startsAnItem(at position: Int) -> Bool {
+        guard let opener = innermostOpener(before: position), skeleton[opener] == "(",
+            let before = previousNonBlank(before: position)
+        else { return false }
+        return skeleton[before] == "(" || skeleton[before] == ","
     }
 
     /// The label of the call argument `label: name` whose name is at `position`, as in `launch(storage: storage)`
