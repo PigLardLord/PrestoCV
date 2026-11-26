@@ -15,9 +15,9 @@ struct BundledDesignsRenderingTests {
     /// same version, so a shipped package that changes needs a new version; `Designs/README.md` gives the steps, and the
     /// new hash is pinned here last.
     static let pins: [String: String] = [
-        "minimal@1.2.0": "1a8658e4e7ae98fbf7a55b617c1677102dcb6bfc1ca5ba0778e19aa34756c9d6",
-        "modern@1.2.0": "5cf0f2a9d98cb3e0efb154fb11c0ae1bb4f7e26c432ec33d815be8135f8cdfcd",
-        "professional@1.2.0": "2ddcdf733c070666a8ef9552e1a00fb28956ac1d88229a6354840dbc9596c6cc",
+        "minimal@1.3.0": "833b94d6d4756b6712ea488f5a6108eff1311e69086680907b6e6caea0c31d93",
+        "modern@1.3.0": "a01abf83812a21e9a57f3a8715ec47b4f53f357df361b535a9c69c519fc23083",
+        "professional@1.3.0": "eef05acb9baa7f70128da4ebc13393138ee7c0777b2a0ca05e599b25d9219d42",
     ]
 
     static func packages() async throws -> [(name: String, data: Data, design: ValidatedDesign)] {

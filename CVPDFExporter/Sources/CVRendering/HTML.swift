@@ -1,6 +1,6 @@
 /// Typed HTML (ADR 0011): tag and attribute names are closed enums, text and attribute values are
 /// always escaped, raw HTML is not representable.
-enum Tag: String { case html, head, meta, title, body, main, header, section, article, h1, h2, h3, p, span, a }
+enum Tag: String { case html, head, meta, title, body, main, header, section, div, article, h1, h2, h3, p, span, a }
 enum Attr: String { case lang, charset, `class`, href, dataSection = "data-section", dataRating = "data-rating", dataSchema = "data-schema" }
 
 indirect enum HTML: Sendable {

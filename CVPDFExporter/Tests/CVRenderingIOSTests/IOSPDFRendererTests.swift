@@ -181,6 +181,22 @@ extension IOSPDFRendererTests {
     }
 
     @MainActor
+    @Suite("#467 · page breaks of the bundled designs and of an imported design at the contract's limits")
+    struct PageBreakChecks {
+        @Test("no section's start at a page's foot, no blank page, no cut line and no lost text, wherever the page breaks",
+              arguments: ["minimal", "modern", "professional"], PageBreakDocument.Body.allCases)
+        func bundled(design: String, body: PageBreakDocument.Body) async throws {
+            try await IOSPDFRendererTests.checks().pageBreaks(design: design, body: body)
+        }
+
+        @Test("a title with the most spacing below it the contract allows is never alone at a page's foot",
+              arguments: PageBreakDocument.LimitDesign.allCases, PageBreakDocument.Body.allCases)
+        func imported(design: PageBreakDocument.LimitDesign, body: PageBreakDocument.Body) async throws {
+            try await IOSPDFRendererTests.checks().pageBreaks(imported: design, body: body)
+        }
+    }
+
+    @MainActor
     @Suite("#78 · the step budget")
     struct StepBudget {
         @Test("real documents use at most 10% of the budget")

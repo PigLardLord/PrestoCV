@@ -198,7 +198,7 @@ Standalone and portable. It has no dependency on any PrestoCV package ([ADR 0002
 - **The JSON Schema**, version 1, is committed as [cv-document.schema.json](../../CVPDFExporter/Docs/cv-document.schema.json). `DocumentSchemaTests` hold it to the type in both directions: what the type encodes validates, its property names, section kinds and language levels are the schema's, and the bounds both state (years, months, ratings, entry counts) are the validator's. The byte bounds on text stay in the validator, which JSON Schema cannot express.
 
 **`CVDesignCatalog`**
-- **`MarkupContract`**, version 1: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
+- **`MarkupContract`**, version 2: elements, classes, section kinds, ratings, pseudo-classes. See [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md).
 - **The CSS policy:** a tokenizer, an allow-list of properties and values, and canonical re-serialisation into `ValidatedStylesheet`, whose initialiser is internal.
 - **`DesignPackageValidator`** takes raw bytes and returns a `ValidatedDesign`: manifest, stylesheet and PNG preview.
   - The manifest's `name` is one line of 1–80 Unicode scalars that is not only white space, and its `description` has up to 500 scalars and may span lines. Neither holds a control character (the description's new line aside), a line or paragraph separator (U+2028, U+2029) or an explicit bidirectional embedding, override or isolate: `invalidName`, `invalidDescription`. The directional marks U+200E, U+200F and U+061C are allowed. `FileDesignStore` applies the same predicates to the entries of its index.
@@ -241,7 +241,7 @@ The store also records each design's origin, `bundled` (installed by the catalog
 - Nothing is written that could not be read back (R12): before the first write of a save or an adoption, the index is encoded, checked against its cap and read back through the same strict reader as a read, and a failure is `wouldNotReadBack`.
 - A design whose entry has no `origin` (an index written by hand or by another tool) has no recorded origin. The store reads such an entry and never writes one. The sync adopts it when it is the bundled design (`adoptAsBundled`), which rewrites the index in one write with that entry's origin set to `bundled`, and otherwise it counts as an import, a conflict: a newer bundle never replaces it.
 
-**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`. `professional`, `modern` and `minimal` are written against markup contract 1 and pinned by hash to their `id@version`, since the catalog's sync never replaces a design of the same version: a changed package needs a new version.
+**`CVBundledDesigns`** holds the bundled `.mcvt` files as resources, served as raw bytes through `Bundle.module`. `professional`, `modern` and `minimal` are written against markup contract 2 and pinned by hash to their `id@version`, since the catalog's sync never replaces a design of the same version: a changed package needs a new version.
 
 **`CVRendering`**
 - **`DocumentHTMLBuilder`:**
@@ -296,14 +296,16 @@ The store also records each design's origin, `bundled` (installed by the catalog
     - `requiredPages` checked against an unlimited render;
     - deterministic pre-start cancellation;
   - `FakePDFRenderer`, which writes real uncompressed PDFs;
-  - `MinimalPDFInspector`.
-- **`CVRenderingNativeTestSupport`** (iOS and macOS) holds what both native renderers' tests share: `NativeRendererChecks`, the loopback listener that counts connections, and `DrawnPDF`, which draws PDFs with CoreText. It may import `CVRendering`, `CVRenderingTestSupport`, `CVRenderingPDFKitInspector`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings`, CoreGraphics, CoreText, Foundation, Network, PDFKit, Synchronization and WebKit (the listener's control page).
+  - `MinimalPDFInspector`;
+  - `PageBreaks`, which reads in a PDF's layout a page that ends with a section title or holds no text (#467).
+- **`CVRenderingNativeTestSupport`** (iOS and macOS) holds what both native renderers' tests share: `NativeRendererChecks`, the loopback listener that counts connections, and `DrawnPDF`, which draws PDFs with CoreText. It may import `CVRendering`, `CVRenderingTestSupport`, `CVRenderingPDFKitInspector`, `CVDocumentModel`, `CVDesignCatalog`, `CVBundledHeadings`, `CVBundledDesigns` (the page-break check prints the bundled designs), CoreGraphics, CoreText, Foundation, Network, PDFKit, Synchronization and WebKit (the listener's control page).
 - **`CVRenderingIOSTests` and `CVRenderingMacOSTests`** run the contract suite against the real renderers with the PDFKit inspector: `xcodebuild test` on the iOS simulator, `swift test` on macOS. They also run the long-document pagination test and in-flight cancellation. `BundledDesignsPreviewTests` prints an English sample with each bundled design, in the design's default palette and font scheme, and stores the first page as the design's preview when `UPDATE_PREVIEWS=1`; it imports `CVDocumentModel`, `CVDesignCatalog`, `CVBundledDesigns` and `CVBundledHeadings`. They run the checks of `NativeRendererChecks`, one line each:
   - a field the renderer drops is reported missing;
   - flex and grid at the minimum column gap keep skills, profiles and interests apart;
   - R8: a script does not run; a remote image, stylesheet and font, a link and a meta refresh make no connection; the PDF keeps the document's text;
   - link annotations: macOS keeps one per link, whose destinations are the builder's `href`s, and iOS keeps none. Each platform's test fails if that changes;
   - the fixture's PDF has no geometry violation;
+  - page breaks (#467): each bundled design prints a CV whose experience section falls at every height of a page's foot with no section title alone at the foot and no blank page;
   - the step budget above.
 - The completeness and geometry tests of every bundled design wait for the bundled designs of the new stack.
 
@@ -449,7 +451,7 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 
 A native SwiftUI multiplatform target ([ADR 0004](adr/0004-native-multiplatform-app.md)). The checker maps each folder as its own target.
 
-These folders live under `PrestoCVNext/`. The target compiles them with the bundle id `com.PigLardLord.prestocv` and, from `PrestoCV/`, its `Info.plist` (the PDFs the app opens), icon, asset catalog, privacy manifest and sample CVs. The `PrestoCV` scheme builds it and runs the test plans `CI` and `PrestoCV`; its UI test target, `PrestoCVNextUITests`, and its unit test target, `PrestoCVNextTests`, hosted in the app, are held to R16. The unit tests may import Testing, SwiftUI, UIKit and the app module, `PrestoCV`: UIKit only to put a view in a window of the app, where a form lays its rows out as on the screen, which `ImageRenderer` does not draw. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
+These folders live under `PrestoCVNext/`. The target compiles them with the bundle id `com.PigLardLord.prestocv` and, from `PrestoCV/`, its `Info.plist` (the PDFs the app opens; `LSSupportsOpeningDocumentsInPlace`, which macOS rejects as `NO`, is a build setting for the iOS SDKs only), icon, asset catalog, privacy manifest and sample CVs. The `PrestoCV` scheme builds it and runs the test plans `CI` and `PrestoCV`; its UI test target, `PrestoCVNextUITests`, and its unit test target, `PrestoCVNextTests`, hosted in the app, are held to R16. The unit tests may import Testing, SwiftUI, UIKit and the app module, `PrestoCV`: UIKit only to put a view in a window of the app, where a form lays its rows out as on the screen, which `ImageRenderer` does not draw. A folder that holds no file yet is listed in `notYetImplemented` of `rules.json`.
 
 | Folder | Contents | May import |
 |---|---|---|
