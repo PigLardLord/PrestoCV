@@ -202,6 +202,31 @@ struct UITestReadyDesignsTests {
         #expect(FixtureLaunches(branch).problems() == ["line 7: a folder in `storage` goes where the check cannot follow it"])
     }
 
+    @Test("the argument counts only where every run of the launch passes it, not under a condition or inside a call")
+    func argumentOnEveryRun() {
+        let conditional = #"""
+            app.launchArguments += ["-PrestoCVNextEmptyStorage"] + (ready ? ["-PrestoCVNextReadyDesigns"] : [])
+            app.launchArguments += ["-PrestoCVNextEmptyStorage", ready ? "-PrestoCVNextReadyDesigns" : "-PrestoCVNextSeed"]
+            app.launchArguments += ready ? [] : ["-PrestoCVNextStorage", "-PrestoCVNextReadyDesigns"]
+            """#
+        let filtered = #"""
+            let storage = ["-PrestoCVNextStorage", folder]
+            app.launchArguments += storage + ["-PrestoCVNextReadyDesigns"].filter { _ in ready }
+            """#
+        let passing = #"""
+            app.launchArguments += ["-PrestoCVNextEmptyStorage"] + ["-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", seed]
+            app.launchArguments.append(contentsOf: ["-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns"])
+            """#
+        let unreadable = "with -PrestoCVNextReadyDesigns where the check cannot tell it is passed on every run"
+        let launches = (1...3).map { "line \($0): a launch over a folder \(unreadable)" }
+
+        #expect(FixtureLaunches(conditional).problems() == launches)
+        #expect(FixtureLaunches(filtered).problems() == [
+            "line 1: a folder in `storage`, which a launch of this file uses \(unreadable)",
+        ])
+        #expect(FixtureLaunches(passing).problems().isEmpty)
+    }
+
     @Test("a folder the check cannot tie to a launch of its file fails the check, so no launch escapes it")
     func folderOutOfSight() {
         let source = #"""

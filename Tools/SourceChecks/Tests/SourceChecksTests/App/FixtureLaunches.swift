@@ -5,7 +5,9 @@ import Foundation
 /// A launch is a statement that adds to `launchArguments` (`+=`, `=`, `append`, `insert`): from that word to the end of its
 /// expression, which may run over several lines. An argument of a fixture folder (`-PrestoCVNextEmptyStorage`,
 /// `-PrestoCVNextStorage`) is read where it is written:
-/// - in a launch, which then passes `-PrestoCVNextReadyDesigns` as well;
+/// - in a launch, which then passes `-PrestoCVNextReadyDesigns` as well, on every run: as an argument of its own, right in
+///   the launch or in an array the launch adds as a whole, and not under a condition (`ready ? […] : []`, `?? […]`) or
+///   inside a call or a bracket the check cannot read (`[…].filter { … }`);
 /// - in a value of the file (`let storage = [...]`, or a parameter's default), which the check follows by its name, value
 ///   by value: into the launches that name it, into the values it goes into (`let copied = storage`, `all = storage + […]`,
 ///   `arguments.append(contentsOf: storage)`) and into the parameters it is passed to (`launch(storage: storage)`); every
@@ -44,7 +46,7 @@ struct FixtureLaunches {
     func problems() -> [String] {
         var problems: Set<Problem> = []
         for launch in launches where holdsFolder(launch) && !passes(launch) {
-            problems.insert(Problem(line: line(of: launch.lowerBound), text: "a launch over a folder without \(Self.readyDesigns)"))
+            problems.insert(Problem(line: line(of: launch.lowerBound), text: "a launch over a folder \(lack(in: launch))"))
         }
         for folder in folders() where !launches.contains(where: { $0.contains(folder) }) {
             problems.formUnion(self.problems(ofValueAt: folder))
@@ -72,7 +74,7 @@ struct FixtureLaunches {
                         let through = name == seed ? "" : " through `\(name)`"
                         problems.append(Problem(
                             line: folderLine,
-                            text: "a folder in `\(seed)`, which a launch of this file uses\(through) without \(Self.readyDesigns)"))
+                            text: "a folder in `\(seed)`, which a launch of this file uses\(through) \(lack(in: launch))"))
                     }
                 case .into(let values):
                     names += values.filter { followed.insert($0).inserted }
@@ -191,8 +193,57 @@ struct FixtureLaunches {
         folders().contains { launch.contains($0) }
     }
 
+    /// Whether the launch passes the argument on every run (see the type's documentation)
     private func passes(_ launch: Range<Int>) -> Bool {
-        Self.positions(of: Self.literal(Self.readyDesigns), in: code).contains { launch.contains($0) }
+        mentions(of: launch).contains { isUnconditional($0, in: launch) }
+    }
+
+    /// How a launch that does not pass the argument on every run fails it: it leaves it out, or it writes it where the
+    /// check cannot tell it is always passed
+    private func lack(in launch: Range<Int>) -> String {
+        mentions(of: launch).isEmpty
+            ? "without \(Self.readyDesigns)"
+            : "with \(Self.readyDesigns) where the check cannot tell it is passed on every run"
+    }
+
+    /// Where the launch writes the argument, wherever that is in its expression
+    private func mentions(of launch: Range<Int>) -> [Int] {
+        Self.positions(of: Self.literal(Self.readyDesigns), in: code).filter { launch.contains($0) }
+    }
+
+    /// Whether the argument written at `literal` is passed on every run of the launch: the launch's expression has no
+    /// condition outside brackets, and the argument is one of its operands, or an element of an array that is one
+    private func isUnconditional(_ literal: Int, in launch: Range<Int>) -> Bool {
+        let word = launch.lowerBound + "launchArguments".unicodeScalars.count
+        guard let start = Self.operatorEnd(in: skeleton, after: word) else { return false }
+        let body = start..<launch.upperBound
+        guard !body.contains(where: { skeleton[$0] == "?" && openers(from: start, to: $0).isEmpty }) else { return false }
+        let end = literal + Self.literal(Self.readyDesigns).unicodeScalars.count
+        let open = openers(from: start, to: literal)
+        if open.isEmpty { return isOperand(from: literal, to: end, of: body) }
+        guard open.count == 1, skeleton[open[0]] == "[", let close = Self.closer(of: open[0], in: skeleton),
+            let before = previousNonBlank(before: literal), let after = nextNonBlank(from: end)
+        else { return false }
+        return (skeleton[before] == "[" || skeleton[before] == ",") && (skeleton[after] == "," || skeleton[after] == "]")
+            && isOperand(from: open[0], to: close + 1, of: body)
+    }
+
+    /// Whether the text from `start` to `end` is an operand of its own in the launch's expression `body`: the whole of it,
+    /// one of the operands that `+` adds together, or what `contentsOf:` adds
+    private func isOperand(from start: Int, to end: Int, of body: Range<Int>) -> Bool {
+        let opens = previousNonBlank(before: start).map { before in
+            before < body.lowerBound || skeleton[before] == "+" || isContentsLabel(endingAt: before, in: body)
+        } ?? true
+        let closes = nextNonBlank(from: end).map { $0 >= body.upperBound || skeleton[$0] == "+" } ?? true
+        return opens && closes
+    }
+
+    /// Whether the colon at `colon` ends the label `contentsOf:` that opens the launch's expression `body`
+    private func isContentsLabel(endingAt colon: Int, in body: Range<Int>) -> Bool {
+        let label = Array("contentsOf".unicodeScalars)
+        let start = colon - label.count
+        guard skeleton[colon] == ":", start >= body.lowerBound, Array(skeleton[start..<colon]) == label else { return false }
+        return previousNonBlank(before: start).map { $0 < body.lowerBound } ?? true
     }
 
     /// Where the arguments of a fixture folder are written, as positions of their opening quote
