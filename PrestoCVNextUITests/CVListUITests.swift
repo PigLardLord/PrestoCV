@@ -27,7 +27,7 @@ final class CVListUITests: RuntimeIssueFailingTestCase {
         let app = XCUIApplication()
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
-            "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try seed(cvs, corrupt: corrupt),
+            "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try seed(cvs, corrupt: corrupt),
         ]
         if failingRenames {
             app.launchArguments += ["-PrestoCVNextFailRenamesInPairs"]
