@@ -227,4 +227,62 @@ struct ShellImportTests {
         await waitUntil("the draft stored") { await world.editing.storedName(of: cv) == "Ada Ferro" }
         #expect(world.editing.editing.writeCount == 1)
     }
+
+    @Test("an import the person left starts nothing on a late paste, file or tap: nothing is read, imported or changed", arguments: LeavingTheImport.allCases, LateDelivery.allCases)
+    func leftImportDropsALateDelivery(leaving: LeavingTheImport, late: LateDelivery) async throws {
+        let world = World()
+        let cv = try await world.editing.storedCV()
+        world.shell.showImport()
+        let left = try #require(world.shell.importer)
+        left.text = Self.text
+        switch leaving {
+        case .backToTheList: #expect(world.shell.deselect() == .left)
+        case .toACV: #expect(world.shell.open(.stored(CVReference(id: cv.id))) == .left)
+        }
+
+        late.deliver(to: left)
+
+        #expect(left.text == Self.text, "a late paste replaces no text")
+        #expect(left.status == .idle, "a late delivery starts no import and shows no problem")
+        #expect(left.source == nil)
+        #expect(left.result == nil)
+        #expect(world.shell.importer == nil, "the shell shows no import")
+        world.shell.showImport()
+        let next = try #require(world.shell.importer)
+        next.text = "Bruno Neri\nPlumber"
+        next.importText()
+        await waitUntil("the new draft") { next.status == .ready }
+        #expect(world.imports.importer.texts.withLock { $0 } == ["Bruno Neri\nPlumber"],
+                "only the new import reaches the port")
+        #expect(world.imports.importer.pdfs.withLock { $0 }.isEmpty, "no late PDF reaches the port")
+        #expect(world.imports.files.reads == 0, "a late file is never read")
+        #expect(world.imports.files.problems(ended: true).isEmpty, "a late file is released once, at once")
+    }
+}
+
+/// How the person leaves the import screen.
+enum LeavingTheImport: CaseIterable, Sendable {
+    case backToTheList
+    case toACV
+}
+
+/// What the system or the person hands to an import screen after it was left: the paste button's and the file picker's
+/// callbacks arrive after an asynchronous load.
+enum LateDelivery: CaseIterable, Sendable {
+    case pastedText
+    case pastedPDF
+    case pickedFile
+    case fileNotOpened
+    case importTapped
+
+    @MainActor
+    func deliver(to screen: ImportViewModel) {
+        switch self {
+        case .pastedText: screen.paste(["Late text"], pdfs: [])
+        case .pastedPDF: screen.paste([], pdfs: [ImportValues.pdf])
+        case .pickedFile: screen.importFile(at: ImportValues.file)
+        case .fileNotOpened: screen.fileNotOpened()
+        case .importTapped: screen.importText()
+        }
+    }
 }
