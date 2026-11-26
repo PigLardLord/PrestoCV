@@ -202,12 +202,13 @@ struct UITestReadyDesignsTests {
         #expect(FixtureLaunches(branch).problems() == ["line 7: a folder in `storage` goes where the check cannot follow it"])
     }
 
-    @Test("the argument counts only where every run of the launch passes it, not under a condition or inside a call")
+    @Test("the argument counts only when every run passes it alone, not under a condition, joined to a string or in a call")
     func argumentOnEveryRun() {
         let conditional = #"""
             app.launchArguments += ["-PrestoCVNextEmptyStorage"] + (ready ? ["-PrestoCVNextReadyDesigns"] : [])
             app.launchArguments += ["-PrestoCVNextEmptyStorage", ready ? "-PrestoCVNextReadyDesigns" : "-PrestoCVNextSeed"]
             app.launchArguments += ready ? [] : ["-PrestoCVNextStorage", "-PrestoCVNextReadyDesigns"]
+            app.launchArguments.append((ready ? "" : "-PrestoCVNextEmptyStorage") + "-PrestoCVNextReadyDesigns")
             """#
         let filtered = #"""
             let storage = ["-PrestoCVNextStorage", folder]
@@ -218,7 +219,7 @@ struct UITestReadyDesignsTests {
             app.launchArguments.append(contentsOf: ["-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns"])
             """#
         let unreadable = "with -PrestoCVNextReadyDesigns where the check cannot tell it is passed on every run"
-        let launches = (1...3).map { "line \($0): a launch over a folder \(unreadable)" }
+        let launches = (1...4).map { "line \($0): a launch over a folder \(unreadable)" }
 
         #expect(FixtureLaunches(conditional).problems() == launches)
         #expect(FixtureLaunches(filtered).problems() == [

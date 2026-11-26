@@ -5,9 +5,10 @@ import Foundation
 /// A launch is a statement that adds to `launchArguments` (`+=`, `=`, `append`, `insert`): from that word to the end of its
 /// expression, which may run over several lines. An argument of a fixture folder (`-PrestoCVNextEmptyStorage`,
 /// `-PrestoCVNextStorage`) is read where it is written:
-/// - in a launch, which then passes `-PrestoCVNextReadyDesigns` as well, on every run: as an argument of its own, right in
-///   the launch or in an array the launch adds as a whole, and not under a condition (`ready ? […] : []`, `?? […]`) or
-///   inside a call or a bracket the check cannot read (`[…].filter { … }`);
+/// - in a launch, which then passes `-PrestoCVNextReadyDesigns` as well, on every run: as the whole argument it appends or
+///   inserts, or as an element of its own in an array the launch adds as a whole, and not under a condition
+///   (`ready ? […] : []`, `?? […]`), joined to another string (`… + "-PrestoCVNextReadyDesigns"`) or inside a call or a
+///   bracket the check cannot read (`[…].filter { … }`);
 /// - in a value of the file (`let storage = [...]`, or a parameter's default), which the check follows by its name, value
 ///   by value: into the launches that name it, into the values it goes into (`let copied = storage`, `all = storage + […]`,
 ///   `arguments.append(contentsOf: storage)`) and into the parameters it is passed to (`launch(storage: storage)`); every
@@ -212,7 +213,8 @@ struct FixtureLaunches {
     }
 
     /// Whether the argument written at `literal` is passed on every run of the launch: the launch's expression has no
-    /// condition outside brackets, and the argument is one of its operands, or an element of an array that is one
+    /// condition outside brackets, and the argument is the whole of it, or an element of its own in an array that is one
+    /// of its operands. A string is never an operand of `+`, which would join it to another string into one argument
     private func isUnconditional(_ literal: Int, in launch: Range<Int>) -> Bool {
         let word = launch.lowerBound + "launchArguments".unicodeScalars.count
         guard let start = Self.operatorEnd(in: skeleton, after: word) else { return false }
@@ -220,12 +222,19 @@ struct FixtureLaunches {
         guard !body.contains(where: { skeleton[$0] == "?" && openers(from: start, to: $0).isEmpty }) else { return false }
         let end = literal + Self.literal(Self.readyDesigns).unicodeScalars.count
         let open = openers(from: start, to: literal)
-        if open.isEmpty { return isOperand(from: literal, to: end, of: body) }
+        if open.isEmpty { return isWhole(from: literal, to: end, of: body) }
         guard open.count == 1, skeleton[open[0]] == "[", let close = Self.closer(of: open[0], in: skeleton),
             let before = previousNonBlank(before: literal), let after = nextNonBlank(from: end)
         else { return false }
         return (skeleton[before] == "[" || skeleton[before] == ",") && (skeleton[after] == "," || skeleton[after] == "]")
             && isOperand(from: open[0], to: close + 1, of: body)
+    }
+
+    /// Whether the text from `start` to `end` is the whole of the launch's expression `body`
+    private func isWhole(from start: Int, to end: Int, of body: Range<Int>) -> Bool {
+        let opens = previousNonBlank(before: start).map { $0 < body.lowerBound } ?? true
+        let closes = nextNonBlank(from: end).map { $0 >= body.upperBound } ?? true
+        return opens && closes
     }
 
     /// Whether the text from `start` to `end` is an operand of its own in the launch's expression `body`: the whole of it,
