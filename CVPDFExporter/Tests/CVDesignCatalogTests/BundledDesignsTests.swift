@@ -3,9 +3,9 @@ import Foundation
 @testable import CVDesignCatalog
 import CVBundledDesigns
 
-/// The designs the package ships are written against markup contract 1 (#3, ADR 0011): they pass the same validator an
+/// The designs the package ships are written against the current markup contract (#3, ADR 0011): they pass the same validator an
 /// installed design does, and they style the classes the renderer emits.
-@Suite("The bundled designs follow markup contract 1 (#3)")
+@Suite("The bundled designs follow the current markup contract (#3)")
 struct BundledDesignsTests {
     static let ids = ["minimal", "modern", "professional"]
     /// The classes every design must style: without them a design prints as a plain page (the symptom of #3).

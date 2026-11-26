@@ -202,6 +202,302 @@ struct EntryReaderTests {
         #expect(found.cv.experience.map { $0.employer?.value } == ["Klinikum Beispiel", "Restaurante Ejemplo"])
     }
 
+    @Test("A weak connector inside a title is no connector when the entry has an employer line", arguments: [
+        ("Teacher for Special Needs", "Northgate Academy, Leeds"),
+        ("Lehrer für Grundschule", "Schule Beispiel, Leeds"),
+        ("Responsabile per le vendite", "Verdi Ltd, Roma"),
+        ("Profesor para adultos", "Escuela Ejemplo, Madrid"),
+    ])
+    func weakConnectorInATitle(title: String, employerLine: String) {
+        let found = read("""
+        Experience
+        \(title)
+        \(employerLine)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [title])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employerLine.components(separatedBy: ", ")[0]])
+    }
+
+    @Test("An employer line that holds a city name is still an employer: the title stays whole")
+    func weakConnectorBesideACityNamedEmployer() {
+        let found = read("""
+        Experience
+        Lehrer für Grundschule
+        Freie Schule Frankfurt
+        08/2021 – 02/2025
+        Frankfurt am Main
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Lehrer für Grundschule"])
+        #expect(found.cv.experience.map { $0.employer?.value } != ["Grundschule"])
+    }
+
+    @Test("A weak connector is a connector when the line is all the entry has", arguments: [
+        ("Developer for Acme Ltd", "Developer", "Acme Ltd"),
+        ("Entwickler für Beispiel GmbH", "Entwickler", "Beispiel GmbH"),
+        ("Venditore per Verdi Srl", "Venditore", "Verdi Srl"),
+    ])
+    func weakConnectorAsConnector(line: String, role: String, employer: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+    }
+
+    @Test("A weak connector inside a title stays in the title when the employer comes after a comma on the same line", arguments: [
+        ("Teacher for Special Needs, Acme Ltd, Leeds", "Teacher for Special Needs"),
+        ("Lehrer für Grundschule, Beispiel GmbH, Leeds", "Lehrer für Grundschule"),
+        ("Responsabile per le vendite, Verdi Srl, Roma", "Responsabile per le vendite"),
+        ("Profesor para adultos, Escuela Ejemplo S.L., Madrid", "Profesor para adultos"),
+    ])
+    func weakConnectorInATitleBeforeCommas(line: String, title: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        let parts = line.components(separatedBy: ", ")
+        #expect(found.cv.experience.map { $0.role?.value } == [title])
+        #expect(found.cv.experience.map { $0.employer?.value } == [parts[1]])
+        #expect(found.cv.experience.map { $0.location?.value } == [parts[2]])
+    }
+
+    @Test("A place does not turn a real weak connector off: on the same line, on its own line, in another table cell", arguments: [
+        "Developer for Acme Ltd | Leeds",
+        "Developer for Acme Ltd, Leeds",
+        "Developer for Acme Ltd\nLeeds",
+        "Developer for Acme Ltd\t\tLeeds",
+    ])
+    func weakConnectorWithAPlace(line: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Developer"])
+        #expect(found.cv.experience.map { $0.employer?.value } == ["Acme Ltd"])
+        #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"])
+    }
+
+    @Test("An organisation word followed by a lowercase word is no employer name: the title stays whole beside a short employer", arguments: [
+        "Lead for Systems integration", "Leiter für Klinikum logistik", "Responsabile per Studio vendite",
+    ])
+    func weakConnectorBesideAnOrganisationWordAndALowercaseWord(title: String) {
+        for layout in ["\(title)\nAcme", "\(title), Acme", "\(title)\t\tAcme", "\(title) | Acme"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector before a name of capitalised words keeps the short part a place", arguments: [
+        ("Engineer at Northwind | Berlin", "Engineer", "Northwind", "Berlin"),
+        ("Developer for Acme Ltd | Leeds", "Developer", "Acme Ltd", "Leeds"),
+        ("Leiter für Klinikum Beispiel | Berlin", "Leiter", "Klinikum Beispiel", "Berlin"),
+    ])
+    func weakConnectorBeforeCapitalisedWords(line: String, role: String, employer: String, place: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [place])
+    }
+
+    @Test("A weak connector inside a title stays whole beside an employer no list knows, in every layout", arguments: [
+        "Teacher for Special Needs", "Lehrer für Grundschule", "Responsabile per le vendite", "Profesor para adultos",
+    ])
+    func weakConnectorBesideAnUnknownEmployer(title: String) {
+        let layouts: [(text: String, place: String?)] = [
+            ("\(title)\nAcme", nil), ("\(title), Acme", nil), ("\(title)\t\tAcme", nil), ("\(title) | Acme", nil),
+            ("\(title), Acme, Leeds", "Leeds"), ("\(title) | Acme | Leeds", "Leeds"), ("\(title)\nAcme, Leeds", "Leeds"),
+        ]
+        for layout in layouts {
+            let found = read("""
+            Experience
+            \(layout.text)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.location?.value } == [layout.place], "\(layout.text)")
+        }
+    }
+
+    @Test("A lowercase linking particle inside a capitalised employer name keeps the name whole beside an unknown city, in every layout", arguments: [
+        ("Developer", "Bank of Scotland"), ("Sviluppatore", "Cassa di Risparmio"), ("Conseiller", "Caisse d'Épargne"),
+        ("Desenvolvedor", "Banco do Brasil"), ("Entwickler", "Institut für Informatik"), ("Analyst", "Banco de España"),
+    ])
+    func weakConnectorBeforeAnEmployerWithAParticle(role: String, employer: String) {
+        let connector = role == "Entwickler" ? "für" : "for"
+        for layout in ["\(role) \(connector) \(employer)\nLeeds", "\(role) \(connector) \(employer), Leeds",
+                       "\(role) \(connector) \(employer)\t\tLeeds", "\(role) \(connector) \(employer) | Leeds"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == ["Leeds"], "\(layout)")
+        }
+    }
+
+    @Test("A functional title whose tail only reads as a name through a particle stays whole beside a short employer, in every layout", arguments: [
+        "Manager for Systems and Integration", "Lead for Research and Development",
+    ])
+    func weakConnectorBeforeAParticleTailBesideAShortEmployer(title: String) {
+        for layout in ["\(title)\nAcme", "\(title), Acme", "\(title)\t\tAcme", "\(title) | Acme"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [nil], "\(layout)")
+            #expect(found.cv.experience.map(\.check) == [.roleOrEmployerByOrder], "\(layout)")
+        }
+    }
+
+    @Test("A generic particle tail with no competing employer still splits at the weak connector, and the person checks it", arguments: [
+        ("Developer for Systems and Services", "Developer", "Systems and Services"),
+        ("Entwickler für Logistik und Bau", "Entwickler", "Logistik und Bau"),
+    ])
+    func weakConnectorBeforeAParticleTailWithoutACompetingEmployer(title: String, role: String, employer: String) {
+        // Split rather than merge: the words after the connector may be a real employer without a legal form, so they are kept as the
+        // employer and the entry is flagged; the whole text is never hidden inside the role.
+        let found = read("""
+        Experience
+        \(title)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [nil])
+        #expect(found.cv.experience.map(\.check) != [nil])
+        // A known place beside it stays a place, and the split stays flagged.
+        for layout in ["\(title)\nBerlin", "\(title), Berlin", "\(title)\t\tBerlin", "\(title) | Berlin"] {
+            let beside = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(beside.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(beside.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(beside.cv.experience.map { $0.location?.value } == ["Berlin"], "\(layout)")
+            #expect(beside.cv.experience.map(\.check) != [nil], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector in a title with organisation vocabulary stays whole beside an employer of four unknown words", arguments: [
+        ("Lead for Systems", "Example North South West"), ("Leiter für Logistik", "Beispiel Nord Süd West"),
+        ("Responsabile per la logistica", "Esempio Nord Sud Ovest"), ("Jefe para Logística", "Ejemplo Norte Sur Oeste"),
+    ])
+    func weakConnectorWithOrganisationWordBesideALongUnknownEmployer(title: String, employer: String) {
+        for layout in ["\(title)\n\(employer)", "\(title), \(employer)", "\(title)\t\t\(employer)", "\(title) | \(employer)"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [nil], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector in a title with organisation vocabulary stays whole beside a short unknown employer", arguments: [
+        "Lead for Systems", "Leiter für Logistik", "Responsabile per la logistica", "Jefe para Logística",
+    ])
+    func weakConnectorWithOrganisationWordBesideAShortUnknownEmployer(title: String) {
+        let layouts: [(text: String, place: String?)] = [
+            ("\(title)\nAcme", nil), ("\(title), Acme", nil), ("\(title)\t\tAcme", nil), ("\(title) | Acme", nil),
+            ("\(title), Acme, Leeds", "Leeds"), ("\(title) | Acme | Leeds", "Leeds"),
+        ]
+        for layout in layouts {
+            let found = read("""
+            Experience
+            \(layout.text)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [title], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.employer?.value } == ["Acme"], "\(layout.text)")
+            #expect(found.cv.experience.map { $0.location?.value } == [layout.place], "\(layout.text)")
+        }
+    }
+
+    @Test("A recognised place beside a title with organisation vocabulary stays a place", arguments: [
+        "Lead for Systems", "Leiter für Logistik",
+    ])
+    func weakConnectorWithOrganisationWordBesideAPlace(title: String) {
+        for layout in ["\(title) | Berlin", "\(title), Berlin", "\(title)\t\tBerlin", "\(title)\nBerlin"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.employer?.value } != ["Berlin"], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == ["Berlin"], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector with nothing else to hold the employer keeps the title whole")
+    func weakConnectorAlone() {
+        let found = read("""
+        Experience
+        Developer for Acme
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == ["Developer for Acme"])
+        #expect(found.cv.experience.map { $0.employer?.value } == [nil])
+        #expect(found.cv.experience.map { $0.location?.value } == [nil])
+    }
+
+    @Test("A weak connector before an organisation splits beside a postal-code place", arguments: [
+        ("Entwickler", "für", "Beispiel GmbH", "10115 Berlin"), ("Sviluppatore", "per", "Esempio Srl", "00184 Roma"),
+        ("Desarrollador", "para", "Ejemplo S.L.", "28013 Madrid"),
+    ])
+    func weakConnectorBesideAPostalCodePlace(role: String, connector: String, employer: String, place: String) {
+        let title = "\(role) \(connector) \(employer)"
+        for layout in ["\(title), \(place)", "\(title)\n\(place)", "\(title)\t\t\(place)", "\(title) | \(place)"] {
+            let found = read("""
+            Experience
+            \(layout)
+            2019 – 2022
+            """)
+            #expect(found.cv.experience.map { $0.role?.value } == [role], "\(layout)")
+            #expect(found.cv.experience.map { $0.employer?.value } == [employer], "\(layout)")
+            #expect(found.cv.experience.map { $0.location?.value } == [place], "\(layout)")
+        }
+    }
+
+    @Test("A weak connector before an organisation reads as a connector, with a place after a comma", arguments: [
+        ("Developer for Acme Ltd, Leeds", "Developer", "Acme Ltd", "Leeds"),
+        ("Entwickler für Beispiel GmbH, Berlin", "Entwickler", "Beispiel GmbH", "Berlin"),
+        ("Venditore per Verdi Srl, Roma", "Venditore", "Verdi Srl", "Roma"),
+        ("Profesor para Escuela Ejemplo S.L., Madrid", "Profesor", "Escuela Ejemplo S.L.", "Madrid"),
+    ])
+    func weakConnectorBeforeAnOrganisationWithAPlace(line: String, role: String, employer: String, place: String) {
+        let found = read("""
+        Experience
+        \(line)
+        2019 – 2022
+        """)
+        #expect(found.cv.experience.map { $0.role?.value } == [role])
+        #expect(found.cv.experience.map { $0.employer?.value } == [employer])
+        #expect(found.cv.experience.map { $0.location?.value } == [place])
+    }
+
     @Test("Parts no word marks follow the section's own order, and the entry is flagged")
     func orderFallback() throws {
         let found = read("""
