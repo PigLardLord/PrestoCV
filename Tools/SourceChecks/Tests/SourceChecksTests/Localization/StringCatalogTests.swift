@@ -24,16 +24,20 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
         folders: ["PrestoCVNext"], rules: StringRules(
             // A format that carries only the order of its values and the punctuation, which a translation may still change.
             sameInEveryLanguage: ["shell.numbered %@ %lld"],
-            // German writes "Website" and "Link" as English does, Italian "Link", and French "Description" and "Certification".
+            // German writes "Website" and "Link" as English does, Italian and Portuguese "Link", and French "Description" and
+            // "Certification". German also names the website a CV of the released app lost "Website".
             // Spanish, French and Italian say "CV" as English does; French counts pages with the English word. German names
-            // the designs "Minimal" and "Modern" and the fonts "System" as English does. German, French and Italian say
-            // "Build", German and French "Version", German "Support", French "Licences", and French and Italian "Open source".
+            // the designs "Minimal" and "Modern" and the fonts "System" as English does. An alert's "OK" reads the same in all
+            // but Spanish. German, French and Italian say "Build", German and French "Version", German "Support", French
+            // "Licences", and French and Italian "Open source".
             sameInSomeLanguages: [
-                "editor.field.website": ["de"], "editor.field.link": ["de", "it"], "editor.field.description": ["fr"],
+                "editor.field.website": ["de"], "editor.field.link": ["de", "it", "pt"], "editor.field.description": ["fr"],
                 "editor.field.certification": ["fr"], "editor.section.certifications": ["fr"],
                 "export.file_name": ["es", "fr", "it"], "export.pages %lld": ["fr"],
-                "editor.entry.title.certification": ["fr"],
+                "editor.entry.title.certification": ["fr"], "import.review.field.certification %lld": ["fr"],
                 "design.minimal": ["de"], "design.modern": ["de"], "fonts.system": ["de"],
+                "import.error.ok": ["de", "fr", "it", "pt"],
+                "legacyImport.detail.website": ["de"],
                 "settings.about.build": ["de", "fr", "it"], "settings.about.version": ["de", "fr"],
                 "settings.support.header": ["de"], "settings.licences.title": ["fr"], "settings.openSource.licences": ["fr"],
                 "settings.openSource.header": ["fr", "it"],
@@ -78,6 +82,24 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                     ["%@"], "SettingsViewModel's supportAddress is a String"),
                 #"editor.level \(level) \(EditorChoices.skillLevels.count)"#: ValueTypes(
                     ["%lld", "%lld"], "a skill level and the number of levels are Ints"),
+                #"import.review.field.experience \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.experiencePeriod \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.education \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.educationPeriod \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.educationLocation \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.review.field.certification \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
+                #"legacyImport.row.label \(name) \(details)"#: ValueTypes(
+                    ["%@", "%@"], "a row's label and its details as a list are Strings"),
+                #"legacyImport.row.toCheck \(name) \(details)"#: ValueTypes(
+                    ["%@", "%@"], "a row's label and its details as a list are Strings"),
+                #"legacyImport.result.kept \(count)"#: ValueTypes(["%lld"], "LegacyReportState.keptSome holds an Int"),
+                #"legacyImport.failed.count \(report.notImportedTotal)"#: ValueTypes(["%lld"], "notImportedTotal is an Int"),
+                #"legacyImport.failed.damaged \(line.count)"#: ValueTypes(["%lld"], "NotImportedCount's count is an Int"),
+                #"legacyImport.failed.notSaved \(line.count)"#: ValueTypes(["%lld"], "NotImportedCount's count is an Int"),
             ],
             // The design system's views take a key, as does the bar's BarButtonLabel; the screens hand one to
             // ErrorStateView as title:, message:, code: and retryTitle:.

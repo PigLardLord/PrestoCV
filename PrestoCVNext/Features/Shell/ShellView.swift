@@ -1,18 +1,21 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it shows
-/// one column at a time, the list first. A first run shows the welcome in its place until a draft is open. The models decide
-/// what is open, which column shows, whether the welcome shows and whether the open CV may be left; this view binds to
-/// them. It shows the export of the open CV in a sheet while the shell holds one. It tells the shell when the scene stops
-/// being active, which stores the open CV at once on its way to the background. The gear in the sidebar's bar opens
-/// Settings in a sheet.
+/// The frame of the app: the list of CVs in the first column and the open CV in the detail. On a compact screen it
+/// shows one column at a time, the list first. A first run shows the welcome in its place until a draft or the import
+/// is open. The models decide what is open, which column shows, whether the welcome shows and whether the open CV may
+/// be left; this view binds to them. It shows the export of the open CV in a sheet while the shell holds one. It tells
+/// the shell when the scene stops being active, which stores the open CV at once on its way to the background. Over the
+/// list it shows what the import of the released app's CVs left out, while the report's model presents it. The gear in
+/// the sidebar's bar opens Settings in a sheet.
 struct ShellView: View {
     let shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
+    let report: LegacyImportReportViewModel
     let settings: SettingsViewModel
     let licences: LicencesViewModel
+    let diagnostics: DiagnosticsViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     @State private var addingCV = false
@@ -23,6 +26,7 @@ struct ShellView: View {
     var body: some View {
         screen
             .task { await firstRun.load() }
+            .task { await report.load() }
             .onChange(of: scenePhase) { _, phase in shell.sceneChanged(isActive: phase == .active) }
     }
 
@@ -41,7 +45,7 @@ struct ShellView: View {
     private var split: some View {
         NavigationSplitView(preferredCompactColumn: column) {
             CVListView(
-                list: list, firstRun: firstRun, selection: selection, choose: start,
+                list: list, report: report, firstRun: firstRun, selection: selection, choose: start,
                 kept: list.keptNotices(shell.keptEditors),
                 retryKept: { id in Task { await shell.retryKept(id) } },
                 openKept: { id in _ = shell.openKept(id) }
@@ -71,11 +75,26 @@ struct ShellView: View {
             }
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(settings: settings, licences: licences)
+            SettingsView(settings: settings, licences: licences, diagnostics: diagnostics)
         }
         .sheet(item: exportSheet) { sheet in
             ExportSheetView(sheet: sheet, close: { shell.closeExport() })
         }
+        .sheet(isPresented: reportShown) {
+            LegacyImportReportView(report: report)
+        }
+        // Here and not in the sheet, which has closed by the time the old copies are all removed
+        .announce(report.state) { LegacyImportReportView.announcement(of: $0) }
+    }
+
+    /// The import report while its model presents it. A swipe down closes it as Not now does; it never confirms.
+    private var reportShown: Binding<Bool> {
+        Binding(
+            get: { report.isPresented },
+            set: { shown in
+                if !shown { report.close() }
+            }
+        )
     }
 
     /// The export sheet of the open CV. A swipe down closes it as Close does, which stops an export that runs.
@@ -88,16 +107,37 @@ struct ShellView: View {
         )
     }
 
-    /// The open CV's editor, a new one for each CV opened, at the root of the detail's stack, so the page of a row opens
-    /// on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person answers
-    /// the status first: the notice above the form offers the ways out, and "Discard" closes the editor without storing
-    /// its text.
+    /// The review's sheet while it is open. A swipe down closes it as Done does; it closes too when the review goes, with
+    /// the editor.
+    private var reviewSheet: Binding<ImportReviewViewModel?> {
+        Binding(
+            get: { shell.reviewSheet },
+            set: { review in
+                if review == nil { shell.review?.closeSheet() }
+            }
+        )
+    }
+
+    /// The open CV's editor, a new one for each CV opened, at the root of the detail's stack, so the page of a row
+    /// opens on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person
+    /// answers the status first: the notice above the form offers the ways out, and "Discard" closes the editor without
+    /// storing its text. The draft of an import shows its review, and the review's sheet opens over the editor, not
+    /// over the split, where the export sheet is. In its place, the import while the shell holds one; the shell hears of each change of its
+    /// status, and opens the draft of an import that is ready.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor), export: { shell.openExport() }, discard: { shell.discardEditor() })
+            EditorView(editor: editor, title: title(of: editor), review: shell.review, export: { shell.openExport() },
+                       discard: { shell.discardEditor() })
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
+                .sheet(item: reviewSheet) { review in
+                    ImportReviewSheet(review: review)
+                }
+        } else if let importer = shell.importer {
+            ImportView(importer: importer)
+                .id(ObjectIdentifier(importer))
+                .onChange(of: importer.status) { shell.importStatusChanged() }
         } else {
             DetailPlaceholderView()
         }
@@ -114,12 +154,9 @@ struct ShellView: View {
         }
     }
 
-    /// Opens the draft a way to start gives. The factory does not offer the import while the app has no import screen,
-    /// so every choice gives a draft.
+    /// Goes where a way to start leads: the draft it gives, or the import.
     private func start(_ choice: StartChoice) {
-        if case .draft(let draft)? = firstRun.start(choice) {
-            shell.open(.draft(draft))
-        }
+        shell.start(at: firstRun.start(choice))
     }
 
     private func startChosenInSheet() {

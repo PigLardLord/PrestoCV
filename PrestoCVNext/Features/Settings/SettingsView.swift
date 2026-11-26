@@ -2,12 +2,13 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// The Settings sheet: the groups and rows the model gives, in its order. A link row leaves the app for the system's
-/// handler, Licences opens inside the sheet, and the values can be selected to quote them. It holds nothing to lose, so
+/// handler, Licences and Diagnostics open inside the sheet, and the values can be selected to quote them. It holds nothing to lose, so
 /// Done and a swipe down close it alike. It reads the notices when it opens, so the Licences screen keeps them while a
 /// notice is open.
 struct SettingsView: View {
     let settings: SettingsViewModel
     let licences: LicencesViewModel
+    let diagnostics: DiagnosticsViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -34,6 +35,7 @@ struct SettingsView: View {
             }
         }
         .task { await licences.load() }
+        .task { await settings.appear() }
         .presentationSizing(.form)
     }
 
@@ -43,6 +45,7 @@ struct SettingsView: View {
         case .legal: Text("settings.legal.header")
         case .openSource: Text("settings.openSource.header")
         case .about: Text("settings.about.header \(settings.appName)")
+        case .diagnostics: Text("diagnostics.group.header")
         }
     }
 
@@ -54,7 +57,7 @@ struct SettingsView: View {
             Text("settings.support.footer \(settings.supportAddress)")
                 .textSelection(.enabled)
                 .accessibilityIdentifier("settings.support.footer")
-        case .legal, .openSource, .about:
+        case .legal, .openSource, .about, .diagnostics:
             EmptyView()
         }
     }
@@ -74,6 +77,10 @@ struct SettingsView: View {
         case .licences:
             NavigationLink { LicencesView(licences: licences) } label: { Text("settings.openSource.licences") }
                 .accessibilityIdentifier("settings.licences")
+        case .diagnostics:
+            NavigationLink { DiagnosticsView(diagnostics: diagnostics) } label: { Text("diagnostics.title") }
+                .accessibilityHint(Text("diagnostics.entry.hint"))
+                .accessibilityIdentifier("settings.diagnostics")
         case .sourceCode(let page):
             LinkRow("settings.openSource.source", hint: "settings.openSource.source.hint", destination: page)
                 .accessibilityIdentifier("settings.source")

@@ -23,6 +23,10 @@ struct RawLine: Equatable {
     var firstCellBold = false
     var firstWordWidth: Double?
     var columnRight: Double?
+    /// In a PDF: where the main text of each of the line's cells starts, and its size, in order, or nil for a cell that
+    /// tells neither. Unlike the line's box and largest size, they are the cell's own: a date beside it in a larger size
+    /// changes neither, nor does a small marker in it.
+    var cellLooks: [SourceBlock.CellLook?] = []
 
     init(text: String, page: Int? = nil, frame: Rect? = nil, column: Int? = nil,
          isEmphasized: Bool = false, followsGap: Bool = false, textStart: Double? = nil, fontSize: Double? = nil) {
@@ -85,6 +89,7 @@ enum DocumentBuilder {
         var lastCellX: Double?
         var lastCellBold: Bool
         var columnRight: Double?
+        var firstCellLook: SourceBlock.CellLook?
     }
 
     static func build(lines: [RawLine], format: SourceFormat) -> (SourceDocument, [LeftOutText]) {
@@ -133,7 +138,10 @@ enum DocumentBuilder {
                 cells: line.cells, kind: kind, isEmphasized: line.isBold || raw.isEmphasized, followsGap: followsGap,
                 lineEnd: line.lineEnd, page: raw.page, frame: raw.frame, column: raw.column,
                 textStart: raw.textStart, fontSize: raw.fontSize, lastCellX: raw.lastCellX, lastCellBold: raw.lastCellBold,
-                columnRight: raw.columnRight
+                columnRight: raw.columnRight,
+                // Only when the PDF's cells are the line's cells one by one is the PDF's first cell the line's first: a
+                // cell left out as noise, an icon's glyph, shifts them
+                firstCellLook: raw.cellLooks.count == line.cells.count ? raw.cellLooks.first ?? nil : nil
             ))
         }
         return (layOut(pending, format: format), leftOut)
@@ -194,6 +202,11 @@ enum DocumentBuilder {
         }
         block.cells[block.cells.count - 1] = joined
         block.lineEnd = line.lineEnd
+        // With one cell, the line joins the block's first cell: its main text keeps its size only when the line is one
+        // cell in that size too; otherwise the cell holds its text in two sizes, and tells neither
+        if block.cells.count == 1, raw.cellLooks.count != 1 || raw.cellLooks[0]?.fontSize != block.firstCellLook?.fontSize {
+            block.firstCellLook = nil
+        }
         // The block's frame ends where its last line ends, so a wrapped line is told from the line it wrapped
         if let frame = raw.frame, let old = block.frame {
             let united = old.union(frame)
@@ -272,7 +285,8 @@ enum DocumentBuilder {
             }
             blocks.append(SourceBlock(
                 index: index, span: SourceSpan(start, offset), cells: cells, kind: block.kind, isEmphasized: block.isEmphasized,
-                followsGap: block.followsGap, page: block.page, frame: block.frame, column: block.column, fontSize: block.fontSize
+                followsGap: block.followsGap, page: block.page, frame: block.frame, column: block.column, fontSize: block.fontSize,
+                firstCellLook: block.firstCellLook
             ))
         }
         return SourceDocument(format: format, text: String(text), blocks: blocks)

@@ -516,6 +516,14 @@
   "source": "traps/bars-it.txt"
  },
  {
+  "id": "traps/certifications-en",
+  "language": "en",
+  "form": "trap",
+  "kind": "text",
+  "expected": "traps/certifications-en.expected.json",
+  "source": "traps/certifications-en.txt"
+ },
+ {
   "id": "traps/colon-dates-fr",
   "language": "fr",
   "form": "trap",

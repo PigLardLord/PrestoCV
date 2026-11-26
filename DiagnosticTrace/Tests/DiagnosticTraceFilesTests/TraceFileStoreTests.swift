@@ -156,6 +156,39 @@ struct TraceFileStoreTests {
         #expect(place.names().count == 2)
     }
 
+    @Test("Each holder's copies are in a folder of their own: one holder's copies and discard never touch another's")
+    func holdersKeepTheirOwnCopies() async throws {
+        let place = try ScratchFolder()
+        let store = place.store()
+        let first = TraceRun.stored(day: 1, outcome: .finished)
+        let second = TraceRun.stored(day: 2, outcome: .finished)
+        store.save(first)
+        store.save(second)
+        await store.flush()
+        let window = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+        let otherWindow = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2))
+
+        let kept = try await store.shareCopies(of: first.id, for: window)
+        _ = try await store.shareCopies(of: second.id, for: otherWindow)
+        let replaced = try await store.shareCopies(of: first.id, for: otherWindow)
+        _ = try await store.shareCopies(of: second.id)
+
+        #expect(kept.map(\.lastPathComponent) == [first.fileStem + ".json", first.fileStem + ".txt"])
+        #expect(Set(kept).isDisjoint(with: replaced), "The same run copied for two holders is two sets of files")
+        #expect(kept.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }, "Another holder's copy leaves these")
+
+        await store.discardCopies(for: otherWindow)
+        await store.discardCopies()
+
+        #expect(kept.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }, "Another holder's discard leaves these")
+        #expect(try Data(contentsOf: kept[0]) == first.document())
+        #expect(!replaced.contains { FileManager.default.fileExists(atPath: $0.path) })
+
+        await store.discardCopies(for: window)
+
+        #expect(place.shareFiles().isEmpty)
+    }
+
     @Test("Sharing a run that is not stored throws a typed error")
     func shareMissingRun() async throws {
         let place = try ScratchFolder()
@@ -199,9 +232,14 @@ struct TraceFileStoreTests {
         store.save(run)
         await store.flush()
 
-        _ = try await store.shareCopies(of: run.id)
+        let single = try await store.shareCopies(of: run.id)
+        let held = try await store.shareCopies(of: run.id, for: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)))
 
         #expect(spy.calls.map(\.folder.path).contains(place.share.path))
+        for copies in [single, held] {
+            let folder = copies[0].deletingLastPathComponent().path
+            #expect(spy.calls.first { $0.folder.path == folder }?.contents == [], "The set's folder was empty when it was protected")
+        }
     }
 
     @Test("A share that cannot be protected leaves no copy behind")
@@ -213,15 +251,20 @@ struct TraceFileStoreTests {
         await store.flush()
 
         await #expect(throws: TraceStoreError.share) { try await store.shareCopies(of: run.id) }
+        await #expect(throws: TraceStoreError.share) {
+            try await store.shareCopies(of: run.id, for: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)))
+        }
 
-        #expect(!FileManager.default.fileExists(atPath: place.share.path))
+        #expect(place.shareFiles().isEmpty)
     }
 
-    @Test("Copies left by an earlier launch are removed when the store starts, and a gate that stays closed still has it")
+    @Test("Copies left by an earlier launch, every holder's, are removed when the store starts, and a gate that stays closed still has it")
     func staleCopiesAreRemovedAtLaunch() async throws {
         let place = try ScratchFolder()
-        try FileManager.default.createDirectory(at: place.share, withIntermediateDirectories: true)
+        let held = place.share.appendingPathComponent(UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)).uuidString)
+        try FileManager.default.createDirectory(at: held, withIntermediateDirectories: true)
         try Data("old".utf8).write(to: place.share.appendingPathComponent("run-old.json"))
+        try Data("old".utf8).write(to: held.appendingPathComponent("run-old.json"))
 
         let store = place.store()
         await store.flush()
@@ -246,7 +289,7 @@ struct TraceFileStoreTests {
         #expect(events.map(\.line) == ["between the two runs"])
     }
 
-    @Test("Purging removes the stored runs, the session events and the copies, and drops what was saved and not written")
+    @Test("Purging removes the stored runs, the session events and every holder's copies, and drops what was saved and not written")
     func purge() async throws {
         let place = try ScratchFolder()
         let store = place.store()
@@ -255,6 +298,7 @@ struct TraceFileStoreTests {
         store.save(sessionEvent: .stored(line: "event"))
         await store.flush()
         _ = try await store.shareCopies(of: run.id)
+        _ = try await store.shareCopies(of: run.id, for: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)))
         store.save(TraceRun.stored(day: 2, outcome: .finished))
 
         await store.purge()
@@ -320,6 +364,15 @@ private final class ScratchFolder {
     /// The names of the files in the store's folder, sorted.
     func names() -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: diagnostics.path)) ?? []).sorted()
+    }
+
+    /// The names of the files in the folder of the copies, in every set, sorted.
+    func shareFiles() -> [String] {
+        let found = FileManager.default.enumerator(at: share, includingPropertiesForKeys: [.isRegularFileKey])?.allObjects ?? []
+        return found.compactMap { $0 as? URL }
+            .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
+            .map(\.lastPathComponent)
+            .sorted()
     }
 }
 

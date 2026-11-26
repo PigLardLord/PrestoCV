@@ -48,10 +48,12 @@ struct TraceOnFailureTests {
             prepare: {},
             wrapListEditing: { $0 },
             wrapStore: { $0 },
+            wrapImport: { $0 },
             backgroundTime: NoBackgroundTime(),
             appLanguage: .preferred(["en"]),
             sharesWithStandIn: false,
             legacyStore: EmptyLegacyStore(),
+            legacyLeftovers: { _ in NoLeftovers() },
             settings: CompositionTests.settings
         )
     }
