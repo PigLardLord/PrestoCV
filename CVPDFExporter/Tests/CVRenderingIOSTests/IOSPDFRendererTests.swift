@@ -7,7 +7,7 @@ import WebKit
 import CVRendering
 @testable import CVRenderingIOS
 import CVRenderingWebKitSupport
-import CVRenderingPDFKitInspector
+@testable import CVRenderingPDFKitInspector
 import CVRenderingTestSupport
 import CVRenderingNativeTestSupport
 
@@ -178,6 +178,14 @@ extension IOSPDFRendererTests {
     struct Geometry {
         @Test("no violation for the fixture")
         func fixture() async throws { try await IOSPDFRendererTests.checks().fixtureGeometry() }
+
+        @Test("#562 · every line of a bundled design is sized from the page's content, as PDFKit's fonts size it",
+              arguments: ["minimal", "modern", "professional"])
+        func glyphHeights(design: String) async throws {
+            let pdf = try await IOSPDFRendererTests.checks().glyphHeightsAgreeWithPDFKit(design: design)
+            let reading = try #require(PDFKitInspector().reading(of: pdf))
+            #expect(reading.linesSizedByAttributedText == 0, "\(reading.linesSizedByAttributedText) lines sized by PDFKit's fonts")
+        }
     }
 
     @MainActor

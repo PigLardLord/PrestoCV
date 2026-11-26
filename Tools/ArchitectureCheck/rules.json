@@ -533,6 +533,7 @@
     "PDFKit",
     "AppKit",
     "UIKit",
+    "CoreGraphics",
     "Foundation"
    ],
    "rules": [
@@ -570,6 +571,8 @@
     "CVDesignCatalog",
     "CVBundledHeadings",
     "CVBundledDesigns",
+    "AppKit",
+    "UIKit",
     "CoreGraphics",
     "CoreText",
     "Foundation",

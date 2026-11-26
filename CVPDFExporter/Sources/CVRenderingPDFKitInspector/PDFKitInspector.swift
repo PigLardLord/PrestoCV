@@ -17,8 +17,11 @@ private typealias PlatformFont = UIFont
 /// A page's box is its crop box, the part a viewer shows (PDFKit gives the media box when the page has no crop box, and
 /// clips a crop box to the media box). A line's box is in page space (points, the PDF's own coordinates, so a crop box
 /// need not start at the origin), as PDFKit gives it whatever the page's rotation. Text drawn wholly outside the page is not in the page's text at all, so completeness reports it.
-/// A line's glyph height is the smallest font size PDFKit gives for its characters, the page's transform included; a
-/// line with a character that has no font has none, so the geometry check rejects it.
+/// A line's glyph height is the smallest size of the text the page's content shows in the line's box, read from the
+/// content's own text operators: the font size through the text and graphics transforms, forms included. A line with
+/// no such text, or with text whose font the content does not size, takes the smallest font size PDFKit gives for its
+/// characters instead (resolving the fonts that way is slow and verbose for the system font, #562); a line with a
+/// character that has no font then has none, so the geometry check rejects it.
 public struct PDFKitInspector: PDFLayoutInspecting {
     public init() {}
 
@@ -29,23 +32,68 @@ public struct PDFKitInspector: PDFLayoutInspecting {
         return (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }.joined(separator: "\n")
     }
 
-    public func layout(of data: Data) -> PDFLayout? {
+    public func layout(of data: Data) -> PDFLayout? { reading(of: data)?.layout }
+
+    /// What `layout(of:)` reads, and how: the lines sized from PDFKit's font attributes, and the forms the scan of the
+    /// content read.
+    struct Reading {
+        let layout: PDFLayout
+        let linesSizedByAttributedText: Int
+        let formsRead: Int
+    }
+
+    func reading(of data: Data) -> Reading? {
         guard let document = PDFDocument(data: data) else { return nil }
         var pages: [PDFBox] = []
         var lines: [PDFTextLine] = []
+        var sizedByAttributedText = 0
+        var formsRead = 0
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { return nil }
             pages.append(Self.box(page.bounds(for: .cropBox)))
             let characters = page.numberOfCharacters
             guard characters > 0, let selection = page.selection(for: NSRange(location: 0, length: characters)) else { continue }
-            for line in selection.selectionsByLine() {
+            let printed = selection.selectionsByLine().compactMap { line -> (line: PDFSelection, text: String, box: CGRect)? in
                 let text = (line.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { continue }
-                lines.append(PDFTextLine(pageIndex: index, text: text, box: Self.box(line.bounds(for: page)),
-                                         glyphHeight: Self.glyphHeight(of: line.attributedString)))
+                return text.isEmpty ? nil : (line, text, line.bounds(for: page))
+            }
+            let shown = page.pageRef.map(ShownTextScanner.reading(of:)) ?? ShownTextReading()
+            formsRead += shown.formsRead
+            for (line, size) in zip(printed, Self.smallestSizes(of: shown.runs, in: printed.map(\.box))) {
+                var glyphHeight = size
+                if glyphHeight == nil {
+                    glyphHeight = Self.glyphHeight(of: line.line.attributedString)
+                    sizedByAttributedText += 1
+                }
+                lines.append(PDFTextLine(pageIndex: index, text: line.text, box: Self.box(line.box), glyphHeight: glyphHeight))
             }
         }
-        return PDFLayout(pages: pages, lines: lines)
+        return Reading(layout: PDFLayout(pages: pages, lines: lines), linesSizedByAttributedText: sizedByAttributedText,
+                       formsRead: formsRead)
+    }
+
+    /// The smallest size of the runs that start in each box, or nil for a box that no run starts in or that holds a run
+    /// of unknown size. A run starts in the box whose bottom edge lies nearest its baseline, among the boxes it lies in
+    /// vertically (a point of slack on either edge) and starts at most an em, or two points, beside.
+    static func smallestSizes(of runs: [ShownText], in boxes: [CGRect]) -> [Double?] {
+        var smallest = [Double?](repeating: nil, count: boxes.count)
+        var unknown = [Bool](repeating: false, count: boxes.count)
+        for run in runs {
+            var best: (index: Int, cost: Double)?
+            for (index, box) in boxes.enumerated() {
+                let beside = max(0, Double(box.minX) - run.x, run.x - Double(box.maxX))
+                guard beside <= max(2, run.size ?? 0), run.y >= Double(box.minY) - 1, run.y <= Double(box.maxY) + 1 else { continue }
+                let cost = beside + abs(run.y - Double(box.minY))
+                if best.map({ cost < $0.cost }) ?? true { best = (index, cost) }
+            }
+            guard let index = best?.index else { continue }
+            if let size = run.size {
+                smallest[index] = min(smallest[index] ?? size, size)
+            } else {
+                unknown[index] = true
+            }
+        }
+        return zip(smallest, unknown).map { size, isUnknown in isUnknown ? nil : size }
     }
 
     /// The smallest font size in `text`, or nil when `text` is empty or any of its characters has no font.
