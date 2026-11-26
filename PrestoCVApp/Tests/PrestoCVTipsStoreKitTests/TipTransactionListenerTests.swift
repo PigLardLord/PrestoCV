@@ -39,7 +39,7 @@ struct TipTransactionListenerTests {
         listener.start()
         _ = await world.logger.next()
 
-        world.updates.send(verified: verified)
+        world.updates.send(id: 100, verified: verified)
         let entry = await world.logger.next()
 
         #expect(world.finishes.count == 1)
@@ -47,26 +47,43 @@ struct TipTransactionListenerTests {
         #expect(entry?.fields == [.flag("verified", verified)])
     }
 
-    @Test("the same transaction handed over twice is finished twice")
-    func repeatedTransactionsAreFinishedEachTime() async {
+    @Test("the same transaction handed over twice by the updates is finished and logged once")
+    func repeatedUpdateIsFinishedOnce() async {
         let world = World(unfinished: [])
         let listener = world.makeListener()
         listener.start()
         _ = await world.logger.next()
 
-        world.updates.send(verified: true)
-        world.updates.send(verified: true)
+        world.updates.send(id: 100, verified: true)
+        world.updates.send(id: 100, verified: true)
+        world.updates.send(id: 101, verified: true)
         _ = await world.logger.next()
         _ = await world.logger.next()
 
-        #expect(world.finishes.count == 2, "a transaction the app already finished comes again, and is finished again")
+        #expect(world.finishes.count == 2, "the second delivery of 100 is not finished again: 100 and 101 are")
+    }
+
+    @Test("a transaction both streams hand over is finished and logged once")
+    func transactionInBothStreamsIsFinishedOnce() async {
+        let world = World(unfinished: [true, true])
+        let listener = world.makeListener()
+        world.updates.send(id: 2, verified: true)
+        world.updates.send(id: 100, verified: false)
+
+        listener.start()
+        let unfinished = await world.logger.next()
+        let update = await world.logger.next()
+
+        #expect(unfinished?.fields == [.count("count", 2), .count("unverified", 0)])
+        #expect(update?.fields == [.flag("verified", false)], "the update of 2, finished with the unfinished ones, is skipped: 100 is the first update logged")
+        #expect(world.finishes.order == ["unfinished", "unfinished", "update"], "the unfinished 1 and 2, then only 100 from the updates")
     }
 
     @Test("the unfinished are all finished before the first update is read")
     func unfinishedComeFirst() async {
         let world = World(unfinished: [true, true])
         let listener = world.makeListener()
-        world.updates.send(verified: true)
+        world.updates.send(id: 100, verified: true)
 
         listener.start()
         _ = await world.logger.next()
@@ -122,8 +139,8 @@ private struct World {
         let finishes = finishes
         let reads = reads
         let updates = updates
-        let items = unfinished.map { verified in
-            TipTransaction(isVerified: verified, finish: { finishes.record("unfinished") })
+        let items = unfinished.enumerated().map { index, verified in
+            TipTransaction(id: UInt64(index + 1), isVerified: verified, finish: { finishes.record("unfinished") })
         }
         return TipTransactionListener(
             feed: TipTransactionFeed(
@@ -160,9 +177,9 @@ private final class UpdatesFeed: Sendable {
         self.finishes = finishes
     }
 
-    func send(verified: Bool) {
+    func send(id: UInt64, verified: Bool) {
         let finishes = finishes
-        continuation.yield(TipTransaction(isVerified: verified, finish: { finishes.record("update") }))
+        continuation.yield(TipTransaction(id: id, isVerified: verified, finish: { finishes.record("update") }))
     }
 }
 

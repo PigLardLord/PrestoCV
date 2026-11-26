@@ -63,8 +63,8 @@ public final class Composition {
     /// Makes what removes the files the released app left, over the launch's log. The composition calls it once, after the
     /// log is made, so a test gives a cleaner it can read.
     typealias MakeLegacyLeftovers = @Sendable (any DiagnosticLogger) -> any LegacyLeftoversCleaning
-    /// Makes what listens to the store's tip transactions, over the launch's log. The composition calls it once and starts
-    /// what it gets, so a test gives one that touches no store.
+    /// Makes what listens to the store's tip transactions, over the launch's log. The first launch of a process calls it
+    /// once, at its start, and starts what it gets; a retry reuses it. A test gives one that touches no store.
     typealias MakeTips = @Sendable (any DiagnosticLogger) -> any TipsListening
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
@@ -208,6 +208,9 @@ public final class Composition {
     /// task, as it does on a launch that succeeds. A launch after a failure puts its trace behind the earlier launch's
     /// (`TraceSettlement`): it records nothing until the earlier purge has ended, so a retry never loses what it wrote.
     static func make(_ inputs: Inputs) async -> CompositionState {
+        // First of all, so that the store's transactions are finished whatever the rest of the launch does: the settlement
+        // holds the listener, because a failed launch leaves no composition to hold it.
+        let tips = inputs.settlement.tipsListener(make: { inputs.makeTips(inputs.log) })
         do {
             try inputs.check()
         } catch {
@@ -218,7 +221,7 @@ public final class Composition {
             device: inputs.device, log: inputs.log, after: inputs.settlement.previous()
         )
         inputs.settlement.record(trace.startup)
-        let state = await assemble(inputs, trace: trace)
+        let state = await assemble(inputs, tips: tips, trace: trace)
         if case .failed = state { await first(of: { await trace.settle() }, or: inputs.settleDeadline) }
         return state
     }
@@ -233,7 +236,7 @@ public final class Composition {
         }
     }
 
-    private static func assemble(_ inputs: Inputs, trace: TraceChain) async -> CompositionState {
+    private static func assemble(_ inputs: Inputs, tips: any TipsListening, trace: TraceChain) async -> CompositionState {
         do {
             try inputs.prepare()
         } catch {
@@ -260,8 +263,6 @@ public final class Composition {
         }
         do {
             let parts = try await rendering(inputs, rules: rules, logger: trace.logger)
-            let tips = inputs.makeTips(trace.logger)
-            tips.start()
             return .ready(Composition(
                 inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, tips: tips, trace: trace
             ))

@@ -44,7 +44,7 @@ extension TipTransactionFeed {
 
 extension TipTransaction {
     fileprivate init(isVerified: Bool, transaction: Transaction) {
-        self.init(isVerified: isVerified, finish: { await transaction.finish() })
+        self.init(id: transaction.id, isVerified: isVerified, finish: { await transaction.finish() })
     }
 }
 #endif
