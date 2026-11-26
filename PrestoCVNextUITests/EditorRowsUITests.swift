@@ -30,9 +30,10 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
 
     // MARK: Launching
 
-    /// A store folder of its own with one CV whose sections are empty, in English, opened.
+    /// A store folder of its own with one CV whose sections are empty, in English, opened. `autosavePause`, in whole
+    /// seconds, replaces the pause after typing before the text is stored.
     @MainActor
-    private func launchAndOpen(largestText: Bool = false) throws -> XCUIApplication {
+    private func launchAndOpen(largestText: Bool = false, autosavePause: String? = nil) throws -> XCUIApplication {
         let app = XCUIApplication()
         // The store reads a CV from the file named by its identity; the fixture takes a JSON map from file name to
         // content, in base 64
@@ -50,6 +51,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
+        app.launchArguments += autosavePause.map { ["-PrestoCVNextAutosavePause", $0] } ?? []
         app.launch()
         let row = app.descendants(matching: .any).matching(identifier: "shell.row")
             .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
@@ -265,14 +267,17 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(app.listRow(titled: "\(title) Lead").waitForExistence(timeout: 30), "The edge swipe leaves to the list")
     }
 
-    /// The swipe from the edge before the pause that stores the text stores it first, then leaves.
+    /// The swipe from the edge before the pause that stores the text stores it first, then leaves. The pause is ten
+    /// minutes here, so the title the list shows can only come from a write that leaving starts: the shell's store of
+    /// the editor it lets go, or the list's store of the editors still alive before it reads.
     @MainActor
     func testTheEdgeSwipeBeforeThePauseStoresThenLeaves() throws {
-        let app = try launchAndOpen()
+        let app = try launchAndOpen(autosavePause: "600")
         try XCTSkipUnless(app.isCompactWidth, "Only a narrow window has the edge swipe")
         let field = app.textInput("editor.field.title")
         field.tap()
         field.append(" Lead")
+        XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: "Unsaved changes"), "The text waits for the pause")
 
         app.swipeBackFromTheLeftEdge()
 
