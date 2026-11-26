@@ -721,7 +721,10 @@ enum EntryVocabulary {
     private static let personalLabels: [String: PersonalLabel] = {
         let groups: [(PersonalLabel, [String])] = [
             (.name, ["name", "nome", "nome e cognome", "cognome e nome", "nombre", "nombre y apellidos", "nom", "nom et prénom",
-                     "nome completo", "full name", "vollständiger name", "nombre completo"]),
+                     "nome completo", "full name", "vollständiger name", "nombre completo", "surname first name", "first name surname",
+                     "cognome nome", "nome cognome", "nachname vorname", "vorname nachname", "apellidos nombre", "nombre apellidos",
+                     "apellido nombre", "nombre apellido", "nom prénom", "prénom nom", "apelido nome", "nome apelido", "apelidos nome",
+                     "sobrenome nome", "nome sobrenome"]),
             (.firstName, ["vorname", "first name", "prénom", "nome proprio", "primeiro nome"]),
             (.lastName, ["nachname", "last name", "surname", "cognome", "apellidos", "apellido", "nom de famille", "apelido", "sobrenome"]),
             (.address, ["address", "indirizzo", "residenza", "domicilio", "adresse", "anschrift", "wohnort", "dirección", "morada",
@@ -747,7 +750,7 @@ enum EntryVocabulary {
                       "stato di nascita", "paese di nascita"]),
             (.nationality, ["nationality", "nazionalità", "staatsangehörigkeit", "nationalität", "nacionalidad", "nationalité",
                             "nacionalidade", "cittadinanza", "citizenship", "staatsbürgerschaft"]),
-            (.maritalStatus, ["marital status", "stato civile", "familienstand", "estado civil", "situation familiale"]),
+            (.maritalStatus, ["marital status", "stato civile", "familienstand", "estado civil", "situation familiale", "état civil", "etat civil"]),
             (.gender, ["sex", "gender", "sesso", "geschlecht", "sexo", "sexe"]),
             (.fax, ["fax", "telefax"]),
         ]
@@ -757,6 +760,87 @@ enum EntryVocabulary {
         }
         return table
     }()
+
+    // MARK: The values of the closed details
+
+    /// Whether a text reads as the value of a closed personal detail (a gender, a marital status, a nationality), as
+    /// opposed to the words of a job title that start with the label ("Gender Pay Analyst").
+    static func looksLikeValue(_ text: String, of label: PersonalLabel) -> Bool {
+        let key = SectionVocabulary.key(text)
+        switch label {
+        case .gender: return genderValues.contains(key)
+        case .maritalStatus: return maritalValues.contains(key)
+        case .nationality: return looksLikeNationality(text)
+        default: return true
+        }
+    }
+
+    private static let genderValues: Set<String> = Set([
+        "male", "female", "m", "f", "w", "h", "man", "woman", "non-binary", "nonbinary", "non binary", "non binaire", "nichtbinär",
+        "nicht binär", "non binario", "no binario", "não binário", "nao binario", "diverse", "other", "x", "maschio", "femmina",
+        "maschile", "femminile", "uomo", "donna", "männlich", "weiblich", "divers", "mann", "frau", "masculino", "feminino",
+        "femenino", "hombre", "mujer", "masculin", "féminin", "homme", "femme", "masculina", "feminina", "m/f", "m/w", "m/w/d",
+    ].map(SectionVocabulary.key))
+
+    private static let maritalValues: Set<String> = Set([
+        "single", "married", "divorced", "widowed", "separated", "partnered", "celibe", "nubile", "coniugato", "coniugata",
+        "coniugato/a", "sposato", "sposata", "sposato/a", "divorziato", "divorziata", "vedovo", "vedova", "separato", "separata",
+        "convivente", "libero", "libera", "ledig", "verheiratet", "geschieden", "verwitwet", "getrennt lebend", "soltero", "soltera",
+        "casado", "casada", "divorciado", "divorciada", "viudo", "viuda", "separado", "separada", "célibataire", "marié", "mariée",
+        "divorcé", "divorcée", "veuf", "veuve", "séparé", "séparée", "pacsé", "pacsée", "solteiro", "solteira", "viúvo", "viúva",
+        "in partnership", "civil partnership", "in a relationship", "domestic partnership", "cohabiting", "unmarried",
+        "in unione civile", "unito civilmente", "unita civilmente", "unione civile", "in coppia", "fidanzato", "fidanzata",
+        "lebenspartnerschaft", "in partnerschaft", "eingetragene lebenspartnerschaft", "lebensgemeinschaft", "in einer beziehung", "unión libre", "pareja de hecho", "en pareja", "unión de hecho", "union libre", "en couple",
+        "concubinage", "vie maritale", "união de facto", "união estável", "união estavel", "em união de facto", "namorando",
+        "em relacionamento",
+    ].map(SectionVocabulary.key))
+
+    /// A nationality is one word ("German", "Tedesca"), or a few of them in a list ("German, Italian"), or a country's name
+    /// of two words ("South African"); a few words of a job ("Law Associate") or a role word alone are not.
+    private static func looksLikeNationality(_ text: String) -> Bool {
+        guard !text.contains(where: \.isNumber) else { return false }
+        let parts = nationalityParts(of: text)
+        guard (1...4).contains(parts.count) else { return false }
+        return parts.allSatisfy(isOneNationality)
+    }
+
+    /// The words of each nationality of a list, which punctuation or the language's joining word ("and", "und", "e", "y",
+    /// "et") separates. Told before the key drops the joining words.
+    private static func nationalityParts(of text: String) -> [[String]] {
+        var parts: [[String]] = []
+        for list in text.split(whereSeparator: { ",/;&".contains($0) }) {
+            var part: [String] = []
+            for token in list.split(separator: " ") {
+                if joiningNationalityWords.contains(token.folded) {
+                    parts.append(part)
+                    part = []
+                } else {
+                    part.append(SectionVocabulary.key(String(token)))
+                }
+            }
+            parts.append(part)
+        }
+        return parts.map { $0.filter { !$0.isEmpty } }.filter { !$0.isEmpty }
+    }
+
+    private static let joiningNationalityWords: Set<String> = ["and", "und", "e", "y", "et"]
+
+    /// One nationality: one word ("German"), or a country's name of two words ("South African"); a role word is not one.
+    private static func isOneNationality(_ words: [String]) -> Bool {
+        if words.contains(where: nonNationalityWords.contains) { return false }
+        return words.count == 1 || (words.count == 2 && nationalityPrefixes.contains(words[0]))
+    }
+
+    private static let nationalityPrefixes: Set<String> = Set([
+        "south", "north", "new", "sri", "costa", "puerto", "saudi", "hong", "east", "west", "sud", "nord", "süd", "sur", "norte",
+        "dominican", "central", "san", "el", "united", "czech", "ivory", "burkina", "papua",
+    ].map(SectionVocabulary.key))
+
+    private static let nonNationalityWords: Set<String> = Set([
+        "manager", "analyst", "engineer", "developer", "designer", "consultant", "specialist", "director", "lead", "officer",
+        "assistant", "associate", "teacher", "advisor", "adviser", "coordinator", "berater", "leiter", "analista", "ingeniero",
+        "responsable", "consulente", "gestore", "direttore", "tecnico", "técnico", "ingegnere", "sviluppatore",
+    ].map(SectionVocabulary.key))
 
     // MARK: Document titles
 

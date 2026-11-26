@@ -32,6 +32,8 @@ enum EntryReader {
         /// The line is a mapped row of a table that had a short row the header could not place before it: the mapping
         /// is kept, but the person is asked to check it.
         var isToCheck = false
+        /// The period is a software-name range ("Unity 9.10 – 9.12") read as dates: it may be a version, to be checked.
+        var periodReadsASoftwareRange = false
 
         var isBody: Bool { isBullet || isProse }
     }
@@ -109,11 +111,23 @@ enum EntryReader {
             line.labelValue = value
         }
         if !isProse && !line.isDurationOnly {
-            let anchor = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
+            let anchorCells = line.label == .period ? line.labelValue : cells
+            var anchor = anchorPeriod(in: anchorCells, isBullet: isBullet)
+            // A range after a software name ("Unity 9.10 – 9.12") is a period unless the line itself says it is a duty:
+            // split rather than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
+            if anchor == nil, !isBullet, !isDutyLine(text) {
+                anchor = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
+                line.periodReadsASoftwareRange = anchor != nil
+            }
             line.period = anchor.map { ($0.0, $0.1) }
             line.headEvidence = anchor?.evidence ?? .none
         }
         return line
+    }
+
+    /// A bullet or a dash line: a duty, where a software range is a version and not a period.
+    private static func isDutyLine(_ text: String) -> Bool {
+        text.first.map { "•·▪◦‣*-–—".contains($0) } == true
     }
 
     /// A Europass row: its label in the first cell, or before a colon.
@@ -139,9 +153,9 @@ enum EntryReader {
 
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool, readsSoftwareRanges: Bool = false) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
         for (cellIndex, cell) in cells.enumerated() {
-            for match in DateReader.periods(in: cell.text) {
+            for match in DateReader.periods(in: cell.text, readsSoftwareRanges: readsSoftwareRanges) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
                 // The text after the period as a string of its own: a range read in it indexes that string
                 let after = String(cell.text[match.range.upperBound...].trimmingSpaces())
@@ -217,16 +231,18 @@ enum EntryReader {
                 draft.inheritedEmployer = group.employer
                 draft.inheritsADoubtfulHeading = section.doubtfulHeadings.contains(group.block)
             }
-            draft.boundsUnsure = layout.unsure.contains(position)
+            // Where the entry starts is doubtful too when its dates are a range after a software name
+            draft.boundsUnsure = layout.unsure.contains(position) || draft.anchor?.periodReadsASoftwareRange == true
             drafts.append(draft)
         }
         return drafts
     }
 
     /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
-    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
+    /// (a period read only as a software range counts as no date) and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
     private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
-        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        // A period read only through the software-range fallback is no date: it must not veto the bullets
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil && !$0.periodReadsASoftwareRange }) else { return false }
         return usable.contains(where: { $0.headEvidence == .strong })
     }
 
