@@ -194,7 +194,8 @@ private func mayWriteVertically(_ cmap: CGPDFStreamRef, within depth: Int) -> Bo
 
 /// The words of a CMap program, which is PostScript, split at white space and delimiters. A comment (from `%` to the
 /// end of its line) gives no word, a string (`(…)`, `<…>`, `<~…~>`) gives one word that starts with its delimiter,
-/// and `<<`, `>>`, `[`, `]`, `{` and `}` are words of their own.
+/// and `<<`, `>>`, `[`, `]`, `{` and `}` are words of their own. A name's `#` and two hex digits are read as the byte
+/// they stand for, as in a PDF name, so `/Identity#2DV` is `/Identity-V` and `/#57Mode` is `/WMode`.
 struct CMapProgram {
     let words: [String]
     /// Whether every string the program opens is closed. One left open hides the rest of the program.
@@ -207,7 +208,7 @@ struct CMapProgram {
         var index = bytes.startIndex
         var isWhole = true
         func endWord() {
-            if !word.isEmpty { words.append(word) }
+            if !word.isEmpty { words.append(word.hasPrefix("/") ? Self.decoded(name: word) : word) }
             word = ""
         }
         while index < bytes.endIndex {
@@ -253,6 +254,25 @@ struct CMapProgram {
         endWord()
         self.words = words
         self.isWhole = isWhole
+    }
+
+    /// `name` with each `#` and two hex digits read as the byte they stand for; a `#` without two hex digits stays.
+    private static func decoded(name: String) -> String {
+        let scalars = Array(name.unicodeScalars)
+        var decoded = String.UnicodeScalarView()
+        var index = scalars.startIndex
+        while index < scalars.endIndex {
+            if scalars[index] == "#", index + 2 < scalars.endIndex,
+               scalars[index + 1...index + 2].allSatisfy(\.properties.isASCIIHexDigit),
+               let byte = UInt8(String(String.UnicodeScalarView(scalars[index + 1...index + 2])), radix: 16) {
+                decoded.append(UnicodeScalar(byte))
+                index += 3
+            } else {
+                decoded.append(scalars[index])
+                index += 1
+            }
+        }
+        return String(decoded)
     }
 
     /// The index of the `)` that closes the string opened at `open`, past nested parentheses and backslash escapes,

@@ -199,16 +199,18 @@ struct ShownTextTests {
                 "mode 1 in the program only, a base named -V, an embedded vertical base, a CMap writing across, the first again, a commented base")
     }
 
-    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one named -V, or an open string")
+    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one named -V, or an open string, with a name's # escapes read")
     func cmapPrograms() {
         let vertical = ["/WMode 1 def", "/WMode\n1 def", "<</WMode 1>>", "/WMode 0.0 def", "/WMode", "/WMode 0 def /WMode 1 def",
                         "/UniJIS-UCS2-V usecmap", "/Identity-V % its base CMap\nusecmap", "/WMode % the mode\n1 def",
                         "(100%) pop /WMode 1 def", "<~9j%~> pop /WMode 1 def", "dup usecmap", "usecmap",
-                        "(not closed /WMode 0 def", "<00 /WMode 0 def", "<~9j /WMode 0 def"]
+                        "(not closed /WMode 0 def", "<00 /WMode 0 def", "<~9j /WMode 0 def", "/Identity#2DV usecmap",
+                        "/#57Mode 1 def", "/WMod#65 1 def", "/Identity#2dV usecmap"]
         let across = ["/WMode 0 def", "<</WMode 0>>", "/UniJIS-UCS2-H usecmap", "/CMapName /Custom-V def", "/WMode0 1", "",
                       "% a comment: /WMode 1", "<</WMode 0>> % /UniJIS-UCS2-V usecmap", "/Identity-H % its base\rusecmap",
                       "/WMode % the mode\r0 def", "/WMode % the mode\u{0C}0 def", "(/WMode 1) pop", "(a \\) /WMode 1) pop",
-                      "((a) /WMode 1) pop", "<2F574D6F6465> pop /WMode 0 def", "<~/WMode 1~> pop"]
+                      "((a) /WMode 1) pop", "<2F574D6F6465> pop /WMode 0 def", "<~/WMode 1~> pop", "/#57Mode 0 def",
+                      "/Identity#2DH usecmap", "/Custom#2V usecmap", "/Custom-V#", "/#WMode 1", "/#+7Mode 1"]
         for program in vertical { #expect(CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
         for program in across { #expect(!CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
     }
