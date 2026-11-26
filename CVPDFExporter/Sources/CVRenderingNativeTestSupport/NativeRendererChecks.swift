@@ -31,6 +31,8 @@ public enum NativeCheckFailure: Error, Equatable {
     case pageBreakDocumentTruncated(design: String, summaryLines: Int, requiredPages: Int)
     /// A design's layout document needed more pages than its page setup keeps.
     case layoutDocumentTruncated(design: String, document: LayoutDocument, requiredPages: Int)
+    /// A design's layout does not match the reference of its kind of device and system version: the verdict says which.
+    case layoutDiffers(design: String, document: LayoutDocument, verdict: String)
 }
 
 /// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
@@ -241,11 +243,24 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         guard layout.pages.count == pdf.pageCount else {
             throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
         }
-        return LayoutReference(platform: .running, osVersion: .running, design: name, document: document, layout: layout)
+        return LayoutReference(kind: .running, osVersion: .running, design: name, document: document, layout: layout)
     }
 
-    /// #558: writes the layout of the bundled design `name` in `document` into `folder`, in the folder of this platform
-    /// and OS version.
+    /// #558: compares the layout of the bundled design `name` in `document` with the stored reference of this kind of
+    /// device and system version (the closest lower version when there is none), at 0.5 pt. The failure names the
+    /// reference's kind and version and every line that moved, by how much.
+    public func checkLayout(
+        design name: String, document: LayoutDocument, against store: LayoutReferenceStore
+    ) async throws {
+        let found = try await layoutReference(design: name, document: document)
+        let verdict = try store.verdict(of: found)
+        guard verdict == .matches else {
+            throw NativeCheckFailure.layoutDiffers(design: name, document: document, verdict: verdict.description)
+        }
+    }
+
+    /// #558: writes the layout of the bundled design `name` in `document` into `folder`, in the folder of this kind of
+    /// device and OS version.
     public func recordLayout(design name: String, document: LayoutDocument, into folder: URL) async throws {
         try LayoutRecording.write(try await layoutReference(design: name, document: document), into: folder)
     }

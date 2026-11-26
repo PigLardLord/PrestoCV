@@ -160,14 +160,20 @@ extension MacPDFRendererTests {
     }
 
     @MainActor
-    @Suite("#558 · where the text of the bundled designs lands",
-           .enabled(if: LayoutRecording.folder != nil, "records only, with RECORD_LAYOUTS set"))
+    @Suite("#558 · where the text of the bundled designs lands")
     struct Layout {
-        @Test("records where every line of each bundled design lands, in the folder RECORD_LAYOUTS names",
+        /// Compares each design's layout with the stored reference of this device and system version; with `RECORD_LAYOUTS`
+        /// set it writes the layout there instead (the commands are in `LayoutReferenceStore`).
+        @Test("every line of each bundled design lands where the layout reference of this device and system version has it",
               arguments: ["minimal", "modern", "professional"], LayoutDocument.allCases)
         func bundled(design: String, document: LayoutDocument) async throws {
-            let folder = try #require(LayoutRecording.folder)
-            try await MacPDFRendererTests.checks().recordLayout(design: design, document: document, into: folder)
+            let checks = try await MacPDFRendererTests.checks()
+            if let folder = LayoutRecording.folder {
+                try await checks.recordLayout(design: design, document: document, into: folder)
+            } else {
+                let stored = LayoutReferenceStore(resources: try #require(Bundle.module.resourceURL))
+                try await checks.checkLayout(design: design, document: document, against: stored)
+            }
         }
     }
 

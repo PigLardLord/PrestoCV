@@ -16,8 +16,8 @@ public enum LayoutDifference: Sendable, Equatable {
 
 /// #558: compares a printed layout with a reference, line by line in order.
 public enum LayoutComparison {
-    /// How far a line may move from its reference, in points, as #558 proposes it. iPhone, iPad and macOS print further
-    /// apart than this, so the checks that compare a print with a reference wait for the owner's choice of tolerance.
+    /// How far a line may move from the reference of its own kind of device and system version, in points. The kinds
+    /// print further apart than this: `LayoutParity.tolerance` is the one between them.
     public static let tolerance = 0.5
 
     /// Every difference of `found` from `reference`: the page count, then each line, in the reference's order.
