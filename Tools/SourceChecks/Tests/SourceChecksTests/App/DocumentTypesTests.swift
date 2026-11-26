@@ -5,8 +5,9 @@ import Testing
 
 /// The second app is among the apps another app can open a PDF in (step 5-13d of #404), as the released app is: as a
 /// viewer at the alternate rank, so that it never becomes the one that opens PDFs by default, and a PDF it is handed is
-/// a copy, never the file in place (ADR 0027). A Debug build carries a PDF of the corpus for the UI tests that open it;
-/// no Release build does.
+/// a copy, never the file in place (ADR 0027). The app builds for macOS too, which rejects the key that asks iOS for a
+/// copy, so the project sets that key for the iOS SDKs only. A Debug build carries a PDF of the corpus for the UI tests
+/// that open it; no Release build does.
 @Suite("Document Types Tests")
 struct DocumentTypesTests {
 
@@ -47,9 +48,16 @@ struct DocumentTypesTests {
         #expect(pdf["LSItemContentTypes"] as? [String] == ["com.adobe.pdf"])
     }
 
-    @Test("A PDF opened from another app is handed over as a copy, never opened in place")
+    @Test("On iOS a PDF opened from another app is handed over as a copy, and the key that asks for it is set for no other SDK")
     func aPDFIsNeverOpenedInPlace() throws {
-        #expect(try Self.info()["LSSupportsOpeningDocumentsInPlace"] as? Bool == false)
+        let key = "LSSupportsOpeningDocumentsInPlace"
+        let target = try #require(try Self.block(from: "\"name\": \"PrestoCVNext\"", to: "\"name\": \""))
+        let settings = target.split(separator: "\n").filter { $0.contains("\"INFOPLIST_KEY_\(key)") }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+
+        #expect(try Self.info()[key] == nil, "\(Self.infoFile) sets \(key) for macOS too, which rejects it")
+        #expect(settings == [#""INFOPLIST_KEY_\#(key)[sdk=iphoneos*]": "NO","#,
+                             #""INFOPLIST_KEY_\#(key)[sdk=iphonesimulator*]": "NO","#], "The target sets \(settings)")
     }
 
     @Test("The project builds the app with that file and does not copy it into the app as a resource")

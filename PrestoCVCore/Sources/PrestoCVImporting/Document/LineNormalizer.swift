@@ -27,6 +27,8 @@ struct NormalizedLine: Equatable {
     var isBold: Bool
     /// How the line ends: a word may go on in the next line after a hyphen right after a letter.
     var lineEnd: LineEnd
+    /// The cells were written between a Markdown table's bars, not set apart by tabs or by a wide gap.
+    var isTableRow = false
 
     var text: String { cells.joined(separator: "\t") }
     var isEmpty: Bool { cells.allSatisfy(\.isEmpty) }
@@ -48,7 +50,9 @@ enum LineNormalizer {
                 return NormalizedLine(cells: [], markup: .tableSeparator, isBold: false, lineEnd: .plain)
             }
             let inline = cells.map { stripInlineMarkup(Substring($0)).trimmingSpaces() }
-            return NormalizedLine(cells: inline.map(collapsingSpaces), markup: .none, isBold: false, lineEnd: .plain)
+            return NormalizedLine(
+                cells: inline.map(collapsingSpaces), markup: .none, isBold: false, lineEnd: .plain, isTableRow: true
+            )
         }
         // A quote's marker is followed by a space; ">5 years" is the person's text
         while line.hasPrefix(">"), line.dropFirst().first.map({ $0 == " " || $0 == ">" }) ?? true {
