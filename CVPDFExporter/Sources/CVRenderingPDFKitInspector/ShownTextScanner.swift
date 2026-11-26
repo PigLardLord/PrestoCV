@@ -192,39 +192,106 @@ private func mayWriteVertically(_ cmap: CGPDFStreamRef, within depth: Int) -> Bo
     return CMapProgram(program as Data).mayWriteVertically
 }
 
-/// The words of a CMap program, which is PostScript, split at white space and delimiters. Strings and comments are
-/// split into words too, which can only make the program look as if it may write vertically when it does not.
+/// The words of a CMap program, which is PostScript, split at white space and delimiters. A comment (from `%` to the
+/// end of its line) gives no word, a string (`(…)`, `<…>`, `<~…~>`) gives one word that starts with its delimiter,
+/// and `<<`, `>>`, `[`, `]`, `{` and `}` are words of their own.
 struct CMapProgram {
     let words: [String]
+    /// Whether every string the program opens is closed. One left open hides the rest of the program.
+    let isWhole: Bool
 
     init(_ program: Data) {
+        let bytes = [UInt8](program)
         var words: [String] = []
         var word = ""
-        for byte in program {
+        var index = bytes.startIndex
+        var isWhole = true
+        func endWord() {
+            if !word.isEmpty { words.append(word) }
+            word = ""
+        }
+        while index < bytes.endIndex {
+            let byte = bytes[index]
             switch byte {
             case 0, 9, 10, 12, 13, 32:
-                if !word.isEmpty { words.append(word) }
-                word = ""
-            case UInt8(ascii: "/"), UInt8(ascii: "("), UInt8(ascii: ")"), UInt8(ascii: "<"), UInt8(ascii: ">"),
-                 UInt8(ascii: "["), UInt8(ascii: "]"), UInt8(ascii: "{"), UInt8(ascii: "}"), UInt8(ascii: "%"):
-                if !word.isEmpty { words.append(word) }
-                word = byte == UInt8(ascii: "/") ? "/" : ""
-                if byte != UInt8(ascii: "/") { words.append(String(UnicodeScalar(byte))) }
+                endWord()
+            case UInt8(ascii: "%"):
+                endWord()
+                while index + 1 < bytes.endIndex, ![10, 12, 13].contains(bytes[index + 1]) { index += 1 }
+            case UInt8(ascii: "("):
+                endWord()
+                words.append("(")
+                index = Self.end(ofStringFrom: index, in: bytes)
+                isWhole = isWhole && index < bytes.endIndex
+            case UInt8(ascii: "<"):
+                endWord()
+                if index + 1 < bytes.endIndex, bytes[index + 1] == UInt8(ascii: "<") {
+                    words.append("<<")
+                    index += 1
+                } else {
+                    let ascii85 = index + 1 < bytes.endIndex && bytes[index + 1] == UInt8(ascii: "~")
+                    words.append(ascii85 ? "<~" : "<")
+                    index = Self.end(ofHexOrASCII85StringFrom: index, ascii85: ascii85, in: bytes)
+                    isWhole = isWhole && index < bytes.endIndex
+                }
+            case UInt8(ascii: ">"):
+                endWord()
+                let pair = index + 1 < bytes.endIndex && bytes[index + 1] == UInt8(ascii: ">")
+                words.append(pair ? ">>" : ">")
+                if pair { index += 1 }
+            case UInt8(ascii: ")"), UInt8(ascii: "["), UInt8(ascii: "]"), UInt8(ascii: "{"), UInt8(ascii: "}"):
+                endWord()
+                words.append(String(UnicodeScalar(byte)))
+            case UInt8(ascii: "/"):
+                endWord()
+                word = "/"
             default:
                 word.unicodeScalars.append(UnicodeScalar(byte))
             }
+            index += 1
         }
-        if !word.isEmpty { words.append(word) }
+        endWord()
         self.words = words
+        self.isWhole = isWhole
     }
 
-    /// Whether the program may set writing mode 1: a `/WMode` it holds is followed by anything but `0`, or it uses
-    /// (`usecmap`) a CMap whose name ends in `-V`.
+    /// The index of the `)` that closes the string opened at `open`, past nested parentheses and backslash escapes,
+    /// or the end of `bytes` when none does.
+    private static func end(ofStringFrom open: Int, in bytes: [UInt8]) -> Int {
+        var depth = 0
+        var index = open
+        while index < bytes.endIndex {
+            switch bytes[index] {
+            case UInt8(ascii: "\\"): index += 1
+            case UInt8(ascii: "("): depth += 1
+            case UInt8(ascii: ")"):
+                depth -= 1
+                if depth == 0 { return index }
+            default: break
+            }
+            index += 1
+        }
+        return bytes.endIndex
+    }
+
+    /// The index of the last byte of the hex string (`<…>`) or ASCII85 string (`<~…~>`) opened at `open`, or the end
+    /// of `bytes` when it is not closed.
+    private static func end(ofHexOrASCII85StringFrom open: Int, ascii85: Bool, in bytes: [UInt8]) -> Int {
+        var index = open + (ascii85 ? 2 : 1)
+        while index < bytes.endIndex {
+            if bytes[index] == UInt8(ascii: ">"), !ascii85 || bytes[index - 1] == UInt8(ascii: "~") { return index }
+            index += 1
+        }
+        return bytes.endIndex
+    }
+
+    /// Whether the program may set writing mode 1: a string it opens is never closed, a `/WMode` it holds is followed
+    /// by anything but `0`, or a `usecmap` it holds is not right after a name, or is after one that ends in `-V`.
     var mayWriteVertically: Bool {
-        words.indices.contains { index in
+        !isWhole || words.indices.contains { index in
             switch words[index] {
             case "/WMode": index + 1 == words.endIndex || words[index + 1] != "0"
-            case "usecmap": index > words.startIndex && words[index - 1].hasSuffix("-V")
+            case "usecmap": index == words.startIndex || !words[index - 1].hasPrefix("/") || words[index - 1].hasSuffix("-V")
             default: false
             }
         }
