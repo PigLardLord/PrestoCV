@@ -7,6 +7,7 @@ import CVRendering
 import CVRenderingTestSupport
 import CVRenderingPDFKitInspector
 import CVBundledHeadings
+import CVBundledDesigns
 
 /// Why a check of a native renderer failed, with what it read, so a failing run says what the PDF held.
 public enum NativeCheckFailure: Error, Equatable {
@@ -24,23 +25,25 @@ public enum NativeCheckFailure: Error, Equatable {
     case geometry([GeometryViolation])
     case pageCountDiffers(layout: Int, rendered: Int)
     case budget(steps: Int, exhausted: Bool)
+    /// The faults of a design's PDFs of one body, by the number of profile lines of the document that showed them.
+    case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
+    /// A design's page-break document of `summaryLines` profile lines needed more pages than `PageBreakDocument.page` keeps.
+    case pageBreakDocumentTruncated(design: String, summaryLines: Int, requiredPages: Int)
 }
 
-/// A design that lays the inline entries (skills, profiles, interests) out with `display:flex` or `display:grid` and the
-/// minimum column gap the CSS policy requires. The builder separates the entries with a space, which flex and grid
-/// drop, so only the gap keeps the words apart in the printed text.
+/// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
+/// minimum column gap the CSS policy requires. The builder separates the two with a space, which flex and grid drop, so
+/// only the gap keeps the words apart in the printed text. The skills and the interests stay apart by their spaces: a
+/// section stays a block (#467).
 public enum SeparationDesign: String, Sendable, CaseIterable {
     case flex, grid
 
     public var css: String {
         switch self {
         case .flex:
-            ".cv{padding:0 36pt}[data-section=\"skills\"],[data-section=\"profiles\"],[data-section=\"interests\"],.cv-profile"
-                + "{display:flex;flex-wrap:wrap;column-gap:3pt}"
+            ".cv{padding:0 36pt}.cv-profile{display:flex;flex-wrap:wrap;column-gap:3pt}"
         case .grid:
-            ".cv{padding:0 36pt}[data-section=\"skills\"],[data-section=\"interests\"]{display:grid;grid-template-columns:1fr 1fr 1fr;column-gap:3pt}"
-                + ".cv-skill,.cv-interest{text-align:right}.cv-skill:last-child,.cv-interest:last-child{text-align:left}"
-                + ".cv-profile{display:grid;grid-template-columns:1fr 1fr;column-gap:3pt}.cv-profile-platform{text-align:right}"
+            ".cv{padding:0 36pt}.cv-profile{display:grid;grid-template-columns:1fr 1fr;column-gap:3pt}.cv-profile-platform{text-align:right}"
         }
     }
 
@@ -175,6 +178,52 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         guard layout.pages.count == pdf.pageCount else {
             throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
         }
+    }
+
+    // MARK: Page breaks
+
+    /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` of `body` whole
+    /// on `PageBreakDocument.page` with no section's start (its title, or the head of its first entry) at a page's foot, no
+    /// blank page, no line cut by a page's edge or hidden in its margin, every text node and no line outside its page; and
+    /// the page count is the PDF's own.
+    public func pageBreaks(design name: String, body: PageBreakDocument.Body) async throws {
+        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
+            throw NativeCheckFailure.fixtureLacks(name)
+        }
+        let design = try DesignPackageValidator().validate(package.data)
+        try await pageBreaks(name, stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
+                             fonts: design.manifest.defaultFonts, body: body)
+    }
+
+    /// #467: the same for an imported design at the markup contract's limits for a section title, in the contract
+    /// fixture's palette and the system fonts.
+    public func pageBreaks(imported design: PageBreakDocument.LimitDesign, body: PageBreakDocument.Body) async throws {
+        try await pageBreaks("imported-\(design.rawValue)", stylesheet: try ContractFixture.stylesheet(design.css),
+                             palette: ContractFixture.palette, fonts: .system, body: body)
+    }
+
+    private func pageBreaks(_ name: String, stylesheet: ValidatedStylesheet, palette: Palette, fonts: FontScheme,
+                            body: PageBreakDocument.Body) async throws {
+        let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
+        var faults: [Int: [PageBreakFault]] = [:]
+        for lines in PageBreakDocument.summaryLines {
+            let document = DocumentHTMLBuilder().render(PageBreakDocument.document(summaryLines: lines, body: body),
+                                                        stylesheet: stylesheet, palette: palette, fonts: fonts, headings: headings)
+            let pdf = try await renderer.render(html: document.html, page: PageBreakDocument.page)
+            guard !pdf.truncated else {
+                throw NativeCheckFailure.pageBreakDocumentTruncated(design: name, summaryLines: lines, requiredPages: pdf.requiredPages)
+            }
+            guard let layout = inspector.layout(of: pdf.data) else {
+                throw NativeCheckFailure.unreadablePDF
+            }
+            guard layout.pages.count == pdf.pageCount else {
+                throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
+            }
+            let found = PageBreaks.faults(of: document, printedAs: layout, starts: PageBreakDocument.startLines(headings),
+                                          page: PageBreakDocument.page)
+            if !found.isEmpty { faults[lines] = found }
+        }
+        guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, body: body, faults: faults) }
     }
 
     // MARK: Step budget
