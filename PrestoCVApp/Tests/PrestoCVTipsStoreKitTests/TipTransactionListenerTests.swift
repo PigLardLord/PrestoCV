@@ -105,6 +105,49 @@ struct TipTransactionListenerTests {
         #expect(world.finishes.order == ["unfinished", "unfinished", "update"])
     }
 
+    @Test("an update delivered while an unfinished transaction is still being finished is finished without another launch")
+    func updateDuringTheDrainIsFinished() async {
+        let finishes = FinishLog()
+        let subscribed = Inbox<Void>()
+        let release = Inbox<Void>()
+        let started = Inbox<Void>()
+        let logger = InboxLogger()
+        let held = TipTransaction(id: 1, isVerified: true, finish: {
+            started.put(())
+            _ = await release.next()
+            finishes.record("unfinished")
+        })
+        let update = TipTransaction(id: 100, isVerified: true, finish: { finishes.record("update") })
+        let listener = TipTransactionListener(
+            feed: TipTransactionFeed(
+                unfinished: { AsyncStream { continuation in continuation.yield(held); continuation.finish() } },
+                updates: {
+                    // Like the store's: nothing is delivered before the stream is first read.
+                    let sent = Mutex(false)
+                    return AsyncStream {
+                        subscribed.put(())
+                        guard sent.withLock({ let was = $0; $0 = true; return !was }) else {
+                            try? await Task.sleep(for: .seconds(60))
+                            return nil
+                        }
+                        return update
+                    }
+                }
+            ),
+            logger: logger
+        )
+
+        listener.start()
+        _ = await started.next()
+        let read = await subscribed.next()
+        release.put(())
+        _ = await logger.next()
+        _ = await logger.next()
+
+        #expect(read != nil, "the updates are read while the unfinished transaction is still being finished")
+        #expect(finishes.order == ["unfinished", "update"], "the update is finished in the same launch")
+    }
+
     @Test("a second start does not read the feed again")
     func startIsOnce() async {
         let world = World(unfinished: [true])

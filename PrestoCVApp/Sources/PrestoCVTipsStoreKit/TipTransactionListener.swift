@@ -26,7 +26,8 @@ struct TipTransactionFeed: Sendable {
 /// Finishes every tip transaction the store hands over, verified or not, and grants nothing. A tip is a consumable: a
 /// transaction left unfinished comes back at every launch.
 ///
-/// It walks the unfinished transactions first, then waits for the updates until it is dropped. Dropping it cancels the task.
+/// It subscribes to the updates first, so none is missed while it finishes the unfinished transactions, then finishes the
+/// unfinished ones, then the updates, until it is dropped. Dropping it cancels the task.
 final class TipTransactionListener: Sendable {
     private let feed: TipTransactionFeed
     private let logger: any DiagnosticLogger
@@ -51,11 +52,19 @@ final class TipTransactionListener: Sendable {
         }
     }
 
-    /// Finishes the unfinished transactions, then each update. The store hands a transaction that is unfinished at launch
-    /// to the updates too, once: the ids of the unfinished stream are kept, an update with one of them is skipped and its
-    /// id dropped. The ids of the updates are not kept, so the set is bounded by the transactions unfinished at launch and
-    /// empties as the overlaps arrive. The two streams are read one after the other, so the ids need no lock.
+    /// Finishes the unfinished transactions, then each update. The updates are read from the start, by a task that only
+    /// buffers them, so one the store delivers while the unfinished ones are being finished is kept, not lost. The store
+    /// hands a transaction that is unfinished at launch to the updates too, once: the ids of the unfinished stream are
+    /// kept, an update with one of them is skipped and its id dropped. The ids of the updates are not kept, so the set is
+    /// bounded by the transactions unfinished at launch and empties as the overlaps arrive. Only this task finishes
+    /// transactions and reads the ids, so they need no lock.
     private static func listen(to feed: TipTransactionFeed, logger: any DiagnosticLogger) async {
+        let (buffered, buffer) = AsyncStream<TipTransaction>.makeStream()
+        let reader = Task {
+            for await transaction in feed.updates() { buffer.yield(transaction) }
+            buffer.finish()
+        }
+        defer { reader.cancel() }
         var pending = Set<UInt64>()
         var finished = 0
         var unverified = 0
@@ -65,7 +74,7 @@ final class TipTransactionListener: Sendable {
             if !transaction.isVerified { unverified += 1 }
         }
         logger.info(.tips, "tips.unfinished.finished", .count("count", finished), .count("unverified", unverified))
-        for await transaction in feed.updates() where pending.remove(transaction.id) == nil {
+        for await transaction in buffered where pending.remove(transaction.id) == nil {
             await transaction.finish()
             logger.info(.tips, "tips.update.finished", .flag("verified", transaction.isVerified))
         }
