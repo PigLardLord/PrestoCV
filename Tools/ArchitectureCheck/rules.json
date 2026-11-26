@@ -669,6 +669,7 @@
     "Foundation",
     "AppKit",
     "UIKit",
+    "CoreGraphics",
     "CVRendering",
     "CVRenderingPDFKitInspector",
     "CVRenderingNativeTestSupport"

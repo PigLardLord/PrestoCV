@@ -21,7 +21,9 @@ private typealias PlatformFont = UIFont
 /// content's own text operators: the font size through the text and graphics transforms, forms included. A line with
 /// no such text, or with text whose font the content does not size, takes the smallest font size PDFKit gives for its
 /// characters instead (resolving the fonts that way is slow and verbose for the system font, #562); a line with a
-/// character that has no font then has none, so the geometry check rejects it.
+/// character that has no font then has none, so the geometry check rejects it. The scan does not read glyph widths, so
+/// text shown right after other text, with no text positioning between them, starts where the content does not say:
+/// every line it may start in is sized by PDFKit's fonts.
 public struct PDFKitInspector: PDFLayoutInspecting {
     public init() {}
 
@@ -72,28 +74,58 @@ public struct PDFKitInspector: PDFLayoutInspecting {
                        formsRead: formsRead)
     }
 
-    /// The smallest size of the runs that start in each box, or nil for a box that no run starts in or that holds a run
-    /// of unknown size. A run starts in the box whose bottom edge lies nearest its baseline, among the boxes it lies in
-    /// vertically (a point of slack on either edge) and starts at most an em, or two points, beside.
+    /// The smallest size of the runs that start in each box, or nil for a box that no run starts in, that holds a run
+    /// of unknown size, or that a run whose start is not known exactly may start in. A run starts in the box whose bottom
+    /// edge lies nearest its baseline, among the boxes it lies in vertically (a point of slack on either edge) and starts
+    /// at most an em, or two points, beside. A run known only to start on a text line may start in every box the line
+    /// meets with the same slack, and one that may start anywhere, in every box.
     static func smallestSizes(of runs: [ShownText], in boxes: [CGRect]) -> [Double?] {
         var smallest = [Double?](repeating: nil, count: boxes.count)
         var unknown = [Bool](repeating: false, count: boxes.count)
         for run in runs {
-            var best: (index: Int, cost: Double)?
-            for (index, box) in boxes.enumerated() {
-                let beside = max(0, Double(box.minX) - run.x, run.x - Double(box.maxX))
-                guard beside <= max(2, run.size ?? 0), run.y >= Double(box.minY) - 1, run.y <= Double(box.maxY) + 1 else { continue }
-                let cost = beside + abs(run.y - Double(box.minY))
-                if best.map({ cost < $0.cost }) ?? true { best = (index, cost) }
-            }
-            guard let index = best?.index else { continue }
-            if let size = run.size {
-                smallest[index] = min(smallest[index] ?? size, size)
-            } else {
-                unknown[index] = true
+            switch run.start {
+            case .at(let x, let y):
+                guard let index = box(holdingARunAt: x, y, ofSize: run.size, among: boxes) else { continue }
+                if let size = run.size {
+                    smallest[index] = min(smallest[index] ?? size, size)
+                } else {
+                    unknown[index] = true
+                }
+            case .onTheLine(let x, let y, let dx, let dy):
+                for (index, box) in boxes.enumerated() where line(through: x, y, along: dx, dy, meets: reach(of: box, forARunOfSize: run.size)) {
+                    unknown[index] = true
+                }
+            case .anywhere:
+                unknown = unknown.map { _ in true }
             }
         }
         return zip(smallest, unknown).map { size, isUnknown in isUnknown ? nil : size }
+    }
+
+    /// The box a run of `size` that starts at (`x`, `y`) starts in, as `smallestSizes(of:in:)` matches them.
+    private static func box(holdingARunAt x: Double, _ y: Double, ofSize size: Double?, among boxes: [CGRect]) -> Int? {
+        var best: (index: Int, cost: Double)?
+        for (index, box) in boxes.enumerated() {
+            let beside = max(0, Double(box.minX) - x, x - Double(box.maxX))
+            guard beside <= max(2, size ?? 0), y >= Double(box.minY) - 1, y <= Double(box.maxY) + 1 else { continue }
+            let cost = beside + abs(y - Double(box.minY))
+            if best.map({ cost < $0.cost }) ?? true { best = (index, cost) }
+        }
+        return best?.index
+    }
+
+    /// Where a run of `size` that starts in `box` may start: the box with a point of slack above and below, and an em,
+    /// or two points, beside.
+    private static func reach(of box: CGRect, forARunOfSize size: Double?) -> CGRect {
+        box.insetBy(dx: -CGFloat(max(2, size ?? 0)), dy: -1)
+    }
+
+    /// Whether the line through (`x`, `y`) in the direction (`dx`, `dy`) meets `rect`: the rectangle's corners do not all
+    /// lie on one side of it. A line with no direction meets every rectangle.
+    private static func line(through x: Double, _ y: Double, along dx: Double, _ dy: Double, meets rect: CGRect) -> Bool {
+        let corners = [(rect.minX, rect.minY), (rect.maxX, rect.minY), (rect.minX, rect.maxY), (rect.maxX, rect.maxY)]
+        let sides = corners.map { dx * (Double($0.1) - y) - dy * (Double($0.0) - x) }
+        return sides.contains { $0 <= 0 } && sides.contains { $0 >= 0 }
     }
 
     /// The smallest font size in `text`, or nil when `text` is empty or any of its characters has no font.
