@@ -23,7 +23,9 @@ private typealias PlatformFont = UIFont
 /// characters instead (resolving the fonts that way is slow and verbose for the system font, #562); a line with a
 /// character that has no font then has none, so the geometry check rejects it. The scan does not read glyph widths, so
 /// text shown right after other text, with no text positioning between them, starts where the content does not say:
-/// every line it may start in is sized by PDFKit's fonts.
+/// every line it may start in is sized by PDFKit's fonts. So is every line of a page whose content the scan cannot read
+/// in full (a form it cannot read, or content it cannot scan to its end), since the text it misses may share a line
+/// with text it reads.
 public struct PDFKitInspector: PDFLayoutInspecting {
     public init() {}
 
@@ -59,9 +61,12 @@ public struct PDFKitInspector: PDFLayoutInspecting {
                 let text = (line.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 return text.isEmpty ? nil : (line, text, line.bounds(for: page))
             }
-            let shown = page.pageRef.map(ShownTextScanner.reading(of:)) ?? ShownTextReading()
+            let shown = page.pageRef.map(ShownTextScanner.reading(of:)) ?? ShownTextReading(isComplete: false)
             formsRead += shown.formsRead
-            for (line, size) in zip(printed, Self.smallestSizes(of: shown.runs, in: printed.map(\.box))) {
+            let sizes = shown.isComplete
+                ? Self.smallestSizes(of: shown.runs, in: printed.map(\.box))
+                : [Double?](repeating: nil, count: printed.count)
+            for (line, size) in zip(printed, sizes) {
                 var glyphHeight = size
                 if glyphHeight == nil {
                     glyphHeight = Self.glyphHeight(of: line.line.attributedString)

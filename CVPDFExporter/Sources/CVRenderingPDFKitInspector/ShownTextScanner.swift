@@ -30,13 +30,18 @@ struct ShownTextReading {
     var runs: [ShownText] = []
     /// The form XObjects the content drew and the scan read.
     var formsRead = 0
+    /// Whether the scan read the whole content: false when it met a form it could not read, or content it could not
+    /// scan to its end, either of which may show text that has no run.
+    var isComplete = true
 }
 
 enum ShownTextScanner {
-    /// The text `page` shows, in content order. A form nested deeper than `formDepthLimit`, or one with no resources or
-    /// an unreadable matrix, is not read: the lines it shows then have no run, and the inspector sizes them as before.
+    /// The text `page` shows, in content order. A form the scan cannot read (nested deeper than `formDepthLimit`, with
+    /// no resources or an unreadable matrix, or an XObject it cannot resolve), or content it cannot scan to its end,
+    /// makes the reading incomplete: the text there has no run, so the inspector sizes every line of the page by PDFKit's
+    /// fonts.
     static func reading(of page: CGPDFPage) -> ShownTextReading {
-        guard let table = operatorTable() else { return ShownTextReading() }
+        guard let table = operatorTable() else { return ShownTextReading(isComplete: false) }
         defer { CGPDFOperatorTableRelease(table) }
         let collector = ShownTextCollector(table: table)
         let stream = CGPDFContentStreamCreateWithPage(page)
@@ -65,10 +70,13 @@ enum ShownTextScanner {
             var name: UnsafePointer<CChar>?
             guard let collector = collecting(info), let size = popNumbers(scanner, 1),
                   CGPDFScannerPopName(scanner, &name), let name else { return }
-            let font = setting(of: name, in: CGPDFScannerGetContentStream(scanner), cmaps: &collector.verticalCMaps)
-            collector.state.fontSize = size[0]
-            collector.state.fontIsReadable = font.sizedByItsEm
-            collector.state.fontWritesAcross = font.writesAcross
+            collector.setFont(font(named: name, in: CGPDFScannerGetContentStream(scanner)), size: size[0])
+        }
+        CGPDFOperatorTableSetCallback(table, "gs") { scanner, info in
+            var name: UnsafePointer<CChar>?
+            guard let collector = collecting(info), CGPDFScannerPopName(scanner, &name), let name,
+                  let set = font(setBy: name, in: CGPDFScannerGetContentStream(scanner)) else { return }
+            collector.setFont(set.font, size: set.size)
         }
         CGPDFOperatorTableSetCallback(table, "TL") { scanner, info in
             guard let collector = collecting(info), let leading = popNumbers(scanner, 1) else { return }
@@ -148,18 +156,44 @@ private func popNumbers(_ scanner: CGPDFScannerRef, _ count: Int) -> [CGFloat]? 
     return values.reversed()
 }
 
-/// How the font `name` of `stream`'s resources sets its glyphs: whether the `Tf` size scales them (any font but Type 3),
-/// and whether it writes across, moving the text position along the text line (any font but a Type 0 one whose CMap
-/// may write vertically). A font missing from the resources does neither.
-private func setting(of name: UnsafePointer<CChar>, in stream: CGPDFContentStreamRef,
-                     cmaps: inout [CGPDFStreamRef: Bool]) -> (sizedByItsEm: Bool, writesAcross: Bool) {
+/// The font `name` of `stream`'s resources, or nil when the resources have no font dictionary of that name.
+private func font(named name: UnsafePointer<CChar>, in stream: CGPDFContentStreamRef) -> CGPDFDictionaryRef? {
     var dictionary: CGPDFDictionaryRef?
-    var subtype: UnsafePointer<CChar>?
     guard let object = CGPDFContentStreamGetResource(stream, "Font", name),
-          CGPDFObjectGetValue(object, .dictionary, &dictionary), let dictionary,
-          CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else { return (false, false) }
+          CGPDFObjectGetValue(object, .dictionary, &dictionary) else { return nil }
+    return dictionary
+}
+
+/// The font and size the graphics state parameters `name` of `stream`'s resources set, as `Tf` does, when `gs` applies
+/// them: nil when they set no font (they have no `/Font` entry). The font, or the size, is nil when the scan cannot
+/// read it: the parameters are missing from the resources, or their entry is not `[font size]`.
+private func font(setBy name: UnsafePointer<CChar>,
+                  in stream: CGPDFContentStreamRef) -> (font: CGPDFDictionaryRef?, size: CGFloat?)? {
+    var parameters: CGPDFDictionaryRef?
+    guard let object = CGPDFContentStreamGetResource(stream, "ExtGState", name),
+          CGPDFObjectGetValue(object, .dictionary, &parameters), let parameters else { return (nil, nil) }
+    var entry: CGPDFObjectRef?
+    guard CGPDFDictionaryGetObject(parameters, "Font", &entry) else { return nil }
+    var array: CGPDFArrayRef?
+    guard let entry, CGPDFObjectGetValue(entry, .array, &array), let array, CGPDFArrayGetCount(array) == 2 else {
+        return (nil, nil)
+    }
+    var font: CGPDFDictionaryRef?
+    var size: CGPDFReal = 0
+    let hasFont = CGPDFArrayGetDictionary(array, 0, &font)
+    let hasSize = CGPDFArrayGetNumber(array, 1, &size)
+    return (hasFont ? font : nil, hasSize ? size : nil)
+}
+
+/// How `font` sets its glyphs: whether the `Tf` size scales them (any font but Type 3), and whether it writes across,
+/// moving the text position along the text line (any font but a Type 0 one whose CMap may write vertically). A font
+/// with no subtype does neither.
+private func setting(of font: CGPDFDictionaryRef,
+                     cmaps: inout [CGPDFStreamRef: Bool]) -> (sizedByItsEm: Bool, writesAcross: Bool) {
+    var subtype: UnsafePointer<CChar>?
+    guard CGPDFDictionaryGetName(font, "Subtype", &subtype), let subtype else { return (false, false) }
     let kind = String(cString: subtype)
-    return (kind != "Type3", kind != "Type0" || !mayWriteVertically(dictionary, cmaps: &cmaps))
+    return (kind != "Type3", kind != "Type0" || !mayWriteVertically(font, cmaps: &cmaps))
 }
 
 /// Whether the Type 0 font `font` may write vertically: its CMap is named, by a name `writesAcross(cmapNamed:)` does
@@ -393,7 +427,7 @@ private final class ShownTextCollector {
     private var lineMatrix = CGAffineTransform.identity
     private var depth = 0
     /// Whether each embedded CMap the content's fonts use may write vertically.
-    var verticalCMaps: [CGPDFStreamRef: Bool] = [:]
+    private var verticalCMaps: [CGPDFStreamRef: Bool] = [:]
     private let table: CGPDFOperatorTableRef
 
     init(table: CGPDFOperatorTableRef) { self.table = table }
@@ -401,7 +435,7 @@ private final class ShownTextCollector {
     func scan(_ stream: CGPDFContentStreamRef) {
         let scanner = CGPDFScannerCreate(stream, table, Unmanaged.passUnretained(self).toOpaque())
         defer { CGPDFScannerRelease(scanner) }
-        _ = CGPDFScannerScan(scanner)
+        if !CGPDFScannerScan(scanner) { reading.isComplete = false }
     }
 
     func save() { saved.append(state) }
@@ -409,6 +443,16 @@ private final class ShownTextCollector {
     func restore() { if let last = saved.popLast() { state = last } }
 
     func beginText() { setTextMatrix(.identity) }
+
+    /// Sets the font of the runs that follow, as `Tf` or `gs` does: `font` nil when the content names one the scan
+    /// cannot read, which neither scales its glyphs by the size nor writes across; `size` nil when it cannot read that.
+    func setFont(_ font: CGPDFDictionaryRef?, size: CGFloat?) {
+        var glyphs = (sizedByItsEm: false, writesAcross: false)
+        if let font { glyphs = setting(of: font, cmaps: &verticalCMaps) }
+        state.fontSize = size
+        state.fontIsReadable = glyphs.sizedByItsEm
+        state.fontWritesAcross = glyphs.writesAcross
+    }
 
     func setTextMatrix(_ matrix: CGAffineTransform) {
         textMatrix = matrix
@@ -455,16 +499,24 @@ private final class ShownTextCollector {
     }
 
     /// Reads the form XObject `name` of `parent`'s resources as the content draws it: in its own graphics state, its
-    /// matrix concatenated to the current transform. Images and every other kind of XObject show no text.
+    /// matrix concatenated to the current transform. Images and every other kind of XObject show no text. An XObject
+    /// the scan cannot resolve, or a form it cannot read, makes the reading incomplete.
     func drawForm(named name: UnsafePointer<CChar>, from parent: CGPDFContentStreamRef) {
-        guard depth < ShownTextScanner.formDepthLimit, let object = CGPDFContentStreamGetResource(parent, "XObject", name) else { return }
         var stream: CGPDFStreamRef?
         var subtype: UnsafePointer<CChar>?
+        guard let object = CGPDFContentStreamGetResource(parent, "XObject", name),
+              CGPDFObjectGetValue(object, .stream, &stream), let stream, let dictionary = CGPDFStreamGetDictionary(stream),
+              CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else {
+            reading.isComplete = false
+            return
+        }
+        guard String(cString: subtype) == "Form" else { return }
         var resources: CGPDFDictionaryRef?
-        guard CGPDFObjectGetValue(object, .stream, &stream), let stream, let dictionary = CGPDFStreamGetDictionary(stream),
-              CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype, String(cString: subtype) == "Form",
-              CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources,
-              let matrix = Self.matrix(of: dictionary) else { return }
+        guard depth < ShownTextScanner.formDepthLimit, CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources),
+              let resources, let matrix = Self.matrix(of: dictionary) else {
+            reading.isComplete = false
+            return
+        }
         let form = CGPDFContentStreamCreateWithStream(stream, resources, parent)
         defer { CGPDFContentStreamRelease(form) }
         let outer = (state, saved, textMatrix, lineMatrix, position)

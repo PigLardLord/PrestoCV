@@ -133,11 +133,15 @@ struct ShownTextTests {
         ])
     }
 
+    /// The first page of `data`.
+    static func page(of data: Data) throws -> CGPDFPage {
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        return try #require(CGPDFDocument(provider)?.page(at: 1))
+    }
+
     /// The runs the scan finds on the first page of `data`.
     static func runs(of data: Data) throws -> [ShownText] {
-        let provider = try #require(CGDataProvider(data: data as CFData))
-        let page = try #require(CGPDFDocument(provider)?.page(at: 1))
-        return ShownTextScanner.reading(of: page).runs
+        ShownTextScanner.reading(of: try page(of: data)).runs
     }
 
     @Test("text a page shows through a form is sized through the form's matrix and the page's transform")
@@ -151,6 +155,89 @@ struct ShownTextTests {
         #expect(reading.layout.lines.map(\.text) == ["Twelve point text", "Six point text"])
         #expect(reading.layout.lines.map(\.glyphHeight) == [6, 3], "\(reading.layout.lines)")
         #expect(PDFKitFonts.lines(of: data)?.map(\.height) == [6, 3])
+    }
+
+    /// A one-page A4 PDF whose page content `content` shows Helvetica (`/F1`) and may name the graphics state parameters
+    /// `/Small` (Helvetica at 3 pt), `/Clear` (no font), and `/Broken` (a font entry that is not [font size]).
+    static func pageWithGraphicsStates(_ content: String) -> Data {
+        handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> /ExtGState << "
+                + "/Small << /Font [5 0 R 3] >> /Clear << /CA 0.5 >> /Broken << /Font [5 0 R] >> >> >> /Contents 4 0 R >>",
+            stream(content),
+            helvetica,
+        ])
+    }
+
+    @Test("graphics state parameters that set a font size the text after them as Tf does")
+    func fontFromGraphicsState() throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 12 Tf /Small gs 100 700 Td (Tiny) Tj ET BT /F1 6 Tf /Clear gs 100 600 Td (Six) Tj ET")
+        #expect(try Self.runs(of: data).map(\.size) == [3, 6], "a font and its size, then parameters that set no font")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        #expect(PDFKitFonts.lines(of: data)?.map(\.height) == [3, 6], "PDFKit's fonts")
+        #expect(reading.linesSizedByAttributedText == 0)
+        #expect(reading.layout.lines.map(\.glyphHeight) == [3, 6], "\(reading.layout.lines)")
+    }
+
+    /// A font the scan cannot read may write vertically, so the run after it may start anywhere on the page, as after a
+    /// `Tf` that names a font missing from the resources.
+    @Test("parameters the scan cannot read set a font it does not know, and every line is sized by PDFKit's fonts",
+          arguments: ["/Broken gs", "/Missing gs"])
+    func unreadableGraphicsState(_ parameters: String) throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 6 Tf 100 700 Td (Six) Tj ET BT /F1 12 Tf \(parameters) 100 500 Td (Twelve) Tj ET")
+        #expect(try Self.runs(of: data).map(\.size) == [6, nil], "the size after parameters the scan cannot read")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(expected.map(\.height) == [6, 12], "PDFKit's fonts keep the font of the Tf")
+        #expect(reading.linesSizedByAttributedText == 2, "\(reading.layout.lines)")
+        #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(reading.layout.lines)")
+    }
+
+    @Test("a page whose forms nest deeper than the scan reads is read in part, and its lines are sized by PDFKit's fonts")
+    func formsTooDeep() throws {
+        let form = "/Type /XObject /Subtype /Form /BBox [0 0 595 842] "
+        let nested = (0..<ShownTextScanner.formDepthLimit).map { level in
+            Self.stream("/Fm Do", form + "/Resources << /XObject << /Fm \(7 + level) 0 R >> >> ")
+        }
+        // The deepest form shows small text on the line of the page's own text, which the scan sizes alone.
+        let data = Self.handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                + "/Resources << /Font << /F1 5 0 R >> /XObject << /Fm 6 0 R >> >> "
+                + "/Contents 4 0 R >>",
+            Self.stream("BT /F1 12 Tf 100 700 Td (A) Tj ET /Fm Do"),
+            Self.helvetica,
+        ] + nested + [Self.stream("BT /F1 3 Tf 108 700 Td (B) Tj ET", form + "/Resources << /Font << /F1 5 0 R >> >> ")])
+        let shown = ShownTextScanner.reading(of: try Self.page(of: data))
+        #expect(!shown.isComplete)
+        #expect(shown.formsRead == ShownTextScanner.formDepthLimit)
+        #expect(shown.runs.map(\.size) == [12], "the deepest form is not read")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(expected.map(\.height) == [3], "PDFKit's fonts: \(expected.map(\.text))")
+        #expect(reading.linesSizedByAttributedText == 1)
+        #expect(reading.layout.lines.map(\.glyphHeight) == [3], "\(reading.layout.lines)")
+    }
+
+    @Test("a page that draws an XObject missing from its resources, or a form with no resources, is read in part")
+    func formsNotRead() throws {
+        let missing = Self.pageShowingAForm("BT /F1 12 Tf 100 700 Td (Twelve point text) Tj ET", matrix: "1 0 0 1 0 0",
+                                            drawnWith: "/Fm0 Do /Nowhere Do")
+        let bare = Self.handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                + "/Resources << /Font << /F1 5 0 R >> /XObject << /Fm 6 0 R >> >> "
+                + "/Contents 4 0 R >>",
+            Self.stream("BT /F1 12 Tf 100 700 Td (A) Tj ET /Fm Do"),
+            Self.helvetica,
+            Self.stream("BT /F1 3 Tf 108 700 Td (B) Tj ET", "/Type /XObject /Subtype /Form /BBox [0 0 595 842] "),
+        ])
+        for (name, data) in [("a missing XObject", missing), ("a form with no resources", bare)] {
+            #expect(!ShownTextScanner.reading(of: try Self.page(of: data)).isComplete, "\(name)")
+            let reading = try #require(PDFKitInspector().reading(of: data), "\(name)")
+            let expected = try #require(PDFKitFonts.lines(of: data), "\(name)")
+            #expect(reading.linesSizedByAttributedText == reading.layout.lines.count, "\(name): \(reading.layout.lines)")
+            #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(name): \(reading.layout.lines)")
+        }
     }
 
     // MARK: Where a run starts
