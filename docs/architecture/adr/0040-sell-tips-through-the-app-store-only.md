@@ -7,7 +7,7 @@
 ## Context
 
 - **PrestoCV is free, and every feature works without paying** (#197). Some people want to say thank you to the developer, and #213 asks for a way to do it: three tips of €1.99, €4.99 and €9.99, with a thank-you. #505 places it in Settings, as the row "Support PrestoCV".
-- **Apple's rules for a payment made inside the app.** The App Review Guidelines ask that a payment made inside an app go through In-App Purchase (3.1.1), and they keep collecting donations for approved nonprofits (3.2.2). PrestoCV's developer is a person, not a nonprofit, so what the app sells is a tip, not a donation. On the US storefront only, the guidelines also allow a link to another way of paying.
+- **Apple's rules for a payment made inside the app.** The App Review Guidelines ask that a payment made inside an app go through In-App Purchase (3.1.1), and they keep collecting donations for approved nonprofits (3.2.2). PrestoCV's developer is a person, not a nonprofit, so what the app sells is a tip, not a donation. On the US storefront, the guidelines also allow a link to another way of paying, with no entitlement (3.1.1(a)). In some other regions a link needs a StoreKit External Purchase Link Entitlement, granted on application and bound by its agreement, and it may lead only to the destinations Apple permits in that region.
 - **The maintainer assessed that selling tips makes the developer a trader** under the EU Digital Services Act (#269). The status is a self-assessment that each developer declares in App Store Connect; Apple names in-app purchases among the signs of a trader, but no rule makes the status follow from a sale alone. A trader's contact details show on the product page in the EU. The maintainer switches the status when the tips ship.
 - **Selling needs the Paid Applications Agreement** and the developer's bank and tax details in App Store Connect. They block the sale, not the code.
 - **The maintainer decided on 2026-11-26:** the tips ship inside version 1.1; they are named "Small tip", "Medium tip" and "Large tip"; a tip gives no mark or badge; the screen's introduction is neutral; the link to another way of paying on the US storefront is not in 1.1 and is listed for 1.2 (#569).
@@ -33,7 +33,7 @@
 
 ## Alternatives considered
 
-- **A link to a sponsorship page for everyone.** Outside the US storefront, the guidelines do not allow it in the app, and the review would refuse the version. On the US storefront it is allowed, and it is #569, for 1.2.
+- **A link to a sponsorship page for everyone.** Outside the US storefront, a link is allowed only in the regions that offer a StoreKit External Purchase Link Entitlement, once it is granted and its agreement signed; without one, the review would refuse the version. An entitlement is not part of this decision. On the US storefront no entitlement is needed, and that link is #569, for 1.2.
 - **A supporter mark or an extra unlocked by a tip.** The maintainer chose no mark, and #197 keeps every feature free. Anything unlocked would also need storage and a restore.
 - **A subscription or a one-time "supporter" purchase.** A renewal or a restore that unlocks nothing confuses people and adds work.
 - **The word "donation".** It suggests a nonprofit, which the guidelines reserve for approved organisations.
