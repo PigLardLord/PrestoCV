@@ -270,6 +270,19 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture that opens a file outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// UI tests that are not about the designs accept the bundled designs without rendering them; no Release build may
+    /// install a design that no render checked.
+    @Test("The fixture that accepts the bundled designs without rendering them is read only by Debug builds")
+    func theFixtureThatAcceptsTheDesignsIsReadOnlyInDebugBuilds() {
+        let names = ["readyDesignsArgument", "acceptsBundledDesigns", "AcceptedDesigns", "fixtures.designGate"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that accepts the designs outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
     /// carries the composition's flag, always false, and has no code that sets it, passes it on or shows the stand-in.
     @Test("The stand-in of the share sheet is set, passed on and shown only by Debug builds")
