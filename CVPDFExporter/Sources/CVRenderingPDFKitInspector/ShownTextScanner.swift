@@ -116,6 +116,8 @@ enum ShownTextScanner {
         CGPDFOperatorTableSetCallback(table, "\"") { scanner, info in
             guard let collector = collecting(info) else { return }
             let shows = showsAGlyph(collector.string(from: scanner))
+            // The word and character spacing under the string: the scan measures no widths, so it reads only their type.
+            guard collector.numbers(2, from: scanner) != nil else { return }
             collector.nextLine()
             if shows { collector.show(after: 0) }
         }

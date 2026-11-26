@@ -210,13 +210,22 @@ struct ShownTextTests {
 
     @Test("an operand the scan cannot read, missing or not of the type its operator takes, makes the reading incomplete",
           arguments: ["1 0 0 1 0 /x cm", "/x TL", "TL", "/x Ts", "/x Tz", "0 /x Td", "0 /x TD", "1 0 0 1 0 /x Tm",
-                      "/F1 /x Tf", "(F1) 12 Tf", "12 gs", "12 Tj", "12 '", "0 0 12 \"", "12 TJ", "[/x (B)] TJ", "12 Do"])
+                      "/F1 /x Tf", "(F1) 12 Tf", "12 gs", "12 Tj", "12 '", "0 0 12 \"", "/x 0 (B) \"", "0 /x (B) \"",
+                      "(B) \"", "12 TJ", "[/x (B)] TJ", "12 Do"])
     func unreadableOperand(_ operation: String) throws {
         let readable = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing("BT /F1 12 Tf 100 700 Td (A) Tj ET")))
         let content = "BT /F1 12 Tf 100 700 Td (A) Tj \(operation) ET"
         let reading = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing(content)))
         #expect(readable.isComplete, "the page without the operation")
         #expect(!reading.isComplete, "\(content)")
+    }
+
+    @Test("operands of the types their operators take keep the reading complete",
+          arguments: ["1 0 0 1 0 0 cm", "14 TL", "2 Ts", "50 Tz", "0 -14 Td", "0 -14 TD", "1 0 0 1 0 0 Tm", "/F1 9 Tf",
+                      "T*", "(B) Tj", "(B) '", "1 0 (B) \"", "[(B) -10 (C)] TJ"])
+    func readableOperand(_ operation: String) throws {
+        let content = "BT /F1 12 Tf 100 700 Td (A) Tj \(operation) ET"
+        #expect(ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing(content))).isComplete, "\(content)")
     }
 
     @Test("a page whose forms nest deeper than the scan reads is read in part, and its lines are sized by PDFKit's fonts")
