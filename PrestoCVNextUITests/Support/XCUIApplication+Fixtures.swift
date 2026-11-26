@@ -35,7 +35,7 @@ extension XCUIApplication {
         for cv in cvs { files["\(cv.identity).cv.json"] = cv.json }
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
-            "-PrestoCVNextSeed", try seed(files),
+            "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try seed(files),
         ]
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]

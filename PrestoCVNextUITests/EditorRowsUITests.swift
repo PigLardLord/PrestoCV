@@ -230,7 +230,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         let file = XCUIApplication.storedCV(identity: identity, title: title)
         app.launchArguments += [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", folder,
-            "-PrestoCVNextSeed", try XCUIApplication.seed(["\(identity).cv.json": file]),
+            "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try XCUIApplication.seed(["\(identity).cv.json": file]),
         ]
         app.launch()
         app.openCV(titled: title)
@@ -242,6 +242,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         app.terminate()
         app.launchArguments = [
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", folder,
+            "-PrestoCVNextReadyDesigns",
         ]
         app.launch()
 

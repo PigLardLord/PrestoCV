@@ -61,7 +61,8 @@ final class LanguagePassUITests: RuntimeIssueFailingTestCase {
             Set(Self.importOffer.values).count, Self.importOffer.count, "The six texts differ, or the check proves nothing")
         let expected = try XCTUnwrap(Self.importOffer[language], "A text is written for \"\(language)\"")
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVNextEmptyStorage"]
+        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVNextEmptyStorage",
+            "-PrestoCVNextReadyDesigns"]
         app.launch()
 
         let importing = app.buttons["start.import"]

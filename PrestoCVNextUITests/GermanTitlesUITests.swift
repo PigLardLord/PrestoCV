@@ -31,7 +31,8 @@ final class GermanTitlesUITests: RuntimeIssueFailingTestCase {
     /// export control.
     @MainActor
     func testTheTitleOfANewCVIsWhole() throws {
-        let app = launchInGerman(arguments: ["-PrestoCVNextEmptyStorage"])
+        let storage = ["-PrestoCVNextEmptyStorage"]
+        let app = launchInGerman(arguments: storage)
         let blank = app.buttons["start.blank"]
         XCTAssertTrue(blank.waitForExistence(timeout: 30), "The first run offers a blank CV")
         blank.tap()
@@ -44,9 +45,10 @@ final class GermanTitlesUITests: RuntimeIssueFailingTestCase {
     @MainActor
     func testTheTitleOfACVWithoutANameIsWhole() throws {
         let json = XCUIApplication.storedCV(identity: nameless, title: "", person: "")
-        let app = launchInGerman(arguments: [
+        let storage = [
             "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try XCUIApplication.seed(["\(nameless).cv.json": json]),
-        ])
+        ]
+        let app = launchInGerman(arguments: storage)
         let row = app.element("shell.row")
         XCTAssertTrue(row.waitForExistence(timeout: 30), "The list shows the CV without a name")
         row.tap()
@@ -64,7 +66,7 @@ final class GermanTitlesUITests: RuntimeIssueFailingTestCase {
     private func launchInGerman(arguments: [String]) -> XCUIApplication {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"] + arguments
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE", "-PrestoCVNextReadyDesigns"] + arguments
         app.launch()
         return app
     }
