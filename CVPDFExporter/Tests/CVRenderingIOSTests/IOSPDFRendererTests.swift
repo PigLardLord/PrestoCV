@@ -200,7 +200,8 @@ extension IOSPDFRendererTests {
     @Suite("#558 · where the text of the bundled designs lands")
     struct Layout {
         /// Compares each design's layout with the stored reference of this device and system version; with `RECORD_LAYOUTS`
-        /// set it writes the layout there instead (the commands are in `LayoutReferenceStore`).
+        /// set it writes the layout there instead and fails, so a recording run never passes (the commands are in
+        /// `LayoutReferenceStore`).
         @Test("every line of each bundled design lands where the layout reference of this device and system version has it",
               arguments: ["minimal", "modern", "professional"], LayoutDocument.allCases)
         func bundled(design: String, document: LayoutDocument) async throws {

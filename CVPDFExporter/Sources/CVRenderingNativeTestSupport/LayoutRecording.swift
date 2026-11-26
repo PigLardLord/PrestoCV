@@ -4,7 +4,8 @@ import CVRenderingTestSupport
 
 /// #558: where the native layout tests write the layouts they record. A developer sets `RECORD_LAYOUTS` to an absolute
 /// folder; on the iOS simulator, through the test runner's environment (`TEST_RUNNER_RECORD_LAYOUTS` for `xcodebuild`).
-/// With it set the layout tests write the references instead of comparing them: `LayoutReferenceStore` has the commands.
+/// With it set the layout tests write the references instead of comparing them, and each one fails with
+/// `NativeCheckFailure.layoutRecorded`, so a recording run never passes: `LayoutReferenceStore` has the commands.
 public enum LayoutRecording {
     /// The folder `RECORD_LAYOUTS` names, or nil when it is not set.
     public static var folder: URL? {

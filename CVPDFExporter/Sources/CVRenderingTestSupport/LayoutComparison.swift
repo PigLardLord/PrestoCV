@@ -4,6 +4,8 @@ import CVRendering
 public enum LayoutDifference: Sendable, Equatable {
     /// The PDF has another number of pages.
     case pageCount(reference: Int, found: Int)
+    /// A page whose box moved or changed size by more than the tolerance, by how much, in points.
+    case pageBox(page: Int, dx: Double, dy: Double, dwidth: Double, dheight: Double)
     /// A line of the reference that the PDF does not have.
     case missing(page: Int, text: String)
     /// A line of the PDF that the reference does not have.
@@ -20,11 +22,17 @@ public enum LayoutComparison {
     /// print further apart than this: `LayoutParity.tolerance` is the one between them.
     public static let tolerance = 0.5
 
-    /// Every difference of `found` from `reference`: the page count, then each line, in the reference's order.
+    /// Every difference of `found` from `reference`: the page count, then the box of each page both have, then each line,
+    /// in the reference's order.
     public static func differences(_ found: PDFLayout, from reference: PDFLayout, tolerance: Double = tolerance) -> [LayoutDifference] {
         var differences: [LayoutDifference] = []
         if found.pages.count != reference.pages.count {
             differences.append(.pageCount(reference: reference.pages.count, found: found.pages.count))
+        }
+        for (page, (foundBox, referenceBox)) in zip(found.pages, reference.pages).enumerated() {
+            if let d = change(foundBox, from: referenceBox, tolerance: tolerance) {
+                differences.append(.pageBox(page: page, dx: d.dx, dy: d.dy, dwidth: d.dwidth, dheight: d.dheight))
+            }
         }
         for step in alignment(reference.lines.map(\.text), found.lines.map(\.text)) {
             switch step {
@@ -43,10 +51,19 @@ public enum LayoutComparison {
         guard found.pageIndex == reference.pageIndex else {
             return [.otherPage(text: reference.text, reference: reference.pageIndex, found: found.pageIndex)]
         }
-        let dx = found.box.x - reference.box.x, dy = found.box.y - reference.box.y
-        let dwidth = found.box.width - reference.box.width, dheight = found.box.height - reference.box.height
-        guard [dx, dy, dwidth, dheight].contains(where: { abs($0) > tolerance }) else { return [] }
-        return [.moved(page: reference.pageIndex, text: reference.text, dx: dx, dy: dy, dwidth: dwidth, dheight: dheight)]
+        guard let d = change(found.box, from: reference.box, tolerance: tolerance) else { return [] }
+        return [.moved(page: reference.pageIndex, text: reference.text, dx: d.dx, dy: d.dy, dwidth: d.dwidth, dheight: d.dheight)]
+    }
+
+    /// How far each side of `found` is from that of `reference`, or nil when none is further than `tolerance`.
+    private static func change(
+        _ found: PDFBox, from reference: PDFBox, tolerance: Double
+    ) -> (dx: Double, dy: Double, dwidth: Double, dheight: Double)? {
+        let change = (
+            dx: found.x - reference.x, dy: found.y - reference.y,
+            dwidth: found.width - reference.width, dheight: found.height - reference.height
+        )
+        return [change.dx, change.dy, change.dwidth, change.dheight].contains { abs($0) > tolerance } ? change : nil
     }
 
     private enum Step: Equatable {
@@ -84,6 +101,8 @@ extension LayoutDifference: CustomStringConvertible {
         switch self {
         case .pageCount(let reference, let found):
             "\(reference) pages in the reference, \(found) found"
+        case .pageBox(let page, let dx, let dy, let dwidth, let dheight):
+            "page \(page + 1): the page's box moved by \(Self.offsets(dx, dy, dwidth, dheight))"
         case .missing(let page, let text):
             "page \(page + 1): \"\(text)\" is missing"
         case .extra(let page, let text):
@@ -91,9 +110,12 @@ extension LayoutDifference: CustomStringConvertible {
         case .otherPage(let text, let reference, let found):
             "\"\(text)\" is on page \(found + 1), on page \(reference + 1) in the reference"
         case .moved(let page, let text, let dx, let dy, let dwidth, let dheight):
-            "page \(page + 1): \"\(text)\" moved by x \(Self.signed(dx)), y \(Self.signed(dy)), width \(Self.signed(dwidth)), "
-                + "height \(Self.signed(dheight))"
+            "page \(page + 1): \"\(text)\" moved by \(Self.offsets(dx, dy, dwidth, dheight))"
         }
+    }
+
+    private static func offsets(_ dx: Double, _ dy: Double, _ dwidth: Double, _ dheight: Double) -> String {
+        "x \(signed(dx)), y \(signed(dy)), width \(signed(dwidth)), height \(signed(dheight))"
     }
 
     private static func signed(_ value: Double) -> String {

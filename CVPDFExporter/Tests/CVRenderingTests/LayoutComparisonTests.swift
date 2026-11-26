@@ -70,6 +70,33 @@ struct LayoutComparisonTests {
         #expect(LayoutComparison.differences(found, from: Self.reference) == [.pageCount(reference: 2, found: 3)])
     }
 
+    @Test("a page box moved or resized beyond the tolerance is reported with how far, and its lines are still compared")
+    func pageBox() {
+        var pages = Self.reference.pages
+        pages[1].height += 0.75; pages[0].x -= 2
+        let found = PDFLayout(pages: pages, lines: Self.changing { $0[4].box.y += 1 }.lines)
+        #expect(LayoutComparison.differences(found, from: Self.reference) == [
+            .pageBox(page: 0, dx: -2, dy: 0, dwidth: 0, dheight: 0),
+            .pageBox(page: 1, dx: 0, dy: 0, dwidth: 0, dheight: 0.75),
+            .moved(page: 1, text: "Experience", dx: 0, dy: 1, dwidth: 0, dheight: 0),
+        ])
+    }
+
+    @Test("a page box changed by at most the tolerance has no difference")
+    func pageBoxWithinTolerance() {
+        let shifted = PDFBox(x: 0.5, y: -0.5, width: 595.5, height: 841.5)
+        let found = PDFLayout(pages: [shifted, Self.page], lines: Self.reference.lines)
+        #expect(LayoutComparison.differences(found, from: Self.reference).isEmpty)
+    }
+
+    @Test("with another page count, the boxes of the pages both layouts have are still compared")
+    func pageBoxWithAnotherCount() {
+        let found = PDFLayout(pages: [PDFBox(x: 0, y: 0, width: 612, height: 792)], lines: Self.reference.lines)
+        #expect(LayoutComparison.differences(found, from: Self.reference) == [
+            .pageCount(reference: 2, found: 1), .pageBox(page: 0, dx: 0, dy: 0, dwidth: 17, dheight: -50),
+        ])
+    }
+
     @Test("a missing line is reported, and the lines after it are still compared with their own reference")
     func missing() {
         let found = Self.changing { $0.remove(at: 2); $0[2].box.x += 1 }
@@ -105,6 +132,8 @@ struct LayoutComparisonTests {
     @Test("each difference reads as a sentence, its pages counted from 1")
     func descriptions() {
         #expect(LayoutDifference.pageCount(reference: 2, found: 3).description == "2 pages in the reference, 3 found")
+        #expect(LayoutDifference.pageBox(page: 1, dx: 0, dy: 0, dwidth: 17, dheight: -50).description
+            == "page 2: the page's box moved by x +0.00, y +0.00, width +17.00, height -50.00")
         #expect(LayoutDifference.missing(page: 0, text: "Profile").description == "page 1: \"Profile\" is missing")
         #expect(LayoutDifference.extra(page: 1, text: "Profile").description == "page 2: \"Profile\" is extra")
         #expect(LayoutDifference.otherPage(text: "Profile", reference: 0, found: 1).description

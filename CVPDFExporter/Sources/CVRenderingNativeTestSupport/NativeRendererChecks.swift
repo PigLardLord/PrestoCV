@@ -33,6 +33,9 @@ public enum NativeCheckFailure: Error, Equatable {
     case layoutDocumentTruncated(design: String, document: LayoutDocument, requiredPages: Int)
     /// A design's layout does not match the reference of its kind of device and system version: the verdict says which.
     case layoutDiffers(design: String, document: LayoutDocument, verdict: String)
+    /// A recording run wrote a design's layout at `path`, inside the `RECORD_LAYOUTS` folder. It fails on purpose, so a
+    /// run that keeps the variable set never passes: review and commit the recording, then run the tests without it.
+    case layoutRecorded(design: String, document: LayoutDocument, path: String)
 }
 
 /// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
@@ -260,9 +263,12 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
     }
 
     /// #558: writes the layout of the bundled design `name` in `document` into `folder`, in the folder of this kind of
-    /// device and OS version.
+    /// device and OS version, then fails with `layoutRecorded`: a recording never passes, so a run that keeps
+    /// `RECORD_LAYOUTS` set fails instead of skipping every comparison.
     public func recordLayout(design name: String, document: LayoutDocument, into folder: URL) async throws {
-        try LayoutRecording.write(try await layoutReference(design: name, document: document), into: folder)
+        let reference = try await layoutReference(design: name, document: document)
+        try LayoutRecording.write(reference, into: folder)
+        throw NativeCheckFailure.layoutRecorded(design: name, document: document, path: reference.path)
     }
 
     // MARK: Step budget

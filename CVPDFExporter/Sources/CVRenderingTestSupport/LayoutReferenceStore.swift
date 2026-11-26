@@ -11,7 +11,8 @@ import CVRendering
 /// - on the iPhone or iPad simulator: `TEST_RUNNER_RECORD_LAYOUTS=<the same path> xcodebuild test
 ///   -scheme CVPDFExporter-Package -destination 'platform=iOS Simulator,name=<device>' -only-testing:CVRenderingIOSTests`,
 ///   once on an iPhone and once on an iPad (the folders are told apart by the device).
-/// With the variable set the layout tests write the references instead of comparing. The tests read the stored references
+/// With the variable set the layout tests write the references instead of comparing, and each of them fails on purpose
+/// (`layoutRecorded`), so a run that keeps the variable never passes. The tests read the stored references
 /// as a resource of their own bundle (`LayoutReferenceStore(folder:)` with the bundle's `LayoutReferences` folder, R16), so
 /// a recording must be committed and the tests built again before they compare with it.
 public struct LayoutReferenceStore: Sendable {
