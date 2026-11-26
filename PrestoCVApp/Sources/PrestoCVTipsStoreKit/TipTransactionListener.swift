@@ -27,7 +27,8 @@ struct TipTransactionFeed: Sendable {
 /// transaction left unfinished comes back at every launch.
 ///
 /// It subscribes to the updates first, so none is missed while it finishes the unfinished transactions, then finishes the
-/// unfinished ones, then the updates, until it is dropped. Dropping it cancels the task.
+/// unfinished ones, then the updates, until it is dropped. Dropping it cancels the task; a finish already in flight
+/// ends first.
 final class TipTransactionListener: Sendable {
     private let feed: TipTransactionFeed
     private let logger: any DiagnosticLogger
@@ -53,15 +54,17 @@ final class TipTransactionListener: Sendable {
     }
 
     /// Finishes the unfinished transactions, then each update. The updates are read from the start, by a task that only
-    /// buffers them (the drain starts once it has subscribed), so one the store delivers while the unfinished ones are being finished is kept, not lost. The store
-    /// hands a transaction that is unfinished at launch to the updates too, once: the ids of the unfinished stream are
-    /// kept, an update with one of them is skipped and its id dropped. The ids of the updates are not kept, so the set is
-    /// bounded by the transactions unfinished at launch and empties as the overlaps arrive. Only this task finishes
-    /// transactions and reads the ids, so they need no lock.
+    /// buffers them (the drain starts once it has subscribed), so one the store delivers while the unfinished ones are
+    /// being finished is kept, not lost. The store hands a transaction that is unfinished at launch to the updates too,
+    /// once: the ids of the unfinished stream are kept, an update with one of them is skipped and its id dropped. The ids
+    /// of the updates are not kept, so the set is bounded by the transactions unfinished at launch and empties as the
+    /// overlaps arrive. Only the drain finishes transactions and reads the ids, so they need no lock.
     private static func listen(to feed: TipTransactionFeed, logger: any DiagnosticLogger) async {
         let (buffered, buffer) = AsyncStream<TipTransaction>.makeStream()
         let (subscribed, subscription) = AsyncStream<Void>.makeStream()
-        // One group holds the reader and the drain, so cancelling the listener cancels both, a suspended finish included.
+        // One group holds the reader and the drain, so cancelling the listener cancels both. A finish already in flight is
+        // awaited: the store's finish takes no cancellation, and returning before it ends would leave it running outside
+        // the listener.
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 var updates = feed.updates().makeAsyncIterator()
