@@ -222,7 +222,7 @@ struct ReleaseHygieneTests {
         return try #require(project.targets.first { $0.name == target }?.buildSettings, "No target \(target)")
     }
 
-    @Test("The shipped Info.plist builds for macOS, and the iOS document key is set for the iOS SDKs only")
+    @Test("The shipped Info.plist builds for macOS, and the document key is NO for the iOS SDKs and YES for macOS")
     func theInfoPlistBuildsOnEveryPlatform() throws {
         let url = Self.root.appendingPathComponent("PrestoCV/Info.plist")
         let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
@@ -230,13 +230,15 @@ struct ReleaseHygieneTests {
         let documentKey = "INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"
         let documentSettings = settings.filter { $0.key.hasPrefix(documentKey) }
 
-        // The target builds for macOS too, and macOS rejects LSSupportsOpeningDocumentsInPlace set to NO; iOS asks for
-        // the key once the app declares document types, and the released app takes a copy of the PDF it is given.
+        // iOS gets NO so the app is handed a copy of the PDF it is given, as the released app is. The target builds for
+        // macOS too, which rejects NO for an app with document types, and a setting made for some SDKs only still makes
+        // the build write the key for macOS as NO: the macOS SDK sets it itself, to YES.
         #expect(plist["CFBundleDocumentTypes"] != nil, "Info.plist no longer declares the PDFs the app opens")
         #expect(plist["LSSupportsOpeningDocumentsInPlace"] == nil, "Info.plist sets the key for macOS too")
         #expect(documentSettings == [
             "\(documentKey)[sdk=iphoneos*]": .word("NO"),
             "\(documentKey)[sdk=iphonesimulator*]": .word("NO"),
+            "\(documentKey)[sdk=macosx*]": .word("YES"),
         ], "The target sets \(documentSettings)")
     }
 
