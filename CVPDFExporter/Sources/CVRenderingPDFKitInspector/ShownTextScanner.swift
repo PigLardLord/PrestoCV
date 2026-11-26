@@ -30,16 +30,17 @@ struct ShownTextReading {
     var runs: [ShownText] = []
     /// The form XObjects the content drew and the scan read.
     var formsRead = 0
-    /// Whether the scan read the whole content: false when it met a form it could not read, or content it could not
-    /// scan to its end, either of which may show text that has no run.
+    /// Whether the scan read the whole content: false when it met a form it could not read, an operand it could not
+    /// read, or content it could not scan to its end, any of which may show or place text that then has no run, or a
+    /// run where the text is not.
     var isComplete = true
 }
 
 enum ShownTextScanner {
     /// The text `page` shows, in content order. A form the scan cannot read (nested deeper than `formDepthLimit`, with
-    /// no resources or an unreadable matrix, or an XObject it cannot resolve), or content it cannot scan to its end,
-    /// makes the reading incomplete: the text there has no run, so the inspector sizes every line of the page by PDFKit's
-    /// fonts.
+    /// no resources or an unreadable matrix, or an XObject it cannot resolve), an operand it cannot read (not of the type
+    /// its operator takes), or content it cannot scan to its end, makes the reading incomplete: the text there may have
+    /// no run, or a run where it is not, so the inspector sizes every line of the page by PDFKit's fonts.
     static func reading(of page: CGPDFPage) -> ShownTextReading {
         guard let table = operatorTable() else { return ShownTextReading(isComplete: false) }
         defer { CGPDFOperatorTableRelease(table) }
@@ -61,69 +62,66 @@ enum ShownTextScanner {
         CGPDFOperatorTableSetCallback(table, "q") { _, info in collecting(info)?.save() }
         CGPDFOperatorTableSetCallback(table, "Q") { _, info in collecting(info)?.restore() }
         CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
-            guard let collector = collecting(info), let m = popNumbers(scanner, 6) else { return }
+            guard let collector = collecting(info), let m = collector.numbers(6, from: scanner) else { return }
             collector.state.ctm = CGAffineTransform(a: m[0], b: m[1], c: m[2], d: m[3], tx: m[4], ty: m[5])
                 .concatenating(collector.state.ctm)
         }
         CGPDFOperatorTableSetCallback(table, "BT") { _, info in collecting(info)?.beginText() }
         CGPDFOperatorTableSetCallback(table, "Tf") { scanner, info in
-            var name: UnsafePointer<CChar>?
-            guard let collector = collecting(info), let size = popNumbers(scanner, 1),
-                  CGPDFScannerPopName(scanner, &name), let name else { return }
+            guard let collector = collecting(info), let size = collector.numbers(1, from: scanner),
+                  let name = collector.name(from: scanner) else { return }
             collector.setFont(font(named: name, in: CGPDFScannerGetContentStream(scanner)), size: size[0])
         }
         CGPDFOperatorTableSetCallback(table, "gs") { scanner, info in
-            var name: UnsafePointer<CChar>?
-            guard let collector = collecting(info), CGPDFScannerPopName(scanner, &name), let name,
+            guard let collector = collecting(info), let name = collector.name(from: scanner),
                   let set = font(setBy: name, in: CGPDFScannerGetContentStream(scanner)) else { return }
             collector.setFont(set.font, size: set.size)
         }
         CGPDFOperatorTableSetCallback(table, "TL") { scanner, info in
-            guard let collector = collecting(info), let leading = popNumbers(scanner, 1) else { return }
+            guard let collector = collecting(info), let leading = collector.numbers(1, from: scanner) else { return }
             collector.state.leading = leading[0]
         }
         CGPDFOperatorTableSetCallback(table, "Ts") { scanner, info in
-            guard let collector = collecting(info), let rise = popNumbers(scanner, 1) else { return }
+            guard let collector = collecting(info), let rise = collector.numbers(1, from: scanner) else { return }
             collector.state.rise = rise[0]
         }
         CGPDFOperatorTableSetCallback(table, "Tz") { scanner, info in
-            guard let collector = collecting(info), let scale = popNumbers(scanner, 1) else { return }
+            guard let collector = collecting(info), let scale = collector.numbers(1, from: scanner) else { return }
             collector.state.horizontalScale = scale[0] / 100
         }
         CGPDFOperatorTableSetCallback(table, "Td") { scanner, info in
-            guard let collector = collecting(info), let offset = popNumbers(scanner, 2) else { return }
+            guard let collector = collecting(info), let offset = collector.numbers(2, from: scanner) else { return }
             collector.moveLine(by: offset[0], offset[1])
         }
         CGPDFOperatorTableSetCallback(table, "TD") { scanner, info in
-            guard let collector = collecting(info), let offset = popNumbers(scanner, 2) else { return }
+            guard let collector = collecting(info), let offset = collector.numbers(2, from: scanner) else { return }
             collector.state.leading = -offset[1]
             collector.moveLine(by: offset[0], offset[1])
         }
         CGPDFOperatorTableSetCallback(table, "Tm") { scanner, info in
-            guard let collector = collecting(info), let m = popNumbers(scanner, 6) else { return }
+            guard let collector = collecting(info), let m = collector.numbers(6, from: scanner) else { return }
             collector.setTextMatrix(CGAffineTransform(a: m[0], b: m[1], c: m[2], d: m[3], tx: m[4], ty: m[5]))
         }
         CGPDFOperatorTableSetCallback(table, "T*") { _, info in collecting(info)?.nextLine() }
         CGPDFOperatorTableSetCallback(table, "Tj") { scanner, info in
-            guard let collector = collecting(info), showsAGlyph(popString(scanner)) else { return }
+            guard let collector = collecting(info), showsAGlyph(collector.string(from: scanner)) else { return }
             collector.show(after: 0)
         }
         CGPDFOperatorTableSetCallback(table, "'") { scanner, info in
             guard let collector = collecting(info) else { return }
-            let shows = showsAGlyph(popString(scanner))
+            let shows = showsAGlyph(collector.string(from: scanner))
             collector.nextLine()
             if shows { collector.show(after: 0) }
         }
         CGPDFOperatorTableSetCallback(table, "\"") { scanner, info in
             guard let collector = collecting(info) else { return }
-            let shows = showsAGlyph(popString(scanner))
+            let shows = showsAGlyph(collector.string(from: scanner))
             collector.nextLine()
             if shows { collector.show(after: 0) }
         }
         CGPDFOperatorTableSetCallback(table, "TJ") { scanner, info in
-            var array: CGPDFArrayRef?
-            guard let collector = collecting(info), CGPDFScannerPopArray(scanner, &array), let array else { return }
-            let before = adjustments(beforeTheFirstGlyphOf: array)
+            guard let collector = collecting(info), let array = collector.array(from: scanner) else { return }
+            guard let before = adjustments(beforeTheFirstGlyphOf: array) else { return collector.unreadable() }
             if before.showsAGlyph {
                 collector.show(after: before.sum)
             } else {
@@ -131,8 +129,7 @@ enum ShownTextScanner {
             }
         }
         CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
-            var name: UnsafePointer<CChar>?
-            guard let collector = collecting(info), CGPDFScannerPopName(scanner, &name), let name else { return }
+            guard let collector = collecting(info), let name = collector.name(from: scanner) else { return }
             collector.drawForm(named: name, from: CGPDFScannerGetContentStream(scanner))
         }
         return table
@@ -165,8 +162,9 @@ private func font(named name: UnsafePointer<CChar>, in stream: CGPDFContentStrea
 }
 
 /// The font and size the graphics state parameters `name` of `stream`'s resources set, as `Tf` does, when `gs` applies
-/// them: nil when they set no font (they have no `/Font` entry). The font, or the size, is nil when the scan cannot
-/// read it: the parameters are missing from the resources, or their entry is not `[font size]`.
+/// them: nil when they set no font (they have no `/Font` entry). Both are nil when the scan cannot read one of them: the
+/// parameters are missing from the resources, or their entry is not `[font size]`, a font and a number. A readable font
+/// of unknown size would place the text after it at the wrong position, so it counts as a font the scan does not know.
 private func font(setBy name: UnsafePointer<CChar>,
                   in stream: CGPDFContentStreamRef) -> (font: CGPDFDictionaryRef?, size: CGFloat?)? {
     var parameters: CGPDFDictionaryRef?
@@ -180,9 +178,10 @@ private func font(setBy name: UnsafePointer<CChar>,
     }
     var font: CGPDFDictionaryRef?
     var size: CGPDFReal = 0
-    let hasFont = CGPDFArrayGetDictionary(array, 0, &font)
-    let hasSize = CGPDFArrayGetNumber(array, 1, &size)
-    return (hasFont ? font : nil, hasSize ? size : nil)
+    guard CGPDFArrayGetDictionary(array, 0, &font), let font, CGPDFArrayGetNumber(array, 1, &size) else {
+        return (nil, nil)
+    }
+    return (font, size)
 }
 
 /// How `font` sets its glyphs: whether the `Tf` size scales them (any font but Type 3), and whether it writes across,
@@ -375,19 +374,14 @@ struct CMapProgram {
     }
 }
 
-private func popString(_ scanner: CGPDFScannerRef) -> CGPDFStringRef? {
-    var string: CGPDFStringRef?
-    return CGPDFScannerPopString(scanner, &string) ? string : nil
-}
-
 private func showsAGlyph(_ string: CGPDFStringRef?) -> Bool {
     string.map { CGPDFStringGetLength($0) > 0 } ?? false
 }
 
 /// The sum of the position adjustments a `TJ` array makes before its first glyph (thousandths of the em, moving the
 /// text position left when positive), and whether the array shows a glyph at all: when it does not, the sum is all the
-/// array does.
-private func adjustments(beforeTheFirstGlyphOf array: CGPDFArrayRef) -> (sum: CGFloat, showsAGlyph: Bool) {
+/// array does. Nil when an element before the first glyph is neither a string nor a number.
+private func adjustments(beforeTheFirstGlyphOf array: CGPDFArrayRef) -> (sum: CGFloat, showsAGlyph: Bool)? {
     var adjustment: CGFloat = 0
     for index in 0..<CGPDFArrayGetCount(array) {
         var string: CGPDFStringRef?
@@ -396,6 +390,8 @@ private func adjustments(beforeTheFirstGlyphOf array: CGPDFArrayRef) -> (sum: CG
             if showsAGlyph(string) { return (adjustment, true) }
         } else if CGPDFArrayGetNumber(array, index, &number) {
             adjustment += number
+        } else {
+            return nil
         }
     }
     return (adjustment, false)
@@ -437,6 +433,38 @@ private final class ShownTextCollector {
         defer { CGPDFScannerRelease(scanner) }
         if !CGPDFScannerScan(scanner) { reading.isComplete = false }
     }
+
+    // MARK: Reading operands
+
+    /// The last `count` operands, in the order the content wrote them. These read every operand the scan uses: one it
+    /// cannot read (missing, or not of the type its operator takes) makes the reading incomplete, since its operator
+    /// may show or place text the runs then miss.
+    func numbers(_ count: Int, from scanner: CGPDFScannerRef) -> [CGFloat]? { readable(popNumbers(scanner, count)) }
+
+    func name(from scanner: CGPDFScannerRef) -> UnsafePointer<CChar>? {
+        var name: UnsafePointer<CChar>?
+        return readable(CGPDFScannerPopName(scanner, &name) ? name : nil)
+    }
+
+    func string(from scanner: CGPDFScannerRef) -> CGPDFStringRef? {
+        var string: CGPDFStringRef?
+        return readable(CGPDFScannerPopString(scanner, &string) ? string : nil)
+    }
+
+    func array(from scanner: CGPDFScannerRef) -> CGPDFArrayRef? {
+        var array: CGPDFArrayRef?
+        return readable(CGPDFScannerPopArray(scanner, &array) ? array : nil)
+    }
+
+    /// Makes the reading incomplete: the content holds an operand the scan cannot read.
+    func unreadable() { reading.isComplete = false }
+
+    private func readable<Operand>(_ operand: Operand?) -> Operand? {
+        if operand == nil { unreadable() }
+        return operand
+    }
+
+    // MARK: Graphics and text state
 
     func save() { saved.append(state) }
 

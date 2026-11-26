@@ -158,11 +158,13 @@ struct ShownTextTests {
     }
 
     /// A one-page A4 PDF whose page content `content` shows Helvetica (`/F1`) and may name the graphics state parameters
-    /// `/Small` (Helvetica at 3 pt), `/Clear` (no font), and `/Broken` (a font entry that is not [font size]).
+    /// `/Small` (Helvetica at 3 pt), `/Clear` (no font), `/Broken` (a font entry that is not [font size]), and `/BadSize`
+    /// (Helvetica at a size that is not a number).
     static func pageWithGraphicsStates(_ content: String) -> Data {
         handWritten([
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> /ExtGState << "
-                + "/Small << /Font [5 0 R 3] >> /Clear << /CA 0.5 >> /Broken << /Font [5 0 R] >> >> >> /Contents 4 0 R >>",
+                + "/Small << /Font [5 0 R 3] >> /Clear << /CA 0.5 >> /Broken << /Font [5 0 R] >> "
+                + "/BadSize << /Font [5 0 R /Bad] >> >> >> /Contents 4 0 R >>",
             stream(content),
             helvetica,
         ])
@@ -182,7 +184,7 @@ struct ShownTextTests {
     /// A font the scan cannot read may write vertically, so the run after it may start anywhere on the page, as after a
     /// `Tf` that names a font missing from the resources.
     @Test("parameters the scan cannot read set a font it does not know, and every line is sized by PDFKit's fonts",
-          arguments: ["/Broken gs", "/Missing gs"])
+          arguments: ["/Broken gs", "/Missing gs", "/BadSize gs"])
     func unreadableGraphicsState(_ parameters: String) throws {
         let data = Self.pageWithGraphicsStates(
             "BT /F1 6 Tf 100 700 Td (Six) Tj ET BT /F1 12 Tf \(parameters) 100 500 Td (Twelve) Tj ET")
@@ -192,6 +194,29 @@ struct ShownTextTests {
         #expect(expected.map(\.height) == [6, 12], "PDFKit's fonts keep the font of the Tf")
         #expect(reading.linesSizedByAttributedText == 2, "\(reading.layout.lines)")
         #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(reading.layout.lines)")
+    }
+
+    /// A font whose size the scan cannot read moves the text position by adjustments it cannot measure: the small text
+    /// after the move would seem to start in the line of the large text, which would then take its size.
+    @Test("a move by a font of a size the scan cannot read leaves every line to PDFKit's fonts")
+    func moveByAnUnreadableSize() throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 12 Tf 100 500 Td (Twelve) Tj ET BT /F1 12 Tf /BadSize gs 100 500 Td [-30000] TJ /F1 3 Tf (Tiny) Tj ET")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(reading.linesSizedByAttributedText == reading.layout.lines.count, "\(reading.layout.lines)")
+        #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(reading.layout.lines) \(expected)")
+    }
+
+    @Test("an operand the scan cannot read, missing or not of the type its operator takes, makes the reading incomplete",
+          arguments: ["1 0 0 1 0 /x cm", "/x TL", "TL", "/x Ts", "/x Tz", "0 /x Td", "0 /x TD", "1 0 0 1 0 /x Tm",
+                      "/F1 /x Tf", "(F1) 12 Tf", "12 gs", "12 Tj", "12 '", "0 0 12 \"", "12 TJ", "[/x (B)] TJ", "12 Do"])
+    func unreadableOperand(_ operation: String) throws {
+        let readable = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing("BT /F1 12 Tf 100 700 Td (A) Tj ET")))
+        let content = "BT /F1 12 Tf 100 700 Td (A) Tj \(operation) ET"
+        let reading = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing(content)))
+        #expect(readable.isComplete, "the page without the operation")
+        #expect(!reading.isComplete, "\(content)")
     }
 
     @Test("a page whose forms nest deeper than the scan reads is read in part, and its lines are sized by PDFKit's fonts")
