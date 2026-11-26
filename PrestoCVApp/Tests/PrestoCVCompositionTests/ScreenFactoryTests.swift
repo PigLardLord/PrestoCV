@@ -526,7 +526,7 @@ struct ScreenFactoryTests {
 
         Education
         BSc Mathematics, Example University, 2015 – 2018
-        """])
+        """], pdfs: [])
 
         screen.importText()
         await Self.ended(screen)
