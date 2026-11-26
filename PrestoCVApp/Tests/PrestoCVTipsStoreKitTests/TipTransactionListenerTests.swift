@@ -47,8 +47,8 @@ struct TipTransactionListenerTests {
         #expect(entry?.fields == [.flag("verified", verified)])
     }
 
-    @Test("the same transaction handed over twice by the updates is finished and logged once")
-    func repeatedUpdateIsFinishedOnce() async {
+    @Test("the id of an update is not kept: the same one handed over again is finished again")
+    func updateIdsAreNotRetained() async {
         let world = World(unfinished: [])
         let listener = world.makeListener()
         listener.start()
@@ -56,11 +56,24 @@ struct TipTransactionListenerTests {
 
         world.updates.send(id: 100, verified: true)
         world.updates.send(id: 100, verified: true)
-        world.updates.send(id: 101, verified: true)
         _ = await world.logger.next()
         _ = await world.logger.next()
 
-        #expect(world.finishes.count == 2, "the second delivery of 100 is not finished again: 100 and 101 are")
+        #expect(world.finishes.count == 2, "only the ids of the unfinished stream are remembered, and 100 was not one")
+    }
+
+    @Test("an id seen in both streams is finished once, and forgotten after its update")
+    func unfinishedIdIsSkippedOnceInTheUpdates() async {
+        let world = World(unfinished: [true])
+        let listener = world.makeListener()
+        world.updates.send(id: 1, verified: true)
+        world.updates.send(id: 1, verified: true)
+
+        listener.start()
+        _ = await world.logger.next()
+        _ = await world.logger.next()
+
+        #expect(world.finishes.order == ["unfinished", "update"], "the first update of 1 is the overlap and is skipped; the id is then forgotten, so a later one is finished")
     }
 
     @Test("a transaction both streams hand over is finished and logged once")

@@ -1,3 +1,4 @@
+import DiagnosticLogging
 import Synchronization
 
 /// Where the trace of the launches of one process stands. A launch purges what an earlier install stored once the
@@ -11,6 +12,7 @@ import Synchronization
 public final class TraceSettlement: Sendable {
     private let last = Mutex<Task<Void, Never>?>(nil)
     private let tips = Mutex<(any TipsListening)?>(nil)
+    private let traceLogger = Mutex<(any DiagnosticLogger)?>(nil)
 
     public init() {}
 
@@ -19,9 +21,22 @@ public final class TraceSettlement: Sendable {
         last.withLock { $0 }
     }
 
-    /// Makes `startup` the task the next launch waits for
-    func record(_ startup: Task<Void, Never>) {
+    /// Makes `startup` the task the next launch waits for, and `logger` the logger of that launch's trace: the one the
+    /// tips listener's entries go to from now on (`tipsLogger`)
+    func record(_ startup: Task<Void, Never>, logger: any DiagnosticLogger) {
         last.withLock { $0 = startup }
+        traceLogger.withLock { $0 = logger }
+    }
+
+    /// The logger of the tips listener. The listener starts before any trace exists, so until a launch has made its trace the
+    /// entries go to `fallback`, the unified log only; once a launch has recorded its trace they go to that trace's logger,
+    /// which mirrors them into the session events, and a later launch's trace takes over from the earlier one.
+    func tipsLogger(fallback: any DiagnosticLogger) -> any DiagnosticLogger {
+        SettlementLogger(settlement: self, fallback: fallback)
+    }
+
+    fileprivate func currentTraceLogger() -> (any DiagnosticLogger)? {
+        traceLogger.withLock { $0 }
     }
 
     /// The listener of this process: made and started by the first launch, which asks, and given back to every later one
@@ -38,5 +53,15 @@ public final class TraceSettlement: Sendable {
     /// Returns once every launch so far has settled its trace: each launch's startup ends after the one before it
     public func settled() async {
         await previous()?.value
+    }
+}
+
+/// Forwards each entry to the trace logger the settlement holds at that moment, or to `fallback` when there is none yet.
+private struct SettlementLogger: DiagnosticLogger {
+    let settlement: TraceSettlement
+    let fallback: any DiagnosticLogger
+
+    func log(_ entry: LogEntry) {
+        (settlement.currentTraceLogger() ?? fallback).log(entry)
     }
 }

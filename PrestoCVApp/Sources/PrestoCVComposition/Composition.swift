@@ -209,8 +209,9 @@ public final class Composition {
     /// (`TraceSettlement`): it records nothing until the earlier purge has ended, so a retry never loses what it wrote.
     static func make(_ inputs: Inputs) async -> CompositionState {
         // First of all, so that the store's transactions are finished whatever the rest of the launch does: the settlement
-        // holds the listener, because a failed launch leaves no composition to hold it.
-        let tips = inputs.settlement.tipsListener(make: { inputs.makeTips(inputs.log) })
+        // holds the listener, because a failed launch leaves no composition to hold it. No trace exists yet, so the
+        // listener's entries go to the unified log only until a launch has made its trace (`TraceSettlement.tipsLogger`).
+        let tips = inputs.settlement.tipsListener(make: { inputs.makeTips(inputs.settlement.tipsLogger(fallback: inputs.log)) })
         do {
             try inputs.check()
         } catch {
@@ -220,7 +221,7 @@ public final class Composition {
             directory: inputs.paths.trace, shareDirectory: inputs.paths.traceShare, gate: inputs.gate,
             device: inputs.device, log: inputs.log, after: inputs.settlement.previous()
         )
-        inputs.settlement.record(trace.startup)
+        inputs.settlement.record(trace.startup, logger: trace.logger)
         let state = await assemble(inputs, tips: tips, trace: trace)
         if case .failed = state { await first(of: { await trace.settle() }, or: inputs.settleDeadline) }
         return state

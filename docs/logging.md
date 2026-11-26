@@ -171,6 +171,8 @@ At launch the app listens to the store's tip transactions and finishes each one 
 
 The events carry counts and flags only: no product, price, identifier or account.
 
+The listener starts before the launch's trace exists, so an event it logs before then goes to the unified log only. From the moment a launch has made its trace, its events go through that trace's logger, so in a TestFlight or Debug build they also appear in `session-events.json`; a later launch's trace takes over from the earlier one.
+
 ## The trace of a test build
 
 A TestFlight or Debug build also keeps a **trace**: each step of every AI draft and every import of pasted text, with the text it read and wrote ([ADR 0032](architecture/adr/0032-record-each-step-of-the-ai-draft-and-the-import-in-test-builds.md)). It is not this log: it lives in its own package, `DiagnosticTrace`, and never goes to the unified log.

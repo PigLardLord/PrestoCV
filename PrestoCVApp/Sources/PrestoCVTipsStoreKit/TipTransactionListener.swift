@@ -23,7 +23,7 @@ struct TipTransactionFeed: Sendable {
     let updates: @Sendable () -> AsyncStream<TipTransaction>
 }
 
-/// Finishes every tip transaction the store hands over, verified or not, once by its id, and grants nothing. A tip is a consumable: a
+/// Finishes every tip transaction the store hands over, verified or not, and grants nothing. A tip is a consumable: a
 /// transaction left unfinished comes back at every launch.
 ///
 /// It walks the unfinished transactions first, then waits for the updates until it is dropped. Dropping it cancels the task.
@@ -51,20 +51,21 @@ final class TipTransactionListener: Sendable {
         }
     }
 
-    /// Finishes each transaction once, by its id, across both streams: the store hands a transaction to the unfinished
-    /// stream and to the updates, and a second finish of the same one is skipped, not logged. The two streams are read one
-    /// after the other, so the ids need no lock.
+    /// Finishes the unfinished transactions, then each update. The store hands a transaction that is unfinished at launch
+    /// to the updates too, once: the ids of the unfinished stream are kept, an update with one of them is skipped and its
+    /// id dropped. The ids of the updates are not kept, so the set is bounded by the transactions unfinished at launch and
+    /// empties as the overlaps arrive. The two streams are read one after the other, so the ids need no lock.
     private static func listen(to feed: TipTransactionFeed, logger: any DiagnosticLogger) async {
-        var seen = Set<UInt64>()
+        var pending = Set<UInt64>()
         var finished = 0
         var unverified = 0
-        for await transaction in feed.unfinished() where seen.insert(transaction.id).inserted {
+        for await transaction in feed.unfinished() where pending.insert(transaction.id).inserted {
             await transaction.finish()
             finished += 1
             if !transaction.isVerified { unverified += 1 }
         }
         logger.info(.tips, "tips.unfinished.finished", .count("count", finished), .count("unverified", unverified))
-        for await transaction in feed.updates() where seen.insert(transaction.id).inserted {
+        for await transaction in feed.updates() where pending.remove(transaction.id) == nil {
             await transaction.finish()
             logger.info(.tips, "tips.update.finished", .flag("verified", transaction.isVerified))
         }
