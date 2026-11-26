@@ -53,30 +53,39 @@ final class TipTransactionListener: Sendable {
     }
 
     /// Finishes the unfinished transactions, then each update. The updates are read from the start, by a task that only
-    /// buffers them, so one the store delivers while the unfinished ones are being finished is kept, not lost. The store
+    /// buffers them (the drain starts once it has subscribed), so one the store delivers while the unfinished ones are being finished is kept, not lost. The store
     /// hands a transaction that is unfinished at launch to the updates too, once: the ids of the unfinished stream are
     /// kept, an update with one of them is skipped and its id dropped. The ids of the updates are not kept, so the set is
     /// bounded by the transactions unfinished at launch and empties as the overlaps arrive. Only this task finishes
     /// transactions and reads the ids, so they need no lock.
     private static func listen(to feed: TipTransactionFeed, logger: any DiagnosticLogger) async {
         let (buffered, buffer) = AsyncStream<TipTransaction>.makeStream()
-        let reader = Task {
-            for await transaction in feed.updates() { buffer.yield(transaction) }
-            buffer.finish()
-        }
-        defer { reader.cancel() }
-        var pending = Set<UInt64>()
-        var finished = 0
-        var unverified = 0
-        for await transaction in feed.unfinished() where pending.insert(transaction.id).inserted {
-            await transaction.finish()
-            finished += 1
-            if !transaction.isVerified { unverified += 1 }
-        }
-        logger.info(.tips, "tips.unfinished.finished", .count("count", finished), .count("unverified", unverified))
-        for await transaction in buffered where pending.remove(transaction.id) == nil {
-            await transaction.finish()
-            logger.info(.tips, "tips.update.finished", .flag("verified", transaction.isVerified))
+        let (subscribed, subscription) = AsyncStream<Void>.makeStream()
+        // One group holds the reader and the drain, so cancelling the listener cancels both, a suspended finish included.
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                var updates = feed.updates().makeAsyncIterator()
+                subscription.yield()
+                subscription.finish()
+                while let transaction = await updates.next() { buffer.yield(transaction) }
+                buffer.finish()
+            }
+            group.addTask {
+                for await _ in subscribed { break }
+                var pending = Set<UInt64>()
+                var finished = 0
+                var unverified = 0
+                for await transaction in feed.unfinished() where pending.insert(transaction.id).inserted {
+                    await transaction.finish()
+                    finished += 1
+                    if !transaction.isVerified { unverified += 1 }
+                }
+                logger.info(.tips, "tips.unfinished.finished", .count("count", finished), .count("unverified", unverified))
+                for await transaction in buffered where pending.remove(transaction.id) == nil {
+                    await transaction.finish()
+                    logger.info(.tips, "tips.update.finished", .flag("verified", transaction.isVerified))
+                }
+            }
         }
     }
 }

@@ -161,6 +161,56 @@ struct TipTransactionListenerTests {
         #expect(world.reads.updates == 1, "the updates are read once")
     }
 
+    @Test("the updates are subscribed to before the unfinished transactions are asked for, whatever the scheduling", arguments: 0..<50)
+    func updatesAreSubscribedFirst(round: Int) async {
+        let order = FinishLog()
+        let logger = InboxLogger()
+        let listener = TipTransactionListener(
+            feed: TipTransactionFeed(
+                unfinished: {
+                    order.record("unfinished")
+                    return AsyncStream { $0.finish() }
+                },
+                updates: {
+                    order.record("updates")
+                    return AsyncStream { _ in }
+                }
+            ),
+            logger: logger
+        )
+
+        listener.start()
+        _ = await logger.next()
+
+        #expect(order.order == ["updates", "unfinished"], "round \(round): the drain does not wait for the subscription, the listener does")
+    }
+
+    @Test("dropping the listener ends its reading of the updates even while a finish is suspended and ignores cancellation")
+    func droppingEndsTheReadingDuringAFinish() async {
+        let updates = UpdatesFeed(finishes: FinishLog())
+        let started = Inbox<Void>()
+        let release = Inbox<Void>()
+        let held = TipTransaction(id: 1, isVerified: true, finish: {
+            started.put(())
+            _ = await release.next()
+        })
+        var listener: TipTransactionListener? = TipTransactionListener(
+            feed: TipTransactionFeed(
+                unfinished: { AsyncStream { continuation in continuation.yield(held); continuation.finish() } },
+                updates: { updates.stream }
+            ),
+            logger: InboxLogger()
+        )
+        listener?.start()
+        _ = await started.next()
+
+        listener = nil
+        let ended = await updates.ended.next()
+        release.put(())
+
+        #expect(ended != nil, "the stream of the updates is cancelled with the listener, not when the finish returns")
+    }
+
     @Test("dropping the listener ends its reading of the updates")
     func droppingEndsTheReading() async {
         let world = World(unfinished: [])
