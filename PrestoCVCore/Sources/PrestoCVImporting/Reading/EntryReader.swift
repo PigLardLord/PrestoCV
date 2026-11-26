@@ -932,7 +932,12 @@ enum EntryReader {
             for (label, values) in rows {
                 switch label {
                 case .period:
-                    if period == nil, let value = values.first, let match = DateReader.periods(in: value.text).first {
+                    // The column names the cell a period, so a range after a software name ("Unity 9.10 – 9.12") is read
+                    // as one, as a free line would be; the row bounds the entry, so no boundary is in doubt, and the name
+                    // stays visible as text not imported
+                    if period == nil, let value = values.first,
+                       let match = DateReader.periods(in: value.text).first
+                        ?? DateReader.periods(in: value.text, readsSoftwareRanges: true).first {
                         period = periodValue(value.sub(match.range), match.period)
                         for rest in value.removing([match.range]) where !leftOut.holds(rest.span) { findings.unplace(rest, in: section) }
                         for rest in values.dropFirst() { findings.unplace(rest, in: section) }

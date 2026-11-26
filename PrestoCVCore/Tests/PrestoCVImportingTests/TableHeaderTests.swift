@@ -710,6 +710,24 @@ struct TableHeaderTests {
         #expect(jobs.map { $0.details.map(\.value) } == [["Supported pupils"], []])
     }
 
+    @Test("A period cell that reads as a software range is the row's period: the column names it, and the name stays visible")
+    func softwareRangeInThePeriodColumn() throws {
+        let result = try importText("""
+        Berufserfahrung
+        | Zeitraum | Unternehmen | Rolle |
+        |---|---|---|
+        | Unity 9.10 – 9.12 | Muster Technik | Monteur |
+        """)
+        let jobs = result.cv.experience
+        #expect(jobs.map { $0.period?.value.start } == [YearMonth(year: 2010, month: 9)])
+        #expect(jobs.map { $0.period?.value.end } == [.date(YearMonth(year: 2012, month: 9))])
+        #expect(jobs.map { $0.role?.value } == ["Monteur"])
+        #expect(jobs.map { $0.employer?.value } == ["Muster Technik"])
+        #expect(jobs.flatMap(\.details).isEmpty)
+        #expect(result.unplaced.map(\.text) == ["Unity"])
+        noLoss(result)
+    }
+
     // MARK: Header words in each language
 
     @Test("The header words of each language", arguments: [
