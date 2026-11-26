@@ -111,7 +111,7 @@ struct ShownTextTests {
         return handWritten([
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 9 0 R "
                 + "/F4 11 0 R /F5 12 0 R /F6 14 0 R /F7 16 0 R /F8 18 0 R /F10 20 0 R /F11 22 0 R /F12 23 0 R /F13 24 0 R "
-                + "/F14 25 0 R /F15 27 0 R >> >> /Contents 4 0 R >>",
+                + "/F14 25 0 R /F15 27 0 R /F16 29 0 R /F17 30 0 R >> >> /Contents 4 0 R >>",
             stream(content),
             helvetica,
             "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-V /DescendantFonts [7 0 R] >>",
@@ -129,6 +129,7 @@ struct ShownTextTests {
             named("V"), named("Custom"), named("H"),
             font(26), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /Custom "),
             font(28), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /H "),
+            named("Custom-H"), font(31), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /Custom-H "),
         ])
     }
 
@@ -206,24 +207,27 @@ struct ShownTextTests {
                 "mode 1 in the program only, a base named -V, an embedded vertical base, a CMap writing across, the first again, a commented base")
     }
 
-    @Test("a CMap a font or its base names writes across only when its name is H or ends in -H")
+    @Test("a CMap a font or its base names writes across only when it is a predefined horizontal CMap")
     func namedCMaps() throws {
         let runs = try Self.runs(of: Self.pageShowing("BT /F11 9 Tf 100 700 Td <0001> Tj ET BT /F12 9 Tf 100 600 Td <0001> Tj ET "
-            + "BT /F13 9 Tf 100 500 Td <0001> Tj ET BT /F14 9 Tf 100 400 Td <0001> Tj ET BT /F15 9 Tf 100 300 Td <0001> Tj ET"))
+            + "BT /F13 9 Tf 100 500 Td <0001> Tj ET BT /F14 9 Tf 100 400 Td <0001> Tj ET BT /F15 9 Tf 100 300 Td <0001> Tj ET "
+            + "BT /F16 9 Tf 100 200 Td <0001> Tj ET BT /F17 9 Tf 100 100 Td <0001> Tj ET"))
         #expect(runs == [ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9),
                          ShownText(start: .at(x: 100, y: 500), size: 9), ShownText(start: .anywhere, size: 9),
-                         ShownText(start: .at(x: 100, y: 300), size: 9)],
-                "the predefined V, a name the scan does not know, the predefined H, a base it does not know, a base named H")
+                         ShownText(start: .at(x: 100, y: 300), size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .anywhere, size: 9)],
+                "the predefined V, an unknown name, the predefined H, an unknown base, a base named H, a custom -H, its base")
     }
 
-    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one not named H or -H, or an open string, with a name's # escapes read")
+    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one not of a predefined horizontal CMap, or an open string, with a name's # escapes read")
     func cmapPrograms() {
         let vertical = ["/WMode 1 def", "/WMode\n1 def", "<</WMode 1>>", "/WMode 0.0 def", "/WMode", "/WMode 0 def /WMode 1 def",
                         "/UniJIS-UCS2-V usecmap", "/Identity-V % its base CMap\nusecmap", "/WMode % the mode\n1 def",
                         "(100%) pop /WMode 1 def", "<~9j%~> pop /WMode 1 def", "dup usecmap", "usecmap",
                         "(not closed /WMode 0 def", "<00 /WMode 0 def", "<~9j /WMode 0 def", "/Identity#2DV usecmap",
                         "/#57Mode 1 def", "/WMod#65 1 def", "/Identity#2dV usecmap", "/Custom usecmap", "/V usecmap",
-                        "/Custom#2V usecmap", "/Custom-H2 usecmap", "/#48V usecmap"]
+                        "/Custom#2V usecmap", "/Custom-H2 usecmap", "/#48V usecmap", "/Custom-H usecmap",
+                        "/Custom#2DH usecmap"]
         let across = ["/WMode 0 def", "<</WMode 0>>", "/UniJIS-UCS2-H usecmap", "/CMapName /Custom-V def", "/WMode0 1", "",
                       "% a comment: /WMode 1", "<</WMode 0>> % /UniJIS-UCS2-V usecmap", "/Identity-H % its base\rusecmap",
                       "/WMode % the mode\r0 def", "/WMode % the mode\u{0C}0 def", "(/WMode 1) pop", "(a \\) /WMode 1) pop",

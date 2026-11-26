@@ -195,12 +195,22 @@ private func mayWriteVertically(_ cmap: CGPDFStreamRef, within depth: Int) -> Bo
     return CMapProgram(program as Data).mayWriteVertically
 }
 
-/// Whether the CMap named `name` writes across for sure: it is a predefined horizontal CMap, which is named `H` or by a
-/// name that ends in `-H` (ISO 32000-1, table 118). Any other name may write vertically: a predefined vertical CMap
-/// (`V`, or a name that ends in `-V`), or one the scan does not know, which a renderer may still find.
+/// Whether the CMap named `name` writes across for sure: it is one of the predefined horizontal CMaps. Any other name
+/// may write vertically: a predefined vertical CMap, or one the scan does not know, which a renderer may still find and
+/// which may set writing mode 1 whatever its name says (`Custom-H` too).
 private func writesAcross(cmapNamed name: String) -> Bool {
-    name == "H" || name.hasSuffix("-H")
+    predefinedHorizontalCMaps.contains(name)
 }
+
+/// The predefined CMaps that write across, by their names in ISO 32000-1, table 118
+private let predefinedHorizontalCMaps: Set<String> = [
+    "GB-EUC-H", "GBpc-EUC-H", "GBK-EUC-H", "GBKp-EUC-H", "GBK2K-H", "UniGB-UCS2-H", "UniGB-UTF16-H",
+    "B5pc-H", "HKscs-B5-H", "ETen-B5-H", "ETenms-B5-H", "CNS-EUC-H", "UniCNS-UCS2-H", "UniCNS-UTF16-H",
+    "83pv-RKSJ-H", "90ms-RKSJ-H", "90msp-RKSJ-H", "90pv-RKSJ-H", "Add-RKSJ-H", "EUC-H", "Ext-RKSJ-H", "H",
+    "UniJIS-UCS2-H", "UniJIS-UCS2-HW-H", "UniJIS-UTF16-H",
+    "KSC-EUC-H", "KSCms-UHC-H", "KSCms-UHC-HW-H", "KSCpc-EUC-H", "UniKS-UCS2-H", "UniKS-UTF16-H",
+    "Identity-H",
+]
 
 /// The words of a CMap program, which is PostScript, split at white space and delimiters. A comment (from `%` to the
 /// end of its line) gives no word, a string (`(…)`, `<…>`, `<~…~>`) gives one word that starts with its delimiter,
