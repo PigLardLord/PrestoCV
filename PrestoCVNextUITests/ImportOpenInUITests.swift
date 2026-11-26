@@ -27,7 +27,7 @@ final class ImportOpenInUITests: RuntimeIssueFailingTestCase {
     private func launch(seeded: Bool, holdingTheRead: Bool) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextOpenedFile", "linkedin",
         ]
         if seeded {

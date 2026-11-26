@@ -38,7 +38,8 @@ final class EditorDatesUITests: RuntimeIssueFailingTestCase {
         """
         let seed = try JSONEncoder().encode(["\(identity).cv.json": cv]).base64EncodedString()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", seed,
         ]
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]

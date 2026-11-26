@@ -56,6 +56,9 @@ public final class Composition {
     /// Gives the import the screens read through from the workflow. A launch gives it back as it is; in a Debug build a UI
     /// test's fixture replaces it.
     typealias WrapImport = @MainActor (any CVImporting) -> any CVImporting
+    /// Gives the gate the sync checks the bundled designs through from the composition's own. A launch gives it back as it
+    /// is; in a Debug build a UI test's fixture replaces it.
+    typealias WrapGate = @MainActor (any DesignRenderingGate) -> any DesignRenderingGate
     /// Makes what removes the files the released app left, over the launch's log. The composition calls it once, after the
     /// log is made, so a test gives a cleaner it can read.
     typealias MakeLegacyLeftovers = @Sendable (any DiagnosticLogger) -> any LegacyLeftoversCleaning
@@ -339,6 +342,7 @@ public final class Composition {
         let sharesWithStandIn: Bool
         let wrapStore: WrapStore
         let wrapImport: WrapImport
+        let wrapGate: WrapGate
         let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
         let bundled = resources.appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
@@ -380,6 +384,7 @@ public final class Composition {
         sharesWithStandIn = fixtures.sharesWithStandIn
         wrapStore = { fixtures.store($0) }
         wrapImport = { fixtures.importing($0) }
+        wrapGate = { fixtures.designGate($0) }
         // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
         // left alone here, and `make` fails the launch through `check`.
         if rejected == nil, fixtures.passesCheck(paths) {
@@ -397,6 +402,7 @@ public final class Composition {
         sharesWithStandIn = false
         wrapStore = { $0 }
         wrapImport = { $0 }
+        wrapGate = { $0 }
         #endif
         let state = await make(Inputs(
             paths: paths,
@@ -413,7 +419,9 @@ public final class Composition {
             },
             designs: BundleDesignSource(),
             makeGate: { renderer, inspector, headings in
-                FixtureRenderingGate(renderer: renderer, inspector: inspector, fixture: GateFixture.document, headings: headings)
+                wrapGate(
+                    FixtureRenderingGate(renderer: renderer, inspector: inspector, fixture: GateFixture.document, headings: headings)
+                )
             },
             settleDeadline: {
                 do {

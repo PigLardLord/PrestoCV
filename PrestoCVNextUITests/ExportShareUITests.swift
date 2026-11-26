@@ -142,7 +142,7 @@ final class ExportShareUITests: RuntimeIssueFailingTestCase {
     private func launch(_ cv: StoredCV) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try seed(cv), "-PrestoCVNextShareStandIn",
         ]
         app.launch()

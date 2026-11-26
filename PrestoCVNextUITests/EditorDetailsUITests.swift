@@ -72,7 +72,9 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func launch(_ cvs: [StoredCV], largestText: Bool) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage"]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+        ]
         if !cvs.isEmpty {
             app.launchArguments += ["-PrestoCVNextSeed", try seed(cvs)]
         }
