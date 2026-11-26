@@ -280,6 +280,9 @@ enum EntryReader {
         var isMarked: Bool
         /// A place whose start no rule tells: the person checks it.
         var isUnsure = false
+        /// A weak connector split the entry before words with no legal form ("for Systems and Services"): the split keeps every
+        /// word, and the person checks which part is the role.
+        var isGuessedSplit = false
         /// The segment is what follows a connector, and this is the span of what comes before it: a line parted at "at"
         /// stays one line where its parts are details (#313).
         var followsConnectorOf: SourceSpan?
@@ -287,43 +290,98 @@ enum EntryReader {
 
     /// The segments of an entry's lines without its dates and durations, each with the part it reads as.
     static func segments(of draft: Draft, kind: Kind) -> [Segment] {
-        var segments: [Segment] = []
         let lines = draft.head + (draft.anchor.map { [$0] } ?? []) + draft.tail
-        for line in lines {
-            var removed = line.durations
-            if let period = line.period?.piece { removed.append(period) }
-            for cell in line.cells {
-                let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
-                for piece in cell.removing(ranges).flatMap({ $0.split(by: Separators.strong + [" - "]) }) {
-                    segments += split(piece, kind: kind)
-                }
-            }
+        let pieces = lines.flatMap { linePieces($0) }
+        return pieces.enumerated().flatMap { index, piece in
+            let others = pieces.enumerated().filter { $0.offset != index }.map(\.element)
+            return split(piece, kind: kind, readsWeakConnectors: !otherPartHoldsEmployer(piece, others: others, kind: kind))
         }
-        return segments
+    }
+
+    /// Whether something besides the weak connector can name the employer: another piece, or a part after a comma of the
+    /// piece itself, that reads as an organisation or is no recognised place, by the lists or by its shape (four unknown words are a name, not a
+    /// city). Then the weak connector stays in the title: "Teacher for Special Needs, Acme Ltd, Leeds", a title above
+    /// "Acme Ltd" and "Leiter für Logistik" above "Beispiel Nord Süd West" keep it. A short name no list knows ("Acme")
+    /// has the shape of a place and is no evidence either way.
+    private static func otherPartHoldsEmployer(_ piece: Piece, others: [Piece], kind: Kind) -> Bool {
+        let afterComma = piece.split(by: [", "]).dropFirst().map { classify($0, kind: kind) }
+        let inOthers = others.flatMap { split($0, kind: kind, readsWeakConnectors: false) }
+        let ownEmployerIsNamed = namesAnEmployer(after: piece)
+        return (afterComma + inOthers).contains { canHoldEmployer($0, shortNameCounts: !ownEmployerIsNamed) }
+    }
+
+    /// Whether what follows a weak connector in the piece is a name on its own: a legal form or two capitalised words ("for Acme Ltd",
+    /// "für Klinikum Beispiel"). One word ("for Systems", "für Logistik") may be the end of a title.
+    private static func namesAnEmployer(after piece: Piece) -> Bool {
+        for connector in EntryVocabulary.weakConnectors {
+            guard let range = piece.text.firstRange(of: connector) else { continue }
+            let head = employerHead(piece.sub(range.upperBound..<piece.text.endIndex).trimmed())
+            if namesAnOrganisation(head, asCompetingEmployer: true) && (hasLegalForm(head) || head.words.count >= 2 && EntryVocabulary.isCapitalisedName(head)) { return true }
+        }
+        return false
+    }
+
+    /// Whether a name reads as an organisation: by the lists, or a school-word name of three or more capitalised words
+    /// ("Institut für Informatik"); a school word alone ("für Grundschule") is a title's tail.
+    private static func namesAnOrganisation(_ name: String, asCompetingEmployer: Bool = false) -> Bool {
+        // A tail that reads as a name only through its particle and holds nothing but generic vocabulary ("Systems and
+        // Integration") is a title's tail: it never displaces the employer beside it. With no employer beside it, it still splits
+        // (flagged), because a real employer without a legal form must not be hidden inside the title.
+        if asCompetingEmployer, EntryVocabulary.hasLinkingParticle(name), !EntryVocabulary.isOrganisationBeyondGenericWords(name),
+           !EntryVocabulary.isSchool(name) { return false }
+        return EntryVocabulary.isOrganisation(name)
+            || EntryVocabulary.isSchool(name) && name.words.count >= 3 && EntryVocabulary.isCapitalisedName(name)
+    }
+
+    /// A short name no list knows ("Acme") fills the employer slot when the weak connector's own employer is no name by
+    /// itself; beside a named employer it is read as a place ("Developer for Acme Ltd | Leeds").
+    private static func canHoldEmployer(_ segment: Segment, shortNameCounts: Bool) -> Bool {
+        switch segment.part {
+        case .secondary: true
+        case .unknown: shortNameCounts || !hasPlaceShape(segment.piece)
+        case .primary, .address, .location: false
+        }
+    }
+
+    /// The pieces of a line without its dates and durations, cut at the strong separators.
+    private static func linePieces(_ line: Line) -> [Piece] {
+        var removed = line.durations
+        if let period = line.period?.piece { removed.append(period) }
+        return line.cells.flatMap { cell -> [Piece] in
+            let ranges = removed.filter { cell.span.contains($0.span) }.map { cell.range(of: $0.span) }
+            return cell.removing(ranges).flatMap { $0.split(by: Separators.strong + [" - "]) }
+        }
     }
 
     /// A segment split at a role's connector ("Developer at Acme") or at its commas, each part classified. A place in
     /// brackets at the end, "Tienda Ejemplo S.L. (Madrid)", is a part of its own.
-    private static func split(_ piece: Piece, kind: Kind) -> [Segment] {
+    private static func split(_ piece: Piece, kind: Kind, readsWeakConnectors: Bool) -> [Segment] {
         if piece.text.hasSuffix(")"), let open = piece.text.lastIndex(of: "("), open > piece.text.startIndex {
             let inside = piece.sub(piece.text.index(after: open)..<piece.text.index(before: piece.text.endIndex)).trimmed()
             let before = piece.sub(piece.text.startIndex..<open).trimmed()
             let looksLikePlace = (1...3).contains(inside.words.count) && inside.text.first?.isUppercase == true
                 && !inside.text.contains(where: \.isNumber) && EntryVocabulary.isOrganisation(before.text)
             if !before.isEmpty, Places.isKnownPlace(inside.text) || Places.isCountryOrRegion(inside.text) || looksLikePlace {
-                return split(before, kind: kind) + [Segment(piece: inside, part: .location, isMarked: true)]
+                return split(before, kind: kind, readsWeakConnectors: readsWeakConnectors) + [Segment(piece: inside, part: .location, isMarked: true)]
             }
         }
         if kind == .experience {
             for connector in EntryVocabulary.roleEmployerConnectors {
-                guard let range = piece.text.firstRange(of: connector) else { continue }
+                guard readsWeakConnectors || !EntryVocabulary.weakConnectors.contains(connector),
+                      let range = piece.text.firstRange(of: connector) else { continue }
                 let role = piece.sub(piece.text.startIndex..<range.lowerBound).trimmed()
                 let employer = piece.sub(range.upperBound..<piece.text.endIndex).trimmed()
+                // A weak connector splits only before an organisation ("Developer for Acme Ltd"); "for Special Needs" is a title.
+                if EntryVocabulary.weakConnectors.contains(connector), !namesAnOrganisation(employerHead(employer)) { continue }
                 guard !role.isEmpty, !employer.isEmpty, EntryVocabulary.isRole(role.text) || EntryVocabulary.isOrganisation(employer.text)
                         || role.words.count <= 4 && employer.words.count <= 5 else { continue }
+                let guessed = EntryVocabulary.weakConnectors.contains(connector)
+                    && !hasLegalForm(employerHead(employer))
                 return [Segment(piece: role, part: .primary, isMarked: true)]
                     + piece.sub(range.upperBound..<piece.text.endIndex).split(by: [", "]).enumerated().map { index, part in
-                        index == 0 ? Segment(piece: part, part: .secondary, isMarked: true, followsConnectorOf: role.span) : classify(part, kind: kind)
+                        index == 0
+                            ? Segment(piece: part, part: .secondary, isMarked: true, isGuessedSplit: guessed, followsConnectorOf: role.span)
+                            : classify(part, kind: kind)
                     }
             }
         }
@@ -336,6 +394,11 @@ enum EntryReader {
                 + [Segment(piece: piece.sub(lower..<upper), part: .location, isMarked: true, isUnsure: place.isUnsure)]
         }
         return parts.map { classify($0, kind: kind) }
+    }
+
+    /// The text of an employer up to its first comma: what follows ("Leeds") is a place, not a part of the name.
+    private static func employerHead(_ employer: Piece) -> String {
+        employer.split(by: [", "]).first?.text ?? employer.text
     }
 
     /// Where the place starts in the parts of a line that ends with a country or a region: the city before it, and the
@@ -472,7 +535,7 @@ enum EntryReader {
             || (draft.inheritsADoubtfulHeading && secondary?.piece == draft.inheritedEmployer)
         let check: CheckReason? = draft.boundsUnsure ? .entryBoundsUnsure
             : takesADoubtfulHeading ? .headingUnsure
-            : byOrder && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
+            : (byOrder || secondary?.isGuessedSplit == true) && (primary != nil && secondary != nil) ? .roleOrEmployerByOrder : nil
         switch kind {
         case .experience:
             var entry = ImportedExperience()
