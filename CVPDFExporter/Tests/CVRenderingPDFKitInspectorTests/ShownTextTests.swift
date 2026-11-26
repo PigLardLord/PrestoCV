@@ -90,15 +90,20 @@ struct ShownTextTests {
 
     /// A one-page A4 PDF whose content is `content`, with the fonts `/F1` (Helvetica), `/F2` (a Type 0 font whose
     /// predefined CMap writes vertically), `/F3` (a Type 0 font whose embedded CMap writes vertically) and `/F4` (a
-    /// Type 0 font that writes across).
+    /// Type 0 font that writes across), and Type 0 fonts whose embedded CMap writes vertically by its program only
+    /// (`/F5`), is built on a predefined vertical CMap (`/F6`) or on an embedded one (`/F7`), or writes across (`/F8`).
     static func pageShowing(_ content: String) -> Data {
         let cid = "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>"
         let cmap = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /Custom def /WMode 1 def "
             + "1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange <0000> <FFFF> 0 endcidrange "
             + "endcmap CMapName currentdict /CMap defineresource pop end end"
+        let across = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /Across def /WMode 0 def "
+            + "1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange <0000> <FFFF> 0 endcidrange "
+            + "endcmap CMapName currentdict /CMap defineresource pop end end"
+        let font = { (cmap: Int) in "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding \(cmap) 0 R /DescendantFonts [7 0 R] >>" }
         return handWritten([
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 9 0 R "
-                + "/F4 11 0 R >> >> /Contents 4 0 R >>",
+                + "/F4 11 0 R /F5 12 0 R /F6 14 0 R /F7 16 0 R /F8 18 0 R >> >> /Contents 4 0 R >>",
             stream(content),
             helvetica,
             "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-V /DescendantFonts [7 0 R] >>",
@@ -108,6 +113,10 @@ struct ShownTextTests {
             "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding 10 0 R /DescendantFonts [7 0 R] >>",
             stream(cmap, "/Type /CMap /CMapName /Custom \(cid) /WMode 1 "),
             "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-H /DescendantFonts [7 0 R] >>",
+            font(13), stream(cmap, "/Type /CMap /CMapName /Custom \(cid) "),
+            font(15), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /UniJIS-UCS2-V "),
+            font(17), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap 13 0 R "),
+            font(19), stream(across, "/Type /CMap /CMapName /Across \(cid) "),
         ])
     }
 
@@ -172,6 +181,25 @@ struct ShownTextTests {
                          ShownText(start: .at(x: 100, y: 300), size: 9), ShownText(start: .onTheLine(x: 100, y: 300, dx: 1, dy: 0), size: 9),
                          ShownText(start: .anywhere, size: 9)],
                 "a predefined vertical CMap, an embedded one, a missing font, then a font that writes across, and a move in a vertical font")
+    }
+
+    @Test("an embedded CMap may write vertically by its program or by the CMap it is built on, whatever its dictionary says")
+    func embeddedCMaps() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F5 9 Tf 100 700 Td <0001> Tj ET BT /F6 9 Tf 100 600 Td <0001> Tj ET "
+            + "BT /F7 9 Tf 100 500 Td <0001> Tj ET BT /F8 9 Tf 100 400 Td <0001> Tj (a) Tj ET BT /F5 9 Tf 100 300 Td <0001> Tj ET"))
+        #expect(runs == [ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 400), size: 9), ShownText(start: .onTheLine(x: 100, y: 400, dx: 1, dy: 0), size: 9),
+                         ShownText(start: .anywhere, size: 9)],
+                "writing mode 1 in the program only, a base named -V, an embedded vertical base, a CMap that writes across, and the first again")
+    }
+
+    @Test("a CMap program may write vertically when a /WMode it holds is followed by anything but 0, or it uses a CMap named -V")
+    func cmapPrograms() {
+        let vertical = ["/WMode 1 def", "/WMode\n1 def", "<</WMode 1>>", "/WMode 0.0 def", "/WMode", "/WMode 0 def /WMode 1 def",
+                        "/UniJIS-UCS2-V usecmap", "% a comment: /WMode 1"]
+        let across = ["/WMode 0 def", "<</WMode 0>>", "/UniJIS-UCS2-H usecmap", "/CMapName /Custom-V def", "/WMode0 1", ""]
+        for program in vertical { #expect(CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
+        for program in across { #expect(!CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
     }
 
     @Test("lines on the text line of text shown after other text are sized by PDFKit's fonts, the others from the content")

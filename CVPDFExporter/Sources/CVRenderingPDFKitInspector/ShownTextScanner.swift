@@ -1,5 +1,6 @@
 #if canImport(PDFKit)   // Apple-only adapter (R11): the whole file is platform-guarded
 import CoreGraphics
+import Foundation
 
 /// One operator of a page's content that shows text: where its first glyph starts on the page (page space, the text
 /// rise included) and how tall the font's em is there, the text and graphics transforms included. The size is nil when
@@ -15,7 +16,7 @@ struct ShownText: Equatable {
         /// others, set in fonts that write across, with no text positioning between them.
         case onTheLine(x: Double, y: Double, dx: Double, dy: Double)
         /// Anywhere: the run, or one before it with no text positioning between them, is set in a font that may write
-        /// vertically (a Type 0 font whose CMap writes vertically, or one missing from the resources).
+        /// vertically (a Type 0 font whose CMap may write vertically, or one missing from the resources).
         case anywhere
     }
 
@@ -45,6 +46,8 @@ enum ShownTextScanner {
     }
 
     static let formDepthLimit = 8
+    /// How many embedded CMaps, each built on the next (`/UseCMap`), the scan reads to learn a font's writing mode.
+    static let cmapDepthLimit = 4
 
     // MARK: Operators
 
@@ -62,7 +65,7 @@ enum ShownTextScanner {
             var name: UnsafePointer<CChar>?
             guard let collector = collecting(info), let size = popNumbers(scanner, 1),
                   CGPDFScannerPopName(scanner, &name), let name else { return }
-            let font = setting(of: name, in: CGPDFScannerGetContentStream(scanner))
+            let font = setting(of: name, in: CGPDFScannerGetContentStream(scanner), cmaps: &collector.verticalCMaps)
             collector.state.fontSize = size[0]
             collector.state.fontIsReadable = font.sizedByItsEm
             collector.state.fontWritesAcross = font.writesAcross
@@ -147,26 +150,85 @@ private func popNumbers(_ scanner: CGPDFScannerRef, _ count: Int) -> [CGFloat]? 
 
 /// How the font `name` of `stream`'s resources sets its glyphs: whether the `Tf` size scales them (any font but Type 3),
 /// and whether it writes across, moving the text position along the text line (any font but a Type 0 one whose CMap
-/// writes vertically). A font missing from the resources does neither.
-private func setting(of name: UnsafePointer<CChar>, in stream: CGPDFContentStreamRef) -> (sizedByItsEm: Bool, writesAcross: Bool) {
+/// may write vertically). A font missing from the resources does neither.
+private func setting(of name: UnsafePointer<CChar>, in stream: CGPDFContentStreamRef,
+                     cmaps: inout [CGPDFStreamRef: Bool]) -> (sizedByItsEm: Bool, writesAcross: Bool) {
     var dictionary: CGPDFDictionaryRef?
     var subtype: UnsafePointer<CChar>?
     guard let object = CGPDFContentStreamGetResource(stream, "Font", name),
           CGPDFObjectGetValue(object, .dictionary, &dictionary), let dictionary,
           CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else { return (false, false) }
     let kind = String(cString: subtype)
-    return (kind != "Type3", kind != "Type0" || !writesVertically(dictionary))
+    return (kind != "Type3", kind != "Type0" || !mayWriteVertically(dictionary, cmaps: &cmaps))
 }
 
-/// Whether the Type 0 font `font` writes vertically: its CMap is a predefined one whose name ends in `-V`, or an
-/// embedded one with writing mode 1.
-private func writesVertically(_ font: CGPDFDictionaryRef) -> Bool {
+/// Whether the Type 0 font `font` may write vertically: its CMap is a predefined one whose name ends in `-V`, or an
+/// embedded one that may. `cmaps` keeps the answer for each embedded CMap, which a page's content sets again and again.
+private func mayWriteVertically(_ font: CGPDFDictionaryRef, cmaps: inout [CGPDFStreamRef: Bool]) -> Bool {
     var name: UnsafePointer<CChar>?
     if CGPDFDictionaryGetName(font, "Encoding", &name), let name { return String(cString: name).hasSuffix("-V") }
     var cmap: CGPDFStreamRef?
-    var mode: CGPDFInteger = 0
-    guard CGPDFDictionaryGetStream(font, "Encoding", &cmap), let cmap, let info = CGPDFStreamGetDictionary(cmap) else { return false }
-    return CGPDFDictionaryGetInteger(info, "WMode", &mode) && mode == 1
+    guard CGPDFDictionaryGetStream(font, "Encoding", &cmap), let cmap else { return false }
+    if let known = cmaps[cmap] { return known }
+    let answer = mayWriteVertically(cmap, within: ShownTextScanner.cmapDepthLimit)
+    cmaps[cmap] = answer
+    return answer
+}
+
+/// Whether the embedded CMap `cmap` may write vertically: its dictionary gives a writing mode other than 0, its
+/// program may set one (`CMapProgram`), or it is built on (`/UseCMap`) a CMap whose name ends in `-V` or an embedded
+/// one that may. A CMap whose program the scan cannot read, or a chain of CMaps longer than `depth`, may.
+private func mayWriteVertically(_ cmap: CGPDFStreamRef, within depth: Int) -> Bool {
+    guard depth > 0, let info = CGPDFStreamGetDictionary(cmap) else { return true }
+    var mode: CGPDFObjectRef?
+    var value: CGPDFInteger = 0
+    if CGPDFDictionaryGetObject(info, "WMode", &mode), !(CGPDFDictionaryGetInteger(info, "WMode", &value) && value == 0) { return true }
+    var baseName: UnsafePointer<CChar>?
+    if CGPDFDictionaryGetName(info, "UseCMap", &baseName), let baseName, String(cString: baseName).hasSuffix("-V") { return true }
+    var base: CGPDFStreamRef?
+    if CGPDFDictionaryGetStream(info, "UseCMap", &base), let base, mayWriteVertically(base, within: depth - 1) { return true }
+    var format = CGPDFDataFormat.raw
+    guard let program = CGPDFStreamCopyData(cmap, &format), format == .raw else { return true }
+    return CMapProgram(program as Data).mayWriteVertically
+}
+
+/// The words of a CMap program, which is PostScript, split at white space and delimiters. Strings and comments are
+/// split into words too, which can only make the program look as if it may write vertically when it does not.
+struct CMapProgram {
+    let words: [String]
+
+    init(_ program: Data) {
+        var words: [String] = []
+        var word = ""
+        for byte in program {
+            switch byte {
+            case 0, 9, 10, 12, 13, 32:
+                if !word.isEmpty { words.append(word) }
+                word = ""
+            case UInt8(ascii: "/"), UInt8(ascii: "("), UInt8(ascii: ")"), UInt8(ascii: "<"), UInt8(ascii: ">"),
+                 UInt8(ascii: "["), UInt8(ascii: "]"), UInt8(ascii: "{"), UInt8(ascii: "}"), UInt8(ascii: "%"):
+                if !word.isEmpty { words.append(word) }
+                word = byte == UInt8(ascii: "/") ? "/" : ""
+                if byte != UInt8(ascii: "/") { words.append(String(UnicodeScalar(byte))) }
+            default:
+                word.unicodeScalars.append(UnicodeScalar(byte))
+            }
+        }
+        if !word.isEmpty { words.append(word) }
+        self.words = words
+    }
+
+    /// Whether the program may set writing mode 1: a `/WMode` it holds is followed by anything but `0`, or it uses
+    /// (`usecmap`) a CMap whose name ends in `-V`.
+    var mayWriteVertically: Bool {
+        words.indices.contains { index in
+            switch words[index] {
+            case "/WMode": index + 1 == words.endIndex || words[index + 1] != "0"
+            case "usecmap": index > words.startIndex && words[index - 1].hasSuffix("-V")
+            default: false
+            }
+        }
+    }
 }
 
 private func popString(_ scanner: CGPDFScannerRef) -> CGPDFStringRef? {
@@ -220,6 +282,8 @@ private final class ShownTextCollector {
     private var textMatrix = CGAffineTransform.identity
     private var lineMatrix = CGAffineTransform.identity
     private var depth = 0
+    /// Whether each embedded CMap the content's fonts use may write vertically.
+    var verticalCMaps: [CGPDFStreamRef: Bool] = [:]
     private let table: CGPDFOperatorTableRef
 
     init(table: CGPDFOperatorTableRef) { self.table = table }
