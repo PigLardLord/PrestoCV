@@ -19,26 +19,36 @@ public final class TipJarViewModel {
     /// Reads the offers when the screen appears. A read that starts while another is still running replaces it: only
     /// the latest read sets the state, so an older one that ends late cannot overwrite a newer result.
     public func load() async {
+        await read(startRead())
+    }
+
+    /// Reads the offers again after the person asks for it. The older read is replaced before the screen shows
+    /// loading, so nothing it brings back can take the place of this one.
+    public func retry() async {
+        let number = startRead()
+        state = .loading
+        await read(number)
+    }
+
+    /// Takes the next read number, which makes every read started before it out of date at once.
+    private func startRead() -> Int {
         latestRead += 1
-        let read = latestRead
+        return latestRead
+    }
+
+    private func read(_ number: Int) async {
         guard selling.canPay else {
             state = .unavailable(.notAllowed)
             return
         }
         do throws(TipFailure) {
             let offers = try await selling.offers()
-            guard read == latestRead else { return }
+            guard number == latestRead else { return }
             state = offers.isEmpty ? .unavailable(.noOffers) : .offers(offers.map(TipRow.init))
         } catch {
-            guard read == latestRead else { return }
+            guard number == latestRead else { return }
             state = .unavailable(error == .unreachable ? .unreachable : .failed)
         }
-    }
-
-    /// Reads the offers again after the person asks for it.
-    public func retry() async {
-        state = .loading
-        await load()
     }
 }
 

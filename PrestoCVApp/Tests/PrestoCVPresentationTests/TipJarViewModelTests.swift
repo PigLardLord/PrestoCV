@@ -90,6 +90,26 @@ struct TipJarViewModelTests {
 
         #expect(model.state == .offers(rows))
     }
+
+    @Test("an older request that ends while a retry waits leaves the screen loading")
+    func olderRequestEndsDuringRetry() async {
+        let selling = GatedTips()
+        let model = TipJarViewModel(selling: selling)
+        var arrivals = selling.arrivals.makeAsyncIterator()
+
+        let older = Task { await model.load() }
+        await arrivals.next()
+        let newer = Task { await model.retry() }
+        await arrivals.next()
+
+        selling.finish(request: 0, with: .failure(.failed))
+        await older.value
+        #expect(model.state == .loading)
+
+        selling.finish(request: 1, with: .success(all))
+        await newer.value
+        #expect(model.state == .offers(rows))
+    }
 }
 
 /// Tips whose every `offers()` call waits until the test finishes it, so the test decides the order they end in.
