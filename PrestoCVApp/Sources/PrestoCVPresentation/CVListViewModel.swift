@@ -66,11 +66,15 @@ public final class CVListViewModel {
     @ObservationIgnored private let browsing: any CVBrowsing
     @ObservationIgnored private let editing: any CVEditing
     @ObservationIgnored private let untitled: String
+    @ObservationIgnored private let barUntitled: String
+    @ObservationIgnored private let barNewCV: String
     @ObservationIgnored private let numbered: @MainActor (String, Int) -> String
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private let editorsStored: @MainActor () async -> Void
     /// The CVs as the store listed them. A change reads its CV here, when the intent comes.
     @ObservationIgnored private var listed: [CV] = []
+    /// The label each listed CV shows in the editor's bar: the list's numbering with the bar's word for no title.
+    @ObservationIgnored private var barLabels: [CVID: String] = [:]
     @ObservationIgnored private var generation = 0
     /// The reads that passed the wait for the editors and have not ended.
     @ObservationIgnored private var running = 0
@@ -86,14 +90,19 @@ public final class CVListViewModel {
     /// - Parameters:
     ///   - untitled: The view's words for a CV with no title, as "Untitled CV" (R13).
     ///   - numbered: How the view numbers a title that reads like another row's, as "Backend (2)" (R13).
+    ///   - barUntitled: The view's words for a CV with no title in the editor's bar, which is narrower than the list (R13).
+    ///   - barNewCV: The view's words for a CV not stored yet in the editor's bar (R13).
     ///   - now: The time the view words "saved ... ago" from.
     ///   - editorsStored: Returns when every open editor has stored what it showed at its turn; the store is read after.
     public init(
         browsing: any CVBrowsing, editing: any CVEditing, untitled: String,
+        barUntitled: String, barNewCV: String,
         numbered: @escaping @MainActor (String, Int) -> String, now: @escaping @MainActor () -> Date,
         editorsStored: @escaping @MainActor () async -> Void
     ) {
         self.untitled = untitled
+        self.barUntitled = barUntitled
+        self.barNewCV = barNewCV
         self.numbered = numbered
         self.browsing = browsing
         self.editing = editing
@@ -131,6 +140,18 @@ public final class CVListViewModel {
     }
 
     public func refreshNow() { now = clock() }
+
+    /// The title the editor's bar shows for what the detail holds: the open CV's own words, numbered as the list numbers
+    /// them but with the bar's word for a CV with no title; the bar's word for a CV not stored yet. `editorTitle` stands in
+    /// when the open CV is not listed.
+    public func barTitle(of detail: EditorStart?, selected: CVReference?, editorTitle: String) -> String {
+        switch detail {
+        case .stored?:
+            selected.flatMap { barLabels[$0.id] } ?? editorTitle
+        case .draft?, .blank?, nil:
+            barNewCV
+        }
+    }
 
     public func dismissNotice() { isNoticeDismissed = true }
 
@@ -178,6 +199,7 @@ public final class CVListViewModel {
 
     private func showRows() {
         let labels = Self.labels(of: listed, untitled: untitled, numbered: numbered)
+        barLabels = Self.labels(of: listed, untitled: barUntitled, numbered: numbered)
         rows = listed.map { cv in
             CVRow(
                 reference: CVReference(id: cv.id), label: labels[cv.id] ?? untitled, title: cv.title,

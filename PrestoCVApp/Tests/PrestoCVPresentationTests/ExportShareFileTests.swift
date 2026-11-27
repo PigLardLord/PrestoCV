@@ -56,6 +56,7 @@ struct ExportShareFileTests {
         let (sheet, share) = try await shared(in: world)
 
         share.end(.sent)
+        await waitUntil("the file to go") { world.files.left.isEmpty }
 
         #expect(world.files.removed == world.files.written)
         #expect(world.files.left.isEmpty)
@@ -70,6 +71,8 @@ struct ExportShareFileTests {
 
         share.end(.sent)
         share.end(.cancelled)
+        await waitUntil("the file to go") { world.files.left.isEmpty }
+        await settle()
 
         #expect(world.files.removed.count == 1)
         #expect(sheet.shareOutcome == .sent)
@@ -87,8 +90,10 @@ struct ExportShareFileTests {
 
         #expect(world.files.written.count == 2)
         #expect(first.url != second.url)
+        await waitUntil("the first file to go") { world.files.removed.count == 1 }
         #expect(world.files.left == [world.files.written[1]])
         second.end(.saved)
+        await waitUntil("the file to go") { world.files.left.isEmpty }
         #expect(world.files.left.isEmpty)
     }
 
@@ -104,6 +109,7 @@ struct ExportShareFileTests {
         #expect(sheet.openShare == nil)
         #expect(world.files.removed.isEmpty, "the share sheet still reads the file")
         share.end(.saved)
+        await waitUntil("the file to go") { world.files.left.isEmpty }
         #expect(world.files.left.isEmpty)
         #expect(sheet.shareOutcome == nil, "the PDF of the share is no longer the sheet's")
     }
@@ -135,6 +141,7 @@ struct ExportShareFileTests {
         #expect(gone == nil, "the share holds its sheet weakly")
         #expect(world.files.removed.isEmpty)
         share.end(.sent)
+        await waitUntil("the file to go") { world.files.left.isEmpty }
         #expect(world.files.left.isEmpty)
     }
 
@@ -150,6 +157,7 @@ struct ExportShareFileTests {
         let second = try #require(sheet.openShare)
 
         first.end(.saved)
+        await waitUntil("the first file to go") { world.files.removed.count == 1 }
 
         #expect(sheet.openShare === second)
         #expect(sheet.shareOutcome == nil, "the first share was of a PDF no longer on screen")

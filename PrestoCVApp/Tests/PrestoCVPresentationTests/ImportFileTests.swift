@@ -19,6 +19,7 @@ struct ImportFileTests {
 
         model.importFile(at: file)
         await waitUntil("the draft") { model.status == .ready }
+        await model.files.settled()
 
         #expect(world.importer.pdfs.withLock { $0 } == [ImportValues.pdf])
         #expect(world.importer.texts.withLock { $0 }.isEmpty)
@@ -95,6 +96,7 @@ struct ImportFileTests {
 
         model.importFile(at: file)
         await waitUntil("the problem") { model.status == .failed(ImportProblem(failure)) }
+        await model.files.settled()
 
         #expect(world.importer.calls == 0)
         #expect(model.result == nil)
@@ -120,6 +122,7 @@ struct ImportFileTests {
 
         model.importFile(at: file)
         await waitUntil("the problem") { model.status != .importing }
+        await model.files.settled()
 
         #expect(model.status == .failed(.encrypted))
         #expect(world.importer.pdfs.withLock { $0 } == [ImportValues.pdf])
@@ -137,7 +140,7 @@ struct ImportFileTests {
             let model = world.model()
             model.importFile(at: file)
             await waitUntil("the end \(end)") { model.status == end }
-            await settle()
+            await model.files.settled()
             #expect(world.files.released(file) == 1, "end \(end)")
         }
 
@@ -149,7 +152,7 @@ struct ImportFileTests {
         #expect(world.files.released(file) == 0)
         await world.files.gate.open()
         await waitUntil("the release") { world.files.released(file) == 1 }
-        await settle()
+        await model.files.settled()
         #expect(world.files.recorded == [.read(file), .released(file)])
     }
 
@@ -160,13 +163,14 @@ struct ImportFileTests {
         await world.hold(model) { $0.importFile(at: file) }
 
         model.importFile(at: otherFile)
+        await model.files.settled()
 
         #expect(world.files.recorded == [.read(file), .released(otherFile)])
         #expect(model.status == .importing)
         await world.files.gate.open()
         await world.importer.gate.open()
         await waitUntil("the draft") { model.status == .ready }
-        await settle()
+        await model.files.settled()
         #expect(world.files.recorded == [.read(file), .released(otherFile), .released(file)])
 
         let typed = ImportWorld()
@@ -174,6 +178,7 @@ struct ImportFileTests {
         typing.text = "Ada Ferro"
         await typed.hold(typing) { $0.importText() }
         typing.importFile(at: file)
+        await typing.files.settled()
         #expect(typed.files.recorded == [.released(file)])
     }
 
@@ -185,12 +190,13 @@ struct ImportFileTests {
 
         model.importFile(at: file)
         model.importFile(at: file)
+        await model.files.settled()
 
         #expect(world.files.recorded == [.read(file), .released(file), .released(file)])
         await world.files.gate.open()
         await world.importer.gate.open()
         await waitUntil("the draft") { model.status == .ready }
-        await settle()
+        await model.files.settled()
         #expect(world.files.recorded == [.read(file), .released(file), .released(file), .released(file)])
         #expect(world.files.problems(ended: true).isEmpty)
     }
@@ -247,12 +253,13 @@ struct ImportFileTests {
         await world.hold(model) { $0.importFile(at: file) }
 
         model.importFile(at: otherFile)
+        await model.files.settled()
         #expect(model.status == .idle)
 
         await world.files.gate.open()
         await world.importer.gate.open()
         await waitUntil("the release") { world.files.released(file) == 1 }
-        await settle()
+        await model.files.settled()
         #expect(model.status == .idle && model.result == nil)
         #expect(world.importer.calls == 0)
         #expect(world.files.recorded == [.read(file), .released(otherFile), .released(file)])

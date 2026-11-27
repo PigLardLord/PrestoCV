@@ -78,7 +78,7 @@ final class IOSPrintEngine {
         guard required > 0 else { throw IOSPDFRenderer.Failure.nothingToPrint }
         let kept = min(required, page.maxPages)
         let data = try draw(renderer, pages: kept)
-        try Self.check(data, holds: kept)
+        try await Self.check(data, holds: kept)
         try stopIfCancelled(at: .beforeReturn)
         return RenderedPDF(data: data, pageCount: kept, requiredPages: required)
     }
@@ -103,7 +103,9 @@ final class IOSPrintEngine {
     }
 
     /// The PDF must read back with the pages it was drawn with.
-    private static func check(_ data: Data, holds pages: Int) throws {
+    /// Core Graphics parses the whole PDF to count its pages, and needs no main thread for it, so the check runs off
+    /// the main actor: WebKit's load and UIKit's print layout before it are what must stay there.
+    @concurrent private nonisolated static func check(_ data: Data, holds pages: Int) async throws {
         guard let provider = CGDataProvider(data: data as CFData), let document = CGPDFDocument(provider),
               document.numberOfPages == pages else {
             throw IOSPDFRenderer.Failure.unreadableOutput

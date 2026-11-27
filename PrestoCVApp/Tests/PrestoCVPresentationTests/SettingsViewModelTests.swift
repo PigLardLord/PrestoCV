@@ -20,9 +20,10 @@ struct SettingsViewModelTests {
     func groupsInOrder() throws {
         let settings = try settings(address: "help@example.org")
 
-        #expect(settings.groups.map(\.kind) == [.support, .legal, .openSource, .about])
+        #expect(settings.groups.map(\.kind) == [.support, .tips, .legal, .openSource, .about])
         #expect(settings.groups.map(\.rows) == [
             [.contactSupport(try #require(URL(string: "mailto:help@example.org")))],
+            [.tips],
             [.privacyPolicy(try #require(URL(string: "https://example.org/privacy.html")))],
             [.openSourceStatement, .licences, .sourceCode(try #require(URL(string: "https://example.org/source.html")))],
             [.version("1.1"), .build("140")],
@@ -60,8 +61,8 @@ struct SettingsViewModelTests {
             appName: "PrestoCV", diagnostics: DiagnosticsFake()
         )
 
-        #expect(settings.groups.map(\.kind) == [.support, .openSource, .about])
-        #expect(settings.groups[1].rows == [.openSourceStatement, .licences])
+        #expect(settings.groups.map(\.kind) == [.support, .tips, .openSource, .about])
+        #expect(settings.groups[2].rows == [.openSourceStatement, .licences])
     }
 
     // MARK: The Diagnostics row (decision 7)
@@ -74,9 +75,9 @@ struct SettingsViewModelTests {
         await open.appear()
         await closed.appear()
 
-        #expect(open.groups.map(\.kind) == [.support, .legal, .openSource, .about, .diagnostics])
+        #expect(open.groups.map(\.kind) == [.support, .tips, .legal, .openSource, .about, .diagnostics])
         #expect(open.groups.last?.rows == [.diagnostics])
-        #expect(closed.groups.map(\.kind) == [.support, .legal, .openSource, .about])
+        #expect(closed.groups.map(\.kind) == [.support, .tips, .legal, .openSource, .about])
     }
 
     @Test("SettingsViewModel treats a gate that has not answered as closed")

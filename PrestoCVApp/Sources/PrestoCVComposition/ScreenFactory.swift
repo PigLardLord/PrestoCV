@@ -44,6 +44,8 @@ public final class ScreenFactory {
     private let clock: any TimeSource
     /// The clock the editors' autosave pause runs on.
     private let editorClock: any Clock<Duration>
+    /// How long an editor waits after the last change before it stores.
+    private let autosavePause: Duration
     /// The time the system grants the shell to store its editors once the app leaves the foreground.
     private let backgroundTime: any BackgroundTime
     private let legacyImport: LegacyImportAtLaunch
@@ -56,6 +58,8 @@ public final class ScreenFactory {
     ///   - clock: The time of day, for the list's dates.
     ///   - editorClock: The clock the editors' autosave pause runs on: the composition gives the real one, a test one it
     ///     moves by hand.
+    ///   - autosavePause: How long an editor waits after the last change before it stores: the autosave's own pause, but
+    ///     for a UI test's launch fixture.
     ///   - importer: Reads a text or a PDF for the import.
     ///   - importFiles: Reads and lets go the files handed to the import screens.
     ///   - exportFiles: Writes and removes the PDFs the export sheets hand to a share.
@@ -78,7 +82,7 @@ public final class ScreenFactory {
         exportFiles: any ExportFileSharing, exporter: any CVExporting, lookOptions: any LookOptionsProviding,
         languages: [ExportLanguage], languageDetector: any CVLanguageDetecting,
         wrapListEditing: (any CVEditing) -> any CVEditing, wrapImport: (any CVImporting) -> any CVImporting,
-        backgroundTime: any BackgroundTime, appLanguage: ExportLanguage, legacyImport: LegacyImportAtLaunch
+        autosavePause: Duration, backgroundTime: any BackgroundTime, appLanguage: ExportLanguage, legacyImport: LegacyImportAtLaunch
     ) {
         browsing = BrowseCVsWorkflow(repository: repository, samples: samples, ids: ids, legacyImport: legacyImport.outcome)
         self.legacyImport = legacyImport
@@ -93,6 +97,7 @@ public final class ScreenFactory {
         self.languageDetector = languageDetector
         self.clock = clock
         self.editorClock = editorClock
+        self.autosavePause = autosavePause
         self.backgroundTime = backgroundTime
         self.appLanguage = appLanguage
     }
@@ -101,6 +106,8 @@ public final class ScreenFactory {
     /// - Parameters:
     ///   - untitled: The view's words for a CV with no title (R13).
     ///   - numbered: How the view numbers a title that reads like another row's (R13).
+    ///   - barUntitled: The view's words for a CV with no title in the editor's bar (R13).
+    ///   - barNewCV: The view's words for a CV not stored yet in the editor's bar (R13).
     ///
     /// Before it reads the store, the list has every editor still alive store what it shows at its turn, once
     /// (`editorsStored`, through each editor's `saveWhatItShows()`). An edit made after an editor's turn, even while that
@@ -108,11 +115,12 @@ public final class ScreenFactory {
     /// editors call the list's `load()` after each write they stored). The factory holds editors weakly, and the shell
     /// keeps an editor it lets go alive until its `saveNow()` ended, which stores every edit.
     public func makeCVList(
-        untitled: String, numbered: @escaping @MainActor (String, Int) -> String
+        untitled: String, barUntitled: String, barNewCV: String, numbered: @escaping @MainActor (String, Int) -> String
     ) -> CVListViewModel {
         let clock = clock
         return CVListViewModel(
-            browsing: browsing, editing: listEditing, untitled: untitled, numbered: numbered, now: { clock.now() },
+            browsing: browsing, editing: listEditing, untitled: untitled, barUntitled: barUntitled, barNewCV: barNewCV,
+            numbered: numbered, now: { clock.now() },
             editorsStored: { [weak self] in await self?.storeEditors() }
         )
     }
@@ -159,7 +167,7 @@ public final class ScreenFactory {
                     Task { await editor.changeLook(to: look, parts: parts) }
                 }
             )
-        }, makeImporter: { self.makeImport() }, backgroundTime: backgroundTime)
+        }, makeImporter: { self.makeImport() }, files: importFiles, backgroundTime: backgroundTime)
     }
 
     /// The first run and the ways to start another CV, the import first: the shell shows the import (`showImport()`).
@@ -195,7 +203,7 @@ public final class ScreenFactory {
         start: EditorStart, copyTitle: @escaping @MainActor (String) -> String, storeChanged: @escaping @MainActor () -> Void
     ) -> EditorViewModel {
         let editor = EditorViewModel(
-            start: start, editing: editing, clock: editorClock, pause: Autosave<CV>.pause, copyTitle: copyTitle,
+            start: start, editing: editing, clock: editorClock, pause: autosavePause, copyTitle: copyTitle,
             storeChanged: storeChanged
         )
         made += 1
