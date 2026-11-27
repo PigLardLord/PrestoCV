@@ -80,9 +80,11 @@ public final class Composition {
         let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
-        /// The folders where the system puts the copy of a file opened in the app: the import deletes a copy only when it
-        /// lies directly in one of them, and never a file the person chose where it is.
-        let copyFolders: [URL]
+        /// The import's file adapter, one for the process (`importFiles(copyFolders:logger:)`): the windows'
+        /// inboxes and the screens hold the files opened in the app through it, so a copy goes only when none of them
+        /// holds it. It deletes a copy only when it lies directly in one of the folders where the system puts the copy of a
+        /// file opened in the app, and never a file the person chose where it is. The composition gives it its own log.
+        let importFiles: ImportFileAdapter
         let compileRules: CompileRules
         /// The designs that ship with the app, synced into the design store at every launch
         let designs: any BundledDesignSource
@@ -100,6 +102,8 @@ public final class Composition {
         let wrapListEditing: WrapListEditing
         let wrapStore: WrapStore
         let wrapImport: WrapImport
+        /// How long an editor waits after the last change before it stores: the autosave's own pause, but for a UI test.
+        let autosavePause: Duration
         /// The time the system grants to end the writes once the app leaves the foreground: the app's platform layer
         /// gives it, since asking for it is the app's own (UIKit on iOS).
         let backgroundTime: any BackgroundTime
@@ -140,6 +144,11 @@ public final class Composition {
     public let sharesWithStandIn: Bool
     /// What the import of the released app's store did at this launch, before any screen read the store
     public let legacyImport: LegacyImportOutcome
+    #if DEBUG
+    /// The PDF of the bundle a window is handed each time it becomes active, as if another app opened it there; nil
+    /// unless a Debug build was launched with `-PrestoCVNextOpenedFile`. A Release build has no such member.
+    public private(set) var openedFile: OpenedFileFixture?
+    #endif
     /// What listens to the store's tip transactions: started once at launch, and held for as long as the app runs
     let tips: any TipsListening
 
@@ -151,6 +160,7 @@ public final class Composition {
         let exporter: any CVExporting
         let lookOptions: any LookOptionsProviding
         let languages: [ExportLanguage]
+        let exportFiles: ExportFileAdapter
     }
 
     private init(
@@ -171,23 +181,19 @@ public final class Composition {
         tracer = trace.tracer
         traceAccess = trace.access
         sharesWithStandIn = inputs.sharesWithStandIn
-        settings = SettingsFactory(facts: inputs.settings, trace: trace.access)
+        settings = SettingsFactory(facts: inputs.settings, trace: trace.access, tips: tips)
         let importer = ImportCV(
             pdfReader: PDFKitTextExtractor(logger: trace.logger), limits: .standard, logger: trace.logger,
             clock: ContinuousClock(), tracer: trace.tracer
         )
-        let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
-        let importFiles = ImportFileAdapter(
-            files: SystemImportFiles(), copyFolders: inputs.copyFolders,
-            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
-        )
+        let importFiles = inputs.importFiles.logging(to: trace.logger)
         screens = ScreenFactory(
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
-            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
+            editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: parts.exportFiles,
             exporter: parts.exporter, lookOptions: parts.lookOptions, languages: parts.languages,
-            languageDetector: DetectDocumentLanguage(reader: NaturalLanguageTextReader()),
-            wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, backgroundTime: inputs.backgroundTime,
-            appLanguage: inputs.appLanguage, legacyImport: legacyImport
+            languageDetector: DetectedCVLanguage(DetectDocumentLanguage(reader: NaturalLanguageTextReader())),
+            wrapListEditing: inputs.wrapListEditing, wrapImport: inputs.wrapImport, autosavePause: inputs.autosavePause,
+            backgroundTime: inputs.backgroundTime, appLanguage: inputs.appLanguage, legacyImport: legacyImport
         )
     }
 
@@ -244,7 +250,7 @@ public final class Composition {
             return .failed(error)
         }
         do {
-            try inputs.paths.create()
+            try await inputs.paths.create()
         } catch {
             return .failed(CompositionFailure(error))
         }
@@ -300,14 +306,7 @@ public final class Composition {
         let renderer = renderer(rules: rules)
         let inspector = PDFKitInspector()
         let headings = HeadingsCatalog(source: BundleHeadingTableSource())
-        let gateHeadings: Headings
-        let languages: [String]
-        do throws(HeadingsCatalog.Failure) {
-            gateHeadings = try headings.headings(for: GateFixture.document.language)
-            languages = try headings.supportedLanguages()
-        } catch {
-            throw CompositionFailure(error)
-        }
+        let (gateHeadings, languages) = try await read(headings, gate: GateFixture.document.language)
         let store = FileDesignStore(directory: inputs.paths.designs, validator: DesignPackageValidator(), lockWait: .standard)
         let designs = try await DesignBootstrap(
             store: store, source: inputs.designs, gate: inputs.makeGate(renderer, inspector, gateHeadings), logger: logger,
@@ -322,8 +321,27 @@ public final class Composition {
                 headings: headings, policy: .standard
             ),
             lookOptions: CatalogLookOptions(installed: designs.installed, defaultDesign: designs.defaultDesign),
-            languages: languages.compactMap(ExportLanguage.init)
+            languages: languages.compactMap(ExportLanguage.init),
+            exportFiles: await exportFiles(root: inputs.paths.exportShare, logger: logger)
         )
+    }
+
+    /// The headings the gate renders with, in `language`, and the languages a PDF can be written in. Reading and decoding
+    /// the tables waits for the file system, so it runs off the main actor (R19) while the app shows that it is loading.
+    @concurrent nonisolated static func read(
+        _ headings: HeadingsCatalog, gate language: String
+    ) async throws(CompositionFailure) -> (gate: Headings, languages: [String]) {
+        do throws(HeadingsCatalog.Failure) {
+            return (try headings.headings(for: language), try headings.supportedLanguages())
+        } catch {
+            throw CompositionFailure(error)
+        }
+    }
+
+    /// The export's file adapter. Making it removes the PDFs an earlier launch left to share, which waits for the file
+    /// system, so it is made off the main actor (R19).
+    @concurrent private nonisolated static func exportFiles(root: URL, logger: any DiagnosticLogger) async -> ExportFileAdapter {
+        ExportFileAdapter(root: root, logger: logger)
     }
 
     /// Assembles the app for this launch. A Debug build reads the fixtures its launch arguments ask for; a Release build
@@ -343,7 +361,10 @@ public final class Composition {
         let wrapStore: WrapStore
         let wrapImport: WrapImport
         let wrapGate: WrapGate
-        let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
+        let autosavePause: Duration
+        let makeTips: MakeTips
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        let bundled = resources.appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
         let leftovers: LegacyLeftoverPaths
@@ -384,6 +405,11 @@ public final class Composition {
         wrapStore = { fixtures.store($0) }
         wrapImport = { fixtures.importing($0) }
         wrapGate = { fixtures.designGate($0) }
+        autosavePause = fixtures.autosavePause(Autosave<CV>.pause)
+        makeTips = { logger in
+            guard let given = fixtures.tips else { return StoreKitTips(logger: logger) }
+            return GivenTips(given: given)
+        }
         // Before `make` starts the trace chain, whose closed gate purges the folder. A folder that fails its check is
         // left alone here, and `make` fails the launch through `check`.
         if rejected == nil, fixtures.passesCheck(paths) {
@@ -402,6 +428,8 @@ public final class Composition {
         wrapStore = { $0 }
         wrapImport = { $0 }
         wrapGate = { $0 }
+        autosavePause = Autosave<CV>.pause
+        makeTips = { StoreKitTips(logger: $0) }
         #endif
         let state = await make(Inputs(
             paths: paths,
@@ -412,7 +440,7 @@ public final class Composition {
             device: .current,
             settlement: settlement,
             samples: samples,
-            copyFolders: AppPaths.importCopiesOnDevice(),
+            importFiles: deviceImportFiles,
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
             },
@@ -435,21 +463,46 @@ public final class Composition {
             wrapListEditing: wrapListEditing,
             wrapStore: wrapStore,
             wrapImport: wrapImport,
+            autosavePause: autosavePause,
             backgroundTime: backgroundTime,
             appLanguage: .preferred(Bundle.main.preferredLocalizations),
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             legacyLeftovers: { LegacyLeftoversAdapter(paths: leftovers, logger: $0) },
-            makeTips: { StoreKitTips(logger: $0) },
+            makeTips: makeTips,
             settings: bundledSettings()
         ))
         #if DEBUG
+        if case .ready(let composition) = state { composition.openedFile = fixtures.openedFileFixture(in: resources) }
         // A launch with the invented runs returns once its trace has settled, so that a UI test that sees the first screen
         // knows what the gate did with them: a closed gate has purged them. The fixture's distribution answers at once.
         if fixtures.storesTraceRuns { await settlement.previous()?.value }
         #endif
         return state
     }
+
+    /// The inbox of a window's files opened from another app. It holds a file waiting for the window's shell through the
+    /// process's import file adapter, and lets go, as the import does, a file that never reaches the shell. The adapter's
+    /// log here is the system's log only: a window can be handed a file before any composition, and its trace, exists.
+    public static func makeOpenedFileInbox() -> OpenedFileInbox {
+        OpenedFileInbox(files: deviceImportFiles)
+    }
+
+    /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`, and only those
+    /// this run received. Made once for the process.
+    nonisolated static func importFiles(copyFolders: [URL], logger: any DiagnosticLogger) -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: copyFolders,
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: logger
+        )
+    }
+
+    /// The process's import file adapter, made at its first use: the first window's inbox, before any file is handed to
+    /// the app.
+    private nonisolated static let deviceImportFiles = importFiles(
+        copyFolders: AppPaths.importCopiesOnDevice(),
+        logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
 
     /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of
     /// the site, and the notices file the bundle holds.
@@ -463,8 +516,13 @@ public final class Composition {
             version: info["CFBundleShortVersionString"] as? String ?? "",
             build: info["CFBundleVersion"] as? String ?? "",
             appName: info["CFBundleDisplayName"] as? String ?? "PrestoCV",
-            notices: { try Data(contentsOf: notices) }
+            notices: { try await readNotices(at: notices) }
         )
+    }
+
+    /// The bytes of the notices file, read off the main actor (R19): the Settings sheet waits for them.
+    @concurrent private nonisolated static func readNotices(at url: URL) async throws -> Data {
+        try Data(contentsOf: url)
     }
 }
 

@@ -67,7 +67,7 @@ struct TraceChain {
 
     /// Returns once the gate has answered and a closed launch has purged. The composition awaits it when it fails, so that
     /// the error screen never leaves the traces of an earlier install behind.
-    func settle() async {
+    @concurrent func settle() async {
         await startup.value
     }
 }

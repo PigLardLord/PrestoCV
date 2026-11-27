@@ -51,7 +51,7 @@ public final class TraceSettlement: Sendable {
     }
 
     /// Returns once every launch so far has settled its trace: each launch's startup ends after the one before it
-    public func settled() async {
+    @concurrent public func settled() async {
         await previous()?.value
     }
 }

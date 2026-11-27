@@ -32,6 +32,7 @@ public final class SettingsViewModel {
         let source = sourceCode.map { [SettingsRow.sourceCode($0)] } ?? []
         fixedGroups = [
             SettingsGroup(kind: .support, rows: Self.mailLink(to: supportAddress).map { [.contactSupport($0)] } ?? []),
+            SettingsGroup(kind: .tips, rows: [.tips]),
             privacyPolicy.map { SettingsGroup(kind: .legal, rows: [.privacyPolicy($0)]) },
             SettingsGroup(kind: .openSource, rows: [.openSourceStatement, .licences] + source),
             SettingsGroup(kind: .about, rows: [.version(version), .build(build)]),
@@ -57,19 +58,20 @@ public final class SettingsViewModel {
 
 /// One group of the sheet: what it is about and its rows, in order.
 public struct SettingsGroup: Hashable, Sendable {
-    public enum Kind: Hashable, Sendable { case support, legal, openSource, about, diagnostics }
+    public enum Kind: Hashable, Sendable { case support, tips, legal, openSource, about, diagnostics }
 
     public let kind: Kind
     public let rows: [SettingsRow]
 }
 
 /// A row of the sheet. A link opens outside the app; `licences` opens the Licences screen and `openSourceStatement` is
-/// a text with no action. `diagnostics` opens the Diagnostics screen of a test build.
+/// a text with no action. `tips` opens the tip jar. `diagnostics` opens the Diagnostics screen of a test build.
 public enum SettingsRow: Hashable, Sendable {
     case contactSupport(URL)
     case privacyPolicy(URL)
     case openSourceStatement
     case licences
+    case tips
     case sourceCode(URL)
     case version(String)
     case build(String)

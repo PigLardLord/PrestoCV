@@ -130,14 +130,58 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
         keepScreenshot("The sheet at the largest text size", of: app)
     }
 
+    /// The sheet is the only place the document language is chosen (#407): the editor has no such row. The line names
+    /// the language once, and Change is the one control that opens the choice.
+    @MainActor
+    func testTheSheetNamesTheDocumentLanguageOnceOnTheControl() throws {
+        let app = try launch(complete, largestText: false)
+        open(complete, in: app)
+        app.buttons["editor.export"].tap()
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
+        assertTheDocumentLanguageIsOneControlThatOpensTheChoice(in: app)
+    }
+
+    /// At the accessibility sizes Change goes under the sentence, and the middle of the row is the sentence.
+    @MainActor
+    func testTheDocumentLanguageOpensTheChoiceAtTheLargestTextSize() throws {
+        let app = try launch(complete, largestText: true)
+        open(complete, in: app)
+        app.buttons["editor.export"].tap()
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The sheet counts the pages")
+        let change = app.buttons["export.headings.change"]
+        let lines = app.scrollViews.containing(.staticText, identifier: "export.pages").firstMatch
+        for _ in 0..<8 where !(change.exists && change.isHittable) {
+            lines.swipeUp(velocity: .slow)
+        }
+        assertTheDocumentLanguageIsOneControlThatOpensTheChoice(in: app)
+    }
+
+    /// The phone speaks Italian and the CV is in English: the sheet says so in Italian and the PDF is made in English.
+    @MainActor
+    func testAnEnglishCVOnAnItalianPhoneIsExportedInEnglish() throws {
+        let app = try launch(complete, largestText: false, italian: true)
+        open(complete, in: app)
+        app.buttons["editor.export"].tap()
+
+        XCTAssertTrue(
+            wait(for: app.staticTexts["export.headings"], toRead: "Titoli in inglese"),
+            "The sheet says in Italian that the headings are in English")
+        let send = app.buttons["export.share"]
+        XCTAssertTrue(send.waitForExistence(timeout: 30), "The sheet has a button for the PDF")
+        XCTAssertEqual(send.label, "Invia o salva il PDF", "The button is labelled in the phone's language")
+        XCTAssertTrue(app.staticTexts["export.pages"].waitForExistence(timeout: 60), "The PDF is made")
+        XCTAssertTrue(send.isEnabled, "The button is ready once the PDF is made")
+    }
+
     // MARK: Launching
 
     /// A store folder of its own with the CV, in English.
     @MainActor
-    private func launch(_ cv: StoredCV, largestText: Bool) throws -> XCUIApplication {
+    private func launch(_ cv: StoredCV, largestText: Bool, italian: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-AppleLanguages", italian ? "(it)" : "(en)", "-AppleLocale", italian ? "it_IT" : "en_US",
+            "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try seed(cv),
         ]
         if largestText {
@@ -174,6 +218,18 @@ final class ExportSheetUITests: RuntimeIssueFailingTestCase {
     }
 
     // MARK: Elements and waiting
+
+    @MainActor
+    private func assertTheDocumentLanguageIsOneControlThatOpensTheChoice(in app: XCUIApplication) {
+        let named = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Change headings language"))
+        XCTAssertTrue(named.firstMatch.waitForExistence(timeout: 10), "The sheet offers to change the headings language")
+        XCTAssertEqual(named.count, 1, "VoiceOver reads the control once, not as a text and then a button")
+        let change = named.firstMatch
+        XCTAssertEqual(change.elementType, .button, "The control is the one that opens the choice")
+        XCTAssertEqual(change.value as? String, "English", "The control says which language the CV is in")
+        change.tap()
+        XCTAssertTrue(app.buttons["German"].waitForExistence(timeout: 10), "The control opens the choice of the languages")
+    }
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch

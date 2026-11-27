@@ -54,17 +54,29 @@ final class PDFPagesView: PDFView {
     ///
     /// A new document takes PDFKit's old pages out of the window, and one of them may hold the focus. Given up inside
     /// SwiftUI's update, the focus makes SwiftUI read its graph again in the middle of that update, and the update never
-    /// ends: the app stops answering (#407). After the update, it is an ordinary change of focus.
+    /// ends: the app stops answering (#407). After the update, it is an ordinary change of focus. PDFKit reads the whole
+    /// file when it opens it, so it opens off the main actor (R19); a PDF given while one opens takes its place.
     func showAfterTheUpdate(_ pdf: Data) {
         waitingPDF = pdf
         guard showing == nil else { return }
         showing = Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.showing = nil
-            guard let pdf = self.waitingPDF else { return }
-            self.waitingPDF = nil
-            self.show(PDFDocument(data: pdf))
+            while let pdf = self?.takeWaitingPDF() {
+                let opened = await Self.open(pdf)
+                guard let self else { return }
+                if self.waitingPDF == nil { self.show(opened) }
+            }
+            self?.showing = nil
         }
+    }
+
+    private func takeWaitingPDF() -> Data? {
+        defer { waitingPDF = nil }
+        return waitingPDF
+    }
+
+    /// The document of a PDF, read off the main actor.
+    @concurrent private nonisolated static func open(_ pdf: Data) async -> sending PDFDocument? {
+        PDFDocument(data: pdf)
     }
 
     /// Keeps the fit and the zoom limits after a layout.
@@ -152,7 +164,8 @@ final class PDFPagesView: PDFView {
 }
 
 /// A PDF's pages in SwiftUI (`PDFPagesView`). The document is read again only when `id` changes, so that a redraw keeps
-/// the person's zoom and scroll; a new one is shown once SwiftUI's update is done (`showAfterTheUpdate`).
+/// the person's zoom and scroll; each one, the first too, is opened off the main actor and shown once SwiftUI's update
+/// is done (`showAfterTheUpdate`).
 #if os(iOS)
 struct PDFPages<ID: Hashable>: UIViewRepresentable {
     let pdf: Data
@@ -180,12 +193,12 @@ struct PDFPages<ID: Hashable>: NSViewRepresentable {
 #endif
 
 extension PDFPages {
-    /// The first document is shown at once: the view is in no window yet, so nothing in it holds the focus.
+    /// The first document opens as the later ones do, off the main actor (R19); the view shows no page meanwhile.
     private func make(_ shown: ShownDocument<ID>) -> PDFPagesView {
         let view = PDFPagesView(frame: .zero)
         view.isForTheEyeOnly = isForTheEyeOnly
         shown.id = id
-        view.show(PDFDocument(data: pdf))
+        view.showAfterTheUpdate(pdf)
         return view
     }
 

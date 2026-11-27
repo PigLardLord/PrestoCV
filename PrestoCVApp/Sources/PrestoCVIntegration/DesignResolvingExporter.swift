@@ -29,7 +29,7 @@ public struct DesignResolvingExporter: CVExporting {
         self.policy = policy
     }
 
-    public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
+    @concurrent public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
         let look = try await resolved(snapshot.design)
         try Task.checkCancellation()                                   // a store wait can outlive the cancel: render nothing
         let style = DocumentStyle(stylesheet: look.stylesheet, palette: look.palette, fonts: look.fonts)
@@ -37,7 +37,7 @@ public struct DesignResolvingExporter: CVExporting {
         return try await workflow.export(snapshot, language: language)
     }
 
-    private func resolved(_ choice: DesignChoice?) async throws -> ResolvedDesign {
+    @concurrent private func resolved(_ choice: DesignChoice?) async throws -> ResolvedDesign {
         let wanted = choice?.design ?? defaultDesign
         do {
             do {

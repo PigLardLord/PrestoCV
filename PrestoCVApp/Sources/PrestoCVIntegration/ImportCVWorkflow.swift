@@ -25,17 +25,17 @@ public struct ImportCVWorkflow: CVImporting {
         self.importer = importer; self.ids = ids
     }
 
-    public func importCV(fromText text: String) async throws -> ImportOutcome {
+    @concurrent public func importCV(fromText text: String) async throws -> ImportOutcome {
         try await outcome { try importer.importText(text) }
     }
 
     /// The PDF is read with the layout of its words; what it gives goes the way of a text's result.
-    public func importCV(fromPDF data: Data) async throws -> ImportOutcome {
+    @concurrent public func importCV(fromPDF data: Data) async throws -> ImportOutcome {
         try await outcome { try await importer.importPDF(data) }
     }
 
     /// One way for both: the same errors and the same mapper, and an id only for a CV that was read.
-    private func outcome(_ read: () async throws -> ImportResult) async throws -> ImportOutcome {
+    @concurrent private func outcome(_ read: () async throws -> ImportResult) async throws -> ImportOutcome {
         let result: ImportResult
         do { result = try await read() } catch is CancellationError {
             throw CancellationError()                                  // ADR 0010: cancellation is not a failure

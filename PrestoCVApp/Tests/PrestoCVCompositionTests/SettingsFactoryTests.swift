@@ -16,16 +16,25 @@ struct SettingsFactoryTests {
                   "text": "The notice."}]}
     """.utf8)
 
+    @Test("The tip jar asks the tips the launch made")
+    func tipJarFromTheLaunch() async {
+        let factory = SettingsFactory(facts: CompositionTests.settings, trace: TraceDiagnosticsTests.closedTrace(), tips: NoTips())
+        let tips = factory.makeTips()
+        #expect(tips.state == .loading)
+        await tips.load()
+        #expect(tips.state == .unavailable(.notAllowed))
+    }
+
     @Test("Settings shows the facts the launch read")
     func settingsFromTheFacts() throws {
-        let settings = SettingsFactory(facts: CompositionTests.settings, trace: TraceDiagnosticsTests.closedTrace()).makeSettings()
+        let settings = SettingsFactory(facts: CompositionTests.settings, trace: TraceDiagnosticsTests.closedTrace(), tips: NoTips()).makeSettings()
 
         #expect(settings.supportAddress == "help@example.org")
         #expect(settings.appName == "PrestoCV")
-        #expect(settings.groups.map(\.kind) == [.support, .legal, .openSource, .about])
+        #expect(settings.groups.map(\.kind) == [.support, .tips, .legal, .openSource, .about])
         let source = try #require(URL(string: "https://example.org/source"))
-        #expect(settings.groups[2].rows == [.openSourceStatement, .licences, .sourceCode(source)])
-        #expect(settings.groups[3].rows == [.version("1.0"), .build("1")])
+        #expect(settings.groups[3].rows == [.openSourceStatement, .licences, .sourceCode(source)])
+        #expect(settings.groups[4].rows == [.version("1.0"), .build("1")])
     }
 
     @Test("Licences reads the notices the launch hands over, through the file adapter")
@@ -34,7 +43,7 @@ struct SettingsFactoryTests {
             supportAddress: "help@example.org", privacyPolicy: nil, sourceCode: nil, version: "1.0", build: "1",
             appName: "PrestoCV", notices: { Self.notices }
         )
-        let licences = SettingsFactory(facts: facts, trace: TraceDiagnosticsTests.closedTrace()).makeLicences()
+        let licences = SettingsFactory(facts: facts, trace: TraceDiagnosticsTests.closedTrace(), tips: NoTips()).makeLicences()
 
         await licences.load()
 
@@ -50,7 +59,7 @@ struct SettingsFactoryTests {
             isOn: { true },
             reader: TraceReaderFake(runs: [TraceRunListing(id: UUID(), kind: .aiDraft, started: started, outcome: .finished, summary: "S")])
         )
-        let factory = SettingsFactory(facts: CompositionTests.settings, trace: access)
+        let factory = SettingsFactory(facts: CompositionTests.settings, trace: access, tips: NoTips())
         let settings = factory.makeSettings()
         let diagnostics = factory.makeDiagnostics()
 
@@ -73,7 +82,7 @@ struct SettingsFactoryTests {
             directory: paths.trace, shareDirectory: paths.traceShare, gate: .debug, device: device, log: SilentLogger(), after: nil
         )
         await chain.settle()
-        let factory = SettingsFactory(facts: CompositionTests.settings, trace: chain.access)
+        let factory = SettingsFactory(facts: CompositionTests.settings, trace: chain.access, tips: NoTips())
         let window = factory.makeDiagnostics()
         let otherWindow = factory.makeDiagnostics()
         func offered(_ files: [URL]) -> Bool { !files.isEmpty && files.allSatisfy { FileManager.default.fileExists(atPath: $0.path) } }
