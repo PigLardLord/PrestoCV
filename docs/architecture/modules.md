@@ -348,7 +348,8 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 | `PrestoCVImportFiles` | outbound adapter (the files handed to the import) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `PrestoCVImporting` (its log category), `DiagnosticLogging`, Foundation, Synchronization, Glibc, Darwin, Android |
 | `PrestoCVExportFiles` | outbound adapter (the file of an export's share) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `DiagnosticLogging`, Foundation, Synchronization |
 | `PrestoCVLegacyLeftovers` | outbound adapter (what the released app left that holds nothing the person wrote) | iOS, macOS, Linux ✓, Android ✓ | `PrestoCVWorkflowPorts`, `DiagnosticLogging`, Foundation |
-| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `PrestoCVApplicationNaturalLanguage`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization, Observation |
+| `PrestoCVTipsStoreKit` | outbound adapter (the tips sold through the App Store) | iOS, macOS | `DiagnosticLogging`, Foundation, Synchronization, StoreKit |
+| `PrestoCVComposition` | composition root | iOS, macOS | everything above, plus `PrestoCVTipsStoreKit`, `PrestoCVPersistence`, `PrestoCVImportingPDFKit`, `PrestoCVApplicationNaturalLanguage`, `CVDesignCatalogFileStore`, `CVBundledDesigns`, `CVBundledHeadings`, `CVRenderingIOS` (iOS only), `CVRenderingMacOS` (macOS only), `CVRenderingWebKitSupport`, `CVRenderingPDFKitInspector`, `CVDraftingFoundationModels`, `DiagnosticLogging`, `DiagnosticLoggingOSLog`, `DiagnosticTrace`, `DiagnosticTraceFiles`, `DiagnosticTraceDistribution`, WebKit, Synchronization, Observation |
 
 **`PrestoCVWorkflowPorts`**
 - The ports that view models consume: `CVEditing` (new, load, save, rename, duplicate, delete, and the writer of the open CV, which writes its text and changes its look or document language), `CVBrowsing` (the list with the store's issues, the first-run state, the samples) and `CVExporting`. The editing and browsing operations have typed `throws(EditFailure)`; `CVExporting` and `CVAutosaveWriting` have untyped `throws`, so cancellation passes through.
@@ -423,6 +424,11 @@ A local package next to the Xcode project. The compiler holds the app's layers t
 - A path that is a link is removed as the link, never its target, and a link as the `PrestoCV` folder above two of them is never followed: what lies under it stays, and the skip is logged by its kind and the code `linkedFolder`. A path that is not there counts as removed, so there is no mark of its own: the composition runs it at every launch whose import left nothing out, and the next ones find nothing. A removal that fails is logged by its kind (`templates`, `templateCache`, `exportPreferences`) and a code, never a path ([logging](../logging.md)); the others still go.
 - **`PrestoCVLegacyLeftoversTests`** may import `PrestoCVLegacyLeftovers`, `PrestoCVWorkflowPorts`, `DiagnosticLogging`, `DiagnosticLoggingTestSupport`, Testing, Foundation, Glibc, Darwin and Android. They run on Linux with `swift test --package-path PrestoCVApp`, against the real file system in a temporary folder.
 
+**`PrestoCVTipsStoreKit`** ([ADR 0040](adr/0040-sell-tips-through-the-app-store-only.md))
+- `StoreKitTips` is the adapter over StoreKit's transactions, made only by the composition root, which starts it once, at the start of the launch and whether or not the launch succeeds, and holds it for the process (the settlement the launches share). It walks `Transaction.unfinished` and then loops `Transaction.updates`, finishes every transaction it reads, verified or not, once by the store's transaction id across both streams, and grants nothing. A consumable that is not finished comes back at every launch. It logs counts and outcome codes under the category `tips` ([logging](../logging.md)), never a product, a price or an identifier.
+- Every file is wrapped in `#if canImport(StoreKit)`, and the manifest adds the target on Apple hosts only, so it is not in the Linux build. The listener reads plain values through `TipTransactionFeed` (two closures that each give a stream) and finishes through a closure of the transaction, so its tests need no StoreKit; the only code that touches StoreKit is `StoreKitTips`, checked on the Macs.
+- **`PrestoCVTipsStoreKitTests`** may import `PrestoCVTipsStoreKit`, `DiagnosticLogging`, StoreKit, Testing, Foundation, Synchronization, Glibc, Darwin and Android. They run on Apple hosts only, with `swift test --package-path PrestoCVApp`.
+
 **`PrestoCVComposition`**
 - The only place that creates infrastructure (R4). The `@main` App type holds it in a `static let`. It owns:
   - file locations (`AppPaths`, the only code that asks the system for a folder): the root is `Application Support/PrestoCVNext`, never the legacy `PrestoCV/CVs`; the store is `Store/` in it, the designs are `Designs/` (the design store makes its own folder in it), the trace is `Diagnostics/`, the copies made to share are `DiagnosticsShare/` in the temporary folder, and the files of an export's share are `ExportShare/` there; `create()` makes the folders off the main actor (R19), and the launch awaits it; the person's choice not to see the import report again is the empty file `LegacyReportOff` in the root, outside the store (`LegacyReportMarker`);
@@ -496,7 +502,7 @@ PrestoCV (app) ─▶ PrestoCVPresentation ─▶ PrestoCVWorkflowPorts ─▶ P
      │                                    │                └─▶ CVDesignCatalog              │
      │                                    ├─▶ CVDrafting                                     │
      │                                    └─▶ PrestoCVImporting ─────────────────────────────┘
-     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVImportFiles, PrestoCVExportFiles, PrestoCVLegacyLeftovers, PrestoCVPersistence, PrestoCVImportingPDFKit, PrestoCVApplicationNaturalLanguage, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
+     └────▶ PrestoCVComposition ─▶ (all of the above) + PrestoCVImportFiles, PrestoCVExportFiles, PrestoCVLegacyLeftovers, PrestoCVTipsStoreKit, PrestoCVPersistence, PrestoCVImportingPDFKit, PrestoCVApplicationNaturalLanguage, CVDesignCatalogFileStore, CVBundledDesigns, CVBundledHeadings,
                                 CVRenderingWebKitSupport, CVRenderingIOS | CVRenderingMacOS,
                                 CVRenderingPDFKitInspector, CVDraftingFoundationModels,
                                 DiagnosticLogging, DiagnosticLoggingOSLog, DiagnosticTrace, DiagnosticTraceFiles, DiagnosticTraceDistribution
@@ -505,6 +511,7 @@ PrestoCVApplicationNaturalLanguage ─▶ PrestoCVApplication, PrestoCVDomain
 PrestoCVImportFiles ─▶ PrestoCVWorkflowPorts, PrestoCVImporting, DiagnosticLogging
 PrestoCVExportFiles ─▶ PrestoCVWorkflowPorts, DiagnosticLogging
 PrestoCVLegacyLeftovers ─▶ PrestoCVWorkflowPorts, DiagnosticLogging
+PrestoCVTipsStoreKit ─▶ DiagnosticLogging, StoreKit
 PrestoCVImporting, PrestoCVImportingPDFKit, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticLogging
 PrestoCV (app) ─▶ DiagnosticLoggingOSLog ─▶ DiagnosticLogging
 PrestoCVImporting, CVGeneratorAI (legacy), PrestoCV (app) ─▶ DiagnosticTrace ─▶ DiagnosticLogging
