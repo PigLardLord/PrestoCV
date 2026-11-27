@@ -162,14 +162,15 @@ The event names a kind of file and a code, never a path.
 
 ### The tips (category `tips`)
 
-At launch the app listens to the store's tip transactions and finishes each one it reads, verified or not, and grants nothing ([ADR 0040](architecture/adr/0040-sell-tips-through-the-app-store-only.md)).
+At launch the app listens to the store's tip transactions and finishes each one it reads, verified or not, and grants nothing ([ADR 0040](architecture/adr/0040-sell-tips-through-the-app-store-only.md)). A tip bought from the tip jar is finished the same way, as soon as the store answers.
 
 | Event | Level | Fields | When |
 |---|---|---|---|
 | `tips.unfinished.finished` | info | `count` (the transactions finished), `unverified` (how many of them the store did not verify) | Once per launch, after the transactions the store still held from an earlier run have all been finished. A count of zero is logged too. |
 | `tips.update.finished` | info | `verified` (flag) | A transaction that arrived while the app ran was finished. |
+| `tips.purchase.ended` | info | `outcome` (`completed`, `unverified`, `cancelled`, `pending`, `notAllowed`, `unreachable` or `failed`) | A purchase from the tip jar ended. A tip the store sold is finished first, the unverified one too, which grants nothing. |
 
-The events carry counts and flags only: no product, price, identifier or account.
+The events carry counts, flags and outcome codes only: no product, price, identifier or account.
 
 The listener starts before the launch's trace exists, so an event it logs before then goes to the unified log only. From the moment a launch has made its trace, its events go through that trace's logger, so in a TestFlight or Debug build they also appear in `session-events.json`; a later launch's trace takes over from the earlier one.
 

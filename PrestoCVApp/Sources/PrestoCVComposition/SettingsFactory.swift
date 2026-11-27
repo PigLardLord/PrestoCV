@@ -23,11 +23,13 @@ public struct SettingsFactory {
 
     private let facts: Facts
     private let trace: TraceAccess
+    private let tips: any TipSelling
 
     /// - Parameter trace: The gate and the stored runs of a test build's trace, which `TraceDiagnostics` adapts.
-    init(facts: Facts, trace: TraceAccess) {
+    init(facts: Facts, trace: TraceAccess, tips: any TipSelling) {
         self.facts = facts
         self.trace = trace
+        self.tips = tips
     }
 
     public func makeSettings() -> SettingsViewModel {
@@ -39,6 +41,10 @@ public struct SettingsFactory {
 
     public func makeLicences() -> LicencesViewModel {
         LicencesViewModel(reading: LicenceNoticesFile(contents: facts.notices))
+    }
+
+    public func makeTips() -> TipJarViewModel {
+        TipJarViewModel(selling: tips)
     }
 
     /// Each screen gets an adapter of its own, and with it copies of its own: a screen open in two windows never removes
