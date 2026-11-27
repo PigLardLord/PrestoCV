@@ -89,9 +89,17 @@ targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
 
 // The composition root is Apple-only (docs/architecture/modules.md): it wires the platform adapters.
 #if !os(Linux)
+targets.append(.target(name: "PrestoCVTipsStoreKit", dependencies: [
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+]))
+targets.append(.testTarget(name: "PrestoCVTipsStoreKitTests", dependencies: [
+    "PrestoCVTipsStoreKit",
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+]))
 products.append(.library(name: "PrestoCVComposition", targets: ["PrestoCVComposition"]))
 targets.append(.target(name: "PrestoCVComposition", dependencies: [
     "PrestoCVImportFiles", "PrestoCVExportFiles", "PrestoCVLegacyLeftovers", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVTipsStoreKit",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
