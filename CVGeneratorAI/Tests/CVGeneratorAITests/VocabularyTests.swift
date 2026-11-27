@@ -48,7 +48,7 @@ struct VocabularyTests {
         "worked", "taught", "trained", "studied", "graduated", "started", "moved", "employed", "since", "from", "years", "now", "degree",
         "ho", "lavorato", "insegno", "dal", "anni", "laureata", "scuola", "habe", "gearbeitet", "unterrichte", "seit", "jahre", "abschluss",
         "trabaje", "desde", "anos", "gradue", "travaille", "enseigne", "depuis", "diplome", "ecole", "trabalhei", "leciono",
-        "universidade", "formei", "j", "l", "dell",
+        "universidade", "formei", "j", "l", "dell", "formation", "carrera",
     ])
     func plainWords(word: String) {
         #expect(Vocabulary.explains(word), "\(word)")
@@ -125,7 +125,8 @@ struct VocabularyTests {
         #expect(Vocabulary.isGraduating(word), "\(word)")
     }
 
-    @Test("Obtained, made and the pronouns only go with the words of graduating, and are no word of graduating", arguments: ["obtenu", "gemacht", "mi", "sono", "mon", "meinen", "me"])
+    @Test("Obtained, made, the pronouns and articles, and the course or the studies only go with the words of graduating, and are no word of graduating",
+          arguments: ["obtenu", "gemacht", "mi", "sono", "mon", "meinen", "me", "the", "o", "course", "curso", "corso", "formation", "studies", "estudios"])
     func graduationFrameWords(word: String) {
         #expect(Vocabulary.isGraduationFrame(word), "\(word)")
         #expect(!Vocabulary.isGraduating(word), "\(word)")
@@ -149,6 +150,7 @@ struct VocabularyTests {
             ("J'ai écrit des plans de soins", .french, "plans"), ("Ho gestito casi complessi", .italian, "casi"),
             ("Lavoro la sera presso Acme", .italian, "sera"), ("Se me asignó la formación", .spanish, "se"),
             ("Une équipe qui se forme", .french, "se"), ("Mi si è affidato un reparto", .italian, "si"), ("Trabalho para si", .portuguese, "si"),
+            ("Bei Acme habe ich auch mal bei der Baumpflege ausgeholfen", .german, "mal"),
           ])
     func modalityOfAnotherLanguage(text: String, language: Vocabulary.Language, word: String) {
         #expect(!Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")
@@ -159,7 +161,7 @@ struct VocabularyTests {
         ("Ich habe fast 3 Jahre gearbeitet", Vocabulary.Language.german, "fast"), ("Falls Acme mich einstellt", .german, "falls"),
         ("I plan to work at Acme", .english, "plan"), ("Casi tres años", .spanish, "casi"), ("Je sera", .french, "sera"),
         ("Si Acme me contrata", .spanish, "si"), ("Si Acme m'embauche", .french, "si"), ("Se Acme mi assume", .italian, "se"),
-        ("Se a Acme me contratar", .portuguese, "se"),
+        ("Se a Acme me contratar", .portuguese, "se"), ("Falo mal inglês", .portuguese, "mal"),
     ])
     func modalityOfItsLanguage(text: String, language: Vocabulary.Language, word: String) {
         #expect(Vocabulary.modality(in: Word.words(in: text), language: language).contains(word), "\(word) in \(language)")

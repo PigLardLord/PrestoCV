@@ -196,7 +196,9 @@ public final class FoundationModelsService: CVGenerationService {
     nonisolated static func map(_ error: LanguageModelSession.GenerationError) -> CVGenerationError {
         switch error {
         case .exceededContextWindowSize:
-            return .descriptionTooLong
+            // The app's own instructions and schema fill the window, not a long description (that is the validator's
+            // `descriptionTooLong`); the same text would fill it again, so it is not tried again
+            return .generationFailed
         case .guardrailViolation, .refusal:
             return .contentNotAllowed
         case .unsupportedLanguageOrLocale:

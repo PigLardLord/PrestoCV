@@ -21,4 +21,17 @@ struct SeparableVerbsTests {
     func joined(text: String, expected: String) {
         #expect(SeparableVerbs.joined(in: text) == expected)
     }
+
+    /// A verb of a subordinate clause split into the verb and the particle a main clause ends with (#359): the longest particle, and
+    /// none for a verb that only begins like one.
+    @Test("A separable verb splits at its whole particle; a verb that only begins like one stays whole", arguments: [
+        ("einteile", "teile ein"), ("sicherstelle", "stelle sicher"), ("herunterlade", "lade herunter"),
+        ("einarbeite", "arbeite ein"), ("ausarbeitete", "arbeitete aus"), ("anordne", "ordne an"), ("teilnehme", "nehme teil"),
+        ("herrichte", "richte her"), ("hervorhebe", "hebe hervor"), ("vorausplane", "plane voraus"),
+        ("analysiere", nil), ("analysierte", nil), ("abonnierte", nil), ("antworte", nil), ("hinterlege", nil), ("hindere", nil),
+        ("herrsche", nil), ("angelte", nil), ("ankere", nil), ("einigte", nil), ("durchführe", nil), ("plane", nil), ("leitete", nil),
+    ] as [(String, String?)])
+    func split(verb: String, expected: String?) {
+        #expect(SeparableVerbs.split(verb).map { "\($0.verb) \($0.particle)" } == expected)
+    }
 }
