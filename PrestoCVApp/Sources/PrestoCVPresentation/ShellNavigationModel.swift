@@ -296,12 +296,12 @@ public final class ShellNavigationModel {
         return status
     }
 
-    /// Stops and drops the import, closes the export sheet of the open editor and drops its review, then hands the editor
-    /// to its `saveNow()`
+    /// Stops and drops the import for good (a late paste or picked file starts nothing), closes the export sheet of the
+    /// open editor and drops its review, then hands the editor to its `saveNow()`
     /// and keeps it alive until that ended; when that did not store its text, the editor is kept (`landed(_:)`). Every
     /// caller reads what the detail opened before it changes the detail.
     private func letGo() {
-        importer?.cancel()
+        importer?.discard()
         importer = nil
         closeExport()
         review = nil

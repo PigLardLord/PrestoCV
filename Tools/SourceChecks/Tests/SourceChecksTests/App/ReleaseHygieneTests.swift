@@ -240,7 +240,7 @@ struct ReleaseHygieneTests {
         return try #require(project.targets.first { $0.name == target }?.buildSettings, "No target \(target)")
     }
 
-    @Test("The shipped Info.plist builds for macOS, and the iOS document key is set for the iOS SDKs only")
+    @Test("The shipped Info.plist builds for macOS, and the document key is NO for the iOS SDKs and YES for macOS")
     func theInfoPlistBuildsOnEveryPlatform() throws {
         let url = Self.root.appendingPathComponent("PrestoCV/Info.plist")
         let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
@@ -248,13 +248,15 @@ struct ReleaseHygieneTests {
         let documentKey = "INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"
         let documentSettings = settings.filter { $0.key.hasPrefix(documentKey) }
 
-        // The target builds for macOS too, and macOS rejects LSSupportsOpeningDocumentsInPlace set to NO; iOS asks for
-        // the key once the app declares document types, and the released app takes a copy of the PDF it is given.
+        // iOS gets NO so the app is handed a copy of the PDF it is given, as the released app is. The target builds for
+        // macOS too, which rejects NO for an app with document types, and a setting made for some SDKs only still makes
+        // the build write the key for macOS as NO: the macOS SDK sets it itself, to YES.
         #expect(plist["CFBundleDocumentTypes"] != nil, "Info.plist no longer declares the PDFs the app opens")
         #expect(plist["LSSupportsOpeningDocumentsInPlace"] == nil, "Info.plist sets the key for macOS too")
         #expect(documentSettings == [
             "\(documentKey)[sdk=iphoneos*]": .word("NO"),
             "\(documentKey)[sdk=iphonesimulator*]": .word("NO"),
+            "\(documentKey)[sdk=macosx*]": .word("YES"),
         ], "The target sets \(documentSettings)")
     }
 
@@ -328,6 +330,19 @@ struct ReleaseHygieneTests {
 
         #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
         #expect(offenders.isEmpty, "The fixture that holds the import outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// UI tests that are not about the designs accept the bundled designs without rendering them; no Release build may
+    /// install a design that no render checked.
+    @Test("The fixture that accepts the bundled designs without rendering them is read only by Debug builds")
+    func theFixtureThatAcceptsTheDesignsIsReadOnlyInDebugBuilds() {
+        let names = ["readyDesignsArgument", "acceptsBundledDesigns", "AcceptedDesigns", "fixtures.designGate"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that accepts the designs outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
     /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build

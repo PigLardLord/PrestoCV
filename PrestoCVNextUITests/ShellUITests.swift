@@ -14,7 +14,7 @@ final class ShellUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func launchWithOneCV(largestText: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try seed()]
+        app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try seed()]
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
@@ -112,7 +112,8 @@ final class ShellUITests: RuntimeIssueFailingTestCase {
         let app = XCUIApplication()
         let files = ["\(identity).cv.json": "not a CV"]
         app.launchArguments += [
-            "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try JSONEncoder().encode(files).base64EncodedString(),
+            "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", try JSONEncoder().encode(files).base64EncodedString(),
         ]
         app.launch()
 
