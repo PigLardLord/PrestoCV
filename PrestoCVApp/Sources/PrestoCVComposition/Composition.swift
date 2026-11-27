@@ -21,6 +21,7 @@ import PrestoCVLegacyLeftovers
 import PrestoCVIntegration
 import PrestoCVPersistence
 import PrestoCVPresentation
+import PrestoCVTipsStoreKit
 import PrestoCVWorkflowPorts
 import Synchronization
 import WebKit
@@ -62,6 +63,9 @@ public final class Composition {
     /// Makes what removes the files the released app left, over the launch's log. The composition calls it once, after the
     /// log is made, so a test gives a cleaner it can read.
     typealias MakeLegacyLeftovers = @Sendable (any DiagnosticLogger) -> any LegacyLeftoversCleaning
+    /// Makes what listens to the store's tip transactions, over the launch's log. The first launch of a process calls it
+    /// once, at its start, and starts what it gets; a retry reuses it. A test gives one that touches no store.
+    typealias MakeTips = @Sendable (any DiagnosticLogger) -> any TipsListening
 
     /// What a composition is built from: everything that reaches outside the process comes in here, chosen by `launch`.
     struct Inputs {
@@ -110,6 +114,8 @@ public final class Composition {
         let legacyStore: any LegacyStore
         /// What removes the files of the released app that hold nothing the person wrote, once its import has gone through
         let legacyLeftovers: MakeLegacyLeftovers
+        /// What listens to the store's tip transactions from the launch on
+        let makeTips: MakeTips
         /// What the Settings sheet shows about the app, read from its bundle
         let settings: SettingsFactory.Facts
     }
@@ -136,6 +142,8 @@ public final class Composition {
     public let sharesWithStandIn: Bool
     /// What the import of the released app's store did at this launch, before any screen read the store
     public let legacyImport: LegacyImportOutcome
+    /// What listens to the store's tip transactions: started once at launch, and held for as long as the app runs
+    let tips: any TipsListening
 
     /// What `assemble` made before the composition: the rendering, and the designs with what the export offers.
     private struct Parts {
@@ -148,9 +156,11 @@ public final class Composition {
     }
 
     private init(
-        inputs: Inputs, repository: FileCVRepository, legacyImport: LegacyImportAtLaunch, parts: Parts, trace: TraceChain
+        inputs: Inputs, repository: FileCVRepository, legacyImport: LegacyImportAtLaunch, parts: Parts, tips: any TipsListening,
+        trace: TraceChain
     ) {
         paths = inputs.paths
+        self.tips = tips
         self.repository = repository
         self.legacyImport = legacyImport.outcome
         renderer = parts.renderer
@@ -200,6 +210,10 @@ public final class Composition {
     /// task, as it does on a launch that succeeds. A launch after a failure puts its trace behind the earlier launch's
     /// (`TraceSettlement`): it records nothing until the earlier purge has ended, so a retry never loses what it wrote.
     static func make(_ inputs: Inputs) async -> CompositionState {
+        // First of all, so that the store's transactions are finished whatever the rest of the launch does: the settlement
+        // holds the listener, because a failed launch leaves no composition to hold it. No trace exists yet, so the
+        // listener's entries go to the unified log only until a launch has made its trace (`TraceSettlement.tipsLogger`).
+        let tips = inputs.settlement.tipsListener(make: { inputs.makeTips(inputs.settlement.tipsLogger(fallback: inputs.log)) })
         do {
             try inputs.check()
         } catch {
@@ -209,8 +223,8 @@ public final class Composition {
             directory: inputs.paths.trace, shareDirectory: inputs.paths.traceShare, gate: inputs.gate,
             device: inputs.device, log: inputs.log, after: inputs.settlement.previous()
         )
-        inputs.settlement.record(trace.startup)
-        let state = await assemble(inputs, trace: trace)
+        inputs.settlement.record(trace.startup, logger: trace.logger)
+        let state = await assemble(inputs, tips: tips, trace: trace)
         if case .failed = state { await first(of: { await trace.settle() }, or: inputs.settleDeadline) }
         return state
     }
@@ -225,7 +239,7 @@ public final class Composition {
         }
     }
 
-    private static func assemble(_ inputs: Inputs, trace: TraceChain) async -> CompositionState {
+    private static func assemble(_ inputs: Inputs, tips: any TipsListening, trace: TraceChain) async -> CompositionState {
         do {
             try inputs.prepare()
         } catch {
@@ -252,7 +266,9 @@ public final class Composition {
         }
         do {
             let parts = try await rendering(inputs, rules: rules, logger: trace.logger)
-            return .ready(Composition(inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, trace: trace))
+            return .ready(Composition(
+                inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, tips: tips, trace: trace
+            ))
         } catch {
             return .failed(error)
         }
@@ -430,6 +446,7 @@ public final class Composition {
             sharesWithStandIn: sharesWithStandIn,
             legacyStore: DirectoryLegacyStore(directory: legacy, clock: SystemTimeSource()),
             legacyLeftovers: { LegacyLeftoversAdapter(paths: leftovers, logger: $0) },
+            makeTips: { StoreKitTips(logger: $0) },
             settings: bundledSettings()
         ))
         #if DEBUG

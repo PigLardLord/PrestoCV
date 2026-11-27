@@ -75,6 +75,7 @@ struct CompositionTests {
 
     static func inputs(
         _ paths: AppPaths,
+        settlement: TraceSettlement = TraceSettlement(),
         log: any DiagnosticLogger = RecordingLogger(),
         clock: any TimeSource = SteppingClock(),
         ids: any IDGenerator = SequentialIDGenerator(),
@@ -83,7 +84,9 @@ struct CompositionTests {
         designs: any BundledDesignSource = BundleDesignSource(),
         makeGate: @escaping Composition.MakeGate = { _, _, _ in FakeRenderingGate() },
         legacyStore: any LegacyStore = EmptyLegacyStore(),
-        legacyLeftovers: @escaping Composition.MakeLegacyLeftovers = { _ in NoLeftovers() }
+        legacyLeftovers: @escaping Composition.MakeLegacyLeftovers = { _ in NoLeftovers() },
+        check: @escaping @MainActor () throws(CompositionFailure) -> Void = {},
+        makeTips: @escaping Composition.MakeTips = { _ in NoTips() }
     ) -> Composition.Inputs {
         Composition.Inputs(
             paths: paths,
@@ -92,14 +95,14 @@ struct CompositionTests {
             log: log,
             gate: .asking(FixedDistribution(.production)),
             device: TraceDevice(appVersion: "1.0", build: "1", osVersion: "iOS 26.5", model: "iPhone17,1"),
-            settlement: TraceSettlement(),
+            settlement: settlement,
             samples: paths.root.appendingPathComponent("Samples", isDirectory: true),
             copyFolders: copyFolders,
             compileRules: compileRules,
             designs: designs,
             makeGate: makeGate,
             settleDeadline: Self.neverFires,
-            check: {},
+            check: check,
             prepare: {},
             wrapListEditing: { $0 },
             wrapStore: { $0 },
@@ -110,6 +113,7 @@ struct CompositionTests {
             sharesWithStandIn: false,
             legacyStore: legacyStore,
             legacyLeftovers: legacyLeftovers,
+            makeTips: makeTips,
             settings: Self.settings
         )
     }

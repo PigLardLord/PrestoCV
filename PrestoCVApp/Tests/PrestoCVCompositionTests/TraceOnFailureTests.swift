@@ -55,6 +55,7 @@ struct TraceOnFailureTests {
             sharesWithStandIn: false,
             legacyStore: EmptyLegacyStore(),
             legacyLeftovers: { _ in NoLeftovers() },
+            makeTips: { _ in NoTips() },
             settings: CompositionTests.settings
         )
     }
