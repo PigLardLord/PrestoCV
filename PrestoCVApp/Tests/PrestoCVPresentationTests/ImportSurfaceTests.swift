@@ -55,6 +55,12 @@ func useEveryPublicMember(of inbox: OpenedFileInbox, shell: ShellNavigationModel
     inbox.shellReady(shell)
     inbox.receive(file)
     shell.receive(file: file)
+    switch shell.question {
+    case .keepEditingOrDiscard(let status)?: let _: SaveStatus = status
+    case nil: break
+    }
+    shell.keepEditing()
+    shell.discardAndImport()
 }
 
 @MainActor

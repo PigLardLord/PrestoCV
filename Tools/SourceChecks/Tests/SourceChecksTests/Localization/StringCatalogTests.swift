@@ -97,6 +97,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.opened.message \(reason)"#: ValueTypes(["%@"], "OpenedFileDialog's reason is a String"),
                 #"import.review.field.certification \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
                 #"legacyImport.row.label \(name) \(details)"#: ValueTypes(

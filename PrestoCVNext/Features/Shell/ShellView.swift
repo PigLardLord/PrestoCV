@@ -9,7 +9,7 @@ import SwiftUI
 /// list it shows what the import of the released app's CVs left out, while the report's model presents it. The gear in
 /// the sidebar's bar opens Settings in a sheet.
 struct ShellView: View {
-    let shell: ShellNavigationModel
+    @Bindable var shell: ShellNavigationModel
     let list: CVListViewModel
     let firstRun: FirstRunViewModel
     let report: LegacyImportReportViewModel
@@ -19,10 +19,6 @@ struct ShellView: View {
     let tips: TipJarViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
-    @State private var addingCV = false
-    @State private var showingSettings = false
-    /// The way to start chosen in the "+" sheet, opened when the sheet has closed.
-    @State private var chosenInSheet: StartChoice?
 
     var body: some View {
         screen
@@ -53,11 +49,11 @@ struct ShellView: View {
             )
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
-                        Button { showingSettings = true } label: { Label("settings.open", systemImage: "gearshape") }
+                        Button { shell.showsSettings = true } label: { Label("settings.open", systemImage: "gearshape") }
                             .accessibilityIdentifier("settings.open")
                     }
                     ToolbarItem(placement: .primaryAction) {
-                        Button { addingCV = true } label: { Label("shell.add", systemImage: "plus") }
+                        Button { shell.showsNewCV = true } label: { Label("shell.add", systemImage: "plus") }
                             .accessibilityIdentifier("shell.add")
                     }
                 }
@@ -69,13 +65,10 @@ struct ShellView: View {
         }
         .onChange(of: list.rows) { _, rows in shell.reconcile(with: rows) }
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $addingCV, onDismiss: startChosenInSheet) {
-            NewCVSheet(firstRun: firstRun) { choice in
-                chosenInSheet = choice
-                addingCV = false
-            }
+        .sheet(isPresented: $shell.showsNewCV, onDismiss: startChosenInSheet) {
+            NewCVSheet(firstRun: firstRun) { choice in shell.choose(choice) }
         }
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $shell.showsSettings) {
             SettingsView(settings: settings, licences: licences, diagnostics: diagnostics, tips: tips)
         }
         .sheet(item: exportSheet) { sheet in
@@ -123,8 +116,9 @@ struct ShellView: View {
     /// opens on top of it. While its text cannot be stored, Back is hidden (which also stops the swipe), so the person
     /// answers the status first: the notice above the form offers the ways out, and "Discard" closes the editor without
     /// storing its text. The draft of an import shows its review, and the review's sheet opens over the editor, not
-    /// over the split, where the export sheet is. In its place, the import while the shell holds one; the shell hears of each change of its
-    /// status, and opens the draft of an import that is ready.
+    /// over the split, where the export sheet is. A PDF opened in the app while the text cannot be stored asks the
+    /// shell's question over the editor (`OpenedFileDialog`). In its place, the import while the shell holds one; the
+    /// shell hears of each change of its status, and opens the draft of an import that is ready.
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
@@ -135,6 +129,7 @@ struct ShellView: View {
                 .sheet(item: reviewSheet) { review in
                     ImportReviewSheet(review: review)
                 }
+                .modifier(OpenedFileDialog(shell: shell))
         } else if let importer = shell.importer {
             ImportView(importer: importer)
                 .id(ObjectIdentifier(importer))
@@ -161,9 +156,7 @@ struct ShellView: View {
     }
 
     private func startChosenInSheet() {
-        guard let chosenInSheet else { return }
-        self.chosenInSheet = nil
-        start(chosenInSheet)
+        if let choice = shell.sheetDismissed() { start(choice) }
     }
 
     /// The system selects a row, and clears the selection when the person goes back. The model may keep the open CV (its

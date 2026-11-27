@@ -85,6 +85,7 @@ private final class ShellModels: ObservableObject {
             list: list, firstRun: firstRun, copyTitle: { title in String(localized: "list.copy.title \(title)") },
             fileNamePattern: { language in ExportTitlePattern.pattern(in: language) }
         )
+        shell.legacyReport = report
     }
 }
 

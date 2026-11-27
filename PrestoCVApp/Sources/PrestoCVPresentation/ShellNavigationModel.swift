@@ -61,11 +61,48 @@ public final class ShellNavigationModel {
     /// The import's review while its sheet is open, for the view to show the sheet.
     public var reviewSheet: ImportReviewViewModel? { review.flatMap { $0.isSheetShown ? $0 : nil } }
 
+    /// The question about a PDF opened in the app while the open CV's text cannot be stored as it is, nil when none is
+    /// asked (`receive(file:)`). The shell holds the file until the person answers (`keepEditing()`,
+    /// `discardAndImport()`), or until the editor goes.
+    public private(set) var question: OpenedFileQuestion?
+
+    /// Whether Settings shows in a sheet over the shell. The view binds its sheet to it; `receive(file:)` clears it.
+    public var showsSettings = false
+
+    /// Whether the sheet of the ways to start a CV shows over the shell. The view binds its sheet to it; `receive(file:)`
+    /// clears it.
+    public var showsNewCV = false
+
+    /// The way to start the person chose in that sheet, run once the sheet has gone (`sheetDismissed()`).
+    @ObservationIgnored private var chosenInSheet: StartChoice?
+
+    /// Closes the sheet of the ways to start a CV on the person's choice, kept until the sheet has gone: the view starts
+    /// it then (`sheetDismissed()`), never before.
+    public func choose(_ choice: StartChoice) {
+        chosenInSheet = choice
+        showsNewCV = false
+    }
+
+    /// The sheet of the ways to start a CV has gone: the choice made in it, once, for the view to start, nil when none
+    /// was made or a file opened since took it away (`receive(file:)`).
+    public func sheetDismissed() -> StartChoice? {
+        defer { chosenInSheet = nil }
+        return chosenInSheet
+    }
+
+    /// The report of the released app's import, which `receive(file:)` closes as Not now does when it shows over the
+    /// shell. Set by the composition; nil where no report exists.
+    @ObservationIgnored public var legacyReport: LegacyImportReportViewModel?
+
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
-    /// Lets go a file opened in the app that no import takes (`receive(file:)`).
+    /// Holds a file opened in the app while its question shows, and lets go one no import takes (`receive(file:)`).
     @ObservationIgnored let files: any ImportFileReading
+    /// The file the question is about, held from its arrival until the person answers; nil while none is asked.
+    @ObservationIgnored private var heldFile: ReceivedFile?
+    /// Waits for the editor's copy to end when a file arrived during it (`receive(file:)`); nil while none waits.
+    @ObservationIgnored private var waitingForCopy: Task<Void, Never>?
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -115,7 +152,8 @@ public final class ShellNavigationModel {
     ///     `storeChanged`.
     ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
     ///   - makeImporter: Makes the import the detail shows (`showImport()`).
-    ///   - files: The files of the imports it makes, to let go a file opened in the app that none of them takes.
+    ///   - files: The files of the imports it makes, to hold a file opened in the app while its question shows, and to
+    ///     let go one that none of them takes.
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
     public init(
         makeEditor: @escaping @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel,
@@ -128,6 +166,11 @@ public final class ShellNavigationModel {
         self.makeImporter = makeImporter
         self.files = files
         self.backgroundTime = backgroundTime
+    }
+
+    isolated deinit {
+        waitingForCopy?.cancel()
+        if let heldFile { files.release(heldFile) }
     }
 
     /// The scene became active, or stopped being active. On its way to the background a scene is inactive first, and from
@@ -289,9 +332,132 @@ public final class ShellNavigationModel {
     /// may store the text the person meant to drop, and the editor goes on with it.
     public func discardEditor() {
         guard let editor, editor.canBeDiscarded else { return }
-        self.editor = nil
+        dropEditor()
+    }
+
+    /// Drops the open editor with its text that is not stored, and what goes with it, so that the detail shows nothing.
+    /// Nothing is written, and the question about a file goes with the editor it was about.
+    private func dropEditor() {
+        dropQuestion()
+        editor = nil
         detail = nil
         review = nil
+    }
+
+    // MARK: A file opened in the app
+
+    /// A PDF opened in the app from another app: the import shows, in place of what was open, as `showImport()` shows
+    /// it, and reads the file; while it reads another, the file is let go (one import at a time).
+    ///
+    /// An editor whose text cannot be stored as it is keeps the person in it, and the shell holds the file and asks
+    /// whether to keep editing or to discard the edits and import it (`question`). The sheets over the editor and over the shell close, so
+    /// that the question shows. While it shows, a newer file takes the place of the one held, which is let go, and the
+    /// same file opened again is held once.
+    ///
+    /// The question is never asked while the editor's copy runs (`isReplacing`): the copy may store the text, and an
+    /// answer given meanwhile could not be carried out. The file is held with no question, and decided again as on
+    /// arrival once the copy ended: the sheets the person opened while it waited close again, then it goes the ordinary way
+    /// when the editor's text can then be stored, and the question shows otherwise.
+    public func receive(file url: URL) {
+        closeSheetsOverTheShell()
+        if let held = heldFile {
+            guard !url.namesTheSameFile(as: held.url) else { return }
+            heldFile = files.receive(url)
+            files.release(held)
+            return
+        }
+        switch showImport() {
+        case .left:
+            importer?.importFile(at: url)
+        case .stayed:
+            heldFile = files.receive(url)
+            closeSheetsOverTheEditor()
+            decideHeldFile()
+        }
+    }
+
+    /// The export's sheet and the review's sheet over the editor close, so that the question about the file held shows.
+    private func closeSheetsOverTheEditor() {
+        closeExport()
+        review?.closeSheet()
+    }
+
+    /// A file handed over by another app is the person's newest request: Settings, the sheet of the ways to start a CV
+    /// and the import's report, which cover the shell, close, so that the import or the question shows. The report
+    /// closes as Not now does and stays closed for this launch, which keeps the old copies and the reminder for the next launch.
+    private func closeSheetsOverTheShell() {
+        showsSettings = false
+        showsNewCV = false
+        chosenInSheet = nil
+        legacyReport?.dismissForTheLaunch()
+    }
+
+    /// Decides what to do with the file held: waits while the editor's copy runs, then imports it the ordinary way when
+    /// the editor's text can be stored, or asks the question. Once the copy ended, the sheets over the shell and over the
+    /// editor close again: the person may have opened one while the file waited, and it would cover the import or the
+    /// question, or start the choice made in it in their place.
+    private func decideHeldFile() {
+        guard let held = heldFile, question == nil, waitingForCopy == nil else { return }
+        if let editor, let copy = editor.replacing {
+            waitingForCopy = Task { [weak self] in
+                await copy.value
+                guard !Task.isCancelled, let self else { return }
+                self.waitingForCopy = nil
+                self.closeSheetsOverTheShell()
+                self.closeSheetsOverTheEditor()
+                self.decideHeldFile()
+            }
+            return
+        }
+        // The file is out of the shell's hold while the import is shown, so that leaving the editor does not let it go
+        heldFile = nil
+        switch showImport() {
+        case .left:
+            importer?.importFile(at: held.url)
+            files.release(held)
+        case .stayed(let status):
+            heldFile = held
+            question = .keepEditingOrDiscard(status)
+        }
+    }
+
+    /// The person keeps editing: the file held for the question is let go, and the editor stays with its text and its
+    /// status. With no question asked it does nothing.
+    public func keepEditing() {
+        guard question != nil else { return }
+        dropQuestion()
+    }
+
+    /// The person discards their edits and imports the file held: the editor goes with its text that is not stored, on
+    /// the person's word, whatever its status, and nothing is written; the import shows and reads the file. The import
+    /// holds the file before the shell lets its own hold go, so its copy is never removed under it. With no question
+    /// asked it does nothing. While a copy of the editor's text runs (`isReplacing`) the editor stays, as `discardEditor()`
+    /// leaves it: the copy would store the text the person meant to drop. The question goes at the tap, as the system
+    /// closes its dialog after the button and a question left shown would then be answered "keep editing"; the file
+    /// stays held and is decided again once the copy ended, as a file that arrived during the copy is.
+    public func discardAndImport() {
+        guard let held = heldFile, question != nil else { return }
+        if let editor, editor.isReplacing {
+            question = nil
+            decideHeldFile()
+            return
+        }
+        heldFile = nil
+        question = nil
+        dropEditor()
+        showImport()
+        importer?.importFile(at: held.url)
+        files.release(held)
+    }
+
+    /// The question goes, and the file held for it is let go.
+    private func dropQuestion() {
+        waitingForCopy?.cancel()
+        waitingForCopy = nil
+        guard let held = heldFile else { return }
+        heldFile = nil
+        question = nil
+        files.release(held)
     }
 
     // MARK: Leaving
@@ -303,11 +469,12 @@ public final class ShellNavigationModel {
         return status
     }
 
-    /// Stops and drops the import for good (a late paste or picked file starts nothing), closes the export sheet of the
-    /// open editor and drops its review, then hands the editor to its `saveNow()`
+    /// Lets the question's file go, stops and drops the import for good (a late paste or picked file starts nothing),
+    /// closes the export sheet of the open editor and drops its review, then hands the editor to its `saveNow()`
     /// and keeps it alive until that ended; when that did not store its text, the editor is kept (`landed(_:)`). Every
     /// caller reads what the detail opened before it changes the detail.
     private func letGo() {
+        dropQuestion()
         importer?.discard()
         importer = nil
         closeExport()
