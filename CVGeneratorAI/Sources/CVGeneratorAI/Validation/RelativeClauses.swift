@@ -14,7 +14,9 @@ import Foundation
 ///   claims nothing either, an accepted loss: "hay que hablar inglés" says what a job needs, and "un team con cui parlare inglese"
 ///   gives no English.
 /// - German "der", "die" and "das" are articles too: they bring in a subject only at the start of a clause that a comma or a conjunction
-///   split off, or right after a preposition there ("mit dem").
+///   split off, or right after a preposition there ("mit dem"), and only when a verb follows, in their clause or in the clauses that go
+///   on with it: a relative clause or one with a subject of its own has one ("das Kotlin und Swift nutzt", "und die Kollegen pflegten
+///   die Parkanlagen"), a list of nouns has none ("mit dem Verlegen von Pflasterflächen und dem Einbau von Bewässerungsanlagen", #359).
 /// - English "that" is a demonstrative too: it brings in a subject only after the first word of its clause, and before a verb, a pronoun
 ///   of the third person, a possessive or an article ("a team that uses", "that my team chose"), never before a noun ("in that role").
 /// - The pronoun reads the same when the person is the subject it brings in: "I am a developer who knows Swift" claims no Swift, an
@@ -33,13 +35,19 @@ enum RelativeClauses {
     private static let everyObligation: [[String]] = obligations.values.flatMap { $0 }
 
     /// The position in `clause` of the word from which it speaks of another subject, or nil when it speaks of none.
-    static func start(in clause: Clause, language: Vocabulary.Language?) -> Int? {
+    ///
+    /// - Parameter later: The later clauses of the sentence that go on with `clause`, split off by a comma or a conjunction, up to one
+    ///   that opens a clause of its own: where the verb of a German relative clause may stand ("das Kotlin und / Swift nutzt").
+    static func start(in clause: Clause, goingOnWith later: [Clause], language: Vocabulary.Language?) -> Int? {
         let words = clause.words
         return words.indices.dropLast().first { index in
             let word = words[index].folded
             guard Vocabulary.isRelative(word, in: language), !keepsThePerson(words[index + 1], language: language),
                   !makesAnObligation(at: index, in: words, language: language) else { return false }
-            if articles.contains(word) { return startsTheClause(index, clause, language: language) }
+            if articles.contains(word) {
+                return startsTheClause(index, clause, language: language)
+                    && (hasAVerb(clause, after: index, language: language) || later.contains { hasAVerb($0, after: -1, language: language) })
+            }
             if demonstratives.contains(word) { return index > 0 && bringsInASubject(words[index + 1], language: language) }
             return true
         }
@@ -67,6 +75,18 @@ enum RelativeClauses {
     private static func startsTheClause(_ index: Int, _ clause: Clause, language: Vocabulary.Language?) -> Bool {
         guard !clause.isAnchored else { return false }
         return index == 0 || (index == 1 && rules(of: language).prepositions.contains(clause.words[0].accented))
+    }
+
+    /// Whether a word of the German `clause` after `index` may be a verb: a word written in lower case, as German writes every noun with
+    /// a capital letter ("Verlegen" is a noun, whatever the device tags), and no number, that the device tags or a list holds as a verb,
+    /// or that is no function word and no word of time.
+    static func hasAVerb(_ clause: Clause, after index: Int, language: Vocabulary.Language?) -> Bool {
+        clause.words.indices.dropFirst(index + 1).contains { position in
+            let word = clause.words[position]
+            guard !word.isNumber, !clause.isCapitalised(position) else { return false }
+            return word.isTaggedVerb || Vocabulary.isVerb(word.folded, in: language) || Vocabulary.isAuxiliary(word.accented, in: language)
+                || Vocabulary.isBeForm(word.accented, in: language) || !Vocabulary.isNeutral(word.folded, in: language)
+        }
     }
 
     /// Whether the word after a demonstrative relative starts a clause of its own: a verb, a pronoun of the third person, a possessive

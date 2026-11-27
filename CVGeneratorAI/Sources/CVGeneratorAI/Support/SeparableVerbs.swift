@@ -32,6 +32,28 @@ enum SeparableVerbs {
         return String(clause[..<particle.endIndex]) + String(clause[verb.startIndex...])
     }
 
+    /// A finite verb a separable particle opens, as a subordinate clause writes it, split into the verb and the particle a main
+    /// clause ends with: "einteile" is "teile … ein", "sicherstelle" is "stelle … sicher", "herunterlade" is "lade … herunter"
+    /// (#359). The longest particle wins, so a compound particle stays one ("herunter", not "her"). A verb that only begins like
+    /// one stays whole: a foreign verb in "-ieren", present or past ("analysiere", "analysierte"), and the verbs of `wholeVerbs`
+    /// ("antworte", "hindere"). A separable verb this does not know stays whole too: a duty that reads "Ich ausprobiere" is
+    /// clumsy, a wrong split ("Ich alysierte … an") is no word at all.
+    static func split(_ verb: String) -> (verb: String, particle: String)? {
+        guard verb.first?.isLowercase == true, !wholeVerbs.contains(where: { verb.hasPrefix($0) }),
+              !foreignEndings.contains(where: { verb.hasSuffix($0) }) else { return nil }
+        for particle in particles.union(adjectives).sorted(by: { $0.count > $1.count }) where verb.hasPrefix(particle) {
+            let rest = String(verb.dropFirst(particle.count))
+            if rest.count >= 4, isFiniteVerb(Substring(rest)), joins(particle, rest) { return (rest, particle) }
+        }
+        return nil
+    }
+
+    /// The verbs that begin with a particle's letters and are not separable.
+    private static let wholeVerbs = ["antwort", "hinter", "hinder", "herrsch", "angel", "anker", "einig"]
+
+    /// The endings of a foreign verb in "-ieren", in the present and the past of "ich".
+    private static let foreignEndings = ["iere", "ierst", "iert", "ieren", "ierte", "ierten", "iertest", "iertet"]
+
     /// A finite verb as a subordinate clause ends with it: lower case, unlike a noun, and with the ending of a person.
     private static func isFiniteVerb(_ word: Substring) -> Bool {
         guard word.count >= 4, word.first?.isLowercase == true else { return false }
@@ -52,6 +74,8 @@ enum SeparableVerbs {
     private static let particles: Set<String> = [
         "an", "auf", "aus", "ein", "mit", "vor", "nach", "ab", "hin", "her", "dar", "zurück", "fort", "zusammen", "vorbei", "los",
         "teil", "statt", "instand",
+        "herab", "heran", "herauf", "heraus", "herbei", "herein", "herüber", "herum", "herunter", "hervor",
+        "hinab", "hinauf", "hinaus", "hinein", "hinüber", "hinunter", "hinweg", "hinzu", "voran", "voraus",
     ]
 
     private static let adjectives: Set<String> = ["sicher", "fest", "bereit"]

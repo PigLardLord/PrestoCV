@@ -102,8 +102,8 @@ extension Vocabulary {
         """,
         /// Words of studying and graduating.
         studying: """
-        academie college cours diplome diplomee doctorat ecole ecoles etude etudes etudiant etudiante examen institut
-        licence lycee master primaire secondaire these universite universites
+        academie college cours diplome diplomee doctorat ecole ecoles etude etudes etudiant etudiante examen formation
+        institut licence lycee master primaire secondaire these universite universites
         """,
         /// Prepositions and adverbs of time, and the conjunctions that join them: what a pure time phrase is made of, with years.
         timePhrase: """
@@ -115,7 +115,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        ai j je ma mon obtenu suis
+        ai etudes formation j je l la le les ma mes mon obtenu suis
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """

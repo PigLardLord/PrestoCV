@@ -143,7 +143,7 @@ extension Vocabulary {
         """,
         /// Words of studying and graduating.
         studying: """
-        academia colegio curso cursos diploma diplomatura doctorado escuela escuelas estudiante estudiantes estudios
+        academia carrera colegio curso cursos diploma diplomatura doctorado escuela escuelas estudiante estudiantes estudios
         examen grado instituto licenciada licenciado licenciatura master primaria secundaria tesis titulo universidad
         universidades
         """,
@@ -158,7 +158,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        me
+        carrera curso el estudios la los me mi mis
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """
