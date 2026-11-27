@@ -14,6 +14,14 @@ struct ModulesDocsTests {
     private static let rulesPath = "Tools/ArchitectureCheck/rules.json"
     private static let fixturesPath = "PrestoCVApp/Sources/PrestoCVComposition/LaunchFixtures.swift"
     private static let launchArgumentsBullet = "- **UI tests and previews**"
+    /// The test targets of `rules.json` that modules.md describes in prose, with no "may import" bullet. Every other test
+    /// target must have one, so a bullet whose wording the reading no longer finds fails instead of leaving its target
+    /// unchecked. The list may only shrink: a target that gains a bullet leaves it.
+    private static let testTargetsWithoutBullet: Set<String> = [
+        "PrestoCVPersistenceTests", "PrestoCVAuthoringTests", "CVRenderingNativeTestSupport", "CVRenderingTests",
+        "CVRenderingIOSTests", "CVRenderingMacOSTests", "CVRenderingWebKitSupportTests", "CVRenderingPDFKitInspectorTests",
+        "CVDesignCatalogFileStoreTests", "CVDesignCatalogTests", "PrestoCVNextUITests", "PrestoCVNextTests",
+    ]
 
     // MARK: Reading
 
@@ -101,10 +109,14 @@ struct ModulesDocsTests {
     func testBulletsNameEveryAllowedImport() throws {
         let rules = try JSONDecoder().decode(Rules.self, from: Data(Repository.text(Self.rulesPath).utf8))
         let lists = try Self.mayImportLists(in: Repository.text(Self.modulesPath))
-        let documented = rules.targets.filter { $0.kind == "test" && lists[$0.name] != nil }
-        // The bullets are still found: a change of their wording must not empty the check.
-        #expect(documented.count >= 15, "only \(documented.count) test targets of rules.json have a may-import bullet")
-        for target in documented {
+        let tests = rules.targets.filter { $0.kind == "test" }
+        let withoutBullet = Set(tests.map(\.name).filter { lists[$0] == nil })
+        // Every bullet is still found: a change of its wording must not take its target out of the check.
+        #expect(withoutBullet.subtracting(Self.testTargetsWithoutBullet).isEmpty,
+                "\(Self.modulesPath) has no may-import bullet the test can read for \(withoutBullet.subtracting(Self.testTargetsWithoutBullet).sorted())")
+        #expect(Self.testTargetsWithoutBullet.subtracting(withoutBullet).isEmpty,
+                "these targets have a bullet now or left rules.json, so they leave the list: \(Self.testTargetsWithoutBullet.subtracting(withoutBullet).sorted())")
+        for target in tests where lists[target.name] != nil {
             let missing = try Self.unnamed(target.allowedImports, in: lists[target.name] ?? "")
             #expect(missing.isEmpty, "the bullet of \(target.name) in \(Self.modulesPath) does not name \(missing)")
         }
