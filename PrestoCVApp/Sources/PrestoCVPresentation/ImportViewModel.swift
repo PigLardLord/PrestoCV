@@ -23,7 +23,8 @@ public final class ImportViewModel {
     // MARK: - State
 
     @ObservationIgnored private let importer: any CVImporting
-    @ObservationIgnored private let files: any ImportFileReading
+    /// Receives, reads and lets go the files of the imports, off the main actor and in the order they came.
+    @ObservationIgnored let files: FileHolder
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Counts the intents that start or end an import: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
@@ -33,7 +34,7 @@ public final class ImportViewModel {
     /// Does no I/O and starts nothing.
     public init(importer: any CVImporting, files: any ImportFileReading) {
         self.importer = importer
-        self.files = files
+        self.files = FileHolder(files: files)
     }
 
     // MARK: - Intents
@@ -59,25 +60,28 @@ public final class ImportViewModel {
         start(from: .pasted, releasing: nil) { try await importer.importCV(fromText: text) }
     }
 
-    /// A PDF file the person chose or opened in the app. The port receives it first. If an import runs, or the screen
-    /// was let go before the picker handed the file over, the file is not read and is released at once; otherwise the
-    /// import task reads it and releases it when the task ends, however the import ended, also when the view model is
-    /// gone. The view model never decides which files are the same.
-    public func importFile(at url: URL) {
-        let received = files.receive(url)
+    /// A PDF file the person chose or opened in the app. The port receives it first, off the main actor. If an import
+    /// runs, or the screen was let go before the picker handed the file over, the file is not read and is released once
+    /// received; otherwise the import task reads it and releases it when the task ends, however the import ended, also
+    /// when the view model is gone. The view model never decides which files are the same.
+    /// - Returns: The end of the receive, after which a part that handed the file over may let its own hold go.
+    @discardableResult
+    public func importFile(at url: URL) -> FileReceipt {
+        let hold = files.hold(url)
         guard status != .importing, !discarded else {
-            files.release(received)
-            return
+            files.letGo(hold)
+            return hold.receipt
         }
         let importer = importer, files = files
-        start(from: .file, releasing: { files.release(received) }) {
+        start(from: .file, releasing: hold) {
             let data: Data
-            do { data = try await files.readPDF(of: received) } catch {
+            do { data = try await files.read(hold) } catch {
                 throw Self.readFailure(error)
             }
             try Task.checkCancellation()
             return try await importer.importCV(fromPDF: data)
         }
+        return hold.receipt
     }
 
     /// The system could not hand over the file the person chose: the screen tells them, as for a file it could not read.
@@ -127,7 +131,7 @@ public final class ImportViewModel {
         start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
     }
 
-    private func start(from source: ImportSource, releasing release: (@Sendable () -> Void)?,
+    private func start(from source: ImportSource, releasing hold: FileHold?,
                        _ work: @escaping @MainActor () async throws -> ImportOutcome) {
         running?.cancel()
         generation += 1
@@ -135,12 +139,13 @@ public final class ImportViewModel {
         self.source = source
         result = nil
         status = .importing
-        running = Task { [weak self] in
-            // After the draft or the problem is published; the closure holds the port, not the view model.
-            defer { release?() }
+        running = Task { [weak self, files] in
             let ended: Result<ImportOutcome, any Error>
             do { ended = .success(try await work()) } catch { ended = .failure(error) }
             self?.finish(mine, ended, from: source)
+            // After the draft or the problem is published; the task holds the files, not the view model. Nothing above
+            // throws, so the file is let go however the import ended.
+            if let hold { files.letGo(hold) }
         }
     }
 

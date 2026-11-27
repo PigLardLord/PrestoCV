@@ -90,7 +90,7 @@ public final class ImportFileAdapter: ImportFileReading {
         )
     }
 
-    public func receive(_ url: URL) -> ReceivedFile {
+    @concurrent public func receive(_ url: URL) async -> ReceivedFile {
         // Access first: without it the system may not even let the path be resolved or looked at
         let scoped = files.startAccess(url) ? url : nil
         return holdings.state.withLock { state -> ReceivedFile in
@@ -107,7 +107,7 @@ public final class ImportFileAdapter: ImportFileReading {
         }
     }
 
-    public func readPDF(of file: ReceivedFile) async throws -> Data {
+    @concurrent public func readPDF(of file: ReceivedFile) async throws -> Data {
         let began = holdings.state.withLock { state -> Received? in
             state.received[file.id]
         }
@@ -138,7 +138,7 @@ public final class ImportFileAdapter: ImportFileReading {
         }
     }
 
-    public func release(_ file: ReceivedFile) {
+    @concurrent public func release(_ file: ReceivedFile) async {
         guard let released = letGo(file) else {
             logger.notice(.importing, "import.file.releasedAgain")
             return

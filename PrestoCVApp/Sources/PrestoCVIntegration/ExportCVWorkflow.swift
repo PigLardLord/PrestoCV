@@ -32,7 +32,7 @@ public struct ExportCVWorkflow: CVExporting {
         self.renderer = renderer; self.inspector = inspector; self.headings = headings; self.style = style; self.policy = policy
     }
 
-    public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
+    @concurrent public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
         let personal = snapshot.personal
         let readiness = ExportReadiness(name: personal.fullName, email: personal.email?.value ?? "", phone: personal.phone?.value ?? "")
         guard readiness.canExport else { throw ExportFailure.notReady }

@@ -50,7 +50,7 @@ public final class ExportFileAdapter: ExportFileSharing {
         removeLeftovers()
     }
 
-    public func write(_ pdf: Data, named fileName: String) async throws -> SharedFile {
+    @concurrent public func write(_ pdf: Data, named fileName: String) async throws -> SharedFile {
         guard Self.isOneName(fileName) else {
             logger.error(.export, "export.share.notWritten", .error(ExportFileError.notAName))
             throw ExportFileError.notAName
@@ -77,7 +77,7 @@ public final class ExportFileAdapter: ExportFileSharing {
         }
     }
 
-    public func remove(_ file: SharedFile) {
+    @concurrent public func remove(_ file: SharedFile) async {
         guard let folder = state.withLock({ $0.folders.removeValue(forKey: file.id) }) else { return }
         delete(folder, of: "share")
     }

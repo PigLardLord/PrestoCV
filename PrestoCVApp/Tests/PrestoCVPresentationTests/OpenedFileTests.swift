@@ -29,6 +29,14 @@ struct OpenedFileTests {
             inbox = OpenedFileInbox(files: inboxFiles)
         }
 
+        /// Waits until every file call the inbox, the shell and its import asked so far ended: the port runs them off the
+        /// main actor (R19).
+        func settled() async {
+            await inbox.files.settled()
+            await shell.files.settled()
+            await shell.importer?.files.settled()
+        }
+
         /// Waits until the import's fake let go of `file` once.
         func letGo(_ file: URL) async {
             await waitUntil("\(file.lastPathComponent) let go") { imports.files.released(file) == 1 }
@@ -114,6 +122,7 @@ struct OpenedFileTests {
         editor.type(\.summary, String(repeating: "a", count: CVLimits.maxTextCharacters + 1))
 
         world.inbox.receive(Self.file)
+        await world.settled()
 
         #expect(world.shell.importer == nil)
         #expect(world.shell.editor === editor)
@@ -132,6 +141,7 @@ struct OpenedFileTests {
         let importer = try #require(world.shell.importer)
 
         world.inbox.receive(Self.other)
+        await world.settled()
 
         #expect(world.shell.importer === importer)
         #expect(importer.status == .importing)
@@ -154,6 +164,7 @@ struct OpenedFileTests {
         #expect(importer.source == .file)
         await world.letGo(Self.file)
         world.inbox.shellReady(world.shell)
+        await world.settled()
         #expect(world.imports.files.recorded == [.read(Self.file), .released(Self.file)])
         #expect(world.inboxFiles.received.map(\.file.url) == [Self.file])
         #expect(world.inboxFiles.recorded == [.released(Self.file)])
@@ -161,7 +172,7 @@ struct OpenedFileTests {
     }
 
     @Test("a file waiting for the shell stays held until the shell's import holds it")
-    func waitingFileIsHeldUntilTheImportHoldsIt() {
+    func waitingFileIsHeldUntilTheImportHoldsIt() async {
         let world = World()
         let seen = Seen()
         let imports = world.imports.files
@@ -169,21 +180,25 @@ struct OpenedFileTests {
         world.inbox.receive(Self.file)
 
         world.inbox.shellReady(world.shell)
+        await world.settled()
 
         #expect(seen.counts == [1], "the import held the file when the inbox let it go")
     }
 
     @Test("an inbox that goes away while a file waits lets that file go once")
-    func inboxGoneLetsTheWaitingFileGo() {
+    func inboxGoneLetsTheWaitingFileGo() async throws {
         let files = FileReadingFake(.success(ImportValues.pdf))
         var inbox: OpenedFileInbox? = OpenedFileInbox(files: files)
         inbox?.receive(Self.file)
         weak let probe = inbox
+        let holder = try #require(inbox?.files)
 
         inbox = nil
 
         let gone = probe == nil
         #expect(gone)
+        await waitUntil("the waiting file let go") { files.released(Self.file) > 0 }
+        await holder.settled()
         #expect(files.recorded == [.released(Self.file)])
         #expect(files.problems(ended: true).isEmpty)
     }
@@ -194,12 +209,14 @@ struct OpenedFileTests {
 
         world.inbox.receive(Self.file)
         world.inbox.receive(Self.other)
+        await world.settled()
 
         #expect(world.inboxFiles.received.map(\.file.url) == [Self.file, Self.other])
         #expect(world.inboxFiles.received.map(\.releases) == [1, 0], "the older let go once, the newer held")
         #expect(world.inboxFiles.problems(ended: false).isEmpty)
         world.inbox.shellReady(world.shell)
         await world.letGo(Self.other)
+        await world.settled()
         #expect(world.imports.files.recorded == [.read(Self.other), .released(Self.other)])
         #expect(world.inboxFiles.recorded == [.released(Self.file), .released(Self.other)])
         #expect(world.inboxFiles.problems(ended: true).isEmpty)
@@ -213,11 +230,13 @@ struct OpenedFileTests {
 
         world.inbox.receive(Self.file)
         world.inbox.receive(same)
+        await world.settled()
 
         #expect(world.inboxFiles.received.count == 1)
         #expect(world.inboxFiles.recorded.isEmpty)
         world.inbox.shellReady(world.shell)
         await waitUntil("the file let go") { world.imports.files.recorded.count == 2 }
+        await world.settled()
         #expect(world.imports.files.reads == 1)
         #expect(world.imports.files.problems(ended: true).isEmpty)
         #expect(world.inboxFiles.problems(ended: true).isEmpty)
@@ -229,11 +248,13 @@ struct OpenedFileTests {
         world.inbox.receive(Self.file)
 
         world.inbox.compositionFailed()
+        await world.settled()
 
         #expect(world.inboxFiles.recorded == [.released(Self.file)])
         #expect(world.inboxFiles.problems(ended: true).isEmpty)
         world.inbox.compositionFailed()
         world.inbox.shellReady(world.shell)
+        await world.settled()
         #expect(world.inboxFiles.recorded == [.released(Self.file)])
         #expect(world.shell.importer == nil)
     }

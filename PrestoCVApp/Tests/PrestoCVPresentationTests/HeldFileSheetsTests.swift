@@ -52,6 +52,7 @@ struct HeldFileSheetsTests {
         world.coverTheShell()
 
         world.shell.receive(file: Self.file)
+        await world.held.settled()
 
         world.expectUncovered()
         #expect(world.shell.importer != nil)

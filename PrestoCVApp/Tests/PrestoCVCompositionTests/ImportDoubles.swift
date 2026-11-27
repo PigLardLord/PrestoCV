@@ -7,7 +7,7 @@ import PrestoCVWorkflowPorts
 
 /// A reader of a CV's language that never finds one, for the tests that never export.
 struct NoDetectedLanguage: CVLanguageDetecting {
-    func language(of cv: CV, among languages: [DocumentLanguage]) -> DocumentLanguage? { nil }
+    func language(of cv: CV, among languages: [DocumentLanguage]) async -> DocumentLanguage? { nil }
 }
 
 /// An importer for the tests that never import.
@@ -18,9 +18,9 @@ struct NoImporter: CVTextImporting {
 
 /// A file port for the tests that never import a file.
 struct NoImportFiles: ImportFileReading {
-    func receive(_ url: URL) -> ReceivedFile { ReceivedFile(id: 0, url: url) }
+    func receive(_ url: URL) async -> ReceivedFile { ReceivedFile(id: 0, url: url) }
     func readPDF(of file: ReceivedFile) async throws -> Data { throw ImportFailure.fileNotRead }
-    func release(_ file: ReceivedFile) {}
+    func release(_ file: ReceivedFile) async {}
 }
 
 /// A share file port for the tests that never share: a write fails, and a remove has nothing to remove.
@@ -28,7 +28,7 @@ struct NoExportFiles: ExportFileSharing {
     struct NotWritten: Error {}
 
     func write(_ pdf: Data, named fileName: String) async throws -> SharedFile { throw NotWritten() }
-    func remove(_ file: SharedFile) {}
+    func remove(_ file: SharedFile) async {}
 }
 
 /// An exporter for the tests that never export.
