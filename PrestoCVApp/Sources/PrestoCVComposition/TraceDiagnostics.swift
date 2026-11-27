@@ -10,11 +10,11 @@ struct TraceDiagnostics: DiagnosticsReading {
     /// Whose copies these are, in the trace's folder of copies: a new id for each adapter
     let holder = UUID()
 
-    func isAvailable() async -> Bool {
+    @concurrent func isAvailable() async -> Bool {
         await access.isOn()
     }
 
-    func runs() async -> [DiagnosticRun] {
+    @concurrent func runs() async -> [DiagnosticRun] {
         await access.reader.runs().map { listing in
             DiagnosticRun(
                 id: listing.id, kind: Self.kind(of: listing.kind), started: listing.started,
@@ -23,11 +23,11 @@ struct TraceDiagnostics: DiagnosticsReading {
         }
     }
 
-    func shareCopies(of id: UUID) async throws -> [URL] {
+    @concurrent func shareCopies(of id: UUID) async throws -> [URL] {
         try await access.reader.shareCopies(of: id, for: holder)
     }
 
-    func discardCopies() async {
+    @concurrent func discardCopies() async {
         await access.reader.discardCopies(for: holder)
     }
 

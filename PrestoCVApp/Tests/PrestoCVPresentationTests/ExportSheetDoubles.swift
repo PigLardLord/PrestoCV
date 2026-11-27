@@ -86,7 +86,7 @@ final class SharedFilesFake: ExportFileSharing {
         }
     }
 
-    func remove(_ file: SharedFile) { state.withLock { $0.removed.append(file) } }
+    func remove(_ file: SharedFile) async { state.withLock { $0.removed.append(file) } }
 }
 
 /// The reader of a CV's language: it gives the language the test set, nil by default, and records the languages it
@@ -105,7 +105,7 @@ final class LanguageDetectorStub: CVLanguageDetecting {
     /// The languages offered at each reading, in order.
     var asked: [[DocumentLanguage]] { state.withLock { $0.asked } }
 
-    func language(of cv: CV, among languages: [DocumentLanguage]) -> DocumentLanguage? {
+    func language(of cv: CV, among languages: [DocumentLanguage]) async -> DocumentLanguage? {
         state.withLock { state in
             state.asked.append(languages)
             return state.answer
