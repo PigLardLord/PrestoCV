@@ -106,6 +106,80 @@ struct InterestQualityTests {
     }
     #endif
 
+    // MARK: A hobby is never cut to a fragment (#359)
+
+    /// One description per language, each with the pastimes a draft quotes.
+    static let pastimes: [String: String] = [
+        "de": """
+            Seit 2019 arbeite ich als Feinmechaniker bei der Werkstatt Ohlsen in Suhl. In meiner Freizeit gehe ich klettern und spiele \
+            Schach. Ich spiele das Klavier und koche am Wochenende für meine Freunde. Ich gehe gern mit meinem Hund spazieren und \
+            wandere in den Bergen. Ich mag Fußball, Lesen und Wandern in den Bergen. Ich fahre am Wochenende gern Rad und sammle \
+            im Herbst. Ich tanze nicht am Wochenende und schwimme selten im Winter. \
+            Ich male im Sommer nie und reite im Winter selten.
+            """,
+        "en": """
+            I have been a waiter at the Lantern Bistro in Exeter since 2019. In my free time I walked in the park every Sunday, \
+            and I like chess, football and hiking in the Alps.
+            """,
+        "it": "Faccio il magazziniere a Pavia dal 2018. Nel tempo libero mi piace la pesca e passeggiare con il mio cane.",
+        "es": "Soy mecánico en Zaragoza desde 2018. En mi tiempo libre me gusta la pesca y salir a pasear por el campo.",
+        "fr": "Je suis boulanger à Lille depuis 2018. Pendant mon temps libre, j'aime la lecture et la randonnée dans les Vosges.",
+        "pt": "Sou padeiro em Braga desde 2018. No meu tempo livre gosto de pesca e de caminhadas com o meu cão.",
+    ]
+
+    @Test("An interest cut to a clause fragment goes, and a noun hobby stays: a conjugated verb is cut away only when a noun phrase is left, and a German verb that only tells when, where or how gives its noun (#359)",
+          arguments: [
+              ("de", "koche am Wochenende für meine Freunde", ["Kochen"]),
+              ("de", "gehe gern mit meinem Hund spazieren", ["Spazieren"]),
+              ("de", "wandere in den Bergen", ["Wandern"]),
+              ("de", "sammle im Herbst", ["Sammeln"]),
+              ("de", "fahre am Wochenende gern Rad", []),
+              ("de", "tanze nicht am Wochenende", []),
+              ("de", "schwimme selten im Winter", []),
+              ("de", "male im Sommer nie", []),
+              ("de", "reite im Winter selten", []),
+              ("de", "Wandern in den", []),
+              ("de", "spiele Schach", ["Schach"]),
+              ("de", "spiele das Klavier", ["Klavier"]),
+              ("de", "Wandern in den Bergen", ["Wandern in den Bergen"]),
+              ("de", "Fußball", ["Fußball"]),
+              ("de", "Lesen", ["Lesen"]),
+              ("en", "walked in the park", []),
+              ("en", "hiking in the", []),
+              ("en", "football", ["football"]),
+              ("en", "hiking in the Alps", ["hiking in the Alps"]),
+              ("it", "passeggiare con il", []),
+              ("it", "la pesca", ["la pesca"]),
+              ("es", "pasear por el", []),
+              ("es", "la pesca", ["la pesca"]),
+              ("fr", "la randonnée dans les", []),
+              ("fr", "la lecture", ["la lecture"]),
+              ("pt", "caminhadas com o", []),
+              ("pt", "pesca", ["pesca"]),
+          ])
+    func fragmentOfAHobbyGoes(language: String, interest: String, kept: [String]) throws {
+        let sanitizer = CVDataSanitizer(
+            languageOfText: { _ in language },
+            lexicalClasses: ForcedLexicalTagger([
+                .german: .words(["arbeite", "spiele", "koche", "gehe", "wandere", "mag", "fahre", "sammle", "tanze", "schwimme", "male", "reite"]),
+                .english: .words(["have", "been", "walked", "like"]),
+            ]),
+            wordList: TableWordList()
+        )
+
+        let result = try sanitizer.sanitize(CVData(interests: [interest]), against: try #require(Self.pastimes[language]))
+
+        #expect(result.interests == kept)
+    }
+
+    @Test("A German hobby the person denies or hardly ever does gives no pastime", arguments: [
+        "koche nicht am Wochenende", "male im Sommer nie", "reite im Winter selten", "gehe nie mit meinem Hund spazieren",
+        "koche kaum für meine Freunde", "wandere niemals in den Bergen",
+    ])
+    func deniedHobbyGivesNoPastime(interest: String) {
+        #expect(InterestFragment.germanActivity(of: interest) == nil)
+    }
+
     @Test("A hobby with the person's own things in it stays")
     func hobbiesStay() throws {
         let draft = CVData(interests: ["chess", "long walks with my dog", "hiking in the Alps"])

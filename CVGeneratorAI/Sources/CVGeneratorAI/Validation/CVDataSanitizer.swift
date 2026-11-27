@@ -113,7 +113,7 @@ public struct CVDataSanitizer: Sendable {
         let titles = ([cvData.personalInfo.title] + jobTitles).compactMap(\.presentValue)
         let interests = unique(cvData.interests.compactMap(claimed.named).filter {
             !Self.isWork($0, titles: titles, source) && !Self.isQualityAtWork($0, in: source.explainer.language)
-        }.map { pastime(of: $0, in: source) }) { $0 }
+        }.compactMap { pastime(of: $0, in: source) }) { $0 }
         let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
 
         let personalInfo = Self.withWholeTitle(Self.withStatedTitle(
@@ -154,11 +154,20 @@ public struct CVDataSanitizer: Sendable {
             .union(languageWords)
         // A written sentence says the person is, or works as, only what a kept title names (#354).
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
+        let workWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + experience.map(\.company))
         let language = source.explainer.language
+        // The qualities the summary names as a manner are the kept soft skills' or those the description states of the person (#359,
+        // N1), as in the summary check.
+        let softSkills = skills.filter { $0.kind == .softSkill }.map(\.name)
+        let heldQualities: Set<String>? = softSkills.isEmpty
+            ? nil : UnheldQualities.heldWords(softSkills: softSkills, stated: claimed.foldedWords)
         let summary = { (text: String?, words: Set<String>) in
-            source.written(text, quoting: entries.summaryQuotes, allowsNumbers: false) {
+            source.written(UnheldQualities.applied(to: text, language: language, held: heldQualities), quoting: entries.summaryQuotes, allowsNumbers: false) {
                 written.isPlain($0, ownWords: words, ownQualifications: ownQualifications)
                     && RoleAssertion.unkeptRole(in: $0, titles: keptTitles, name: personalInfo.name, language: language) == nil
+                    && !(DraftDepth.isRich && OwnQualifications.tiesAStudyToALanguage(
+                        $0, education: education, languages: languages, apart: workWords, source: source
+                    ))
             }
         }
 
@@ -179,7 +188,8 @@ public struct CVDataSanitizer: Sendable {
     // MARK: - Sections
 
     /// The name must not be a title: for "I'm a nurse" the model writes "Nurse" as the name, and the description does
-    /// contain the word.
+    /// contain the word. Nor must it be a pronoun or a clause of the description ("Ich", "Trabajo desde hace nueve años en ..."):
+    /// such a name is left empty (`PersonNameShape`, #359).
     ///
     /// - Parameters:
     ///   - claimed: What the headline title and the place are looked up in, when it is not `source`: the clauses that claim them,
@@ -191,7 +201,9 @@ public struct CVDataSanitizer: Sendable {
         let claimed = claimed ?? source
         let contacts = contacts ?? source
         let titles = ([info.title] + jobTitles.map { Optional($0) }).compactMap { $0.presentValue }.map { DescriptionText.normalized($0) }
-        let name = source.named(info.name).flatMap { titles.contains(DescriptionText.normalized($0)) ? nil : $0 }
+        let name = source.named(info.name).flatMap {
+            titles.contains(DescriptionText.normalized($0)) || !PersonNameShape.isName($0, in: source.explainer.language) ? nil : $0
+        }
 
         return PersonalInfo(
             name: name,
@@ -370,7 +382,18 @@ public struct CVDataSanitizer: Sendable {
     /// English verb with no "-s" and no "-ed" ("play football", "bake bread"), a gerund ("hiking in the Alps") and a German infinitive
     /// ("wandern gehen"). An interest of one word stays whole, and so does one whose rest holds no word of 3 letters or more, or, in
     /// German, no noun.
-    private func pastime(of interest: String, in source: DescriptionText) -> String {
+    ///
+    /// No pastime is left (nil) where a piece of a clause is (#359): what the verb leaves must start, past its articles, with a noun
+    /// ("spiele das Klavier" gives "Klavier"), not with a preposition or an adverb that tells when, where or how ("walked in the
+    /// park"), and no interest, clipped or whole, ends on an article or a preposition ("Wandern in den"): its noun is missing. In
+    /// German such an interest gives the verb's noun ("koche am Wochenende für meine Freunde" gives "Kochen"), or nothing when the
+    /// noun would lose an object. See `InterestFragment`.
+    private func pastime(of interest: String, in source: DescriptionText) -> String? {
+        guard let pastime = clipped(interest, in: source) else { return nil }
+        return InterestFragment.endsOnALinkWord(pastime, in: source.explainer.language) ? nil : pastime
+    }
+
+    private func clipped(_ interest: String, in source: DescriptionText) -> String? {
         let language = source.explainer.language
         let words = Word.words(in: interest)
         guard let language, VerbForms.readsVerbsByTags(in: language), lexicalClasses.tagsLexicalClass(inLanguage: language.rawValue),
@@ -387,8 +410,11 @@ public struct CVDataSanitizer: Sendable {
             let saidAlone = language == .german
                 && lexicalClasses.verbs(in: "ich " + Self.lowercasingFirst(interest), language: language.rawValue).contains { $0.contains(4) }
             guard saidAlone || verbs.contains(where: { $0.contains(said[start].range.lowerBound) }) else { return interest }
-            let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.folded) }
+            let rest = InterestFragment.withoutArticles(words.dropFirst(), in: language)
             guard let next = rest.first, rest.contains(where: { $0.folded.count >= 3 }) else { return interest }
+            guard !InterestFragment.tellsHowOrWhere(next, in: interest, language: language) else {
+                return language == .german ? InterestFragment.germanActivity(of: interest) : nil
+            }
             let kept = String(Array(interest)[next.range.lowerBound...])
             guard language != .german || kept.split(separator: " ").contains(where: { $0.first?.isUppercase == true }) else {
                 return interest
