@@ -15,19 +15,29 @@ extension XCUIElement {
     /// Where the middle of this element lies against the window of `app`.
     @MainActor
     func place(in app: XCUIApplication) -> ScreenPlace {
+        place(within: app.windows.firstMatch.frame)
+    }
+
+    /// Where the middle of this element lies against `room`, a part of the screen such as the room a form leaves for a
+    /// tap (`XCUIApplication.tapRoom(in:)`).
+    @MainActor
+    func place(within room: CGRect) -> ScreenPlace {
         guard exists else { return .missing }
         let frame = self.frame
-        let window = app.windows.firstMatch.frame
-        guard !frame.isNull, !frame.isInfinite, !frame.isEmpty, !window.isEmpty else { return .missing }
-        if frame.midY < window.minY { return .above }
-        if frame.midY > window.maxY { return .below }
-        if frame.midX < window.minX || frame.midX > window.maxX { return .beside }
+        guard !frame.isNull, !frame.isInfinite, !frame.isEmpty, !room.isNull, !room.isEmpty else { return .missing }
+        if frame.midY < room.minY { return .above }
+        if frame.midY > room.maxY { return .below }
+        if frame.midX < room.minX || frame.midX > room.maxX { return .beside }
         return .inside
     }
 
     /// Whether a tap would reach this element now. Asked of an element whose frame lies off the screen, XCTest's own
     /// `isHittable` can find no point to try and stops the test ("Activation point invalid"): a row a form keeps past
     /// its edge once the screen turns. So it is asked only of an element whose middle is on the screen.
+    ///
+    /// It sees neither the keyboard nor the Done button over it: `isHittable` says yes for a field that lies under
+    /// them, and a tap there does not reach the field. A field of the form is brought where a tap reaches it by
+    /// `scrollForm`, which keeps to the room the form leaves for a tap.
     @MainActor
     func canBeTapped(in app: XCUIApplication) -> Bool {
         place(in: app) == .inside && isHittable
@@ -89,27 +99,76 @@ extension XCUIApplication {
         XCTAssertTrue(page.waitForNonExistence(timeout: 30), "Back closes the page", file: file, line: line)
     }
 
-    /// Scrolls the open form in steps shorter than the screen, so that no field is passed over, until the element can
-    /// be tapped: on while it lies below, back while above, towards the middle while a bar or the keyboard covers it.
-    /// One the form has not built is looked for `forward`, or back. The drag stays in the form, away from the list
-    /// beside it.
+    /// The part of `area` where a tap lands on what lies in it: below the bar at its top, and above the keyboard and
+    /// the Done button over the keyboard. XCTest's `isHittable` sees neither: on an iPhone with the keyboard up, a field
+    /// whose middle lay under the Done button's strip read hittable, and a tap on it gave it no focus. With the keyboard
+    /// up, the form's own frame ends at the bottom of that button, so the room ends at the button's top. Null where no
+    /// room is left.
+    @MainActor
+    func tapRoom(in area: XCUIElement) -> CGRect {
+        let window = windows.firstMatch.frame
+        let whole = area.exists ? window.intersection(area.frame) : window
+        guard !whole.isNull, !whole.isEmpty else { return .null }
+        var top = whole.minY
+        var bottom = whole.maxY
+        for bar in navigationBars.allElementsBoundByIndex where bar.exists {
+            let frame = bar.frame
+            // A bar over the area: not the bar of a column beside it, nor one off the screen
+            guard frame.minX < whole.midX, frame.maxX > whole.midX, frame.midY > window.minY, frame.midY < whole.midY,
+                  bar.isHittable
+            else { continue }
+            top = max(top, frame.maxY)
+        }
+        let keyboard = keyboards.firstMatch
+        if keyboard.exists, !keyboard.frame.isEmpty {
+            bottom = min(bottom, keyboard.frame.minY)
+        }
+        let done = buttons.matching(identifier: "keyboard.done").firstMatch
+        if done.exists, done.frame.midY > whole.midY {
+            bottom = min(bottom, done.frame.minY)
+        }
+        guard bottom > top else { return .null }
+        return CGRect(x: whole.minX, y: top, width: whole.width, height: bottom - top)
+    }
+
+    /// Scrolls the open form in steps shorter than the screen, so that no field is passed over, until the middle of
+    /// the element lies in the room the form leaves for a tap (`tapRoom(in:)`) and a tap would reach it: on while it
+    /// lies below the room, back while above, towards the middle of the room while something else covers it. One the
+    /// form has not built is looked for `forward`, or back. The drag stays in the form, away from the list beside it.
     @MainActor
     func scrollForm(until element: XCUIElement, named name: String, forward: Bool = true,
                     file: StaticString = #filePath, line: UInt = #line) {
-        let form = openForm
         for _ in 0..<15 {
-            let place = element.place(in: self)
+            let room = tapRoom(in: openForm)
+            let place = element.place(within: room)
             if place == .inside, element.isHittable { break }
             let on: Bool
             switch place {
             case .below: on = true
             case .above: on = false
-            case .inside: on = element.frame.midY > form.frame.midY
+            case .inside: on = element.frame.midY > room.midY
             case .missing, .beside: on = forward
             }
             dragForm(on: on)
         }
-        XCTAssertTrue(element.canBeTapped(in: self), "\(name) comes into view", file: file, line: line)
+        let room = tapRoom(in: openForm)
+        let place = element.place(within: room)
+        XCTAssertTrue(place == .inside && element.isHittable,
+                      "\(name) comes into view: \(Self.describe(place, against: room))", file: file, line: line)
+    }
+
+    /// Where an element lies against the room for a tap, in words for a failure.
+    private static func describe(_ place: ScreenPlace, against room: CGRect) -> String {
+        // A null rectangle's edges are infinite, which no Int holds
+        guard !room.isNull, !room.isEmpty else { return "the form leaves no room for a tap" }
+        let span = "the room for a tap, from \(Int(room.minY)) to \(Int(room.maxY))"
+        switch place {
+        case .missing: return "it is not in the tree, or has no frame (\(span))"
+        case .above: return "its middle lies above \(span)"
+        case .below: return "its middle lies below \(span)"
+        case .beside: return "its middle lies beside \(span)"
+        case .inside: return "its middle lies in \(span), and a tap there does not reach it"
+        }
     }
 
     /// Scrolls the open form in the same steps, on or back, until `shown` holds: for a place that "can be tapped" does
