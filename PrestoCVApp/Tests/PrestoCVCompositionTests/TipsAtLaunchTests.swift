@@ -10,6 +10,7 @@ struct NoTips: TipsListening {
     func start() {}
     var canPay: Bool { false }
     func offers() async throws(TipFailure) -> [TipOffer] { [] }
+    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase { throw .notAllowed }
 }
 
 /// What listens to the tips, and counts its starts.
@@ -20,6 +21,7 @@ final class CountingTips: TipsListening {
     func start() { starts.withLock { $0 += 1 } }
     var canPay: Bool { false }
     func offers() async throws(TipFailure) -> [TipOffer] { [] }
+    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase { throw .notAllowed }
 }
 
 /// The listening to the store's tip transactions, at the launch.

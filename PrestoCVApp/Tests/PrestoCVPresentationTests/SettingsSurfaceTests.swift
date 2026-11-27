@@ -38,6 +38,11 @@ func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesView
         case .notAllowed, .unreachable, .noOffers, .failed: break
         }
     }
+    await tips.buy(.small)
+    switch tips.attempt as TipAttempt {
+    case .idle, .thanked, .pending, .failed, .unreachable: break
+    case .buying(let size): let _: TipRow.Size = size
+    }
     await diagnostics.load()
     switch diagnostics.state as DiagnosticsState {
     case .loading, .empty, .listed: break

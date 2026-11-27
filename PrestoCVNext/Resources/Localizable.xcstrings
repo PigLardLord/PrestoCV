@@ -15717,6 +15717,88 @@
         }
       }
     },
+    "settings.tips.pending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihr Trinkgeld wartet auf eine Freigabe. Wenn es freigegeben wird, vielen Dank."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your tip is waiting for approval. If it is approved, thank you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu propina está esperando aprobación. Si se aprueba, gracias."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre pourboire attend une approbation. S’il est approuvé, merci."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La tua mancia è in attesa di approvazione. Se viene approvata, grazie."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua gorjeta está aguardando aprovação. Se for aprovada, obrigado."
+          }
+        }
+      }
+    },
+    "settings.tips.purchaseFailed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Trinkgeld konnte nicht abgeschlossen werden. Sie können es erneut versuchen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The tip did not go through. You can try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La propina no se completó. Puedes intentarlo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le pourboire n’a pas abouti. Vous pouvez réessayer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mancia non è andata a buon fine. Puoi riprovare."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A gorjeta não foi concluída. Você pode tentar de novo."
+          }
+        }
+      }
+    },
     "settings.tips.retry" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15758,6 +15840,88 @@
         }
       }
     },
+    "settings.tips.row.buying" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird gekauft"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buying"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprando"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achat en cours"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acquisto in corso"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprando"
+          }
+        }
+      }
+    },
+    "settings.tips.row.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffnet den App Store zur Bestätigung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the App Store to confirm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el App Store para confirmar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre l’App Store pour confirmer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apre l’App Store per confermare."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre a App Store para confirmar."
+          }
+        }
+      }
+    },
     "settings.tips.small" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15795,6 +15959,88 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gorjeta pequena"
+          }
+        }
+      }
+    },
+    "settings.tips.thanks.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es schaltet nichts frei, und in der App ändert sich nichts. Es bedeutet trotzdem sehr viel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It unlocks nothing, and nothing changes in the app. It means a lot all the same."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No desbloquea nada y nada cambia en la app. Aun así, significa mucho."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne débloque rien, et rien ne change dans l’app. Il compte beaucoup malgré tout."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sblocca nulla e nell’app non cambia niente. Significa comunque molto."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ela não libera nada, e nada muda no app. Mesmo assim, significa muito."
+          }
+        }
+      }
+    },
+    "settings.tips.thanks.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vielen Dank. Ihr Trinkgeld ist angekommen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thank you. Your tip arrived."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gracias. Tu propina llegó."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merci. Votre pourboire est bien arrivé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grazie. La tua mancia è arrivata."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obrigado. Sua gorjeta chegou."
           }
         }
       }

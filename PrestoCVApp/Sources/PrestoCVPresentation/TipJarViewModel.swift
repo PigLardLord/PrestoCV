@@ -8,6 +8,7 @@ import PrestoCVWorkflowPorts
 public final class TipJarViewModel {
 
     public private(set) var state: TipJarState = .loading
+    public private(set) var attempt: TipAttempt = .idle
 
     @ObservationIgnored private let selling: any TipSelling
     @ObservationIgnored private var latestRead = 0
@@ -17,8 +18,10 @@ public final class TipJarViewModel {
     }
 
     /// Reads the offers when the screen appears. A read that starts while another is still running replaces it: only
-    /// the latest read sets the state, so an older one that ends late cannot overwrite a newer result.
+    /// the latest read sets the state, so an older one that ends late cannot overwrite a newer result. What became of an
+    /// earlier tip leaves with the screen; a purchase still running keeps its row busy.
     public func load() async {
+        if attempt.hasEnded { attempt = .idle }
         await read(startRead())
     }
 
@@ -30,7 +33,34 @@ public final class TipJarViewModel {
         await read(number)
     }
 
+    /// Buys the tip of this size through the store's sheet and shows what became of it. A tap while a purchase runs buys
+    /// nothing: only one purchase runs at a time. The person chose from the offers on screen, so a read started before
+    /// the tap cannot replace them, nor hide what became of the purchase; a read started while it runs still can.
+    public func buy(_ size: TipRow.Size) async {
+        if case .buying = attempt { return }
+        startRead()
+        attempt = .buying(size)
+        do throws(TipFailure) {
+            switch try await selling.purchase(TipSize(size)) {
+            case .completed: attempt = .thanked
+            case .cancelled: attempt = .idle
+            case .pending: attempt = .pending
+            }
+        } catch {
+            switch error {
+            case .notAllowed:
+                // A read still running knows less than this answer: it may not bring the offers back
+                startRead()
+                attempt = .idle
+                state = .unavailable(.notAllowed)
+            case .unreachable: attempt = .unreachable
+            case .failed: attempt = .failed
+            }
+        }
+    }
+
     /// Takes the next read number, which makes every read started before it out of date at once.
+    @discardableResult
     private func startRead() -> Int {
         latestRead += 1
         return latestRead
@@ -59,6 +89,24 @@ public enum TipJarState: Hashable, Sendable {
     case unavailable(TipUnavailability)
 }
 
+/// What became of the tip the person chose, as codes the view words (R13). A cancelled purchase shows nothing, as before it.
+public enum TipAttempt: Hashable, Sendable {
+    case idle
+    case buying(TipRow.Size)
+    case thanked
+    case pending
+    case failed
+    case unreachable
+
+    /// The purchase is over and its notice is on screen.
+    var hasEnded: Bool {
+        switch self {
+        case .idle, .buying: false
+        case .thanked, .pending, .failed, .unreachable: true
+        }
+    }
+}
+
 /// Why there is nothing to buy.
 public enum TipUnavailability: Hashable, Sendable {
     case notAllowed, unreachable, noOffers, failed
@@ -84,5 +132,15 @@ public struct TipRow: Hashable, Sendable, Identifiable {
         case .large: .large
         }
         price = offer.price
+    }
+}
+
+extension TipSize {
+    init(_ size: TipRow.Size) {
+        self = switch size {
+        case .small: .small
+        case .medium: .medium
+        case .large: .large
+        }
     }
 }

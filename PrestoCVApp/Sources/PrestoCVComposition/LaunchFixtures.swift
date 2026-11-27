@@ -18,8 +18,10 @@ import PrestoCVWorkflowPorts
 ///   import reads it, as a JSON map from file name (`cv_<id>.json`) to content. It needs one of the two storage arguments,
 ///   as the seed does. A test leaves it out of a relaunch, so the files the import removed stay removed.
 /// - `-PrestoCVNextDistribution <answer>`: the answer the store would give about how the app was installed (ADR 0032).
-/// - `-PrestoCVNextTips <offers|notAllowed|unreachable|noOffers|failed>`: what the store answers about the tip jar, without
-///   StoreKit: its three offers, or the reason there are none. It writes nothing, so it needs no folder.
+/// - `-PrestoCVNextTips <offers|notAllowed|unreachable|noOffers|failed|cancelled|pending|purchaseFailed>`: what the store
+///   answers about the tip jar, without StoreKit: its three offers, or the reason there are none. With `offers` a purchase
+///   goes through; `cancelled`, `pending` and `purchaseFailed` show the three offers and answer a purchase so. It writes
+///   nothing, so it needs no folder.
 /// - `-PrestoCVNextNoSamples`: the examples come from a folder of the fixture that nothing makes, so the app cannot read
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
@@ -56,6 +58,9 @@ struct LaunchFixtures: Equatable, Sendable {
         case unreachable
         case noOffers
         case failed
+        case cancelled
+        case pending
+        case purchaseFailed
     }
 
     /// The PDF of the corpus a window is handed as if another app opened it, by its name in the bundle
@@ -411,10 +416,24 @@ struct GivenTips: TipsListening {
 
     func offers() async throws(TipFailure) -> [TipOffer] {
         switch given {
-        case .offers, .notAllowed: TipSize.allCases.map { TipOffer(size: $0, price: Self.price(of: $0)) }
+        case .offers, .notAllowed, .cancelled, .pending, .purchaseFailed:
+            TipSize.allCases.map { TipOffer(size: $0, price: Self.price(of: $0)) }
         case .noOffers: []
         case .unreachable: throw .unreachable
         case .failed: throw .failed
+        }
+    }
+
+    /// The offers' answer buys: a tip goes through. A device that may not pay, or a store that cannot be reached, refuses
+    /// the purchase as it refused the offers.
+    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase {
+        switch given {
+        case .offers: .completed
+        case .cancelled: .cancelled
+        case .pending: .pending
+        case .notAllowed: throw .notAllowed
+        case .unreachable: throw .unreachable
+        case .noOffers, .failed, .purchaseFailed: throw .failed
         }
     }
 

@@ -51,6 +51,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 "import.pdf.button.hint": ["Archivos", "Fichiers", "File", "Arquivos"],
                 "settings.openSource.statement": ["Apache"],
                 "settings.tips.loading": ["App", "Store"],
+                "settings.tips.row.hint": ["App", "Store"],
                 "settings.tips.unreachable": ["App", "Store"],
             ],
             nonKeyLiterals: [
