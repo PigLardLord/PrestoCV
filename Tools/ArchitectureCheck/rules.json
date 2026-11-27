@@ -975,6 +975,7 @@
    "name": "PrestoCVTipsStoreKit",
    "path": "PrestoCVApp/Sources/PrestoCVTipsStoreKit",
    "allowedImports": [
+    "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
     "StoreKit",
     "Foundation",
@@ -1001,6 +1002,7 @@
     "Darwin",
     "Android",
     "PrestoCVTipsStoreKit",
+    "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
     "StoreKit"
    ],

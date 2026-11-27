@@ -18,6 +18,8 @@ import PrestoCVWorkflowPorts
 ///   import reads it, as a JSON map from file name (`cv_<id>.json`) to content. It needs one of the two storage arguments,
 ///   as the seed does. A test leaves it out of a relaunch, so the files the import removed stay removed.
 /// - `-PrestoCVNextDistribution <answer>`: the answer the store would give about how the app was installed (ADR 0032).
+/// - `-PrestoCVNextTips <offers|notAllowed|unreachable|noOffers|failed>`: what the store answers about the tip jar, without
+///   StoreKit: its three offers, or the reason there are none. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextNoSamples`: the examples come from a folder of the fixture that nothing makes, so the app cannot read
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
@@ -47,6 +49,15 @@ struct LaunchFixtures: Equatable, Sendable {
         case deleted
     }
 
+    /// What the store answers about the tips
+    enum TipsAnswer: String, CaseIterable, Equatable, Sendable {
+        case offers
+        case notAllowed
+        case unreachable
+        case noOffers
+        case failed
+    }
+
     /// The PDF of the corpus a window is handed as if another app opened it, by its name in the bundle
     enum OpenedFile: String, CaseIterable, Equatable, Sendable {
         case linkedin
@@ -58,6 +69,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case invalidFolderName
         case unreadableSeed
         case unreadableDistribution
+        case unreadableTips
         case seedWithoutFolder
         case unreadableLegacySeed
         case legacySeedWithoutFolder
@@ -78,6 +90,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let seedArgument = "-PrestoCVNextSeed"
     static let legacySeedArgument = "-PrestoCVNextLegacySeed"
     static let distributionArgument = "-PrestoCVNextDistribution"
+    static let tipsArgument = "-PrestoCVNextTips"
     static let noSamplesArgument = "-PrestoCVNextNoSamples"
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
@@ -94,6 +107,8 @@ struct LaunchFixtures: Equatable, Sendable {
     /// The released app's CV files to write in the legacy folder before the import reads it, by file name
     var legacySeed: [String: String] = [:]
     var distribution: DistributionAnswer?
+    /// What the store answers about the tips, nil when the real store does
+    var tips: TipsAnswer?
     /// The arguments that start like a fixture and are none: ignored, and named so that a test's typo shows
     var unknownArguments: [String] = []
     /// The examples are read from a folder that is not there
@@ -141,6 +156,11 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableDistribution
                 }
                 fixtures.distribution = answer
+            case tipsArgument:
+                guard let answer = TipsAnswer(rawValue: try value(after: argument, in: arguments, at: &index)) else {
+                    throw .unreadableTips
+                }
+                fixtures.tips = answer
             case noSamplesArgument:
                 fixtures.withoutSamples = true
             case failRenamesInPairsArgument:
@@ -378,6 +398,32 @@ struct GivenDistribution: DistributionReading {
 
     func answer() async throws -> DistributionAnswer {
         given
+    }
+}
+
+/// The tips the store would answer, given by a launch argument: the listener has nothing to listen to.
+struct GivenTips: TipsListening {
+    let given: LaunchFixtures.TipsAnswer
+
+    func start() {}
+
+    var canPay: Bool { given != .notAllowed }
+
+    func offers() async throws(TipFailure) -> [TipOffer] {
+        switch given {
+        case .offers, .notAllowed: TipSize.allCases.map { TipOffer(size: $0, price: Self.price(of: $0)) }
+        case .noOffers: []
+        case .unreachable: throw .unreachable
+        case .failed: throw .failed
+        }
+    }
+
+    private static func price(of size: TipSize) -> String {
+        switch size {
+        case .small: "€1,99"
+        case .medium: "€4,99"
+        case .large: "€9,99"
+        }
     }
 }
 
