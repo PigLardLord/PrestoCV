@@ -16,6 +16,7 @@ struct ShellView: View {
     let settings: SettingsViewModel
     let licences: LicencesViewModel
     let diagnostics: DiagnosticsViewModel
+    let tips: TipJarViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
@@ -68,7 +69,7 @@ struct ShellView: View {
             NewCVSheet(firstRun: firstRun) { choice in shell.choose(choice) }
         }
         .sheet(isPresented: $shell.showsSettings) {
-            SettingsView(settings: settings, licences: licences, diagnostics: diagnostics)
+            SettingsView(settings: settings, licences: licences, diagnostics: diagnostics, tips: tips)
         }
         .sheet(item: exportSheet) { sheet in
             ExportSheetView(sheet: sheet, close: { shell.closeExport() })

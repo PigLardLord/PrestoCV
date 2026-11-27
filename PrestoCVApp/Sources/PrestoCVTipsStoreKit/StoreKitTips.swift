@@ -2,13 +2,16 @@
 import DiagnosticLogging
 import StoreKit
 
-/// The tips sold through the App Store (ADR 0040), as far as the app launches: it listens to the store's transactions and
-/// finishes each one. It is made by the composition root, which holds it for as long as the app runs.
+/// The tips sold through the App Store (ADR 0040): at launch it listens to the store's transactions and finishes each one,
+/// and the tip jar reads and buys through it. It is made by the composition root, which holds it for as long as the app
+/// runs.
 public final class StoreKitTips: Sendable {
     private let listener: TipTransactionListener
+    let logger: any DiagnosticLogger
 
     public init(logger: any DiagnosticLogger) {
         listener = TipTransactionListener(feed: .store, logger: logger)
+        self.logger = logger
     }
 
     /// Starts listening. A second call does nothing.
@@ -49,7 +52,7 @@ extension TipTransactionFeed {
 }
 
 extension TipTransaction {
-    fileprivate init(isVerified: Bool, transaction: Transaction) {
+    init(isVerified: Bool, transaction: Transaction) {
         self.init(id: transaction.id, isVerified: isVerified, finish: { await transaction.finish() })
     }
 }

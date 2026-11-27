@@ -1,0 +1,90 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locales" : [
+          {
+            "locale" : "en_US",
+            "policyText" : "",
+            "policyURL" : ""
+          }
+        ],
+        "policyType" : "termsOfService"
+      },
+      {
+        "locales" : [
+          {
+            "locale" : "en_US",
+            "policyText" : "",
+            "policyURL" : ""
+          }
+        ],
+        "policyType" : "privacyPolicy"
+      }
+    ]
+  },
+  "identifier" : "7C4E2A91",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "6755210001",
+      "localizations" : [
+        {
+          "description" : "A one-time tip. It unlocks nothing.",
+          "displayName" : "Small tip",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.PigLardLord.prestocv.tip.small",
+      "referenceName" : "Tip small",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "6755210002",
+      "localizations" : [
+        {
+          "description" : "A one-time tip. It unlocks nothing.",
+          "displayName" : "Medium tip",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.PigLardLord.prestocv.tip.medium",
+      "referenceName" : "Tip medium",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "6755210003",
+      "localizations" : [
+        {
+          "description" : "A one-time tip. It unlocks nothing.",
+          "displayName" : "Large tip",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.PigLardLord.prestocv.tip.large",
+      "referenceName" : "Tip large",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "DEU"
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
