@@ -356,8 +356,8 @@ public final class ShellNavigationModel {
     ///
     /// The question is never asked while the editor's copy runs (`isReplacing`): the copy may store the text, and an
     /// answer given meanwhile could not be carried out. The file is held with no question, and decided again as on
-    /// arrival once the copy ended: it goes the ordinary way when the editor's text can then be stored, and the
-    /// question shows otherwise.
+    /// arrival once the copy ended: the sheets the person opened while it waited close again, then it goes the ordinary way
+    /// when the editor's text can then be stored, and the question shows otherwise.
     public func receive(file url: URL) {
         closeSheetsOverTheShell()
         if let held = heldFile {
@@ -371,10 +371,15 @@ public final class ShellNavigationModel {
             importer?.importFile(at: url)
         case .stayed:
             heldFile = files.receive(url)
-            closeExport()
-            review?.closeSheet()
+            closeSheetsOverTheEditor()
             decideHeldFile()
         }
+    }
+
+    /// The export's sheet and the review's sheet over the editor close, so that the question about the file held shows.
+    private func closeSheetsOverTheEditor() {
+        closeExport()
+        review?.closeSheet()
     }
 
     /// A file handed over by another app is the person's newest request: Settings, the sheet of the ways to start a CV
@@ -388,7 +393,9 @@ public final class ShellNavigationModel {
     }
 
     /// Decides what to do with the file held: waits while the editor's copy runs, then imports it the ordinary way when
-    /// the editor's text can be stored, or asks the question.
+    /// the editor's text can be stored, or asks the question. Once the copy ended, the sheets over the shell and over the
+    /// editor close again: the person may have opened one while the file waited, and it would cover the import or the
+    /// question, or start the choice made in it in their place.
     private func decideHeldFile() {
         guard let held = heldFile, question == nil, waitingForCopy == nil else { return }
         if let editor, let copy = editor.replacing {
@@ -396,6 +403,8 @@ public final class ShellNavigationModel {
                 await copy.value
                 guard !Task.isCancelled, let self else { return }
                 self.waitingForCopy = nil
+                self.closeSheetsOverTheShell()
+                self.closeSheetsOverTheEditor()
                 self.decideHeldFile()
             }
             return
