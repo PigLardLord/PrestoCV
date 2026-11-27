@@ -60,8 +60,9 @@ struct TipsStoreKitConfigurationTests {
 
     @Test("only the run action of the app's scheme names the file; no test action, test plan or project does")
     func onlyTheRunActionNamesIt() throws {
+        // The project is `project.xcproj`: a membership there would copy the file into the app.
         let naming = try Repository.presentFiles()
-            .filter { path in [".xcscheme", ".xctestplan", ".pbxproj"].contains { path.hasSuffix($0) } }
+            .filter { path in [".xcscheme", ".xctestplan", ".xcproj", ".pbxproj"].contains { path.hasSuffix($0) } }
             .filter { try Repository.text($0).contains(".storekit") }
         #expect(naming == [Self.scheme])
 
