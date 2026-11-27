@@ -575,12 +575,14 @@ printf '| Target | Layer | Platforms | May import |\n|---|---|---|---|\n| `Pure`
 expect "modules.md: Android is a module name, as Glibc and Darwin are" 0 "" --modules "$ROOT/modules.md"
 # --- R19: long work stays off the main actor (ADR 0039)
 r19_setup() {   # the Pure target has the three R19 rules only; $1 is the quickRequirements object
+  # The empty object is a variable: macOS bash 3.2 keeps the backslash of "${1:-{\}}", bash 5 drops it.
+  local quick=${1:-}; [ -n "$quick" ] || quick='{}'
   setup
   rules_edit set rules.R19p '["synchronousPortRequirement"]'
   rules_edit set rules.R19c '["concurrentByDefault"]'
   rules_edit set rules.R19m '["mainActorLongWork"]'
   rules_edit set targets.name=Pure.rules '["R19p","R19c","R19m"]'
-  rules_edit set quickRequirements "${1:-{\}}"
+  rules_edit set quickRequirements "$quick"
   rules_edit set longWorkCalls '["Data(contentsOf:)","String(contentsOfFile:)",".write(to:)",".removeItem(at:)","Thread.sleep()",
     "JSONDecoder()","NLTagger()","PDFDocument(url:)"]'
 }
