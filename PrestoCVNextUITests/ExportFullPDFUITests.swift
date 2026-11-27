@@ -150,7 +150,7 @@ final class ExportFullPDFUITests: RuntimeIssueFailingTestCase {
     private func launch(_ cv: StoredCV, language: String = "en", locale: String = "en_US") throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try seed(cv),
         ]
         app.launch()

@@ -35,14 +35,15 @@ func useEveryPublicMember(of screen: ImportViewModel, file: URL, pdf: Data) {
     }
     let _: [ReviewReason] = ReviewReason.allCases
     let _: [ImportProblem] = ImportProblem.allCases
-    screen.paste(["Ada Ferro"])
+    screen.paste(["Ada Ferro"], pdfs: [])
     screen.opened()
     screen.importText()
     screen.cancel()
-    screen.importPDF(pdf)
+    screen.paste([], pdfs: [pdf])
     screen.cancel()
     screen.importFile(at: file)
     screen.cancel()
+    screen.fileNotOpened()
     screen.clearProblem()
 }
 

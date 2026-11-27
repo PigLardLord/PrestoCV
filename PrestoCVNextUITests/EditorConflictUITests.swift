@@ -211,7 +211,7 @@ final class EditorConflictUITests: RuntimeIssueFailingTestCase {
     private func launch(otherWindow change: String, largestText: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage",
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
             "-PrestoCVNextSeed", try seed([backendEngineer, dataAnalyst]),
             "-PrestoCVNextOtherWindow", change,
         ]

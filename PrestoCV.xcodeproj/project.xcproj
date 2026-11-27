@@ -48,6 +48,8 @@
     { "path": "PrestoCV/PrestoCV.icon", "target-membership": [ "PrestoCV/resources" ] },
     { "path": "PrestoCV/PrivacyInfo.xcprivacy", "target-membership": [ "PrestoCV/resources" ] },
     { "path": "PrestoCV/Resources/Samples", "target-membership": [ "PrestoCV/resources" ] },
+    { "path": "PrestoCVCore/Tests/ImportFixtures/en-emily/linkedin.pdf", "target-membership": [ "PrestoCVNextUITests/resources" ] },
+    { "path": "PrestoCVCore/Tests/ImportFixtures/scan/scan.pdf", "target-membership": [ "PrestoCVNextUITests/resources" ] },
     { "kind": "folder", "path": "PrestoCVNextUITests", "target-membership": [ "PrestoCVNextUITests" ] },
     { "kind": "folder", "path": "PrestoCVNextTests", "target-membership": [ "PrestoCVNextTests" ] },
     { "path": "<PRODUCTS>/PrestoCV.app", "id": "237D7D9E2E91379300212357", "type": "wrapper.application", "index": false },
