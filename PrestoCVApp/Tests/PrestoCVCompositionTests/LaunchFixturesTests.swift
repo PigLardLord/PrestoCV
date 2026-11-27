@@ -76,6 +76,20 @@ struct LaunchFixturesTests {
         await #expect(throws: TipFailure.failed) { try await GivenTips(given: .failed).offers() }
     }
 
+    @Test("The given tips buy as the store would, and the answers about a purchase show the three offers")
+    func givenPurchases() async throws {
+        #expect(try await GivenTips(given: .offers).purchase(.small) == .completed)
+        #expect(try await GivenTips(given: .cancelled).purchase(.medium) == .cancelled)
+        #expect(try await GivenTips(given: .pending).purchase(.large) == .pending)
+        await #expect(throws: TipFailure.failed) { try await GivenTips(given: .purchaseFailed).purchase(.small) }
+        await #expect(throws: TipFailure.notAllowed) { try await GivenTips(given: .notAllowed).purchase(.small) }
+        await #expect(throws: TipFailure.unreachable) { try await GivenTips(given: .unreachable).purchase(.small) }
+        for answer in [LaunchFixtures.TipsAnswer.cancelled, .pending, .purchaseFailed] {
+            #expect(try await GivenTips(given: answer).offers().map(\.size) == TipSize.allCases)
+            #expect(GivenTips(given: answer).canPay)
+        }
+    }
+
     @Test("An unknown fixture argument is ignored and named in the unknown list")
     func unknownArgument() throws {
         let fixtures = try LaunchFixtures.parse([

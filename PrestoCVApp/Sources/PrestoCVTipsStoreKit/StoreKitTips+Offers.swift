@@ -38,7 +38,7 @@ enum TipProducts {
         return .unreachable
     }
 
-    private static func identifier(of size: TipSize) -> String {
+    static func identifier(of size: TipSize) -> String {
         switch size {
         case .small: identifiers[0]
         case .medium: identifiers[1]
