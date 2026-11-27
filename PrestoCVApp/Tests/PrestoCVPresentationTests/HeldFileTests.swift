@@ -292,6 +292,58 @@ struct HeldFileTests {
         #expect(world.imports.files.problems(ended: true).isEmpty)
     }
 
+    @Test("Settings and the new-CV sheet opened while the file waits for the copy close once it stored the text: the import shows")
+    func sheetsOpenedDuringACopyCloseForTheImport() async throws {
+        let world = World()
+        let (_, copying) = try await fileDuringACopy(world)
+        world.shell.showsSettings = true
+        world.shell.showsNewCV = true
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
+
+        #expect(!world.shell.showsSettings, "Settings would cover the import")
+        #expect(!world.shell.showsNewCV, "the new-CV sheet would cover the import")
+        let importer = try #require(world.shell.importer)
+        #expect(importer.status == .ready)
+    }
+
+    @Test("Settings and the new-CV sheet opened while the file waits for the copy close once it failed: the question shows")
+    func sheetsOpenedDuringACopyCloseForTheQuestion() async throws {
+        let world = World()
+        world.editing.editing.duplicateErrors.withLock { $0 = [.unavailable] }
+        let (editor, copying) = try await fileDuringACopy(world)
+        world.shell.showsSettings = true
+        world.shell.showsNewCV = true
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the question") { world.shell.question != nil }
+
+        #expect(world.shell.question == .keepEditingOrDiscard(editor.saveStatus))
+        #expect(!world.shell.showsSettings, "Settings would cover the question")
+        #expect(!world.shell.showsNewCV, "the new-CV sheet would cover the question")
+        world.shell.keepEditing()
+        await world.settled()
+        #expect(world.imports.files.problems(ended: true).isEmpty)
+    }
+
+    @Test("a choice made in the new-CV sheet while the file waits for the copy is dropped once it ended: no draft replaces the import")
+    func choiceMadeDuringACopyIsDropped() async throws {
+        let world = World()
+        let (_, copying) = try await fileDuringACopy(world)
+        world.shell.showsNewCV = true
+        world.shell.choose(.blank)
+
+        await world.editing.editing.duplicateGate.open()
+        await copying.value
+        await waitUntil("the import let its file go") { world.imports.files.released(Self.file) == 2 }
+
+        #expect(world.shell.sheetDismissed() == nil, "the choice would start a draft in place of the import")
+        #expect(world.shell.importer != nil)
+    }
+
     @Test("a shell that goes while a copy runs lets the file held go once")
     func shellGoneDuringACopyLetsTheFileGo() async throws {
         let editing = Editing()
