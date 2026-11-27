@@ -97,7 +97,7 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// The forms of "to work" that a role follows ("lavoro come", "habe als ... gearbeitet"), folded: a duty that only says where
-    /// the person worked holds one and no other word of work (#354, round 11).
+    /// the person worked holds one and no other word of work (#354).
     static let workVerbs: Set<String> = [
         "work", "worked", "working", "lavoro", "lavorato", "lavoravo", "arbeite", "arbeitete", "gearbeitet", "travaille",
         "travaillais", "trabajo", "trabaje", "trabajaba", "trabajado", "trabalho", "trabalhei", "trabalhava", "trabalhado",
@@ -135,24 +135,24 @@ public struct CVDataSanitizer: Sendable {
             inferring: hasAFact ? InferredSkills(cvData, language: source.explainer.language, written: written) : nil
         )
         // A kept technology is the person's word in the summary, as the summary check reads it: "SAP" names the work and no one
-        // (#354, round 10), and under O1 a typical tool the skills list holds is draft content too (probe round 4). The kept employers
-        // and schools are no names the draft's summary invents either, as in the summary check (probe round 7): this pass dropped "Je
+        // (#354), and under O1 a typical tool the skills list holds is draft content too. The kept employers
+        // and schools are no names the draft's summary invents either, as in the summary check: this pass dropped "Je
         // donne des cours à l'école Don Milani", which the check had kept. The extraction's own summary keeps no such sentence: "I am
         // a primary school teacher from Bologna" quotes nothing (ADR 0023).
         let keptTools = skills.filter { $0.kind == .technology }.map(\.name)
         let ownWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + education.map(\.degree) + keptTools)
-        // The acronyms of the kept duties are the person's words too in a rich draft, as in the summary check (probe round 17):
+        // The acronyms of the kept duties are the person's words too in a rich draft, as in the summary check:
         // this pass dropped "I managed the PA systems …", which the check had kept for the "PA" of a kept duty.
         let acronyms = DraftDepth.isRich ? Self.acronyms(in: experience.compactMap(\.description)) : []
         // The kept languages and the person's own qualifications (the kept degrees, and the words of the sentences about the studies) are
-        // no names or qualifications the draft's summary invents in a rich draft either, as in the summary check (probe round 22):
+        // no names or qualifications the draft's summary invents in a rich draft either, as in the summary check:
         // this pass dropped "I speak English and Polish", which the check had kept.
         let languages = sanitize(cvData.languages, claimed)
         let languageWords: Set<String> = DraftDepth.isRich ? Self.words(of: languages.map(\.name)) : []
         let ownQualifications: Set<String> = DraftDepth.isRich ? OwnQualifications.words(of: education, in: source) : []
         let draftWords = ownWords.union(Self.words(of: experience.map(\.company) + education.map(\.institution))).union(acronyms)
             .union(languageWords)
-        // A written sentence says the person is, or works as, only what a kept title names (#354, round 7 and the final gate).
+        // A written sentence says the person is, or works as, only what a kept title names (#354).
         let keptTitles = ([personalInfo.title] + experience.map(\.title)).compactMap(\.presentValue)
         let workWords = Self.words(of: [personalInfo.title] + experience.map(\.title) + experience.map(\.company))
         let language = source.explainer.language
@@ -330,7 +330,7 @@ public struct CVDataSanitizer: Sendable {
     }
 
     /// `quote` without its sentences that only say the person worked, with no word of the job ("Trabajé."): the job's only text then
-    /// says nothing, and a job with none reads better (#354, round 11). One that names the title or the employer stays (`RoleStub`).
+    /// says nothing, and a job with none reads better (#354). One that names the title or the employer stays (`RoleStub`).
     private static func withoutBareWork(_ quote: String, language: Vocabulary.Language?) -> String? {
         SentenceSplitter.sentences(in: quote).filter { !RoleStub.isStub($0, jobWords: [], language: language) }
             .joined(separator: " ").presentValue
@@ -378,7 +378,7 @@ public struct CVDataSanitizer: Sendable {
     /// An interest quoted with a conjugated verb of its clause first ("spiele Schach" of "... und spiele Schach") as the pastime the
     /// verb names ("Schach"): a conjugated verb is no pastime (#354). The verb is the interest's first word where the description's
     /// sentence that quotes the interest tags it as one, or, in German, where "ich" and the interest do, in English and German, whose
-    /// verbs grounding reads by their tags. A verb in the form of its infinitive is the pastime's phrase and stays (#354, round 1): an
+    /// verbs grounding reads by their tags. A verb in the form of its infinitive is the pastime's phrase and stays (#354): an
     /// English verb with no "-s" and no "-ed" ("play football", "bake bread"), a gerund ("hiking in the Alps") and a German infinitive
     /// ("wandern gehen"). An interest of one word stays whole, and so does one whose rest holds no word of 3 letters or more, or, in
     /// German, no noun.
@@ -633,7 +633,7 @@ public struct CVDataSanitizer: Sendable {
 
     /// The first word of `sentence` in lower case, outside the employers' `names` it holds whole, that is a word of 4 letters or more
     /// of the names, or a form of one, and that the description writes nowhere outside the names: the model took it from a name
-    /// ("each event" at "Brightwater Events"; #354, round 13). A sentence that names an employer whole ("a cook in a bakery") is
+    /// ("each event" at "Brightwater Events"; #354). A sentence that names an employer whole ("a cook in a bakery") is
     /// not read for it. A word stands for its forms by its first 6 letters, as the reader of the evaluation reads it.
     static func employerWord(in sentence: String, names: [String], in source: DescriptionText) -> String? {
         let nameWords = Set(names.flatMap { Word.words(in: $0).map(\.folded) }.filter { $0.count >= 4 })

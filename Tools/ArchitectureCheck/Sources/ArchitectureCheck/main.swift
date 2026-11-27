@@ -50,6 +50,10 @@ struct Config: Decodable {
     let warningDetectors: [String]?
     /// Modules and types only the listed files may import or make (ADR 0032): the composition root's own adapters.
     let compositionOnly: CompositionOnly?
+    /// R19p: the synchronous requirements of a workflow port that are quick, as `Protocol.name(labels:)` → why.
+    let quickRequirements: [String: String]?
+    /// R19m: the calls that block their thread, in the form `LongWorkCall` documents.
+    let longWorkCalls: [String]?
     struct CompositionOnly: Decodable { let adr: String; let files: [String]; let modules: [String]; let types: [String] }
 }
 
@@ -164,16 +168,26 @@ for (file, target) in assignment where target.kind != "legacy" || !target.rules.
     parsed.append((file, target, source, Parser.parse(source: source)))
 }
 var viewTypes: [String: Set<String>] = [:]
+var concurrency: [String: ConcurrencyIndex] = [:]
+var longWorkCalls: [LongWorkCall] = []
+for text in config.longWorkCalls ?? [] {
+    if let call = LongWorkCall(text) { longWorkCalls.append(call) } else { problems.append("longWorkCalls: cannot read the entry \(text)") }
+}
+var syncRequirements: Set<String> = []
 var memberTypes: [String: [String: TypeMembers]] = [:]
 for entry in parsed {
     viewTypes[entry.target.name, default: []].formUnion(Scanner.viewTypeNames(in: entry.tree))
+    concurrency[entry.target.name, default: ConcurrencyIndex()].merge(ConcurrencyIndex.collect(in: entry.tree))
     for (type, members) in MemberIndex.members(in: entry.tree) { memberTypes[entry.target.name, default: [:]][type, default: TypeMembers()].merge(members) }
 }
 for (file, target, source, tree) in parsed {
     let scanner = Scanner(tree: tree, file: file, infrastructureTypes: Set(config.infrastructureTypes), viewTypes: viewTypes[target.name] ?? [],
                           memberTypes: memberTypes[target.name] ?? [:],
-                          serviceSuffixes: config.serviceSuffixes ?? [], dependencySuffixes: config.dependencySuffixes ?? [])
+                          serviceSuffixes: config.serviceSuffixes ?? [], dependencySuffixes: config.dependencySuffixes ?? [],
+                          concurrency: concurrency[target.name] ?? ConcurrencyIndex(), longWorkCalls: longWorkCalls,
+                          quickRequirements: Set((config.quickRequirements ?? [:]).keys))
     scanner.walk(tree)
+    if detectorToRules(target)["synchronousPortRequirement"] != nil { syncRequirements.formUnion(scanner.syncRequirements) }
     var ordinals: [String: Int] = [:]
     func record(rule: String, detector: String, detail: String, node: String, line: Int) {
         if exceptionsValid.contains(where: { file.hasPrefix($0.path) && $0.detector == detector }) { return }
@@ -214,6 +228,11 @@ for (file, target, source, tree) in parsed {
             }
         }
     }
+}
+
+// A quick requirement that matches no synchronous requirement is stale: the list may only shrink with the code (R19p).
+for key in (config.quickRequirements ?? [:]).keys.sorted() where !syncRequirements.contains(key) {
+    problems.append("quickRequirements lists \(key), which matches no synchronous requirement of a workflow port")
 }
 
 // MARK: 4b. Composition-only modules and types (ADR 0032)
@@ -271,7 +290,11 @@ if let only = config.compositionOnly {
 
 // MARK: 5. modules.md, both directions
 
-let frameworks: Set<String> = ["Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit", "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization", "CoreGraphics", "CoreText", "StoreKit"]
+let frameworks: Set<String> = [
+    "Glibc", "Darwin", "Android", "Dispatch", "Foundation", "Observation", "WebKit", "UIKit", "AppKit",
+    "FoundationModels", "Testing", "SwiftUI", "PDFKit", "QuickLook", "UniformTypeIdentifiers", "Synchronization",
+    "CoreGraphics", "CoreText", "StoreKit", "NaturalLanguage",
+]
 if let modulesPath = value(after: "--modules") {
     var documented: [String: Set<String>?] = [:]
     let modulesText = (try? String(contentsOfFile: modulesPath, encoding: .utf8)) ?? ""

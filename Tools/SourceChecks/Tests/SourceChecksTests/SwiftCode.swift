@@ -47,7 +47,17 @@ struct SwiftCode {
     /// The lines of the code where `pattern` starts. The pattern may run over several lines (`\s` takes a line break), so a
     /// call split after its parenthesis is found on the line of its name.
     func lines(matching pattern: NSRegularExpression) -> [Int] {
-        let text = code.joined(separator: "\n")
+        Self.lines(of: code, matching: pattern)
+    }
+
+    /// The lines of the skeleton where `pattern` starts: as `lines(matching:)`, without the text of the strings, so a
+    /// declaration quoted in a string is not found, and one inside an interpolation is.
+    func skeletonLines(matching pattern: NSRegularExpression) -> [Int] {
+        Self.lines(of: skeleton, matching: pattern)
+    }
+
+    private static func lines(of view: [String], matching pattern: NSRegularExpression) -> [Int] {
+        let text = view.joined(separator: "\n")
         let found = pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).map { match in
             text.utf16.prefix(match.range.location).filter { $0 == 10 }.count
         }

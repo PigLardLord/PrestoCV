@@ -1,6 +1,6 @@
 import Foundation
 
-/// The qualification words that a rich summary may name as the person's own (ADR 0031, #354, probe round 21): the words of the kept
+/// The qualification words that a rich summary may name as the person's own (ADR 0031, #354): the words of the kept
 /// degrees, and those of the description's sentences that speak of the person's studies ("I hold a diploma in logistics from Harlow
 /// City College"). A qualification word anywhere else is not a claim about the person: "I calibrate certified weights at Chartered
 /// Scales" gives no "certified" or "chartered".
@@ -40,7 +40,7 @@ enum OwnQualifications {
         // Only a whole sentence of the description, word for word and stop for stop, backs it. Sharing its words is not enough,
         // since "I studied nursing at Harlow City College and I speak German" holds every word of "I studied nursing in German at
         // Harlow City College", and nor is a run of its words: "I studied nursing; in German, I speak with patients" holds "I studied
-        // nursing in German" (review round 1, the final gate and its fix check). A true sentence said otherwise goes: losing it is safe.
+        // nursing in German". A true sentence said otherwise goes: losing it is safe.
         let written = verbatim(sentence)
         return !source.sentences.contains { verbatim($0.raw) == written }
     }

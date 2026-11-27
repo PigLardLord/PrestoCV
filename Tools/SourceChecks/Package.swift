@@ -10,6 +10,6 @@ let package = Package(
     name: "SourceChecks",
     platforms: [.macOS(.v13)],
     targets: [
-        .testTarget(name: "SourceChecksTests"),
+        .testTarget(name: "SourceChecksTests", exclude: ["Localization/Planted"]),
     ]
 )

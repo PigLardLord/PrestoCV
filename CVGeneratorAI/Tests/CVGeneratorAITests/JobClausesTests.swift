@@ -666,10 +666,10 @@ struct JobClausesTests {
                   sentence: parks + "die Bodenproben analysiere und die Beete plane.",
                   pinned: "Ich analysiere die Bodenproben und plane die Beete."
               ),
-              // A past of "-ieren" is no separable verb, and "herunter" is one particle, not "her" (review round 1).
+              // A past of "-ieren" is no separable verb, and "herunter" is one particle, not "her".
               GermanOrderRow(sentence: nursery + "die Bodenproben analysierte.", pinned: "Ich analysierte die Bodenproben."),
               GermanOrderRow(sentence: parks + "Dateien herunterlade.", pinned: "Ich lade Dateien herunter."),
-              // A participle with no "ge", or of a strong verb, shares the auxiliary too (review round 1).
+              // A participle with no "ge", or of a strong verb, shares the auxiliary too.
               GermanOrderRow(
                   sentence: nursery + "Material recycelt und Abfälle sortiert habe.",
                   pinned: "Ich habe Material recycelt und Abfälle sortiert."

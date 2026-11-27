@@ -106,7 +106,7 @@ struct SummaryStudyTests {
         #expect(summary == Self.inputs[id]?.opening, "\(summary ?? "nil")")
     }
 
-    // MARK: Two schools and two languages: a sentence the description says of one school stays (review round 1)
+    // MARK: Two schools and two languages: a sentence the description says of one school stays
 
     private static let twoSchools = CVData(
         personalInfo: PersonalInfo(name: "Daniel Hart", title: "nurse"),

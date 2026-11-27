@@ -45,7 +45,7 @@ struct DraftingWrittenTests {
         #expect(!measure.hasSkills(sparse: false))
     }
 
-    @Test("Enough skills count the tools of the trade: a technology the reader rejects is no tool (#354, round 9)")
+    @Test("Enough skills count the tools of the trade: a technology the reader rejects is no tool (#354)")
     func tradeTools() throws {
         let soft = ["precisione", "affidabilità", "organizzazione"].map { Skill(name: $0, kind: .softSkill) }
         let clerk = CVData(skills: ["Microsoft Excel", "Google Calendar", "Outlook", "archivio digitale"].map { Skill(name: $0) } + soft)
@@ -78,7 +78,7 @@ struct DraftingWrittenTests {
         #expect(right.otherLanguage.isEmpty)
     }
 
-    @Test("A written sentence the detector gives to a close language is the description's when its dictionary knows every word; one with a word it lacks is listed (#354, round 13, pt-traps)", arguments: [
+    @Test("A written sentence the detector gives to a close language is the description's when its dictionary knows every word; one with a word it lacks is listed (#354, pt-traps)", arguments: [
         (["desenvolvo", "aplicativos", "para", "lojas", "gerencio", "fluxos", "de", "dados", "internos"], 0),
         (["desenvolvo", "aplicativos", "para", "lojas"], 1),
     ])
@@ -202,7 +202,7 @@ struct DraftingWrittenTests {
         #expect(!measure.readerFindings.contains { $0.kind == .skillInAnotherLanguage })
     }
 
-    @Test("A technology whose head noun an earlier one has is counted: the last word in English, the first in French; a generic head is not (probe round 12)")
+    @Test("A technology whose head noun an earlier one has is counted: the last word in English, the first in French; a generic head is not")
     func sharedHeadNoun() {
         let english = CVData(skills: [Skill(name: "Mixing desks"), Skill(name: "Stage boxes"), Skill(name: "Digital desk")])
         let french = CVData(skills: [Skill(name: "carnets"), Skill(name: "carnet de notes"), Skill(name: "rétroprojecteur")])
@@ -283,7 +283,7 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "pt").map(\.path) == ["experience[0].description"])
     }
 
-    @Test("An ended job whose French verbs are reflexive is in one tense, and one in two tenses is counted (#354, round 11)")
+    @Test("An ended job whose French verbs are reflexive is in one tense, and one in two tenses is counted (#354)")
     func mixedTenseOfAReflexiveVerb() {
         let cv = CVData(experience: [
             Experience(company: "A", endDate: "2016", description: "Je m'occupais des enfants. Je veillais à leur sécurité."),
@@ -345,7 +345,7 @@ struct DraftingWrittenTests {
         #expect(Self.reader(cv, "en").filter { $0.kind == .clauseAsSkill }.map(\.path) == ["skills[0].name", "skills[2].name"])
     }
 
-    @Test("A name of three words joined by prepositions is no clause; a clause of more words with one is (#354, round 6)")
+    @Test("A name of three words joined by prepositions is no clause; a clause of more words with one is (#354)")
     func joinedNameIsNoClause() {
         let cv = CVData(skills: [
             Skill(name: "logiciel de suivi de lecture"), Skill(name: "j'ai animé des ateliers de lecture"),
@@ -374,7 +374,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A summary sentence whose subject is a bare word of a title or of the field, before a verb to be, is counted; one as the person is not (#354, round 1)")
+    @Test("A summary sentence whose subject is a bare word of a title or of the field, before a verb to be, is counted; one as the person is not (#354)")
     func bareSubjectSummary() throws {
         let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
         let cv = CVData(
@@ -390,7 +390,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A technology with a word in neither the description nor the tools of the trade is counted; a stated or a typical tool is not (#354, round 1)")
+    @Test("A technology with a word in neither the description nor the tools of the trade is counted; a stated or a typical tool is not (#354)")
     func offTradeTechnology() throws {
         let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
         let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })
@@ -411,7 +411,7 @@ struct DraftingWrittenTests {
         #expect(counted(["PLC", "quadri elettrici", "multimetro", "termocamera", "inverter"], italian).isEmpty)
     }
 
-    @Test("A kind of tool alone or with a word of any trade is counted; one with a word of its trade, a name or an acronym is not (#354, rounds 2 and 5)")
+    @Test("A kind of tool alone or with a word of any trade is counted; one with a word of its trade, a name or an acronym is not (#354)")
     func categoryAsTechnology() {
         let english = CVData(skills: ["accounting software", "Sage 50", "PA system", "ticketing platform", "QuickBooks software",
                                       "software", "development platform"].map { Skill(name: $0) })
@@ -425,35 +425,35 @@ struct DraftingWrittenTests {
         #expect(counted(portuguese, "pt") == ["editor de texto", "plataforma de desenvolvimento"])
     }
 
-    @Test("A German technology that is an activity in its infinitive is no tool of the trade; the tool of that activity is one (#354, round 2)")
+    @Test("A German technology that is an activity in its infinitive is no tool of the trade; the tool of that activity is one (#354)")
     func activityInfinitive() {
         let cv = CVData(skills: ["Löten", "Lötkolben", "Kalibrieren", "Prüfgerät"].map { Skill(name: $0) })
 
         #expect(Self.reader(cv, "de").filter { $0.kind == .noToolOfTheTrade }.map(\.value) == ["Löten", "Kalibrieren"])
     }
 
-    @Test("A device in English in a draft of another language is a skill in another language (#354, round 2)")
+    @Test("A device in English in a draft of another language is a skill in another language (#354)")
     func englishDevice() {
         let cv = CVData(skills: [Skill(name: "stampante laser"), Skill(name: "label printer")])
 
         #expect(Self.reader(cv, "it").filter { $0.kind == .skillInAnotherLanguage }.map(\.value) == ["label printer"])
     }
 
-    @Test("A console, a mixer and a desk are one tool: the second and the third are counted as one head noun (#354, round 2)")
+    @Test("A console, a mixer and a desk are one tool: the second and the third are counted as one head noun (#354)")
     func headGroups() {
         let cv = CVData(skills: ["analog mixer", "stage boxes", "digital console", "broadcast desk"].map { Skill(name: $0) })
 
         #expect(Self.reader(cv, "en").filter { $0.kind == .sharedHeadNoun }.map(\.value) == ["digital console", "broadcast desk"])
     }
 
-    @Test("A word for knowledge listed as a soft skill is the word for a skill; a quality is not (#354, round 2)")
+    @Test("A word for knowledge listed as a soft skill is the word for a skill; a quality is not (#354)")
     func knowledgeAsQuality() {
         let cv = CVData(skills: ["Fachwissen", "Verständnis", "Geduld"].map { Skill(name: $0, kind: .softSkill) })
 
         #expect(Self.reader(cv, "de").filter { $0.kind == .skillWordAsQuality }.map(\.value) == ["Fachwissen", "Verständnis"])
     }
 
-    @Test("A soft skill of the quality of an earlier one is counted; qualities of their own are not (#354, round 2)")
+    @Test("A soft skill of the quality of an earlier one is counted; qualities of their own are not (#354)")
     func sameQuality() {
         let cv = CVData(skills: ["accuratezza", "pazienza", "attenzione ai dettagli", "spirito di collaborazione", "lavoro di squadra"]
             .map { Skill(name: $0, kind: .softSkill) })
@@ -463,7 +463,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A summary sentence whose subject is a quality is counted; a quality before a comma and the person is not (#354, round 2)")
+    @Test("A summary sentence whose subject is a quality is counted; a quality before a comma and the person is not (#354)")
     func qualitySubjectSummary() {
         let cv = CVData(
             summary: "Sono tecnica di laboratorio da sei anni. Pazienza e metodo sono i miei punti di forza. "
@@ -476,7 +476,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A summary sentence that ends with the three words of an earlier one is counted (#354, round 2)")
+    @Test("A summary sentence that ends with the three words of an earlier one is counted (#354)")
     func repeatedEnding() {
         let cv = CVData(
             summary: "Soy técnico de sonido con enfoque práctico. Monto los equipos de cada gira con enfoque práctico. "
@@ -488,7 +488,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("A job with three sentences that open with the same two words is counted once; two are not (#354, round 2)")
+    @Test("A job with three sentences that open with the same two words is counted once; two are not (#354)")
     func sameOpening() {
         let cv = CVData(experience: [
             Experience(company: "A", description: "Je préparais les ateliers du matin. Je préparais les goûters. "
@@ -501,7 +501,7 @@ struct DraftingWrittenTests {
         ])
     }
 
-    @Test("Three sentences of a job that open with the subject and an auxiliary are no repeated opening; three with one verb are (#354, round 2)")
+    @Test("Three sentences of a job that open with the subject and an auxiliary are no repeated opening; three with one verb are (#354)")
     func sameOpeningPastAnAuxiliary() {
         let cv = CVData(experience: [
             Experience(company: "A", description: "Ich habe die Regale montiert. Ich habe die Lampen geprüft. Ich habe die Böden verlegt."),
@@ -539,7 +539,7 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .clauseAsInterest }.map(\.value) == [clause])
     }
 
-    @Test("An interest of one noun said after a verb in the form of its infinitive is counted; the whole phrase, and a noun said after a conjugated verb, are not (#354, round 1)")
+    @Test("An interest of one noun said after a verb in the form of its infinitive is counted; the whole phrase, and a noun said after a conjugated verb, are not (#354)")
     func bareInterest() {
         let input = DraftingInput(
             id: "reader-en", kind: .plain, language: "en",
@@ -554,7 +554,7 @@ struct DraftingWrittenTests {
         #expect(found.filter { $0.kind == .clauseAsInterest }.isEmpty)
     }
 
-    @Test("A duty or a quality the person states and no skill or description of its job holds is counted; one a skill or the description of its job holds is not (#354, round 1; #362)")
+    @Test("A duty or a quality the person states and no skill or description of its job holds is counted; one a skill or the description of its job holds is not (#354; #362)")
     func unwrittenStatement() throws {
         let english = try #require(DraftingInputs.jobs.first { $0.id == "jobs-en" })
         let italian = try #require(DraftingInputs.jobs.first { $0.id == "jobs-it" })

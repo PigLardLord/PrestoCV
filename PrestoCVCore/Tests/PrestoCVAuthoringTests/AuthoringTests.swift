@@ -14,7 +14,13 @@ let emailLengthCases: [(String, Bool)] = {
     let accented32 = String(repeating: "é", count: 32), accented33 = String(repeating: "é", count: 33)
     let label63 = "a" + String(repeating: "\u{0301}", count: 61) + "b", label64 = "a" + String(repeating: "\u{0301}", count: 62) + "b"
     return [(local64 + domain, true), (local65 + domain, false), (accented32 + domain, true), (accented33 + domain, false),
-            ("ada@example." + label63, true), ("ada@example." + label64, false)]
+            ("ada@example." + label63, false), ("ada@example." + label64, false),   // 63 marks, past 63 bytes once encoded
+            ("ada@example.a" + String(repeating: "\u{0301}", count: 20) + "b", true),
+            ("ada@" + String(repeating: "a", count: 63) + ".com", true), ("ada@" + String(repeating: "a", count: 64) + ".com", false),
+            ("ada@" + String(repeating: "é", count: 57) + ".com", true),     // xn-- and 59 more: exactly 63 bytes
+            ("ada@" + String(repeating: "é", count: 58) + ".com", false),
+            ("ada@" + String(repeating: "\u{00E9}", count: 30) + ".example.com", true),    // composed
+            ("ada@" + String(repeating: "e\u{0301}", count: 30) + ".example.com", true)]  // decomposed: the same label    // 58 characters, 64 bytes once encoded
 }()
 
 @Suite("R6 · rich domain")
@@ -56,7 +62,7 @@ struct DomainTests {
                       "ada@-example.com", "ada@example-.com", "ada@example.c", "ada@example.123", "ada@@example.com", "@example.com"])
     func malformedEmail(raw: String) { #expect(EmailAddress(raw) == nil) }
 
-    @Test("a local part is at most 64 bytes and a domain label at most 63 characters, marks included", arguments: emailLengthCases)
+    @Test("a local part is at most 64 bytes and a domain label at most 63 characters and 63 bytes once encoded for IDNA", arguments: emailLengthCases)
     func emailLengths(raw: String, accepted: Bool) { #expect((EmailAddress(raw) != nil) == accepted) }
 
     @Test("every accepted link rebuilds itself from its value and stays within the limit (final gate)",
@@ -96,6 +102,9 @@ struct DomainTests {
     @Test("document languages are BCP 47 tags in canonical case",
           arguments: [("it", "it"), ("PT-br", "pt-BR"), ("zh-hant-tw", "zh-Hant-TW"), ("es-419", "es-419")])
     func languageTags(raw: String, tag: String) { #expect(DocumentLanguage(raw)?.tag == tag) }
+
+    @Test("English is the tag \"en\" in canonical case")
+    func english() { #expect(DocumentLanguage.english == DocumentLanguage("en")) }
 
     @Test("malformed language tags are rejected", arguments: ["", "i", "italian", "it-", "it-XX-extra-more", "it_IT", "e1", "it-1234"])
     func badLanguageTags(raw: String) { #expect(DocumentLanguage(raw) == nil) }

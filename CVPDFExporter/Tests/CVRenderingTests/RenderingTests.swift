@@ -9,7 +9,8 @@ import CVBundledHeadings
 let cleanCSS = ".cv-name{color:var(--color-primary)}.cv-entry-title{font-weight:600}.cv-section-title{text-transform:uppercase}"
 
 func designData(_ css: String, id: String = "clean") -> Data {
-    let object: [String: Any] = ["manifest": ["id": id, "name": "Clean", "version": "1.0.0", "description": "", "markupContract": 1], "cssContent": css]
+    let object: [String: Any] = ["manifest": ["id": id, "name": "Clean", "version": "1.0.0", "description": "", "defaultPalette": "ink",
+                                              "defaultFonts": "system", "markupContract": MarkupContract.version], "cssContent": css]
     return try! JSONSerialization.data(withJSONObject: object)   // test fixture only
 }
 
@@ -73,7 +74,7 @@ struct BuilderTests {
         ])
         let rendered = DocumentHTMLBuilder().render(doc, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "en"))
         let html = rendered.html
-        #expect(html.contains(#"<p class="cv-summary">Summary one</p><p class="cv-summary">Summary two</p>"#))
+        #expect(html.contains(#"<p class="cv-summary">Summary one</p></div><p class="cv-summary">Summary two</p>"#))   // the first goes with the title (#467)
         #expect(html.contains(#"<p class="cv-entry-description">- led a team</p><p class="cv-entry-description">- shipped X</p><p class="cv-entry-description">- fixed Y</p>"#))
         #expect(html.contains(#"<p class="cv-entry-description">Thesis</p><p class="cv-entry-description">Honours</p>"#))
         #expect(html.contains(#"<p class="cv-entry-description">Part one</p><p class="cv-entry-description">Part two</p>"#))
@@ -190,11 +191,11 @@ struct BuilderTests {
         #expect(html == (try String(contentsOf: url, encoding: .utf8)))
     }
 
-    @Test("contact fields, certifications and links are rendered in their contract classes; links print their destination (review rounds 2, 3)")
+    @Test("contact fields, certifications and links are rendered in their contract classes; links print their destination")
     func contactAndCertifications() throws {
         let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         for needle in [#"<p class="cv-phone">+39 06 1234567</p>"#, #"<p class="cv-location">Roma</p>"#, #"<a class="cv-website" href="https://ada.example">https://ada.example</a>"#,
-                       #"<section class="cv-section" data-section="certifications"><h2 class="cv-section-title">Certificazioni</h2>"#,
+                       #"<section class="cv-section" data-section="certifications"><div class="cv-section-start"><h2 class="cv-section-title">Certificazioni</h2>"#,
                        #"<h3 class="cv-entry-title">Swift Certified</h3><p class="cv-entry-subtitle">Apple</p><p class="cv-entry-period">2021</p>"#,
                        #"<a class="cv-entry-link" href="https://cert.example/1">https://cert.example/1</a>"#,
                        #"<a class="cv-profile" href="https://github.com/ada"><span class="cv-profile-platform">GitHub</span> <span class="cv-profile-url">https://github.com/ada</span></a>"#] {
@@ -202,7 +203,7 @@ struct BuilderTests {
         }
     }
 
-    @Test("completeness counts occurrences: repeated, contained and duplicated values, and dates (review round 2)")
+    @Test("completeness counts occurrences: repeated, contained and duplicated values, and dates")
     func completenessOccurrences() throws {
         let doc = CVDocument(language: "en", person: Person(name: "Ada"), sections: [
             .summary("I write Swift every day"),
@@ -256,7 +257,7 @@ struct BuilderTests {
         #expect(html.contains(#"<p class="cv-entry-description">Tutored</p>"#))
     }
 
-    @Test("inline entries and a profile's parts are separated, so printed text never runs together (review round 4)")
+    @Test("inline entries and a profile's parts are separated, so printed text never runs together")
     func inlineSeparators() throws {
         let doc = CVDocument(language: "en", person: Person(name: "Ada"), sections: [
             .skills([SkillItem(name: "Swift"), SkillItem(name: "Git")]),
@@ -272,7 +273,65 @@ struct BuilderTests {
         #expect(!rendered.textNodes.contains { $0.allSatisfy(\.isWhitespace) })            // separators are not fields
     }
 
-    @Test("a PDF that keeps link labels but loses their destinations is incomplete (review round 3)")
+    @Test("a section's start holds its title and first block; an inline section's start holds its title alone, its entries follow (#467)")
+    func titleStartsWithFirstBlock() throws {
+        let h = try headingsCatalog.headings(for: "it")
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: h)
+        func start(_ kind: String, _ title: String) -> String {
+            #"<section class="cv-section" data-section="\#(kind)"><div class="cv-section-start"><h2 class="cv-section-title">\#(title)</h2>"#
+        }
+        #expect(html.contains(start("summary", h.summary) + #"<p class="cv-summary">Writes {{title}} literally &amp; &lt;script&gt;alert(1)&lt;/script&gt;</p></div></section>"#))
+        #expect(html.contains(start("experience", h.experience) + #"<article class="cv-entry"><h3 class="cv-entry-title">Analyst</h3>"#))
+        #expect(html.contains(#"</article></div><article class="cv-entry"><h3 class="cv-entry-title">Clerk</h3>"#))
+        #expect(html.contains(#"</p></div><p class="cv-language">Italiano "#))
+        #expect(html.contains(start("skills", h.skills) + #"</div><span class="cv-skill" data-rating="5">Swift</span> <span class="cv-skill">Git</span></section>"#))
+        #expect(html.contains(start("profiles", h.profiles) + #"</div><a class="cv-profile" href="https://github.com/ada">"#))
+        #expect(html.contains(start("interests", h.interests) + #"</div><span class="cv-interest">Poetry</span></section>"#))
+        #expect(html.components(separatedBy: "<div").count - 1 == 8 && html.components(separatedBy: "<section").count - 1 == 8)
+    }
+
+    @Test("the base style keeps the start of a section whole and ends the document at its last line, whatever the design says (#467)")
+    func baseStyleKeepsAndEnds() throws {
+        let html = DocumentHTMLBuilder().build(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
+        let base = try #require(html.firstMatch(of: #/<style>([^<]*)</style>/#)?.1)
+        // A title, kept whole, reserves room for what may follow its last line at a page's foot: its bottom padding and
+        // margin and its bottom border at the contract's limits, then the next line, or at least 150pt above a
+        // description (bundled designs: 23pt, 143pt). All but 1px is given back, so a pushed reserve makes the title
+        // cross the page's end.
+        let reserve = "calc(2*max(1em,12pt) + max(0.3em,4pt) + max(2.5em,30pt))"
+        let descriptionReserve = "calc(2*max(1em,12pt) + max(0.3em,4pt) + max(2.5em,150pt))"
+        // An iPhone's text autosizing is off: with it, the iOS print path left titles alone at a page's foot.
+        #expect(base.contains("html{-webkit-text-size-adjust:none!important}"))
+        let spacing = MarkupContract.titleBottomSpacing, border = MarkupContract.borderWidth
+        #expect([spacing.em, spacing.pt, border.em, border.pt] == [1, 12, 0.3, 4])
+        #expect(base.contains(".cv-section-start>.cv-section-title{display:flow-root!important;break-inside:avoid!important}"))
+        #expect(base.contains(#".cv-section-title::after{content:"";display:block;height:\#(reserve);margin-bottom:calc(1px - \#(reserve));break-inside:avoid}"#))
+        #expect(base.contains(".cv-section-start:has(>.cv-entry>.cv-entry-description)>.cv-section-title::after"
+                              + "{height:\(descriptionReserve);margin-bottom:calc(1px - \(descriptionReserve))}"))
+        // No forced break separates a title from what follows it.
+        #expect(base.contains(".cv-section-title{break-after:auto!important}.cv-section-title~*,.cv-section-title~* *{break-before:auto!important}"
+                              + ".cv-section-start:has(>.cv-section-title:only-child){break-after:auto!important}"
+                              + ".cv-section-start:has(>.cv-section-title:only-child)+*{break-before:auto!important}"))
+        #expect(base.contains(".cv-section-start{break-inside:avoid!important}.cv-section-start>*{break-inside:auto!important}"))
+        #expect(base.contains("body,.cv{margin-bottom:0!important}") && base.contains(".cv{padding-bottom:0!important}"))
+        // The last element at every depth the builder nests below `main.cv` has no bottom margin: the fixture has every kind of section.
+        let reset = try #require(base.firstMatch(of: #/([^}]*)\{margin-bottom:0!important\}$/#)?.1)
+        let chains = (1...Self.depthBelowMain(html)).map { ".cv" + String(repeating: ">:last-child", count: $0) }
+        #expect(Set(reset.split(separator: ",").map(String.init)) == Set(chains))
+    }
+
+    /// How deep the elements nest below `main.cv`: 1 for a section, 2 for what a section holds, and so on. Text is escaped,
+    /// so every `<` opens a tag.
+    static func depthBelowMain(_ html: String) -> Int {
+        guard let main = html.range(of: "<main") else { return 0 }
+        var depth = 0, deepest = 0
+        for tag in html[main.lowerBound...].matches(of: #/<(/?)[a-z0-9]+/#) {
+            if tag.1.isEmpty { depth += 1; deepest = max(deepest, depth) } else { depth -= 1 }
+        }
+        return deepest - 1
+    }
+
+    @Test("a PDF that keeps link labels but loses their destinations is incomplete")
     func completenessLinkDestinations() throws {
         let rendered = DocumentHTMLBuilder().render(fixture, stylesheet: try stylesheet(), palette: palette, headings: try headingsCatalog.headings(for: "it"))
         let full = rendered.textNodes.joined(separator: "\n")
@@ -463,16 +522,17 @@ func startTags(in html: String) -> [(name: String, attributes: [String: String])
     return tags
 }
 
-@Suite("ADR 0011 · installing a design goes through the rendering gate (review round 2)")
+@Suite("ADR 0011 · installing a design goes through the rendering gate")
 struct InstallTests {
+    let noBundledDesigns = FixedBundledSource(packages: [])
     func gate(_ renderer: any PDFRendering) throws -> FixtureRenderingGate {
         FixtureRenderingGate(renderer: renderer, inspector: MinimalPDFInspector(), fixture: fixture,
-                             headings: try headingsCatalog.headings(for: "it"), palette: palette)
+                             headings: try headingsCatalog.headings(for: "it"))
     }
     @Test("a valid design that renders completely is stored")
     func installs() async throws {
         let store = InMemoryDesignStore()
-        _ = try await InstallDesign(gate: try gate(FakePDFRenderer()), store: store)(designData(cleanCSS, id: "clean"))
+        _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(FakePDFRenderer()), store: store)(designData(cleanCSS, id: "clean"))
         #expect(try await store.design(id: "clean") != nil)
     }
     @Test("a design whose rendering loses content is not stored")
@@ -483,14 +543,14 @@ struct InstallTests {
             }
         }
         let store = InMemoryDesignStore()
-        await #expect(throws: FixtureRenderingGate.Rejection.self) { _ = try await InstallDesign(gate: try gate(Dropping()), store: store)(designData(cleanCSS, id: "clean")) }
+        await #expect(throws: FixtureRenderingGate.Rejection.self) { _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(Dropping()), store: store)(designData(cleanCSS, id: "clean")) }
         #expect(try await store.design(id: "clean") == nil)
     }
     @Test("an invalid package is not stored and never rendered")
     func invalid() async throws {
         struct Unreachable: PDFRendering { func render(html: String, page: PageSetup) async throws -> RenderedPDF { Issue.record("rendered"); throw CancellationError() } }
         let store = InMemoryDesignStore()
-        await #expect(throws: DesignPackageRejected.self) { _ = try await InstallDesign(gate: try gate(Unreachable()), store: store)(designData(".cv{display:none}", id: "bad")) }
+        await #expect(throws: DesignPackageRejected.self) { _ = try await InstallDesign(source: noBundledDesigns, gate: try gate(Unreachable()), store: store)(designData(".cv{display:none}", id: "bad")) }
         #expect(try await store.design(id: "bad") == nil)
     }
 }

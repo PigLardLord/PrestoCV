@@ -114,7 +114,7 @@ struct FoundationModelsServiceTests {
         }
     }
 
-    @Test("A tools request asks the tools its count says, 2 or 3 of a job among others, never none (#354, rounds 5 and 6)",
+    @Test("A tools request asks the tools its count says, 2 or 3 of a job among others, never none (#354)",
           arguments: [(2...3, 80), (3...4, 100), (4...5, 120)] as [(ClosedRange<Int>, Int)])
     func toolsOfACount(count: ClosedRange<Int>, tokens: Int) throws {
         let data = try JSONEncoder().encode(FoundationModelsService.toolsSchema(count: count))
@@ -128,14 +128,14 @@ struct FoundationModelsServiceTests {
         #expect(FoundationModelsService.toolsTokens(most: count.upperBound) == tokens)
     }
 
-    @Test("A skills list splits a value that joins several with \";\" and drops the schema's type name (probe round 11)")
+    @Test("A skills list splits a value that joins several with \";\" and drops the schema's type name")
     func skillsOfAList() {
         #expect(FoundationModelsService.skills(["registro di classe ; lavagna interattiva", "string", " Moodle ", "String", ""])
             == ["registro di classe", "lavagna interattiva", "Moodle"])
         #expect(FoundationModelsService.skills(nil).isEmpty)
     }
 
-    @Test("A job's request writes exactly the person's duties and the typical ones the job needs, 1 to 4, and its years only if said (#354, round 10)",
+    @Test("A job's request writes exactly the person's duties and the typical ones the job needs, 1 to 4, and its years only if said (#354)",
           arguments: [(0, 2, 2), (1, 1, 2), (2, 1, 3), (3, 0, 3), (5, 1, 4), (0, 0, 1)] as [(Int, Int, Int)])
     func dutiesOfAJob(said: Int, adding: Int, duties: Int) throws {
         #expect(FoundationModelsService.jobDuties(said: said, adding: adding) == duties)

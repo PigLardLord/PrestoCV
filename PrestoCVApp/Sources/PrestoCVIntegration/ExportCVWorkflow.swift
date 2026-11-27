@@ -15,23 +15,24 @@ public struct DocumentStyle: Sendable {
 }
 
 /// Exports a snapshot of a CV as a PDF (ADR 0007, ADR 0011). Every export is checked against its own document: the text
-/// of the PDF must hold every text the document has (R8). The outcome says when the PDF is shorter than the CV needs.
+/// of the PDF must hold every text the document has, and every line must be visible: inside its page and at least
+/// `GeometricCompleteness.minimumGlyphHeight` high (R8, #80). The outcome says when the PDF is shorter than the CV needs.
 /// A link the exporter would not print as it is makes the export fail (`invalidDocument`) instead of vanishing from the PDF.
 /// Failures are `ExportFailure`, including any error of the renderer; a cancelled task stays a `CancellationError` (R3, R7).
 public struct ExportCVWorkflow: CVExporting {
     private let renderer: any PDFRendering
-    private let inspector: any PDFInspecting
+    private let inspector: any PDFLayoutInspecting
     private let headings: HeadingsCatalog
     private let style: DocumentStyle
     private let policy: ExportPolicy
     private let mapper = CVToDocumentMapper()
 
-    public init(renderer: any PDFRendering, inspector: any PDFInspecting, headings: HeadingsCatalog, style: DocumentStyle,
+    public init(renderer: any PDFRendering, inspector: any PDFLayoutInspecting, headings: HeadingsCatalog, style: DocumentStyle,
                 policy: ExportPolicy) {
         self.renderer = renderer; self.inspector = inspector; self.headings = headings; self.style = style; self.policy = policy
     }
 
-    public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
+    @concurrent public func export(_ snapshot: CV, language: DocumentLanguage) async throws -> ExportOutcome {
         let personal = snapshot.personal
         let readiness = ExportReadiness(name: personal.fullName, email: personal.email?.value ?? "", phone: personal.phone?.value ?? "")
         guard readiness.canExport else { throw ExportFailure.notReady }
@@ -49,6 +50,9 @@ public struct ExportCVWorkflow: CVExporting {
             guard let text = inspector.text(of: pdf.data) else { throw ExportFailure.renderingFailed }
             let missing = DocumentCompleteness.missing(in: text, expected: rendered.textNodes)
             guard missing.isEmpty else { throw ExportFailure.incomplete(missing: missing.count) }
+            guard let layout = inspector.layout(of: pdf.data) else { throw ExportFailure.renderingFailed }   // fail closed
+            let hidden = GeometricCompleteness.violations(in: layout, minimumGlyphHeight: GeometricCompleteness.minimumGlyphHeight)
+            guard hidden.isEmpty else { throw ExportFailure.textNotVisible(lines: hidden.count) }
         }
         return ExportOutcome(pdf: pdf.data, pageCount: pdf.pageCount, requiredPages: pdf.requiredPages)
     }

@@ -8,6 +8,7 @@ import CVDesignCatalog
 import CVRendering
 import CVRenderingTestSupport
 import CVBundledHeadings
+import Synchronization
 
 // MARK: Doubles
 
@@ -38,9 +39,53 @@ private struct FailingRenderer: PDFRendering {
     func render(html: String, page: PageSetup) async throws -> RenderedPDF { throw RendererFailure() }
 }
 
-private struct UnreadableInspector: PDFInspecting {
+private struct UnreadableInspector: PDFLayoutInspecting {
+    func layout(of data: Data) -> PDFLayout? { nil }
     func pageCount(of data: Data) -> Int? { nil }
     func text(of data: Data) -> String? { nil }
+}
+
+/// Reads text and page count like the Linux inspector, and answers `layout` as given: the geometry a test wants to check.
+private struct FixedLayoutInspector: PDFLayoutInspecting {
+    let fixed: PDFLayout?
+    func pageCount(of data: Data) -> Int? { MinimalPDFInspector().pageCount(of: data) }
+    func text(of data: Data) -> String? { MinimalPDFInspector().text(of: data) }
+    func layout(of data: Data) -> PDFLayout? { fixed }
+}
+
+private let pageBox = PDFBox(x: 0, y: 0, width: 595, height: 842)
+
+private func layout(_ lines: [PDFTextLine]) -> PDFLayout { PDFLayout(pages: [pageBox], lines: lines) }
+
+private func line(_ box: PDFBox, glyph: Double? = 10) -> PDFTextLine {
+    PDFTextLine(pageIndex: 0, text: "line", box: box, glyphHeight: glyph)
+}
+
+/// Whether each call of a long step ran on the main actor, in the order of the calls.
+private final class ThreadRecord: Sendable {
+    private let threads = Mutex<[Bool]>([])
+    var onMainActor: [Bool] { threads.withLock { $0 } }
+    func record() {
+        let onMainActor = MainActorProbe.isOnTheMainActor
+        threads.withLock { $0.append(onMainActor) }
+    }
+}
+
+/// Reads the bundled headings and records the thread of each read.
+private struct ThreadRecordingHeadings: HeadingTableSource {
+    let threads: ThreadRecord
+    private let inner = BundleHeadingTableSource()
+    func index() throws -> Data { threads.record(); return try inner.index() }
+    func table(_ tag: String) throws -> Data? { threads.record(); return try inner.table(tag) }
+}
+
+/// Inspects like the minimal inspector and records the thread of each look at the PDF.
+private struct ThreadRecordingInspector: PDFLayoutInspecting {
+    let threads: ThreadRecord
+    private let inner = MinimalPDFInspector()
+    func layout(of data: Data) -> PDFLayout? { threads.record(); return inner.layout(of: data) }
+    func pageCount(of data: Data) -> Int? { threads.record(); return inner.pageCount(of: data) }
+    func text(of data: Data) -> String? { threads.record(); return inner.text(of: data) }
 }
 
 private struct BrokenHeadingSource: HeadingTableSource {
@@ -49,7 +94,7 @@ private struct BrokenHeadingSource: HeadingTableSource {
     func table(_ tag: String) throws -> Data? { throw Broken() }
 }
 
-private func workflow(renderer: any PDFRendering = FakePDFRenderer(), inspector: any PDFInspecting = MinimalPDFInspector(),
+private func workflow(renderer: any PDFRendering = FakePDFRenderer(), inspector: any PDFLayoutInspecting = MinimalPDFInspector(),
                       source: any HeadingTableSource = BundleHeadingTableSource(),
                       policy: ExportPolicy = .standard) throws -> ExportCVWorkflow {
     ExportCVWorkflow(renderer: renderer, inspector: inspector, headings: HeadingsCatalog(source: source),
@@ -75,6 +120,19 @@ struct ExportCVWorkflowTests {
         for expected in ["Ada Lovelace", "Analytical Engineer", "ada@example.com", "Babbage & Co", "Poetry", "Swift Certified", "github.com/ada"] {
             #expect(pdf.contains(expected), "\(expected) is missing from the PDF")
         }
+    }
+
+    @MainActor
+    @Test("the headings are read and the PDF is checked off the main actor, also when the sheet asks from it (R19)")
+    func exportRunsOffTheMainActor() async throws {
+        let headings = ThreadRecord(), inspector = ThreadRecord()
+        let export = try workflow(inspector: ThreadRecordingInspector(threads: inspector),
+                                  source: ThreadRecordingHeadings(threads: headings))
+
+        _ = try await export.export(Fixtures.fullCV(), language: language("it"))
+
+        #expect(!headings.onMainActor.isEmpty && !headings.onMainActor.contains(true))
+        #expect(!inspector.onMainActor.isEmpty && !inspector.onMainActor.contains(true))
     }
 
     @Test("a multi-line summary and description export complete, each line in the PDF")
@@ -113,6 +171,14 @@ struct ExportCVWorkflowTests {
         let outcome = try await workflow().export(Fixtures.fullCV(), language: language(tag))
         #expect(text(of: outcome).localizedCaseInsensitiveContains(headings.experience))
         #expect(text(of: outcome).localizedCaseInsensitiveContains(headings.skills))
+    }
+
+    @Test("a current job ends with the word for the present in the language of the export, not the CV's own (#363)",
+          arguments: ["it", "en", "de", "fr", "es", "pt"])
+    func currentJobEndsWithThePresentOfTheLanguage(tag: String) async throws {
+        let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: tag)
+        let outcome = try await workflow().export(Fixtures.fullCV(), language: language(tag))
+        #expect(text(of: outcome).contains("03/2019 – \(headings.present)"), "\(tag): \(text(of: outcome))")
     }
 
     @Test("a regional tag finds the table of its language")
@@ -224,5 +290,70 @@ struct ExportCVWorkflowTests {
         let second = try await export.export(cv, language: language("it"))
         #expect(first == second)
         #expect(cv == Fixtures.fullCV())
+    }
+
+    // MARK: Geometry (R8, #80)
+
+    private func export(layout: PDFLayout?, policy: ExportPolicy = .standard,
+                        renderer: any PDFRendering = FakePDFRenderer()) async throws -> ExportOutcome {
+        try await workflow(renderer: renderer, inspector: FixedLayoutInspector(fixed: layout), policy: policy)
+            .export(Fixtures.fullCV(), language: language("it"))
+    }
+
+    @Test("a line below the bottom edge fails with textNotVisible")
+    func belowBottom() async throws {
+        await #expect(throws: ExportFailure.textNotVisible(lines: 1)) {
+            try await export(layout: layout([line(PDFBox(x: 40, y: -5, width: 100, height: 10))]))
+        }
+    }
+
+    @Test("a line past the right edge fails with textNotVisible")
+    func pastRight() async throws {
+        await #expect(throws: ExportFailure.textNotVisible(lines: 1)) {
+            try await export(layout: layout([line(PDFBox(x: 500, y: 100, width: 100, height: 10))]))
+        }
+    }
+
+    @Test("a glyph under the minimum fails with textNotVisible, and the count is the lines at fault")
+    func glyphTooSmall() async throws {
+        let ok = line(PDFBox(x: 40, y: 100, width: 100, height: 10))
+        let small = line(PDFBox(x: 40, y: 80, width: 100, height: 5), glyph: 5)
+        await #expect(throws: ExportFailure.textNotVisible(lines: 2)) { try await export(layout: layout([ok, small, small])) }
+    }
+
+    @Test("a line of unknown glyph height fails with textNotVisible")
+    func unknownGlyph() async throws {
+        await #expect(throws: ExportFailure.textNotVisible(lines: 1)) {
+            try await export(layout: layout([line(PDFBox(x: 40, y: 100, width: 100, height: 10), glyph: nil)]))
+        }
+    }
+
+    @Test("a line exactly on the edges, with glyphs exactly at the minimum, passes")
+    func onTheEdge() async throws {
+        let edge = line(PDFBox(x: 0, y: 0, width: 595, height: 842), glyph: GeometricCompleteness.minimumGlyphHeight)
+        let outcome = try await export(layout: layout([edge]))
+        #expect(!outcome.truncated)
+    }
+
+    @Test("a layout that cannot be read is renderingFailed")
+    func noLayout() async throws {
+        await #expect(throws: ExportFailure.renderingFailed) { try await export(layout: nil) }
+    }
+
+    @Test("a truncated PDF skips the text and geometry checks")
+    func truncatedSkipsGeometry() async throws {
+        let policy = ExportPolicy(pageWidth: 595.28, pageHeight: 841.89, margin: 43, maxPages: 1)
+        let outcome = try await export(layout: layout([line(PDFBox(x: 40, y: -50, width: 100, height: 10), glyph: 1)]), policy: policy)
+        #expect(outcome.truncated)
+    }
+
+    @Test("an incomplete text is reported before the geometry")
+    func incompleteFirst() async throws {
+        await #expect {
+            try await export(layout: layout([line(PDFBox(x: 40, y: -5, width: 100, height: 10))]), renderer: DroppingRenderer())
+        } throws: { error in
+            guard let failure = error as? ExportFailure, case .incomplete = failure else { return false }
+            return true
+        }
     }
 }

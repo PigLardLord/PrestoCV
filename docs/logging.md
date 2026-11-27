@@ -77,6 +77,9 @@ The tables list every event the code writes; the source checks fail when the cod
 
 | Event | Level | Fields | When |
 |---|---|---|---|
+| `import.file.notRead` | error | `reason` (`notReceived`, `noIdentity` or `releasedDuringRead`), or `error` (`notTheFile`, or a system error by name, such as `ENOENT`) | The file the person chose could not be read: the screen never received it, its identity could not be taken when it came, the path no longer names that regular file, or it was let go while it was read. The import then fails with `fileNotRead`. |
+| `import.file.releasedAgain` | notice | none | A file was let go twice, or one never received was let go; nothing else happens. |
+| `import.file.copyNotDeleted` | error | `error` (`notTheFile`, `leftAside`, or a system error by name) | A copy the system made of the chosen file, in one of the app's copy folders, could not be deleted when the last import of that file ended. One line per copy. |
 | `pdf.read` | info | `pages`, `words` | PDFKit read the words of a PDF's pages. |
 | `pdf.limit` | notice | `limit` | The PDF reader stopped at a bound of the reading: `bytes`, `pages`, `characters` or `words`. It throws that bound as a `LimitReached`, so `import.failed` names it too. |
 | `import.sections` | info | one count per kind of section recognised, such as `experience=2` | The text was read into sections. |
@@ -84,6 +87,8 @@ The tables list every event the code writes; the source checks fail when the cod
 | `import.finished` | info | `kind` (`pdf` or `text`), `pages` (a PDF only), `characters`, `sections`, `elapsed` | The draft is ready for the review. |
 | `import.failed` | error | `kind`, `error`, `limit` (when a bound was reached, whether the core or the PDF reader found it: `bytes`, `pages`, `characters`, `words`, `lines`, `cells` or `steps`), `elapsed` | The import failed, and the person is told why. |
 | `import.cancelled` | info | `kind`, `elapsed` | The screen went away while the import ran. |
+
+The `import.file.*` events name no path and no file name: a file is only ever described by what happened to it.
 
 The AI screen reads every text with the import before it asks for a draft ([ADR 0034](architecture/adr/0034-read-a-text-that-is-already-a-cv-with-the-import.md)), so the import's events, with `kind=text`, come before the draft's. When the import fails, or reads a text that is not a CV, the person is not told and the AI draft starts; the diagnostics of a TestFlight install then list a CV import before the AI draft.
 
@@ -121,6 +126,53 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 | `trace.writeFailed` | error | `error` (`write`) | A run or the session's events could not be written to the device. The draft or the import goes on. |
 | `trace.readFailed` | error | `error` (`corruptRun` or `write`) | A stored run or the session's events did not read back, or the folder could not be listed; the run is left out of the list. |
 | `trace.shareFailed` | error | `error` (`share`) | The copies of a run to share could not be made or removed. |
+
+### The designs (category `designs`)
+
+Every launch brings the designs that ship with the app into the design store before the first screen, and renders a design only when it is new or changed. The first launch renders the three bundled designs; a launch after it renders none.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `repaired` (a bundled design the store listed but could not read, written again), `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
+| `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the launch goes on with the designs installed before, if the default design is among them. |
+| `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync or while the store was read. The designs saved before it stay saved, so the next launch does not render them again. |
+| `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read were left out of the launch; the launch goes on with the others. |
+| `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The store gives no default design, so the launch fails with this code. |
+
+### The share of an export (category `export`)
+
+The export sheet writes the PDF to a file of its own for the system's share sheet, and removes it when the share sheet closes. When the app starts, it removes what an earlier launch left.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `export.share.notWritten` | error | `error` (`notAName`, `noSpace`, `noPermission`, `readOnly`, `notFound` or `other`) | The file of a share could not be written, so the share sheet does not open. |
+| `export.share.notRemoved` | error | `of` (`share` or `leftover`), `error` | The folder of a share, or one an earlier launch left, could not be removed; the next launch tries again. |
+
+The `export.share.*` events name no path and no file name: the file's name holds the person's name.
+
+### The released app's leftovers (category `legacy`)
+
+After an import that left nothing out, the launch removes the released app's design files, their cache and its export settings, which hold nothing the person wrote.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `legacy.leftovers.notRemoved` | error | `of` (`templates`, `templateCache` or `exportPreferences`), `error` | A file the released app left, with nothing the person wrote in it, could not be removed after the import; the next launch tries again. |
+
+The event names a kind of file and a code, never a path.
+
+### The tips (category `tips`)
+
+At launch the app listens to the store's tip transactions and finishes each one it reads, verified or not, and grants nothing ([ADR 0040](architecture/adr/0040-sell-tips-through-the-app-store-only.md)). A tip bought from the tip jar is finished the same way, as soon as the store answers.
+
+| Event | Level | Fields | When |
+|---|---|---|---|
+| `tips.unfinished.finished` | info | `count` (the transactions finished), `unverified` (how many of them the store did not verify) | Once per launch, after the transactions the store still held from an earlier run have all been finished. A count of zero is logged too. |
+| `tips.update.finished` | info | `verified` (flag) | A transaction that arrived while the app ran was finished. |
+| `tips.purchase.ended` | info | `outcome` (`completed`, `unverified`, `cancelled`, `pending`, `notAllowed`, `unreachable` or `failed`) | A purchase from the tip jar ended. A tip the store sold is finished first, the unverified one too, which grants nothing. |
+
+The events carry counts, flags and outcome codes only: no product, price, identifier or account.
+
+The listener starts before the launch's trace exists, so an event it logs before then goes to the unified log only. From the moment a launch has made its trace, its events go through that trace's logger, so in a TestFlight or Debug build they also appear in `session-events.json`; a later launch's trace takes over from the earlier one.
 
 ## The trace of a test build
 

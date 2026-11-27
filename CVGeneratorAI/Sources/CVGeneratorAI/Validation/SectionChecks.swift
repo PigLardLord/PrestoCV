@@ -22,7 +22,7 @@ extension CVDataSanitizer {
         let jobs: [Job]
         let field: String?
         /// The sentences in which the person says what they do and what they are like at work, with no job: the skills requests
-        /// read them (#354, round 1).
+        /// read them (#354).
         var own: [String] = []
     }
 
@@ -174,7 +174,7 @@ extension CVDataSanitizer {
                 if !current { sentence = FirstPersonDuty.inThePast(of: held, sentence, language: language, wordList: wordList) }
                 sentence = Self.withoutCareTail(sentence)
                 // A count the person gave in digits that the model wrote in words is the person's: a sentence that goes for it is
-                // written as they wrote it, and stays (#354, round 6). Another count still goes.
+                // written as they wrote it, and stays (#354). Another count still goes.
                 let counted = WrittenTextWords.inDigits(sentence, language: language)
                 if counted != sentence, reason(sentence, quotes) != nil, reason(counted, quotes) == nil { sentence = counted }
                 let words = Self.letterWords(of: sentence)
@@ -241,7 +241,7 @@ extension CVDataSanitizer {
     /// Why a written duty goes that says what the person did at another job (`DutyRule.rejection(of:)`, #362).
     static let atAnotherJobReason = "it says what the person did at another job"
 
-    // MARK: Filler and vague duties (#354, round 11)
+    // MARK: Filler and vague duties (#354)
 
     /// Why a written duty that only says where the person worked goes ("Ho lavorato allo Studio Contabile Merlini.").
     static let onlyWhereReason = "it says only where the person worked: name a task of the job"
@@ -257,7 +257,7 @@ extension CVDataSanitizer {
     /// Whether `text` names some work: a word of five letters or more that is no form of "to work" or "to start", no word of
     /// `names`, of a time ("prima", "since") or of the idle words. "je pétris le pain au Fournil Delaunay" names work; "Prima, dal
     /// 2013 al 2017, ho lavorato allo Studio Contabile Merlini." names none: asked for what the person said first, the model wrote
-    /// that they worked there (#354, round 11).
+    /// that they worked there (#354).
     static func namesWork(_ text: String, names: [String]) -> Bool {
         let named = words(of: names)
         return Word.words(in: text).contains { word in
@@ -274,7 +274,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether `duty` names its task only through what it relates to ("tasks related to", "compiti legati a"), in the six
-    /// languages: the reader rejects it as a duty of any job (#354, round 11).
+    /// languages: the reader rejects it as a duty of any job (#354).
     static func isVague(_ duty: String) -> Bool {
         let folded = " " + Word.words(in: duty).map(\.folded).joined(separator: " ") + " "
         return vaguePhrases.contains { folded.contains(" \($0) ") }
@@ -282,7 +282,7 @@ extension CVDataSanitizer {
 
     /// `duty` without a phrase of care at its end ("Pulivo le superfici interne con attenzione." is "Pulivo le superfici interne."):
     /// it says nothing of the work, and every duty is done with care. A duty of 2 words or fewer before it is left as it is, for
-    /// the checks to read (#354, round 16).
+    /// the checks to read (#354).
     static func withoutCareTail(_ duty: String) -> String {
         var body = duty.trimmingCharacters(in: .whitespaces)
         let end = body.last.map { ".!".contains($0) } == true ? String(body.removeLast()) : "."
@@ -304,15 +304,15 @@ extension CVDataSanitizer {
         "mit sorgfalt", "mit bedacht",
     ]
 
-    /// Why a written duty whose work is only abstract nouns goes ("I managed the processes.", #354, round 14).
+    /// Why a written duty whose work is only abstract nouns goes ("I managed the processes.", #354).
     static let abstractReason = "it names no thing the work is done on, only abstract words: name what the person works on"
 
     /// Whether `duty` says its work only through abstract nouns ("processes", "flows", "systems", "parts"): it holds one, and,
     /// of its other words of four letters or more, one at most is no stop word, empty modifier, general verb or place. A duty
     /// that names what the work is done on ("the brake systems of the trucks") has more, and stays. A general verb (manage,
     /// ensure, maintain) and a place (areas, site) say nothing of the work either: "I manage the audio flow across all areas."
-    /// is one word of the work, and goes (#354, round 16). The person's own duties are pinned before this check, so it drops
-    /// only a written one (#354, round 14).
+    /// is one word of the work, and goes (#354). The person's own duties are pinned before this check, so it drops
+    /// only a written one (#354).
     static func isAbstract(_ duty: String) -> Bool {
         let words = Word.words(in: duty).map(\.folded).filter { $0.count >= 4 && !abstractStops.contains($0) }
         guard words.contains(where: abstractNouns.contains) else { return false }
@@ -322,7 +322,7 @@ extension CVDataSanitizer {
     }
 
     /// The verbs of a duty that name no work of their own, folded, in the six languages: manage, ensure, maintain, handle,
-    /// oversee, coordinate, supervise, monitor (#354, round 16).
+    /// oversee, coordinate, supervise, monitor (#354).
     private static let generalVerbs: Set<String> = [
         "manage", "manages", "managed", "ensure", "ensures", "ensured", "maintain", "maintains", "maintained", "handle", "handles",
         "handled", "oversee", "oversees", "oversaw", "coordinate", "coordinates", "coordinated", "supervise", "supervises",
@@ -338,14 +338,14 @@ extension CVDataSanitizer {
         "coordenava", "asseguro", "assegurei", "supervisionei",
     ]
 
-    /// Why a written duty that names its work only as a general verb and an activity goes (#354, round 16).
+    /// Why a written duty that names its work only as a general verb and an activity goes (#354).
     static let nominalReason = "it names its work only as a general verb and an activity (\"I managed the movement of …\"): say what the person did, to what"
 
     /// Whether `duty` names its work only as a general verb (`generalVerbs`) whose object is the noun of an activity or a state
     /// ("I managed the movement of heavy equipment", "Mantenevo l'integrità dei cavi", "Gerencio fluxos de dados"): the verb
     /// says no work, and the noun names one without saying what the person did. In German, whose verb comes last, the two
     /// stand anywhere in the duty; elsewhere the noun closes the duty or takes an "of", so "the flow meters" stays. The
-    /// person's own duties are pinned before this check (#354, round 16).
+    /// person's own duties are pinned before this check (#354).
     static func isNominal(_ duty: String, language: Vocabulary.Language?) -> Bool {
         let words = Word.words(in: duty).map(\.folded)
         if language == .german {
@@ -382,7 +382,7 @@ extension CVDataSanitizer {
         "les", "du", "o", "os", "as", "um", "uma", "tutti", "tutte", "todos", "todas", "tous", "toutes",
     ]
 
-    /// The words of a duty for where the work is done, with no thing it is done on, folded, in the six languages (#354, round 16).
+    /// The words of a duty for where the work is done, with no thing it is done on, folded, in the six languages (#354).
     private static let placeWords: Set<String> = [
         "area", "areas", "site", "sites", "zone", "zones", "location", "locations", "aree", "sito", "siti", "sede", "sedi",
         "zona", "zonas", "lugar", "lugares", "locaux", "lieux", "bereich", "bereiche", "bereichen", "standort", "standorte",
@@ -439,14 +439,14 @@ extension CVDataSanitizer {
     ]
 
     /// The first two words of a duty, folded, unless the second is an auxiliary ("J'ai formé…", "Ich habe…"), whose verb comes
-    /// later: a job of three duties that open alike reads as a list, not as a person's work ("Je veillais à…", #354, round 2).
+    /// later: a job of three duties that open alike reads as a list, not as a person's work ("Je veillais à…", #354).
     static func opening(of duty: String) -> [String]? {
         let words = Word.words(in: duty).prefix(2).map(\.folded)
         guard words.count == 2, !auxiliaries.contains(words[1]) else { return nil }
         return words
     }
 
-    /// The topics of `duties`, at most `limit`, that the summary request reads (#354, round 3): each clause with its subject, its
+    /// The topics of `duties`, at most `limit`, that the summary request reads (#354): each clause with its subject, its
     /// auxiliary and its verb gone ("Je range les dossiers et j'accueille les clients." gives "les dossiers" and "les clients"), so
     /// that the summary says what the work is about without a duty to copy, which its check drops. A clause with a number goes:
     /// the summary states none.
@@ -474,7 +474,7 @@ extension CVDataSanitizer {
         return Array(topics.prefix(limit))
     }
 
-    /// What the work of a job's own lines is done on, which its tools request reads as no tool (#354, round 6): their topics,
+    /// What the work of a job's own lines is done on, which its tools request reads as no tool (#354): their topics,
     /// none that names a tool or its kind, holds an acronym or, but in German, whose nouns all take a capital, a name. Asked for
     /// the tools of all jobs at once, the request listed the panels and the belts the person repairs.
     static func workObjects(of lines: [String], capitalNouns: Bool) -> [String] {
@@ -495,7 +495,7 @@ extension CVDataSanitizer {
     private static let relativeOpenings: Set<String> = ["where", "dove", "wo", "ou", "donde", "onde"]
 
     /// `sentence` without the relative word it opens with, its next letter in capital ("où j'ai formé 3 nouveaux enseignants" is
-    /// "j'ai formé 3 nouveaux enseignants"; #354, round 12): a clause cut from the sentence that named the employer reads as a
+    /// "j'ai formé 3 nouveaux enseignants"; #354): a clause cut from the sentence that named the employer reads as a
     /// fragment, and the model wrote it back as one. A relative word in a phrase of three words or fewer before a comma ("Where
     /// needed, I…") opens the sentence of its own, and the German "wo" stays: its clause puts the verb last.
     static func withoutRelativeOpening(_ sentence: String) -> String {
@@ -553,11 +553,11 @@ extension CVDataSanitizer {
     /// Whether `sentence` says again what `earlier` says: the words of one, by their first four letters, are all words of the other,
     /// or it says it with another verb (`restates`).
     /// Why a duty that holds five words of an earlier duty of its job in a row goes ("I was setting up the sound equipment." after "I
-    /// was setting up the PA systems."): the job would say the same words twice (#354, round 13).
+    /// was setting up the PA systems."): the job would say the same words twice (#354).
     static let repeatsWordsReason = "it repeats five words of a duty already written: write it in other words"
 
     /// The runs of five words in a row of `duties`, folded, each sentence on its own; a sentence of fewer words is a run whole: what
-    /// a later duty of the job, or a summary sentence, may not hold again (#354, round 13).
+    /// a later duty of the job, or a summary sentence, may not hold again (#354).
     static func copiedRuns(of duties: [String], length: Int = 5) -> [[String]] {
         duties.flatMap { SentenceSplitter.sentences(in: $0) }.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             .flatMap { duty in duty.count < length ? [duty] : (0...(duty.count - length)).map { Array(duty[$0..<($0 + length)]) } }
@@ -591,8 +591,8 @@ extension CVDataSanitizer {
 
     /// Whether `sentence` is about what `earlier` is about, said another way: a word of 7 letters or more of both, its object, comes
     /// with a word of 5 letters or more that qualifies it in each, after it in the Romance languages and before it in English and
-    /// German ("Monitoro l'invio delle comunicazioni formali" after "Organizzo la gestione delle comunicazioni ufficiali", #354,
-    /// round 10). A word the two share alone ("le fatture dei fornitori", "i pagamenti dei fornitori") is no such object. Two kinds
+    /// German ("Monitoro l'invio delle comunicazioni formali" after "Organizzo la gestione delle comunicazioni ufficiali", #354).
+    /// A word the two share alone ("le fatture dei fornitori", "i pagamenti dei fornitori") is no such object. Two kinds
     /// of one thing read the same ("gli impianti elettrici", "gli impianti idraulici"): the second goes, and the repair asks another.
     static func namesAgain(_ sentence: String, _ earlier: String, language: Vocabulary.Language?) -> Bool {
         let after = language != .english && language != .german
@@ -1101,7 +1101,7 @@ extension CVDataSanitizer {
         "tutte", "circa", "tramite", "grazie", "perante", "onde", "ainda", "agora", "tive", "estive", "trouxe", "disse", "soube",
     ]
 
-    /// The most sentences a summary keeps: 6 in a rich draft (`DraftDepth`; probe rounds 15 and 17), whose summary says more of the
+    /// The most sentences a summary keeps: 6 in a rich draft (`DraftDepth`), whose summary says more of the
     /// work and of the career, and 4 in a plain one. With 5, five summaries of nine stopped at the limit under 450 characters.
     static var summaryMost: Int { DraftDepth.isRich ? 6 : 4 }
 
@@ -1119,8 +1119,8 @@ extension CVDataSanitizer {
     }
 
     /// The summary check, where a sentence whose subject is one of the kept `qualities` also goes (`hasAQualitySubject`), and so
-    /// does every sentence that ends with the last three words of an earlier one kept (#354, round 2), or whose closing clause
-    /// opens and ends as an earlier one's (`closing`; round 8).
+    /// does every sentence that ends with the last three words of an earlier one kept (#354), or whose closing clause
+    /// opens and ends as an earlier one's (`closing`).
     func summaryCheck(
         of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String],
         against description: String
@@ -1130,9 +1130,9 @@ extension CVDataSanitizer {
         )
     }
 
-    /// The summary check, where a sentence that lists three or more of the kept `tools` and `qualities` also goes (#354, round 3),
+    /// The summary check, where a sentence that lists three or more of the kept `tools` and `qualities` also goes (#354),
     /// and, when a job of `cvData` is current, a sentence in the present about the duties of the ended jobs, `endedDuties`
-    /// (`speaksOfAnEndedJob`; round 10).
+    /// (`speaksOfAnEndedJob`).
     func summaryCheck(
         of cvData: CVData, summary: String?, field: String?, work: [String], duties: [String], qualities: [String], tools: [String],
         endedDuties: [String] = [], against description: String
@@ -1150,19 +1150,19 @@ extension CVDataSanitizer {
             let topicWords = ownWords.isEmpty ? Self.words(of: [cleanField]).filter { $0.count >= 4 } : ownWords
             let workWords = ownWords.union(Self.words(of: [cleanField])).filter { $0.count >= 4 }
             let workStems = Self.workStems(of: work + titles.compactMap { $0 })
-            // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters (#354, round 10); under
-            // O1 a typical tool is draft content, so any kept one anchors a sentence (round 13).
-            // Every kept tool's words are the person's own (probe round 4, O1): the skills list holds them already, and the tool
+            // A kept tool names the work whole, however short: "Java" and "SAP" have no stem of five letters (#354); under
+            // O1 a typical tool is draft content, so any kept one anchors a sentence.
+            // Every kept tool's words are the person's own (O1): the skills list holds them already, and the tool
             // check drops one that holds a name of the draft; read as names, "Excel" and "Xcode" left the summary short.
             let toolRuns = tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             let toolWords = Self.words(of: tools)
-            // The draft's own employers and schools are no names the summary invents (probe round 6): "Je donne des cours à
+            // The draft's own employers and schools are no names the summary invents: "Je donne des cours à
             // l'école Don Milani" lost the school where the person teaches.
             let employerWords = Self.words(of: facts.experience.map(\.company)).union(Self.words(of: facts.education.map(\.institution)))
-            // The acronyms the person writes of their work are their own words in a rich draft (probe round 16): "I managed the PA
+            // The acronyms the person writes of their work are their own words in a rich draft: "I managed the PA
             // systems …" went for "PA", which the job's own line names.
             let acronyms = DraftDepth.isRich ? Self.acronyms(in: work + duties) : []
-            // The person's studies and languages are their own in a rich draft (probe round 21, O1): a word of a degree or school of
+            // The person's studies and languages are their own in a rich draft (O1): a word of a degree or school of
             // the facts, or a language's name, anchors a sentence, the languages are no names, and a qualification word of a degree
             // or of a sentence of the description that speaks of the studies is the person's own (`OwnQualifications`): not one
             // of an object of the work or of an employer ("I calibrate certified weights at Chartered Scales"). Told never to name
@@ -1183,7 +1183,7 @@ extension CVDataSanitizer {
             let endedStems = cvData.experience.contains(where: \.current) ? Self.workStems(of: endedDuties) : []
             let currentStems = Self.workStems(of: duties.filter { !endedDuties.contains($0) } + titles.compactMap { $0 })
             // A summary sentence may name the work of a duty, and of two, and say it with how or what for; it goes when it says one
-            // again and adds less than two words to it (`copiesADuty`, probe round 7).
+            // again and adds less than two words to it (`copiesADuty`).
             let dutyTitles = titles.compactMap { $0?.presentValue }.joined(separator: " ")
             // A sentence that says the person is, or works as, what no kept title names goes (#354, the final gate; O1): "As a nurse,
             // I coordinate patient care" of a nursing assistant. The person's own words, quoted, stay.
@@ -1200,30 +1200,30 @@ extension CVDataSanitizer {
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             // The qualities of the soft skills the draft keeps, and those the description states of the person, are the only ones the
             // summary names as a manner (#359, N1): with no soft skill known, the summary is not read for them. A quality the
-            // description gives someone else ("My colleague works with precision.") is not the person's (review round 1).
+            // description gives someone else ("My colleague works with precision.") is not the person's.
             let heldQualities: Set<String>? = qualities.isEmpty
                 ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: claimed.foldedWords)
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
                 var sentence = writtenAsThePerson(raw.trimmingCharacters(in: .whitespacesAndNewlines), qualities: qualityWords, language: language)
-                // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays (round 10).
+                // A clause of self-praise after an earlier sentence's closing comment goes, and the sentence stays.
                 if hasATail, let tail = Self.commentTail(of: sentence), tail.praises { sentence = tail.head }
-                // A sentence that ends as an earlier one loses the shared tail, and stays when enough is left to say something
-                // (probe round 6): "…con hojas de cálculo y un sistema de gestión financiero." closed every sentence. Not in German,
+                // A sentence that ends as an earlier one loses the shared tail, and stays when enough is left to say something:
+                // "…con hojas de cálculo y un sistema de gestión financiero." closed every sentence. Not in German,
                 // where the last words hold the verb ("…, dass die Anlage stabil bleibt").
                 if language != .german, let head = Self.withoutTheTail(of: sentence, endings: endings, closings: closings, earlier: verdict.kept) {
                     sentence = head
                 }
-                // A closing phrase that says again what the kept sentences say goes in a rich draft, and the sentence stays (probe
-                // round 15): "…, usando o Swift e o Xcode." after a sentence on Swift and Xcode said the tools twice.
+                // A closing phrase that says again what the kept sentences say goes in a rich draft, and the sentence stays:
+                // "…, usando o Swift e o Xcode." after a sentence on Swift and Xcode said the tools twice.
                 if DraftDepth.isRich, let head = Self.withoutARepeatedTail(
                     of: sentence, earlier: verdict.kept, besides: qualities, tools: toolRuns, language: language
                 ) {
                     sentence = head
                 }
                 // A sentence the written check rejects for a word of a closing phrase keeps the head before the phrase in a rich
-                // draft (probe round 16): "…com código usando o Visual Studio Code para desenvolvimento." went whole for "Code".
+                // draft: "…com código usando o Visual Studio Code para desenvolvimento." went whole for "Code".
                 if DraftDepth.isRich, source.isInTheLanguageOfTheDescription(sentence, wordList: wordList),
                    source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
                    written.rejection(of: sentence, ownWords: summaryOwnWords, ownQualifications: ownQualifications) != nil,
@@ -1333,7 +1333,7 @@ extension CVDataSanitizer {
                 verdict.rejected.append(Rejection(sentence: idleFirst, reason: Self.namesNoWork))
             }
             // A sentence that opens with the opening's verb goes, but not the opening itself, which code wrote in front of the
-            // summary: a summary that kept only it lost it, and its repair was told to drop the opening (#354, round 11).
+            // summary: a summary that kept only it lost it, and its repair was told to drop the opening (#354).
             if let opening = verdict.opening, let verb = Self.leadingVerb(of: opening) {
                 let opensAsIt = { (sentence: String) in sentence != opening && Self.leadingVerb(of: sentence) == verb }
                 verdict.rejected += verdict.kept.filter(opensAsIt).map { Rejection(sentence: $0, reason: Self.startsAsAnEarlierOne) }
@@ -1349,26 +1349,26 @@ extension CVDataSanitizer {
     }
 
     /// The summary's opening for `cvData`, as `summaryCheck` writes it from the facts it keeps: the summary request writes what
-    /// follows it (#354, round 3). Nil when the facts hold no title or the description's language is none of the six.
+    /// follows it (#354). Nil when the facts hold no title or the description's language is none of the six.
     func summaryOpening(of cvData: CVData, against description: String) throws(CVGenerationError) -> String? {
         try reading(description) { source in
             Self.opening(of: grounded(cvData, writing: nil, in: source), language: source.explainer.language)
         }
     }
 
-    /// The summary with a floor written by code from the grounded `facts` (#354, round 6): a summary of fewer than 2 sentences or
+    /// The summary with a floor written by code from the grounded `facts` (#354): a summary of fewer than 2 sentences or
     /// 120 characters, as the requests left it, else the person's own, gets the opening (`opening(of:language:)`) when it names no
     /// title, and a sentence of the earlier titles it does not name, the latest first, within `most` sentences. Every impersonal
     /// sentence of a summary and of its repair went, and the draft kept the person's own sentence alone. Nil when the summary needs
     /// no floor or the facts give it no sentence. A floor still short ends, as a last resort, with a sentence of the person's
     /// strengths: the title the person works as now (`currentTitle`), else the latest one, and the first two `qualities`, in a
-    /// fixed form per language (`strengths`; #354, round 13, O1).
+    /// fixed form per language (`strengths`; #354, O1).
     func summaryFloor(
         of facts: CVData, summary: String?, most: Int, qualities: [String], against description: String
     ) throws(CVGenerationError) -> String? {
         try reading(description) { source in
             // The titles the description grounds, not those of the draft: "contabile" of "Studio Contabile Merlini" is no title of
-            // the person (#354, round 7).
+            // the person (#354).
             let facts = Self.withGroundedTitles(facts, grounded: grounded(facts, writing: nil, in: source))
             let sentences = SentenceSplitter.sentences(in: summary ?? facts.summary ?? "")
             guard sentences.count < 2 || sentences.joined(separator: " ").count < 120,
@@ -1384,7 +1384,7 @@ extension CVDataSanitizer {
                 .filter { seen.insert($0.lowercased()).inserted }
             var opening = titles.contains(where: named) ? nil : Self.opening(of: facts, language: language)
             // "Lavoro come capoturno." before "Lavoro da sedici anni…" opens two sentences with one verb: the opening then says what
-            // the person is (#354, round 7).
+            // the person is (#354).
             if let first = sentences.first, let said = opening, Self.leadingVerb(of: first) == Self.leadingVerb(of: said) {
                 opening = Self.beingOpening(of: facts, language: language) ?? said
             }
@@ -1422,7 +1422,7 @@ extension CVDataSanitizer {
         sentence.lowercased().hasSuffix(" \(title.lowercased()).")
     }
 
-    /// The floor's last sentence, of the person's strengths: "As a head of sound, I work with care and calm." (#354, round 13, O1),
+    /// The floor's last sentence, of the person's strengths: "As a head of sound, I work with care and calm." (#354, O1),
     /// or, when the qualities are adjectives, "Come impiegata amministrativa, sono organizzata e puntuale.": the first two qualities of
     /// one form (`isAdjective`), nouns first, written as the skills read them, in lower case but in German, whose nouns take a
     /// capital. Nil when no two qualities share a form.
@@ -1454,7 +1454,7 @@ extension CVDataSanitizer {
 
     /// Whether a quality reads as an adjective by its ending ("organizzata", "puntual", "ponctuelle", "reliable"), and as no noun
     /// ("precisione", "puntualità", "rigueur", "teamwork"); in German, by its lower-case first letter. A rough rule for the
-    /// strengths sentence only (#354, round 13).
+    /// strengths sentence only (#354).
     static func isAdjective(_ quality: String, language: Vocabulary.Language) -> Bool {
         let word = quality.trimmingCharacters(in: .whitespaces)
         guard !word.contains(" ") else { return false }
@@ -1504,7 +1504,7 @@ extension CVDataSanitizer {
     }
 
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
-    /// with no opening may (#354, round 6), as the first sentence is the one a reader takes for the person's own introduction.
+    /// with no opening may (#354), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
     /// A manner phrase of a quality that is none of the kept soft skills, which cannot be cut clean (#359, N1).
     static let namesAnUnheldQuality = "it names a quality that is none of the person's soft skills: leave it out, or name a soft skill"
@@ -1522,9 +1522,9 @@ extension CVDataSanitizer {
     static let guaranteesReason = "it guarantees a result: say what the person does"
 
 
-    /// Whether a summary sentence promises an outcome (#354, round 13): a form of "to guarantee" in the six languages, not its
+    /// Whether a summary sentence promises an outcome (#354): a form of "to guarantee" in the six languages, not its
     /// noun, with a clause or a word of all or always in the two words after it ("Ich garantiere, dass jede Verbindung
-    /// funktioniert", "I guarantee every delivery"). A guarantee of plain work is draft content (O1; #354, probe round 10):
+    /// funktioniert", "I guarantee every delivery"). A guarantee of plain work is draft content (O1; #354):
     /// "garantisco l'accesso ai sistemi interni", "per garantire la sicurezza alimentare".
     static func guarantees(_ sentence: String) -> Bool {
         let words = Word.words(in: sentence).map(\.folded)
@@ -1547,7 +1547,7 @@ extension CVDataSanitizer {
         "garantis", "garantier",
     ]
 
-    /// Whether a summary sentence says in the present the duties of an ended job (#354, round 10): in the present
+    /// Whether a summary sentence says in the present the duties of an ended job (#354): in the present
     /// (`isInThePresent`), with at least three stems of `endedStems` that are not of `currentStems`, the current jobs' titles and
     /// duties, and these at least half of its own. The summary read the topics of every job's duties and wrote a forklift
     /// driver's machinery as a supervisor's present work. A sentence in the past, or about the current work, stays.
@@ -1601,7 +1601,7 @@ extension CVDataSanitizer {
 
     /// Whether a German sentence has a clause after dass, weil, sodass or ob whose verb stands before its end: the clause ends on a
     /// noun while an earlier lowercase word of four letters or more ends as a verb ("dass alle Maschinen laufen ruhig durch genaue
-    /// Pflege"), or ends on an adverb right after that verb ("dass die Anlagen funktionieren zuverlässig"; #354, round 12). A clause
+    /// Pflege"), or ends on an adverb right after that verb ("dass die Anlagen funktionieren zuverlässig"; #354). A clause
     /// with a comparison ("wie am ersten Tag", "als je") may end on a noun after its verb, and it stays.
     private static func putsTheVerbBeforeTheEnd(_ sentence: String) -> Bool {
         sentence.split { ",;.!?".contains($0) }.contains { clause in
@@ -1631,7 +1631,7 @@ extension CVDataSanitizer {
 
     /// Whether `sentence` starts with the words of one of `qualities` (folded) in a clause of five words or more before its first
     /// comma: a quality spoken of as the subject ("Precisione e calma sono le mie doti."), a summary made of a list of qualities
-    /// (#354, round 2). A quality before a comma ("Calma e attenta, seguo…") describes the person who speaks after it.
+    /// (#354). A quality before a comma ("Calma e attenta, seguo…") describes the person who speaks after it.
     static func hasAQualitySubject(_ sentence: String, qualities: [[String]]) -> Bool {
         let words = Word.words(in: sentence).map(\.folded)
         let clause = Word.words(in: String(sentence.prefix { $0 != "," }))
@@ -1641,7 +1641,7 @@ extension CVDataSanitizer {
 
     /// Whether `sentence`, which ends as the `earlier` kept sentences do, says too little more than one of them to stay: always
     /// in a plain draft, and in a rich one (`DraftDepth`) when it adds fewer than three content words to it past the `besides`
-    /// qualities (`addedStems`; #354, probe round 14). "Utilizzo il sistema di email per inviare comunicazioni ufficiali e il
+    /// qualities (`addedStems`; #354). "Utilizzo il sistema di email per inviare comunicazioni ufficiali e il
     /// database aziendale per conservare la documentazione richiesta." after a sentence that ends on "la documentazione
     /// richiesta" says the tools of that work, and stays.
     static func saysLittleMore(_ sentence: String, than earlier: [String], besides: [String]) -> Bool {
@@ -1649,7 +1649,7 @@ extension CVDataSanitizer {
     }
 
     /// The first and the last word of the last clause of `sentence` after a comma, folded, when it has three or more: two sentences
-    /// that close alike tie each a quality to the work in one phrase ("…, was meine Geduld zeigt."; #354, round 8).
+    /// that close alike tie each a quality to the work in one phrase ("…, was meine Geduld zeigt."; #354).
     static func closing(of sentence: String) -> [String]? {
         guard let comma = sentence.lastIndex(of: ",") else { return nil }
         let words = Word.words(in: String(sentence[sentence.index(after: comma)...])).map(\.folded)
@@ -1660,7 +1660,7 @@ extension CVDataSanitizer {
     /// The last clause of `sentence` after a comma when it comments on what the sentence says ("…, was die Sicherheit erhöht",
     /// "…, which shows my care"): the sentence without it, with a full stop, and whether it praises the person's own quality
     /// (`selfPraise`). Nil when the last clause is no comment. The summary closed each sentence with a quality of the person
-    /// ("…, was meine Präzision zeigt. …, was meine Verlässlichkeit beweist."; #354, round 10): after the first comment, a later
+    /// ("…, was meine Präzision zeigt. …, was meine Verlässlichkeit beweist."; #354): after the first comment, a later
     /// one of praise goes and its sentence stays.
     static func commentTail(of sentence: String) -> (head: String, praises: Bool)? {
         guard let comma = sentence.lastIndex(of: ",") else { return nil }
@@ -1680,11 +1680,11 @@ extension CVDataSanitizer {
         "^ ce qui [a-z]+ (mon|ma|mes) ", "^ lo (que|cual) [a-z]+ (mi|mis) ", "^ o (que|qual) [a-z]+ (o meu|a minha|os meus|as minhas|meu|minha) ",
     ]
 
-    /// `sentence` without the tail it shares with an earlier sentence of `earlier`, with a full stop (probe round 6): the words after
+    /// `sentence` without the tail it shares with an earlier sentence of `earlier`, with a full stop: the words after
     /// its last comma when its closing is one of `closings`, or the last words it shares with one of `earlier` when its ending is
     /// one of `endings`, with the joining words left before them (`tailJoins`). Nil when it shares neither, or when fewer than four
     /// words would be left. The model closed each sentence with the same tools; the sentence went whole, and the summary ran short.
-    /// The shared words go only from the word that brings them in (`toolJoins`), with only joining words between (probe round 7):
+    /// The shared words go only from the word that brings them in (`toolJoins`), with only joining words between:
     /// after "…, with care and patience.", the cut of "… with great care and patience." left "… with great.", and now none is made.
     static func withoutTheTail(of sentence: String, endings: Set<[String]>, closings: Set<[String]>, earlier: [String]) -> String? {
         let words = Word.words(in: sentence)
@@ -1709,12 +1709,12 @@ extension CVDataSanitizer {
         return String(Array(sentence)[..<words[end - 1].range.upperBound]) + "."
     }
 
-    /// `sentence` without a closing phrase that says again what the `earlier` kept sentences say, with a full stop, in a rich draft
-    /// (probe round 15): the words from a point that brings in a phrase (`repeatPoints`) to the end go when they add fewer than two
+    /// `sentence` without a closing phrase that says again what the `earlier` kept sentences say, with a full stop, in a rich draft:
+    /// the words from a point that brings in a phrase (`repeatPoints`) to the end go when they add fewer than two
     /// content words past the earlier sentences and the `besides` qualities and repeat more words than they add, or when they
-    /// repeat three words or more and twice as many as they add (round 16); the joining words before them go too (`tailJoins`).
+    /// repeat three words or more and twice as many as they add; the joining words before them go too (`tailJoins`).
     /// A phrase that names `tools` (each as its folded words), all of them named earlier, goes too when it adds no more words than
-    /// it repeats, each tool a word (round 16): "…, usando o IDE para escrever códigos e o SQL …" after a sentence on the IDE and
+    /// it repeats, each tool a word: "…, usando o IDE para escrever códigos e o SQL …" after a sentence on the IDE and
     /// SQL. The cut is made again while a point is left, and none leaves fewer than four words. Nil when no cut is made. The model
     /// closed sentences with the work or the tools of an earlier one ("…, usando o Swift e o Xcode.", "…, indem ich die Anlage
     /// prüfe."), and the summary said the same thing twice.
@@ -1751,7 +1751,7 @@ extension CVDataSanitizer {
     }
 
     /// The heads of `sentence` before each point that brings in a closing phrase (`repeatPoints`), the rightmost first, as
-    /// `head(of:in:before:)` writes them (probe round 16).
+    /// `head(of:in:before:)` writes them.
     static func heads(of sentence: String, language: Vocabulary.Language?) -> [String] {
         let words = Word.words(in: sentence)
         let characters = Array(sentence)
@@ -1784,8 +1784,8 @@ extension CVDataSanitizer {
     }
 
     /// The points of `words` where a closing phrase starts, each as the first word to drop and the first word of the phrase to
-    /// compare (probe round 15): a word of `toolJoins`, a gerund in Italian, Spanish and Portuguese (`isGerund`), a word that
-    /// opens a clause of time or purpose (`clauseStarts`, round 16), a subordinating word after a comma (`subordinators`), or
+    /// compare: a word of `toolJoins`, a gerund in Italian, Spanish and Portuguese (`isGerund`), a word that
+    /// opens a clause of time or purpose (`clauseStarts`), a subordinating word after a comma (`subordinators`), or
     /// after a comma a French participle in "-ant" or an English one in "-ing". In German, where the verb closes the sentence,
     /// only a subordinating word after a comma.
     private static func repeatPoints(in words: [Word], language: Vocabulary.Language?) -> [(end: Int, tail: Int)] {
@@ -1812,8 +1812,8 @@ extension CVDataSanitizer {
         .english: ["while", "using", "with", "to", "by"],
     ]
 
-    /// The words, folded, that open a clause of time or purpose with no comma before them, in the five languages but German
-    /// (probe round 16): "Uso le norme HACCP per garantire la sicurezza alimentare mentre gestisco la cottura nei piatti
+    /// The words, folded, that open a clause of time or purpose with no comma before them, in the five languages but German:
+    /// "Uso le norme HACCP per garantire la sicurezza alimentare mentre gestisco la cottura nei piatti
     /// principali …" said the dishes of an earlier sentence again.
     private static let clauseStarts: [Vocabulary.Language: Set<String>] = [
         .italian: ["mentre", "per"],
@@ -1843,7 +1843,7 @@ extension CVDataSanitizer {
     ]
 
     /// The last three words of `sentence`, folded, when it has five or more: two sentences that end alike repeat a phrase
-    /// ("…con enfoque organizado.", #354, round 2).
+    /// ("…con enfoque organizado.", #354).
     static func ending(of sentence: String) -> [String]? {
         let words = Word.words(in: sentence).map(\.folded)
         return words.count >= 5 ? Array(words.suffix(3)) : nil
@@ -1852,7 +1852,7 @@ extension CVDataSanitizer {
     /// Whether `sentence` starts with a word of the person's work (`workWords`, folded) with no article, and has a form of "to be"
     /// of `language` among its next three words with no word of the person before it: the work spoken of as a thing
     /// ("Manutenzione è la mia attività principale.", #354). The language that drops the pronoun has no other sign of it. After an
-    /// article, the work or a word of it is the subject with any verb ("Il lavoro richiede…", round 3).
+    /// article, the work or a word of it is the subject with any verb ("Il lavoro richiede…").
     static func hasABareSubject(_ sentence: String, workWords: Set<String>, language: Vocabulary.Language) -> Bool {
         let words = Word.words(in: sentence)
         if let first = words.first, subjectArticles[language]?.contains(first.folded) == true, words.count > 2 {
@@ -1866,7 +1866,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether `word` is a word of the person in `language`: the Italian "i" is an article and "ma" a "but" ("con occhio per i
-    /// dettagli", #354, round 3), not the English "I" or the French "ma".
+    /// dettagli", #354), not the English "I" or the French "ma".
     private static func isOfThePerson(_ word: Word, in language: Vocabulary.Language) -> Bool {
         wordsOfThePerson.contains(word.folded) && !(notOfThePerson[language]?.contains(word.folded) ?? false)
     }
@@ -1876,7 +1876,7 @@ extension CVDataSanitizer {
 
     /// Whether `sentence` is a bare word of the person's work (`workWords`, folded) and the language's "with", with no comma, no
     /// form of "to be" and no word of the person: a title with its qualities and no verb ("Fornaio con mani svelte e pazienza.",
-    /// #354, round 3). A comma may open the person's own clause ("Fornaio con calma, impasto…").
+    /// #354). A comma may open the person's own clause ("Fornaio con calma, impasto…").
     static func isAFragment(_ sentence: String, workWords: Set<String>, language: Vocabulary.Language) -> Bool {
         let words = Word.words(in: sentence)
         guard words.count > 2, workWords.contains(words[0].folded), withWords[language]?.contains(words[1].folded) == true,
@@ -1891,8 +1891,8 @@ extension CVDataSanitizer {
     ]
 
     /// Whether `sentence` holds three or more of `skills` (each its words, folded) in a row, with only commas, "and", "or" or an
-    /// article between them: a list of the draft's skills, not the person's work (#354, round 3). Skills named inside the work
-    /// ("Uso il forno per… e l'abbattitore per…") stay (probe round 4): held anywhere, three dropped good sentences.
+    /// article between them: a list of the draft's skills, not the person's work (#354). Skills named inside the work
+    /// ("Uso il forno per… e l'abbattitore per…") stay: held anywhere, three dropped good sentences.
     static func listsSkills(_ sentence: String, skills: [[String]]) -> Bool {
         let words = Word.words(in: sentence).map(\.folded)
         let held = skills.filter { !$0.isEmpty }.flatMap { run in
@@ -1971,13 +1971,13 @@ extension CVDataSanitizer {
         "poi", "inoltre", "anche", "e", "quindi", "dopo", "luego", "también", "y", "después", "depois", "além", "ma", "pero", "mas",
     ]
 
-    /// Whether an Italian, Spanish or Portuguese summary sentence speaks as the person (#354, round 5): it holds a word of the
+    /// Whether an Italian, Spanish or Portuguese summary sentence speaks as the person (#354): it holds a word of the
     /// person or an auxiliary of the first person ("mi", "tengo", "sou"), or its first word, or the first word after a comma, is a
     /// verb of the first person, in "-o" ("Controllo …", "Con cura, verifico …") or in the past of the first person in Spanish and
-    /// Portuguese ("Revisé …", "Organizei …"). A past participle (`isParticiple`) is no verb of the person (#354, round 6):
+    /// Portuguese ("Revisé …", "Organizei …"). A past participle (`isParticiple`) is no verb of the person (#354):
     /// "Mantenido un control riguroso …" speaks as no one, nor does a gerund (`isGerund`): "…, garantendo conti in ordine". In a
-    /// rich draft (`DraftDepth`), a verb of the person in "-o" after "ciò che", "o que" or "lo que" counts too (probe round 15):
-    /// "…, é o que faço.", and a first word in the imperfect of a verb in "-ar" (`isAnImperfectOfThePerson`, round 16). A rough
+    /// rich draft (`DraftDepth`), a verb of the person in "-o" after "ciò che", "o que" or "lo que" counts too:
+    /// "…, é o que faço.", and a first word in the imperfect of a verb in "-ar" (`isAnImperfectOfThePerson`). A rough
     /// rule: "Con cura verifico" is not read.
     private static func speaksAsThePerson(_ sentence: String, language: Vocabulary.Language) -> Bool {
         let words = letterWords(of: sentence)
@@ -2005,7 +2005,7 @@ extension CVDataSanitizer {
     private static let relativeHeads: Set<String> = ["o", "lo", "ciò", "cio", "quello", "eso", "esto", "isso", "aquilo"]
 
     /// Whether a lowercased word ends as the imperfect of a verb in "-ar": "-aba" in Spanish ("gestionaba"), "-ava" in Portuguese
-    /// ("criava"; probe round 16). "Criava soluções para aplicações para uso interno." read as no verb of the person, and went;
+    /// ("criava"). "Criava soluções para aplicações para uso interno." read as no verb of the person, and went;
     /// the third person writes it alike, but with no subject before it the sentence reads as the person.
     private static func isAnImperfectOfThePerson(_ word: String, language: Vocabulary.Language) -> Bool {
         switch language {
@@ -2016,7 +2016,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a lowercased word ends as the first person of the simple past of a verb in "-er" or "-ir": "-í" in Spanish
-    /// ("aprendí"), "-i" or "-í" in Portuguese ("desenvolvi", "construí"; probe round 6). "Desenvolvi aplicações …" read as no verb
+    /// ("aprendí"), "-i" or "-í" in Portuguese ("desenvolvi", "construí"). "Desenvolvi aplicações …" read as no verb
     /// of the person, and went.
     private static func isAPastOfThePerson(_ word: String, language: Vocabulary.Language) -> Bool {
         switch language {
@@ -2035,7 +2035,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a folded word of six letters or more ends as a gerund, "-ando" or "-endo", and "-indo" in Portuguese, and is no first
-    /// person of the same ending that a summary writes ("comprendo", "atiendo"; #354, round 6). A rough rule: a first person missing
+    /// person of the same ending that a summary writes ("comprendo", "atiendo"; #354). A rough rule: a first person missing
     /// from the list reads as a gerund.
     private static func isGerund(_ word: String, language: Vocabulary.Language) -> Bool {
         guard word.count >= 6, let endings = gerundEndings[language], endings.contains(where: word.hasSuffix) else { return false }
@@ -2086,7 +2086,7 @@ extension CVDataSanitizer {
         ],
     ]
 
-    /// `sentence` as the person says it, in Italian, Spanish or Portuguese (#354, round 5): a sentence that opens with a verb of the
+    /// `sentence` as the person says it, in Italian, Spanish or Portuguese (#354): a sentence that opens with a verb of the
     /// third person (`speaksInTheThirdPerson`), alone or after a lone word of the kept `qualities` ("Precisa gestisce la contabilità"),
     /// opens with its first person in "-o" when the word list knows that form ("Gestisco la contabilità"). Any other sentence, one
     /// with a title or a noun as its subject, and one whose first person the list does not know keep their words.
@@ -2110,7 +2110,7 @@ extension CVDataSanitizer {
     }
 
     /// The first five letters of each word of five letters or more of `texts` that says nothing of a work: how a summary sentence
-    /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354, round 6).
+    /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354).
     /// A stem is read without its accents, as a title and a verb of one stock write them differently ("Bäckerin", "backe"; #359,
     /// P4): the sentence "Ich backe Brot mit Präzision" of a baker said nothing of the work.
     private static func workStems(of texts: [String]) -> Set<String> {
@@ -2198,15 +2198,15 @@ extension CVDataSanitizer {
 
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
     /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a German infinitive
-    /// (`isGermanActivity`), while a method or a field of the trade stays ("manutenzione preventiva", "Contabilidad"; probe round
-    /// 12), and a concept, an activity or a place the description does not write goes ("Facturación", "Lehrplan", "aula";
+    /// (`isGermanActivity`), while a method or a field of the trade stays ("manutenzione preventiva", "Contabilidad"),
+    /// and a concept, an activity or a place the description does not write goes ("Facturación", "Lehrplan", "aula";
     /// `namesAConcept`, #359); the singular and the plural of one skill count once, and of two tools of one kind, by their head
     /// noun ("studio monitors", "nearfield monitor"), the second goes, unless that noun is a generic kind ("software di
     /// diagnostica", "software di controllo"); a fragment, a verb (a lone form the description does not write, too: "pensa",
     /// "organiza"; `verbReading`, #359), a skill in another language (a product name is none: "Docker") and a soft skill that
     /// names a tool go, and so does stationery, furniture or protective wear (`namesAnEverydayObject`); so does a technology that
     /// is a bare kind of tool ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo")
-    /// stays (#354, round 4). A technology the verb it starts with leads ("usare i PLC") is cut to its object; a tool word
+    /// stays (#354). A technology the verb it starts with leads ("usare i PLC") is cut to its object; a tool word
     /// ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective, and a soft skill the
     /// description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
@@ -2214,10 +2214,10 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code, against the tools the person names (`stated`): of a written technology of the kind of
-    /// one of them, by its head noun, the written one goes (#354, round 2). A written technology that holds a word of one of the
+    /// one of them, by its head noun, the written one goes (#354). A written technology that holds a word of one of the
     /// `names` of the CV (an employer, a school, the person) goes unless the description writes it whole: the tools request read
-    /// "Kestrel Logistics" and wrote "Kestrel forklift" (#354, round 7). What the person's work is done on stays: a CV of the trade
-    /// lists it ("quadri elettrici" for a person who checks them; probe round 12).
+    /// "Kestrel Logistics" and wrote "Kestrel forklift" (#354). What the person's work is done on stays: a CV of the trade
+    /// lists it ("quadri elettrici" for a person who checks them).
     func skillCheck(
         technologies: [String], softSkills: [String], stated: [String], names: [String] = [], against description: String
     ) -> SkillVerdict {
@@ -2246,7 +2246,7 @@ extension CVDataSanitizer {
                 return nil
             }
             let second = words.count > 1 ? words[1].lowercased() : nil
-            // A lone English quality in -ed is an adjective the tagger reads as a past verb ("organized"; #354, round 2).
+            // A lone English quality in -ed is an adjective the tagger reads as a past verb ("organized"; #354).
             let adjective = !cutsVerb && second == nil && language == "en" && first.hasSuffix("ed")
             // A lone word of a Romance language is a verb only in the infinitive: the tagger of iOS 26 reads a lone noun of the
             // trade as a verb ("Auditoría", #354).
@@ -2270,9 +2270,8 @@ extension CVDataSanitizer {
             }
             if let language, language != "en" {
                 // Each word as written: the device's German dictionary knows its nouns only with their capital ("Multimeter"), and
-                // read in lower case a tool of the trade went as English (#354, round 15). A technology whose words all have a
-                // capital is a product's name in any language but German, whose nouns all have one ("Docker", "TypeScript"; probe
-                // round 12).
+                // read in lower case a tool of the trade went as English (#354). A technology whose words all have a
+                // capital is a product's name in any language but German, whose nouns all have one ("Docker", "TypeScript").
                 let letters = words.filter { $0.count >= 3 && $0.allSatisfy(\.isLetter) && $0 != $0.uppercased() }
                 let named = cutsVerb && language != "de" && letters.allSatisfy { $0.first?.isUppercase == true }
                 if !letters.isEmpty, !named, letters.allSatisfy({
@@ -2307,8 +2306,8 @@ extension CVDataSanitizer {
                 // A kind of tool named by a quality alone is no tool of a trade ("Präzisionswerkzeug").
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a kind of tool, not its name"))
             } else if !soft || namesATool || !Self.namesAQuality(item, language: language) {
-                // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354, round 5),
-                // and so is one whose head noun is no quality ("computer di gestione"; #354, probe round 9).
+                // A tool named by the quality it serves and a word of its trade is a tool ("logiciel de gestion de classe"; #354),
+                // and so is one whose head noun is no quality ("computer di gestione"; #354).
                 if Self.holdsANameWord(item, of: nameWords, in: description) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
                 } else if language == "de", Self.isGermanActivity(item) {
@@ -2398,7 +2397,7 @@ extension CVDataSanitizer {
     /// its billing ("Facturación"), a school's plan or room ("curriculum", "aula", "Klassenzimmer"), or a German compound of a
     /// plan, a training, a development, an adjustment, an administration, an analysis, a review or a room ("Lehrplananpassung",
     /// "Lehrerausbildung", "Dokumentenverwaltung", "Serverraum"). A word the description writes stays: the caller asks.
-    /// A field of the trade is no concept here ("Contabilidad"; probe round 12), and neither is a device of a German compound
+    /// A field of the trade is no concept here ("Contabilidad"), and neither is a device of a German compound
     /// ("Analysegerät", "Planfräser").
     static func namesAConcept(_ item: String, language: String?) -> Bool {
         guard let language else { return false }
@@ -2457,9 +2456,9 @@ extension CVDataSanitizer {
 
     // MARK: Names among the tools
 
-    /// The words of `names` that name nothing else (#354, round 7): of 3 letters or more, with a capital, no word that links others
+    /// The words of `names` that name nothing else (#354): of 3 letters or more, with a capital, no word that links others
     /// ("di", "of") and no legal form ("GmbH"). In German, whose nouns all take a capital, a name word is one the device's dictionary
-    /// does not know as written: it knows a noun only with its capital (#354, round 15).
+    /// does not know as written: it knows a noun only with its capital (#354).
     private func nameWords(of names: [String], language: String?) -> Set<String> {
         Set(names.flatMap { $0.split { !$0.isLetter }.map(String.init) }.filter { word in
             word.count >= 3 && word.first?.isUppercase == true && !Self.skillLinkWords.contains(word.lowercased())
@@ -2493,7 +2492,7 @@ extension CVDataSanitizer {
     ]
 
     /// Whether a technology's head noun is a part or a material a person installs or lays, by its key: a cable, a switch or a pipe
-    /// is what the work is done on, not a tool of it ("Leitungen", "Schalter"; #354, round 3). A tool named after one stays
+    /// is what the work is done on, not a tool of it ("Leitungen", "Schalter"; #354). A tool named after one stays
     /// ("Kabelschere", "cable tester": its head is the tool).
     static func namesAPart(_ item: String, language: String?) -> Bool {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init)
@@ -2501,10 +2500,10 @@ extension CVDataSanitizer {
         return partKeys.contains(skillKey(head))
     }
 
-    /// Whether a technology is a record or a document alone, or the scan of one (#354, round 8): the request for more tools filled
+    /// Whether a technology is a record or a document alone, or the scan of one (#354): the request for more tools filled
     /// the count with "Escaneo", "Registro" and "archivio", and the tools request listed "Documenti". A record named with its system
     /// or device stays ("registro elettronico", "archivio digitale", "document scanner"), and so does an audit, a method of the
-    /// trade ("Auditoría"; probe round 12).
+    /// trade ("Auditoría").
     static func namesARecord(_ item: String, language: String?) -> Bool {
         if recordKeys.contains(skillKey(item)) { return true }
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { !skillLinkWords.contains($0) }
@@ -2543,14 +2542,14 @@ extension CVDataSanitizer {
     ].map(skillKey))
 
     /// Whether a technology, as a whole, is stationery, furniture or protective wear, which a person of any trade uses: the tools
-    /// request named a teacher's pen and notebooks and a warehouse's safety harness though it asks for none (#354, round 4). It
+    /// request named a teacher's pen and notebooks and a warehouse's safety harness though it asks for none (#354). It
     /// reads the whole item, not its head: a tool named with such a word stays ("tableau numérique", "Rigging Harness").
     static func namesAnEverydayObject(_ item: String) -> Bool {
         everydayObjectKeys.contains(skillKey(item))
     }
 
     /// Whether a technology is stationery named with a word after or before its noun ("cahiers d'exercices", "gel pens"): the tools
-    /// request named a teacher's exercise books once the whole-item list kept them out (#354, round 6). A board is no stationery
+    /// request named a teacher's exercise books once the whole-item list kept them out (#354). A board is no stationery
     /// ("tableau interactif"), and a pen that is a device stays ("lápiz óptico", "digital pens").
     static func namesStationery(_ item: String, language: String?) -> Bool {
         guard let head = headKey(of: item, language: language), stationeryHeadKeys.contains(head) else { return false }
@@ -2594,7 +2593,7 @@ extension CVDataSanitizer {
         "warnweste", "auffanggurt", "schutzbrille",
     ].map(skillKey))
 
-    /// The words that say only that the person is a professional or has experience (#354, round 3), and the bare words that name a
+    /// The words that say only that the person is a professional or has experience (#354), and the bare words that name a
     /// group of people in any of the six languages ("team", "squadra", "equipo", "equipe", "equipa", "mannschaft"; #362), folded: no
     /// quality a reader can weigh, so no soft skill. A quality said with one of them ("atteggiamento professionale", "lavoro di
     /// squadra", "trabajo en equipo") stays, and so does a loanword that holds one ("teamwork").
@@ -2609,7 +2608,7 @@ extension CVDataSanitizer {
 
     /// The languages whose own words end in a vowel, each with the words of English it writes as its own: there, a lower-case word
     /// of English of four letters or more that ends in a consonant and is none of them is a word of another language, though the
-    /// device's dictionary of the language lists it ("printer"; #354, round 3).
+    /// device's dictionary of the language lists it ("printer"; #354).
     static let loanwords: [String: Set<String>] = [
         "it": [
             "computer", "scanner", "server", "router", "tablet", "laptop", "desktop", "notebook", "mixer", "timer", "laser",
@@ -2627,7 +2626,7 @@ extension CVDataSanitizer {
     private static let vowels: Set<String> = ["a", "e", "i", "o", "u", "y", "à", "è", "é", "ì", "ò", "ù"]
 
     /// The beginnings of the words of one quality, by quality: two soft skills with a word of one group say one quality twice
-    /// ("precisione", "attenzione ai dettagli"; #354, round 2).
+    /// ("precisione", "attenzione ai dettagli"; #354).
     static let qualityGroups: [[String]] = [
         ["precis", "präzis", "prazis", "attent", "attenz", "atenc", "atenç", "accura", "genau", "sorgf", "exact", "rigor",
          "rigueur", "meticul", "minuz", "esmero", "cuidad"],
@@ -2652,7 +2651,7 @@ extension CVDataSanitizer {
     }
 
     /// The technologies with a one-word one clipped from a phrase of two joined by a conjunction joined back to the phrase it was
-    /// cut from, as the description writes it ("schemi elettrici e pneumatici", "hydraulic and pneumatic valves"; #354, round 5):
+    /// cut from, as the description writes it ("schemi elettrici e pneumatici", "hydraulic and pneumatic valves"; #354):
     /// alone, the clipped word reads as another thing ("pneumatici", tyres). The word is clipped when it shares the ending of the
     /// phrase's last word (Romance languages) or has an adjective's ending and comes before the phrase (English, German, in lower
     /// case); two tools joined by a conjunction stay apart ("PLC e HMI").
@@ -2693,14 +2692,14 @@ extension CVDataSanitizer {
 
     /// Whether a skill's words are too many for the name of a skill: more than `mostSkillWords` besides its link words, or more than
     /// two link words. The link words do not count up to two, so a name of a language that joins its words with them stays
-    /// ("logiciel de gestion de classe"; #354, round 5).
+    /// ("logiciel de gestion de classe"; #354).
     private static func isTooLong(_ words: [String]) -> Bool {
         let links = words.filter { skillLinkWords.contains($0.lowercased()) }.count
         return words.count - links > mostSkillWords || links > 2
     }
 
     /// Whether a kind of tool named with a quality has a word besides the kind, the quality and its link words: the trade it serves
-    /// ("classe" of "logiciel de gestion de classe"; #354, round 5).
+    /// ("classe" of "logiciel de gestion de classe"; #354).
     private static func hasAWordOfItsTrade(_ item: String) -> Bool {
         item.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).contains { word in
             !skillLinkWords.contains(word) && !toolWords.contains(word) && !toolKinds.contains(DescriptionText.normalized(word))
@@ -2724,7 +2723,7 @@ extension CVDataSanitizer {
 
     /// The key of a tool's head noun, the word that names its kind ("monitors" of "studio monitors", "pince" of "pince à dénuder"):
     /// the last word in English and German, the first in the other languages, past an elided article ("l'oscilloscope"); none when
-    /// that word has fewer than 4 letters ("Logic Pro"). A mixer, a desk and a console are one kind (#354, round 2).
+    /// that word has fewer than 4 letters ("Logic Pro"). A mixer, a desk and a console are one kind (#354).
     private static func headKey(of item: String, language: String?) -> String? {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first, head.count >= 4 else { return nil }
@@ -2733,7 +2732,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a tool's head noun (`headKey`) is a generic kind ("software di diagnostica", "Audio editing software"): two tools of
-    /// that kind are two tools (probe round 12).
+    /// that kind are two tools.
     private static func hasAGenericHead(_ item: String, language: String?) -> Bool {
         let words = item.lowercased().split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
         guard let head = ["en", "de"].contains(language ?? "") ? words.last : words.first else { return false }
@@ -2754,7 +2753,7 @@ extension CVDataSanitizer {
 
     /// Whether a soft skill of one word is written in the description only as a name: with a capital past the start of a sentence,
     /// and never in lower case ("Chiara" of "Mi chiamo Chiara Riva"). An address ("chiara.riva@...") is no word of the text. The
-    /// final check drops such a word as a claim about the person, after the request for missing skills (#354, round 2).
+    /// final check drops such a word as a claim about the person, after the request for missing skills (#354).
     static func namesAName(_ item: String, in description: String) -> Bool {
         let key = DescriptionText.normalized(item)
         guard !key.isEmpty, !key.contains(" ") else { return false }
@@ -2771,8 +2770,8 @@ extension CVDataSanitizer {
         return capitalised
     }
 
-    /// Whether a German technology of one word is the infinitive of an activity written as a noun ("Messen", "Installieren"; #354,
-    /// round 2): a word of `germanActivities`, or one of more than 7 letters ending in "-ieren".
+    /// Whether a German technology of one word is the infinitive of an activity written as a noun ("Messen", "Installieren"; #354):
+    /// a word of `germanActivities`, or one of more than 7 letters ending in "-ieren".
     static func isGermanActivity(_ item: String) -> Bool {
         let words = DescriptionText.normalized(item.replacingOccurrences(of: "ß", with: "ss")).split { !$0.isLetter }.map(String.init)
         guard words.count == 1, let word = words.first else { return false }
@@ -2785,8 +2784,8 @@ extension CVDataSanitizer {
         "reinigen", "reparieren", "warten", "verlegen", "anschliessen", "einbauen", "frasen", "schleifen",
     ]
 
-    /// Whether a technology names a kind of tool and no tool of it ("sound design software", "editor de código", "software"; #354,
-    /// round 2): its head noun (the last word in English and German, the first in the other languages) is a word of `toolKinds`,
+    /// Whether a technology names a kind of tool and no tool of it ("sound design software", "editor de código", "software"; #354):
+    /// its head noun (the last word in English and German, the first in the other languages) is a word of `toolKinds`,
     /// and none of its words is a name, an acronym or a number ("Pro Tools", "software CMMS", "aplicativos Android"). In German,
     /// whose nouns all have a capital, a capital past the first word names nothing.
     static func namesAKindOfTool(_ item: String, language: String?) -> Bool {
@@ -2802,7 +2801,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a technology is a kind of tool with no word of its trade: the kind alone ("software", "Maschine"), or with generic
-    /// words only ("editor de texto", "plataforma de desenvolvimento"; #354, round 5). A kind with a word of its trade stays
+    /// words only ("editor de texto", "plataforma de desenvolvimento"; #354). A kind with a word of its trade stays
     /// ("software di rilievo", "machine à coudre").
     private static func namesABareKind(_ item: String, language: String?) -> Bool {
         guard namesAKindOfTool(item, language: language) else { return false }
@@ -2857,7 +2856,7 @@ extension CVDataSanitizer {
     /// ("time management", "lavoro di squadra"), or a head noun, the word that names its kind (the last in English and German, the
     /// first in the other languages), that holds a stem or names a skill ("gestione del tempo", "capacità organizzative"). A tool
     /// named by the quality it serves is none ("computer di gestione", "precision scale"): read by any of its words, it went to the
-    /// soft skills (#354, probe round 9).
+    /// soft skills (#354).
     static func namesAQuality(_ item: String, language: String?) -> Bool {
         let lower = item.lowercased()
         let words = lower.split { !$0.isLetter }.map(String.init).filter { $0.count > 1 }
@@ -2917,7 +2916,7 @@ extension CVDataSanitizer {
 
     // MARK: - Helpers
 
-    /// The tools of `names` the description states, each a run of its whole words: the only ones the summary reads (#354, round 11).
+    /// The tools of `names` the description states, each a run of its whole words: the only ones the summary reads (#354).
     func statedTools(_ names: [String], against description: String) throws(CVGenerationError) -> [String] {
         try reading(description) { source in names.filter { source.named($0) != nil } }
     }

@@ -9,6 +9,7 @@ import CVRenderingMacOS
 import CVRenderingWebKitSupport
 import CVRenderingPDFKitInspector
 import CVRenderingTestSupport
+import CVRenderingNativeTestSupport
 
 @MainActor
 @Suite("#77 · the macOS renderer, checked with PDFKit", .serialized, .timeLimit(.minutes(3)))
@@ -91,6 +92,78 @@ struct MacPDFRendererTests {
     ])
     func invalidPageSetup(page: PageSetup) async throws {
         await #expect(throws: MacPDFRenderer.Failure.invalidPageSetup) { _ = try await renderer().render(html: "<p>x</p>", page: page) }
+    }
+}
+
+/// #78 on macOS: the checks shared with the other platform, one line each, so a check cannot differ between them. They
+/// are nested in the serialized suite above, so no other render runs while they do.
+extension MacPDFRendererTests {
+    @MainActor static func checks() async throws -> NativeRendererChecks<MacPDFRenderer> {
+        NativeRendererChecks(renderer: MacPDFRenderer(rules: try await SecureWebViewConfiguration.compileRules()))
+    }
+
+    @MainActor
+    @Suite("#78 · completeness on real PDFs")
+    struct Completeness {
+        @Test("a field the renderer drops is incomplete on a real PDF")
+        func droppedField() async throws { try await MacPDFRendererTests.checks().droppedField() }
+
+        @Test("flex and grid keep inline entries apart", arguments: SeparationDesign.allCases)
+        func inlineEntries(design: SeparationDesign) async throws { try await MacPDFRendererTests.checks().inlineEntriesStayApart(design: design) }
+    }
+
+    @MainActor
+    @Suite("#78 · R8 on the renderer")
+    struct R8 {
+        @Test("a script in the document does not run")
+        func script() async throws { try await MacPDFRendererTests.checks().scriptDoesNotRun() }
+
+        @Test("a remote image, stylesheet and font make no connection")
+        func remoteResources() async throws { try await MacPDFRendererTests.checks().remoteResourcesMakeNoConnection() }
+
+        @Test("a link and a meta refresh are not followed")
+        func linkAndRefresh() async throws { try await MacPDFRendererTests.checks().linkAndRefreshAreNotFollowed() }
+
+        @Test("the PDF still holds the document's text after those attempts")
+        func keepsItsText() async throws { try await MacPDFRendererTests.checks().documentKeepsItsText() }
+    }
+
+    /// Recorded: macOS keeps one link annotation per href.
+    @MainActor
+    @Suite("#78 · link annotations")
+    struct LinkAnnotations {
+        @Test("the annotations match the builder's hrefs, or the platform keeps none, as recorded")
+        func annotations() async throws { try await MacPDFRendererTests.checks().linkAnnotations(kept: true) }
+    }
+
+    @MainActor
+    @Suite("#78 · the geometry of the real PDFs")
+    struct Geometry {
+        @Test("no violation for the fixture")
+        func fixture() async throws { try await MacPDFRendererTests.checks().fixtureGeometry() }
+    }
+
+    @MainActor
+    @Suite("#467 · page breaks of the bundled designs and of an imported design at the contract's limits")
+    struct PageBreakChecks {
+        @Test("no section's start at a page's foot, no blank page, no cut line and no lost text, wherever the page breaks",
+              arguments: ["minimal", "modern", "professional"], PageBreakDocument.Body.allCases)
+        func bundled(design: String, body: PageBreakDocument.Body) async throws {
+            try await MacPDFRendererTests.checks().pageBreaks(design: design, body: body)
+        }
+
+        @Test("a title with the most spacing below it the contract allows is never alone at a page's foot",
+              arguments: PageBreakDocument.LimitDesign.allCases, PageBreakDocument.Body.allCases)
+        func imported(design: PageBreakDocument.LimitDesign, body: PageBreakDocument.Body) async throws {
+            try await MacPDFRendererTests.checks().pageBreaks(imported: design, body: body)
+        }
+    }
+
+    @MainActor
+    @Suite("#78 · the step budget")
+    struct StepBudget {
+        @Test("real documents use at most 10% of the budget")
+        func budget() async throws { try await MacPDFRendererTests.checks().stepBudget() }
     }
 }
 #endif

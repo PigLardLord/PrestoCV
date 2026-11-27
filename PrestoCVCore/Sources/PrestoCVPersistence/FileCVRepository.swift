@@ -136,7 +136,7 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
 
     /// Writes only what this repository will be able to read back: the encoded file must be within the size
     /// cap and must decode, through the same strict path as a read, to the same CV. Otherwise nothing is
-    /// written and the previous version stays (review round 2: the writer accepted what the reader rejects).
+    /// written and the previous version stays (the writer accepted what the reader rejects).
     ///
     /// A failure keeps the error it came from, as a domain and a code (R7); the text the user sees does not depend on it.
     func write(_ cv: CV) throws(RepositoryError) { try write(cv, to: url(cv.id)) }
@@ -174,7 +174,8 @@ public actor FileCVRepository: CVRepository, CVStoreMaintenance {
             guard existing.revision == cv.revision else { throw .conflict(cv.id, storedRevision: existing.revision) }
             let stored = cv.stored(revision: cv.revision + 1, at: now())
             let written = CV(id: stored.id, revision: stored.revision, createdAt: existing.createdAt, updatedAt: stored.updatedAt, title: stored.title,
-                             personal: stored.personal, sections: stored.sections, design: stored.design, language: stored.language)
+                             personal: stored.personal, sections: stored.sections, design: stored.design, language: stored.language,
+                             draft: stored.draft)
             try write(written)
             return try current(cv.id) ?? written
         }

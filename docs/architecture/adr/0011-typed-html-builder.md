@@ -46,7 +46,7 @@ The three bundled designs are CSS-only (`htmlContent: null`). R8 already rejects
 
 ## Validation
 
-**Scope.** HTML and CSS level. PDF-level evidence needs the native renderers ([ADR 0003](0003-one-pdf-renderer-per-platform.md)), and the geometric completeness check is still pending.
+**Scope.** HTML and CSS level. PDF-level evidence comes from the native renderers ([ADR 0003](0003-one-pdf-renderer-per-platform.md)): their tests check the separation of inline entries and the geometric completeness on the printed PDFs (#78, #80).
 
 The validation prototype in `Prototypes/ADRValidation/` (Swift 6.3.3, Linux). 42 Exporter tests pass, many with dozens of parameterised cases.
 

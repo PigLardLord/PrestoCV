@@ -6,7 +6,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R18), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (R1–R19), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md) | The HTML structure designs may style, versioned |
@@ -118,14 +118,15 @@ The current code is not refactored in place. The new structure is built next to 
    - The legacy exporter, with its `PrestoCVCoreAdapter`, keeps serving the old app until step 5.
 4. **CV Authoring.** Rich aggregate, persistence DTOs with schema v1, use cases returning the persisted identity (#4, #5, #10, #11, #12, #13, #27, #45).
 5. **App integration, presentation and composition.** One composition root, view models in `PrestoCVPresentation`, workflow ports in `PrestoCVWorkflowPorts`, mappers in `PrestoCVIntegration`, NavigationSplitView for iOS and macOS (#6, #7, #14, #49). The app switches to the new export and editing workflows here; the legacy exporter is deleted.
+   - Until the switch, the new app is built in a second app target, `PrestoCVNext`, beside the one that ships ([modules.md](modules.md#xcode-app-target-prestocv-ios-265-macos-26)).
 6. **AI Drafting.** Port with its own draft model, availability port, validation on every path (#16, #17, #18, #35).
 7. **Delete the old code** and close the issues the refactor made obsolete.
 
-Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks and the Android build run on GitHub Actions and the Apple checks on the Mac mini ([ADR 0029](adr/0029-check-pull-requests-on-the-mac-mini.md)); Xcode Cloud tests, archives and uploads the releases ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
+Each step lands behind green CI on iOS, macOS and Linux. On Linux only the new targets exist ([ADR 0012](adr/0012-legacy-targets-during-migration.md)). The Linux checks and the Android build run the steps of the GitHub Actions workflow on a Linux computer (the workflow itself runs only when started by hand) and the Apple checks run on a maintainer's Mac ([ADR 0029](adr/0029-check-pull-requests-on-the-mac-mini.md)); Xcode Cloud tests, archives and uploads the releases ([ADR 0024](adr/0024-run-apple-ci-and-releases-on-xcode-cloud.md)).
 
 ### Porting from the validation prototype
 
-The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (owner decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
+The validation prototype proved the ADRs; it is not production code. Its review ended with a fix-check round and no final gate (maintainer decision, 2026-09-28), because every part of it is reviewed again when it is ported. It lives in `Prototypes/ADRValidation/`, outside every build; the checker maps it as `excluded`.
 
 Code ported from the prototype into the real targets, in step 1 (the checker) and in steps 3 to 6, is treated as new code:
 - it is reviewed in full in the pull request that ports it, including the final adversarial review;

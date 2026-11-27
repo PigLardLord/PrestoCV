@@ -18,12 +18,31 @@ struct MarkupContractPageTests {
         #expect(try Set(values("Pseudo-classes").map { String($0.drop { $0 == ":" }) }) == MarkupContract.pseudoClasses)
     }
 
+    @Test("the palettes and font schemes the manifest paragraph names are the catalog's")
+    func manifestIdentifiers() throws {
+        let page = try Page.text()
+        func listed(_ key: String) throws -> [String] {
+            let group = try #require(Page.matches("\\(`\(key)`: ([^)]*)\\)", in: page).first, "the page names no \(key)")
+            return Page.backticked(group)
+        }
+        #expect(try listed("defaultPalette") == NamedPalette.allCases.map(\.rawValue))
+        #expect(try listed("defaultFonts") == FontScheme.allCases.map(\.rawValue))
+    }
+
     @Test("the structure uses exactly the contract's classes and elements")
     func structure() throws {
         let tree = try Page.section(from: "### Structure", to: "**Inline text")
         #expect(Set(Page.matches(#"\.(cv[a-z-]*)"#, in: tree)) == MarkupContract.classes)
         let elements = Set(Page.matches(#"(?:^|[\s>─])([a-z][a-z0-9]*)(?=[.\[])"#, in: tree)).subtracting(["html"])
         #expect(elements == MarkupContract.elements)
+    }
+
+    @Test("the page describes the code's version, and its changelog ends with it")
+    func version() throws {
+        let page = try Page.text()
+        #expect(page.contains("\n## Version \(MarkupContract.version)\n"))
+        let rows = Page.matches(#"^\| (\d+) \|"#, in: try Page.section(from: "## Changelog", to: "A change that could break"))
+        #expect(rows.last == "\(MarkupContract.version)")
     }
 
     @Test("the declarations table lists exactly the allowed properties")
@@ -51,7 +70,7 @@ struct MarkupContractPageTests {
             let probes = property.probes()
             #expect(probes.contains { $0.1 } && probes.contains { !$0.1 }, "the page's values for \(property.name) were not understood")
             for (declaration, accepted) in probes {
-                let result = (try? CSSPolicy.canonical(".cv{\(declaration);gap:3pt}")) != nil
+                let result = (try? CSSPolicy.canonical(".cv-entry{\(declaration);gap:3pt}")) != nil
                 #expect(result == accepted, "\(declaration) should be \(accepted ? "accepted" : "rejected")")
             }
         }

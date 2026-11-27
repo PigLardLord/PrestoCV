@@ -1,0 +1,106 @@
+internal import PrestoCVApplication
+internal import PrestoCVDomain
+import PrestoCVWorkflowPorts
+
+extension EditorViewModel {
+
+    /// Stores what is left at once, as when the editor is left or the app goes to the background. Returns once the store
+    /// holds the form as it was when this was called, edits made meanwhile included, or once a write failed. It is the
+    /// person's attempt to store: every field that cannot be read is a problem from now on (`problems`).
+    public func saveNow() async {
+        meetEveryProblem()
+        while let replacing { await replacing.value }
+        guard let autosave else { return }
+        do {
+            try await autosave.flush()
+        } catch {
+            // A cancelled write is no failure: the content waits for the next write, and the status says so
+            refreshSaveStatus()
+        }
+    }
+
+    /// Stores what the form shows at this call, after any replacement, and returns without waiting for edits made
+    /// meanwhile: the autosave stores those a pause after them. It waits for two writes at most (`Autosave.flushOnce()`),
+    /// even beside a `saveNow()` that keeps writing. It is for whoever must not wait for a person who keeps typing, as the
+    /// list of CVs, which reads the store after each editor's turn. A failed or cancelled write shows in the status, as
+    /// for `saveNow()`.
+    public func saveWhatItShows() async {
+        while let replacing { await replacing.value }
+        guard let autosave else { return }
+        await autosave.flushOnce()
+        refreshSaveStatus()
+    }
+
+    /// After a conflict: the form takes the stored CV, and the person's unstored text goes. In any other state it does
+    /// nothing. It waits for the write the old autosave still runs before it reads the store, and the old autosave writes
+    /// nothing once the stored CV is taken. If the person types while the store is read, the stored CV is not taken: the
+    /// form keeps every character, the editor stays on its writer, and the conflict stays to be reloaded again or saved as
+    /// a copy. While a reload, a copy or a change of the look runs (`isReplacing`) it returns at once: the person asked
+    /// before seeing where that one leads.
+    public func reload() async {
+        guard replacing == nil else { return }
+        await replace { [self] in
+            guard saveStatus == .conflict, let base, autosave?.isStored == true else { return }
+            let edits = formEdits
+            do throws(EditFailure) {
+                await writes.untilIdle()
+                let stored = try await editing.load(base.id)
+                // A write the old autosave started meanwhile ends first, so that none runs when the new writer is installed
+                await writes.untilIdle()
+                guard formEdits == edits else { return }
+                form = admit(EditorContent(stored, ids: &rowIDs))
+                pendingRemoval = nil
+                openedEntry = nil
+                standOn(stored, unchangedFrom: stored, writer: editing.autosaveWriter(startingFrom: stored), isStored: true)
+            } catch {
+                failed(with: SaveStatus(error))
+            }
+        }
+    }
+
+    /// After a conflict or a deletion elsewhere: the form's text is stored as a new CV, and the editor goes on with it.
+    /// While a reload, a copy or a change of the look runs (`isReplacing`) it returns at once and stores nothing, so that
+    /// a second tap makes no second copy.
+    public func saveAsCopy() async {
+        guard replacing == nil else { return }
+        await replace { [self] in
+            guard let held else { return }
+            let current = form.applied(to: held)
+            let titleEdited = titleEdits
+            do throws(EditFailure) {
+                let copy = try await editing.duplicate(current, title: copyTitle(current.title))
+                // A title typed while the copy was stored stays, and goes to the autosave once this ends
+                if titleEdits == titleEdited { form.title = EditorContent(copy).title }
+                standOn(copy, unchangedFrom: copy, writer: editing.autosaveWriter(startingFrom: copy), isStored: true)
+                storeChanged()
+            } catch {
+                failed(with: SaveStatus(error))
+            }
+        }
+    }
+
+    /// Runs `body`, which replaces the CV the form stands on or the look and the language it holds, after the
+    /// replacements asked for before it, in the order they were asked for. Edits made meanwhile stay in the form, and
+    /// go to the autosave once the last one queued ends; `saveNow()` waits for it. A replacement that reads the store
+    /// takes what it read only if the form is as it was when the replacement began.
+    ///
+    /// Each replacement waits for the one queued just before it, never in a loop on `replacing`: the tasks that wait
+    /// for one task resume last-first, so two changes asked for behind a running one would run in the reverse order.
+    /// A `body` never calls this: it would wait for itself.
+    func replace(_ body: @escaping @MainActor () async -> Void) async {
+        let before = replacing
+        replacements += 1
+        let number = replacements
+        let replacement = Task {
+            await before?.value
+            await body()
+            // Cleared by the last one queued before it ends, so that whoever waits for it finds the way free
+            if replacements == number { replacing = nil }
+            passOnTheForm()
+            refreshSaveStatus()
+        }
+        replacing = replacement
+        refreshSaveStatus()
+        await replacement.value
+    }
+}

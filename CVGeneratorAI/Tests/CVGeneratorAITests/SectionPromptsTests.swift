@@ -42,7 +42,7 @@ struct SectionPromptsTests {
         #expect(!prompt.text.contains("tre tecnici"))
     }
 
-    @Test("o1: a job's request asks for exactly the typical duties the job needs after the person's, to reach three (#354, rounds 10 and 13)",
+    @Test("o1: a job's request asks for exactly the typical duties the job needs after the person's, to reach three (#354)",
           arguments: [
               (4, 0, "Write only the duties the person said, and add none."),
               (1, 2, "Write exactly 2 more duties typical of this job, after the duty the person said."),
@@ -62,7 +62,7 @@ struct SectionPromptsTests {
         #expect(!SectionPrompts.jobInstructions.contains("2 to 4"))
     }
 
-    @Test("A job whose clauses pin no duty asks first for what the person said, and only a job that said nothing asks for typical duties alone (#354, round 10)")
+    @Test("A job whose clauses pin no duty asks first for what the person said, and only a job that said nothing asks for typical duties alone (#354)")
     func jobWithClausesThatPinNoDuty() {
         let said = DraftBrief(
             language: "French", headline: nil,
@@ -80,7 +80,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.job(number: 0, of: silent).text.hasSuffix("\nWrite exactly 3 duties typical of this job."))
     }
 
-    @Test("A job whose clauses only say where the person worked asks for typical duties alone: asked for what the person said first, the model wrote that they worked there (#354, round 11)")
+    @Test("A job whose clauses only say where the person worked asks for typical duties alone: asked for what the person said first, the model wrote that they worked there (#354)")
     func jobWithClausesThatNameNoWork() {
         var brief = DraftBrief(
             language: "Italian", headline: nil,
@@ -95,7 +95,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.job(number: 0, of: brief).text.hasSuffix("\nWrite exactly 3 duties typical of this job."))
     }
 
-    @Test("A job's request reads its employer masked, and a name of its own masked in its clauses: the duties of an accountant at a haulier were about transport (#354, round 11)")
+    @Test("A job's request reads its employer masked, and a name of its own masked in its clauses: the duties of an accountant at a haulier were about transport (#354)")
     func jobWithItsEmployerMasked() {
         var brief = DraftBrief(
             language: "Spanish", headline: nil,
@@ -116,7 +116,7 @@ struct SectionPromptsTests {
         #expect(!SectionPrompts.jobInstructions.contains("employer"))
     }
 
-    @Test("A job's clauses keep an employer whose name opens with a word of the trade, as the person said it (#354, round 11)")
+    @Test("A job's clauses keep an employer whose name opens with a word of the trade, as the person said it (#354)")
     func jobWithAnEmployerOfTheTrade() {
         var brief = DraftBrief(
             language: "French", headline: nil,
@@ -194,7 +194,7 @@ struct SectionPromptsTests {
         #expect(instructions.contains("Never add a job, study, certification, achievement or result."))
     }
 
-    @Test("o1: a job's repair reads the duties kept, each rejected sentence with its reason, and asks for exactly the duties missing to reach three (#354, round 13)")
+    @Test("o1: a job's repair reads the duties kept, each rejected sentence with its reason, and asks for exactly the duties missing to reach three (#354)")
     func jobRepair() {
         let prompt = SectionPrompts.jobRepair(
             number: 1, of: Self.brief, kept: ["Coordino tre tecnici."],
@@ -219,7 +219,7 @@ struct SectionPromptsTests {
         #expect(two.text.hasSuffix("\nAdd exactly 1 more duty typical of this job."))
     }
 
-    @Test("o1: a job gets typical duties to reach three, at least one, and none from four duties of its own (#354, round 13)",
+    @Test("o1: a job gets typical duties to reach three, at least one, and none from four duties of its own (#354)",
           arguments: [(0, 3), (1, 2), (2, 1), (3, 1), (4, 0), (6, 0)])
     func typicalDutiesAJobNeeds(said: Int, adding: Int) {
         #expect(DraftBrief.Role.adding(said: said) == adding)
@@ -228,7 +228,7 @@ struct SectionPromptsTests {
 
     // MARK: The skills
 
-    @Test("A tools request reads one job: its title, its own lines, what its work is done on as no tool, and the skills the person named (#354, round 6)")
+    @Test("A tools request reads one job: its title, its own lines, what its work is done on as no tool, and the skills the person named (#354)")
     func toolsPrompt() {
         let prompt = SectionPrompts.tools(for: Self.brief, roles: [0], count: 2...3)
 
@@ -247,7 +247,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.tools(for: Self.brief, roles: [1], count: 2...3).text.contains("What the work is done on, which is no tool: tre tecnici\n"))
     }
 
-    @Test("The jobs that share a title ask for their tools once, with the lines of each, each line once (#354, round 6)")
+    @Test("The jobs that share a title ask for their tools once, with the lines of each, each line once (#354)")
     func toolsOfJobsThatShareATitle() {
         let brief = DraftBrief(
             language: "English", headline: nil,
@@ -272,34 +272,34 @@ struct SectionPromptsTests {
         #expect(text.hasSuffix("What the work is done on, which is no tool: helping the lighting crew with the follow spots"))
     }
 
-    @Test("The tools request puts the equipment of a job's own lines first, asks 2 or 3 for every job, and asks for no activity (#354, rounds 1 and 5)")
+    @Test("The tools request puts the equipment of a job's own lines first, asks 2 or 3 for every job, and asks for no activity (#354)")
     func toolsOfEachJob() {
         let rules = SectionPrompts.toolsInstructions(count: 2...3)
 
         #expect(rules.contains("First the equipment, machines and software the job's own lines name, as written;"))
         #expect(rules.contains("only when they fit the job's title and the tools the person names"))
-        // Allowed none, a job with no lines of its own got none, and the next request filled it with roles (#354, round 5).
+        // Allowed none, a job with no lines of its own got none, and the next request filled it with roles (#354).
         #expect(!rules.contains("none fits"))
         #expect(rules.contains("Not a tool: what the work is done on; an activity or task, also when written as a noun; a document;"))
-        // Asked for pieces of equipment, the request named a pen and a truck load (#354, round 4).
+        // Asked for pieces of equipment, the request named a pen and a truck load (#354).
         #expect(rules.contains("2 or 3 software, equipment, machines or instruments that a person with the job's title uses at work"))
-        // One title asked 2 or 3, and the request for those missing named activities and bare kinds (#354, round 6).
+        // One title asked 2 or 3, and the request for those missing named activities and bare kinds (#354).
         #expect(SectionPrompts.toolsInstructions(count: 4...5).contains("4 or 5 software, equipment, machines or instruments"))
         #expect(SectionPrompts.tools(for: Self.brief, roles: [0], count: 4...5).instructions == SectionPrompts.toolsInstructions(count: 4...5))
         #expect(rules.contains("stationery, furniture or protective wear; an everyday object a person of any trade uses"))
         // Asked for objects only, the request named household objects and rooms ("frigorifero", "classe"); asked for methods and
-        // fields of knowledge too, it named fields instead of products: a standard or method counts by its own name (probe round 11).
+        // fields of knowledge too, it named fields instead of products: a standard or method counts by its own name.
         #expect(rules.contains("an everyday object a person of any trade uses, a household appliance or a room;"))
         #expect(rules.contains("as a CV of that trade names them; a standard or method of the trade known by its own name counts as one."))
         #expect(!rules.contains("field of knowledge"))
-        // A bare kind is no tool; with a word of its trade it is one (#354, round 4).
+        // A bare kind is no tool; with a word of its trade it is one (#354).
         #expect(rules.contains("A kind of tool with a word of its trade is a tool; a bare kind, with no word of its trade, is not."))
         #expect(!rules.contains("pieces of equipment"))
         #expect(!rules.contains("technique"))
         #expect(!SectionPrompts.moreSkillsInstructions.contains("technique"))
     }
 
-    @Test("The tools request reads the names of the CV as \"the company\", whole or by a word of theirs (#354, round 7)")
+    @Test("The tools request reads the names of the CV as \"the company\", whole or by a word of theirs (#354)")
     func toolsWithoutNames() {
         var brief = DraftBrief(
             language: "English", headline: nil,
@@ -340,10 +340,10 @@ struct SectionPromptsTests {
             for: Self.brief, title: nil, tools: 1, qualities: 0, listedTools: [], listedQualities: [], rejected: []
         ).text
 
-        // Asked for the tools of the jobs, the request wrote the tools of a trade the person left (#354, round 15); asked for "named
+        // Asked for the tools of the jobs, the request wrote the tools of a trade the person left (#354); asked for "named
         // software products, named devices", it wrote devices of any trade ("scanner portable", "Tableta táctil"); asked "each of
-        // another kind", it wrote kinds an office has none of ("Termostatos"; probe round 9); asked for methods and fields of
-        // knowledge, it wrote fields instead of products: only a standard or method with its own name, after them (probe round 11).
+        // another kind", it wrote kinds an office has none of ("Termostatos"); asked for methods and fields of
+        // knowledge, it wrote fields instead of products: only a standard or method with its own name, after them.
         #expect(both.contains(
             "The CV lists too few tools for a person working as manutentore elettromeccanico: name 2 more tools that a CV of a "
                 + "person working as manutentore elettromeccanico typically lists, the most common first: the software, as a kind "
@@ -362,7 +362,7 @@ struct SectionPromptsTests {
         #expect(!both.contains("material"))
         #expect(!both.contains("pieces of equipment"))
         #expect(!SectionPrompts.toolsInstructions(count: 2...3).contains("materials or"))
-        // Asked for qualities with no language, the request wrote an Italian CV English ones (#354, round 4).
+        // Asked for qualities with no language, the request wrote an Italian CV English ones (#354).
         #expect(both.contains("Name 1 more personal qualities at work that fit these jobs, as nouns in the language named on the first line."))
         #expect(both.contains("Tools listed, do not repeat: PLC"))
         #expect(both.contains("Qualities listed, do not repeat: precisione"))
@@ -372,7 +372,7 @@ struct SectionPromptsTests {
         #expect(!toolsOnly.contains("Rejected"))
     }
 
-    @Test("The skills requests read what the person says of their work with no job, and put the person's own tools and qualities first (#354, round 1)")
+    @Test("The skills requests read what the person says of their work with no job, and put the person's own tools and qualities first (#354)")
     func ownSentencesInTheSkillsRequests() {
         var brief = Self.brief
         brief.own = ["Leggo gli schemi elettrici e uso i PLC per trovare i guasti.", "Sono preciso e mi piace lavorare in squadra."]
@@ -401,7 +401,7 @@ struct SectionPromptsTests {
 
     // MARK: The summary
 
-    @Test("A summary sentence's request reads the job's title and its tense, past when it ended and present otherwise (a current job's sentence came in the past), its slot (the field, the topics or the qualities) and the summary so far, and no employer (#354, round 13)")
+    @Test("A summary sentence's request reads the job's title and its tense, past when it ended and present otherwise (a current job's sentence came in the past), its slot (the field, the topics or the qualities) and the summary so far, and no employer (#354)")
     func summarySentencePrompt() {
         let topic = SummaryTopic(
             title: "capoturno della manutenzione", field: "manutenzione industriale", work: ["i turni", "i quadri elettrici"],
@@ -446,20 +446,20 @@ struct SectionPromptsTests {
             + "\nRejected, with the reason: " + rejected)
     }
 
-    @Test("A summary sentence is one sentence as the person on its topic alone, with no fact of its own (#354, round 13)")
+    @Test("A summary sentence is one sentence as the person on its topic alone, with no fact of its own (#354)")
     func summaryInstructions() {
         for instructions in [SectionPrompts.summarySentenceInstructions, SectionPrompts.summarySentenceRepairInstructions] {
             #expect(instructions.contains("exactly 1 sentence") || instructions.contains("Exactly 1 sentence"))
             #expect(instructions.contains("in the first person, never \"he\", \"she\" or \"the person\""))
             #expect(instructions.contains("in the past when the job ended"))
             #expect(instructions.contains("Do not start with the first verb of a sentence of the summary so far."))
-            // O1: typical duties and tools are draft content; facts never are (#354, round 13).
+            // O1: typical duties and tools are draft content; facts never are (#354).
             #expect(instructions.contains("Typical duties and tools of the job are fine, in your own words."))
             #expect(instructions.contains(
                 "Never add a number, company, customer, product, school, place, person, language, study, certification or achievement"
             ))
             #expect(instructions.contains("never guarantee a result"))
-            // Asked for a quality in each sentence, the summary closed each with the person's own praise (#354, round 10).
+            // Asked for a quality in each sentence, the summary closed each with the person's own praise (#354).
             #expect(!instructions.contains("quality of the lists"))
         }
     }
@@ -473,7 +473,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.asSentence(" ") == "")
     }
 
-    @Test("A clause a job request reads as a duty also loses the relative word that tied it to the employer (#354, round 12)")
+    @Test("A clause a job request reads as a duty also loses the relative word that tied it to the employer (#354)")
     func clauseAsDuty() {
         #expect(SectionPrompts.asDuty(", dove coordino tre tecnici;") == "Coordino tre tecnici.")
         #expect(SectionPrompts.asDuty("où je range 12 rayons de livres") == "Je range 12 rayons de livres.")
@@ -482,7 +482,7 @@ struct SectionPromptsTests {
         #expect(SectionPrompts.asDuty("I train the juniors!") == "I train the juniors!")
     }
 
-    @Test("The skills requests read a clause as the person said it, its relative word kept: they copy no clause, and the word dropped there changed the tools of three drafts (#354, round 12)")
+    @Test("The skills requests read a clause as the person said it, its relative word kept: they copy no clause, and the word dropped there changed the tools of three drafts (#354)")
     func skillsReadTheClauseAsSaid() {
         #expect(SectionPrompts.tools(for: Self.brief, roles: [1], count: 2...3).text.contains("- Dove coordino tre tecnici.\n"))
         #expect(SectionPrompts.softSkills(for: Self.brief).text.contains("Dove coordino tre tecnici."))

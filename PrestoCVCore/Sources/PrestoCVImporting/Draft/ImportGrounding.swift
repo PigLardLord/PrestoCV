@@ -49,7 +49,7 @@ enum ImportGrounding {
             cv.skills = cv.skills.filter { keep($0, "skill", quote) != nil }
             cv.interests = cv.interests.filter { keep($0, "interest", quote) != nil }
             cv.languages = cv.languages.compactMap { language in
-                guard var kept = keep(Optional(language.name), "language", quote).map({ ImportedLanguage(name: $0, level: language.level, levelWords: language.levelWords) }) else {
+                guard var kept = keep(Optional(language.name), "language", quote).map({ ImportedLanguage(name: $0, level: language.level, levelWords: language.levelWords, heading: language.heading) }) else {
                     return nil
                 }
                 kept.level = keep(language.level, "language level", isLevel)
@@ -61,6 +61,10 @@ enum ImportGrounding {
                 var kept = ImportedCertification(name: name)
                 kept.issuer = keep(certification.issuer, "certification issuer", quote)
                 kept.year = keep(certification.year, "certification year", isYear)
+                kept.link = keep(certification.link, "certification link", isLink)
+                kept.description = keep(certification.description, "certification description", quote)
+                kept.check = certification.check
+                kept.heading = certification.heading
                 return kept
             }
             return cv

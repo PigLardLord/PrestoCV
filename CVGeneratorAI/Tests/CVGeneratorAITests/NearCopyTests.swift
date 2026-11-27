@@ -1,9 +1,9 @@
 import Testing
 @testable import CVGeneratorAI
 
-/// A summary sentence on a job's work that says one of its duties again (#354, round 15; probe round 7).
+/// A summary sentence on a job's work that says one of its duties again (#354).
 struct NearCopyTests {
-    @Test("A sentence that shares more content words with a duty than it adds, and adds less than two past the title, copies it; one that joins two duties, says how, or names a kept tool or quality the duty does not, adds to it (#354, probe round 7)",
+    @Test("A sentence that shares more content words with a duty than it adds, and adds less than two past the title, copies it; one that joins two duties, says how, or names a kept tool or quality the duty does not, adds to it (#354)",
           arguments: [
               ("Ich installiere elektrische Anlagen in Neubauten.", ["Ich installiere Anlagen in Neubauten."], "Elektriker", [], true),
               ("Ich installiere elektrische Anlagen in Neubauten mit Sorgfalt und Präzision.", ["Ich installiere Anlagen in Neubauten."], "Elektriker", [], false),

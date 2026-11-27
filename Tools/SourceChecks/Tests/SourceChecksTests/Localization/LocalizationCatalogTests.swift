@@ -1,116 +1,8 @@
 import Testing
 import Foundation
 
-// MARK: - Catalog and source tree
-
-/// The string catalog of the app, read from the source tree.
-private struct LocalizationCatalog {
-    static let languages = ["de", "en", "es", "fr", "it", "pt"]
-    static let translatedLanguages = ["de", "es", "fr", "it", "pt"]
-
-    let strings: [String: [String: Any]]
-
-    static func load() throws -> LocalizationCatalog {
-        let data = try Data(contentsOf: SourceTree.root.appendingPathComponent("PrestoCV/Localizable.xcstrings"))
-        let catalog = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        return LocalizationCatalog(strings: try #require(catalog["strings"] as? [String: [String: Any]]))
-    }
-
-    var keys: [String] { strings.keys.sorted() }
-
-    /// The state and the texts of a key in a language. A key with plural forms has one text per form.
-    func localization(of key: String, in language: String) -> (state: String?, texts: [String])? {
-        guard let localizations = strings[key]?["localizations"] as? [String: Any],
-              let localization = localizations[language] as? [String: Any] else {
-            return nil
-        }
-        if let unit = localization["stringUnit"] as? [String: Any], let value = unit["value"] as? String {
-            return (unit["state"] as? String, [value])
-        }
-        let forms = ((localization["variations"] as? [String: Any])?["plural"] as? [String: Any]) ?? [:]
-        let units = forms.keys.sorted().compactMap { forms[$0] as? [String: Any] }.compactMap { $0["stringUnit"] as? [String: Any] }
-        guard !units.isEmpty else { return nil }
-        return (units.first?["state"] as? String, units.compactMap { $0["value"] as? String })
-    }
-
-    func texts(of key: String, in language: String) -> [String]? {
-        localization(of: key, in: language)?.texts
-    }
-}
-
-private enum SourceTree {
-    static let root = Repository.root
-
-    /// The Swift sources whose text reaches the user: the app, and the legacy packages it links.
-    static let shippedFolders = [
-        "PrestoCV", "PrestoCVCore/Sources/PrestoCVCore", "CVPDFExporter/Sources/CVPDFExporter", "CVGeneratorAI/Sources/CVGeneratorAI",
-    ]
-
-    struct SwiftFile {
-        let path: String
-        /// The code that ships: without comment lines, and without the previews at the end of the file.
-        let code: String
-    }
-
-    static func swiftFiles(in folders: [String]) -> [SwiftFile] {
-        var files: [SwiftFile] = []
-        for folder in folders {
-            let url = root.appendingPathComponent(folder)
-            guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil) else { continue }
-            for case let file as URL in enumerator where file.pathExtension == "swift" {
-                guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
-                files.append(SwiftFile(path: String(file.path.dropFirst(root.path.count + 1)), code: shippedCode(of: text)))
-            }
-        }
-        return files.sorted { $0.path < $1.path }
-    }
-
-    private static func shippedCode(of text: String) -> String {
-        var end = text.endIndex
-        for marker in ["PreviewProvider", "#Preview"] {
-            if let range = text.range(of: marker), range.lowerBound < end { end = range.lowerBound }
-        }
-        return text[..<end]
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-            .joined(separator: "\n")
-    }
-}
-
-private extension String {
-    /// The captures of a group of a regular expression, for every match.
-    func matches(of pattern: String, group: Int = 1) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        return regex.matches(in: self, range: NSRange(startIndex..., in: self)).compactMap { match in
-            Range(match.range(at: group), in: self).map { String(self[$0]) }
-        }
-    }
-
-    /// The key a text with values in it is looked up under: `"\(title). \(message)"` is `"%@. %@"`.
-    var asFormatKey: String { replacingValues(with: "%@") }
-
-    /// The same key when the values are numbers: `"\(count) CVs"` is `"%lld CVs"`.
-    var asNumberFormatKey: String { replacingValues(with: "%lld") }
-
-    private func replacingValues(with placeholder: String) -> String {
-        replacingOccurrences(of: #"\\\((?:[^()]|\([^()]*\))*\)"#, with: placeholder, options: .regularExpression)
-    }
-}
-
-/// A string literal: its text may hold escaped characters and values.
-private let stringLiteral = #""((?:[^"\\\n]|\\.)*)""#
-
-// MARK: - Defects
-
-private enum Defect: Equatable {
-    case missing(language: String)
-    case notMarkedTranslated(language: String)
-    case copiedFromEnglish(language: String)
-    case otherPlaceholders(language: String)
-    case unused
-}
-
-// MARK: - Localization Catalog Tests
+// The checks of the legacy app's catalog that no other catalog needs. The checks that every catalog must pass are in
+// StringCatalogTests, run for this catalog and for the new app's.
 
 @Suite("Localization catalog")
 struct LocalizationCatalogTests {
@@ -118,13 +10,13 @@ struct LocalizationCatalogTests {
     // MARK: Exemptions
 
     /// Texts that read the same in every language: symbols, abbreviations, formats.
-    fileprivate static let sameInEveryLanguage: Set<String> = [
+    static let sameInEveryLanguage: Set<String> = [
         "%@. %@", "ai.generation.character_count", "common.ok", "cv.title.numbered", "export.font_preview_sample", "field.url",
         "format.required_indicator",
     ]
 
     /// Words that happen to be written the same in English and in these languages.
-    fileprivate static let sameInSomeLanguages: [String: Set<String>] = [
+    static let sameInSomeLanguages: [String: Set<String>] = [
         "common.error": ["es"],
         "error.subject.cv": ["es", "fr", "it"],
         "export.color.minimal": ["de"],
@@ -132,219 +24,79 @@ struct LocalizationCatalogTests {
         "export.file_name": ["es", "fr", "it"],
         "export.font.modern": ["de"],
         "field.description": ["fr"],
+        "import.review.field.certification": ["fr"],
         "section.certifications": ["fr"],
         "section.details": ["de"],
     ]
 
     /// Keys that a branch that has not landed yet is still rewriting or removing. An entry without a defect left
     /// fails `exemptionsAreStillNeeded`, so each one has to go as soon as its branch has landed.
-    fileprivate static let pendingKeys: Set<String> = []
+    static let pendingKeys: Set<String> = []
 
     /// Keys that the code builds from other values, so that no literal names them.
-    fileprivate static let dynamicKeyPrefixes = ["language.level."]
+    static let dynamicKeyPrefixes = ["language.level."]
 
     /// Names that keep their capital letter inside a sentence: Apple Intelligence, Siri, and the Settings app of the
     /// iPhone and of the Mac ("Ajustes del Sistema", "Réglages Système", "Impostazioni di Sistema").
-    fileprivate static let properNames: Set<String> = [
+    static let properNames: Set<String> = [
         "Apple", "Intelligence", "Siri", "Ajustes", "Réglages", "Impostazioni", "Sistema", "Système",
     ]
 
     /// Keys whose text is the name of a person in every language.
-    fileprivate static let personNames: Set<String> = ["export.font_preview_name"]
+    static let personNames: Set<String> = ["export.font_preview_name"]
 
     /// Proper names that the text of one key keeps capitalised inside a sentence: the person, the city, the school and
     /// the degree of the example description on the AI screen.
-    fileprivate static let properNamesOfKey: [String: Set<String>] = [
+    static let properNamesOfKey: [String: Set<String>] = [
         "ai.generation.example_text": [
             "Maria", "Rossi", "Don", "Milani", "Bologna", "Bolonia", "Bologne", "Bolonha",
             "Ciencias", "Educación", "Universidad", "Scienze", "Formazione", "Ciências", "Educação", "Universidade",
         ],
     ]
 
-    /// The languages whose texts are written in sentence case.
-    fileprivate static let sentenceCaseLanguages = ["es", "fr", "it", "pt"]
+    /// Only the AI texts are checked for a promise of availability in the legacy catalog.
+    static let promiseKeyPrefix = "ai."
 
-    /// Words that promise future availability or readiness, by language: that the AI draft, a model or its data will
-    /// be there soon, in a moment, later, or not yet. Nothing tells when they will be ready, and the owner decided that the
-    /// AI texts promise no availability the app cannot deliver now (#255, #270). The expected duration of a task that is
-    /// already running is not such a promise.
-    fileprivate static let availabilityPromises: [String: [String]] = [
-        "en": ["soon", "shortly", "in a moment", "coming", "yet", "later"],
-        "de": ["bald", "gleich", "demnächst", "in Kürze", "noch nicht", "später"],
-        "es": ["pronto", "en un momento", "en breve", "todavía no", "aún no", "más tarde"],
-        "fr": ["bientôt", "dans un instant", "sous peu", "pas encore", "plus tard"],
-        "it": ["presto", "tra un attimo", "fra poco", "a breve", "non ancora", "più tardi"],
-        "pt": ["em breve", "em instantes", "logo", "ainda não", "mais tarde"],
+    /// The placeholders of the values of the legacy app's formats, which the checks cannot read from the code.
+    static let valueTypes: [String: ValueTypes] = [
+        #"cv.list.unreadable_notice \(unreadableCount)"#: ValueTypes(["%lld"], "unreadableCount is an Int"),
+        #"export.preview.open \($0.pageCount)"#: ValueTypes(["%lld"], "ExportedPDF.pageCount is an Int"),
+        #"\(title). \(message)"#: ValueTypes(["%@", "%@"], "EmptyStateView and ErrorView: title and message are Strings"),
+        #"\(unavailable). \(explanation)"#: ValueTypes(["%@", "%@"], "both are Strings read from the catalog"),
     ]
 
-    /// The promise of future availability or readiness in a text, if it makes one.
-    fileprivate static func availabilityPromise(in text: String, language: String) -> String? {
-        (availabilityPromises[language] ?? []).first { promise in
-            text.range(of: "\\b\(NSRegularExpression.escapedPattern(for: promise))\\b", options: [.regularExpression, .caseInsensitive]) != nil
-        }
-    }
+    /// The exemptions of the legacy catalog, as the checks take them. It keeps the scan of the literals handed to a view
+    /// (`everyLiteralInViews` stays off): its app is frozen to fixes of the published version (ADR 0033), and that scan is
+    /// the one it already had on main. The new app reads every literal of its views.
+    static let legacyRules = StringRules(
+        sameInEveryLanguage: sameInEveryLanguage,
+        sameInSomeLanguages: sameInSomeLanguages,
+        pendingKeys: pendingKeys,
+        dynamicKeyPrefixes: dynamicKeyPrefixes,
+        properNames: properNames,
+        personNames: personNames,
+        properNamesOfKey: properNamesOfKey,
+        promiseKeyPrefix: promiseKeyPrefix,
+        valueTypes: valueTypes,
+        viewFolders: ["PrestoCV"]
+    )
 
-    // MARK: Defects
+    static let catalogPath = "PrestoCV/Localizable.xcstrings"
 
-    /// What is wrong with a key, before any exemption.
-    fileprivate static func defects(of key: String, in catalog: LocalizationCatalog, usedKeys: Set<String>) -> [Defect] {
-        var defects: [Defect] = []
-        for language in LocalizationCatalog.languages where catalog.localization(of: key, in: language) == nil {
-            defects.append(.missing(language: language))
-        }
-        if let english = catalog.texts(of: key, in: "en") {
-            for language in LocalizationCatalog.translatedLanguages {
-                guard let translation = catalog.localization(of: key, in: language) else { continue }
-                if translation.state != "translated" {
-                    defects.append(.notMarkedTranslated(language: language))
-                }
-                let mayBeSame = sameInEveryLanguage.contains(key) || (sameInSomeLanguages[key]?.contains(language) ?? false)
-                if translation.texts == english && !mayBeSame {
-                    defects.append(.copiedFromEnglish(language: language))
-                }
-                if formatSpecifiers(of: translation.texts) != formatSpecifiers(of: english) {
-                    defects.append(.otherPlaceholders(language: language))
-                }
-            }
-        }
-        if !usedKeys.contains(key) && !dynamicKeyPrefixes.contains(where: key.hasPrefix) {
-            defects.append(.unused)
-        }
-        return defects
-    }
+    /// The Swift sources whose text reaches the user: the app, and the legacy packages it links.
+    static let shippedFolders = [
+        "PrestoCV", "PrestoCVCore/Sources/PrestoCVCore", "CVPDFExporter/Sources/CVPDFExporter", "CVGeneratorAI/Sources/CVGeneratorAI",
+    ]
 
-    /// The words of a text that start with a capital letter as in an English title: inside a sentence, and neither
-    /// an abbreviation nor a proper name. "Crea Tu CV Perfecto" has "Tu" and "Perfecto".
-    fileprivate static func titleCaseWords(in text: String) throws -> [String] {
-        let sentenceBreaks: Set<Character> = [".", "!", "?", ":", "-", "–", "—", "(", "«", "“", "\""]
-        let words = try NSRegularExpression(pattern: #"\S+"#)
-        var titleCase: [String] = []
-        for match in words.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-            guard let range = Range(match.range, in: text), range.lowerBound > text.startIndex else { continue }
-            let before = text[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
-            if let last = before.last, sentenceBreaks.contains(last) || last.isNewline { continue }
-            let word = text[range].trimmingCharacters(in: .punctuationCharacters)
-            guard let first = word.first, first.isUppercase else { continue }
-            let isAbbreviation = word.filter(\.isUppercase).count > 1 || word.contains(where: \.isNumber)
-            if !isAbbreviation && !properNames.contains(word) { titleCase.append(word) }
-        }
-        return titleCase
-    }
-
-    private static func formatSpecifiers(of texts: [String]) -> [String] {
-        texts.flatMap { $0.matches(of: #"%(?:\d+\$)?(?:@|lld|d|f)"#, group: 0) }.sorted()
-    }
-
-    /// Every key of the catalog that a string literal of the shipped code names.
-    fileprivate static func usedKeys(in catalog: LocalizationCatalog) -> Set<String> {
-        let keys = Set(catalog.keys)
-        var used: Set<String> = []
-        for file in SourceTree.swiftFiles(in: SourceTree.shippedFolders) {
-            for literal in file.code.matches(of: stringLiteral) {
-                if keys.contains(literal) { used.insert(literal) }
-                for format in [literal.asFormatKey, literal.asNumberFormatKey] where keys.contains(format) { used.insert(format) }
-            }
-        }
-        return used
-    }
-
-    /// The words written as the message of an `AppError`, by file. The message is shown to the user.
-    fileprivate static func hardCodedErrorMessages(catalog: LocalizationCatalog) -> [String: [String]] {
-        let errors = "unknown|invalidData|notFound|networkError|validationError|decodingError|encodingError|fileSystemError"
-        var found: [String: [String]] = [:]
-        for file in SourceTree.swiftFiles(in: SourceTree.shippedFolders) {
-            for literal in file.code.matches(of: "AppError\\.(?:\(errors))\\(\\s*\(stringLiteral)") {
-                let hasWords = literal.asFormatKey.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
-                if hasWords && catalog.strings[literal] == nil { found[file.path, default: []].append(literal) }
-            }
-        }
-        return found
-    }
-
-    /// The keys with a defect of one kind, outside the exemptions.
-    private func keys(withDefect matches: (Defect) -> Bool) throws -> [String] {
-        let catalog = try LocalizationCatalog.load()
-        let used = Self.usedKeys(in: catalog)
-        return catalog.keys.filter { key in
-            !Self.pendingKeys.contains(key) && Self.defects(of: key, in: catalog, usedKeys: used).contains(where: matches)
-        }
+    private static func catalog() throws -> LocalizationCatalog {
+        try LocalizationCatalog(contentsOf: Repository.root.appendingPathComponent(catalogPath))
     }
 
     // MARK: Tests
 
-    @Test("Every key that the code looks up is in the catalog")
-    func everyLookedUpKeyIsInTheCatalog() throws {
-        let catalog = try LocalizationCatalog.load()
-        let lookups = [
-            "(\(stringLiteral))\\s*\\.(?:localized|asLoclizedKey|localizedWithArgs)\\b",
-            #"String\(\s*localized:\s*"([^"\\\n]+)""#,
-            #"LocalizedStringKey\(\s*"([^"\\\n]+)""#,
-        ]
-        var missing: [String] = []
-        for file in SourceTree.swiftFiles(in: SourceTree.shippedFolders) {
-            for pattern in lookups {
-                for literal in file.code.matches(of: pattern, group: pattern == lookups[0] ? 2 : 1) where catalog.strings[literal] == nil {
-                    missing.append("\(literal) (\(file.path))")
-                }
-            }
-        }
-
-        #expect(missing.isEmpty, "Keys that are looked up but missing from the catalog: \(missing)")
-    }
-
-    @Test("Every key has a text in each language, marked as translated")
-    func everyKeyHasATextInEveryLanguage() throws {
-        let incomplete = try keys { defect in
-            switch defect {
-            case .missing, .notMarkedTranslated: return true
-            default: return false
-            }
-        }
-
-        #expect(incomplete.isEmpty, "Keys without a translated text in every language: \(incomplete)")
-    }
-
-    @Test("No text is copied from English, except those that read the same")
-    func noTextIsCopiedFromEnglish() throws {
-        let copied = try keys { defect in
-            if case .copiedFromEnglish = defect { return true }
-            return false
-        }
-
-        #expect(copied.isEmpty, "Keys with a text copied from English: \(copied)")
-    }
-
-    @Test("Each text keeps the placeholders of the English text")
-    func textsKeepThePlaceholders() throws {
-        let mismatched = try keys { defect in
-            if case .otherPlaceholders = defect { return true }
-            return false
-        }
-
-        #expect(mismatched.isEmpty, "Keys whose placeholders differ from English: \(mismatched)")
-    }
-
-    @Test("Spanish, French, Italian and Portuguese texts are written in sentence case, not in English title case")
-    func noEnglishTitleCase() throws {
-        let catalog = try LocalizationCatalog.load()
-        var titleCase: [String] = []
-        for key in catalog.keys where !Self.personNames.contains(key) {
-            let names = Self.properNamesOfKey[key] ?? []
-            for language in Self.sentenceCaseLanguages {
-                for text in catalog.texts(of: key, in: language) ?? [] {
-                    if try !Self.titleCaseWords(in: text).allSatisfy(names.contains) {
-                        titleCase.append("\(key) (\(language)): \(text)")
-                    }
-                }
-            }
-        }
-
-        #expect(titleCase.isEmpty, "Texts with capitals of an English title: \(titleCase)")
-    }
-
     @Test("The German texts call a CV a Lebenslauf, as the rest of the German app does")
     func germanTextsSayLebenslauf() throws {
-        let catalog = try LocalizationCatalog.load()
+        let catalog = try Self.catalog()
         let cv = try NSRegularExpression(pattern: #"\bCVs?\b"#)
 
         let english = catalog.keys.filter { key in
@@ -358,7 +110,7 @@ struct LocalizationCatalogTests {
 
     @Test("The title of a CV with none names it a CV, with the word for one that the app uses in each language")
     func untitledCVSaysCV() throws {
-        let catalog = try LocalizationCatalog.load()
+        let catalog = try Self.catalog()
 
         for language in LocalizationCatalog.languages {
             // "New CV", "Nuovo CV", "Lebenslauf", "Novo currículo": the word for a CV ends the title of a new one
@@ -373,23 +125,16 @@ struct LocalizationCatalogTests {
 
     @Test("A capital letter is expected at the start of a sentence, in an abbreviation and in a proper name")
     func titleCaseWordsSkipsLegitimateCapitals() throws {
-        #expect(try Self.titleCaseWords(in: "Crea Tu CV Perfecto") == ["Tu", "Perfecto"])
-        #expect(try Self.titleCaseWords(in: "Crea tu CV perfecto").isEmpty)
-        #expect(try Self.titleCaseWords(in: "Impossibile creare il PDF. Riprova.").isEmpty)
-        #expect(try Self.titleCaseWords(in: "C1 - Avanzado").isEmpty)
-        #expect(try Self.titleCaseWords(in: "O Apple Intelligence está desativado. Abra Ajustes.").isEmpty)
-    }
-
-    @Test("Every key of the catalog is used by the code")
-    func noKeyIsUnused() throws {
-        let unused = try keys { $0 == .unused }
-
-        #expect(unused.isEmpty, "Keys that no code uses: \(unused)")
+        #expect(try StringChecks.titleCaseWords(in: "Crea Tu CV Perfecto", properNames: Self.properNames) == ["Tu", "Perfecto"])
+        #expect(try StringChecks.titleCaseWords(in: "Crea tu CV perfecto", properNames: Self.properNames).isEmpty)
+        #expect(try StringChecks.titleCaseWords(in: "Impossibile creare il PDF. Riprova.", properNames: Self.properNames).isEmpty)
+        #expect(try StringChecks.titleCaseWords(in: "C1 - Avanzado", properNames: Self.properNames).isEmpty)
+        #expect(try StringChecks.titleCaseWords(in: "O Apple Intelligence está desativado. Abra Ajustes.", properNames: Self.properNames).isEmpty)
     }
 
     @Test("The product is called PrestoCV in every language")
     func productIsCalledPrestoCV() throws {
-        let catalog = try LocalizationCatalog.load()
+        let catalog = try Self.catalog()
 
         for language in LocalizationCatalog.languages {
             let welcome = catalog.texts(of: "welcome.title", in: language) ?? []
@@ -397,39 +142,22 @@ struct LocalizationCatalogTests {
         }
     }
 
-    @Test("The texts of AI drafting promise no future availability or readiness, in any language")
-    func aiTextsPromiseNoAvailability() throws {
-        let catalog = try LocalizationCatalog.load()
-        var promises: [String] = []
-        for key in catalog.keys where key.hasPrefix("ai.") {
-            for language in LocalizationCatalog.languages {
-                for text in catalog.texts(of: key, in: language) ?? [] {
-                    if let promise = Self.availabilityPromise(in: text, language: language) {
-                        promises.append("\(key) (\(language)): \"\(promise)\" in \(text)")
-                    }
-                }
-            }
-        }
-
-        #expect(promises.isEmpty, "Texts that promise future availability or readiness: \(promises)")
-    }
-
     @Test("A promise of availability is found as a word, in any case; a text without one, or a duration, passes")
     func availabilityPromiseIsFoundAsAWord() {
-        #expect(Self.availabilityPromise(in: "Getting ready, available soon", language: "en") == "soon")
-        #expect(Self.availabilityPromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
-        #expect(Self.availabilityPromise(in: "Bald verfügbar", language: "de") == "bald")
-        #expect(Self.availabilityPromise(in: "Try again later.", language: "en") == "later")
-        #expect(Self.availabilityPromise(in: "Riprova più tardi.", language: "it") == "più tardi")
-        #expect(Self.availabilityPromise(in: "Downloading the model", language: "en") == nil)
-        #expect(Self.availabilityPromise(in: "Not available right now", language: "en") == nil)
-        #expect(Self.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
-        #expect(Self.availabilityPromise(in: "This can take up to a minute.", language: "en") == nil, "A duration is not a promise of availability")
+        #expect(StringChecks.availabilityPromise(in: "Getting ready, available soon", language: "en") == "soon")
+        #expect(StringChecks.availabilityPromise(in: "In preparazione, presto disponibile", language: "it") == "presto")
+        #expect(StringChecks.availabilityPromise(in: "Bald verfügbar", language: "de") == "bald")
+        #expect(StringChecks.availabilityPromise(in: "Try again later.", language: "en") == "later")
+        #expect(StringChecks.availabilityPromise(in: "Riprova più tardi.", language: "it") == "più tardi")
+        #expect(StringChecks.availabilityPromise(in: "Downloading the model", language: "en") == nil)
+        #expect(StringChecks.availabilityPromise(in: "Not available right now", language: "en") == nil)
+        #expect(StringChecks.availabilityPromise(in: "Apple Intelligence is busy right now. Please try again.", language: "en") == nil)
+        #expect(StringChecks.availabilityPromise(in: "This can take up to a minute.", language: "en") == nil, "A duration is not a promise of availability")
     }
 
     @Test("The welcome speaks to everyone, not to a man or to a woman")
     func welcomeIsGenderNeutral() throws {
-        let catalog = try LocalizationCatalog.load()
+        let catalog = try Self.catalog()
         // A welcome that opens with the adjective agrees with the person: "Benvenuto", "Bienvenida". The noun inside
         // a sentence speaks to everyone ("Ti diamo il benvenuto", "Te damos la bienvenida"), and so does the French
         // "Bienvenue" that opens one, where "Bienvenu" is the adjective of a man.
@@ -449,63 +177,10 @@ struct LocalizationCatalogTests {
         }
     }
 
-    @Test("No exemption outlives its defect")
-    func exemptionsAreStillNeeded() throws {
-        let catalog = try LocalizationCatalog.load()
-        let used = Self.usedKeys(in: catalog)
-
-        for key in Self.pendingKeys {
-            #expect(!Self.defects(of: key, in: catalog, usedKeys: used).isEmpty, "\(key) has no defect left: remove it from pendingKeys")
-        }
-        for key in Self.sameInEveryLanguage {
-            for language in LocalizationCatalog.translatedLanguages {
-                #expect(catalog.texts(of: key, in: language) == catalog.texts(of: key, in: "en"), "\(key) differs in \(language): remove it from sameInEveryLanguage")
-            }
-        }
-        for (key, languages) in Self.sameInSomeLanguages {
-            for language in languages {
-                #expect(catalog.texts(of: key, in: language) == catalog.texts(of: key, in: "en"), "\(key) differs in \(language): remove it from sameInSomeLanguages")
-            }
-        }
-        for (key, names) in Self.properNamesOfKey {
-            let capitalised = try Set(Self.sentenceCaseLanguages.flatMap { language in
-                try (catalog.texts(of: key, in: language) ?? []).flatMap(Self.titleCaseWords(in:))
-            })
-            #expect(names.isSubset(of: capitalised), "\(key) no longer capitalises \(names.subtracting(capitalised)): remove it from properNamesOfKey")
-        }
-    }
-
-    @Test("The text of a view is looked up in the catalog, not written in the code")
-    func viewsHaveNoHardCodedText() throws {
-        let catalog = try LocalizationCatalog.load()
-        let views = "Text|Label|Button|Section|Toggle|TextField|SecureField|Picker|Menu|NavigationLink|DisclosureGroup|LabeledContent|ProgressView|Link"
-        let modifiers = "navigationTitle|accessibilityLabel|accessibilityHint|accessibilityValue|help|badge"
-        let patterns = [
-            "\\b(?:\(views))\\(\\s*\(stringLiteral)",
-            "\\.(?:\(modifiers))\\(\\s*\(stringLiteral)",
-        ]
-        var hardCoded: [String] = []
-        for file in SourceTree.swiftFiles(in: ["PrestoCV"]) {
-            for pattern in patterns {
-                for literal in file.code.matches(of: pattern) {
-                    let format = literal.asFormatKey
-                    let isLookedUp = catalog.strings[literal] != nil || catalog.strings[format] != nil
-                        || catalog.strings[literal.asNumberFormatKey] != nil
-                    // A text of values and symbols only, such as "\(a) / \(b)", has nothing to translate.
-                    let hasWords = format.replacingOccurrences(of: "%@", with: "").range(of: #"\p{L}{2,}"#, options: .regularExpression) != nil
-                    if !isLookedUp && hasWords {
-                        hardCoded.append("\"\(literal)\" (\(file.path))")
-                    }
-                }
-            }
-        }
-
-        #expect(hardCoded.isEmpty, "Text written in the code instead of the catalog: \(hardCoded)")
-    }
-
     @Test("An error message is looked up in the catalog, not written in the code")
     func errorMessagesAreNotWrittenInTheCode() throws {
-        let violations = Self.hardCodedErrorMessages(catalog: try LocalizationCatalog.load())
+        let violations = try StringChecks.hardCodedErrorMessages(
+            catalog: try Self.catalog(), sources: try SwiftSource.trackedFiles(in: Self.shippedFolders))
 
         #expect(violations.isEmpty, "Files that write the message of an error in the code: \(violations)")
     }

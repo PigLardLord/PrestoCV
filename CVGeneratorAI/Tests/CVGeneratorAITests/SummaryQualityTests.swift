@@ -124,7 +124,7 @@ struct SummaryQualityTests {
         )
     }
 
-    // MARK: A quality the description gives someone else does not hold (review round 1)
+    // MARK: A quality the description gives someone else does not hold
 
     private static let baker = CVData(
         personalInfo: PersonalInfo(name: "Daniel Hart", title: "baker"),

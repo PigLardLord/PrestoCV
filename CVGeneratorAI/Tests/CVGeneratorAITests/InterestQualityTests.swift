@@ -72,7 +72,7 @@ struct InterestQualityTests {
         #expect(sundays.interests == ["play chess", "hiking in the Alps"])
     }
 
-    @Test("An English interest whose verb is in the form the person says after \"I\" keeps its verb, and a German one conjugated loses it (#354, round 1)",
+    @Test("An English interest whose verb is in the form the person says after \"I\" keeps its verb, and a German one conjugated loses it (#354)",
           arguments: [("play football", "en", "play football"), ("bake bread", "en", "bake bread"), ("spiele Schach", "de", "Schach")])
     func infinitiveOfAnInterestStays(interest: String, language: String, kept: String) throws {
         let description = language == "en"
@@ -89,7 +89,7 @@ struct InterestQualityTests {
         #expect(result.interests == [kept])
     }
 
-    @Test("A verb is conjugated by its ending: \"-s\" or \"-ed\" in English, anything but \"-n\" in German (#354, round 1)",
+    @Test("A verb is conjugated by its ending: \"-s\" or \"-ed\" in English, anything but \"-n\" in German (#354)",
           arguments: [("play", "en", false), ("plays", "en", true), ("baked", "en", true), ("dress", "en", false), ("spiele", "de", true), ("spielen", "de", false)])
     func conjugatedVerb(verb: String, language: String, conjugated: Bool) throws {
         #expect(CVDataSanitizer.isConjugated(verb, in: try #require(Vocabulary.Language(rawValue: language))) == conjugated)
@@ -172,7 +172,7 @@ struct InterestQualityTests {
         #expect(result.interests == kept)
     }
 
-    @Test("A German hobby the person denies or hardly ever does gives no pastime (review round 2)", arguments: [
+    @Test("A German hobby the person denies or hardly ever does gives no pastime", arguments: [
         "koche nicht am Wochenende", "male im Sommer nie", "reite im Winter selten", "gehe nie mit meinem Hund spazieren",
         "koche kaum für meine Freunde", "wandere niemals in den Bergen",
     ])
@@ -189,7 +189,7 @@ struct InterestQualityTests {
         #expect(result.interests == ["chess", "long walks with my dog", "hiking in the Alps"])
     }
 
-    @Test("D8: a liking of working or collaborating gives the work in the person's words; another liking, a wish or a title gives none (#354, round 3)",
+    @Test("D8: a liking of working or collaborating gives the work in the person's words; another liking, a wish or a title gives none (#354)",
           arguments: [
               ("I keep calm and I like working closely with choreographers.", ["working closely with choreographers"]),
               ("Sono paziente e mi piace lavorare in squadra.", ["lavorare in squadra"]),

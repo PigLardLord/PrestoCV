@@ -3,11 +3,14 @@ import PrestoCVDomain
 import PrestoCVApplication
 
 /// Maps what the legacy app wrote to the domain (ADR 0022). A value the domain refuses is dropped, not repaired, and the
-/// drop is noted once per kind, so the report says what the person lost without quoting their content.
+/// drop is noted once per kind, so the report says what the person lost without quoting their content. A period that is not
+/// a clear range is the exception: it is kept as written in the entry's description, and noted once as a check.
 struct LegacyMapper {
     private(set) var drops: [LegacyDrop] = []
+    private(set) var checks: [LegacyCheck] = []
 
     private mutating func note(_ drop: LegacyDrop) { if !drops.contains(drop) { drops.append(drop) } }
+    private mutating func note(_ check: LegacyCheck) { if !checks.contains(check) { checks.append(check) } }
 
     mutating func map(_ raw: LegacyCVFile.Raw, id: CVID, fallback: Date) -> CV {
         let times = Self.times(raw, fallback: fallback)
@@ -63,20 +66,29 @@ struct LegacyMapper {
                    profiles: (raw.social ?? []).compactMap { profile($0) }, interests: raw.interests ?? [])
     }
 
-    private mutating func period(_ text: String?) -> Period? {
+    /// The dates of an entry and its description. A period that is not a clear range has no dates: its text, as written,
+    /// becomes the description's first line, for the person to move into the dates.
+    private mutating func dated(_ text: String?, _ description: String?) -> (period: Period?, description: String) {
+        let description = description ?? ""
         switch LegacyPeriod.read(text ?? "") {
-        case .none: return nil
-        case .period(let period): return period
-        case .unreadable: note(.period); return nil
+        case .none: return (nil, description)
+        case .period(let period): return (period, description)
+        case .unreadable:
+            note(.period)
+            let written = text ?? ""
+            return (nil, description.isEmpty ? written : written + "\n" + description)
         }
     }
 
     private mutating func experience(_ e: LegacyCVFile.Experience) -> Experience {
-        Experience(role: e.title ?? "", company: e.company ?? "", location: e.location ?? "", period: period(e.period), description: e.description ?? "")
+        let dated = dated(e.period, e.description)
+        return Experience(role: e.title ?? "", company: e.company ?? "", location: e.location ?? "", period: dated.period,
+                          description: dated.description)
     }
 
     private mutating func education(_ e: LegacyCVFile.Education) -> Education {
-        Education(degree: e.degree ?? "", school: e.school ?? "", period: period(e.period), description: e.description ?? "")
+        let dated = dated(e.period, e.description)
+        return Education(degree: e.degree ?? "", school: e.school ?? "", period: dated.period, description: dated.description)
     }
 
     /// The legacy level 0 is "no level".

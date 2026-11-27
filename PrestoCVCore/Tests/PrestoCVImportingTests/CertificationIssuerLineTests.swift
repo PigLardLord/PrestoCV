@@ -168,11 +168,13 @@ struct CertificationIssuerLineTests {
         #expect(years.cv.certifications.first?.year?.value == 2020)
     }
 
-    @Test("A long sentence that starts with a lead is not an issuer")
+    @Test("A long sentence that starts with a lead is not an issuer: it is the description of the certification (#283)")
     func longSentence() {
-        let found = read(["First Aid Certificate", "Issued by the committee after a long review of the written and practical exams that candidates sat in spring and autumn of the year."])
-        #expect(found.cv.certifications.count == 2)
+        let sentence = "Issued by the committee after a long review of the written and practical exams that candidates sat in spring and autumn of the year."
+        let found = read(["First Aid Certificate", sentence])
+        #expect(found.cv.certifications.count == 1)
         #expect(found.cv.certifications.first?.issuer == nil)
+        #expect(found.cv.certifications.first?.description?.value == sentence)
     }
 
     @Test("A lead with nothing after it is not an issuer")
@@ -317,7 +319,7 @@ struct CertificationIssuerLineTests {
         for var section in sections where section.kind == .certifications {
             let first = section.blocks[0]
             let empty = SourceBlock(index: 99, span: first.span, cells: [], kind: .line, isEmphasized: false, followsGap: false,
-                                    page: nil, frame: nil, column: nil, fontSize: nil)
+                                    page: nil, frame: nil, column: nil, fontSize: nil, firstCellLook: nil)
             section.blocks.insert(empty, at: 1)
             CertificationReader.read(section, into: &findings)
         }

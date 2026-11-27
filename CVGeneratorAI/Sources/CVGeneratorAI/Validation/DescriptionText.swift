@@ -221,7 +221,7 @@ struct DescriptionText {
     /// A sentence is in another language only when the detector is sure of both languages and they differ, and, given a `wordList`,
     /// the dictionary of the description's language lacks one of its words: a short sentence the detector gives to a close language
     /// ("Gerencio fluxos de dados internos." read as Spanish in a Portuguese description) whose words are all Portuguese stays
-    /// (#354, round 13).
+    /// (#354).
     func isInTheLanguageOfTheDescription(_ sentence: String, wordList: (any WordList)?) -> Bool {
         guard let descriptionLanguage = language, let sentenceLanguage = languageOfText(sentence).map(Self.primaryLanguage),
               sentenceLanguage != descriptionLanguage else { return true }

@@ -29,8 +29,17 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 /// instance per process (ADR 0008).
 ///
 /// - Every save of a design writes a new generation of its package file under `Designs/`, then `index.json`, which
-///   lists each design with its current generation. Both writes are atomic. A save that fails before the index is
-///   written leaves the listed version untouched; superseded and unlisted files are removed at the next save.
+///   lists each design with its current generation and its origin. Each write is atomic, and nothing is written after
+///   the index. A save that fails before or during the index write leaves the listing, the generations and every origin
+///   as they were; superseded and unlisted files are removed at the next save.
+/// - Each index entry records whether the catalog's sync installed the design (`bundled`) or an import did
+///   (`imported`). It is the store's own record: a package is untrusted, so it cannot say what it is. The generation
+///   and the origin are committed by the one write of the index, so a design is never listed without the origin its
+///   save gave it. An entry with no origin has none recorded: the store reads such an entry, and never writes one. The
+///   caller decides what that means.
+/// - A save never replaces a design of the other origin, and the store decides that under its lock: an import leaves an
+///   installed bundled design alone (`ImportSave.keptBundled`), and a conditional save leaves alone one that is not
+///   recorded as bundled (`ConditionalSave.keptImported`).
 /// - A save holds an exclusive `flock` on the store and a read a shared one, so a second instance or another
 ///   process loses no index update. While the lock is held elsewhere the call suspends between attempts and holds no
 ///   thread, and it gives up with `lockTimeout` at the deadline of `lockWait`.
@@ -39,9 +48,11 @@ public enum FileDesignStoreError: Error, Equatable, Sendable {
 ///   directory is never used. Only validated designs leave the store.
 public actor FileDesignStore: DesignStore {
     let directory: URL, validator: DesignPackageValidator, lockWait: LockWait
+    /// How a file of the store is written. Tests replace it to see the order of the writes and to fail one of them.
+    let writeFile: @Sendable (Data, URL) throws -> Void
 
     public init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), lockWait: LockWait = .standard) {
-        self.directory = directory; self.validator = validator; self.lockWait = lockWait
+        self.init(directory: directory, validator: validator, lockWait: lockWait, writeFile: Self.writeAtomically)
     }
 
     /// How the store waits while its lock is held elsewhere: it tries again after each pause, and gives up with
@@ -77,7 +88,19 @@ public actor FileDesignStore: DesignStore {
         }
     }
 
-    static let indexVersion = 1, maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
+    init(directory: URL, validator: DesignPackageValidator = DesignPackageValidator(), lockWait: LockWait = .standard,
+         writeFile: @escaping @Sendable (Data, URL) throws -> Void) {
+        self.directory = directory; self.validator = validator; self.lockWait = lockWait; self.writeFile = writeFile
+    }
+
+    private static func writeAtomically(_ data: Data, to url: URL) throws { try data.write(to: url, options: .atomic) }
+
+    /// The index's schema version. An index written with a new palette, font scheme or origin cannot be read by an older
+    /// app: bump the index version when these change. Schema 2 is new with the origin in each entry, and no device has a
+    /// schema 2 store from before (no released app built a `FileDesignStore`), so the origin record needs no migration:
+    /// an entry with no `origin` is read as having none recorded, and the store never writes one.
+    static let indexVersion = 2
+    static let maxIndexBytes = 1024 * 1024, maxGeneration = Int(Int32.max)
     private var designsDirectory: URL { directory.appendingPathComponent("Designs", isDirectory: true) }
     private var indexFile: URL { directory.appendingPathComponent("index.json") }
     private static func fileName(_ id: String, _ generation: Int) -> String { "\(id).\(generation).mcvt" }
@@ -85,48 +108,156 @@ public actor FileDesignStore: DesignStore {
 
     /// A design file is a design package, in the format the validator reads.
     private struct PackageFile: Codable { let manifest: DesignManifest; let cssContent: String; let previewImageBase64: String? }
-    /// Index schema 1: each stored design's manifest and the generation of its file.
-    private struct IndexV1: Codable { let schemaVersion: Int; let designs: [Entry] }
-    private struct Entry: Codable { let manifest: DesignManifest; let generation: Int }
+    /// Index schema 2: each stored design's manifest, the generation of its file and its origin (nil: none recorded).
+    private struct IndexV2: Codable { let schemaVersion: Int; let designs: [Entry] }
+    private struct Entry: Codable, Equatable {
+        let manifest: DesignManifest, generation: Int
+        let origin: OriginName?
+        func with(origin: OriginName) -> Entry { Entry(manifest: manifest, generation: generation, origin: origin) }
+    }
+    /// How an origin is written. The catalog's `DesignOrigin` does not decide what is on disk, and a new origin does not
+    /// compile until it has a name here.
+    private enum OriginName: String, Codable, Equatable {
+        case bundled, imported
+        init(_ origin: DesignOrigin) {
+            switch origin {
+            case .bundled: self = .bundled
+            case .imported: self = .imported
+            }
+        }
+        var origin: DesignOrigin {
+            switch self {
+            case .bundled: .bundled
+            case .imported: .imported
+            }
+        }
+    }
+    private struct Envelope: Decodable { let schemaVersion: Int }
 
     // MARK: DesignStore
 
-    public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) {
+    @discardableResult public func save(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ImportSave {
+        switch try await saveEntry(design, as: .imported, mode: .anyway) {
+        case .keptOtherOrigin: .keptBundled
+        case .installed, .upgraded, .keptInstalled: .saved
+        }
+    }
+
+    public func saveIfNewer(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> ConditionalSave {
+        switch try await saveEntry(design, as: .bundled, mode: .onlyIfNewer) {
+        case .installed: .installed
+        case .upgraded: .upgraded
+        case .keptInstalled: .keptInstalled
+        case .keptOtherOrigin: .keptImported
+        }
+    }
+
+    private enum Written { case installed, upgraded, keptInstalled, keptOtherOrigin }
+    /// Which installed designs a write replaces. `anyway` and `onlyIfNewer` also install a design that is not there.
+    private enum Mode {
+        /// An import: replaces any design that is not recorded as bundled.
+        case anyway
+        /// The sync: replaces a bundled design of an older version.
+        case onlyIfNewer
+        /// The repair: replaces a bundled design of any version, and installs nothing.
+        case replaceBundled
+    }
+
+    /// The one write path, which records the design's `origin`. The installed design is judged inside the exclusive lock
+    /// that the write holds, and a save never replaces a design of the other origin: an import leaves an installed bundled
+    /// design alone, and a bundled save leaves alone one that the store did not record as bundled (`keptOtherOrigin`).
+    /// With `onlyIfNewer`, an installed design of the same or a newer version is left alone as well. With `replaceBundled`, only a design recorded as bundled is written, whatever its version.
+    private func saveEntry(_ design: ValidatedDesign, as origin: DesignOrigin, mode: Mode) async throws(FileDesignStoreError) -> Written {
         let id = design.manifest.id
         let package = try encodeReadingBack(design)
-        _ = try await withLock(exclusive: true) { () throws(FileDesignStoreError) in
+        let outcome = try await withLock(exclusive: true) { () throws(FileDesignStoreError) -> Written in
             let entries = try readIndex()
+            let installed = entries.first { $0.manifest.id == id }
+            switch mode {
+            case .anyway:
+                if installed?.origin == .bundled { return .keptOtherOrigin }
+            case .onlyIfNewer:
+                if let installed {
+                    guard installed.origin == .bundled else { return .keptOtherOrigin }
+                    if design.manifest.version <= installed.manifest.version { return .keptInstalled }
+                }
+            case .replaceBundled:
+                guard installed?.origin == .bundled else { return .keptOtherOrigin }
+            }
             try removeUnlistedFiles(keeping: entries, for: id)
-            let generation = (entries.first { $0.manifest.id == id }?.generation ?? 0) + 1
+            let generation = (installed?.generation ?? 0) + 1
             guard generation <= Self.maxGeneration else { throw .wouldNotReadBack(id: id) }
-            let entry = Entry(manifest: design.manifest, generation: generation)
+            let entry = Entry(manifest: design.manifest, generation: generation, origin: OriginName(origin))
             let listed = (entries.filter { $0.manifest.id != id } + [entry]).sorted { $0.manifest.id < $1.manifest.id }
-            let index = try encode(IndexV1(schemaVersion: Self.indexVersion, designs: listed), for: id)
-            guard index.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
+            let index = try encodeIndex(listed, for: id)
             try write(package, to: file(entry), for: id)
-            try write(index, to: indexFile, for: id)
+            try write(index, to: indexFile, for: id)   // the only commit: the listing, the generation and the origin are in this one write
+            return installed == nil ? .installed : .upgraded
         }
+        guard let outcome else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
+        return outcome
     }
 
     public func design(id: String) async throws(FileDesignStoreError) -> ValidatedDesign? {
         guard DesignManifest.isValidID(id) else { return nil }   // never a path, such as "../x", or "Clean" on a case-insensitive volume
         return try await withLock(exclusive: false) { () throws(FileDesignStoreError) -> ValidatedDesign? in
             guard let entry = try readIndex().first(where: { $0.manifest.id == id }) else { return nil }
-            let data: Data
-            switch readRegularFile(file(entry), cap: validator.maxBytes) {
-            case .data(let bytes): data = bytes
-            case .absent, .unreadable: throw .designUnreadable(id: id)
-            case .tooLarge(let bytes): throw .designTooLarge(id: id, bytes: bytes)
-            }
-            let design: ValidatedDesign
-            do throws(DesignPackageRejected) { design = try validator.validate(data) } catch { throw .designRejected(id: id, error.violations) }
-            guard design.manifest == entry.manifest else { throw .designRejected(id: id, [.malformed("the manifest differs from the index")]) }
-            return design
+            return try readDesign(entry)
         } ?? nil
+    }
+
+    /// The design a listed entry's file holds, validated again, and the same as the index says.
+    private func readDesign(_ entry: Entry) throws(FileDesignStoreError) -> ValidatedDesign {
+        let id = entry.manifest.id
+        let data: Data
+        switch readRegularFile(file(entry), cap: validator.maxBytes) {
+        case .data(let bytes): data = bytes
+        case .absent, .unreadable: throw .designUnreadable(id: id)
+        case .tooLarge(let bytes): throw .designTooLarge(id: id, bytes: bytes)
+        }
+        let design: ValidatedDesign
+        do throws(DesignPackageRejected) { design = try validator.validate(data) } catch { throw .designRejected(id: id, error.violations) }
+        guard design.manifest == entry.manifest else { throw .designRejected(id: id, [.malformed("the manifest differs from the index")]) }
+        return design
     }
 
     public func installedDesigns() async throws(FileDesignStoreError) -> [DesignManifest] {
         try await withLock(exclusive: false) { () throws(FileDesignStoreError) in try readIndex().map(\.manifest) } ?? []
+    }
+
+    /// Records the installed design as bundled when it equals `design` and has no recorded origin. The index's manifest is
+    /// compared first, then the design's own file, read and validated again. Only the index is rewritten, in one write.
+    public func adoptAsBundled(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> Bool {
+        let id = design.manifest.id
+        let adopted = try await withLock(exclusive: true) { () throws(FileDesignStoreError) -> Bool in
+            let entries = try readIndex()
+            guard let installed = entries.first(where: { $0.manifest.id == id }), installed.manifest == design.manifest,
+                  installed.origin != .imported else { return false }
+            guard try readDesign(installed) == design else { return false }
+            if installed.origin == nil {
+                let adopted = entries.map { $0.manifest.id == id ? $0.with(origin: .bundled) : $0 }
+                try write(try encodeIndex(adopted, for: id), to: indexFile, for: id)
+            }
+            return true
+        }
+        guard let adopted else { throw .storeUnavailable }   // an exclusive lock creates the store, so it is never absent
+        return adopted
+    }
+
+    /// Replaces a design recorded as bundled whatever the versions and whether or not its file can be read: the write
+    /// path never reads the installed file, only the index.
+    public func replaceBundled(_ design: ValidatedDesign) async throws(FileDesignStoreError) -> Bool {
+        switch try await saveEntry(design, as: .bundled, mode: .replaceBundled) {
+        case .upgraded: true
+        case .installed, .keptInstalled, .keptOtherOrigin: false
+        }
+    }
+
+    /// The origins the store has recorded, by identifier, for the designs it lists. A design whose entry has no origin has none.
+    public func installedOrigins() async throws(FileDesignStoreError) -> [String: DesignOrigin] {
+        try await withLock(exclusive: false) { () throws(FileDesignStoreError) -> [String: DesignOrigin] in
+            Dictionary(uniqueKeysWithValues: try readIndex().compactMap { entry in entry.origin.map { (entry.manifest.id, $0.origin) } })
+        } ?? [:]
     }
 
     // MARK: Locking
@@ -221,19 +352,34 @@ public actor FileDesignStore: DesignStore {
         case .unreadable: throw .indexUnreadable
         case .tooLarge: throw .indexCorrupt("too large")
         }
-        struct Envelope: Decodable { let schemaVersion: Int }
+        return try decodeIndex(data)
+    }
+
+    /// The strict reader of the index: what a read decodes, and what a write must be read back as.
+    private func decodeIndex(_ data: Data) throws(FileDesignStoreError) -> [Entry] {
         let version: Int
         do { version = try JSONDecoder().decode(Envelope.self, from: data).schemaVersion } catch { throw .indexCorrupt("no schema version") }
+        // Schema 1 has no migration: it was only ever written by tests, since no app built a FileDesignStore before this version.
         guard version <= Self.indexVersion else { throw .indexFromNewerVersion(version) }
         guard version == Self.indexVersion else { throw .indexCorrupt("schema version \(version)") }
-        let index: IndexV1
-        do { index = try JSONDecoder().decode(IndexV1.self, from: data) } catch { throw .indexCorrupt("not an index") }
+        let index: IndexV2
+        do { index = try JSONDecoder().decode(IndexV2.self, from: data) } catch { throw .indexCorrupt("not an index") }
         let ids = index.designs.map(\.manifest.id)
         guard ids.allSatisfy(DesignManifest.isValidID), ids == ids.sorted(), Set(ids).count == ids.count,
-              index.designs.allSatisfy({ (1...Self.maxGeneration).contains($0.generation) }) else {
+              index.designs.allSatisfy({ (1...Self.maxGeneration).contains($0.generation) && Self.isValid($0.manifest) }) else {
             throw .indexCorrupt("entries")
         }
         return index.designs
+    }
+
+    /// The fields an index holds are checked as the validator checks them in a package (the identifier is checked
+    /// with the list, and the version, palette and font scheme are typed, so they are checked by decoding): an entry the
+    /// validator would refuse is corrupt. The one exception is a markup contract older than the current one: the entry
+    /// of a design saved before the contract changed is listed, its design is refused when read (`designRejected`), and
+    /// the sync replaces a bundled one with its new version. A corrupt entry would make the whole store unreadable (#467).
+    private static func isValid(_ manifest: DesignManifest) -> Bool {
+        DesignManifest.isValidName(manifest.name) && DesignManifest.isValidDescription(manifest.description)
+            && (1...MarkupContract.version).contains(manifest.markupContract)
     }
 
     // MARK: Writing
@@ -255,8 +401,19 @@ public actor FileDesignStore: DesignStore {
         return data
     }
 
+    /// The index's bytes for the listed designs, only if they are within the cap and the strict reader reads them back as the
+    /// same entries, so nothing is written that could not be read back (R12).
+    private func encodeIndex(_ listed: [Entry], for id: String) throws(FileDesignStoreError) -> Data {
+        let data = try encode(IndexV2(schemaVersion: Self.indexVersion, designs: listed), for: id)
+        guard data.count <= Self.maxIndexBytes else { throw .wouldNotReadBack(id: id) }
+        let readBack: [Entry]
+        do throws(FileDesignStoreError) { readBack = try decodeIndex(data) } catch { throw .wouldNotReadBack(id: id) }
+        guard readBack == listed else { throw .wouldNotReadBack(id: id) }
+        return data
+    }
+
     private func write(_ data: Data, to url: URL, for id: String) throws(FileDesignStoreError) {
-        do { try data.write(to: url, options: .atomic) } catch { throw .writeFailed(id: id) }
+        do { try writeFile(data, url) } catch { throw .writeFailed(id: id) }
     }
 
     /// Removes the design files the index does not list: generations a later save superseded, and files a failed

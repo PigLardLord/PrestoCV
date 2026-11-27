@@ -142,7 +142,7 @@ enum WrittenLayer {
         tools[input.id] ?? texts[input.language]?.technologies ?? []
     }
 
-    /// 4 tools of the list of each input's trade, with no name or acronym (#354, round 9).
+    /// 4 tools of the list of each input's trade, with no name or acronym (#354).
     static let tools: [String: [String]] = [
         "jobs-en": ["mixing desks", "line arrays", "stage monitors", "wireless microphones"],
         "jobs-it": ["multimetro", "termocamera", "oscilloscopio", "trapano"],

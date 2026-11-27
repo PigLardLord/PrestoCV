@@ -17,9 +17,13 @@ struct Findings {
 
     mutating func unplace(_ piece: Piece, in section: Section) {
         guard !piece.isEmpty else { return }
-        unplaced.append(UnplacedText(
-            section: section.kind, heading: section.heading.map { document.text(of: $0.span) }, text: piece.text, span: piece.span
-        ))
+        unplaced.append(UnplacedText(section: section.kind, heading: heading(of: section), text: piece.text, span: piece.span))
+    }
+
+    /// The heading of the section as the CV writes it, without the values a heading row also holds; nil when the
+    /// section has none.
+    func heading(of section: Section) -> String? {
+        section.headingText(in: document)
     }
 
     /// A value that was read and is not used, as text not imported: the text of each of its spans.
@@ -30,6 +34,16 @@ struct Findings {
     /// The whole block as text not imported, its cells joined as the canonical text joins them.
     mutating func unplace(_ block: SourceBlock, in section: Section) {
         unplace(Piece(text: document.text(of: block.span), span: block.span), in: section)
+    }
+
+    /// The values of a block of the section as one passage of text not imported: a heading row gives its cells after
+    /// the heading's own one, which is the passage's heading.
+    mutating func unplaceValues(of block: SourceBlock, in section: Section) {
+        guard block.index == section.heading?.index else { return unplace(block, in: section) }
+        let values = section.cells(of: block, in: document)
+        guard let first = values.first, let last = values.last else { return }
+        let span = SourceSpan(first.span.lowerBound, last.span.upperBound)
+        unplace(Piece(text: document.text(of: span), span: span), in: section)
     }
 
     mutating func leaveOut(_ piece: Piece, _ reason: LeftOutText.Reason) {

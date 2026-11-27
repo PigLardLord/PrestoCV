@@ -33,9 +33,11 @@ enum HeaderReader {
         let closing = contactsAfterAName(blocks, in: findings.document)?.index
 
         for section in sections {
+            let heading = findings.heading(of: section)
+            let isForm = isForm(section, in: findings.document)
             for block in section.blocks where !findings.consumedBlocks.contains(block.index) {
                 let cells = Piece.cells(of: block, in: findings.document)
-                if let (label, values) = labelled(cells) {
+                if let (label, values) = labelled(cells) ?? (isForm ? labelledByPosition(cells) : nil) {
                     switch label {
                     case .name:
                         names.add(withoutCredentials(values, in: section, into: &findings), to: \.name, section: section, into: &findings)
@@ -52,13 +54,16 @@ enum HeaderReader {
                         }
                     case .phone, .email, .web:
                         contactBlocks.insert(block.index)
+                        var labels: [Piece] = []
                         for value in values {
                             let contacts = ContactReader.read(value, label: label)
                             emails += contacts.emails.map { ($0, section) }
                             phones += contacts.phones.map { ($0, section) }
-                            findings.cv.person.links += contacts.links
+                            findings.cv.person.links += contacts.links.map { $0.under(heading) }
                             for rest in contacts.rest + contacts.unknownLabels { findings.unplace(rest, in: section) }
+                            labels += contacts.labels
                         }
+                        for shown in namingNoValue(labels, in: block, of: findings.document) { findings.unplace(shown, in: section) }
                     case .birth, .nationality, .maritalStatus, .gender, .fax, .other:
                         // Personal details that the CV has no field for stay visible, with their label
                         findings.unplace(block, in: section)
@@ -67,12 +72,15 @@ enum HeaderReader {
                 }
                 let line = LineContacts(cells)
                 var rest: [Piece] = []
+                var labels: [Piece] = []
                 for contacts in line.cells {
                     emails += contacts.emails.map { ($0, section) }
                     phones += contacts.phones.map { ($0, section) }
-                    findings.cv.person.links += contacts.links
+                    findings.cv.person.links += contacts.links.map { $0.under(heading) }
                     rest += contacts.rest + keepingNames(contacts.unknownLabels, in: section, into: &findings)
+                    labels += contacts.labels
                 }
+                rest += namingNoValue(labels, in: block, of: findings.document)
                 if line.hasContacts { contactBlocks.insert(block.index) }
                 rest.sort { $0.span < $1.span }
                 for (index, piece) in rest.enumerated() {
@@ -108,13 +116,12 @@ enum HeaderReader {
             let candidate = candidates[reading.index]
             findings.cv.person.name = reading.name.quote(check: chosen.isSure && cut.isEmpty ? nil : .nameByPosition)
             taken.insert(reading.index)
-            // The title follows the name, in the same line or the next, and the credentials of the name go with it; a line
-            // that could have been the name is to be checked as the title
+            // The title follows the name, in the same line or the next, as written up to a place of that line (#455), and
+            // the credentials of the name go with it; a line that could have been the name is to be checked as the title
             if let next = titleLine(under: reading.index, in: candidates) {
-                findings.cv.person.title = title(
-                    candidates[next].piece, with: reading.split?.credentials ?? [], couldBeTheName: chosen.couldBeTheName(next)
-                )
-                taken.insert(next)
+                let whole = wholeTitle(from: next, in: candidates, document: findings.document)
+                findings.cv.person.title = title(whole, with: reading.split?.credentials ?? [], couldBeTheName: chosen.couldBeTheName(next))
+                taken.formUnion(whole.indices)
             } else if let tail = reading.split?.tail {
                 findings.unplace(tail, in: candidate.section)
             }
@@ -199,6 +206,14 @@ enum HeaderReader {
     // MARK: Labels
 
     /// A row whose first cell is the label of a personal detail, or a line that reads "Label: value".
+    /// The contact labels of a cell that name no value of their whole line, nor of the line under it, are text of their own
+    /// ("iOS Engineer · Mobile"); a label beside its value, in its cell or in the next one, names it and is dropped.
+    private static func namingNoValue(_ labels: [Piece], in block: SourceBlock, of document: SourceDocument) -> [Piece] {
+        guard !labels.isEmpty else { return [] }
+        let shown = SpanIndex(ContactReader.labelsWithoutAValue(in: block, of: document).map(\.span))
+        return labels.filter { shown.holds($0.span) }
+    }
+
     private static func labelled(_ cells: [Piece]) -> (EntryVocabulary.PersonalLabel, [Piece])? {
         guard let first = cells.first else { return nil }
         if cells.count >= 2, let label = EntryVocabulary.personalLabel(first.text) {
@@ -210,6 +225,73 @@ enum HeaderReader {
         let value = first.sub(first.text.index(after: colon)..<first.text.endIndex).trimmed()
         return value.isEmpty ? nil : (label, [value])
     }
+
+    /// Whether a section is a form of personal details: it is one under a heading of personal information, or it holds
+    /// several lines that are bare labels of one ("Address(es)", "Date of birth"), as a Europass-style form has. One or two
+    /// labelled contacts ("Email: ...") make an ordinary header, not a form (#321).
+    private static func isForm(_ section: Section, in document: SourceDocument) -> Bool {
+        section.kind == .personal || section.blocks.count(where: { block in
+            let cells = Piece.cells(of: block, in: document)
+            return cells.count == 1 && isBareLabel(cells[0].text)
+        }) >= minBareLabelsOfAForm
+    }
+
+    private static let minBareLabelsOfAForm = 2
+
+    /// The details whose value a form may give after its label with no colon: a closed set of values (a nationality, a
+    /// gender, a marital status, a birth date) or the form's own name labels. The other labels start job titles and
+    /// names ("City Planner", "Web Developer", "Mobile Developer"), so they are read only with a colon or a column. A
+    /// value that does not look like the label's own ("Gender Pay Analyst") leaves the line to be a title.
+    private static func isReadByPosition(_ label: EntryVocabulary.PersonalLabel, labelText: String, value: Piece) -> Bool {
+        switch label {
+        case .name, .firstName, .lastName: !continuesACompoundLabel(labelText, value: value.text)
+        case .nationality, .maritalStatus, .gender: EntryVocabulary.looksLikeValue(value.text, of: label)
+        case .birth: value.text.contains(where: \.isNumber)
+        case .address, .phone, .email, .web, .fax, .other: false
+        }
+    }
+
+    /// Whether the label read is only the start of a compound one ("Apelido(s) /" before "Nome(s) Anna Weber"), so that what
+    /// follows is not yet the name. Only the form of the text tells: the label ends with a slash, or the value starts with
+    /// a label word that carries a bracketed plural. A name that starts with a label's word ("Full name Nom Weber") is a name.
+    private static func continuesACompoundLabel(_ labelText: String, value: String) -> Bool {
+        if labelText.hasSuffix("/") || value.hasPrefix("/") { return true }
+        guard let firstWord = value.split(separator: " ").first.map(String.init), firstWord.contains("("), firstWord.hasSuffix(")") else {
+            return false
+        }
+        switch EntryVocabulary.personalLabel(firstWord) {
+        case .name, .firstName, .lastName: return true
+        default: return false
+        }
+    }
+
+    /// A line of one cell that starts with the whole label of a personal detail and goes on with its value, with no colon
+    /// and no column between them: "Nationality German", "Cognome(i)/Nome(i) Weber Anna". The longest label wins.
+    private static func labelledByPosition(_ cells: [Piece]) -> (EntryVocabulary.PersonalLabel, [Piece])? {
+        guard cells.count == 1, let line = cells.first, !line.text.contains(":"), !isBareLabel(line.text) else { return nil }
+        for end in wordEnds(of: line.text).reversed() {
+            guard let label = EntryVocabulary.personalLabel(String(line.text[..<end])) else { continue }
+            let value = line.sub(end..<line.text.endIndex).trimmed()
+            let labelText = String(line.text[..<end])
+            if value.text.contains(where: { $0.isLetter || $0.isNumber }), isReadByPosition(label, labelText: labelText, value: value) {
+                return (label, [value])
+            }
+        }
+        return nil
+    }
+
+    /// Where the first words of a text end, as many as the longest label has.
+    private static func wordEnds(of text: String) -> [String.Index] {
+        var ends: [String.Index] = []
+        var start = text.startIndex
+        while ends.count < maxLabelWords, let space = text[start...].firstIndex(of: " ") {
+            if space > start { ends.append(space) }
+            start = text.index(after: space)
+        }
+        return ends
+    }
+
+    private static let maxLabelWords = 6
 
     // MARK: Contacts
 
@@ -382,7 +464,7 @@ enum HeaderReader {
     /// evidence, neither a mark of any kind nor a title ("Anna Weber / person@example.com / Community Outreach", the last
     /// line the largest); nor does a heading of the first level under a line in the shape of a name, in any column ("Anna
     /// Weber / Nurse / # University Projects"). Such a line stays one that could be the name, so the name is to be checked
-    /// unless a mark of its own makes it sure. A line made only of known places above it, or a piece after a contact,
+    /// unless a mark of its own makes it sure: a title under it still keeps an unmarked name flagged (#328). A line made only of known places above it, or a piece after a contact,
     /// takes no evidence away.
     private static func headName(of candidates: [Candidate], closedAt closing: Int?, in document: SourceDocument) -> HeadName? {
         let window = candidates.indices.prefix(6).filter { candidates[$0].isFirstInBlock }
@@ -396,6 +478,17 @@ enum HeaderReader {
         }
         let titled = indices.filter {
             !candidates[$0].followsContact && !gainsNoEvidence($0) && hasTitle(under: $0, in: candidates, readings: indices)
+        }
+        // Ranking and certainty apart (#328): a title under a line after the closing block gains that line no evidence of the
+        // name, but it still tells that the line could have been it, so it keeps an unmarked name to be checked.
+        // Only a line that nothing says is something else is such a rival: not a place, an organisation, a school, a role or
+        // a heading ("Berlin Germany / Open to relocation").
+        let personLike = Dictionary(uniqueKeysWithValues: readings.map { reading in
+            (reading.index, !isNotAPerson(reading.name.text, titledAsARole: hasRoleUnder(reading.index, in: candidates)))
+        })
+        let titledAfterTheClosing = indices.filter { index in
+            guard let closing, candidates[index].block.index > closing, personLike[index] == true else { return false }
+            return !candidates[index].followsContact && hasTitle(under: index, in: candidates, readings: indices)
         }
         let first = candidates.indices.first { !candidates[$0].followsContact }
         func isMarked(_ index: Int) -> Bool {
@@ -414,8 +507,44 @@ enum HeaderReader {
         let hasOwnTitle = titleLine(under: best.index, in: candidates).map { !indices.contains($0) } ?? false
         let isOnlyMarked = isMarked(best.index) && !rivals.contains(where: isMarked)
         let isPlainlyFirst = best.index == first && (hasOwnTitle || rivals.isEmpty)
-        let isSure = (isOnlyMarked || isPlainlyFirst) && best.doubt == 0 && titled.subtracting([best.index]).isEmpty
+        let hasTitledRival = !titled.subtracting([best.index]).isEmpty
+        let isSure = best.doubt == 0 && !hasTitledRival
+            && (isOnlyMarked || (isPlainlyFirst && titledAfterTheClosing.subtracting([best.index]).isEmpty))
         return HeadName(reading: best, isSure: isSure, rivals: rivals)
+    }
+
+    /// Whether the evidence about the whole line says that a line in the shape of a name is no person. In this order:
+    /// 1. a line made only of known places, or a section's heading, is no person;
+    /// 2. a line that ends in a country or a region ("Potsdam Germany", "Hessen Deutschland") is no person, unless the line
+    ///    under it is a title, a recognised role or any line that is no sentence: that is evidence outside the ambiguous
+    ///    word, and "Sarah Ireland / Dental hygienist" is a person; under "Open to relocation" it is a place (#328);
+    /// 3. a line the role, organisation and school vocabulary explains as a whole is no person ("Senior Nurse",
+    ///    "Beispiel GmbH", "Ospedale di Erfurt"). One such word is no evidence: "Priya Cook" stays a possible person.
+    /// A line with no evidence either way is a possible person: a needless check costs less than a wrong sure name.
+    private static func isNotAPerson(_ text: String, titledAsARole: Bool) -> Bool {
+        Places.isPlaceOnly(text) || SectionVocabulary.kind(ofHeading: text) != nil
+            || (!titledAsARole && Places.endsInCountryOrRegion(text))
+            || EntryVocabulary.explainsWholeLine(text)
+    }
+
+    /// Whether the line under the one at `index` is a title: a recognised role, or a line that is not a sentence. A title
+    /// outside every list ("Dental hygienist") is still no sentence, and that is evidence outside the ambiguous words.
+    private static func hasRoleUnder(_ index: Int, in candidates: [Candidate]) -> Bool {
+        titleLine(under: index, in: candidates).map {
+            EntryVocabulary.isRole(candidates[$0].piece.text) || !readsAsASentence(candidates[$0].piece.text)
+        } ?? false
+    }
+
+    /// Whether a line reads as a sentence and not as a title, by its shape alone: right after its first word it has a short
+    /// function word in lower case (a preposition or an article: "to", "for", "für", "a", "al"), and another word in lower
+    /// case after that ("Open to relocation", "Willing to travel", "Disponibile a trasferte", "Bereit für einen Umzug"). A
+    /// title has no such opening: its words are nouns ("Dental hygienist"), capitalised around a short connector ("Head of
+    /// Sales"), or a noun phrase before the function word ("Dental hygienist in training", #549).
+    private static func readsAsASentence(_ text: String) -> Bool {
+        let rest = text.words.dropFirst()
+        let isLower = { (word: Substring) in word.first(where: \.isLetter)?.isLowercase == true }
+        guard let opening = rest.first, isLower(opening), opening.count(where: \.isLetter) <= 3 else { return false }
+        return rest.dropFirst().contains(where: isLower)
     }
 
     /// The line at `index` read as a name: without its credentials, whole, or without a code that may also be a state's,
@@ -472,12 +601,73 @@ enum HeaderReader {
     }
 
     /// The title with the credentials of the name after it: "Nurse, RN". A title that names a role and also has the form
-    /// of a place ("Driver Creek, Oregon"), or that could have been the name, is to be checked.
-    private static func title(_ piece: Piece, with credentials: [Piece], couldBeTheName: Bool) -> Sourced<String> {
-        let check: CheckReason? = hasPlaceForm(piece.text) || couldBeTheName ? .titleByPosition : nil
-        guard !credentials.isEmpty else { return piece.quote(check: check) }
-        let pieces = [piece] + credentials
-        return Sourced(value: pieces.map(\.text).joined(separator: ", "), spans: pieces.map(\.span), check: check)
+    /// of a place ("Driver Creek, Oregon"), or that could have been the name, is to be checked. So is a title joined from
+    /// several parts of its line: nothing tells a second part of the title ("Platform Lead") from a detail of the head
+    /// ("Open to work"), so the person checks the whole of it, and no part is lost either way. The title quotes its runs
+    /// and the credentials, joined by ", ", so that it is the text of its spans as the import's last check reads them.
+    private static func title(_ whole: WholeTitle, with credentials: [Piece], couldBeTheName: Bool) -> Sourced<String> {
+        let isJoined = whole.parts.count > 1
+        let check: CheckReason? = isJoined || whole.parts.contains { hasPlaceForm($0.text) } || couldBeTheName ? .titleByPosition : nil
+        let quoted = whole.runs + credentials
+        return Sourced(value: quoted.map(\.text).joined(separator: ", "), spans: quoted.map(\.span), check: check)
+    }
+
+    /// The title line read as one title: the candidates it takes, its parts, and its runs, each run the text of the line
+    /// from its first part to its last as written, separators included.
+    private struct WholeTitle {
+        var indices: [Int]
+        var parts: [Piece]
+        var runs: [Piece]
+    }
+
+    /// The title line from its first part on, cut at its separators and read as one title (#455): "iOS Engineer · Platform
+    /// Lead". Parts with a separator between them in one cell make one run, quoted as written; parts set apart (in cells of
+    /// their own, or by space alone) are runs of their own, which the title joins by ", ". It ends before the first part
+    /// that is no part of a title (a place, a period, a heading), which is left for the place or shown as text not
+    /// imported, and before a part that would take it past the words of a title. A line that holds a contact gives only its
+    /// first part, as its other parts are the head's place and details. A title of more than one part is to be checked
+    /// (`title(_:with:couldBeTheName:)`).
+    private static func wholeTitle(from first: Int, in candidates: [Candidate], document: SourceDocument) -> WholeTitle {
+        let line = candidates[first]
+        var indices = [first]
+        var runs = [line.piece]
+        var words = line.piece.words.count
+        guard !line.blockHasContacts else { return WholeTitle(indices: indices, parts: [line.piece], runs: runs) }
+        var next = first + 1
+        while next < candidates.count, candidates[next].block.index == line.block.index, candidates[next].section == line.section,
+              goesOnWithTitle(candidates[next]), words + candidates[next].piece.words.count <= maxTitleWords,
+              let gap = gap(between: candidates[next - 1].piece, and: candidates[next].piece, in: document) {
+            let piece = candidates[next].piece
+            switch gap {
+            case .inOneCell:
+                let run = runs.removeLast()
+                let span = SourceSpan(run.span.lowerBound, piece.span.upperBound)
+                runs.append(Piece(text: document.text(of: span), span: span))
+            case .apart:
+                runs.append(piece)
+            }
+            words += piece.words.count
+            indices.append(next)
+            next += 1
+        }
+        return WholeTitle(indices: indices, parts: indices.map { candidates[$0].piece }, runs: runs)
+    }
+
+    /// What lies between two parts of the title line.
+    private enum Gap {
+        /// A separator in one cell: "iOS Engineer · Platform Lead".
+        case inOneCell
+        /// A cell boundary, which the document writes as a tab, or space alone.
+        case apart
+    }
+
+    /// The gap between two parts of one line; none when anything but a separator or space lies between them, such as a
+    /// placeholder left out: the parts are then not one title.
+    private static func gap(between left: Piece, and right: Piece, in document: SourceDocument) -> Gap? {
+        let between = document.text(of: SourceSpan(left.span.upperBound, right.span.lowerBound))
+        guard !between.contains(where: { $0.isLetter || $0.isNumber }) else { return nil }
+        let isApart = between.allSatisfy(\.isWhitespace) || between.contains { $0 == "\t" || $0.isNewline }
+        return isApart ? .apart : .inOneCell
     }
 
     /// A label the vocabulary does not know ("Contact via") is shown as text not imported. One that has the shape of a name
@@ -525,11 +715,25 @@ enum HeaderReader {
     private static func looksLikeTitle(_ candidate: Candidate) -> Bool {
         let text = candidate.piece.text
         let words = candidate.piece.words
-        guard (1...14).contains(words.count), text.contains(where: \.isLetter), candidate.isFirstInBlock else { return false }
+        guard (1...maxTitleWords).contains(words.count), text.contains(where: \.isLetter), candidate.isFirstInBlock else { return false }
         if !DateReader.periods(in: text).isEmpty || SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         // The line under the name is a title unless it is a place or a street, whatever follows it
         if looksLikePlace(candidate, beside: []) && !EntryVocabulary.isRole(text) { return false }
         return true
+    }
+
+    private static let maxTitleWords = 14
+
+    /// A later part of the title line that goes on with the title: words with a letter, and neither a place nor the form
+    /// of one, a period, a heading or a bare label. The label of a contact with no contact beside it goes on with the title
+    /// ("iOS Engineer · Mobile"): it is shown, not read as a place.
+    private static func goesOnWithTitle(_ candidate: Candidate) -> Bool {
+        let text = candidate.piece.text
+        guard text.contains(where: \.isLetter), DateReader.periods(in: text).isEmpty else { return false }
+        if ContactReader.isContactLabel(text) { return true }
+        if SectionVocabulary.kind(ofHeading: text) != nil || isBareLabel(text) || hasPlaceForm(text) { return false }
+        return !looksLikePlace(candidate, beside: [])
     }
 
     /// A short piece of letters that names a place: a known place or a street, in a line of contacts, or alone with a
@@ -540,6 +744,7 @@ enum HeaderReader {
         guard (1...8).contains(words.count), !text.contains("@"), text.contains(where: \.isLetter) else { return false }
         if EntryVocabulary.isRole(text) || EntryVocabulary.isOrganisation(text) || text.hasSuffix(".") { return false }
         if SectionVocabulary.kind(ofHeading: text) != nil || !DateReader.periods(in: text).isEmpty || isBareLabel(text) { return false }
+        if ContactReader.isContactLabel(text) { return false }
         if Places.isKnownPlace(text) || Places.isAddress(text) { return true }
         if candidate.blockHasContacts && (text.contains(",") || words.count <= 3) { return true }
         return isLoneCity(candidate, beside: contactBlocks)
@@ -602,5 +807,14 @@ enum HeaderReader {
         guard let size = block.fontSize else { return false }
         let sizes = document.blocks.filter { $0.page == block.page }.compactMap(\.fontSize)
         return size >= (sizes.max() ?? 0) - 0.1
+    }
+}
+
+private extension ImportedLink {
+    /// The link, under the heading of the section it stands in.
+    func under(_ heading: String?) -> ImportedLink {
+        var link = self
+        link.heading = heading
+        return link
     }
 }

@@ -13,43 +13,52 @@ enum ContactReader {
         var rest: [Piece] = []
         /// The labels before a contact that the vocabulary does not know ("Contact via"), to be shown as text not imported.
         var unknownLabels: [Piece] = []
+        /// The labels of a contact with no contact beside them ("iOS Engineer · Mobile"): they name no value of the piece.
+        var labels: [Piece] = []
+        /// The kind of the first contact, when nothing but its labels comes before it: the value a label alone on the line
+        /// above may name ("Mobile" over "+49 170 1234567").
+        var leading: Kind?
 
         var isEmpty: Bool { emails.isEmpty && phones.isEmpty && links.isEmpty }
     }
+
+    /// What a contact is.
+    enum Kind { case email, phone, link }
 
     /// `label` is the label the value was given under, when the line had one ("Phone" before a number): a number under
     /// the label of a phone is the phone, whatever its shape.
     static func read(_ piece: Piece, label: EntryVocabulary.PersonalLabel? = nil) -> Contacts {
         var contacts = Contacts()
-        var consumed: [Range<String.Index>] = []
+        var found: [(range: Range<String.Index>, kind: Kind)] = []
         let text = piece.text
 
         for range in emailRanges(in: text) {
             let candidate = piece.sub(range)
             if let email = EmailAddress(candidate.text) {
                 contacts.emails.append(Sourced(value: email, spans: [candidate.span]))
-                consumed.append(range)
+                found.append((range, .email))
             }
         }
         // The words are apart from each other, and so are the numbers: a candidate meets only what was read before its
         // loop, and finding that is a search in order, not a look at each of the ranges (R8)
-        let addresses = Taken(consumed)
+        let addresses = Taken(found.map(\.range))
         for range in tokenRanges(in: text) where !addresses.overlaps(range) {
             let candidate = piece.sub(range)
             if let link = link(candidate) {
                 contacts.links.append(link)
-                consumed.append(range)
+                found.append((range, .link))
             }
         }
-        let beside = Taken(consumed)
-        for range in phoneRanges(in: text, hinted: label == .phone, beside: consumed) where !beside.overlaps(range) {
+        let taken = found.map(\.range)
+        let beside = Taken(taken)
+        for range in phoneRanges(in: text, hinted: label == .phone, beside: taken) where !beside.overlaps(range) {
             let candidate = piece.sub(range)
             if let phone = PhoneNumber(candidate.text) {
                 contacts.phones.append(Sourced(value: phone, spans: [candidate.span]))
-                consumed.append(range)
+                found.append((range, .phone))
             }
         }
-        split(piece, around: consumed, into: &contacts)
+        split(piece, around: found, into: &contacts)
         return contacts
     }
 
@@ -82,18 +91,24 @@ enum ContactReader {
 
     // MARK: What is left of the line
 
-    /// The pieces between the contacts, split at the strong separators. A label right before a contact is not a part
-    /// of the line: a known one is dropped, an unknown one is kept apart to be shown, never read as a place or a title.
-    private static func split(_ piece: Piece, around consumed: [Range<String.Index>], into contacts: inout Contacts) {
+    /// The pieces between the contacts, split at the strong separators. A label right beside a contact is not a part
+    /// of the line: a known one is dropped, an unknown one before a contact is kept apart to be shown, never read as a
+    /// place or a title. A known label with no contact beside it names nothing of the piece and is kept apart too.
+    private static func split(_ piece: Piece, around found: [(range: Range<String.Index>, kind: Kind)], into contacts: inout Contacts) {
         var start = piece.text.startIndex
-        for range in consumed.sorted(by: { $0.lowerBound < $1.lowerBound }) where range.lowerBound >= start {
-            gap(piece.sub(start..<range.lowerBound), beforeAContact: true, into: &contacts)
+        var afterAContact = false
+        for (range, kind) in found.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) where range.lowerBound >= start {
+            gap(piece.sub(start..<range.lowerBound), beforeAContact: true, afterAContact: afterAContact, into: &contacts)
+            if !afterAContact && contacts.rest.isEmpty && contacts.labels.isEmpty && contacts.unknownLabels.isEmpty {
+                contacts.leading = kind
+            }
+            afterAContact = true
             start = range.upperBound
         }
-        gap(piece.sub(start..<piece.text.endIndex), beforeAContact: false, into: &contacts)
+        gap(piece.sub(start..<piece.text.endIndex), beforeAContact: false, afterAContact: afterAContact, into: &contacts)
     }
 
-    private static func gap(_ gap: Piece, beforeAContact: Bool, into contacts: inout Contacts) {
+    private static func gap(_ gap: Piece, beforeAContact: Bool, afterAContact: Bool, into contacts: inout Contacts) {
         let trimmed = gap.trimmed()
         var segments = trimmed.isEmpty ? [] : trimmed.split(by: Separators.strong)
         let endsWithColon = beforeAContact && gap.text.trimmingSpaces().hasSuffix(":")
@@ -106,7 +121,14 @@ enum ContactReader {
                 contacts.unknownLabels.append(last)
             }
         }
-        contacts.rest += segments.filter { !isContactLabel($0.text) }
+        // The labels next to a contact are its own: those before it ("Mobile · +49 …") and those after it ("+49 … (mobile)")
+        var lower = segments.startIndex
+        var upper = segments.endIndex
+        if beforeAContact { while upper > lower, isContactLabel(segments[upper - 1].text) { upper -= 1 } }
+        if afterAContact { while lower < upper, isContactLabel(segments[lower].text) { lower += 1 } }
+        for segment in segments[lower..<upper] {
+            if isContactLabel(segment.text) { contacts.labels.append(segment) } else { contacts.rest.append(segment) }
+        }
     }
 
     /// The piece without a label of a contact at its end, as in "Available for relocation. Mail".
@@ -132,17 +154,58 @@ enum ContactReader {
 
     /// The label of a contact field, such as "E-mail", "Tel.", "Handy", "Phone number" or "(Mobile)".
     static func isContactLabel(_ text: String) -> Bool {
-        if isStrictLabel(text) || extraLabels.contains(SectionVocabulary.key(text)) { return true }
-        // A qualifier in brackets does not change what the label is: "Telefon (privat)"
-        let piece = Piece(text: text, span: SourceSpan(0, text.unicodeScalars.count))
-        let ranges = piece.bracketedRanges()
-        guard !ranges.isEmpty else { return false }
-        let parts = piece.removing(ranges)
-        return parts.count == 1 && (isStrictLabel(parts[0].text) || extraLabels.contains(SectionVocabulary.key(parts[0].text)))
+        labelKind(text) != nil
     }
 
     static func isPhoneLabel(_ text: String) -> Bool {
-        EntryVocabulary.personalLabel(text) == .phone || extraPhoneLabels.contains(SectionVocabulary.key(text))
+        EntryVocabulary.personalLabel(text) == .phone || extraLabels[SectionVocabulary.key(text)] == .phone
+    }
+
+    /// The labels of a contact on a line of the document that name no value: no contact is beside them, and for a label
+    /// alone on its line, no contact of its kind opens the line below ("Mobile" over "+49 170 1234567" names that number,
+    /// "Mobile" over an e-mail address names nothing). The header shows them and the net of silent losses counts them, by
+    /// this one rule (R6).
+    static func labelsWithoutAValue(in block: SourceBlock, of document: SourceDocument) -> [Piece] {
+        let line = Piece(text: document.text(of: block.span), span: block.span)
+        let labels = read(line).labels
+        guard labels.count == 1, let label = labels.first, label.span == line.trimmed().span, let kind = labelKind(label.text)
+        else { return labels }
+        let next = block.index + 1
+        guard document.blocks.indices.contains(next) else { return labels }
+        let below = document.blocks[next]
+        guard let leading = read(Piece(text: document.text(of: below.span), span: below.span)).leading, names(kind, leading)
+        else { return labels }
+        return []
+    }
+
+    /// What a label names: a phone ("Mobile", "Work"), an e-mail address, a web address ("Blog"), or any of them
+    /// ("Personal").
+    private enum LabelKind { case phone, email, link, any }
+
+    private static func labelKind(_ text: String) -> LabelKind? {
+        if let kind = plainLabelKind(text) { return kind }
+        // A qualifier in brackets does not change what the label is: "Telefon (privat)"
+        let piece = Piece(text: text, span: SourceSpan(0, text.unicodeScalars.count))
+        let ranges = piece.bracketedRanges()
+        guard !ranges.isEmpty else { return nil }
+        let parts = piece.removing(ranges)
+        return parts.count == 1 ? plainLabelKind(parts[0].text) : nil
+    }
+
+    private static func plainLabelKind(_ text: String) -> LabelKind? {
+        switch EntryVocabulary.personalLabel(text) {
+        case .phone: .phone
+        case .email: .email
+        case .web: .link
+        default: extraLabels[SectionVocabulary.key(text)]
+        }
+    }
+
+    private static func names(_ label: LabelKind, _ kind: Kind) -> Bool {
+        switch (label, kind) {
+        case (.any, _), (.phone, .phone), (.email, .email), (.link, .link): true
+        default: false
+        }
     }
 
     /// A label the personal details of the CV know: the vocabulary of the labels exists once.
@@ -153,9 +216,13 @@ enum ContactReader {
         }
     }
 
-    private static let extraPhoneLabels: Set<String> = Set(["work", "home"].map(SectionVocabulary.key))
-
-    private static let extraLabels: Set<String> = extraPhoneLabels.union(["personal", "company", "other", "blog"].map(SectionVocabulary.key))
+    /// Words a CV puts before a contact that are not the names of its fields: "Work" and "Home" before a phone, "Blog"
+    /// before a web address, "Personal" before any of them.
+    private static let extraLabels: [String: LabelKind] = Dictionary(
+        ([("work", .phone), ("home", .phone), ("blog", .link), ("personal", .any), ("company", .any), ("other", .any)] as [(String, LabelKind)])
+            .map { (SectionVocabulary.key($0.0), $0.1) },
+        uniquingKeysWith: { first, _ in first }
+    )
 
     // MARK: E-mail addresses
 
@@ -179,6 +246,11 @@ enum ContactReader {
     }
 
     // MARK: Web addresses
+
+    /// The web addresses in a piece of text, each with its range there: a certification's line holds its link (#283).
+    static func webAddresses(in piece: Piece) -> [(link: ImportedLink, range: Range<String.Index>)] {
+        tokenRanges(in: piece.text).compactMap { range in link(piece.sub(range)).map { ($0, range) } }
+    }
 
     /// The ranges of the text's words, without the brackets and punctuation around them.
     private static func tokenRanges(in text: String) -> [Range<String.Index>] {
@@ -219,13 +291,26 @@ enum ContactReader {
         } else {
             return nil
         }
-        let host = lowered.split(separator: "/").first { $0.contains(".") } ?? Substring(lowered)
-        let kind: ImportedLink.Kind
-        if host.contains("linkedin.") { kind = .linkedIn }
-        else if host.contains("github.") { kind = .gitHub }
-        else if host.contains("xing.") { kind = .xing }
-        else { kind = .website }
-        return ImportedLink(address: address, kind: kind)
+        return ImportedLink(address: address, kind: kind(of: address.value))
+    }
+
+    /// The platforms whose profile a link can be, each by its own domain. A link is a profile only when its host is that
+    /// domain or a subdomain of it ("www.github.com", "de.linkedin.com"); any other host is a website: a site on GitHub
+    /// Pages ("tobiasrenn.github.io") and a host that only holds the word ("linkedin.example.org") too.
+    private static let profileDomains: [(domain: String, kind: ImportedLink.Kind)] = [
+        ("linkedin.com", .linkedIn), ("github.com", .gitHub), ("xing.com", .xing),
+    ]
+
+    /// The kind of a link by its host: the host stands between the scheme and the first "/", "?" or "#", without the
+    /// port and without a final dot.
+    private static func kind(of link: WebLink) -> ImportedLink.Kind {
+        let value = link.value.lowercased()
+        // A WebLink always holds its scheme; a value without one is no profile.
+        guard let scheme = value.firstRange(of: "://") else { return .website }
+        var host = value[scheme.upperBound...].prefix { !"/?#".contains($0) }
+        if let colon = host.firstIndex(of: ":") { host = host[..<colon] }
+        while host.hasSuffix(".") { host = host.dropLast() }
+        return profileDomains.first { host == $0.domain || host.hasSuffix("." + $0.domain) }?.kind ?? .website
     }
 
     /// A domain in lower case with a known top-level domain, such as "linkedin.com/in/…" or "example.dev".

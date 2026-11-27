@@ -1,5 +1,6 @@
 #if canImport(FoundationModels)
 import Testing
+import DiagnosticLogging
 import DiagnosticTrace
 import Foundation
 import FoundationModels
@@ -93,7 +94,11 @@ struct DraftingEvaluation {
             languageOfText: { AppLanguageDetector.languageTag(of: $0) }, lexicalClasses: DeviceLexicalTagger()
         )
         let checker = CheckRecorder(wrapped: FoundationModelsClaimChecker(tracer: NoTracer()), log: log)
-        let useCase = CVGeneratorUseCase(service: service, claimChecker: checker, sanitizer: sanitizer)
+        // The real model: the real limits.
+        let useCase = CVGeneratorUseCase(
+            service: service, claimChecker: checker, logger: SilentLogger(), clock: ContinuousClock(), tracer: NoTracer(),
+            validator: DefaultCVValidator(), sanitizer: sanitizer, limits: .standard
+        )
         useCase.observeWriting = { [service] writing, draft in service.record(writing, around: draft) }
         let load = loadAverage()
         let start = ContinuousClock.now
@@ -241,7 +246,7 @@ struct DraftingEvaluation {
         }
 
         /// What `work` answers, with its time; a request that throws is logged with its error and its time, so that a draft stopped
-        /// by a failed or timed-out request shows which one stopped it and why (#354, probe round 4: the stops on macOS 26 left no
+        /// by a failed or timed-out request shows which one stopped it and why (#354: the stops on macOS 26 left no
         /// trace).
         private func recorded<Value>(_ step: String, _ work: () async throws -> Value) async throws -> Value {
             let start = ContinuousClock.now

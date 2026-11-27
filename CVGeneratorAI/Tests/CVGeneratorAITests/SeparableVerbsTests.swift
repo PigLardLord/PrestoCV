@@ -1,7 +1,7 @@
 import Testing
 @testable import CVGeneratorAI
 
-/// The German separable verbs a request wrote apart at the end of a subordinate clause, joined (#354, round 4). The sentences are
+/// The German separable verbs a request wrote apart at the end of a subordinate clause, joined (#354). The sentences are
 /// invented.
 @Suite("German separable verbs joined at the end of a subordinate clause")
 struct SeparableVerbsTests {
@@ -13,7 +13,7 @@ struct SeparableVerbsTests {
         ("Ich sorge dafür, dass die Pumpen sicher laufen.", "Ich sorge dafür, dass die Pumpen sicher laufen."),
         ("Ich arbeite als Teil des Teams mit Kollegen.", "Ich arbeite als Teil des Teams mit Kollegen."),
         ("Ich halte die Ersatzteile bereit, damit wir bereit sind.", "Ich halte die Ersatzteile bereit, damit wir bereit sind."),
-        // A noun before a verb is no particle, though a particle is spelt as it is ("Teil"; #354, round 8).
+        // A noun before a verb is no particle, though a particle is spelt as it is ("Teil"; #354).
         ("Ich prüfe die Schleuse, indem ich auf jedes Teil achte.", "Ich prüfe die Schleuse, indem ich auf jedes Teil achte."),
         ("Ich arbeite gern, weil ich an jeder Übung teil nehme.", "Ich arbeite gern, weil ich an jeder Übung teilnehme."),
         ("I check the gates before the barges come in.", "I check the gates before the barges come in."),
@@ -23,7 +23,7 @@ struct SeparableVerbsTests {
     }
 
     /// A verb of a subordinate clause split into the verb and the particle a main clause ends with (#359): the longest particle, and
-    /// none for a verb that only begins like one (review round 1).
+    /// none for a verb that only begins like one.
     @Test("A separable verb splits at its whole particle; a verb that only begins like one stays whole", arguments: [
         ("einteile", "teile ein"), ("sicherstelle", "stelle sicher"), ("herunterlade", "lade herunter"),
         ("einarbeite", "arbeite ein"), ("ausarbeitete", "arbeitete aus"), ("anordne", "ordne an"), ("teilnehme", "nehme teil"),

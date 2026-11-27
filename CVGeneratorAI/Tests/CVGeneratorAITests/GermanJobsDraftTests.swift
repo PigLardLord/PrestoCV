@@ -3,7 +3,7 @@ import Testing
 
 /// The draft of the evaluation's "jobs-de" (#359, P7): a landscape gardener who names four jobs and the duties of each. Its final
 /// draft lost seven of the duties she said, though the model's first answer held them all. The answer and the text the second pass
-/// wrote are the evaluation's run 1 (revision 5f848081, macOS 27), and every name and trade in them is invented.
+/// wrote are the evaluation's run 1 (macOS 27), and every name and trade in them is invented.
 @Suite("The evaluation's German jobs keep every duty the person said for them (#359, P7)", .richDraft)
 struct GermanJobsDraftTests {
     /// The verbs the device tags in the description and in the written text.

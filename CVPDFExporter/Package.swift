@@ -23,7 +23,7 @@ var targets: [Target] = [
     .target(name: "CVRenderingTestSupport", dependencies: ["CVRendering", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings"]),
     // The markup contract page, which MarkupContractPageTests holds the code to. The test reads it from its bundle: a
     // simulator may run it where the repository is not.
-    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns"], resources: [.copy("../../Docs/markup-contract.md")]),
+    .testTarget(name: "CVDesignCatalogTests", dependencies: ["CVDesignCatalog", "CVBundledDesigns", "CVRenderingTestSupport"], resources: [.copy("../../Docs/markup-contract.md")]),
     .testTarget(name: "CVDesignCatalogFileStoreTests", dependencies: ["CVDesignCatalogFileStore", "CVDesignCatalog", "CVRenderingTestSupport"]),
     .testTarget(
         name: "CVRenderingTests",
@@ -45,12 +45,24 @@ targets += [
     .target(name: "CVRenderingIOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingMacOS", dependencies: ["CVRenderingWebKitSupport", "CVRendering"]),
     .target(name: "CVRenderingPDFKitInspector", dependencies: ["CVRendering"]),
-    .testTarget(name: "CVRenderingWebKitSupportTests", dependencies: ["CVRenderingWebKitSupport"]),
+    // The native renderer checks both platforms run (#78, #80): a library, since Swift Testing runs no tests from one,
+    // and each platform's test target wraps every check in a one-line test.
+    .target(name: "CVRenderingNativeTestSupport", dependencies: [
+        "CVRendering", "CVRenderingTestSupport", "CVRenderingPDFKitInspector", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings",
+        "CVBundledDesigns",
+    ]),
+    .testTarget(name: "CVRenderingPDFKitInspectorTests", dependencies: [
+        "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingNativeTestSupport",
+    ]),
+    .testTarget(name: "CVRenderingWebKitSupportTests", dependencies: ["CVRenderingWebKitSupport", "CVRenderingNativeTestSupport"]),
     .testTarget(name: "CVRenderingIOSTests", dependencies: [
         "CVRenderingIOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
+        "CVRenderingNativeTestSupport",
     ]),
     .testTarget(name: "CVRenderingMacOSTests", dependencies: [
         "CVRenderingMacOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
+        "CVDocumentModel", "CVDesignCatalog", "CVBundledDesigns", "CVBundledHeadings",
+        "CVRenderingNativeTestSupport",
     ]),
 ]
 #endif

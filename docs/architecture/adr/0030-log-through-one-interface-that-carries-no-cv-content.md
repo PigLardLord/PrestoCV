@@ -21,7 +21,7 @@
   - the legacy exporter uses the subsystem `CVPDFExporter`.
   These calls cannot run on Linux or Android ([ADR 0026](0026-keep-the-core-portable-to-android.md)), and no test sees them. Changing where logs go would mean finding and rewriting every call.
 - **A CV is personal data.** The values that `os.Logger` interpolates are private by default: Console shows them as `<private>`, so these logs are hard to read. Making them public would put names, employers and dates in logs that testers send to us.
-- **The owner's direction (2026-10-25):** the logger is an interface, with decorators. Then a crash-reporting service, the native log or a logger of our own can be swapped in "with little effort, without having to replace or track down every log".
+- **The maintainer's direction (2026-10-25):** the logger is an interface, with decorators. Then a crash-reporting service, the native log or a logger of our own can be swapped in "with little effort, without having to replace or track down every log".
 
 ## Decision
 
@@ -162,7 +162,7 @@ This is the one legacy target that gets the interface before submission: it has 
 
 - **`os.Logger` directly, as the legacy code does.**
   - It is native and fast.
-  - It cannot run on Linux or Android, no test sees it, and changing the backend means rewriting every call: what the owner wants to avoid.
+  - It cannot run on Linux or Android, no test sees it, and changing the backend means rewriting every call: what the maintainer wants to avoid.
 - **swift-log as the interface.** It is the standard API on Swift servers. It has many backends, and a multiplexing handler.
   - Its messages and metadata take any string, so nothing keeps CV text out.
   - Its global bootstrap invites a process-wide singleton (R4).
@@ -175,4 +175,4 @@ This is the one legacy target that gets the interface before submission: it has 
   - It is the strongest typing.
   - But every new log line needs a case and a mapping. With that friction, fewer lines get written, and debugging should stay simple.
 - **A crash-reporting service now.** Apple's crash reports already reach Xcode Organizer and TestFlight without an SDK. A service that sends data to a third party is a separate decision, and this interface makes it one adapter.
-- **Everything now, the legacy code included.** The owner chose against it on 2026-10-25. It touches code that will be deleted, and it puts the submission date at risk.
+- **Everything now, the legacy code included.** The maintainer chose against it on 2026-10-25. It touches code that will be deleted, and it puts the submission date at risk.

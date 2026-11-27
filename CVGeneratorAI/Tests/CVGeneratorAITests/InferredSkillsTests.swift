@@ -42,7 +42,7 @@ struct InferredSkillsTests {
         #expect(skills().accepted(name) == name)
     }
 
-    @Test("A name of three words joined by prepositions stays; a clause of more than four words still goes (#354, round 6)",
+    @Test("A name of three words joined by prepositions stays; a clause of more than four words still goes (#354)",
           arguments: [
               ("fr", "logiciel de suivi de lecture", true), ("fr", "j'ai animé des ateliers de lecture", false),
               ("it", "piattaforma di gestione dei compiti", true), ("it", "Ho guidato il team di vendita", false),

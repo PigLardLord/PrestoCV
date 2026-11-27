@@ -109,7 +109,7 @@ struct GroundingContractTests {
 /// One idea of the contract.
 struct GroundingRow: Sendable, CustomTestStringConvertible {
     enum Kind: Sendable {
-        /// A finding of the review rounds, or a rule of the ADR, with a draft that breaks it.
+        /// A finding of a review, or a rule of the ADR, with a draft that breaks it.
         case counterexample
         /// A draft that quotes the app's example description, as a good model would.
         case faithful
@@ -1758,7 +1758,7 @@ enum GroundingRows {
         return rows
     }
 
-    // MARK: A completion year is never a start date (no-go round 3)
+    // MARK: A completion year is never a start date
 
     /// A year written with a verb of finishing a course ("I completed my degree at Alpha University in 2016") is the year the study
     /// ended: the draft's end date takes it, even when the model wrote it as the start, and its start date never (ADR 0023, rule (c),
@@ -6648,7 +6648,7 @@ extension GroundingRows {
                       [Skill(name: "Excel"), Skill(name: "Excel spreadsheets"), planning],
                       .exactly(CVData(personalInfo: info, skills: [planning])),
                       description: AppExample.en + " I have never used Excel."),
-            // The caps of a rich draft are 12 and 6 (probe round 13); the depth is the OS's here.
+            // The caps of a rich draft are 12 and 6; the depth is the OS's here.
             skillsRow("caps-by-kind", "the cap of each kind, 8 technologies and 5 soft skills or 12 and 6 of a rich draft, the named "
                       + "Excel among them: the rest go",
                       technologies.map { Skill(name: $0) } + softSkills.map { Skill(name: $0, kind: .softSkill) },
@@ -6866,7 +6866,7 @@ extension GroundingRows {
                         "I am a plumber and a welder.",
                         CVData(personalInfo: person(title: "welder"), experience: [job("plumber")]),
                         .exactly(CVData(personalInfo: person(title: "welder")))))
-        // Round 1 of approach 4 (#354): the model cut the headline to a part of the title the person states ("amministrativa" of
+        // #354: the model cut the headline to a part of the title the person states ("amministrativa" of
         // "sono impiegata amministrativa a Verona"). The words the person writes in front of it, after "I am", are the title again;
         // words of a clause that claims nothing, or that a negation splits from "I am", are not.
         rows.append(row("a-part-of-a-stated-title-is-the-whole-title-en",

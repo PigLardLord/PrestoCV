@@ -12,7 +12,7 @@ public struct Sourced<Value: Hashable & Sendable>: Hashable, Sendable {
     /// Why the person should check the value; nil when the rules are sure of it.
     public internal(set) var check: CheckReason?
 
-    init(value: Value, spans: [SourceSpan], reading: ReadingRule? = nil, check: CheckReason? = nil) {
+    package init(value: Value, spans: [SourceSpan], reading: ReadingRule? = nil, check: CheckReason? = nil) {
         self.value = value
         self.spans = spans
         self.reading = reading
@@ -33,7 +33,7 @@ public enum ReadingRule: String, Hashable, Sendable {
 }
 
 /// Why a value of an import should be checked by the person.
-public enum CheckReason: String, Hashable, Sendable {
+public enum CheckReason: String, Hashable, Sendable, CaseIterable {
     /// The name was taken from its place at the top, with no label or mark that says it is the name, or a heading that
     /// closed the head could have been it.
     case nameByPosition
@@ -49,6 +49,9 @@ public enum CheckReason: String, Hashable, Sendable {
     /// Nothing in the section told whether the lines next to the entry's dates are its own or the entry's beside it:
     /// the more common layout decided.
     case entryBoundsUnsure
+    /// A line in capitals in the entry may be a heading the vocabulary does not know: the lines stayed where they read
+    /// best, to be checked.
+    case headingUnsure
     /// A date the rules could not make a period of, such as an end before the start.
     case periodUnreadable
     /// A period without an end: "2019 –".
@@ -57,6 +60,9 @@ public enum CheckReason: String, Hashable, Sendable {
     case levelNotCEFR
     /// A Europass grid that gives the language different levels.
     case levelsDiffer
+    /// A line under a certification that only its words, not the layout, made the certification's description; or a line
+    /// that reads as such a description and became a certification of its own (#283).
+    case descriptionOrEntryUnsure
 }
 
 // MARK: - The imported CV
@@ -94,6 +100,9 @@ public struct ImportedLink: Hashable, Sendable {
 
     public let address: Sourced<WebLink>
     public let kind: Kind
+    /// The heading of the section the address stands in, as the CV writes it; nil in the head of the CV, before the first
+    /// heading. A second website, which the CV has no field for, is shown under it, where the CV wrote it (#456).
+    public var heading: String?
 }
 
 public struct ImportedExperience: Hashable, Sendable {
@@ -105,6 +114,9 @@ public struct ImportedExperience: Hashable, Sendable {
     public var details: [Sourced<String>] = []
     /// Why the person should check the entry as a whole.
     public var check: CheckReason?
+    /// The heading of the section the job stands in, as the CV writes it; nil when the section has none. A date the CV
+    /// cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 public struct ImportedEducation: Hashable, Sendable {
@@ -114,6 +126,9 @@ public struct ImportedEducation: Hashable, Sendable {
     public var period: Sourced<ImportedPeriod>?
     public var details: [Sourced<String>] = []
     public var check: CheckReason?
+    /// The heading of the section the study stands in, as the CV writes it; nil when the section has none. The study's
+    /// place, which the CV has no field for, is shown under it, where the CV wrote it (#456).
+    public var heading: String?
 }
 
 public struct ImportedLanguage: Hashable, Sendable {
@@ -123,12 +138,24 @@ public struct ImportedLanguage: Hashable, Sendable {
     /// The words that give a level the rules do not read as CEFR: "fluent", "buono", "Professional working". Only
     /// when the language has no level: words beside a level are text not imported.
     public var levelWords: Sourced<String>?
+    /// The heading of the section the language stands in, as the CV writes it; nil when the section has none. A language
+    /// the CV cannot take is shown under it, where the CV wrote it (#452).
+    public var heading: String?
 }
 
 public struct ImportedCertification: Hashable, Sendable {
     public var name: Sourced<String>
     public var issuer: Sourced<String>?
     public var year: Sourced<Int>?
+    /// The web address the text gives for the certification, in its line or on a line of its own under it.
+    public var link: Sourced<WebLink>?
+    /// The sentences under the certification that tell what it is, in order.
+    public var description: Sourced<String>?
+    /// Why the person should check the certification as a whole.
+    public var check: CheckReason?
+    /// The heading of the section the certification stands in, as the CV writes it; nil when the section has none. A year
+    /// the CV cannot take is shown under it, where the CV wrote it.
+    public var heading: String?
 }
 
 // MARK: - What was not imported
@@ -143,14 +170,14 @@ public struct UnplacedText: Hashable, Sendable {
 }
 
 /// A value of an imported CV with its place in the CV: `experience[0].role`. The trace of a test build lists them
-/// (ADR 0032); the grounding counts their spans.
-struct ImportedField: Hashable, Sendable {
-    let path: String
+/// (ADR 0032); the grounding counts their spans; the app's mirror-completeness test walks them.
+public struct ImportedField: Hashable, Sendable {
+    public let path: String
     /// The value as text: the quoted text, or what a reading rule read in it.
-    let value: String
-    let spans: [SourceSpan]
-    let reading: ReadingRule?
-    let check: CheckReason?
+    public let value: String
+    public let spans: [SourceSpan]
+    public let reading: ReadingRule?
+    public let check: CheckReason?
 }
 
 extension ImportedCV {
@@ -159,7 +186,7 @@ extension ImportedCV {
 
     /// Every value of the CV, in the order of the CV, and the checks of whole entries. A new field of the CV joins this
     /// list.
-    var fields: [ImportedField] {
+    public var fields: [ImportedField] {
         var fields: [ImportedField] = []
         func add<Value>(_ path: String, _ value: Sourced<Value>?, as text: (Value) -> String) {
             guard let value else { return }
@@ -202,9 +229,12 @@ extension ImportedCV {
             add("languages[\(index)].levelWords", language.levelWords)
         }
         for (index, certification) in certifications.enumerated() {
+            addCheck("certifications[\(index)].check", certification.check)
             add("certifications[\(index)].name", certification.name)
             add("certifications[\(index)].issuer", certification.issuer)
             add("certifications[\(index)].year", certification.year, as: String.init)
+            add("certifications[\(index)].link", certification.link, as: \.value)
+            add("certifications[\(index)].description", certification.description)
         }
         for (index, interest) in interests.enumerated() { add("interests[\(index)]", interest) }
         return fields
@@ -224,5 +254,54 @@ extension ImportedPeriod {
         case .current: return text(start) + " – current"
         case .unstated: return text(start) + " –"
         }
+    }
+}
+
+// MARK: - Construction for tests
+
+// Inside the package only: a test support target builds imports that no reader read, so that the app's tests can script
+// one. Nothing outside the package can make a value without its evidence.
+extension ImportedLink {
+    package static func scripted(_ kind: Kind, _ address: Sourced<WebLink>, heading: String? = nil) -> ImportedLink {
+        ImportedLink(address: address, kind: kind, heading: heading)
+    }
+}
+
+extension ImportedExperience {
+    package static func scripted(role: Sourced<String>?, employer: Sourced<String>?, location: Sourced<String>?,
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?,
+                                 heading: String? = nil) -> ImportedExperience {
+        ImportedExperience(role: role, employer: employer, location: location, period: period, details: details, check: check, heading: heading)
+    }
+}
+
+extension ImportedEducation {
+    package static func scripted(degree: Sourced<String>?, school: Sourced<String>?, location: Sourced<String>?,
+                                 period: Sourced<ImportedPeriod>?, details: [Sourced<String>], check: CheckReason?,
+                                 heading: String? = nil) -> ImportedEducation {
+        ImportedEducation(degree: degree, school: school, location: location, period: period, details: details, check: check, heading: heading)
+    }
+}
+
+extension ImportedLanguage {
+    package static func scripted(
+        _ name: Sourced<String>, level: Sourced<LanguageProficiency>?, levelWords: Sourced<String>?, heading: String? = nil
+    ) -> ImportedLanguage {
+        ImportedLanguage(name: name, level: level, levelWords: levelWords, heading: heading)
+    }
+}
+
+extension ImportedCertification {
+    package static func scripted(
+        _ name: Sourced<String>, issuer: Sourced<String>?, year: Sourced<Int>?, link: Sourced<WebLink>?, description: Sourced<String>?,
+        check: CheckReason?, heading: String? = nil
+    ) -> ImportedCertification {
+        ImportedCertification(name: name, issuer: issuer, year: year, link: link, description: description, check: check, heading: heading)
+    }
+}
+
+extension UnplacedText {
+    package static func scripted(section: SectionKind, heading: String?, text: String, span: SourceSpan) -> UnplacedText {
+        UnplacedText(section: section, heading: heading, text: text, span: span)
     }
 }

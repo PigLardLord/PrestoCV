@@ -10,11 +10,30 @@ struct Section: Equatable {
     /// The heading is one of the first level in the shape of a name that closed the head: it could have been the name
     /// (#301), so the name the head gives is to be checked.
     var headingCouldBeTheName = false
+    /// The indices of the blocks that may be a heading the vocabulary does not know, left in the section (#454): the
+    /// entry that takes one is to be checked.
+    var doubtfulHeadings: Set<Int> = []
+
+    /// Which neighbour a line of dates alone belongs to, by the index of its block, where the section was split into runs by
+    /// `StudiesAndCertifications` (#461): the reader of a run follows that choice instead of deciding again. Empty for a
+    /// section that was not split.
+    var dateOwners: [Int: DateOwner] = [:]
+
+    /// The entry a line of dates alone dates: the one above it or the one below it.
+    enum DateOwner: Equatable { case above, below }
+
+    /// The kinds the heading joins ("Education & Certifications"), when it joins two or more; empty otherwise.
+    var parts: Set<SectionKind> = []
 
     /// What the heading is in the text: its block, or, when a row of cells opens the section, its first cell.
     var headingSpan: SourceSpan? {
         guard let heading else { return nil }
         return heading.cells.count > 1 && blocks.first?.index == heading.index ? heading.cells[0] : heading.span
+    }
+
+    /// The heading as the CV writes it, without the values a heading row also holds; nil when the section has none.
+    func headingText(in document: SourceDocument) -> String? {
+        headingSpan.map { document.text(of: $0) }
     }
 
     /// The cells of a block of the section: a heading row that also holds the section's first value, as the formato
@@ -34,6 +53,7 @@ enum SectionSegmenter {
         var sections: [Section] = [Section(kind: .header, heading: nil, blocks: [], languages: [])]
         var column = document.blocks.first?.column
         var readings = HeaderReader.HeadReadings()
+        let look = try HeadingLook(of: document, work: &work)
         for (position, block) in document.blocks.enumerated() {
             // A second column starts with its own head: a sidebar that opens with the contacts
             if block.column != column {
@@ -68,7 +88,7 @@ enum SectionSegmenter {
             if block.cells.count > 1, block.kind != .listItem, block.kind != .tableHeader,
                let match = SectionVocabulary.kind(ofHeading: firstCell), firstCell.words.count <= SectionVocabulary.maximumWords {
                 // A heading in the first cell of a row, its section's first value in the others
-                sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages))
+                sections.append(Section(kind: match.kind, heading: block, blocks: [block], languages: match.languages, parts: match.parts))
                 continue
             }
             if let opening = try heading(
@@ -77,9 +97,36 @@ enum SectionSegmenter {
             ) {
                 sections.append(Section(
                     kind: opening.match.kind, heading: block, blocks: [], languages: opening.match.languages,
-                    headingCouldBeTheName: opening.couldBeTheName
+                    headingCouldBeTheName: opening.couldBeTheName, parts: opening.match.parts
                 ))
                 continue
+            }
+            // A group's label ("Qualities", "Trade skills") with no language in it, after a group called "Languages" that
+            // came inside the skills: the languages end there (#305)
+            if sections[sections.count - 1].kind == .languages, sections.count >= 2, sections[sections.count - 2].kind == .skills, block.kind != .listItem, block.cells.count == 1,
+               SkillGroups.reopensSkills(
+                firstCell, following: document.blocks.dropFirst(position + 1).first.map { document.text(of: $0.span) }
+               ) {
+                sections.append(Section(kind: .skills, heading: block, blocks: [], languages: []))
+                continue
+            }
+            // A heading the vocabulary does not know, drawn as the ones it knows: its lines stay visible (#454). One that
+            // may as well be the employer of a job stays in the jobs and the studies, where its entry is to be checked; one
+            // with a word of an entry opens nothing elsewhere either, as no other section reads roles or employers (#466)
+            let current = sections[sections.count - 1]
+            if !headKinds.contains(current.kind) {
+                switch try look.reading(block, at: position, after: current, in: document, work: &work) {
+                case .heading:
+                    sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
+                    continue
+                case .doubtful where entryKinds.contains(current.kind), .wordOfAnEntry where entryKinds.contains(current.kind):
+                    sections[sections.count - 1].doubtfulHeadings.insert(block.index)
+                case .doubtful:
+                    sections.append(Section(kind: .unknown, heading: block, blocks: [], languages: []))
+                    continue
+                case .wordOfAnEntry, .partOfTheSection:
+                    break
+                }
             }
             sections[sections.count - 1].blocks.append(block)
         }
@@ -90,6 +137,9 @@ enum SectionSegmenter {
 
     /// The sections the head of the CV is read from.
     private static let headKinds: Set<SectionKind> = [.header, .personal]
+
+    /// The sections read as entries with an employer or a school, where a line in capitals may be either.
+    private static let entryKinds: Set<SectionKind> = [.experience, .education]
 
     /// Whether the contacts of the head follow a name, read from the head's `sections`: the head is read again for each
     /// heading of the first level that has the shape of a name, which the head grows by when it is no section's. A block of
@@ -161,9 +211,8 @@ enum SectionSegmenter {
     /// a short line in capitals that the PDF draws bold or large.
     private static func isMarkedAsHeading(_ block: SourceBlock, text: String) -> Bool {
         if case .heading(let level) = block.kind, level <= 2 { return true }
-        let letters = text.filter(\.isLetter)
-        let isCapitals = !letters.isEmpty && letters.allSatisfy(\.isUppercase)
-        return block.isEmphasized && block.frame != nil && isCapitals && text.words.count <= 4 && !text.contains(where: \.isNumber)
+        return block.isEmphasized && block.frame != nil && HeadingLook.isCapitals(text) && text.words.count <= 4
+            && !text.contains(where: \.isNumber)
             && DateReader.periods(in: text).isEmpty
     }
 

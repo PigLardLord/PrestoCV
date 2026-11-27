@@ -1,7 +1,7 @@
 import Foundation
 
 /// A verb followed by the noun of its own action and that action's object ("Gestisco la gestione delle fatture", "I schedule the
-/// scheduling of the shifts") says the work twice (#354, round 12). The noun, its article and the "of" go, and the object stays
+/// scheduling of the shifts") says the work twice (#354). The noun, its article and the "of" go, and the object stays
 /// with its own article: "Gestisco le fatture", "I schedule the shifts". Nothing else of the sentence changes.
 enum OwnActionNoun {
     /// The words that may stand before the verb: the person.

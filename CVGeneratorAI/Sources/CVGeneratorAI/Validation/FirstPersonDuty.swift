@@ -19,8 +19,8 @@ import Foundation
 /// A first word in the first person that ends as a gerund ("Prendo le ordinazioni") keeps its words too, as does a duty with a form
 /// the list does not know. Each duty starts with a capital letter.
 ///
-/// A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is written the same way (#354, round 10), and
-/// so is one in -ere or -ire of an ended Italian job (round 14).
+/// A duty that starts with an Italian infinitive in -are or a Portuguese one in -ar is written the same way (#354), and
+/// so is one in -ere or -ire of an ended Italian job.
 enum FirstPersonDuty {
     private struct Endings {
         /// The endings of the form the rewrite reads: a gerund's, or an infinitive's.
@@ -56,9 +56,9 @@ enum FirstPersonDuty {
         ),
     ]
 
-    /// The Italian infinitives in -are and the Portuguese ones in -ar, which the rewrite reads as it reads a gerund (#354, round 10):
+    /// The Italian infinitives in -are and the Portuguese ones in -ar, which the rewrite reads as it reads a gerund (#354):
     /// asked for one more duty, the model wrote "Criar um sistema" and wrote it again in the repair. The Italian ones in -ere and -ire
-    /// are written in the imperfect of an ended job, whose endings do not change the stem ("seguire" is "seguivo", #354, round 14),
+    /// are written in the imperfect of an ended job, whose endings do not change the stem ("seguire" is "seguivo", #354),
     /// but for "essere"; in the current job they stay as they are, as their present often changes the stem ("tenere" is "tengo",
     /// and "volere" is not "volo"). The Portuguese ones in -er and -ir ("manter" is "mantenho", "pedir" is "peço") and the Spanish
     /// ones ("jugar" is "juego", and "jugo" is another word) stay as they are, and the duty check drops them.
@@ -279,7 +279,7 @@ enum FirstPersonDuty {
         ),
     ]
 
-    /// `duty` of an ended job in the past its first `held` duty uses (#354, round 12): after "Ho gestito…", the rewrite of an
+    /// `duty` of an ended job in the past its first `held` duty uses (#354): after "Ho gestito…", the rewrite of an
     /// infinitive, or the model, wrote "Verificavo…", and the job mixed two pasts. When that duty opens with the perfective past
     /// (`Perfective`), each part of `duty` that opens with the imperfect in -avo (Italian) or -ava (Portuguese) is written in it:
     /// "Ho verificato… e preparato…", "Revisei… e organizei…". A part in another imperfect, or a form the word list does not know,

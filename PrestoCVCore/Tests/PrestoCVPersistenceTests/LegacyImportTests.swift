@@ -54,6 +54,27 @@ struct LegacyImportTests {
         #expect(report.drops[idA] == [.look])
     }
 
+    @Test("a CV whose only finding is a period to check is imported whole, and its source stays until the person has seen it")
+    func periodToCheckKeepsTheSource() async throws {
+        let fields = #""relevant_experience":[{"title":"T","company":"C","period":"since forever"}]"#
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.minimal(fields)])
+        let report = try await w.importer().run()
+        #expect(report.imported == [idA] && report.checks[idA] == [.period] && report.drops[idA] == nil)
+        #expect(report.removedSources.isEmpty && report.awaitingAcknowledgement[idA] != nil)
+        #expect(FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+        let done = await w.importer().acknowledgeLosses(of: report)
+        #expect(done.removedSources.count == 1 && done.failures.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: w.legacyFile(LegacyFixtures.idA).path))
+    }
+
+    @Test("what was dropped and what is to check are reported apart, for the same CV")
+    func reportsDropsAndChecksApart() async throws {
+        let fields = #""look":{"palette":"ocean"},"education":[{"degree":"D","school":"S","period":"2020"}]"#
+        let w = try world([LegacyFixtures.fileName(LegacyFixtures.idA): LegacyFixtures.minimal(fields)])
+        let report = try await w.importer().run()
+        #expect(report.drops[idA] == [.look] && report.checks[idA] == [.period])
+    }
+
     @Test("a source is removed only once its copy is stored, and the copy reads back")
     func removesVerifiedSources() async throws {
         let w = try standard()
@@ -443,7 +464,7 @@ private func oneRecord() -> LegacyRecord { oneRecord(drops: []) }
 private func oneRecord(drops: [LegacyDrop]) -> LegacyRecord {
     let cv = CV(id: idA, revision: 0, createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 200), title: "T",
                 personal: PersonalDetails(fullName: "N"), sections: CVSections(), design: nil, language: nil)
-    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops)), version: .init(bytes: fakeBytes))
+    return LegacyRecord(key: key("cv_x.json"), content: .cv(LegacyCV(cv: cv, drops: drops, checks: [])), version: .init(bytes: fakeBytes))
 }
 
 @Suite("The source is kept until the new copy is verified")
@@ -563,5 +584,53 @@ struct LegacySourceKeptTests {
         }
         let target = FakeTarget { _ throws(RepositoryError) in .existing }
         await #expect(throws: RepositoryError.storeUnavailable(.cannotList)) { try await ImportLegacyStore(source: Broken(), target: target).run() }
+    }
+}
+
+@Suite("What a launch tells of its import")
+struct LegacyImportOutcomeTests {
+    @Test("a CV stored with its file left counts as imported, not failed; a run that stopped or never listed knows no count")
+    func counts() {
+        var report = LegacyImportReport()
+        report.imported = [idA]
+        report.alreadyStored = [idB]
+        report.failures = [.unreadable, .didNotReadBack, .sourceChanged, .sourceNotRemoved(.storeUnavailable(.cannotLock))]
+            .enumerated().map { LegacyImportFailure(key: key("\($0.offset)"), reason: $0.element) }
+        var erased = LegacyImportReport()
+        erased.storeErased = true
+
+        #expect(LegacyImportOutcome.ran(report).imported == 2)
+        #expect(LegacyImportOutcome.ran(report).failed == 2)
+        #expect(LegacyImportOutcome.ran(LegacyImportReport()).failed == 0)
+        #expect(LegacyImportOutcome.ran(erased).failed == nil)
+        #expect(LegacyImportOutcome.failed(.storeUnavailable(.cannotList)).failed == nil)
+    }
+}
+
+@Suite("Why a legacy CV is missing from the new store")
+struct LegacyLeftOutTests {
+    @Test("a damaged file and a CV the store could not keep are left out; a stored CV whose file stayed is not")
+    func causes() {
+        let reasons: [LegacyImportFailure.Reason] = [
+            .invalid(.json), .unreadable, .notStored(.storeUnavailable(.cannotLock)), .didNotReadBack,
+            .sourceNotRemoved(.storeUnavailable(.cannotLock)), .sourceChanged,
+        ]
+        #expect(reasons.map(\.leftOut) == [.damaged, .damaged, .notSaved, .notSaved, nil, nil])
+    }
+
+    @Test("a launch that left CVs out, or never knew them, may leave CVs out; one that stored all or was erased may not")
+    func mayLeaveCVsOut() {
+        var leftOut = LegacyImportReport()
+        leftOut.failures = [LegacyImportFailure(key: key("a"), reason: .unreadable)]
+        var kept = LegacyImportReport()
+        kept.failures = [LegacyImportFailure(key: key("b"), reason: .sourceChanged)]
+        var erased = LegacyImportReport()
+        erased.storeErased = true
+
+        #expect(LegacyImportOutcome.ran(leftOut).mayLeaveCVsOut)
+        #expect(LegacyImportOutcome.failed(.storeUnavailable(.cannotList)).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(kept).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(erased).mayLeaveCVsOut)
+        #expect(!LegacyImportOutcome.ran(LegacyImportReport()).mayLeaveCVsOut)
     }
 }

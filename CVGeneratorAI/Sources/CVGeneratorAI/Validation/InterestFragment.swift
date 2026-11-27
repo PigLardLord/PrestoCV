@@ -85,7 +85,7 @@ enum InterestFragment {
 
     private static let conjunctions: Set<String> = ["und", "oder", "sowie"]
 
-    /// The German negations, and the words that say the person does it hardly ever, as `Word.folded` writes them (review round 2).
+    /// The German negations, and the words that say the person does it hardly ever, as `Word.folded` writes them.
     private static let denials = WrittenTextWords.of(.german).negations.union(["kaum", "selten", "nimmer", "nirgends", "nirgendwo"])
 
     private static func capitalized(_ word: String) -> String {

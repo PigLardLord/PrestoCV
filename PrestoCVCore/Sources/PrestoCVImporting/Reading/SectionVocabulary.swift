@@ -36,6 +36,9 @@ enum SectionVocabulary {
     struct Match: Equatable {
         let kind: SectionKind
         let languages: Set<CVLanguage>
+        /// The kinds a heading of alternatives joins when they are two or more ("Education & Certifications"); empty for
+        /// any other heading.
+        var parts: Set<SectionKind> = []
     }
 
     /// The most words a heading has: a longer line is a sentence, whatever words of a heading it has.
@@ -59,11 +62,19 @@ enum SectionVocabulary {
     /// ("e", "and", "und", "y", "et") left out.
     static func key(_ text: String) -> String {
         var cleaned = ""
-        for character in text.folded {
+        for character in withoutPluralMarks(text.folded) {
             cleaned.append(character.isLetter || character.isNumber ? character : " ")
         }
         return cleaned.split(separator: " ").filter { !joiningWords.contains(String($0)) }.joined(separator: " ")
     }
+
+    /// The text without the plural a form writes in brackets: "Surname(s)", "Cognome(i)", "Address(es)".
+    private static func withoutPluralMarks(_ text: String) -> String {
+        guard text.contains("(") else { return text }
+        return pluralMarks.reduce(text) { $0.replacing($1, with: "") }
+    }
+
+    private static let pluralMarks = ["(s)", "(i)", "(es)", "(n)", "(en)"]
 
     private static let joiningWords: Set<String> = ["and", "e", "und", "y", "et", "s"]
 
@@ -113,9 +124,10 @@ enum SectionVocabulary {
     }
 
     /// Two or more known headings joined by "/", "&", "+", "|", a comma or a joining word: "Weiterbildung / Kurse". When
-    /// the parts are one kind of section, it is that kind; when they are two, no section of its own reads them, so
-    /// they are additional information and the lines under the heading show as text not imported. The vote is the
-    /// languages that all the parts have, or, if there are none, the languages of any part.
+    /// the parts are one kind of section, it is that kind; when they are two or more, the heading is additional
+    /// information that names its kinds in `parts`: the reader of the CV reads each entry under it by its own shape when
+    /// it knows the pair (the studies and the certifications, #453), and shows the lines as text not imported otherwise.
+    /// The vote is the languages that all the parts have, or, if there are none, the languages of any part.
     private static func alternatives(_ text: String) -> Match? {
         var spaced = ""
         for character in text { spaced += alternativeSeparators.contains(character) ? " | " : String(character) }
@@ -136,7 +148,7 @@ enum SectionVocabulary {
         let kinds = Set(matches.map(\.kind))
         let common = matches.dropFirst().reduce(matches[0].languages) { $0.intersection($1.languages) }
         let languages = common.isEmpty ? matches.reduce(into: Set<CVLanguage>()) { $0.formUnion($1.languages) } : common
-        return Match(kind: kinds.count == 1 ? matches[0].kind : .additional, languages: languages)
+        return Match(kind: kinds.count == 1 ? matches[0].kind : .additional, languages: languages, parts: kinds.count > 1 ? kinds : [])
     }
 
     private static let languageLabels: Set<String> = Set([
