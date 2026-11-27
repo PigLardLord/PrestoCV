@@ -16,6 +16,10 @@ import Synchronization
 ///   the delete and then finds no file, never half of one.
 /// - `readPDF(of:)` reads within the size bound, from the path `receive` captured, and only the file of the identity it
 ///   captured: a path that names another file by then is not read.
+/// - A copy is deleted only by the release of a file this run received. A copy left by a run that ended before reading
+///   it stays in the app's container: no file this run did not receive is ever deleted.
+/// - `logging(to:)` gives an adapter over the same received files and copies left over, writing to another log: the
+///   process makes one, and each part that holds files uses its own log.
 public final class ImportFileAdapter: ImportFileReading {
     private struct Received {
         /// Nil when the path named no regular file at `receive`: such a file is never read and never deleted.
@@ -42,25 +46,54 @@ public final class ImportFileAdapter: ImportFileReading {
         let failures: [ImportFileError]
     }
 
+    /// What the adapters made by `logging(to:)` share.
+    private final class Holdings: Sendable {
+        let state: Mutex<State>
+
+        init() {
+            state = Mutex(State())
+        }
+    }
+
     private let files: any ImportFileSystem
     private let copyFolders: [URL]
     private let maximumBytes: Int
     private let logger: any DiagnosticLogger
-    private let state = Mutex(State())
+    private let holdings: Holdings
 
-    /// - Parameter copyFolders: the folders the system puts the copy of an opened file in; only a file directly inside
-    ///   one of them is ever deleted.
+    /// - Parameters:
+    ///   - copyFolders: the folders the system puts the copy of an opened file in; only a file directly inside one of
+    ///     them, received by this run, is ever deleted.
     public init(files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, logger: any DiagnosticLogger) {
         self.files = files
         self.copyFolders = copyFolders
         self.maximumBytes = maximumBytes
         self.logger = logger
+        holdings = Holdings()
+    }
+
+    private init(
+        files: any ImportFileSystem, copyFolders: [URL], maximumBytes: Int, logger: any DiagnosticLogger,
+        holdings: Holdings
+    ) {
+        self.files = files
+        self.copyFolders = copyFolders
+        self.maximumBytes = maximumBytes
+        self.logger = logger
+        self.holdings = holdings
+    }
+
+    /// An adapter over the same received files, writing to `logger`.
+    public func logging(to logger: any DiagnosticLogger) -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: files, copyFolders: copyFolders, maximumBytes: maximumBytes, logger: logger, holdings: holdings
+        )
     }
 
     public func receive(_ url: URL) -> ReceivedFile {
         // Access first: without it the system may not even let the path be resolved or looked at
         let scoped = files.startAccess(url) ? url : nil
-        return state.withLock { state -> ReceivedFile in
+        return holdings.state.withLock { state -> ReceivedFile in
             let resolved = files.resolve(url)
             let identity = files.identity(ofResolved: resolved)
             let id = state.nextID
@@ -75,7 +108,10 @@ public final class ImportFileAdapter: ImportFileReading {
     }
 
     public func readPDF(of file: ReceivedFile) async throws -> Data {
-        guard let received = state.withLock({ $0.received[file.id] }) else {
+        let began = holdings.state.withLock { state -> Received? in
+            state.received[file.id]
+        }
+        guard let received = began else {
             logger.error(.importing, "import.file.notRead", .token("reason", "notReceived"))
             throw ImportFailure.fileNotRead
         }
@@ -92,7 +128,7 @@ public final class ImportFileAdapter: ImportFileReading {
             throw ImportFailure.fileNotRead
         }
         try Task.checkCancellation()
-        guard state.withLock({ $0.received[file.id] != nil }) else {
+        guard holdings.state.withLock({ $0.received[file.id] != nil }) else {
             logger.error(.importing, "import.file.notRead", .token("reason", "releasedDuringRead"))
             throw ImportFailure.fileNotRead
         }
@@ -114,21 +150,22 @@ public final class ImportFileAdapter: ImportFileReading {
         if let scoped = released.scoped { files.stopAccess(scoped) }
     }
 
-    /// Takes the file out of the count, and deletes its copies when it was the last one of its identity, all under the
-    /// lock. Gives nil for a file not received or already released.
+    /// Takes the file out of the count, and deletes its copies when it was the last one of its identity, under the lock.
+    /// Gives nil for a file not received or already released.
     private func letGo(_ file: ReceivedFile) -> Released? {
-        state.withLock { state -> Released? in
+        holdings.state.withLock { state -> Released? in
             guard let received = state.received.removeValue(forKey: file.id) else { return nil }
-            guard let identity = received.identity, var open = state.open[identity] else {
-                return Released(scoped: received.scoped, failures: [])
+            var failures: [ImportFileError] = []
+            if let identity = received.identity, var open = state.open[identity] {
+                open.count -= 1
+                if open.count == 0 {
+                    state.open.removeValue(forKey: identity)
+                    failures += deleteCopies(of: identity, at: open.paths)
+                } else {
+                    state.open[identity] = open
+                }
             }
-            open.count -= 1
-            guard open.count == 0 else {
-                state.open[identity] = open
-                return Released(scoped: received.scoped, failures: [])
-            }
-            state.open.removeValue(forKey: identity)
-            return Released(scoped: received.scoped, failures: deleteCopies(of: identity, at: open.paths))
+            return Released(scoped: received.scoped, failures: failures)
         }
     }
 

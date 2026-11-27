@@ -80,9 +80,11 @@ public final class Composition {
         let settlement: TraceSettlement
         /// The folder of the sample CVs that ship with the app
         let samples: URL
-        /// The folders where the system puts the copy of a file opened in the app: the import deletes a copy only when it
-        /// lies directly in one of them, and never a file the person chose where it is.
-        let copyFolders: [URL]
+        /// The import's file adapter, one for the process (`importFiles(copyFolders:logger:)`): the windows'
+        /// inboxes and the screens hold the files opened in the app through it, so a copy goes only when none of them
+        /// holds it. It deletes a copy only when it lies directly in one of the folders where the system puts the copy of a
+        /// file opened in the app, and never a file the person chose where it is. The composition gives it its own log.
+        let importFiles: ImportFileAdapter
         let compileRules: CompileRules
         /// The designs that ship with the app, synced into the design store at every launch
         let designs: any BundledDesignSource
@@ -140,6 +142,11 @@ public final class Composition {
     public let sharesWithStandIn: Bool
     /// What the import of the released app's store did at this launch, before any screen read the store
     public let legacyImport: LegacyImportOutcome
+    #if DEBUG
+    /// The PDF of the bundle a window is handed each time it becomes active, as if another app opened it there; nil
+    /// unless a Debug build was launched with `-PrestoCVNextOpenedFile`. A Release build has no such member.
+    public private(set) var openedFile: OpenedFileFixture?
+    #endif
     /// What listens to the store's tip transactions: started once at launch, and held for as long as the app runs
     let tips: any TipsListening
 
@@ -177,10 +184,7 @@ public final class Composition {
             clock: ContinuousClock(), tracer: trace.tracer
         )
         let exportFiles = ExportFileAdapter(root: inputs.paths.exportShare, logger: trace.logger)
-        let importFiles = ImportFileAdapter(
-            files: SystemImportFiles(), copyFolders: inputs.copyFolders,
-            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: trace.logger
-        )
+        let importFiles = inputs.importFiles.logging(to: trace.logger)
         screens = ScreenFactory(
             repository: inputs.wrapStore(repository), samples: samples, ids: inputs.ids, clock: inputs.clock,
             editorClock: ContinuousClock(), importer: importer, importFiles: importFiles, exportFiles: exportFiles,
@@ -344,7 +348,8 @@ public final class Composition {
         let wrapImport: WrapImport
         let wrapGate: WrapGate
         let makeTips: MakeTips
-        let bundled = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Samples", isDirectory: true)
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        let bundled = resources.appendingPathComponent("Samples", isDirectory: true)
         let samples: URL
         let legacy: URL
         let leftovers: LegacyLeftoverPaths
@@ -418,7 +423,7 @@ public final class Composition {
             device: .current,
             settlement: settlement,
             samples: samples,
-            copyFolders: AppPaths.importCopiesOnDevice(),
+            importFiles: deviceImportFiles,
             compileRules: { () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in
                 try await SecureWebViewConfiguration.compileRules()
             },
@@ -450,12 +455,36 @@ public final class Composition {
             settings: bundledSettings()
         ))
         #if DEBUG
+        if case .ready(let composition) = state { composition.openedFile = fixtures.openedFileFixture(in: resources) }
         // A launch with the invented runs returns once its trace has settled, so that a UI test that sees the first screen
         // knows what the gate did with them: a closed gate has purged them. The fixture's distribution answers at once.
         if fixtures.storesTraceRuns { await settlement.previous()?.value }
         #endif
         return state
     }
+
+    /// The inbox of a window's files opened from another app. It holds a file waiting for the window's shell through the
+    /// process's import file adapter, and lets go, as the import does, a file that never reaches the shell. The adapter's
+    /// log here is the system's log only: a window can be handed a file before any composition, and its trace, exists.
+    public static func makeOpenedFileInbox() -> OpenedFileInbox {
+        OpenedFileInbox(files: deviceImportFiles)
+    }
+
+    /// The import's file adapter over the device's file system, deleting copies only in `copyFolders`, and only those
+    /// this run received. Made once for the process.
+    nonisolated static func importFiles(copyFolders: [URL], logger: any DiagnosticLogger) -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: SystemImportFiles(), copyFolders: copyFolders,
+            maximumBytes: ImportLimits.standard.maximumPDFBytes, logger: logger
+        )
+    }
+
+    /// The process's import file adapter, made at its first use: the first window's inbox, before any file is handed to
+    /// the app.
+    private nonisolated static let deviceImportFiles = importFiles(
+        copyFolders: AppPaths.importCopiesOnDevice(),
+        logger: OSLogDiagnosticLogger(subsystem: "com.PigLardLord.prestocv")
+    )
 
     /// What the Settings sheet shows about this build: its name, version and build from the bundle, the fixed addresses of
     /// the site, and the notices file the bundle holds.

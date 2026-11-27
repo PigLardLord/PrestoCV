@@ -1,4 +1,6 @@
+import Foundation
 import Observation
+import PrestoCVWorkflowPorts
 
 /// The column a compact screen shows: the list, or the opened CV.
 public enum ShellColumn: Hashable, Sendable {
@@ -62,6 +64,8 @@ public final class ShellNavigationModel {
     @ObservationIgnored private let makeEditor: @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel
     @ObservationIgnored private let makeExportSheet: @MainActor (EditorViewModel) -> ExportSheetViewModel?
     @ObservationIgnored private let makeImporter: @MainActor () -> ImportViewModel
+    /// Lets go a file opened in the app that no import takes (`receive(file:)`).
+    @ObservationIgnored let files: any ImportFileReading
     @ObservationIgnored private let backgroundTime: any BackgroundTime
     /// The editors left and still storing, each by the number of its leaving.
     @ObservationIgnored private var flushing: [Int: Leaving] = [:]
@@ -111,15 +115,18 @@ public final class ShellNavigationModel {
     ///     `storeChanged`.
     ///   - makeExportSheet: Makes the export sheet over an editor; nil while the editor has not read its CV.
     ///   - makeImporter: Makes the import the detail shows (`showImport()`).
+    ///   - files: The files of the imports it makes, to let go a file opened in the app that none of them takes.
     ///   - backgroundTime: The time the system grants to end the writes once the app leaves the foreground.
     public init(
         makeEditor: @escaping @MainActor (EditorStart, @escaping @MainActor () -> Void) -> EditorViewModel,
         makeExportSheet: @escaping @MainActor (EditorViewModel) -> ExportSheetViewModel?,
-        makeImporter: @escaping @MainActor () -> ImportViewModel, backgroundTime: any BackgroundTime
+        makeImporter: @escaping @MainActor () -> ImportViewModel, files: any ImportFileReading,
+        backgroundTime: any BackgroundTime
     ) {
         self.makeEditor = makeEditor
         self.makeExportSheet = makeExportSheet
         self.makeImporter = makeImporter
+        self.files = files
         self.backgroundTime = backgroundTime
     }
 
