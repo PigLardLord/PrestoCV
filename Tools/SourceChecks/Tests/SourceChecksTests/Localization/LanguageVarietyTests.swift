@@ -36,6 +36,21 @@ struct LanguageVarietyTests {
             "secção", "secções",
             // The tu forms, Portugal's way to address the person: the app, as 1.0, says "você" ("seu", "sua").
             "tu", "teu", "tua", "teus", "tuas",
+            // The verbs' tu forms, which address the person as "tu" as the pronouns do, in a text with no pronoun:
+            // in the present ("podes"), the present subjunctive ("não envies"), the future subjunctive and the
+            // personal infinitive ("se precisares", "antes de o enviares") and the past ("o que fizeste"). The app
+            // says "você pode", "não envie", "se precisar", "antes de enviá-lo" and "o que você fez". A tu form that
+            // is also another word is no marker: the imperatives "confirma" and "troca" are also "ele confirma" and
+            // "ele troca", "precisas" is also "datas precisas", "escolhas" also "as escolhas", "deste" also
+            // "deste currículo" and "tens", as the case is not matched, also "TENS", the electrotherapy of a
+            // physiotherapist's CV. "estás" and "dás" are matched with their accent, so "estas datas" and "das" are
+            // no match.
+            "podes", "queres", "sabes", "estás", "vais", "deves", "consegues", "preferes", "gostas", "escolhes",
+            "dizes", "fazes", "ficas", "dás", "vês", "és", "envias", "adicionas", "abres", "usas", "escreves",
+            "possas", "tenhas", "queiras", "sejas", "faças", "precises", "envies", "esqueças", "digas",
+            "precisares", "enviares", "escolheres", "quiseres", "puderes", "tiveres", "fizeres", "fores", "estiveres",
+            "usares", "preferires", "adicionares", "guardares", "criares",
+            "foste", "fizeste", "escolheste", "enviaste", "guardaste",
         ],
     ]
 
@@ -66,7 +81,35 @@ struct LanguageVarietyTests {
     @Test("A marker is found as a whole word in any case, and correct text of the app's variety has none", arguments: [
         ("Não foi possível ler o Ficheiro.", "pt", ["ficheiro"]),
         ("Toca no ecrã para abrir os teus registos.", "pt", ["ecrã", "registos", "teus"]),
+        ("Confirma cada campo antes de o enviares. Podes copiá-lo, se quiseres.", "pt",
+         ["podes", "enviares", "quiseres"]),
+        ("Se tens dúvidas, adiciona o que precisares com o nível que escolheres.", "pt",
+         ["precisares", "escolheres"]),
+        ("Não te esqueças do que fizeste nem envies o CV se não estás pronto.", "pt",
+         ["estás", "envies", "esqueças", "fizeste"]),
+        ("Queres saber se consegues? Sabes o que preferes, vais ver que deves tentar.", "pt",
+         ["queres", "sabes", "vais", "deves", "consegues", "preferes"]),
+        ("Gostas do que escolhes? Dizes o que fazes, ficas com o que dás e vês que és capaz.", "pt",
+         ["gostas", "escolhes", "dizes", "fazes", "ficas", "dás", "vês", "és"]),
+        ("Abres o documento, usas o modelo, escreves o resumo, adicionas a foto e envias o CV.", "pt",
+         ["envias", "adicionas", "abres", "usas", "escreves"]),
+        ("Embora não possas nem tenhas tempo, não queiras desistir nem sejas tímido.", "pt",
+         ["possas", "tenhas", "queiras", "sejas"]),
+        ("Talvez precises de ajuda: faças o que faças, não digas que não.", "pt", ["faças", "precises", "digas"]),
+        ("Quando puderes e tiveres tempo, faz o CV; quando o fizeres e fores à entrevista, sorri.", "pt",
+         ["puderes", "tiveres", "fizeres", "fores"]),
+        ("Se estiveres calmo e usares o modelo que preferires, corre bem.", "pt",
+         ["estiveres", "usares", "preferires"]),
+        ("Antes de adicionares a foto, guardares o CV e criares outro, vê o que já foste.", "pt",
+         ["adicionares", "guardares", "criares", "foste"]),
+        ("Revê o que escolheste, o que enviaste e o que guardaste.", "pt", ["escolheste", "enviaste", "guardaste"]),
         ("Podéis abrirlo desde vuestro ordenador.", "es", ["podéis", "vuestro", "ordenador"]),
+        ("Confira cada campo antes de enviá-lo. Você pode copiá-lo, se quiser.", "pt", []),
+        ("Se tiver dúvidas, adicione o que precisar com o nível que escolher.", "pt", []),
+        ("O app confirma cada campo e troca o cargo pelo empregador.", "pt", []),
+        ("Datas precisas e boas escolhas: estas linhas são deste currículo.", "pt", []),
+        ("Ele vê o que você dá e escolhe o que é seu.", "pt", []),
+        ("Experiência em reabilitação das mãos com TENS e ultrassom.", "pt", []),
         ("Carregando seus currículos…", "pt", []),
         ("Para carregar o arquivo, toque em Arquivos na tela.", "pt", []),
         ("Excluir “%@”? O currículo salvo será excluído.", "pt", []),
