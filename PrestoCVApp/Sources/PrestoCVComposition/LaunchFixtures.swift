@@ -35,6 +35,8 @@ import PrestoCVWorkflowPorts
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextHoldImport`: a read of the import never ends by itself, and ends as cancelled when the person cancels it.
 ///   It writes nothing, so it needs no folder.
+/// - `-PrestoCVNextOpenedFile <linkedin>`: each time a window becomes active, it is handed the PDF of the corpus of that
+///   name, which only a Debug build carries, as if another app opened it there. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextReadyDesigns`: the bundled designs are accepted without the renders that check them (`AcceptedDesigns`),
 ///   so that a UI test that is not about the designs or the first launch does not wait for those renders on every launch of
 ///   an empty folder. The sync, its validator and the design store stay the real ones. It needs one of the two storage
@@ -61,6 +63,11 @@ struct LaunchFixtures: Equatable, Sendable {
         case purchaseFailed
     }
 
+    /// The PDF of the corpus a window is handed as if another app opened it, by its name in the bundle
+    enum OpenedFile: String, CaseIterable, Equatable, Sendable {
+        case linkedin
+    }
+
     enum Failure: Error, Equatable, Sendable {
         case conflictingStorage
         case missingValue(argument: String)
@@ -75,6 +82,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case failuresWithoutFolder
         case unreadableOtherWindow
         case otherWindowWithoutFolder
+        case unreadableOpenedFile
         case traceRunsWithoutFolder
         case readyDesignsWithoutFolder
         case seedUnwritable
@@ -93,6 +101,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
     static let holdImportArgument = "-PrestoCVNextHoldImport"
+    static let openedFileArgument = "-PrestoCVNextOpenedFile"
     static let traceRunsArgument = "-PrestoCVNextTraceRuns"
     static let readyDesignsArgument = "-PrestoCVNextReadyDesigns"
     private static let prefix = "-PrestoCVNext"
@@ -117,6 +126,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var otherWindow: OtherWindow?
     /// The import's reads wait until they are cancelled
     var holdsImport = false
+    /// The PDF a window is handed each time it becomes active, nil when none is
+    var openedFile: OpenedFile?
     /// Two invented runs of the diagnostics are stored before the app starts
     var storesTraceRuns = false
     /// The bundled designs are accepted without the renders that check them
@@ -170,6 +181,11 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.otherWindow = change
             case holdImportArgument:
                 fixtures.holdsImport = true
+            case openedFileArgument:
+                guard let file = OpenedFile(rawValue: try value(after: argument, in: arguments, at: &index)) else {
+                    throw .unreadableOpenedFile
+                }
+                fixtures.openedFile = file
             case readyDesignsArgument:
                 fixtures.acceptsBundledDesigns = true
             case _ where argument.hasPrefix(prefix):
@@ -233,6 +249,11 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What the import reads through: the importer it is given, or with the fixture one whose reads wait until cancelled.
     func importing(_ importer: any CVImporting) -> any CVImporting {
         holdsImport ? HeldImport() : importer
+    }
+
+    /// What a window is handed as if another app opened it: the PDF of that name among `resources`, the bundle's.
+    func openedFileFixture(in resources: URL) -> OpenedFileFixture? {
+        openedFile.map { OpenedFileFixture(file: resources.appendingPathComponent("\($0.rawValue).pdf")) }
     }
 
     /// What checks a bundled design before the sync saves it: the gate it is given, or with the fixture one that accepts
