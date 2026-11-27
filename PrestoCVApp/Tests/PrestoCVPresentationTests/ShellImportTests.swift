@@ -255,6 +255,7 @@ struct ShellImportTests {
         #expect(world.imports.importer.texts.withLock { $0 } == ["Bruno Neri\nPlumber"],
                 "only the new import reaches the port")
         #expect(world.imports.importer.pdfs.withLock { $0 }.isEmpty, "no late PDF reaches the port")
+        await left.files.settled()
         #expect(world.imports.files.reads == 0, "a late file is never read")
         #expect(world.imports.files.problems(ended: true).isEmpty, "a late file is released once, at once")
     }

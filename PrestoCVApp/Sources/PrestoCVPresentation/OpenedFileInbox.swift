@@ -5,7 +5,8 @@ import PrestoCVWorkflowPorts
 /// file can arrive before the window's shell exists, while the store is still being opened: it waits, held by the file
 /// adapter from its arrival, and the shell gets it once it is ready. The inbox lets it go only after the shell's
 /// import, or the shell's question, holds it. One file waits at most: a newer one takes its place and the older is let
-/// go, unless both are the same file. When the store cannot be opened, the file waiting is let go; one that arrives
+/// go, unless both are the same file. The adapter's calls run off the main actor, in the order the inbox asked for them
+/// (`FileHolder`). When the store cannot be opened, the file waiting is let go; one that arrives
 /// while the failure shows waits for a try that opens it, and is let go if that try fails too. When the inbox itself
 /// goes, the file waiting is let go.
 ///
@@ -14,17 +15,17 @@ import PrestoCVWorkflowPorts
 /// file (`ImportFileAdapter`).
 @MainActor
 public final class OpenedFileInbox {
-    private let files: any ImportFileReading
-    private var waiting: ReceivedFile?
+    let files: FileHolder
+    private var waiting: FileHold?
     private var shell: ShellNavigationModel?
 
     /// - Parameter files: Holds the files waiting for a shell, and lets go those that never reach one.
     public init(files: any ImportFileReading) {
-        self.files = files
+        self.files = FileHolder(files: files)
     }
 
     isolated deinit {
-        if let waiting { files.release(waiting) }
+        if let waiting { files.letGo(waiting) }
     }
 
     /// A file opened in the window: its shell imports it, or it waits for the shell.
@@ -35,8 +36,8 @@ public final class OpenedFileInbox {
         }
         if let waiting, url.namesTheSameFile(as: waiting.url) { return }
         let older = waiting
-        waiting = files.receive(url)
-        if let older { files.release(older) }
+        waiting = files.hold(url)
+        if let older { files.letGo(older) }
     }
 
     /// The window's shell is ready: the file waiting goes to it, and every file opened from now on. The shell's import,
@@ -45,14 +46,14 @@ public final class OpenedFileInbox {
         self.shell = shell
         guard let waiting else { return }
         self.waiting = nil
-        shell.receive(file: waiting.url)
-        files.release(waiting)
+        let taken = shell.receive(file: waiting.url)
+        files.letGo(waiting, after: taken)
     }
 
     /// The store could not be opened: the file waiting is let go.
     public func compositionFailed() {
         guard let waiting else { return }
         self.waiting = nil
-        files.release(waiting)
+        files.letGo(waiting)
     }
 }

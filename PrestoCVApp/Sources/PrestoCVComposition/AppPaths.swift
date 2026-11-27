@@ -25,8 +25,9 @@ struct AppPaths: Equatable, Sendable {
     /// The PDFs written for an export's share, each in a folder of its own; the next launch removes what is left
     var exportShare: URL { temporary.appendingPathComponent("ExportShare", isDirectory: true) }
 
-    /// Makes the root and the store; making them again changes nothing.
-    func create() throws(Failure) {
+    /// Makes the root and the store; making them again changes nothing. It waits for the file system, so it runs off the
+    /// main actor (R19) while the app shows that it is loading.
+    @concurrent func create() async throws(Failure) {
         do {
             try FileManager.default.createDirectory(at: store, withIntermediateDirectories: true)
         } catch {

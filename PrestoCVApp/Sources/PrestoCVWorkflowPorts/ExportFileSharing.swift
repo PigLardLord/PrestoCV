@@ -25,6 +25,7 @@ public protocol ExportFileSharing: Sendable {
     func write(_ pdf: Data, named fileName: String) async throws -> SharedFile
     /// Removes the file and its folder. Called exactly once for each written file: when the share that reads it has
     /// ended, however it ended, or at once when no share will read it. A file that cannot be removed is logged, not
-    /// thrown: the next launch clears what is left.
-    func remove(_ file: SharedFile)
+    /// thrown: the next launch clears what is left. It waits for the file system, so the sheet awaits it off the main
+    /// actor (R19).
+    func remove(_ file: SharedFile) async
 }
