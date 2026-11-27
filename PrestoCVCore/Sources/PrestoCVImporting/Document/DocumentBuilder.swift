@@ -80,6 +80,7 @@ enum DocumentBuilder {
         var kind: SourceBlock.Kind
         var isEmphasized: Bool
         var followsGap: Bool
+        var isTableRow: Bool
         var lineEnd: NormalizedLine.LineEnd
         var page: Int?
         var frame: Rect?
@@ -136,7 +137,7 @@ enum DocumentBuilder {
             }
             pending.append(Pending(
                 cells: line.cells, kind: kind, isEmphasized: line.isBold || raw.isEmphasized, followsGap: followsGap,
-                lineEnd: line.lineEnd, page: raw.page, frame: raw.frame, column: raw.column,
+                isTableRow: line.isTableRow, lineEnd: line.lineEnd, page: raw.page, frame: raw.frame, column: raw.column,
                 textStart: raw.textStart, fontSize: raw.fontSize, lastCellX: raw.lastCellX, lastCellBold: raw.lastCellBold,
                 columnRight: raw.columnRight,
                 // Only when the PDF's cells are the line's cells one by one is the PDF's first cell the line's first: a
@@ -286,6 +287,7 @@ enum DocumentBuilder {
             blocks.append(SourceBlock(
                 index: index, span: SourceSpan(start, offset), cells: cells, kind: block.kind, isEmphasized: block.isEmphasized,
                 followsGap: block.followsGap, page: block.page, frame: block.frame, column: block.column, fontSize: block.fontSize,
+                isTableRow: block.isTableRow,
                 firstCellLook: block.firstCellLook
             ))
         }

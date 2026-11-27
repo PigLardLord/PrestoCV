@@ -33,7 +33,9 @@ final class ImportPasteUITests: RuntimeIssueFailingTestCase {
     private func openImport(seeded: Bool = false, holdingTheRead: Bool = false,
                             largestText: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage"]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+        ]
         if seeded {
             let cv = """
             {"schemaVersion":1,"id":"\(identity)","revision":1,
@@ -74,7 +76,8 @@ final class ImportPasteUITests: RuntimeIssueFailingTestCase {
         let top = (app.navigationBars.allElementsBoundByIndex.map(\.frame.maxY).max() ?? window.minY) + 44
         let band = CGRect(x: window.minX, y: top, width: window.width, height: window.minY + window.height * 0.7 - top)
         for _ in 0..<12 where box.frame.intersection(band).height < 44 {
-            app.dragImport(showingBelow: box.frame.midY > band.maxY)
+            // A null frame is a box scrolled away above: XCUITest clips a text view's frame to the screen
+            app.dragImport(showingBelow: !box.frame.isNull && box.frame.midY > band.maxY)
         }
         let part = box.frame.intersection(band)
         XCTAssertGreaterThanOrEqual(part.height, 44, "The box, \(way), comes into view")
@@ -127,7 +130,7 @@ final class ImportPasteUITests: RuntimeIssueFailingTestCase {
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 30))
         XCTAssertEqual(alert.label, "Nothing to Import")
-        XCTAssertTrue(alert.staticTexts["This text is longer than a CV. Paste only the CV."].exists)
+        XCTAssertTrue(alert.staticTexts["This is longer than a CV. Paste only the CV, or choose a smaller PDF."].exists)
         alert.buttons["OK"].tap()
 
         XCTAssertTrue(alert.waitForNonExistence(timeout: 30))

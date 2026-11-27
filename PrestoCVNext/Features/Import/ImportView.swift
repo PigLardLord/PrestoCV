@@ -1,10 +1,11 @@
 import PrestoCVPresentation
 import SwiftUI
 
-/// The import of a CV the person already has, as text: they paste or type it in the box and tap Import, and the shell
-/// opens the draft in the editor. One scroll at the readable width, which a later section joins without moving the
-/// rest. The box keeps its height and a long CV scrolls inside it, so the buttons stay one swipe away. While the text
-/// is read, a layer over the screen says so and offers Cancel; a problem shows in an alert, and the text stays.
+/// The import of a CV the person already has: they paste or type its text in the box and tap Import, or paste or
+/// choose a PDF, and the shell opens the draft in the editor. One scroll at the readable width: the text with its paste
+/// button, the PDF, then Import, which reads the text only. The box keeps its height and a long CV scrolls inside it,
+/// so the buttons stay one swipe away. While the CV is read, a layer over the screen says so and offers Cancel; a
+/// problem shows in an alert, and the text stays.
 struct ImportView: View {
     @Bindable var importer: ImportViewModel
     @FocusState private var focused: Bool
@@ -14,6 +15,8 @@ struct ImportView: View {
     @ScaledMetric(relativeTo: .body) private var growth: CGFloat = 1
     /// The screen's height without the keyboard, of which the box takes at most a share
     @State private var room: CGFloat = 0
+    /// Whether the system's picker of files is open, for a PDF
+    @State private var choosingPDF = false
 
     var body: some View {
         let importing = importer.status == .importing
@@ -38,6 +41,8 @@ struct ImportView: View {
                 .ignoresSafeArea(.keyboard)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { room = $0 }
         }
+        .pdfFileImporter(isPresented: $choosingPDF, onPick: { importer.importFile(at: $0) },
+                         onFailure: { importer.fileNotOpened() })
         .modifier(ImportProblemAlert(problem: problem) {
             importer.clearProblem()
             focused = true
@@ -59,7 +64,8 @@ struct ImportView: View {
                 FieldLabel("import.text.title")
                 box
             }
-            PasteTextButton { importer.paste($0) }
+            PasteImportButton { importer.paste($0, pdfs: $1) }
+            pdfSection
             PrimaryButton("import.button") {
                 focused = false
                 importer.importText()
@@ -70,6 +76,33 @@ struct ImportView: View {
             WholeWordsText("import.privacy")
                 .footerTextStyle()
         }
+    }
+
+    /// The PDF, apart from the text: Import never reads it, so it has its own title and its own button
+    private var pdfSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            Text("import.pdf.title")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("import.pdf.title")
+            WholeWordsText("import.pdf.description")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("import.pdf.description")
+            Button {
+                focused = false
+                choosingPDF = true
+            } label: {
+                WholeWordsText("import.pdf.button")
+                    .frame(minHeight: TapTarget.minimumHeight)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: CornerRadius.control))
+            .controlSize(.large)
+            .accessibilityHint(Text("import.pdf.button.hint"))
+            .accessibilityIdentifier("import.pdf.button")
+        }
+        .padding(.vertical, Spacing.small)
     }
 
     private var box: some View {

@@ -203,6 +203,63 @@ struct ReleaseHygieneTests {
         #expect(legacyCode.isEmpty, "Legacy files are still tracked: \(legacyCode.prefix(10)) and \(max(0, legacyCode.count - 10)) more")
     }
 
+    /// The targets of the project file with their build settings, read as JSON5 (it has trailing commas). A setting is a
+    /// word or a list of words.
+    private struct Project: Decodable {
+        enum Setting: Decodable, Equatable {
+            case word(String)
+            case words([String])
+
+            init(from decoder: any Decoder) throws {
+                let value = try decoder.singleValueContainer()
+                if let word = try? value.decode(String.self) {
+                    self = .word(word)
+                } else {
+                    self = .words(try value.decode([String].self))
+                }
+            }
+        }
+
+        struct Target: Decodable {
+            let name: String
+            let buildSettings: [String: Setting]?
+
+            enum CodingKeys: String, CodingKey {
+                case name
+                case buildSettings = "build-settings"
+            }
+        }
+
+        let targets: [Target]
+    }
+
+    private static func buildSettings(of target: String) throws -> [String: Project.Setting] {
+        let decoder = JSONDecoder()
+        decoder.allowsJSON5 = true
+        let project = try decoder.decode(Project.self, from: Data(projectText().utf8))
+        return try #require(project.targets.first { $0.name == target }?.buildSettings, "No target \(target)")
+    }
+
+    @Test("The shipped Info.plist builds for macOS, and the document key is NO for the iOS SDKs and YES for macOS")
+    func theInfoPlistBuildsOnEveryPlatform() throws {
+        let url = Self.root.appendingPathComponent("PrestoCV/Info.plist")
+        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let settings = try Self.buildSettings(of: Self.shipped.name)
+        let documentKey = "INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"
+        let documentSettings = settings.filter { $0.key.hasPrefix(documentKey) }
+
+        // iOS gets NO so the app is handed a copy of the PDF it is given, as the released app is. The target builds for
+        // macOS too, which rejects NO for an app with document types, and a setting made for some SDKs only still makes
+        // the build write the key for macOS as NO: the macOS SDK sets it itself, to YES.
+        #expect(plist["CFBundleDocumentTypes"] != nil, "Info.plist no longer declares the PDFs the app opens")
+        #expect(plist["LSSupportsOpeningDocumentsInPlace"] == nil, "Info.plist sets the key for macOS too")
+        #expect(documentSettings == [
+            "\(documentKey)[sdk=iphoneos*]": .word("NO"),
+            "\(documentKey)[sdk=iphonesimulator*]": .word("NO"),
+            "\(documentKey)[sdk=macosx*]": .word("YES"),
+        ], "The target sets \(documentSettings)")
+    }
+
     @Test("The walk reaches the targets the linked products take in, however far down, and no legacy target")
     func theWalkReachesTheTargetsBelow() {
         let names = Set(Self.reached(by: Self.shipped).targets.map(\.name))
@@ -273,6 +330,19 @@ struct ReleaseHygieneTests {
 
         #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
         #expect(offenders.isEmpty, "The fixture that holds the import outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// UI tests that are not about the designs accept the bundled designs without rendering them; no Release build may
+    /// install a design that no render checked.
+    @Test("The fixture that accepts the bundled designs without rendering them is read only by Debug builds")
+    func theFixtureThatAcceptsTheDesignsIsReadOnlyInDebugBuilds() {
+        let names = ["readyDesignsArgument", "acceptsBundledDesigns", "AcceptedDesigns", "fixtures.designGate"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that accepts the designs outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
     /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
@@ -414,11 +484,6 @@ struct ReleaseHygieneTests {
         #expect(types.first?["LSItemContentTypes"] as? [String] == ["com.adobe.pdf"])
         #expect(types.first?["LSHandlerRank"] as? String == "Alternate", "PrestoCV is no default reader of PDFs")
         #expect(types.first?["CFBundleTypeRole"] as? String == "Viewer")
-    }
-
-    @Test("A PDF opened in the app is copied for it, never opened in place")
-    func pdfsAreCopied() throws {
-        #expect(try propertyList(at: Self.infoPlist)["LSSupportsOpeningDocumentsInPlace"] as? Bool == false)
     }
 
     @Test("Info.plist declares no type of its own", arguments: ["UTExportedTypeDeclarations", "UTImportedTypeDeclarations"])

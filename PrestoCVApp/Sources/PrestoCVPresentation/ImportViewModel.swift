@@ -17,8 +17,8 @@ public final class ImportViewModel {
     /// The draft of the last import, until the editor opened it.
     public private(set) var result: ImportedDraft?
 
-    /// A text with no letter in it is no CV, and nothing starts while an import runs.
-    public var canImportText: Bool { text.contains(where: \.isLetter) && status != .importing }
+    /// A text with no letter in it is no CV, and nothing starts while an import runs or once the screen was let go.
+    public var canImportText: Bool { text.contains(where: \.isLetter) && status != .importing && !discarded }
 
     // MARK: - State
 
@@ -27,6 +27,8 @@ public final class ImportViewModel {
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Counts the intents that start or end an import: a task publishes only while it holds the latest one.
     @ObservationIgnored private var generation = 0
+    /// Set for good once the shell let the screen go (`discard()`): no later intent starts or shows anything.
+    @ObservationIgnored private var discarded = false
 
     /// Does no I/O and starts nothing.
     public init(importer: any CVImporting, files: any ImportFileReading) {
@@ -36,8 +38,16 @@ public final class ImportViewModel {
 
     // MARK: - Intents
 
-    /// The strings the person pasted, one per line, in place of the text. A paste of nothing changes nothing.
-    public func paste(_ strings: [String]) {
+    /// What the person pasted: the PDFs and the strings of the clipboard's items. A PDF, such as one copied in Files, goes
+    /// to the import as a PDF, like a file, and the text stays as it was: it wins over strings pasted with it, as it is
+    /// the whole document. Otherwise the strings take the place of the text, one per line. A paste of nothing changes
+    /// nothing, and so does a paste the system delivers after the screen was let go.
+    public func paste(_ strings: [String], pdfs: [Data]) {
+        guard !discarded else { return }
+        if let pdf = pdfs.first {
+            importPDF(pdf)
+            return
+        }
         let pasted = strings.joined(separator: "\n")
         guard !pasted.isEmpty else { return }
         text = pasted
@@ -49,19 +59,13 @@ public final class ImportViewModel {
         start(from: .pasted, releasing: nil) { try await importer.importCV(fromText: text) }
     }
 
-    /// A PDF the person pasted, such as one copied in Files: it goes to the import as a PDF, like a file.
-    public func importPDF(_ data: Data) {
-        guard status != .importing else { return }
-        let importer = importer
-        start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
-    }
-
-    /// A PDF file the person chose or opened in the app. The port receives it first. If an import runs, the file is not
-    /// read and is released at once; otherwise the import task reads it and releases it when the task ends, however the
-    /// import ended, also when the view model is gone. The view model never decides which files are the same.
+    /// A PDF file the person chose or opened in the app. The port receives it first. If an import runs, or the screen
+    /// was let go before the picker handed the file over, the file is not read and is released at once; otherwise the
+    /// import task reads it and releases it when the task ends, however the import ended, also when the view model is
+    /// gone. The view model never decides which files are the same.
     public func importFile(at url: URL) {
         let received = files.receive(url)
-        guard status != .importing else {
+        guard status != .importing, !discarded else {
             files.release(received)
             return
         }
@@ -76,6 +80,15 @@ public final class ImportViewModel {
         }
     }
 
+    /// The system could not hand over the file the person chose: the screen tells them, as for a file it could not read.
+    /// While an import runs, or once the screen was let go, nothing changes.
+    public func fileNotOpened() {
+        guard status != .importing, !discarded else { return }
+        source = .file
+        result = nil
+        status = .failed(.fileNotRead)
+    }
+
     /// The import running stops, with nothing to tell; its late result is dropped.
     public func cancel() {
         guard status == .importing else { return }
@@ -83,6 +96,14 @@ public final class ImportViewModel {
         running = nil
         generation += 1
         end()
+    }
+
+    /// The shell let the screen go, as it shows something else: the import running stops as `cancel()` stops it, and
+    /// no later intent starts an import or shows a problem. A paste or a file the system hands over late, after an
+    /// asynchronous load, changes nothing; such a file is still received and released at once, as the port wants.
+    func discard() {
+        discarded = true
+        cancel()
     }
 
     /// The person read the problem: the screen is ready for another try, with the text kept.
@@ -99,6 +120,12 @@ public final class ImportViewModel {
     }
 
     // MARK: - Running
+
+    private func importPDF(_ data: Data) {
+        guard status != .importing else { return }
+        let importer = importer
+        start(from: .file, releasing: nil) { try await importer.importCV(fromPDF: data) }
+    }
 
     private func start(from source: ImportSource, releasing release: (@Sendable () -> Void)?,
                        _ work: @escaping @MainActor () async throws -> ImportOutcome) {

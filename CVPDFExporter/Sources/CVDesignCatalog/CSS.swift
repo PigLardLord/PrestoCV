@@ -159,7 +159,7 @@ enum CSSValue {
     static let colorVars: Set<String> = ["--color-text", "--color-primary"]
     static let fontSize = LengthBounds(pt: 7...48, em: 0.6...4, percent: nil, relativeUnits: false)
     static let spacing = LengthBounds(pt: 0...48, em: 0...4, percent: nil)
-    static let borderWidth = LengthBounds(pt: 0...4, em: 0...0.3, percent: nil)
+    static let borderWidth = LengthBounds(pt: 0...MarkupContract.borderWidth.pt, em: 0...MarkupContract.borderWidth.em, percent: nil)
     /// Flex and grid drop the space between inline entries, so their column gap must replace it.
     static let columnGap = LengthBounds(pt: 3...48, em: 0.25...4, percent: nil)
 
@@ -320,7 +320,9 @@ struct CSSParser {
         }
         guard i < t.count else { throw CSSRejection(reason: "unterminated rule") }
         i += 1
-        return "\(try Self.selectorList(prelude)){\(try Self.declarations(body))}"
+        let selectors = try Self.selectorList(prelude), declarations = try Self.declarations(body)
+        try SectionStartLimits.check(selectors: selectors, declarations: declarations)
+        return "\(selectors){\(declarations)}"
     }
 
     static func selectorList(_ tokens: [CSSToken]) throws(CSSRejection) -> String {

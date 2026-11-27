@@ -49,6 +49,7 @@ targets += [
     // and each platform's test target wraps every check in a one-line test.
     .target(name: "CVRenderingNativeTestSupport", dependencies: [
         "CVRendering", "CVRenderingTestSupport", "CVRenderingPDFKitInspector", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings",
+        "CVBundledDesigns",
     ]),
     .testTarget(name: "CVRenderingPDFKitInspectorTests", dependencies: [
         "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingNativeTestSupport",

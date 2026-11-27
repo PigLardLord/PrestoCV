@@ -27,6 +27,13 @@ enum EntryReader {
         /// A Europass or formato europeo label, and its value.
         var label: EntryVocabulary.EntryLabel?
         var labelValue: [Piece] = []
+        /// The line is a cell of a table row: only the row's first cell opens an entry.
+        var opensRow: Bool?
+        /// The line is a mapped row of a table that had a short row the header could not place before it: the mapping
+        /// is kept, but the person is asked to check it.
+        var isToCheck = false
+        /// The period is a software-name range ("Unity 9.10 – 9.12") read as dates: it may be a version, to be checked.
+        var periodReadsASoftwareRange = false
 
         var isBody: Bool { isBullet || isProse }
     }
@@ -48,6 +55,20 @@ enum EntryReader {
     static func read(_ section: Section, kind: Kind, into findings: inout Findings) throws {
         let lines = section.blocks.filter { !findings.consumedBlocks.contains($0.index) }
             .map { line($0, cells: section.cells(of: $0, in: findings.document)) }
+        for part in tableParts(of: lines, findings: &findings) {
+            switch part {
+            case .columns(let rows):
+                readLabelled(rows, section: section, kind: kind, into: &findings)
+            case .ordinary(let ordinary, let isDoubtful):
+                try readOrdinary(ordinary, isDoubtful: isDoubtful, section: section, kind: kind, into: &findings)
+            }
+        }
+    }
+
+    /// The lines that are not a table's mapped rows, read by their dates, or by their labels where a Europass has them.
+    /// The entries read from rows a table's header does not explain are marked for the person to check.
+    private static func readOrdinary(_ lines: [Line], isDoubtful: Bool, section: Section, kind: Kind,
+                                     into findings: inout Findings) throws {
         for line in lines where line.isDurationOnly {
             findings.leaveOut(line.block, .computedDuration)
         }
@@ -55,6 +76,8 @@ enum EntryReader {
             for duration in line.durations where !line.isDurationOnly { findings.leaveOut(duration, .computedDuration) }
         }
         let labelled = lines.filter { $0.label != nil }.count
+        let before = (findings.cv.experience.count, findings.cv.education.count)
+        defer { if isDoubtful { flagColumnsByOrder(before, kind: kind, into: &findings) } }
         if labelled >= 2 {
             readLabelled(lines, section: section, kind: kind, into: &findings)
         } else {
@@ -88,11 +111,23 @@ enum EntryReader {
             line.labelValue = value
         }
         if !isProse && !line.isDurationOnly {
-            let anchor = anchorPeriod(in: line.label == .period ? line.labelValue : cells, isBullet: isBullet)
+            let anchorCells = line.label == .period ? line.labelValue : cells
+            var anchor = anchorPeriod(in: anchorCells, isBullet: isBullet)
+            // A range after a software name ("Unity 9.10 – 9.12") is a period unless the line itself says it is a duty:
+            // split rather than merge, as a wrong split keeps every word and shows, and a wrong merge hides a job.
+            if anchor == nil, !isBullet, !isDutyLine(text) {
+                anchor = anchorPeriod(in: anchorCells, isBullet: isBullet, readsSoftwareRanges: true)
+                line.periodReadsASoftwareRange = anchor != nil
+            }
             line.period = anchor.map { ($0.0, $0.1) }
             line.headEvidence = anchor?.evidence ?? .none
         }
         return line
+    }
+
+    /// A bullet or a dash line: a duty, where a software range is a version and not a period.
+    private static func isDutyLine(_ text: String) -> Bool {
+        text.first.map { "•·▪◦‣*-–—".contains($0) } == true
     }
 
     /// A Europass row: its label in the first cell, or before a colon.
@@ -118,9 +153,9 @@ enum EntryReader {
 
     /// A period stated as a line's anchor: alone in its cell, or at a cell's start or end, next to a separator. A
     /// bullet anchors an entry only with its period at the start.
-    private static func anchorPeriod(in cells: [Piece], isBullet: Bool) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
+    private static func anchorPeriod(in cells: [Piece], isBullet: Bool, readsSoftwareRanges: Bool = false) -> (Piece, ImportedPeriod, evidence: EntryVocabulary.HeadEvidence)? {
         for (cellIndex, cell) in cells.enumerated() {
-            for match in DateReader.periods(in: cell.text) {
+            for match in DateReader.periods(in: cell.text, readsSoftwareRanges: readsSoftwareRanges) {
                 let before = cell.text[..<match.range.lowerBound].trimmingSpaces()
                 // The text after the period as a string of its own: a range read in it indexes that string
                 let after = String(cell.text[match.range.upperBound...].trimmingSpaces())
@@ -196,16 +231,18 @@ enum EntryReader {
                 draft.inheritedEmployer = group.employer
                 draft.inheritsADoubtfulHeading = section.doubtfulHeadings.contains(group.block)
             }
-            draft.boundsUnsure = layout.unsure.contains(position)
+            // Where the entry starts is doubtful too when its dates are a range after a software name
+            draft.boundsUnsure = layout.unsure.contains(position) || draft.anchor?.periodReadsASoftwareRange == true
             drafts.append(draft)
         }
         return drafts
     }
 
     /// Whether the bullets of a section that mixes bullets with other lines are its entries: when no other line is dated
-    /// and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
+    /// (a period read only as a software range counts as no date) and a bullet heads an entry. Detail bullets never vote: an undated one, a count, or a year with prose stays a detail.
     private static func bulletsAreEntries(_ usable: [Line]) -> Bool {
-        guard !usable.contains(where: { !$0.isBullet && $0.period != nil }) else { return false }
+        // A period read only through the software-range fallback is no date: it must not veto the bullets
+        guard !usable.contains(where: { !$0.isBullet && $0.period != nil && !$0.periodReadsASoftwareRange }) else { return false }
         return usable.contains(where: { $0.headEvidence == .strong })
     }
 
@@ -634,6 +671,202 @@ enum EntryReader {
         }
     }
 
+    // MARK: Tables
+
+    /// A part of a section, read on its own: the rows of one table whose header names the columns, or everything else.
+    enum TablePart {
+        case columns([Line])
+        /// The lines read by their dates; `true` where they are rows of a table the header does not explain.
+        case ordinary([Line], Bool)
+
+        /// The part with one more line of description: a mapped part gets it as a line with no label, which the
+        /// labelled reading keeps as a detail of the entry open above.
+        func appending(_ line: Line) -> TablePart {
+            switch self {
+            case .columns(let rows): return .columns(rows + [line])
+            case .ordinary(let held, let isDoubtful): return .ordinary(held + [line], isDoubtful)
+            }
+        }
+    }
+
+    /// Cuts a section's lines into its tables and the lines between them. A Markdown table's header row is markup,
+    /// never data, and each table is read by its own header: a row ends the table when it does not follow the one
+    /// before without a gap, or has a single cell. Where the header names the columns, each cell of a row with as many
+    /// cells becomes a labelled line, the first one opening an entry. Any other row, and the rows of a table with no
+    /// known column name, are read by their dates like the rest of the section and are flagged.
+    private static func tableParts(of lines: [Line], findings: inout Findings) -> [TablePart] {
+        var result: [TablePart] = []
+        func add(_ line: Line, isDoubtful: Bool) {
+            if case .ordinary(let held, let flag)? = result.last, flag == isDoubtful {
+                result[result.count - 1] = .ordinary(held + [line], flag)
+            } else {
+                result.append(.ordinary([line], isDoubtful))
+            }
+        }
+        var names: [EntryVocabulary.EntryLabel?] = []
+        var inTable = false
+        var previous = -1
+        var table = 0
+        var rowsOfTable = -1
+        var lastRowWasMapped = true
+        var headerIsDistrusted = false
+        var afterUnplacedShortRow = false
+        for (place, line) in lines.enumerated() {
+            if line.block.kind == .tableHeader {
+                findings.leaveOut(line.block, .markup)
+                names = line.cells.map { EntryVocabulary.entryLabel($0.text) }
+                inTable = true
+                lastRowWasMapped = true
+                headerIsDistrusted = false
+                afterUnplacedShortRow = false
+                previous = line.block.index
+                table += 1
+                continue
+            }
+            // A row is written between the table's bars and follows the one before; a blank line between two rows keeps
+            // the table when the row is about the header's size (one cell more or fewer), and that size is flagged
+            // below. A much shorter or longer bar line after a gap is a heading or prose, and ends the table. Cells set
+            // apart by tabs or a wide gap are a line of their own.
+            let isRow = inTable && line.block.isTableRow && line.block.index == previous + 1
+                && (line.block.followsGap ? line.cells.count > 1 && abs(line.cells.count - names.count) <= 1
+                    : line.cells.count > 1 || line.cells.count == names.count)
+                && !(line.block.followsGap || !lastRowWasMapped ? contradictsHeader(line, names) : false)
+            if !isRow, inTable, continues(lines, at: place, after: result.last, ofTable: rowsOfTable == table) {
+                // A line with no date right under a row is that job's description, not an entry of its own
+                previous = line.block.index
+                result[result.count - 1] = result[result.count - 1].appending(line)
+                continue
+            }
+            guard isRow else {
+                inTable = false
+                add(line, isDoubtful: false)
+                continue
+            }
+            previous = line.block.index
+            if isHeadingAfterAGap(line, names) { headerIsDistrusted = true }
+            let wasAfterUnplacedShortRow = afterUnplacedShortRow
+            if line.block.followsGap, line.cells.count < names.count { afterUnplacedShortRow = true }
+            guard names.contains(where: { $0 != nil }), line.cells.count == names.count,
+                  !headerIsDistrusted, !contradictsHeader(line, names) else {
+                lastRowWasMapped = false
+                add(line, isDoubtful: true)
+                continue
+            }
+            lastRowWasMapped = true
+            var opened = false
+            var rows: [Line] = []
+            for (column, cell) in line.cells.enumerated() where !cell.text.isEmpty {
+                var part = Line(block: line.block, cells: [cell], isBullet: false, isProse: false)
+                part.label = names[column]
+                part.labelValue = [cell]
+                part.opensRow = !opened
+                part.isToCheck = wasAfterUnplacedShortRow
+                opened = true
+                rows.append(part)
+            }
+            if case .columns(let held)? = result.last, rowsOfTable == table {
+                result[result.count - 1] = .columns(held + rows)
+            } else {
+                result.append(.columns(rows))
+                rowsOfTable = table
+            }
+        }
+        return result
+    }
+
+    // A short row after a gap that the header cannot place may be the heading of a new table, whatever its words: the rows
+    // after it stay mapped by the header (an omitted cell is the likelier reading) but are flagged until the next header,
+    // so a value may land in a wrong field only where the person is asked to check it.
+
+    /// Whether a row's own content contradicts the header: the header has a period column, and a cell that is a period
+    /// on its own stands in another column than the header's, or than where one omitted or extra cell puts it. Such a row is never mapped by the header; read by its dates, it is the
+    /// safe way to fail, whatever the row's size. Right under a mapped row it is only flagged; after a gap or an
+    /// unmapped row it ends the table.
+    private static func contradictsHeader(_ line: Line, _ names: [EntryVocabulary.EntryLabel?]) -> Bool {
+        guard let periodColumn = names.firstIndex(of: .period) else { return false }
+        // A row one cell shorter or longer than the header is flagged anyway; its period cell is where one omitted
+        // (or one extra) cell before it puts it, so that is no contradiction.
+        let shift = line.cells.count - names.count
+        let explained = abs(shift) == 1 ? periodColumn + shift : periodColumn
+        return line.cells.enumerated().contains { column, cell in
+            column != periodColumn && column != explained && isPeriodAlone(cell)
+        }
+    }
+
+    /// Whether a bar line after a blank line, one cell short of the header, names a column of its own (`Selected work |
+    /// 2018 – 2020 | Summary`): it is the heading of a new section, not an employer-less row, so the header is no longer
+    /// trusted and the rows after it are read without it, flagged. A short row with no such cell stays a flagged row of the table.
+    private static func isHeadingAfterAGap(_ line: Line, _ names: [EntryVocabulary.EntryLabel?]) -> Bool {
+        guard line.block.followsGap, line.cells.count < names.count else { return false }
+        return line.cells.contains {
+            EntryVocabulary.entryLabel($0.text) != nil || headingWords.contains(SectionVocabulary.key($0.text))
+        }
+    }
+
+    /// Words a column or section heading uses for its text column, which the entry labels do not name. A row of data
+    /// and a heading cannot otherwise be told apart by their cells, so a short row with none of these stays a row.
+    private static let headingWords: Set<String> = [
+        "summary", "notes", "note", "details", "description", "highlights", "overview",
+        "riepilogo", "sintesi", "dettagli", "descrizione",
+        "zusammenfassung", "notizen", "beschreibung",
+        "resumen", "notas", "detalles", "descripcion", "resume", "resumo", "detalhes", "descricao",
+    ]
+
+    private static func isPeriodAlone(_ cell: Piece) -> Bool {
+        let text = cell.text.trimmingCharacters(in: .whitespaces)
+        guard let match = DateReader.periods(in: text).first else { return false }
+        return text[match.range].trimmingCharacters(in: .whitespaces) == text
+    }
+
+    /// Whether a line with no date, right under a row of the table being read, goes on with that row's entry.
+    /// The undated lines just before the next dated line are that entry's heading when the ordinary reader can take
+    /// them so (no bullet, no prose, no gap, no table row): none of them is a detail, they name its employer and role.
+    /// The lines before those are still the row's.
+    private static func continues(
+        _ lines: [Line], at place: Int, after last: TablePart?, ofTable current: Bool
+    ) -> Bool {
+        let line = lines[place]
+        guard !line.block.followsGap, line.period == nil, line.label == nil, !line.isDurationOnly else { return false }
+        if headsADatedEntry(lines, from: place) { return false }
+        switch last {
+        case .columns?: return current
+        case .ordinary(_, let isDoubtful)?: return isDoubtful
+        case nil: return false
+        }
+    }
+
+    /// Whether the line at `start`, with the undated lines after it, is the heading of the dated line that ends the run
+    /// with no gap between: the employer above a dated line that holds the role, or the employer and the role above a
+    /// dated line that is only a period.
+    private static func headsADatedEntry(_ lines: [Line], from start: Int) -> Bool {
+        var place = start
+        while place < lines.count {
+            let line = lines[place]
+            if line.block.followsGap || line.block.isTableRow || line.isBullet || line.isProse { return false }
+            if let period = line.period {
+                let isPeriodAlone = line.cells.count == 1 && line.cells[0].trimmed().text == period.piece.text
+                return place > start && place - start <= (isPeriodAlone ? 2 : 1)
+            }
+            if line.label != nil || line.isDurationOnly { return false }
+            place += 1
+        }
+        return false
+    }
+
+    /// The entries read from a table whose columns the vocabulary does not name are marked for the person to check.
+    private static func flagColumnsByOrder(_ before: (Int, Int), kind: Kind, into findings: inout Findings) {
+        switch kind {
+        case .experience:
+            for place in before.0..<findings.cv.experience.count where findings.cv.experience[place].check == nil {
+                findings.cv.experience[place].check = .roleOrEmployerByOrder
+            }
+        case .education:
+            for place in before.1..<findings.cv.education.count where findings.cv.education[place].check == nil {
+                findings.cv.education[place].check = .roleOrEmployerByOrder
+            }
+        }
+    }
+
     // MARK: Labelled rows
 
     private static func readLabelled(_ lines: [Line], section: Section, kind: Kind, into findings: inout Findings) {
@@ -644,6 +877,8 @@ enum EntryReader {
         // The entries that hold a line that may be a heading the vocabulary does not know (#454), by their place
         var doubtful: Set<Int> = []
         var currentIsDoubtful = false
+        var toCheck: Set<Int> = []
+        var currentIsToCheck = false
         var pendingLabel: EntryVocabulary.EntryLabel?
         var pendingIsDoubtful = false
         for line in lines {
@@ -662,19 +897,24 @@ enum EntryReader {
             let rowIsDoubtful = isDoubtful || (pendingLabel != nil && pendingIsDoubtful)
             pendingLabel = nil
             pendingIsDoubtful = false
-            let opensEntry = label == .period || (label == .employer && current.contains { $0.0 == .employer })
-                || (label == .school && current.contains { $0.0 == .school })
+            let opensEntry = line.opensRow ?? (label == .period
+                || (label == .employer && current.contains { $0.0 == .employer })
+                || (label == .school && current.contains { $0.0 == .school }))
             if opensEntry && !current.isEmpty {
                 if currentIsDoubtful { doubtful.insert(entries.count) }
+                if currentIsToCheck { toCheck.insert(entries.count) }
                 entries.append(current)
                 current = []
                 currentIsDoubtful = false
+                currentIsToCheck = false
             }
             current.append((label, values))
             currentIsDoubtful = currentIsDoubtful || rowIsDoubtful
+            currentIsToCheck = currentIsToCheck || line.isToCheck
         }
         if !current.isEmpty {
             if currentIsDoubtful { doubtful.insert(entries.count) }
+            if currentIsToCheck { toCheck.insert(entries.count) }
             entries.append(current)
         }
 
@@ -692,7 +932,12 @@ enum EntryReader {
             for (label, values) in rows {
                 switch label {
                 case .period:
-                    if period == nil, let value = values.first, let match = DateReader.periods(in: value.text).first {
+                    // The column names the cell a period, so a range after a software name ("Unity 9.10 – 9.12") is read
+                    // as one, as a free line would be; the row bounds the entry, so no boundary is in doubt, and the name
+                    // stays visible as text not imported
+                    if period == nil, let value = values.first,
+                       let match = DateReader.periods(in: value.text).first
+                        ?? DateReader.periods(in: value.text, readsSoftwareRanges: true).first {
                         period = periodValue(value.sub(match.range), match.period)
                         for rest in value.removing([match.range]) where !leftOut.holds(rest.span) { findings.unplace(rest, in: section) }
                         for rest in values.dropFirst() { findings.unplace(rest, in: section) }
@@ -729,7 +974,7 @@ enum EntryReader {
                 entry.period = period
                 entry.details = details
                 entry.heading = findings.heading(of: section)
-                entry.check = doubtful.contains(place) ? .headingUnsure : nil
+                entry.check = doubtful.contains(place) ? .headingUnsure : (toCheck.contains(place) ? .roleOrEmployerByOrder : nil)
                 findings.cv.experience.append(entry)
             case .education:
                 var entry = ImportedEducation()
@@ -739,7 +984,7 @@ enum EntryReader {
                 entry.period = period
                 entry.details = details
                 entry.heading = findings.heading(of: section)
-                entry.check = doubtful.contains(place) ? .headingUnsure : nil
+                entry.check = doubtful.contains(place) ? .headingUnsure : (toCheck.contains(place) ? .roleOrEmployerByOrder : nil)
                 findings.cv.education.append(entry)
             }
         }

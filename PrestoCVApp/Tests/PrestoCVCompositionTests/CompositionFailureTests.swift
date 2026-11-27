@@ -42,7 +42,7 @@ struct CompositionFailureTests {
             .conflictingStorage, .missingValue(argument: "-PrestoCVNextSeed"), .invalidFolderName, .unreadableSeed,
             .unreadableDistribution, .seedWithoutFolder, .seedUnwritable, .unsafeFolder, .samplesWithoutFolder,
             .failuresWithoutFolder, .unreadableOtherWindow, .otherWindowWithoutFolder, .unreadableLegacySeed,
-            .legacySeedWithoutFolder, .traceRunsWithoutFolder,
+            .legacySeedWithoutFolder, .traceRunsWithoutFolder, .readyDesignsWithoutFolder,
         ]
         for failure in failures {
             #expect(CompositionFailure(failure) == .launchFixturesRejected)

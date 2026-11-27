@@ -31,12 +31,14 @@ extension XCUIApplication {
                        file: file, line: line)
     }
 
-    /// Drags the import by its margin beside the box (the box takes a drag that starts on it), to show what is below
-    /// or what is above.
+    /// Drags the import by its margin, left of the column (the box takes a drag that starts on it), to show what is
+    /// below or what is above. The column's edge is read from Import, which spans the column: the box's own frame is
+    /// null once it is scrolled away above (XCUITest clips a text view's frame to the screen), and the scroll's frame
+    /// is no guide, since it lies under the sidebar on an iPad and under the side's safe area on an iPhone on its side.
     @MainActor
     func dragImport(showingBelow below: Bool) {
         let window = windows.firstMatch
-        let margin = importBox.frame.minX - 12
+        let margin = importButton.frame.minX - 12
         let origin = window.coordinate(withNormalizedOffset: .zero)
         let low = origin.withOffset(CGVector(dx: margin, dy: window.frame.height * 0.7))
         let high = origin.withOffset(CGVector(dx: margin, dy: window.frame.height * 0.35))

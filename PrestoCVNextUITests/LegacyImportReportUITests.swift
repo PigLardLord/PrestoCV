@@ -26,7 +26,9 @@ final class LegacyImportReportUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func launch(legacy: String? = nil, largestText: Bool = false) throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", storage]
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", storage, "-PrestoCVNextReadyDesigns",
+        ]
         if let legacy {
             // The fixture takes a JSON map from file name to content, in base 64
             let files = try JSONEncoder().encode(["cv_\(identity).json": legacy]).base64EncodedString()

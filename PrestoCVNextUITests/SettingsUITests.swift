@@ -15,7 +15,7 @@ final class SettingsUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func openSettings() throws -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", try seed()]
+        app.launchArguments += ["-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try seed()]
         app.launch()
         let gear = app.buttons["settings.open"]
         XCTAssertTrue(gear.waitForExistence(timeout: 30))
