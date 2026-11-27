@@ -126,10 +126,12 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("a.pdf", in: world.scratch.inbox)
+        let before = world.files.calls.events.count
 
         let received = world.adapter.receive(copy)
 
-        #expect(Array(world.files.calls.events.prefix(3)) == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
+        let events = Array(world.files.calls.events.dropFirst(before).prefix(3))
+        #expect(events == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
         world.adapter.release(received)
     }
 
@@ -447,6 +449,57 @@ struct ImportFileAdapterTests {
         world.expectBalanced()
     }
 
+    // MARK: Files this run did not receive
+
+    @Test("a file in a copy folder that this run did not receive is never deleted: at launch, after an import, after a window goes away")
+    func unreceivedFileIsNeverDeleted() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let scratch = world.scratch
+        try scratch.file("stray.pdf", in: scratch.inbox)
+        try scratch.file("stray.pdf", in: scratch.documentsInbox)
+
+        _ = world.nextLaunch()
+        let launch = world.nextLaunch()
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+        #expect(try scratch.names(in: scratch.documentsInbox) == ["stray.pdf"])
+
+        let imported = try scratch.file("imported.pdf", in: scratch.inbox)
+        let read = launch.receive(imported)
+        _ = try await launch.readPDF(of: read)
+        launch.release(read)
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+
+        let gone = launch.receive(try scratch.file("gone.pdf", in: scratch.documentsInbox))
+        launch.release(gone)
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+        #expect(try scratch.names(in: scratch.documentsInbox) == ["stray.pdf"])
+        world.expectBalanced()
+    }
+
+    @Test("adapters made with logging(to:) share their received files, each with its own log")
+    func adaptersThatShareFiles() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let inbox = world.nextLaunch()
+        let screenLog = RecordingLogger()
+        let screen = inbox.logging(to: screenLog)
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let waiting = inbox.receive(copy)
+        let read = screen.receive(copy)
+        inbox.release(waiting)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"])
+        _ = try await screen.readPDF(of: read)
+        screen.release(read)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        screen.release(read)
+        #expect(screenLog.events == ["import.file.releasedAgain"])
+        #expect(world.logger.events.isEmpty)
+        world.expectBalanced()
+    }
+
     // MARK: Helpers
 
     /// Releases `first` while another thread receives `copy` from inside the delete of the copy, and gives that receive's
@@ -537,7 +590,6 @@ private final class SpyFiles: ImportFileSystem {
     private let faults: Faults
     private let recorded = Mutex(Calls())
     private let hooks = Mutex(Hooks())
-
     init(_ faults: Faults = Faults()) {
         self.faults = faults
     }
@@ -588,7 +640,11 @@ private final class SpyFiles: ImportFileSystem {
         try system.remove(url, identity: identity)
     }
 
-    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void = { _ in }) {
+    private func record(_ call: String, _ url: URL) {
+        record(call, url) { _ in }
+    }
+
+    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void) {
         recorded.withLock { calls in
             change(&calls)
             calls.events.append("\(call) \(url.lastPathComponent)")
@@ -601,6 +657,7 @@ private struct World {
     let scratch: Scratch
     let files: SpyFiles
     let logger: RecordingLogger
+    let maximumBytes: Int
     let adapter: ImportFileAdapter
 
     init(maximumBytes: Int = 1_000, faults: SpyFiles.Faults = SpyFiles.Faults()) throws {
@@ -610,7 +667,18 @@ private struct World {
         self.scratch = scratch
         self.files = files
         self.logger = logger
-        adapter = ImportFileAdapter(files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger)
+        self.maximumBytes = maximumBytes
+        adapter = ImportFileAdapter(
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger
+        )
+    }
+
+    /// The adapter of the app launched again, over the same folders, file system and log: it holds none of the files
+    /// the earlier one received.
+    func nextLaunch() -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger
+        )
     }
 
     /// Every start of access has had its stop, on the same URL.

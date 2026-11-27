@@ -1,3 +1,5 @@
+import Foundation
+
 extension ShellNavigationModel {
 
     /// Goes where a way to start leads: a draft opens in the editor and the import shows, each in place of what was
@@ -25,5 +27,15 @@ extension ShellNavigationModel {
     func open(_ imported: ImportedDraft) {
         importer?.opened()
         open(imported.start, review: imported.review)
+    }
+
+    /// A PDF opened in the app from another app: the import shows, in place of what was open, as `showImport()` shows
+    /// it, and reads the file; while it reads another, the file is let go (one import at a time). An editor whose text
+    /// cannot be stored as it is keeps the person in it, and the file is let go (5-13e holds it and asks).
+    public func receive(file url: URL) {
+        switch showImport() {
+        case .left: importer?.importFile(at: url)
+        case .stayed: files.release(files.receive(url))
+        }
     }
 }

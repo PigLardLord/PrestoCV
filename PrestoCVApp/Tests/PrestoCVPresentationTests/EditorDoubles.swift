@@ -265,7 +265,7 @@ struct Editing {
     func shell(time: BackgroundTimeSpy = BackgroundTimeSpy(), exports: ShellExports = ShellExports(),
                imports: ImportWorld = ImportWorld()) -> ShellNavigationModel {
         ShellNavigationModel(makeEditor: { editor($0, alsoTelling: $1) }, makeExportSheet: { exports.sheet(for: $0) },
-                             makeImporter: { imports.model() }, backgroundTime: time)
+                             makeImporter: { imports.model() }, files: imports.files, backgroundTime: time)
     }
 }
 

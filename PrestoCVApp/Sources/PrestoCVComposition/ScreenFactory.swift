@@ -159,7 +159,7 @@ public final class ScreenFactory {
                     Task { await editor.changeLook(to: look, parts: parts) }
                 }
             )
-        }, makeImporter: { self.makeImport() }, backgroundTime: backgroundTime)
+        }, makeImporter: { self.makeImport() }, files: importFiles, backgroundTime: backgroundTime)
     }
 
     /// The first run and the ways to start another CV, the import first: the shell shows the import (`showImport()`).
