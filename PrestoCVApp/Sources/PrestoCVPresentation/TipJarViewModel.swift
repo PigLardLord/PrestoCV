@@ -34,9 +34,11 @@ public final class TipJarViewModel {
     }
 
     /// Buys the tip of this size through the store's sheet and shows what became of it. A tap while a purchase runs buys
-    /// nothing: only one purchase runs at a time.
+    /// nothing: only one purchase runs at a time. The person chose from the offers on screen, so a read started before
+    /// the tap cannot replace them, nor hide what became of the purchase; a read started while it runs still can.
     public func buy(_ size: TipRow.Size) async {
         if case .buying = attempt { return }
+        startRead()
         attempt = .buying(size)
         do throws(TipFailure) {
             switch try await selling.purchase(TipSize(size)) {

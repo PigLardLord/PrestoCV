@@ -216,6 +216,38 @@ struct TipJarViewModelTests {
         #expect(model.state == .unavailable(.notAllowed))
     }
 
+    @Test("an offers read started before a purchase that ends after it, empty or failed, leaves the offers and the purchase's notice")
+    func olderReadEndsAfterEachOutcome() async {
+        let outcomes: [(Result<TipPurchase, TipFailure>, TipAttempt)] = [
+            (.success(.completed), .thanked), (.success(.pending), .pending), (.success(.cancelled), .idle),
+            (.failure(.failed), .failed), (.failure(.unreachable), .unreachable),
+        ]
+        let lateReads: [Result<[TipOffer], TipFailure>] = [.success([]), .failure(.failed), .failure(.unreachable)]
+        for (purchased, shown) in outcomes {
+            for late in lateReads {
+                let selling = GatedTips()
+                let model = TipJarViewModel(selling: selling)
+                var arrivals = selling.arrivals.makeAsyncIterator()
+                let loading = Task { await model.load() }
+                await arrivals.next()
+                selling.finish(request: 0, with: .success(all))
+                await loading.value
+
+                let reading = Task { await model.load() }
+                await arrivals.next()
+                let buying = Task { await model.buy(.small) }
+                await arrivals.next()
+                selling.finishPurchase(with: purchased)
+                await buying.value
+                selling.finish(request: 1, with: late)
+                await reading.value
+
+                #expect(model.state == .offers(rows), "purchase \(purchased), late read \(late)")
+                #expect(model.attempt == shown, "purchase \(purchased), late read \(late)")
+            }
+        }
+    }
+
     @Test("the thank-you and the other notices of a purchase are gone when the screen opens again")
     func noticesLeaveWithTheScreen() async {
         let answers: [Result<TipPurchase, TipFailure>] = [
