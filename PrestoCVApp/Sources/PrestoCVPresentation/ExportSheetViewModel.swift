@@ -264,7 +264,7 @@ public final class ExportSheetViewModel {
             do {
                 let file = try await files.write(document.pdf, named: suggestedFileName)
                 guard let self else {
-                    files.remove(file)
+                    await files.remove(file)
                     return
                 }
                 self.shareWritten(file, named: suggestedFileName, of: documentID, mine)
@@ -280,7 +280,8 @@ public final class ExportSheetViewModel {
     /// the file goes at once.
     private func shareWritten(_ file: SharedFile, named fileName: String, of export: ExportID, _ mine: Int) {
         guard mine == generation else {
-            files.remove(file)
+            let files = files
+            Task { await files.remove(file) }
             return
         }
         writing = false
@@ -375,7 +376,7 @@ public final class ExportSheetViewModel {
     }
 
     private func export(_ mine: Int) async {
-        guard let (cv, language) = readCVAndLanguage(mine) else { return }
+        guard let (cv, language) = await readCVAndLanguage(mine) else { return }
         let status: ExportStatus
         var document: ExportedDocument?
         do {
@@ -415,11 +416,12 @@ public final class ExportSheetViewModel {
     /// nil when nothing is to be exported, or when `mine` is no longer the latest intent. On the way it can store in the
     /// CV the language its words are written in (`wordsLanguage`). The snapshot closure and `onLanguageFound` can call
     /// into the sheet, so the generation is checked again after each.
-    private func readCVAndLanguage(_ mine: Int) -> (CV, DocumentLanguage)? {
+    private func readCVAndLanguage(_ mine: Int) async -> (CV, DocumentLanguage)? {
         guard mine == generation else { return nil }
         let cv = snapshot().cv
         guard mine == generation else { return nil }
-        let automatic = cv.language ?? wordsLanguage(of: cv) ?? appLanguage.language
+        let words = cv.language == nil ? await wordsLanguage(of: cv, mine) : nil
+        let automatic = cv.language ?? words ?? appLanguage.language
         guard mine == generation else { return nil }
         return prepare(cv, automatic: ExportLanguage(language: automatic))
     }
@@ -428,11 +430,15 @@ public final class ExportSheetViewModel {
     /// CV. Once the person chose a language the words are not read: that choice goes to the CV instead. The CV keeps
     /// the found one only if it keeps none by the time it is stored (`onLanguageFound`). A save that fails leaves the CV
     /// without a language, as a failed choice does: the editor shows the failure, and the next sheet reads the words
-    /// again.
-    private func wordsLanguage(of cv: CV) -> DocumentLanguage? {
+    /// again. The words are read off the main actor (R19); what they tell counts only while `mine` is the latest intent
+    /// and no language was found or chosen meanwhile.
+    private func wordsLanguage(of cv: CV, _ mine: Int) async -> DocumentLanguage? {
         if let found { return found }
         guard selectedLanguage == nil else { return nil }
-        found = detector.language(of: cv, among: offeredLanguages.map(\.language))
+        let told = await detector.language(of: cv, among: offeredLanguages.map(\.language))
+        if let found { return found }
+        guard mine == generation, selectedLanguage == nil else { return nil }
+        found = told
         if let found { onLanguageFound(ExportLanguage(language: found)) }
         return found
     }

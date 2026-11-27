@@ -16,6 +16,7 @@ private final class ScriptedImporter: CVTextImporting, @unchecked Sendable {
     private let lock = NSLock()
     private var texts: [String] = []
     private var documents: [Data] = []
+    private var threads: [Bool] = []
     private let answer: @Sendable (String) throws -> ImportResult
     private let pdfAnswer: @Sendable (Data) throws -> ImportResult
     init(_ answer: @escaping @Sendable (String) throws -> ImportResult) {
@@ -29,8 +30,11 @@ private final class ScriptedImporter: CVTextImporting, @unchecked Sendable {
     }
     var received: [String] { lock.withLock { texts } }
     var receivedPDFs: [Data] { lock.withLock { documents } }
+    /// For each text read, whether it was read on the main actor.
+    var textsReadOnTheMainActor: [Bool] { lock.withLock { threads } }
     func importText(_ text: String) throws -> ImportResult {
-        lock.withLock { texts.append(text) }
+        let onMainActor = MainActorProbe.isOnTheMainActor
+        lock.withLock { texts.append(text); threads.append(onMainActor) }
         return try answer(text)
     }
     func importPDF(_ data: Data) async throws -> ImportResult {
@@ -79,6 +83,14 @@ struct ImportCVWorkflowTests {
         #expect(outcome.cv.revision == 0 && outcome.cv.createdAt == nil && outcome.cv.updatedAt == nil)
         #expect(outcome == ImportedCVMapper().map(FullImport.result, id: FixedID(5).id))
         #expect(outcome.review.isEmpty == false)
+    }
+
+    @MainActor
+    @Test("a text is read off the main actor, also when the screen asks from it (R19)")
+    func textIsReadOffTheMainActor() async throws {
+        let importer = ScriptedImporter { _ in FullImport.result }
+        _ = try await workflow(importer).importCV(fromText: FullImport.text)
+        #expect(importer.textsReadOnTheMainActor == [false])
     }
 
     @Test("a successful import takes exactly one id")

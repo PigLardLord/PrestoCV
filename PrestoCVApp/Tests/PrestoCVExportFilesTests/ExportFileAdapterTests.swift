@@ -10,6 +10,7 @@ import Darwin
 #endif
 @testable import PrestoCVExportFiles
 import PrestoCVWorkflowPorts
+import Synchronization
 import Testing
 
 @Suite("The file adapter of the export's share")
@@ -65,7 +66,7 @@ struct ExportFileAdapterTests {
         let first = try await world.adapter.write(Self.pdf, named: Self.name)
         let second = try await world.adapter.write(Self.pdf, named: Self.name)
 
-        world.adapter.remove(first)
+        await world.adapter.remove(first)
 
         #expect(!FileManager.default.fileExists(atPath: first.url.deletingLastPathComponent().path))
         #expect(try Data(contentsOf: second.url) == Self.pdf)
@@ -78,10 +79,10 @@ struct ExportFileAdapterTests {
         defer { world.remove() }
         let first = try await world.adapter.write(Self.pdf, named: Self.name)
         let second = try await world.adapter.write(Self.pdf, named: Self.name)
-        world.adapter.remove(first)
+        await world.adapter.remove(first)
 
-        world.adapter.remove(first)
-        world.adapter.remove(SharedFile(id: 99, url: second.url))
+        await world.adapter.remove(first)
+        await world.adapter.remove(SharedFile(id: 99, url: second.url))
 
         #expect(try Data(contentsOf: second.url) == Self.pdf)
         #expect(world.logger.entries.isEmpty)
@@ -94,7 +95,7 @@ struct ExportFileAdapterTests {
         let file = try await world.adapter.write(Self.pdf, named: Self.name)
         try FileManager.default.removeItem(at: file.url.deletingLastPathComponent())
 
-        world.adapter.remove(file)
+        await world.adapter.remove(file)
 
         #expect(world.logger.entries.isEmpty)
     }
@@ -109,13 +110,40 @@ struct ExportFileAdapterTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
         defer { world.allowWrites(folder) }
 
-        world.adapter.remove(file)
+        await world.adapter.remove(file)
 
         let entries = world.logger.entries("export.share.notRemoved")
         #expect(entries.count == 1)
         #expect(entries.first?.value("of") == .token("share"))
         #expect(entries.first?.value("error") == .error(type: "ExportFileError", code: "noPermission"))
         #expect(FileManager.default.fileExists(atPath: file.url.path))
+    }
+
+    // MARK: Off the main actor
+
+    @MainActor
+    @Test("a write and a remove touch the file system off the main actor, also when the sheet asks from it (R19): the log line each writes after its failed call tells",
+          .enabled(if: geteuid() != 0, "the superuser removes any file"))
+    func writeAndRemoveRunOffTheMainActor() async throws {
+        let threads = ThreadRecordingLogger()
+        let removing = World()
+        defer { removing.remove() }
+        let adapter = ExportFileAdapter(root: removing.shares, logger: threads)
+        let file = try await adapter.write(Self.pdf, named: Self.name)
+        let folder = file.url.deletingLastPathComponent()
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+        defer { removing.allowWrites(folder) }
+        await adapter.remove(file)
+
+        let writing = World()
+        defer { writing.remove() }
+        // Made before its root, which then holds nothing; the root is then a file, so no folder can be made in it
+        let writer = ExportFileAdapter(root: writing.shares, logger: threads)
+        try FileManager.default.createDirectory(at: writing.scratch, withIntermediateDirectories: true)
+        try Data("not a folder".utf8).write(to: writing.shares)
+        await #expect(throws: ExportFileError.self) { _ = try await writer.write(Self.pdf, named: Self.name) }
+
+        #expect(threads.logged == ["export.share.notRemoved": false, "export.share.notWritten": false])
     }
 
     // MARK: Names
@@ -249,6 +277,16 @@ struct ExportFileAdapterTests {
         #expect(ExportFileError(Unknown()) == .system(.other))
         #expect(ExportFileError(ExportFileError.notAName) == .notAName)
         #expect(ExportFileError.notAName.logCode.description == "notAName")
+    }
+}
+
+/// Records, for each event logged, whether it was logged on the main actor.
+private final class ThreadRecordingLogger: DiagnosticLogger {
+    private let threads = Mutex<[String: Bool]>([:])
+    var logged: [String: Bool] { threads.withLock { $0 } }
+    func log(_ entry: LogEntry) {
+        let onMainActor = MainActorProbe.isOnTheMainActor
+        threads.withLock { $0[entry.event.description] = onMainActor }
     }
 }
 

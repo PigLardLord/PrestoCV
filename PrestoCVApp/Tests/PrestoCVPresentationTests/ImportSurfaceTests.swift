@@ -47,6 +47,22 @@ func useEveryPublicMember(of screen: ImportViewModel, file: URL, pdf: Data) {
     screen.clearProblem()
 }
 
+/// Every public member a window uses of the files opened in it from another app, the shell's among them.
+@MainActor
+func useEveryPublicMember(of inbox: OpenedFileInbox, shell: ShellNavigationModel, file: URL) {
+    inbox.receive(file)
+    inbox.compositionFailed()
+    inbox.shellReady(shell)
+    inbox.receive(file)
+    shell.receive(file: file)
+    switch shell.question {
+    case .keepEditingOrDiscard(let status)?: let _: SaveStatus = status
+    case nil: break
+    }
+    shell.keepEditing()
+    shell.discardAndImport()
+}
+
 @MainActor
 @Suite("Import public surface")
 struct ImportSurfaceTests {
@@ -63,6 +79,15 @@ struct ImportSurfaceTests {
 
         #expect(screen.status == .idle)
         #expect(screen.result == nil)
+    }
+
+    @Test("the API of the files opened in a window holds no domain or port type a view would use")
+    func noDomainTypeInTheOpenedFileAPI() {
+        let world = OpenedFileTests.World()
+
+        useEveryPublicMember(of: world.inbox, shell: world.shell, file: ImportValues.file)
+
+        #expect(world.shell.importer != nil)
     }
 
     @Test("what the import screen shows of its state, its problems, its sources and its review are codes")

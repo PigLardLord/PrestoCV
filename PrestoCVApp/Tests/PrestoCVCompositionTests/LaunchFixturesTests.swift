@@ -3,6 +3,7 @@ import DiagnosticTrace
 import Foundation
 import PrestoCVApplication
 import PrestoCVLegacyLeftovers
+import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
 
@@ -50,6 +51,42 @@ struct LaunchFixturesTests {
         }
         #expect(throws: LaunchFixtures.Failure.unreadableDistribution) {
             try LaunchFixtures.parse([Self.program, "-PrestoCVNextDistribution", "beta"])
+        }
+    }
+
+    @Test("Every answer of the tips is read, and one that is not an answer fails")
+    func tips() throws {
+        for answer in LaunchFixtures.TipsAnswer.allCases {
+            let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextTips", answer.rawValue])
+            #expect(fixtures.tips == answer)
+        }
+        #expect(throws: LaunchFixtures.Failure.unreadableTips) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextTips", "free"])
+        }
+    }
+
+    @Test("The given tips answer as the store would")
+    func givenTips() async throws {
+        let offers = try await GivenTips(given: .offers).offers()
+        #expect(offers.map(\.size) == TipSize.allCases)
+        #expect(GivenTips(given: .offers).canPay)
+        #expect(!GivenTips(given: .notAllowed).canPay)
+        #expect(try await GivenTips(given: .noOffers).offers().isEmpty)
+        await #expect(throws: TipFailure.unreachable) { try await GivenTips(given: .unreachable).offers() }
+        await #expect(throws: TipFailure.failed) { try await GivenTips(given: .failed).offers() }
+    }
+
+    @Test("The given tips buy as the store would, and the answers about a purchase show the three offers")
+    func givenPurchases() async throws {
+        #expect(try await GivenTips(given: .offers).purchase(.small) == .completed)
+        #expect(try await GivenTips(given: .cancelled).purchase(.medium) == .cancelled)
+        #expect(try await GivenTips(given: .pending).purchase(.large) == .pending)
+        await #expect(throws: TipFailure.failed) { try await GivenTips(given: .purchaseFailed).purchase(.small) }
+        await #expect(throws: TipFailure.notAllowed) { try await GivenTips(given: .notAllowed).purchase(.small) }
+        await #expect(throws: TipFailure.unreachable) { try await GivenTips(given: .unreachable).purchase(.small) }
+        for answer in [LaunchFixtures.TipsAnswer.cancelled, .pending, .purchaseFailed] {
+            #expect(try await GivenTips(given: answer).offers().map(\.size) == TipSize.allCases)
+            #expect(GivenTips(given: answer).canPay)
         }
     }
 
@@ -228,6 +265,30 @@ struct LaunchFixturesTests {
         }
         #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextAutosavePause")) {
             try LaunchFixtures.parse([Self.program, "-PrestoCVNextAutosavePause"])
+        }
+    }
+
+    @Test("The PDF a window is handed as if another app opened it is read, and needs no folder: it writes nothing", arguments: LaunchFixtures.OpenedFile.allCases)
+    func openedFile(_ file: LaunchFixtures.OpenedFile) throws {
+        let fixtures = try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile", file.rawValue])
+        let resources = URL(filePath: "/bundle/Resources", directoryHint: .isDirectory)
+
+        #expect(fixtures.openedFile == file)
+        #expect(fixtures.storage == .device)
+        #expect(fixtures.unknownArguments.isEmpty)
+        #expect(fixtures.openedFileFixture(in: resources)?.file == resources.appendingPathComponent("\(file.rawValue).pdf"))
+        let plain = try LaunchFixtures.parse([Self.program])
+        #expect(plain.openedFile == nil)
+        #expect(plain.openedFileFixture(in: resources) == nil)
+    }
+
+    @Test("A PDF to open that is not in the corpus, or is missing, is a failure of the launch")
+    func unreadableOpenedFile() {
+        #expect(throws: LaunchFixtures.Failure.unreadableOpenedFile) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile", "../secret"])
+        }
+        #expect(throws: LaunchFixtures.Failure.missingValue(argument: "-PrestoCVNextOpenedFile")) {
+            try LaunchFixtures.parse([Self.program, "-PrestoCVNextOpenedFile"])
         }
     }
 
@@ -552,6 +613,7 @@ struct LaunchFixturesTests {
         #expect(store == ["planted.cv.json"], "The seed, beside the lock the import of the legacy store takes")
         #expect(composition.legacyImport == .ran(LegacyImportReport()), "The fixture folder has no legacy store: a run with nothing")
         #expect(!composition.sharesWithStandIn, "Only the argument opens the stand-in of the share sheet")
+        #expect(composition.openedFile == nil, "Only the argument hands a window a PDF")
     }
 
     @MainActor
@@ -603,6 +665,26 @@ struct LaunchFixturesTests {
             return
         }
         #expect(composition.sharesWithStandIn)
+    }
+
+    @MainActor
+    @Test("A launch with the argument of the PDF to open gives a composition that hands a window that PDF of the bundle", .printsForReal)
+    func launchHandsAnOpenedFile() async throws {
+        let name = Self.unique()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("PrestoCVNextFixture-\(name)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let state = await Composition.launch(
+            arguments: try Self.arguments(storage: name) + ["-PrestoCVNextOpenedFile", "linkedin"], settlement: TraceSettlement(),
+            backgroundTime: NoBackgroundTime()
+        )
+
+        guard case .ready(let composition) = state else {
+            Issue.record("expected ready, got \(state)")
+            return
+        }
+        let resources = Bundle.main.resourceURL ?? Bundle.main.bundleURL
+        #expect(composition.openedFile?.file == resources.appendingPathComponent("linkedin.pdf"))
     }
 }
 #endif

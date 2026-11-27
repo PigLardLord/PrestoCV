@@ -255,6 +255,21 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture that holds the import outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test opens a PDF in the second app as another app would; no Release build may open a file the person did
+    /// not. The released app has its own "Open in", whose names this scan would find, so it reads the second app only.
+    @Test("The fixture that opens a file in the app is read only by Debug builds")
+    func theFixtureThatOpensAFileIsReadOnlyInDebugBuilds() {
+        let names = ["openedFile", "OpenedFileFixture"]
+        let reads = Self.shippedLines(in: Self.shippedFolders(of: Self.next)).filter { line in
+            names.contains { line.code.contains($0) }
+        }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that opens a file outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// UI tests that are not about the designs accept the bundled designs without rendering them; no Release build may
     /// install a design that no render checked.
     @Test("The fixture that accepts the bundled designs without rendering them is read only by Debug builds")

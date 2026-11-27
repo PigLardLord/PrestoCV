@@ -18,6 +18,10 @@ import PrestoCVWorkflowPorts
 ///   import reads it, as a JSON map from file name (`cv_<id>.json`) to content. It needs one of the two storage arguments,
 ///   as the seed does. A test leaves it out of a relaunch, so the files the import removed stay removed.
 /// - `-PrestoCVNextDistribution <answer>`: the answer the store would give about how the app was installed (ADR 0032).
+/// - `-PrestoCVNextTips <offers|notAllowed|unreachable|noOffers|failed|cancelled|pending|purchaseFailed>`: what the store
+///   answers about the tip jar, without StoreKit: its three offers, or the reason there are none. With `offers` a purchase
+///   goes through; `cancelled`, `pending` and `purchaseFailed` show the three offers and answer a purchase so. It writes
+///   nothing, so it needs no folder.
 /// - `-PrestoCVNextNoSamples`: the examples come from a folder of the fixture that nothing makes, so the app cannot read
 ///   them. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextFailRenamesInPairs`: the list's renames are held until a second one comes, and then both fail, so that two
@@ -37,6 +41,8 @@ import PrestoCVWorkflowPorts
 ///   took. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextHoldImport`: a read of the import never ends by itself, and ends as cancelled when the person cancels it.
 ///   It writes nothing, so it needs no folder.
+/// - `-PrestoCVNextOpenedFile <linkedin>`: each time a window becomes active, it is handed the PDF of the corpus of that
+///   name, which only a Debug build carries, as if another app opened it there. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextReadyDesigns`: the bundled designs are accepted without the renders that check them (`AcceptedDesigns`),
 ///   so that a UI test that is not about the designs or the first launch does not wait for those renders on every launch of
 ///   an empty folder. The sync, its validator and the design store stay the real ones. It needs one of the two storage
@@ -51,12 +57,30 @@ struct LaunchFixtures: Equatable, Sendable {
         case deleted
     }
 
+    /// What the store answers about the tips
+    enum TipsAnswer: String, CaseIterable, Equatable, Sendable {
+        case offers
+        case notAllowed
+        case unreachable
+        case noOffers
+        case failed
+        case cancelled
+        case pending
+        case purchaseFailed
+    }
+
+    /// The PDF of the corpus a window is handed as if another app opened it, by its name in the bundle
+    enum OpenedFile: String, CaseIterable, Equatable, Sendable {
+        case linkedin
+    }
+
     enum Failure: Error, Equatable, Sendable {
         case conflictingStorage
         case missingValue(argument: String)
         case invalidFolderName
         case unreadableSeed
         case unreadableDistribution
+        case unreadableTips
         case seedWithoutFolder
         case unreadableLegacySeed
         case legacySeedWithoutFolder
@@ -67,6 +91,7 @@ struct LaunchFixtures: Equatable, Sendable {
         case unreadableFailWrites
         case failWritesWithoutFolder
         case unreadableAutosavePause
+        case unreadableOpenedFile
         case traceRunsWithoutFolder
         case readyDesignsWithoutFolder
         case seedUnwritable
@@ -79,6 +104,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let seedArgument = "-PrestoCVNextSeed"
     static let legacySeedArgument = "-PrestoCVNextLegacySeed"
     static let distributionArgument = "-PrestoCVNextDistribution"
+    static let tipsArgument = "-PrestoCVNextTips"
     static let noSamplesArgument = "-PrestoCVNextNoSamples"
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
@@ -86,6 +112,7 @@ struct LaunchFixtures: Equatable, Sendable {
     static let failWritesArgument = "-PrestoCVNextFailWrites"
     static let autosavePauseArgument = "-PrestoCVNextAutosavePause"
     static let holdImportArgument = "-PrestoCVNextHoldImport"
+    static let openedFileArgument = "-PrestoCVNextOpenedFile"
     static let traceRunsArgument = "-PrestoCVNextTraceRuns"
     static let readyDesignsArgument = "-PrestoCVNextReadyDesigns"
     private static let prefix = "-PrestoCVNext"
@@ -96,6 +123,8 @@ struct LaunchFixtures: Equatable, Sendable {
     /// The released app's CV files to write in the legacy folder before the import reads it, by file name
     var legacySeed: [String: String] = [:]
     var distribution: DistributionAnswer?
+    /// What the store answers about the tips, nil when the real store does
+    var tips: TipsAnswer?
     /// The arguments that start like a fixture and are none: ignored, and named so that a test's typo shows
     var unknownArguments: [String] = []
     /// The examples are read from a folder that is not there
@@ -112,6 +141,8 @@ struct LaunchFixtures: Equatable, Sendable {
     var autosavePauseSeconds: Int?
     /// The import's reads wait until they are cancelled
     var holdsImport = false
+    /// The PDF a window is handed each time it becomes active, nil when none is
+    var openedFile: OpenedFile?
     /// Two invented runs of the diagnostics are stored before the app starts
     var storesTraceRuns = false
     /// The bundled designs are accepted without the renders that check them
@@ -145,6 +176,11 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableDistribution
                 }
                 fixtures.distribution = answer
+            case tipsArgument:
+                guard let answer = TipsAnswer(rawValue: try value(after: argument, in: arguments, at: &index)) else {
+                    throw .unreadableTips
+                }
+                fixtures.tips = answer
             case noSamplesArgument:
                 fixtures.withoutSamples = true
             case failRenamesInPairsArgument:
@@ -170,6 +206,11 @@ struct LaunchFixtures: Equatable, Sendable {
                 fixtures.autosavePauseSeconds = seconds
             case holdImportArgument:
                 fixtures.holdsImport = true
+            case openedFileArgument:
+                guard let file = OpenedFile(rawValue: try value(after: argument, in: arguments, at: &index)) else {
+                    throw .unreadableOpenedFile
+                }
+                fixtures.openedFile = file
             case readyDesignsArgument:
                 fixtures.acceptsBundledDesigns = true
             case _ where argument.hasPrefix(prefix):
@@ -239,6 +280,11 @@ struct LaunchFixtures: Equatable, Sendable {
     /// What the import reads through: the importer it is given, or with the fixture one whose reads wait until cancelled.
     func importing(_ importer: any CVImporting) -> any CVImporting {
         holdsImport ? HeldImport() : importer
+    }
+
+    /// What a window is handed as if another app opened it: the PDF of that name among `resources`, the bundle's.
+    func openedFileFixture(in resources: URL) -> OpenedFileFixture? {
+        openedFile.map { OpenedFileFixture(file: resources.appendingPathComponent("\($0.rawValue).pdf")) }
     }
 
     /// What checks a bundled design before the sync saves it: the gate it is given, or with the fixture one that accepts
@@ -390,6 +436,46 @@ struct GivenDistribution: DistributionReading {
 
     func answer() async throws -> DistributionAnswer {
         given
+    }
+}
+
+/// The tips the store would answer, given by a launch argument: the listener has nothing to listen to.
+struct GivenTips: TipsListening {
+    let given: LaunchFixtures.TipsAnswer
+
+    func start() {}
+
+    var canPay: Bool { given != .notAllowed }
+
+    func offers() async throws(TipFailure) -> [TipOffer] {
+        switch given {
+        case .offers, .notAllowed, .cancelled, .pending, .purchaseFailed:
+            TipSize.allCases.map { TipOffer(size: $0, price: Self.price(of: $0)) }
+        case .noOffers: []
+        case .unreachable: throw .unreachable
+        case .failed: throw .failed
+        }
+    }
+
+    /// The offers' answer buys: a tip goes through. A device that may not pay, or a store that cannot be reached, refuses
+    /// the purchase as it refused the offers.
+    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase {
+        switch given {
+        case .offers: .completed
+        case .cancelled: .cancelled
+        case .pending: .pending
+        case .notAllowed: throw .notAllowed
+        case .unreachable: throw .unreachable
+        case .noOffers, .failed, .purchaseFailed: throw .failed
+        }
+    }
+
+    private static func price(of size: TipSize) -> String {
+        switch size {
+        case .small: "€1,99"
+        case .medium: "€4,99"
+        case .large: "€9,99"
+        }
     }
 }
 
