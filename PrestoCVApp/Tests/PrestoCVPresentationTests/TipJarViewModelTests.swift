@@ -71,6 +71,50 @@ struct TipJarViewModelTests {
         #expect(model.state == .offers(rows))
         #expect(selling.asked.withLock { $0 } == 2)
     }
+
+    @Test("an older request that ends after a newer one does not replace the newer result")
+    func olderRequestEndsLast() async {
+        let selling = GatedTips()
+        let model = TipJarViewModel(selling: selling)
+        var arrivals = selling.arrivals.makeAsyncIterator()
+
+        let older = Task { await model.load() }
+        await arrivals.next()
+        let newer = Task { await model.retry() }
+        await arrivals.next()
+
+        selling.finish(request: 1, with: .success(all))
+        await newer.value
+        selling.finish(request: 0, with: .failure(.failed))
+        await older.value
+
+        #expect(model.state == .offers(rows))
+    }
+}
+
+/// Tips whose every `offers()` call waits until the test finishes it, so the test decides the order they end in.
+final class GatedTips: TipSelling {
+    let canPay = true
+    let arrivals: AsyncStream<Void>
+    private let arrived: AsyncStream<Void>.Continuation
+    private let pending = Mutex<[CheckedContinuation<Result<[TipOffer], TipFailure>, Never>]>([])
+
+    init() {
+        (arrivals, arrived) = AsyncStream.makeStream()
+    }
+
+    func offers() async throws(TipFailure) -> [TipOffer] {
+        let result = await withCheckedContinuation { continuation in
+            pending.withLock { $0.append(continuation) }
+            arrived.yield()
+        }
+        return try result.get()
+    }
+
+    /// Ends the call that came `request`th (from 0) with `result`.
+    func finish(request: Int, with result: Result<[TipOffer], TipFailure>) {
+        pending.withLock { $0[request] }.resume(returning: result)
+    }
 }
 
 /// Tips with a fixed answer, which the test may change, and a count of the times the offers were asked for.

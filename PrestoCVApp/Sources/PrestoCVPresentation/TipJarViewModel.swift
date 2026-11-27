@@ -10,21 +10,27 @@ public final class TipJarViewModel {
     public private(set) var state: TipJarState = .loading
 
     @ObservationIgnored private let selling: any TipSelling
+    @ObservationIgnored private var latestRead = 0
 
     public init(selling: any TipSelling) {
         self.selling = selling
     }
 
-    /// Reads the offers when the screen appears.
+    /// Reads the offers when the screen appears. A read that starts while another is still running replaces it: only
+    /// the latest read sets the state, so an older one that ends late cannot overwrite a newer result.
     public func load() async {
+        latestRead += 1
+        let read = latestRead
         guard selling.canPay else {
             state = .unavailable(.notAllowed)
             return
         }
         do throws(TipFailure) {
             let offers = try await selling.offers()
+            guard read == latestRead else { return }
             state = offers.isEmpty ? .unavailable(.noOffers) : .offers(offers.map(TipRow.init))
         } catch {
+            guard read == latestRead else { return }
             state = .unavailable(error == .unreachable ? .unreachable : .failed)
         }
     }
