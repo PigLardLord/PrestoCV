@@ -39,7 +39,11 @@ struct Entries {
     private let language: Vocabulary.Language?
 
     init(_ cvData: CVData, personalInfo: PersonalInfo, _ source: DescriptionText) {
-        let companies = cvData.experience.map { (company: source.namedEmployer($0.company), title: source.named($0.title)) }
+        let companies = cvData.experience.map { entry -> (company: String?, title: String?) in
+            let company = source.namedEmployer(entry.company)
+            let title = source.named(entry.title).flatMap { Self.isAClause($0, of: company, in: source) ? nil : $0 }
+            return (company, title)
+        }
         let institutions = cvData.education.map { (institution: source.named($0.institution), degree: source.named($0.degree)) }
         var subjects: [Subject] = []
 
@@ -158,6 +162,44 @@ struct Entries {
     func supportedTitle(of subject: Int, _ title: String?) -> String? {
         guard let title else { return nil }
         return grounding.supportsTitle(Self.words(of: title), of: subject, person: person) ? title : nil
+    }
+
+    // MARK: - Titles
+
+    /// Whether a job's title, as the description writes it, is a clause of the description and no title (#359): the model copied the
+    /// clause that names the job ("trabalhei no Centro de Saúde de Vale Verde"), or one that says a duty ("onde cuido de doentes da
+    /// cirurgia" gave "cuido de doentes da cirurgia"). The job keeps its employer, its years and its duties, with no title.
+    /// - The title holds the job's employer and more words: an employer is a name of its own, which no title gives. A title that is
+    ///   the employer alone is a copy of the name, or the name written twice, which the grounding decides.
+    /// - Or, in a clause of the description, it opens with a finite verb of the clause that only pronouns and joining words come
+    ///   before ("onde", "dove", "where I": `LeadIn`). A title after a form of "to be" or an auxiliary, which it completes ("onde sou
+    ///   encarregado de carpintaria"), after any other word ("trabalho como encarregado"), or at the start of its clause, stays.
+    private static func isAClause(_ title: String, of employer: String?, in source: DescriptionText) -> Bool {
+        let titleWords = words(of: title)
+        if let employer {
+            let employerWords = words(of: employer)
+            if titleWords.count > employerWords.count, holds(titleWords, employerWords) { return true }
+        }
+
+        let language = source.explainer.language
+        let clauses = DescriptionClauses(sentences: source.sentences.map(\.raw), protecting: [titleWords], language: language)
+        return clauses.places.contains { place in
+            let clause = clauses.clause(at: place)
+            let verbs = Statement.finiteVerbs(in: clause.words, quoted: [], language: language)
+            return clause.spans(of: titleWords).contains { span in
+                let leadIn = clause.words[..<span.lowerBound]
+                let completes = leadIn.contains {
+                    Vocabulary.isBeForm($0.accented, in: language) || Vocabulary.isAuxiliary($0.accented, in: language)
+                }
+                return !leadIn.isEmpty && !completes && verbs.contains(span.lowerBound) && LeadIn.holds(leadIn, in: language)
+            }
+        }
+    }
+
+    /// Whether `words` holds `part`, word by word, at some place.
+    private static func holds(_ words: [String], _ part: [String]) -> Bool {
+        guard !part.isEmpty, words.count >= part.count else { return false }
+        return (0...(words.count - part.count)).contains { Array(words[$0..<($0 + part.count)]) == part }
     }
 
     // MARK: - Subjects

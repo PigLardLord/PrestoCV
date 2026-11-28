@@ -166,7 +166,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        me
+        curso estudos me meu meus minha minhas o os
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """

@@ -181,7 +181,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        ha ho mi sono
+        corso gli ha ho i il l mi miei mio sono studi
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """

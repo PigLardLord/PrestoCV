@@ -23,7 +23,7 @@ struct FoundationModelsServiceTests {
     func mapTranslatesGenerationErrors() {
         let context = LanguageModelSession.GenerationError.Context(debugDescription: "test")
         let cases: [(LanguageModelSession.GenerationError, CVGenerationError)] = [
-            (.exceededContextWindowSize(context), .descriptionTooLong),
+            (.exceededContextWindowSize(context), .generationFailed),
             (.guardrailViolation(context), .contentNotAllowed),
             (.unsupportedLanguageOrLocale(context), .unsupportedLanguage),
             (.assetsUnavailable(context), .unavailable(.modelNotReady)),
@@ -51,7 +51,7 @@ struct FoundationModelsServiceTests {
         let context = LanguageModelSession.GenerationError.Context(debugDescription: "test")
         let cases: [(LanguageModelSession.GenerationError, CVGenerationError)] = [
             (.guardrailViolation(context), .contentNotAllowed),
-            (.exceededContextWindowSize(context), .descriptionTooLong),
+            (.exceededContextWindowSize(context), .generationFailed),
             (.decodingFailure(context), .generationFailed),
         ]
 
