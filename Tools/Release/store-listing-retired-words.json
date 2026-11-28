@@ -16,7 +16,8 @@
     {"pattern": "Apple[\\s-]*Intelligence", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no feature that uses Apple Intelligence"},
     {"pattern": "on[\\s-]?device[\\s-]+(?:models?|AI|KI|Modell\\w*)|modell[oi] di Apple|modelos? de Apple|modelos? da Apple|modèles? d.Apple|modèles? sur l.appareil", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no on-device model"},
     {"pattern": "linked-?in\\b", "languages": ["*"], "ignoreCase": true, "reason": "the LinkedIn import is not in 1.1"},
-    {"pattern": "\\bscan(?:s|n\\w*)?\\b|\\b(?:ein)?gescannt\\w*|\\bscansion\\w*|\\besc[aá]ne\\w*|\\bnum[ée]ris\\w*|\\bdigitaliz\\w*", "languages": ["*"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans"},
+    {"pattern": "\\bscans?\\b|\\w*scann\\w*|\\bscansion\\w*|\\besc[aá]ne\\w*|\\bnum[ée]ris\\w*|\\bdigitaliz\\w*", "languages": ["*"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans"},
+    {"pattern": "\\w+scans?\\b", "languages": ["de"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans (a German compound that ends in Scan)"},
     {"pattern": "\\bMac(?:OS|Book|s)?\\b|\\bmacOS\\b", "languages": ["*"], "reason": "the store page is for iPhone and iPad only"}
   ]
 }

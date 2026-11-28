@@ -134,13 +134,17 @@ class RetiredWords(unittest.TestCase):
         self.assertTrue(retired_errors("pt-PT", "Keywords", "ia"))
 
     def test_a_scan_is_refused_in_its_forms(self):
-        for locale, text in [("en-US", "Scan your CV"), ("en-US", "a scanned page"), ("de-DE", "eingescannt"),
+        for locale, text in [("en-US", "Scan your CV"), ("en-US", "a scanned page"), ("en-US", "scanning made easy"),
+                             ("de-DE", "eingescannt"), ("de-DE", "Sie können Ihren Lebenslauf einscannen"),
+                             ("de-DE", "um ihn einzuscannen"), ("de-DE", "abscannen"), ("de-DE", "der Dokumentenscanner"),
+                             ("de-DE", "ein Dokumentenscan"), ("de-DE", "Scan-Funktion"),
                              ("it", "scansiona il CV"), ("es-ES", "escanea tu CV"), ("fr-FR", "numérisez le CV")]:
             with self.subTest(locale=locale, text=text):
                 self.assertTrue(retired_errors(locale, "Description", text), text)
 
     def test_words_that_only_look_like_a_retired_one_pass(self):
         self.assertEqual(retired_errors("en-US", "Description", "Scandinavian roles, all linked in one place."), [])
+        self.assertEqual(retired_errors("en-US", "Description", "Tuscany and the Tuscans."), [])
         self.assertEqual(retired_errors("pt-PT", "Description", "Eu ia ao trabalho."), [])
         self.assertEqual(retired_errors("it", "Description", "Ai colleghi piace."), [])
 
