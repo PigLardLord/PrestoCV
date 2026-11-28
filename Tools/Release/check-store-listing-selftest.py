@@ -142,6 +142,14 @@ class RetiredWords(unittest.TestCase):
             with self.subTest(locale=locale, text=text):
                 self.assertTrue(retired_errors(locale, "Description", text), text)
 
+    def test_the_mac_is_refused_in_any_case(self):
+        for locale, text in [("en-US", "Also available for macos."), ("en-US", "Also available for MAC."),
+                             ("en-US", "Works on your iMac"), ("en-US", "on a MacBook Pro"), ("en-US", "for iMacs"),
+                             ("de-DE", "Auch für den MAC"), ("fr-FR", "aussi sur MACOS"), ("es-ES", "también en imac"),
+                             ("it", "anche su Mac"), ("pt-BR", "também no macbook air")]:
+            with self.subTest(locale=locale, text=text):
+                self.assertTrue(retired_errors(locale, "Description", text), text)
+
     def test_words_that_only_look_like_a_retired_one_pass(self):
         self.assertEqual(retired_errors("en-US", "Description", "Scandinavian roles, all linked in one place."), [])
         self.assertEqual(retired_errors("en-US", "Description", "Tuscany and the Tuscans."), [])
@@ -163,7 +171,8 @@ class RetiredWords(unittest.TestCase):
         self.assertTrue(any(e.startswith("notes ") for e in errors), errors)
 
     def test_ordinary_words_are_not_retired(self):
-        text = "Mach dein CV in Italia: mail, main, machine, scale, Macedonia, bozzetto, Entwicklung and a tablet."
+        text = ("Mach dein CV in Italia: mail, main, machine, scale, Macedonia, bozzetto, Entwicklung, Mackintosh, "
+                "machen, a macro and a tablet.")
         for locale in ("en-US", "de-DE", "it"):
             with self.subTest(locale):
                 self.assertEqual(retired_errors(locale, "Description", text), [])
