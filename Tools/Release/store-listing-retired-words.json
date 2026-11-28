@@ -1,0 +1,20 @@
+{
+  "comment": "Words the 1.1 listing must not use: each names a feature the app does not have (ADR 0033, issue 530). A text is checked in the language of its locale; the notes for App Review are English. 'allowedIn' lists the fields where the word may still appear, because What's New says in one line that the 1.0 AI draft is gone. 'pendingLocales' is a baseline that may only shrink: a locale still written for 1.0 stays on it until its texts are rewritten, and the checker refuses a locale on it whose texts pass ('notes' is the notes for App Review).",
+  "pendingLocales": ["notes", "en-US", "en-GB", "de-DE", "it", "es-ES", "es-MX", "fr-FR", "pt-PT", "pt-BR"],
+  "entries": [
+    {"pattern": "\\bAI\\b", "languages": ["en"], "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bKI\\b", "languages": ["de"], "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bIA\\b", "languages": ["it", "es", "fr", "pt"], "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bdrafts?\\b", "languages": ["en"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bEntw(?:urf|ürfe)", "languages": ["de"], "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bbozz[ae]\\b", "languages": ["it"], "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bborrador(?:es)?\\b", "languages": ["es"], "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bbrouillons?\\b", "languages": ["fr"], "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\brascunhos?\\b", "languages": ["pt"], "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "Apple Intelligence", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no feature that uses Apple Intelligence"},
+    {"pattern": "on-device (?:model|AI)|On-Device-Modell|modello di Apple|modelo de Apple|modelo da Apple|modèle d.Apple|modèle sur l.appareil", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no on-device model"},
+    {"pattern": "linkedin", "languages": ["*"], "ignoreCase": true, "reason": "the LinkedIn import is not in 1.1"},
+    {"pattern": "\\bscan|\\bscann|scansion|scanner|escane|escáner|numérise|digitaliz", "languages": ["*"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans"},
+    {"pattern": "\\bMac(?:OS|Book)?\\b|\\bmacOS\\b", "languages": ["*"], "reason": "the store page is for iPhone and iPad only"}
+  ]
+}

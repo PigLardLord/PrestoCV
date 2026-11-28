@@ -4,15 +4,20 @@
     Tools/Release/check-store-listing.py           # exits 1 if a text breaks a limit or the counts table is stale
     Tools/Release/check-store-listing.py --write   # rewrites the counts table first
 
+Retired words (store-listing-retired-words.json) name features the app lacks: a text that uses one fails, in the
+language of its locale.
+
 A text is the fenced ```text block under a field heading (### Name) of a locale section (## German, de-DE), or under
 "## Notes for App Review". Characters are Unicode scalars of NFC text; keywords are counted in UTF-8 bytes.
 """
+import json
 import re
 import sys
 import unicodedata
 from pathlib import Path
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "release" / "store-listing.md"
+RETIRED = Path(__file__).resolve().parent / "store-listing-retired-words.json"
 FIELDS = ["Name", "Subtitle", "Keywords", "Promotional text", "Description", "Screenshot captions", "What's New"]
 LIMITS = {"Name": 30, "Subtitle": 30, "Promotional text": 170, "Description": 4000, "What's New": 4000}
 KEYWORD_BYTES, NOTES_LIMIT = 100, 4000
@@ -25,6 +30,7 @@ PRICE_WORDS = {"free", "gratis", "kostenlos", "gratuit", "gratuite", "gratuito",
                "preis", "prezzo", "precio", "prix", "preco"}
 PRICED_FIELDS = ["Name", "Subtitle", "Keywords", "Screenshot captions"]
 NOTES = "Notes for App Review"
+NOTES_LANGUAGE = "en"
 LOCALE = re.compile(r"^## .+, ([a-z]{2}(?:-[A-Z]{2})?)$")
 START, END = "<!-- counts:start -->", "<!-- counts:end -->"
 
@@ -64,7 +70,49 @@ def parse(lines):
     return locales, notes
 
 
-def check(locales, notes):
+def load_retired():
+    """The retired words and the locales still pending (a baseline that may only shrink)"""
+    data = json.loads(RETIRED.read_text(encoding="utf-8"))
+    entries = [dict(entry, regex=re.compile(entry["pattern"], re.IGNORECASE if entry.get("ignoreCase") else 0))
+               for entry in data["entries"]]
+    return entries, data["pendingLocales"]
+
+
+def retired_uses(locale, texts, entries):
+    """[(field, word, reason)] for every retired word a locale's texts use. `texts` is {field: text}."""
+    language = locale.split("-")[0]
+    found = []
+    for field, text in texts.items():
+        for entry in entries:
+            if language not in entry["languages"] and "*" not in entry["languages"]:
+                continue
+            if field in entry.get("allowedIn", []):
+                continue
+            for match in entry["regex"].finditer(text):
+                found.append((field, match.group(0), entry["reason"]))
+    return found
+
+
+def check_retired(locales, notes, entries, pending):
+    """The errors of the retired words. A pending locale is expected to fail: one that passes must leave the baseline."""
+    errors = []
+    subjects = {locale: {name: value for name, values in fields.items() for value in values[:1]}
+                for locale, fields in locales.items()}
+    subjects["notes"] = {NOTES: notes or ""}
+    for name in pending:
+        if name not in subjects:
+            errors.append(f"retired words: pending '{name}' is not a locale of the listing")
+    for name, texts in subjects.items():
+        found = retired_uses(NOTES_LANGUAGE if name == "notes" else name, texts, entries)
+        if name in pending:
+            if not found:
+                errors.append(f"retired words: {name} uses none of them: remove it from pendingLocales")
+            continue
+        errors += [f"{name} {field}: '{word}' names a feature 1.1 lacks ({reason})" for field, word, reason in found]
+    return errors
+
+
+def check(locales, notes, retired=None):
     errors = []
     if notes is None:
         errors.append(f"no text under '## {NOTES}'")
@@ -108,7 +156,7 @@ def check(locales, notes):
         for name in PRICED_FIELDS:
             if words(text[name]) & PRICE_WORDS or re.search(r"[$€£]", text[name]):
                 errors.append(f"{locale} {name}: names a price (guideline 2.3.7)")
-    return errors
+    return errors + check_retired(locales, notes, *(retired or load_retired()))
 
 
 def caption_lengths(captions):

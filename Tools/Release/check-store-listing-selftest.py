@@ -6,10 +6,14 @@
 The composer puts the first caption of a locale on the first capture, the second on the second, and so on: a locale with
 fewer captions than captures would leave the captions over the wrong screens, and one with more would have no capture
 for them. So a locale needs exactly six captions, and the checker says so.
+
+The retired words (store-listing-retired-words.json) are the claims check: a text of the 1.1 listing must not name a
+feature the app lacks, in the language of its locale.
 """
 import importlib.util
 import sys
 import unittest
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -61,6 +65,89 @@ class CaptionCount(unittest.TestCase):
 
     def test_six_captions_are_accepted(self):
         self.assertEqual(caption_errors(self.captions), [])
+
+
+LANGUAGES = {"en-US": "en", "de-DE": "de", "it": "it", "es-ES": "es", "fr-FR": "fr", "pt-PT": "pt"}
+# For each language: a sentence that claims the retired AI draft, as the 1.0 listing did
+AI_CLAIMS = {
+    "en-US": "Draft it with AI on your iPhone.",
+    "de-DE": "Mit KI entwerfen, direkt auf dem iPhone.",
+    "it": "Scrivilo con l'IA sul tuo iPhone.",
+    "es-ES": "Redáctalo con IA en tu iPhone.",
+    "fr-FR": "Rédigez avec l'IA sur votre iPhone.",
+    "pt-PT": "Escreva com IA no seu iPhone.",
+}
+
+
+def retired_errors(locale, field, text):
+    """The retired-word errors that `text` adds to the field of a locale of the real listing"""
+    entries, _ = checker.load_retired()
+    locales, notes = listing()
+    before = Counter(checker.check_retired(locales, notes, entries, set()))
+    locales[locale][field] = [locales[locale][field][0] + "\n" + text]
+    return list((Counter(checker.check_retired(locales, notes, entries, set())) - before).elements())
+
+
+class RetiredWords(unittest.TestCase):
+    def test_the_listing_names_no_retired_feature(self):
+        self.assertEqual(checker.check(*listing()), [])
+
+    def test_every_entry_has_a_reason_and_a_language(self):
+        entries, pending = checker.load_retired()
+        for entry in entries:
+            self.assertTrue(entry["reason"].strip(), entry["pattern"])
+            self.assertTrue(set(entry["languages"]) <= {"*", "en", "de", "it", "es", "fr", "pt"}, entry["pattern"])
+            self.assertTrue(set(entry.get("allowedIn", [])) <= set(checker.FIELDS), entry["pattern"])
+        self.assertTrue(set(pending) <= set(listing()[0]) | {"notes"}, pending)
+
+    def test_the_ai_draft_is_refused_in_every_language(self):
+        for locale, claim in AI_CLAIMS.items():
+            with self.subTest(locale):
+                self.assertTrue(retired_errors(locale, "Description", claim), claim)
+
+    def test_the_other_retired_features_are_refused(self):
+        claims = ["Apple Intelligence writes it", "an on-device model", "Import from LinkedIn", "Scan your CV",
+                  "Also on the Mac", "also for macOS"]
+        for claim in claims:
+            with self.subTest(claim):
+                self.assertTrue(retired_errors("en-US", "Description", claim), claim)
+
+    def test_a_caption_and_the_keywords_are_checked_too(self):
+        self.assertTrue(retired_errors("de-DE", "Screenshot captions", "Apple Intelligence | Ein Entwurf"))
+        self.assertTrue(retired_errors("en-US", "Keywords", "linkedin"))
+
+    def test_whats_new_may_say_the_ai_draft_is_gone(self):
+        self.assertEqual(retired_errors("en-US", "What's New", "The AI draft of version 1.0 is gone."), [])
+        self.assertTrue(retired_errors("en-US", "What's New", "Now with Apple Intelligence."))
+
+    def test_the_notes_for_app_review_are_checked_in_english(self):
+        locales, notes = listing()
+        entries, _ = checker.load_retired()
+        errors = checker.check_retired(locales, notes + "\nTap Draft My CV with AI.", entries, set())
+        self.assertTrue(any(e.startswith("notes ") for e in errors), errors)
+
+    def test_ordinary_words_are_not_retired(self):
+        text = "Mach dein CV in Italia: mail, main, machine, scale, Macedonia, ia, bozzetto and a tablet."
+        for locale in ("en-US", "de-DE", "it"):
+            with self.subTest(locale):
+                self.assertEqual(retired_errors(locale, "Description", text), [])
+
+    def test_a_pending_locale_that_passes_must_leave_the_baseline(self):
+        entries, _ = checker.load_retired()
+        errors = checker.check_retired({"en-US": {"Description": ["A plain CV maker."]}}, "Plain notes.", entries,
+                                       {"en-US"})
+        self.assertTrue(any("remove it from pendingLocales" in e and "en-US" in e for e in errors), errors)
+
+    def test_a_pending_locale_that_fails_is_not_reported(self):
+        entries, _ = checker.load_retired()
+        errors = checker.check_retired({"en-US": {"Description": ["Draft it with AI."]}}, "Plain notes.", entries,
+                                       {"en-US"})
+        self.assertEqual(errors, [])
+
+    def test_a_pending_name_that_is_no_locale_is_refused(self):
+        entries, _ = checker.load_retired()
+        errors = checker.check_retired({"en-US": {"Description": ["Plain."]}}, "Plain.", entries, {"xx"})
+        self.assertTrue(any("'xx' is not a locale" in e for e in errors), errors)
 
 
 if __name__ == "__main__":
