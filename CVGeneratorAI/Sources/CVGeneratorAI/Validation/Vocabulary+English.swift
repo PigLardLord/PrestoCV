@@ -79,7 +79,7 @@ extension Vocabulary {
         """,
         /// Words that go with them in a graduation phrase.
         graduationFrame: """
-        had have i my
+        course had have i my studies the
         """,
         /// The present and past of to be, as written with accents: a verb that says something done on its own.
         beForms: """

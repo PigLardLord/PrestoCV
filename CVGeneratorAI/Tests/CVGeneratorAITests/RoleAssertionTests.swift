@@ -41,6 +41,12 @@ struct RoleAssertionTests {
         #expect(RoleAssertion.unkeptRole(
             in: "Lavoro come cameriere e un cuoco attento.", titles: ["cameriere"], name: nil, language: .italian
         ) == "cuoco attento")
+        #expect(RoleAssertion.unkeptRole(
+            in: "Sono un cuoco e capo reparto vendite.", titles: ["cuoco"], name: nil, language: .italian
+        ) == "capo reparto vendite")
+        #expect(RoleAssertion.unkeptRole(
+            in: "Soy una cajera y jefa de sección.", titles: ["cajera"], name: nil, language: .spanish
+        ) == "jefa")
     }
 
     @Test("A text in no language of the six puts no role forward")
@@ -96,6 +102,16 @@ struct RoleCase: Sendable, CustomTestStringConvertible {
         RoleCase(.german, ["Pflegehelferin"], "Ich arbeite als Pflegehelferin und Krankenpflegerin."),
         RoleCase(.spanish, ["camarero"], "Trabajo como camarero y cocinero."),
         RoleCase(.french, ["serveur"], "Je travaille comme serveur et un cuisinier attentif."),
+        // A joined role of more words, or one that a function word follows, with no article before it (#359 P6).
+        RoleCase(.italian, ["cuoco"], "Sono un cuoco e capo reparto vendite."),
+        RoleCase(.italian, ["commessa"], "Lavoro come commessa e capo reparto vendite."),
+        RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e capo sala."),
+        RoleCase(.spanish, ["cajera"], "Soy una cajera y jefa de sección."),
+        RoleCase(.spanish, ["camarero"], "Trabajo como camarero y gerente del local."),
+        RoleCase(.french, ["vendeuse"], "Je suis une vendeuse et chef de rayon."),
+        RoleCase(.french, ["serveur"], "Je travaille comme serveur et directeur de salle."),
+        RoleCase(.portuguese, ["caixa"], "Sou uma caixa e chefe de seção."),
+        RoleCase(.portuguese, ["caixa"], "Trabalho como caixa e coordenadora de equipe."),
     ]
 
     static let kept: [RoleCase] = [
@@ -129,5 +145,25 @@ struct RoleCase: Sendable, CustomTestStringConvertible {
         RoleCase(.italian, ["cameriere"], "Lavoro come cameriere e collaboro con la cucina."),
         RoleCase(.german, ["Pflegehelferin"], "Ich arbeite als Pflegehelferin und helfe Patienten."),
         RoleCase(.spanish, ["camarero"], "Trabajo como camarero y atiendo a los clientes."),
+        // The joined role is one the person stated, so a kept title holds it (#359 P6).
+        RoleCase(.italian, ["cuoco e capo reparto vendite"], "Sono un cuoco e capo reparto vendite."),
+        RoleCase(.italian, ["commessa", "capo reparto vendite"], "Lavoro come commessa e capo reparto vendite."),
+        RoleCase(.spanish, ["cajera y jefa de sección"], "Soy una cajera y jefa de sección."),
+        RoleCase(.french, ["vendeuse", "chef de rayon"], "Je suis une vendeuse et chef de rayon."),
+        RoleCase(.portuguese, ["caixa", "chefe de seção"], "Sou uma caixa e chefe de seção."),
+        // A verb after the joining word is no role, listed or not, with an object or a place after it (#359 P6).
+        RoleCase(.italian, ["commessa"], "Sono una commessa e lavoro a Roma."),
+        RoleCase(.italian, ["commessa"], "Sono una commessa e vivo a Roma."),
+        RoleCase(.italian, ["commessa"], "Sono una commessa e vendo scarpe."),
+        RoleCase(.italian, ["commessa"], "Sono una commessa e consiglio i clienti con cura."),
+        RoleCase(.spanish, ["cajera"], "Soy una cajera y atiendo a los clientes."),
+        RoleCase(.spanish, ["cajera"], "Soy una cajera y vivo en Madrid."),
+        RoleCase(.french, ["vendeuse"], "Je suis une vendeuse et je conseille les clients."),
+        RoleCase(.french, ["vendeuse"], "Je suis une vendeuse et j'habite à Lyon."),
+        RoleCase(.portuguese, ["caixa"], "Sou uma caixa e trabalho em Lisboa."),
+        RoleCase(.portuguese, ["caixa"], "Sou uma caixa e atendo os clientes."),
+        // A quality said after a role is no joined role (#359 P6).
+        RoleCase(.italian, ["cuoco"], "Sono un cuoco preciso e responsabile nel lavoro."),
+        RoleCase(.spanish, ["cajera"], "Soy una cajera atenta y responsable en mi trabajo."),
     ]
 }

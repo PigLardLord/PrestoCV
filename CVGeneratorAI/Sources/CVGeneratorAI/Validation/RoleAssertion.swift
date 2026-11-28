@@ -13,8 +13,9 @@ import Foundation
 ///
 /// A role joined to one by "and" ("As a nursing assistant and nurse") is read the same way, unless what follows "and" is a verb
 /// ("and help patients", "e mi occupo di"). Italian, Spanish, French and Portuguese have no tags, and the vocabulary lists only some
-/// of their presents, so there a joined role follows an indefinite article ("e un infermiere") or is one word that ends the clause
-/// ("e cuoco."), and "e scrivo applicazioni" or "e collaboro con la cucina" is no role.
+/// of their presents, so there a joined role follows an indefinite article ("e un infermiere"), is one word that ends the clause
+/// ("e cuoco."), or starts with a noun that heads a post (`postHeads`: "e capo reparto vendite", "y jefa de sección", "et chef de
+/// rayon"), and "e scrivo applicazioni" or "e collaboro con la cucina" is no role.
 enum RoleAssertion {
     /// The first role `sentence` puts forward that no title of `titles` names, in its folded words with the words of `name` left
     /// out; nil when it puts forward none, or when its language is not one of the six.
@@ -141,8 +142,9 @@ enum RoleAssertion {
     }
 
     /// The role joined by the word at `coordinator` to the one before it; nil when what follows names no role: a word the
-    /// vocabulary explains or the device tags as a verb, or, in a language without tags, words that no indefinite article opens,
-    /// unless one word ends the clause ("e cuoco."): an unlisted present goes on to what it acts on ("e collaboro con la cucina").
+    /// vocabulary explains or the device tags as a verb, or, in a language without tags, words that no indefinite article opens and
+    /// no noun that heads a post (`postHeads`) starts, unless one word ends the clause ("e cuoco."): an unlisted present goes on to
+    /// what it acts on ("e collaboro con la cucina").
     private static func coordinated(
         in tokens: [Token], after coordinator: Int, verbs: Set<Int>, language: Vocabulary.Language
     ) -> Range<Int>? {
@@ -150,8 +152,15 @@ enum RoleAssertion {
         guard let span = phrase(in: tokens, from: Start(index: next, isBare: false), language: language),
               !Vocabulary.explains(tokens[span.lowerBound].folded, in: language), verbs.isDisjoint(with: span) else { return nil }
         if VerbForms.readsVerbsByTags(in: language) || indefiniteArticles.contains(tokens[next].folded) { return span }
+        if headsAPost(tokens[span.lowerBound].folded, in: language) { return span }
         let endsTheClause = span.upperBound == tokens.count || tokens[next].endsAClause
         return span == next..<next + 1 && endsTheClause ? span : nil
+    }
+
+    /// Whether `word` is a noun that heads a post, masculine or feminine ("capo", "jefa", "chef"): a verb is never one, so a role
+    /// that starts with it is a role whatever follows it.
+    private static func headsAPost(_ word: String, in language: Vocabulary.Language) -> Bool {
+        postHeads[language]?.contains { gendered($0, in: language) == gendered(word, in: language) } ?? false
     }
 
     // MARK: Masculine and feminine
@@ -213,6 +222,19 @@ enum RoleAssertion {
         .french: [["je", "suis"], ["j", "etais"], ["j", "ai", "ete"]],
         .spanish: [["soy"], ["era"], ["fui"], ["he", "sido"]],
         .portuguese: [["sou"], ["era"], ["fui"], ["tenho", "sido"]],
+    ]
+
+    /// The nouns that head a post and that no verb of the language shares, per language, in the masculine: the first word of a role
+    /// that joins another with no article ("e capo reparto vendite", "y jefa de sección"). "Responsabile" and "encargado" are left
+    /// out: they also read as the adjective of a quality ("cuoco preciso e responsabile nel lavoro").
+    private static let postHeads: [Vocabulary.Language: [String]] = [
+        .italian: [
+            "capo", "caposquadra", "caporeparto", "capocantiere", "capoturno", "direttore", "direttrice", "coordinatore", "supervisore",
+            "gestore",
+        ],
+        .spanish: ["jefe", "director", "subdirector", "coordinador", "supervisor", "gerente"],
+        .french: ["chef", "directeur", "coordinateur", "superviseur", "gerant"],
+        .portuguese: ["chefe", "diretor", "coordenador", "supervisor", "gerente", "gestor"],
     ]
 
     private static let indefiniteArticles: Set<String> = ["a", "an", "un", "uno", "una", "ein", "eine", "une", "um", "uma"]

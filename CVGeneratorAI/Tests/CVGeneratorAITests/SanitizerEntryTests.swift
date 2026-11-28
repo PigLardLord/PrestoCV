@@ -110,6 +110,103 @@ struct SanitizerEntryTests {
 
         #expect(try sanitizer.sanitize(hidden, against: example.description) == example.survivors)
     }
+
+    // MARK: - A title written as a clause (#359)
+
+    /// A description of the input `pt-plain` of the evaluation, whose second job the model titled with the clause that names it.
+    private static let nurseInPortuguese = "Chamo-me Beatriz Moura e sou enfermeira. Desde 2018 trabalho no Hospital da Ribeira, em Coimbra, onde cuido de doentes da cirurgia. De 2014 a 2018 trabalhei no Centro de Saúde de Vale Verde. Estudei na Escola Superior de Saúde do Mondego e terminei o curso em 2014."
+
+    /// A sanitizer for a description in `language`, with no device data: only the rules of the sanitizer decide.
+    private func sanitizer(in language: String) -> CVDataSanitizer {
+        CVDataSanitizer(
+            languageOfText: { _ in language },
+            lexicalClasses: ForcedLexicalTagger([.english: .words([]), .german: .words([])]),
+            wordList: TableWordList()
+        )
+    }
+
+    private func job(_ title: String, at employer: String, from start: String?, to end: String?, current: Bool = false) -> CVData {
+        CVData(experience: [Experience(title: title, company: employer, startDate: start, endDate: end, current: current)])
+    }
+
+    @Test("A title the model writes as the clause in which the person says they worked there gives no title: the job keeps its employer and its years (#359)",
+          arguments: [
+            (nurseInPortuguese, "trabalhei no Centro de Saúde de Vale Verde", "Centro de Saúde de Vale Verde", "pt"),
+            ("Sono infermiera. Dal 2014 al 2018 ho lavorato all'Ospedale San Carlo.", "ho lavorato all'Ospedale San Carlo", "Ospedale San Carlo", "it"),
+            ("Soy enfermera. De 2014 a 2018 trabajé en el Hospital Río Claro.", "trabajé en el Hospital Río Claro", "Hospital Río Claro", "es"),
+            ("Je suis infirmière. De 2014 à 2018, j'ai travaillé à l'Hôpital Saint-Louis.", "j'ai travaillé à l'Hôpital Saint-Louis", "Hôpital Saint-Louis", "fr"),
+            ("I am a nurse. From 2014 to 2018 I worked at St Mary's Hospital.", "I worked at St Mary's Hospital", "St Mary's Hospital", "en"),
+            ("Ich bin Pflegerin. Von 2014 bis 2018 habe ich im Klinikum Erfurt gearbeitet.", "habe ich im Klinikum Erfurt gearbeitet", "Klinikum Erfurt", "de"),
+          ])
+    func clauseTitleKeepsTheJob(description: String, title: String, employer: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(job(title, at: employer, from: "2014", to: "2018"), against: description)
+
+        #expect(result.experience.map(\.company) == [employer])
+        #expect(result.experience.first?.title == "", "A clause is no title")
+        #expect(result.experience.first?.startDate == "2014")
+        #expect(result.experience.first?.endDate == "2018")
+    }
+
+    @Test("A duty the model writes as the title of a job is no title: the job stays, current from its year (#359)",
+          arguments: [
+            (nurseInPortuguese, "cuido de doentes da cirurgia", "Hospital da Ribeira", "pt"),
+            ("Dal 2018 lavoro all'Ospedale San Carlo, dove curo i pazienti della chirurgia.", "curo i pazienti della chirurgia", "Ospedale San Carlo", "it"),
+            ("Desde 2018 trabajo en el Hospital Río Claro, donde cuido a los pacientes de cirugía.", "cuido a los pacientes de cirugía", "Hospital Río Claro", "es"),
+          ])
+    func dutyTitleKeepsTheJob(description: String, title: String, employer: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(job(title, at: employer, from: "2018", to: nil, current: true), against: description)
+
+        #expect(result.experience.map(\.company) == [employer])
+        #expect(result.experience.first?.title == "", "A duty is no title")
+        #expect(result.experience.first?.startDate == "2018")
+        #expect(result.experience.first?.current == true)
+    }
+
+    @Test("A title the person states stays, even one that is written like a form of a verb (#359)",
+          arguments: [
+            ("Sou encarregado de carpintaria na Construtora Serra Azul desde 2020.", "encarregado de carpintaria", "Construtora Serra Azul", "pt"),
+            ("Desde 2020 trabalho na Construtora Serra Azul, onde sou encarregado de carpintaria.", "encarregado de carpintaria", "Construtora Serra Azul", "pt"),
+            ("Encarregado de carpintaria na Construtora Serra Azul desde 2020.", "encarregado de carpintaria", "Construtora Serra Azul", "pt"),
+            ("Trabajo como encargada de tienda en la Panadería Sol desde 2020.", "encargada de tienda", "Panadería Sol", "es"),
+            ("Je suis responsable de salle au Café Lumière depuis 2020.", "responsable de salle", "Café Lumière", "fr"),
+            ("Je suis chargée de clientèle à la Banque Alpine depuis 2020.", "chargée de clientèle", "Banque Alpine", "fr"),
+            ("Lavoro come addetta alle vendite alla Libreria Gialla dal 2020.", "addetta alle vendite", "Libreria Gialla", "it"),
+            ("Since 2020 I have been lead developer at Northwind.", "lead developer", "Northwind", "en"),
+          ])
+    func statedTitleStays(description: String, title: String, employer: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(job(title, at: employer, from: "2020", to: nil, current: true), against: description)
+
+        #expect(result.experience.map(\.title) == [title])
+        #expect(result.experience.first?.startDate == "2020")
+    }
+
+    @Test("A job the person only wants, or denies, is still dropped when its title is the clause (#359)",
+          arguments: [
+            ("Sono infermiera. Vorrei lavorare all'Ospedale San Carlo.", "lavorare all'Ospedale San Carlo", "Ospedale San Carlo", "it"),
+            ("Non ho mai lavorato all'Ospedale San Carlo.", "ho mai lavorato all'Ospedale San Carlo", "Ospedale San Carlo", "it"),
+            ("Sou enfermeira. Quero trabalhar no Centro de Saúde de Vale Verde.", "trabalhar no Centro de Saúde de Vale Verde", "Centro de Saúde de Vale Verde", "pt"),
+            ("I am a nurse. I would like to work at St Mary's Hospital.", "work at St Mary's Hospital", "St Mary's Hospital", "en"),
+          ])
+    func unclaimedClauseTitleDropsTheJob(description: String, title: String, employer: String, language: String) throws {
+        let result = try sanitizer(in: language).sanitize(job(title, at: employer, from: nil, to: nil), against: description)
+
+        #expect(result.experience.isEmpty)
+    }
+
+    @Test("A job kept without its clause title gets no year of another entry, and no title the description does not write (#359)")
+    func clauseTitleLendsNoOtherYear() throws {
+        let description = "Dal 2014 al 2018 ho lavorato all'Ospedale San Carlo. Nel 2019 mi sono laureata all'Università di Bari."
+        let sanitizer = sanitizer(in: "it")
+
+        let otherYear = try sanitizer.sanitize(job("ho lavorato all'Ospedale San Carlo", at: "Ospedale San Carlo", from: "2019", to: "2020"), against: description)
+        let invented = try sanitizer.sanitize(job("caposala", at: "Ospedale San Carlo", from: "2014", to: "2018"), against: description)
+
+        #expect(otherYear.experience.map(\.company) == ["Ospedale San Carlo"])
+        #expect(otherYear.experience.first?.title == "")
+        #expect(otherYear.experience.first?.startDate == nil, "2019 is the year of the degree")
+        #expect(otherYear.experience.first?.endDate == nil, "2020 is in no clause")
+        #expect(invented.experience.map(\.title) == [""], "The description writes no \"caposala\"")
+    }
 }
 
 // MARK: - The app's example description, and a draft that says exactly what it says
