@@ -382,7 +382,8 @@ struct ExportWhileCheckingTests {
     }
 
     /// The export's task prefers an executor the test drains, and its store and renderer have no actor, so the whole
-    /// export runs there: once drained, an export that did not wait has ended, on every run.
+    /// export runs there: once drained, an export that did not wait has ended, on every run, and an export that waits on
+    /// the verdict holds the one open watcher (`openWatchers`), so the test cannot pass before the export reaches the wait.
     @Test("an export after a retry, once the default design did not pass while the others are still checked, waits for the check to run again, then prints in the default design")
     func exportAfterARetryWhileChecking() async throws {
         let (checking, designs, _) = checking()
@@ -397,6 +398,7 @@ struct ExportWhileCheckingTests {
             return try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language)
         }
         await executor.drain()                                          // the check still runs: an export that did not wait finds no design
+        #expect(designs.openWatchers == 1, "the export is waiting on the verdict of the check that runs again")
         #expect(ended.withLock { $0 } == false, "the export waits for the check to run again")
         #expect(renderer.rendered.isEmpty)
 

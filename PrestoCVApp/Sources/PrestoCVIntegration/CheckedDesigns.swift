@@ -85,6 +85,10 @@ public final class CheckedDesigns: Sendable {
         if retries { run() }
     }
 
+    /// How many watchers (`changes(_:)` streams, so also `verdict(on:)` waits) are open now. The tests read it to know an
+    /// export is waiting on its design's verdict: a wait registers its watcher before it suspends.
+    public var openWatchers: Int { shared.state.withLock { $0.watchers.count } }
+
     /// The designs now.
     public var current: CheckedDesignsSnapshot { shared.state.withLock { $0.snapshot(defaultDesign: defaultDesign) } }
 
