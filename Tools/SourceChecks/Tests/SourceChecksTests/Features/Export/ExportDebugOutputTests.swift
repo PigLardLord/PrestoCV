@@ -16,11 +16,10 @@ struct ExportDebugOutputTests {
 
     // MARK: - Helpers
 
-    private static let folder = "PrestoCV/Features/Export"
+    private static let folder = "PrestoCVNext/Features/Export"
 
     /// Where the pasteboard is used on purpose, and why: the person asks for the copy with a tap.
     private static let copyOnTap = [
-        "PrestoCV/Features/Import/Views/ImportReviewSheet.swift": "the Copy button of the text the import could not place",
         "PrestoCVNext/Platform/Pasteboard.swift": "the copy that the Copy button of an import's review asks for, of the text the import could not place",
     ]
 
@@ -89,8 +88,8 @@ struct ExportDebugOutputTests {
         let files = try Self.swiftFiles()
 
         #expect(files.count >= 10, "Only \(files.count) Swift files under \(Self.folder)")
-        #expect(files.contains { $0.lastPathComponent == "CVExportSheetView.swift" })
-        #expect(files.contains { $0.lastPathComponent == "CVExportSheetViewModel.swift" })
+        #expect(files.contains { $0.lastPathComponent == "ExportSheetView.swift" })
+        #expect(files.contains { $0.lastPathComponent == "LookPicker.swift" })
     }
 
     @Test("no file of the export feature prints or touches the pasteboard, in a Debug build either")

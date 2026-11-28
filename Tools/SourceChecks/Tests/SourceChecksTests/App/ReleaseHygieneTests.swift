@@ -185,6 +185,24 @@ struct ReleaseHygieneTests {
         #expect(!Self.projectText().contains(#""name": "PrestoCVNext","#), "The second app target is still in the project")
     }
 
+    /// What `PrestoCV/` keeps for the shipped target: the released app's `Info.plist`, icon, asset catalog, privacy
+    /// manifest and sample CVs (docs/architecture/modules.md). Everything else in it was the legacy app.
+    static let keptInTargetFolder: [String] = [
+        "PrestoCV/Info.plist", "PrestoCV/PrivacyInfo.xcprivacy", "PrestoCV/PrestoCV.icon/", "PrestoCV/Assets.xcassets/",
+        "PrestoCV/Resources/Samples/",
+    ]
+
+    @Test("The legacy app's code and tests are gone: PrestoCV/ keeps only what the shipped target uses")
+    func theLegacyAppIsGone() throws {
+        let tracked = try Repository.trackedFiles()
+        let legacyCode = tracked.filter { path in
+            path.hasPrefix("PrestoCVTests/") || path.hasPrefix("PrestoCVUITests/")
+                || (path.hasPrefix("PrestoCV/") && !Self.keptInTargetFolder.contains { path == $0 || ($0.hasSuffix("/") && path.hasPrefix($0)) })
+        }
+
+        #expect(legacyCode.isEmpty, "Legacy files are still tracked: \(legacyCode.prefix(10)) and \(max(0, legacyCode.count - 10)) more")
+    }
+
     /// The targets of the project file with their build settings, read as JSON5 (it has trailing commas). A setting is a
     /// word or a list of words.
     private struct Project: Decodable {
@@ -451,16 +469,19 @@ struct ReleaseHygieneTests {
         "NSPrivacyAccessedAPICategoryActiveKeyboards": #"\bactiveInputModes\b"#,
     ]
 
+    private func propertyList(at path: String) throws -> [String: Any] {
+        let url = Self.root.appendingPathComponent(path)
+        return try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+    }
+
     private func declaredCategories(in manifest: String) throws -> Set<String> {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return Set(types.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
     }
 
     private func declaredWithoutReasons(in manifest: String) throws -> [String] {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return types.filter { ($0["NSPrivacyAccessedAPITypeReasons"] as? [String] ?? []).isEmpty }
             .compactMap { $0["NSPrivacyAccessedAPIType"] as? String }
@@ -484,5 +505,25 @@ struct ReleaseHygieneTests {
             #expect(withoutReason.isEmpty, "\(app.name): no reason declared for \(withoutReason)")
             #expect(declared == used, "\(app.name): declared \(declared.sorted()), used by the code \(used.sorted())")
         }
+    }
+
+    // MARK: Document types
+
+    /// `Tools/Release/check-archive.sh` enforces the same rule on the archive before it is uploaded: change both together.
+    private static let infoPlist = "PrestoCV/Info.plist"
+
+    @Test("Info.plist declares PDFs only, as a viewer of alternate rank, so that \"Open in PrestoCV\" offers the import")
+    func infoPlistOpensPDFs() throws {
+        let types = try #require(try propertyList(at: Self.infoPlist)["CFBundleDocumentTypes"] as? [[String: Any]])
+
+        #expect(types.count == 1)
+        #expect(types.first?["LSItemContentTypes"] as? [String] == ["com.adobe.pdf"])
+        #expect(types.first?["LSHandlerRank"] as? String == "Alternate", "PrestoCV is no default reader of PDFs")
+        #expect(types.first?["CFBundleTypeRole"] as? String == "Viewer")
+    }
+
+    @Test("Info.plist declares no type of its own", arguments: ["UTExportedTypeDeclarations", "UTImportedTypeDeclarations"])
+    func infoPlistDeclaresNoTypes(key: String) throws {
+        #expect(try propertyList(at: Self.infoPlist)[key] == nil)
     }
 }

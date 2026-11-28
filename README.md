@@ -32,7 +32,7 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R18, modules and allowed imports, glossary, ADRs. |
 | `docs/maintainers/` | How the maintainer works: how pull requests are reviewed. |
-| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app's `Info.plist`, icon `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)), asset catalog, privacy manifest and sample CVs. The rest is the legacy app and its tests, which no target compiles, being deleted. |
+| `PrestoCV/` | The app's `Info.plist`, icon `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)), asset catalog, privacy manifest and sample CVs. |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
 | `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
 | `PrestoCVNext/`, `PrestoCVNextTests/`, `PrestoCVNextUITests/` | The app's code, which the `PrestoCV` target compiles, its unit tests and its UI tests. |

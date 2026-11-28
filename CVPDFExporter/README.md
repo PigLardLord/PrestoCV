@@ -25,7 +25,7 @@ What each target holds, what it may import and the rules it follows are in [docs
 
 ### The legacy target
 
-`CVPDFExporter` is the exporter that the published app ships, with its HTML templates (see [TEMPLATE_SYSTEM_ARCHITECTURE.md](TEMPLATE_SYSTEM_ARCHITECTURE.md)). It depends on `PrestoCVCore`, is declared only on Apple hosts, and is deleted when the targets above replace it in the app ([ADR 0012](../docs/architecture/adr/0012-legacy-targets-during-migration.md)).
+`CVPDFExporter` is the exporter that the published app ships, with its HTML templates (see [TEMPLATE_SYSTEM_ARCHITECTURE.md](TEMPLATE_SYSTEM_ARCHITECTURE.md)). It is declared only on Apple hosts, and is deleted when the targets above replace it in the app ([ADR 0012](../docs/architecture/adr/0012-legacy-targets-during-migration.md)).
 
 ## Contracts
 

@@ -10,9 +10,16 @@ func runDemo() async throws {
     print("  Renderer: \(PlatformRendererFactory.rendererName)")
     print("  Library is platform-agnostic ✅")
 
-    // Create adapter and get sample CV data
-    let adapter = PrestoCVCoreAdapter()
-    let cvDocument = adapter.convertToCV(from: nil)
+    // A sample CV document
+    let cvDocument = CVDocument(
+        personalInfo: PersonalInfo(name: "Alexandra Johnson", email: "alex.johnson@email.com", title: "Senior iOS Engineer"),
+        sections: [
+            CVSection(id: "work", type: .work, title: "Work Experience", items: [
+                CVItem(title: "Senior iOS Engineer", subtitle: "TechCorp Inc.", period: "Jan 2021 - Present"),
+            ], order: 1),
+            CVSection(id: "skills", type: .skills, title: "Skills", items: [CVItem(title: "Swift")], order: 2),
+        ]
+    )
 
     print("\n📄 Document Info:")
     print("  Name: \(cvDocument.personalInfo.name)")

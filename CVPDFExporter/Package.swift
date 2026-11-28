@@ -70,11 +70,9 @@ targets += [
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
 #if !os(Linux)
 products.append(.library(name: "CVPDFExporter", targets: ["CVPDFExporter"]))
-dependencies.append(.package(path: "../PrestoCVCore"))
 targets += [
     .target(
         name: "CVPDFExporter",
-        dependencies: [.product(name: "PrestoCVCore", package: "PrestoCVCore")],
         path: "Sources/CVPDFExporter",
         resources: [.copy("../../Resources/Templates")]
     ),

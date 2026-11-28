@@ -4,8 +4,9 @@
 # Xcode writes from IPHONEOS_DEPLOYMENT_TARGET: the check reads what the archive says, not what the sources set, so a
 # target that no source check can read is found here), and the document type that "Open in PrestoCV" needs. That type is
 # PDF only, with role Viewer and rank Alternate, and the app never opens it in place; the app declares no type of its own
-# (no exported or imported type declaration). PrestoCVTests/App/AppInfoPlistTests.swift requires the same of the source
-# Info.plist, so change both together. Fails on the first thing that is wrong.
+# (no exported or imported type declaration). Tools/SourceChecks (ReleaseHygieneTests and DocumentTypesTests) requires
+# the same of the source Info.plist and the target's settings, so change both together. Fails on the first thing that
+# is wrong.
 #
 #   Tools/Release/check-archive.sh <path to PrestoCV.xcarchive>
 #
@@ -28,9 +29,12 @@ fail() { echo "::error::$1"; exit 1; }
 [ -f "$APP/PrivacyInfo.xcprivacy" ] || fail "no privacy manifest in the app bundle"
 [ -n "$(read_key CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] || fail "no app icon"
 
-# The document type's contract. AppInfoPlistTests reads typed values (an array of dictionaries, a Bool), and PlistBuddy
-# prints a string "false", a number or a dictionary with the key 0 the same way as the right type, so the types are
-# checked with plutil, which names them. Its key paths are separated by dots, and an array index is a number.
+# The document type's contract, as the source checks require it: ReleaseHygieneTests (infoPlistOpensPDFs,
+# infoPlistDeclaresNoTypes, theInfoPlistBuildsOnEveryPlatform) and DocumentTypesTests (pdfIsDeclaredAtTheAlternateRank,
+# aPDFIsNeverOpenedInPlace, macOSOpensInPlace). The in-place key comes from the target's settings, NO for the iOS SDKs,
+# so an iOS archive holds false. Those checks read typed values, and PlistBuddy prints a string "false", a number or a
+# dictionary with the key 0 the same way as the right type, so here the types are checked with plutil, which names
+# them. Its key paths are separated by dots, and an array index is a number.
 plist_type() { plutil -type "$1" "$PLIST" 2>/dev/null; }
 plist_value() { plutil -extract "$1" raw -o - "$PLIST" 2>/dev/null; }
 DOCUMENT_TYPES="CFBundleDocumentTypes"

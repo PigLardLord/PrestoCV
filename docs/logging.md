@@ -102,7 +102,6 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 | `draft.unavailable` | notice | `reason` | A draft was asked for while the model cannot run. |
 | `draft.rejected` | notice | `check` (`request`, `language` or `result`), `error`, `elapsed` (a result only) | The description broke a rule of the request, the device lacks the language data that grounding it needs (`draft.language` shows which), or the draft left after the checks broke a rule of the validation. |
 | `draft.language` | info, notice when the data is missing | `supported`, `language` (when supported), `data` (`notNeeded`, `present` or `missing`) | The language of the description, and the device's language data that grounding it needs. |
-| `draft.languageData` | info, notice when the data did not come | `outcome` (`available`, `notAvailable` or `cancelled`), `elapsed` | After a `draft.rejected` with `check=language`, the app asked the system for the missing data and waited for it, a minute at most. `available` is followed by a second draft; `notAvailable` means the system said no or the minute passed (`elapsed` tells which); `cancelled` means the person left first. |
 | `draft.started` | info | `characters` | The model was asked. |
 | `draft.retried` | notice | `stage` (`model` for the facts, `writing` for a section), `error` | A request of the model failed below the model (`serviceFailed`) and is tried once more ([ADR 0031](architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md)). |
 | `draft.written` | info | `summary`, `roles` (the jobs given duties), `technologies`, `softSkills` | What the requests of the sections wrote around the facts and their checks kept, before the final check reads it ([ADR 0031](architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md), "A request per section"). |
@@ -117,7 +116,6 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 
 | Event | Level | Fields | When |
 |---|---|---|---|
-| `launch.seedFailed` | error | `files` (the CV files the test handed over), `error` | The CV files a UI test hands over could not be written into the new storage folder (they are written beside it and moved to it when every file is there, so no half-seeded folder is left), so the test starts without them. |
 
 ### The trace store (category `trace`, TestFlight and Debug builds only)
 

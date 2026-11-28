@@ -190,21 +190,4 @@ final class PDFExportEngineCoreTests: XCTestCase {
         XCTAssertEqual(customOptions.pageSize.width, PageSize.letter.width)
         XCTAssertEqual(customOptions.margins.top, 36)
     }
-
-    // MARK: - Adapter Tests
-
-    func testPrestoCVCoreAdapterCreatesValidDocument() {
-        let adapter = PrestoCVCoreAdapter()
-        let document = adapter.convertToCV(from: nil)
-
-        XCTAssertFalse(document.personalInfo.name.isEmpty)
-        XCTAssertFalse(document.personalInfo.email.isEmpty)
-        XCTAssertFalse(document.sections.isEmpty)
-
-        // Verify sections are properly structured
-        for section in document.sections {
-            XCTAssertFalse(section.title.isEmpty)
-            XCTAssertTrue(section.order > 0)
-        }
-    }
 }
