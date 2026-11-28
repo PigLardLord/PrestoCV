@@ -61,7 +61,9 @@ struct CompositionTests {
         { @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in try await counter.compile() }
     }
 
-    private static let failing: Composition.CompileRules = {
+    /// Rules that cannot be compiled: the launch fails after its paths are checked (`contentRulesUnavailable`), whatever
+    /// the bundled designs hold, since a designs failure no longer fails it (#566).
+    static let failing: Composition.CompileRules = {
         @MainActor () async throws(SecureWebViewConfiguration.Failure) -> WKContentRuleList in throw .contentRulesUnavailable
     }
 
