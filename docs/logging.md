@@ -166,7 +166,7 @@ At launch the app listens to the store's tip transactions and finishes each one 
 |---|---|---|---|
 | `tips.unfinished.finished` | info | `count` (the transactions finished), `unverified` (how many of them the store did not verify) | Once per launch, after the transactions the store still held from an earlier run have all been finished. A count of zero is logged too. |
 | `tips.update.finished` | info | `verified` (flag) | A transaction that arrived while the app ran was finished. |
-| `tips.purchase.ended` | info | `outcome` (`completed`, `unverified`, `cancelled`, `pending`, `notAllowed`, `unreachable` or `failed`) | A purchase from the tip jar ended. A tip the store sold is finished first, the unverified one too, which grants nothing. |
+| `tips.purchase.ended` | info | `outcome` (`completed`, `unverified`, `cancelled`, `windowClosed`, `pending`, `notAllowed`, `unreachable` or `failed`) | A purchase from the tip jar ended. A tip the store sold is finished first, the unverified one too, which grants nothing. `windowClosed`: the window of the tap closed before the store's sheet opened, so no purchase started. |
 
 The events carry counts, flags and outcome codes only: no product, price, identifier or account.
 

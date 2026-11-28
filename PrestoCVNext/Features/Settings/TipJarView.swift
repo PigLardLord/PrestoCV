@@ -6,9 +6,11 @@ import SwiftUI
 /// store's sheet; what became of the purchase shows above the offers until the screen closes.
 struct TipJarView: View {
     let tips: TipJarViewModel
+    @State private var anchor = TipWindowAnchor()
 
     var body: some View {
         content
+            .tipWindow(anchor)
             .navigationTitle(Text("settings.tips.title"))
             .inlineNavigationTitle()
             .task { await tips.load() }
@@ -28,7 +30,9 @@ struct TipJarView: View {
                 Section {
                     ForEach(rows) { row in
                         TipRowView(row: row, isBuying: tips.attempt == .buying(row.size)) {
-                            Task { await tips.buy(row.size) }
+                            // The model reads the window at the tap, and only when the tap starts a purchase, so that the
+                            // store's sheet opens in the window where the person tapped
+                            tips.buy(row.size, in: { anchor.window })
                         }
                         .disabled(tips.attempt.isBuying)
                     }

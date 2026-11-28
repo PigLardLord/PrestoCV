@@ -59,6 +59,16 @@ struct TipPurchasesTests {
         }
     }
 
+    @Test("a purchase whose window closed before the sheet opened ends as if the person cancelled it, under its own code")
+    func windowClosed() async throws {
+        let logger = KeptLogger()
+
+        let ended = try await TipPurchases.settle(.windowClosed, logger: logger)
+
+        #expect(ended == .cancelled)
+        #expect(logger.entries.first?.fields == [.token("outcome", "windowClosed")])
+    }
+
     @Test("what the store throws reads as the port's answer")
     func storeErrors() {
         #expect(TipPurchases.answer(to: StoreKitError.userCancelled).code == "cancelled")
@@ -77,6 +87,7 @@ extension TipPurchaseAnswer {
         switch self {
         case .bought: "bought"
         case .cancelled: "cancelled"
+        case .windowClosed: "windowClosed"
         case .pending: "pending"
         case .refused(let failure): "refused \(failure)"
         }

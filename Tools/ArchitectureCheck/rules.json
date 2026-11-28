@@ -777,7 +777,8 @@
    "allowedImports": [
     "PrestoCVApplication",
     "PrestoCVDomain",
-    "Foundation"
+    "Foundation",
+    "Synchronization"
    ],
    "rules": [
     "R1",
@@ -1010,6 +1011,8 @@
     "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
     "StoreKit",
+    "UIKit",
+    "AppKit",
     "Foundation",
     "Synchronization"
    ],
@@ -1036,7 +1039,8 @@
     "PrestoCVTipsStoreKit",
     "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
-    "StoreKit"
+    "StoreKit",
+    "AppKit"
    ],
    "rules": []
   },
