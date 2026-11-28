@@ -11,7 +11,7 @@ public enum CVGenerationError: Error, Equatable, Sendable {
     /// The description is too short to draft anything from
     case descriptionTooShort
 
-    /// The description is longer than the limit, or than the model can take
+    /// The description is longer than the limit (`CVGenerationLimits`)
     case descriptionTooLong
 
     /// The model declined the text

@@ -6,7 +6,7 @@ Every rule here is meant to be checked by a machine: by the compiler through mod
 
 | Document | Contents |
 |---|---|
-| [rules.md](rules.md) | The rules (R1–R18), why each exists, and how each is enforced |
+| [rules.md](rules.md) | The rules (R1–R19), why each exists, and how each is enforced |
 | [modules.md](modules.md) | Every package and target: responsibility, allowed dependencies, platforms |
 | [glossary.md](glossary.md) | The vocabulary used in code, UI copy and tickets |
 | [markup-contract.md](../../CVPDFExporter/Docs/markup-contract.md) | The HTML structure designs may style, versioned |
@@ -115,10 +115,10 @@ The current code is not refactored in place. The new structure is built next to 
    - Since version 1 was submitted, a legacy target changes only to fix a bug of the published version, until the app switches to the new stack in step 5 ([ADR 0033](adr/0033-change-the-legacy-app-only-to-fix-the-published-version.md)).
 2. **Empty targets.** Create every target in [modules.md](modules.md) with its dependency list, so the compiler holds the boundaries from day one.
 3. **Rendering and Design Catalog.** They are the most broken part (GitHub issues #1, #2, #3, #8, #9, #21, #22) and the one meant for reuse. Build them in the new targets with contract tests, and rewrite the bundled designs against [markup contract 1](../../CVPDFExporter/Docs/markup-contract.md).
-   - The legacy exporter, with its `PrestoCVCoreAdapter`, keeps serving the old app until step 5.
+   - The legacy exporter keeps serving the old app until step 5.
 4. **CV Authoring.** Rich aggregate, persistence DTOs with schema v1, use cases returning the persisted identity (#4, #5, #10, #11, #12, #13, #27, #45).
 5. **App integration, presentation and composition.** One composition root, view models in `PrestoCVPresentation`, workflow ports in `PrestoCVWorkflowPorts`, mappers in `PrestoCVIntegration`, NavigationSplitView for iOS and macOS (#6, #7, #14, #49). The app switches to the new export and editing workflows here; the legacy exporter is deleted.
-   - Until the switch, the new app is built in a second app target, `PrestoCVNext`, beside the one that ships ([modules.md](modules.md#xcode-app-target-prestocv-ios-265-macos-26)).
+   - The new app's code is in `PrestoCVNext/`, and the target that ships, `PrestoCV`, compiles it ([modules.md](modules.md#xcode-app-target-prestocv-ios-265-macos-26)).
 6. **AI Drafting.** Port with its own draft model, availability port, validation on every path (#16, #17, #18, #35).
 7. **Delete the old code** and close the issues the refactor made obsolete.
 

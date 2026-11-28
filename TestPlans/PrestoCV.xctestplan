@@ -7,14 +7,6 @@
     }
   ],
   "defaultOptions" : {
-    "commandLineArgumentEntries" : [
-      {
-        "argument" : "-PrestoCVUnitTestHost"
-      },
-      {
-        "argument" : "YES"
-      }
-    ],
     "targetForVariableExpansion" : {
       "containerPath" : "container:PrestoCV.xcodeproj",
       "identifier" : "23E2E8A327562C01000F2E5D",
@@ -26,8 +18,8 @@
     {
       "target" : {
         "containerPath" : "container:PrestoCV.xcodeproj",
-        "identifier" : "23E2E8B327562C02000F2E5D",
-        "name" : "PrestoCVTests"
+        "identifier" : "8546F134D9674E9BA0776D24",
+        "name" : "PrestoCVNextTests"
       }
     },
     {
@@ -36,8 +28,8 @@
       ],
       "target" : {
         "containerPath" : "container:PrestoCV.xcodeproj",
-        "identifier" : "23E2E8BD27562C02000F2E5D",
-        "name" : "PrestoCVUITests"
+        "identifier" : "7F121E40E0510CC724113715",
+        "name" : "PrestoCVNextUITests"
       }
     },
     {

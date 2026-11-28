@@ -37,5 +37,7 @@ Status is one of **Proposed**, **Accepted**, **Superseded by NNNN**, **Rejected*
 | [0033](0033-change-the-legacy-app-only-to-fix-the-published-version.md) | Change the legacy app only to fix the published version | Accepted |
 | [0034](0034-read-a-text-that-is-already-a-cv-with-the-import.md) | Read a text that is already a CV with the import, not the AI | Accepted |
 | [0036](0036-build-the-draft-from-prepared-lines-of-each-trade.md) | Build the draft from prepared lines of each trade that the person confirms | Accepted |
+| [0039](0039-keep-long-work-off-the-main-actor.md) | Keep long work off the main actor | Accepted |
+| [0040](0040-sell-tips-through-the-app-store-only.md) | Sell tips through the App Store only | Accepted |
 
 New ADRs copy [template.md](template.md).

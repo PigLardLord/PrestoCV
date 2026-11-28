@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Self-test of check-archive.sh. It builds minimal fake archives (an Info.plist, the privacy manifest) and runs the check
 # on each. One archive passes: PDF as the only document type, a viewer of alternate rank, never opened in place. Each of
-# the others breaks one rule of the document type, or of the minimum iOS release, and must fail with its own message. Runs on macOS, where
-# check-archive.sh reads the plist with PlistBuddy.
+# the others breaks one rule of the document type, of the minimum iOS release or of the privacy manifest, and must fail
+# with its own message. The archive of a case carries a copy of the source manifest PrestoCV/PrivacyInfo.xcprivacy unless
+# the case changes it. Runs on macOS, where check-archive.sh reads the plists with PlistBuddy and plutil.
 #
 #   Tools/Release/check-archive-selftest.sh
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$HERE/check-archive.sh"
 [ -x /usr/libexec/PlistBuddy ] || { echo "check-archive-selftest: needs macOS, for PlistBuddy" >&2; exit 1; }
+SOURCE_MANIFEST="$HERE/../../PrestoCV/PrivacyInfo.xcprivacy"
+[ -f "$SOURCE_MANIFEST" ] || { echo "check-archive-selftest: no $SOURCE_MANIFEST" >&2; exit 1; }
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 pass=0; fail=0; count=0
@@ -48,7 +51,7 @@ check() {
   local archive="$WORK/$((++count)).xcarchive" app out rc want
   app="$archive/Products/Applications/PrestoCV.app"
   mkdir -p "$app"
-  : > "$app/PrivacyInfo.xcprivacy"
+  cp "${MANIFEST_FILE-$SOURCE_MANIFEST}" "$app/PrivacyInfo.xcprivacy"
   {
     echo '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
     echo "$BASE"
@@ -121,6 +124,81 @@ check "no in-place key" "LSSupportsOpeningDocumentsInPlace is missing" "$VALID_T
 for key in UTExportedTypeDeclarations UTImportedTypeDeclarations; do
   check "$key declared" "the app declares $key" "$VALID_TYPES" "$COPIED" "<key>$key</key><array/>"
 done
+
+# The privacy manifest of the archive. check_manifest <name> <message, or "" when it must pass> <file>: the archive carries
+# that file. manifest_variant <name> <message> <plutil arguments>...: it carries the source manifest changed by plutil.
+check_manifest() {
+  MANIFEST_FILE="$3" check "$1" "$2" "$VALID_TYPES" "$COPIED"
+}
+manifest_variant() {
+  local name="$1" message="$2"; shift 2
+  local file="$WORK/manifest-$((count + 1)).xcprivacy"
+  cp "$SOURCE_MANIFEST" "$file"
+  plutil "$@" "$file" || { fail=$((fail+1)); echo "FAIL $name (plutil $* failed)"; return; }
+  check_manifest "$name" "$message" "$file"
+}
+NOT_PLIST="the privacy manifest is not a valid property list"
+NOT_FALSE="NSPrivacyTracking is not the boolean false"
+HAS_DOMAINS="the privacy manifest lists tracking domains"
+HAS_DATA="the privacy manifest declares collected data types"
+DIFFERS="the privacy manifest differs from the source manifest PrestoCV/PrivacyInfo.xcprivacy"
+
+check_manifest "a manifest that is the source" "" "$SOURCE_MANIFEST"
+manifest_variant "the source as a binary property list" "" -convert binary1
+: > "$WORK/empty.xcprivacy"
+check_manifest "an empty manifest" "$NOT_PLIST" "$WORK/empty.xcprivacy"
+echo "not a property list" > "$WORK/text.xcprivacy"
+check_manifest "a manifest of plain text" "$NOT_PLIST" "$WORK/text.xcprivacy"
+head -c 120 "$SOURCE_MANIFEST" > "$WORK/cut.xcprivacy"
+check_manifest "a manifest cut short" "$NOT_PLIST" "$WORK/cut.xcprivacy"
+
+# The order of the keys is not a difference, in XML or in a binary property list, at the top level or in a nested
+# dictionary. The real manifest cannot show it (plutil lists its few keys in the same order whatever the file says), so
+# the check runs from a copy of the tree whose source manifest is a small property list with a nested dictionary, which
+# plutil lists in the order of the file unless it is asked to sort. The archive carries the same list with its keys in
+# another order, or with a value changed.
+TREE="$WORK/tree"
+mkdir -p "$TREE/Tools/Release" "$TREE/PrestoCV"
+cp "$CHECK" "$TREE/Tools/Release/check-archive.sh"
+keyed() { # keyed <the top-level keys> <the keys of the nested dictionary b>
+  printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyTracking</key><false/>'
+  printf '%s</dict></plist>\n' "${1//@NESTED@/<key>b</key><dict>$2</dict>}"
+}
+KEY_A='<key>a</key><integer>1</integer>'
+KEY_X='<key>x</key><integer>1</integer>'
+KEY_Y='<key>y</key><integer>2</integer>'
+keyed "$KEY_A@NESTED@" "$KEY_X$KEY_Y" > "$TREE/PrestoCV/PrivacyInfo.xcprivacy"
+# reorder_case <name> <message, or "" when it must pass> <the top-level keys> <the keys of b> <binary: yes or no>
+reorder_case() {
+  local file="$WORK/keyed-$((count + 1)).xcprivacy"
+  keyed "$3" "$4" > "$file"
+  [ "$5" = yes ] && plutil -convert binary1 "$file"
+  CHECK="$TREE/Tools/Release/check-archive.sh" check_manifest "$1" "$2" "$file"
+}
+for binary in no yes; do
+  as=""; [ "$binary" = yes ] && as=", as binary"
+  reorder_case "the same keys in the same order$as" "" "$KEY_A@NESTED@" "$KEY_X$KEY_Y" "$binary"
+  reorder_case "top-level keys in another order$as" "" "@NESTED@$KEY_A" "$KEY_X$KEY_Y" "$binary"
+  reorder_case "nested keys in another order$as" "" "$KEY_A@NESTED@" "$KEY_Y$KEY_X" "$binary"
+  reorder_case "both in another order$as" "" "@NESTED@$KEY_A" "$KEY_Y$KEY_X" "$binary"
+  reorder_case "another order and a nested value that differs$as" "$DIFFERS" "@NESTED@$KEY_A" "$KEY_Y<key>x</key><integer>9</integer>" "$binary"
+  reorder_case "another order and a top-level value that differs$as" "$DIFFERS" "@NESTED@<key>a</key><integer>2</integer>" "$KEY_Y$KEY_X" "$binary"
+done
+
+manifest_variant "tracking true" "$NOT_FALSE" -replace NSPrivacyTracking -bool YES
+manifest_variant "tracking as the string false" "$NOT_FALSE" -replace NSPrivacyTracking -string false
+manifest_variant "tracking as the number 0" "$NOT_FALSE" -replace NSPrivacyTracking -integer 0
+manifest_variant "no tracking key" "$NOT_FALSE" -remove NSPrivacyTracking
+manifest_variant "a tracking domain" "$HAS_DOMAINS" -replace NSPrivacyTrackingDomains -json '["tracker.example"]'
+manifest_variant "tracking domains as a string" "$HAS_DOMAINS" -replace NSPrivacyTrackingDomains -string tracker.example
+manifest_variant "a collected data type" "$HAS_DATA" -replace NSPrivacyCollectedDataTypes -json '[{"NSPrivacyCollectedDataType":"NSPrivacyCollectedDataTypeEmailAddress"}]'
+manifest_variant "collected data types as a boolean" "$HAS_DATA" -replace NSPrivacyCollectedDataTypes -bool NO
+
+manifest_variant "another required-reason category" "$DIFFERS" -replace NSPrivacyAccessedAPITypes -json '[{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryDiskSpace","NSPrivacyAccessedAPITypeReasons":["E174.1"]}]'
+manifest_variant "no required-reason categories" "$DIFFERS" -replace NSPrivacyAccessedAPITypes -json '[]'
+manifest_variant "a key of its own" "$DIFFERS" -insert NSPrivacyExtra -bool YES
+manifest_variant "no tracking domains key" "$DIFFERS" -remove NSPrivacyTrackingDomains
+manifest_variant "no collected data types key" "$DIFFERS" -remove NSPrivacyCollectedDataTypes
 
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]

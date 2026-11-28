@@ -9,7 +9,7 @@
 #                      the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
 #                      check and of the screenshot tools, the check of the store listing, the tests of PrestoCVApp, and the
-#                      builds of the second app target (PrestoCVNext, for iOS and macOS) and of CVPDFExporterExamples. It
+#                      builds of the app for macOS and of CVPDFExporterExamples. It
 #                      also runs the source checks, which read the repository: the machines that then run the test plan
 #                      have only the built products.
 set -euo pipefail
@@ -62,13 +62,11 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/check-store-listing-selftest.py"
     step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
     step swift test --package-path "$ROOT/PrestoCVApp"
-    # The second app target (docs/architecture/modules.md) is built for both of its platforms until the switch; no plan
-    # of the shipped scheme builds it.
-    next_build="$(mktemp -d)"
-    step xcodebuild build -project "$ROOT/PrestoCV.xcodeproj" -scheme PrestoCVNext \
-        -destination 'generic/platform=iOS Simulator' -destination 'generic/platform=macOS' \
-        -derivedDataPath "$next_build" CODE_SIGNING_ALLOWED=NO -quiet
-    rm -rf "$next_build"
+    # The app is built for its second platform (docs/architecture/modules.md): the test plans run it on iOS only.
+    mac_build="$(mktemp -d)"
+    step xcodebuild build -project "$ROOT/PrestoCV.xcodeproj" -scheme PrestoCV -destination 'generic/platform=macOS' \
+        -derivedDataPath "$mac_build" CODE_SIGNING_ALLOWED=NO -quiet
+    rm -rf "$mac_build"
     # The exporter's demos, apart from the library (R14); they use the legacy exporter, Apple hosts only.
     step swift build --package-path "$ROOT/CVPDFExporterExamples"
     ;;

@@ -21,7 +21,7 @@ struct ImportFileLifetimeTests {
     private func finishTheNewImport(_ world: ImportWorld, _ model: ImportViewModel) async {
         await world.importer.gate.open()
         await waitUntil("the draft") { model.status == .ready }
-        await settle()
+        await model.files.settled()
     }
 
     /// Holds the read of `first`, cancels it, and holds the read of `second` too.
@@ -55,7 +55,7 @@ struct ImportFileLifetimeTests {
 
         model.importFile(at: file)
         await waitUntil("the problem") { model.status == .failed(ImportProblem(.fileNotRead)) }
-        await settle()
+        await model.files.settled()
 
         #expect(world.files.released(file) == 1)
         #expect(world.files.problems(ended: true).isEmpty)
@@ -116,6 +116,7 @@ struct ImportFileLifetimeTests {
         await world.hold(model) { $0.importFile(at: file) }
 
         model.importFile(at: otherFile)
+        await model.files.settled()
 
         #expect(world.files.released(otherFile) == 1)
         #expect(world.files.released(file) == 0)
@@ -136,6 +137,7 @@ struct ImportFileLifetimeTests {
         await world.hold(model) { $0.importFile(at: file) }
 
         model.importFile(at: file)
+        await model.files.settled()
         #expect(world.files.received.map(\.releases) == [0, 1])
 
         await world.files.gate.open()
@@ -151,9 +153,12 @@ struct ImportFileLifetimeTests {
         await cancelAndStartAgain(world, model, first: file, second: otherFile)
 
         model.importFile(at: file)
+        await model.files.settled()
         #expect(world.files.released(file) == 1)                // the third, refused
 
         await letTheOldTaskEnd(world)
+        await waitUntil("the cancelled task let its file go") { world.files.released(file) == 2 }
+        await model.files.settled()
         #expect(world.files.released(file) == 2)                // plus the cancelled task's own
         #expect(world.files.released(otherFile) == 0)
 
@@ -167,12 +172,14 @@ struct ImportFileLifetimeTests {
         let world = ImportWorld()
         var model: ImportViewModel? = world.model()
         await world.hold(model!) { $0.importFile(at: file) }
+        let holder = model!.files
 
         model = nil
         #expect(world.files.released(file) == 0)
         await world.files.gate.open()
         await world.importer.gate.open()
-        await settle()
+        await waitUntil("the file let go") { world.files.released(file) > 0 }
+        await holder.settled()
 
         #expect(world.files.released(file) == 1)
         #expect(world.files.problems(ended: true).isEmpty)
@@ -186,11 +193,13 @@ struct ImportFileLifetimeTests {
         model?.cancel()
         model?.importFile(at: file)
         await waitUntil("both reads at the gate") { await world.files.gate.waiting == 2 }
+        let holder = model!.files
 
         model = nil
         await world.files.gate.open()
         await world.importer.gate.open()
-        await settle()
+        await waitUntil("both files let go") { world.files.received.allSatisfy { $0.releases > 0 } }
+        await holder.settled()
 
         #expect(world.files.received.map(\.releases) == [1, 1])
         #expect(world.files.problems(ended: true).isEmpty)

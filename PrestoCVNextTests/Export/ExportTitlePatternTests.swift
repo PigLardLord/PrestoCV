@@ -1,5 +1,5 @@
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// A CV's PDF is named in the language of its document, whatever language the app shows (R13).
 @Suite("ExportTitlePattern: the title of a CV's PDF in the language of its document")

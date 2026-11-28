@@ -8,7 +8,6 @@ import Foundation
 public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
 
     private let renderer: HTMLToPDFRenderer
-    private let adapter: PrestoCVCoreAdapter
     private let templateRepository: TemplateRepositoryProtocol
     private let templateEngine: TemplateEngine
 
@@ -21,7 +20,6 @@ public final class PDFExportEngineImpl: PDFExportEngine, Sendable {
         templateRepository: TemplateRepositoryProtocol = BundledTemplateRepository()
     ) {
         self.renderer = renderer
-        self.adapter = PrestoCVCoreAdapter()
         self.templateRepository = templateRepository
         self.templateEngine = MustacheTemplateEngine()
     }

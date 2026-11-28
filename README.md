@@ -32,10 +32,10 @@ The code is being rebuilt on a target architecture that is enforced mechanically
 | `docs/product/` | The product vision: for whom PrestoCV is, its principles (including scaling with use and paying with revenue), the business model and the release plan. |
 | `docs/architecture/` | The target architecture: overview and migration strategy, rules R1–R18, modules and allowed imports, glossary, ADRs. |
 | `docs/maintainers/` | How the maintainer works: how pull requests are reviewed. |
-| `PrestoCV/`, `PrestoCVTests/`, `PrestoCVUITests/` | The app and its tests (legacy, being replaced). The app icon is `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)). |
+| `PrestoCV/` | The app's `Info.plist`, icon `PrestoCV/PrestoCV.icon` ([docs/design/app-icon.md](docs/design/app-icon.md)), asset catalog, privacy manifest and sample CVs. |
 | `PrestoCVCore/`, `CVPDFExporter/`, `CVGeneratorAI/` | The packages of the three contexts: CV Authoring, the design catalog and document rendering, and AI Drafting. Each holds its legacy targets, being replaced, and the new targets that replace them. |
 | `PrestoCVApp/` | The new app package: workflow ports, presentation, integration and the composition root. |
-| `PrestoCVNext/`, `PrestoCVNextTests/`, `PrestoCVNextUITests/` | The second app target, where the new app grows beside the shipped one until the switch (step 5 of the migration), its unit tests and its UI tests. |
+| `PrestoCVNext/`, `PrestoCVNextTests/`, `PrestoCVNextUITests/` | The app's code, which the `PrestoCV` target compiles, its unit tests and its UI tests. |
 | `CVPDFExporterExamples/` | The exporter's demos and template viewer, kept apart from the library. |
 | `DiagnosticLogging/`, `docs/logging.md` | The diagnostic log (ADR 0030): one interface that carries no CV content, its decorators and its unified log adapter; the guide says how to read the log, what each event holds and how to add one. |
 | `DiagnosticTrace/` | The trace of a test build (ADR 0032): each step of the AI draft and the import, with its text, kept on the device in TestFlight and Debug builds only, and shared by the person; `docs/logging.md` says where it is and how to read it. |
@@ -58,7 +58,7 @@ xcodebuild -project PrestoCV.xcodeproj -scheme PrestoCV -configuration Debug bui
 xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 ```
 
-- **Test plans:** `PrestoCV`, the default, runs every test, the app's UI tests (`PrestoCVUITests`) among them. `CI` leaves the UI tests out, as they take most of an hour.
+- **Test plans:** `PrestoCV`, the default, runs every test, the app's UI tests (`PrestoCVNextUITests`) among them. `CI` leaves the UI tests out, as they take most of an hour.
 - **On Linux:** the packages hold only their new targets, as the legacy ones are declared only on Apple hosts ([ADR 0012](docs/architecture/adr/0012-legacy-targets-during-migration.md)). `Tools/check-linux.sh origin/main` runs what the Linux CI job runs.
 - **Before a pull request:** [CONTRIBUTING.md](CONTRIBUTING.md#building-and-testing) lists every command, the package tests, the architecture check and the source checks among them.
 

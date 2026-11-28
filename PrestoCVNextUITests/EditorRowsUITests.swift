@@ -30,9 +30,10 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
 
     // MARK: Launching
 
-    /// A store folder of its own with one CV whose sections are empty, in English, opened.
+    /// A store folder of its own with one CV whose sections are empty, in English, opened. `autosavePause`, in whole
+    /// seconds, replaces the pause after typing before the text is stored.
     @MainActor
-    private func launchAndOpen(largestText: Bool = false) throws -> XCUIApplication {
+    private func launchAndOpen(largestText: Bool = false, autosavePause: String? = nil) throws -> XCUIApplication {
         let app = XCUIApplication()
         // The store reads a CV from the file named by its identity; the fixture takes a JSON map from file name to
         // content, in base 64
@@ -44,11 +45,13 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         """
         let seed = try JSONEncoder().encode(["\(identity).cv.json": cv]).base64EncodedString()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", seed,
         ]
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
+        app.launchArguments += autosavePause.map { ["-PrestoCVNextAutosavePause", $0] } ?? []
         app.launch()
         let row = app.descendants(matching: .any).matching(identifier: "shell.row")
             .matching(NSPredicate(format: "label BEGINSWITH %@", title + ", ")).firstMatch
@@ -95,7 +98,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
     @MainActor
     private func putKeyboardAway(in app: XCUIApplication) {
         app.buttons["keyboard.done"].tap()
-        XCTAssertTrue(waitUntilGone(app.keyboards.firstMatch), "Done puts the keyboard away")
+        XCTAssertTrue(app.keyboards.firstMatch.waitUntilGone(), "Done puts the keyboard away")
     }
 
     /// The Delete of the dialog: the swipe's own Delete, closed once tapped, may stay in the tree.
@@ -105,20 +108,6 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
             .last { $0.canBeTapped(in: app) }
         XCTAssertNotNil(delete, "The dialog offers Delete")
         delete?.tap()
-    }
-
-    // MARK: Waiting and moving
-
-    @MainActor
-    private func waitUntil(_ element: XCUIElement, holds value: String) -> Bool {
-        let holds = expectation(for: NSPredicate(format: "value == %@", value), evaluatedWith: element)
-        return XCTWaiter().wait(for: [holds], timeout: 30) == .completed
-    }
-
-    @MainActor
-    private func waitUntilGone(_ element: XCUIElement) -> Bool {
-        let gone = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: element)
-        return XCTWaiter().wait(for: [gone], timeout: 30) == .completed
     }
 
     // MARK: Adding
@@ -134,7 +123,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
             addRow(to: section.name, in: app)
             app.typeText(section.text)
             let first = app.textFields[section.first]
-            XCTAssertTrue(waitUntil(first, holds: section.text), "The new row of \(section.name) has the cursor")
+            XCTAssertTrue(first.waitUntil(holds: section.text), "The new row of \(section.name) has the cursor")
             XCTAssertEqual(first.label, section.label, section.first)
             putKeyboardAway(in: app)
             // Checked while the new row is in view: the form loads only the rows on screen
@@ -188,14 +177,14 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(question.waitForExistence(timeout: 30), "The dialog names the row")
         XCTAssertTrue(app.staticTexts["This cannot be undone."].exists)
         app.cancelDialog(showing: question)
-        XCTAssertTrue(waitUntilGone(question))
+        XCTAssertTrue(question.waitUntilGone())
         XCTAssertEqual(skill.value as? String, "Welding", "Cancel keeps the row")
 
         skill.swipeLeft()
         app.buttons["Delete"].tap()
         XCTAssertTrue(question.waitForExistence(timeout: 30))
         confirmDelete(in: app)
-        XCTAssertTrue(waitUntilGone(skill), "The row goes once the person confirms")
+        XCTAssertTrue(skill.waitUntilGone(), "The row goes once the person confirms")
     }
 
     /// A row with nothing in it goes at once: there is nothing to lose, so no dialog asks.
@@ -209,7 +198,7 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
         interest.swipeLeft()
         app.buttons["Delete"].tap()
 
-        XCTAssertTrue(waitUntilGone(interest), "The blank row goes")
+        XCTAssertTrue(interest.waitUntilGone(), "The blank row goes")
         XCTAssertFalse(app.staticTexts["Delete “Unnamed interest”?"].exists, "No dialog asks")
     }
 
@@ -229,7 +218,335 @@ final class EditorRowsUITests: RuntimeIssueFailingTestCase {
 
         XCTAssertTrue(app.staticTexts["Delete “Welding”?"].waitForExistence(timeout: 30))
         confirmDelete(in: app)
-        XCTAssertTrue(waitUntilGone(skill), "The row goes once the person confirms")
+        XCTAssertTrue(skill.waitUntilGone(), "The row goes once the person confirms")
+    }
+
+    // MARK: Staying
+
+    /// What is typed is stored, and an app ended in the background does not lose it: the next launch on the same store
+    /// folder lists the CV under its new title.
+    @MainActor
+    func testWhatIsTypedSurvivesTheAppBeingEndedInTheBackground() throws {
+        let folder = "rows-\(UUID().uuidString)"
+        let app = XCUIApplication()
+        let file = XCUIApplication.storedCV(identity: identity, title: title)
+        app.launchArguments += [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", folder,
+            "-PrestoCVNextReadyDesigns", "-PrestoCVNextSeed", try XCUIApplication.seed(["\(identity).cv.json": file]),
+        ]
+        app.launch()
+        app.openCV(titled: title)
+        let field = app.textInput("editor.field.title")
+        field.tap()
+        field.append(" Lead")
+        XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: "Saved on this device"), "The text is stored")
+
+        app.terminate()
+        app.launchArguments = [
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextStorage", folder,
+            "-PrestoCVNextReadyDesigns",
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.listRow(titled: "\(title) Lead").waitForExistence(timeout: 30), "The next launch lists the new title")
+    }
+
+    /// The swipe from the left edge leaves like Back, once the text is stored; a wide window shows the list beside.
+    @MainActor
+    func testTheEdgeSwipeLeavesLikeBack() throws {
+        let app = try launchAndOpen()
+        try XCTSkipUnless(app.isCompactWidth, "Only a narrow window has the edge swipe")
+        let field = app.textInput("editor.field.title")
+        field.tap()
+        field.append(" Lead")
+        XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: "Saved on this device"), "The text is stored")
+        putKeyboardAway(in: app)
+
+        app.swipeBackFromTheLeftEdge()
+
+        XCTAssertTrue(app.listRow(titled: "\(title) Lead").waitForExistence(timeout: 30), "The edge swipe leaves to the list")
+    }
+
+    /// The swipe from the edge before the pause that stores the text stores it first, then leaves. The pause is ten
+    /// minutes here, so the title the list shows can only come from a write that leaving starts: the shell's store of
+    /// the editor it lets go, or the list's store of the editors still alive before it reads.
+    @MainActor
+    func testTheEdgeSwipeBeforeThePauseStoresThenLeaves() throws {
+        let app = try launchAndOpen(autosavePause: "600")
+        try XCTSkipUnless(app.isCompactWidth, "Only a narrow window has the edge swipe")
+        let field = app.textInput("editor.field.title")
+        field.tap()
+        field.append(" Lead")
+        XCTAssertTrue(app.staticTexts["editor.status"].waitUntil(reads: "Unsaved changes"), "The text waits for the pause")
+
+        app.swipeBackFromTheLeftEdge()
+
+        XCTAssertTrue(app.listRow(titled: "\(title) Lead").waitForExistence(timeout: 30), "The list shows the typed title")
+    }
+
+    // MARK: Describing
+
+    /// The description of a study takes text, loses it letter by letter, and takes new text.
+    @MainActor
+    func testEducationDescriptionCanBeTypedClearedAndTypedAgain() throws {
+        let app = try launchAndOpen()
+        addRow(to: "education", in: app)
+        // The new row holds the keyboard, which covers the lower part of the page where the scroll's drag starts
+        putKeyboardAway(in: app)
+        let description = app.textViews["editor.field.educationDescription"]
+        app.scrollForm(until: description, named: "The description of a study")
+        description.tap()
+
+        app.typeText("Thesis on triage")
+        XCTAssertTrue(description.waitUntil(holds: "Thesis on triage"), "The description takes the text")
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "Thesis on triage".count))
+        XCTAssertTrue(description.waitUntil(holds: ""), "The description empties")
+        app.typeText("Second thought")
+        XCTAssertTrue(description.waitUntil(holds: "Second thought"), "The description takes new text")
+    }
+
+    // MARK: Removing more
+
+    /// The control of a section's row in the form: the row that opens a page where the section opens on one, the first
+    /// field where it stays in place.
+    @MainActor
+    private func control(of section: String, in app: XCUIApplication) -> XCUIElement {
+        if app.opensOnAPage(section) { return app.buttons["editor.entry.\(section)"] }
+        let first = sections.first { $0.name == section }?.first ?? ""
+        return app.textFields[first]
+    }
+
+    /// Adds a row of the section with this text, goes back to the form, and swipes the row to Delete.
+    @MainActor
+    private func swipeToDelete(_ section: String, typing text: String, in app: XCUIApplication) -> XCUIElement {
+        addRow(to: section, typing: text, in: app)
+        if app.entryPage.exists { app.leaveEntryPage() }
+        let row = control(of: section, in: app)
+        app.scrollForm(until: row, named: "The row of \(section)", forward: false)
+        row.swipeLeft()
+        app.buttons["Delete"].tap()
+        return row
+    }
+
+    @MainActor
+    private func assertDeletedAfterTheQuestion(_ section: String, typing text: String) throws {
+        let app = try launchAndOpen()
+        let row = swipeToDelete(section, typing: text, in: app)
+        let question = app.staticTexts["Delete “\(text)”?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 30), "The dialog names the row")
+        XCTAssertTrue(row.exists, "The row stays until the person confirms")
+
+        confirmDelete(in: app)
+
+        XCTAssertTrue(row.waitUntilGone(), "The row goes once the person confirms")
+    }
+
+    @MainActor
+    func testAnEducationIsDeletedAfterTheQuestion() throws {
+        try assertDeletedAfterTheQuestion("education", typing: "Surveying")
+    }
+
+    @MainActor
+    func testACertificationIsDeletedAfterTheQuestion() throws {
+        try assertDeletedAfterTheQuestion("certifications", typing: "Rigging")
+    }
+
+    @MainActor
+    func testASocialLinkIsDeletedAfterTheQuestion() throws {
+        try assertDeletedAfterTheQuestion("profiles", typing: "Mastodon")
+    }
+
+    /// A certification with nothing in it goes at once: no dialog asks.
+    @MainActor
+    func testABlankCertificationIsDeletedAtOnce() throws {
+        let app = try launchAndOpen()
+        addRow(to: "certifications", in: app)
+        putKeyboardAway(in: app)
+        if app.entryPage.exists { app.leaveEntryPage() }
+        let row = control(of: "certifications", in: app)
+        app.scrollForm(until: row, named: "The row of certifications", forward: false)
+
+        row.swipeLeft()
+        app.buttons["Delete"].tap()
+
+        XCTAssertTrue(row.waitUntilGone(), "The blank row goes")
+        XCTAssertFalse(app.staticTexts["Delete “Unnamed certification”?"].exists, "No dialog asks")
+    }
+
+    // MARK: Swiping and tapping beside
+
+    /// Adds a row of the section with this text, leaves it open (on a narrow screen its page), and returns the app with
+    /// the row's menu.
+    @MainActor
+    private func launchWithARowOf(_ section: String, typing text: String) throws -> (XCUIApplication, XCUIElement) {
+        let app = try launchAndOpen()
+        addRow(to: section, typing: text, in: app)
+        let menu = app.buttons.matching(identifier: menus[section] ?? "").firstMatch
+        app.scrollForm(until: menu, named: "The menu of \(section)")
+        return (app, menu)
+    }
+
+    /// The words that name where the control stands: a menu reads its choice, a text view its text.
+    @MainActor
+    private func state(of element: XCUIElement) -> String {
+        "\(element.label)|\(element.value as? String ?? "")"
+    }
+
+    /// Taps next to the control, at the corners of its frame, and checks that no row went and no dialog asked.
+    @MainActor
+    private func assertTapsBesideDeleteNothing(_ control: XCUIElement, in app: XCUIApplication, kept: String) {
+        let before = state(of: control)
+        for offset in [(0.97, 0.85), (0.6, 0.85), (0.03, 0.85), (0.97, 0.15)] {
+            control.coordinate(withNormalizedOffset: CGVector(dx: offset.0, dy: offset.1)).tap()
+            if app.buttons["Not set"].exists { app.buttons["Not set"].tap() }
+            XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Delete “")).firstMatch.exists,
+                           "No dialog asks")
+        }
+        XCTAssertTrue(control.exists, "The control stays")
+        XCTAssertEqual(state(of: control), before, "Nothing changed")
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", kept)).firstMatch.exists, "\(kept) stays")
+    }
+
+    /// Swipes left from the control's right end, far enough to open the row's actions, and checks that the row opened
+    /// with its Delete, nothing was asked and the control changed nothing.
+    @MainActor
+    private func assertSwipeFromOpensTheRowAndChangesNothing(
+        _ control: XCUIElement, in app: XCUIApplication, kept: String, opensActions: Bool
+    ) {
+        let before = state(of: control)
+        let start = control.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: -160, dy: 0)))
+
+        if opensActions {
+            XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 30), "The swipe opens the row to Delete")
+        }
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Delete “")).firstMatch.exists,
+                       "Nothing is asked")
+        XCTAssertEqual(state(of: control), before, "The control is unchanged")
+        XCTAssertFalse(app.buttons["Not set"].exists, "No menu opened")
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", kept)).firstMatch.exists, "\(kept) stays")
+    }
+
+    @MainActor
+    func testATapBesideTheLevelDeletesNothing() throws {
+        let (app, level) = try launchWithARowOf("skills", typing: "Welding")
+        assertTapsBesideDeleteNothing(level, in: app, kept: "Welding")
+    }
+
+    @MainActor
+    func testATapBesideTheLanguagePickerDeletesNothing() throws {
+        let (app, picker) = try launchWithARowOf("languages", typing: "German")
+        assertTapsBesideDeleteNothing(picker, in: app, kept: "German")
+    }
+
+    @MainActor
+    func testASwipeFromTheLevelOpensTheRowAndChangesNothing() throws {
+        let (app, level) = try launchWithARowOf("skills", typing: "Welding")
+        assertSwipeFromOpensTheRowAndChangesNothing(level, in: app, kept: "Welding", opensActions: true)
+    }
+
+    /// A language opens on a page on a narrow screen, where a row has no swipe actions to open.
+    @MainActor
+    func testASwipeFromTheLanguagePickerOpensTheRowAndChangesNothing() throws {
+        let (app, picker) = try launchWithARowOf("languages", typing: "German")
+        assertSwipeFromOpensTheRowAndChangesNothing(
+            picker, in: app, kept: "German", opensActions: !app.opensOnAPage("languages"))
+    }
+
+    /// A study's description is a page's field on a narrow screen, where a row has no swipe actions to open.
+    @MainActor
+    func testASwipeFromTheDescriptionOpensTheRowAndChangesNothing() throws {
+        let app = try launchAndOpen()
+        addRow(to: "education", typing: "Surveying", in: app)
+        let description = app.textViews["editor.field.educationDescription"]
+        app.scrollForm(until: description, named: "The description of a study")
+        description.tap()
+        app.typeText("Thesis on triage")
+        putKeyboardAway(in: app)
+
+        assertSwipeFromOpensTheRowAndChangesNothing(
+            description, in: app, kept: "Surveying", opensActions: !app.opensOnAPage("education"))
+    }
+
+    // MARK: Neighbours
+
+    /// Deleting the middle of three rows keeps the others, and the row that comes up into its place is closed.
+    @MainActor
+    func testDeletingARowKeepsItsNeighboursAndTheNextRowComesUpClosed() throws {
+        let app = try launchAndOpen()
+        for name in ["Welding", "Rigging", "Surveying"] { addRow(to: "skills", typing: name, in: app) }
+        func skill(_ name: String) -> XCUIElement {
+            app.textFields.matching(identifier: "editor.field.skillName").matching(NSPredicate(format: "value == %@", name)).firstMatch
+        }
+        skill("Rigging").swipeLeft()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(app.staticTexts["Delete “Rigging”?"].waitForExistence(timeout: 30))
+
+        confirmDelete(in: app)
+
+        XCTAssertTrue(skill("Rigging").waitUntilGone(), "The row goes")
+        XCTAssertTrue(skill("Welding").exists, "The row before stays")
+        XCTAssertTrue(skill("Surveying").exists, "The row after stays")
+        let open = app.buttons.matching(NSPredicate(format: "label == %@", "Delete")).allElementsBoundByIndex
+            .contains { $0.canBeTapped(in: app) }
+        XCTAssertFalse(open, "The row that came up is closed")
+    }
+
+    /// Adding a row while another is swiped open keeps both, and the new row takes the cursor.
+    @MainActor
+    func testAddingARowWhileAnotherIsSwipedOpenKeepsBothAndFocusesTheNewOne() throws {
+        let app = try launchAndOpen()
+        addRow(to: "skills", typing: "Welding", in: app)
+        let welding = app.textFields.matching(identifier: "editor.field.skillName")
+            .matching(NSPredicate(format: "value == %@", "Welding")).firstMatch
+        welding.swipeLeft()
+        XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 30), "The row is open")
+
+        // The first tap beside an open row only closes it: the system swallows it, as for any swiped row. The next tap adds.
+        let add = app.buttons["editor.add.skills"]
+        app.scrollForm(until: add, named: "The add button of skills")
+        let names = app.textFields.matching(identifier: "editor.field.skillName")
+        add.tap()
+        XCTAssertTrue(app.buttons["Delete"].waitUntilGone(), "The first tap closes the open row")
+        XCTAssertEqual(names.count, 1, "The first tap adds no row")
+        add.tap()
+        XCTAssertTrue(names.element(boundBy: 1).waitForExistence(timeout: 30), "The second tap adds the row")
+        XCTAssertEqual(names.count, 2, "The open row stays and one row is added")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 30), "A new row of skills takes the keyboard")
+        app.typeText("Rigging")
+
+        let rigging = app.textFields.matching(identifier: "editor.field.skillName")
+            .matching(NSPredicate(format: "value == %@", "Rigging")).firstMatch
+        XCTAssertTrue(rigging.waitForExistence(timeout: 30), "The new row has the cursor")
+        XCTAssertTrue(welding.exists, "The open row stays")
+    }
+
+    // MARK: Return
+
+    /// Return in a field of a row ends the entry: the field lets go of the focus, the keyboard closes and it adds no line, at the normal and the largest size.
+    @MainActor
+    private func assertReturnEndsTheEntry(largestText: Bool) throws {
+        let app = try launchAndOpen(largestText: largestText)
+        addRow(to: "skills", in: app)
+
+        app.typeText("Welding\n")
+
+        let skill = app.textInput("editor.field.skillName")
+        XCTAssertTrue(skill.waitUntilUnfocused(), "Return ends the entry of the field")
+        XCTAssertTrue(app.keyboards.firstMatch.waitUntilGone(), "Return closes the keyboard")
+        XCTAssertTrue(skill.waitUntil(holds: "Welding"), "Return adds no line to the field")
+        XCTAssertEqual(app.textFields.matching(identifier: "editor.field.skillName").count
+                       + app.textViews.matching(identifier: "editor.field.skillName").count, 1, "Return adds no row")
+    }
+
+    @MainActor
+    func testReturnEndsTheEntryOfARowFieldInsteadOfAddingALine() throws {
+        try assertReturnEndsTheEntry(largestText: false)
+    }
+
+    @MainActor
+    func testReturnEndsTheEntryOfARowFieldAtTheLargestTextSize() throws {
+        try assertReturnEndsTheEntry(largestText: true)
     }
 
     // MARK: Choosing

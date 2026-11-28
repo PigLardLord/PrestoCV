@@ -33,45 +33,10 @@ struct ButtonPressTests {
 
     /// The controls the system draws and presses although the source does not place them in one of the system's
     /// containers: the file, a piece of the call that tells the control, and why the system owns it.
-    static let systemOwned: [(path: String, call: String, reason: String)] = [
-        ("PrestoCV/DesignSystem/Components/BarButton.swift", "BarButtonContent.resolve",
-         "the button of a navigation bar, drawn by the bar on Liquid Glass; BarButton goes only in toolbars, as a test checks"),
-        ("PrestoCV/Features/Onboarding/Views/ExampleSelectionView.swift", "row(for: example)",
-         "a row of a List: its label sets its own colours, primary and secondary, in row(for:), and the list draws the press as the row's highlight"),
-    ]
+    static let systemOwned: [(path: String, call: String, reason: String)] = []
 
     /// The colours that draw a control in the accent.
     static let accentTokens = ["Colors.accent", "Colors.onAccent", "primaryButton", "secondaryButton", "swipeActionTint", "accentColor", ".tint("]
-
-    @Test("Every button, navigation link, menu or link drawn in the accent or in the system's tint uses a style of the design system, unless the system draws it")
-    func accentControlsUseADesignSystemStyle() throws {
-        let controls = try Self.controls()
-        try #require(!controls.isEmpty, "The sources of the app are in the repository")
-
-        let offending = Self.unprotected(controls)
-        let stale = Self.systemOwned.filter { entry in !controls.contains { $0.path == entry.path && $0.call.contains(entry.call) } }
-
-        #expect(offending.isEmpty, "Draw these with a style of the design system:\n\(offending.map(Self.describe).joined(separator: "\n"))")
-        #expect(stale.isEmpty, "These exceptions match no control: \(stale.map(\.path))")
-    }
-
-    @Test("A control whose style colours its label sets no colour of its own in the label, which would hide the pressed colour")
-    func colouringStylesOwnTheLabelColour() throws {
-        let offending = try Self.controls().filter { control in
-            Self.colouringStyles.contains(Self.style(of: control) ?? "") && Self.setsAColour(control.call)
-        }
-
-        #expect(offending.isEmpty, "\(offending.map(Self.describe).joined(separator: "\n"))")
-    }
-
-    @Test("BarButton goes only in toolbars, where the system draws it")
-    func barButtonsAreInToolbars() throws {
-        let uses = try RepositorySources.swiftFiles(in: "PrestoCV").flatMap { ButtonScan(path: $0.path, text: $0.text).uses(of: "BarButton") }
-        try #require(!uses.isEmpty, "The app has bar buttons")
-
-        let outside = uses.filter { $0.enclosing.allSatisfy { !["toolbar", "ToolbarItem", "ToolbarItemGroup"].contains($0) } }
-        #expect(outside.isEmpty, "\(outside.map(Self.describe).joined(separator: "\n"))")
-    }
 
     // MARK: - The rule on small sources
 
@@ -203,23 +168,7 @@ struct ButtonPressTests {
         }
     }
 
-    // MARK: - The add button
-
-    @Test("An add button draws its title with AccentTextButtonStyle, and sets no colour of its own")
-    func addButtonUsesTheAccentTextStyle() throws {
-        let addButtons = try Self.controls().filter { $0.enclosing.contains("AddButton") }
-        try #require(addButtons.count == 1, "AddButton draws one button")
-        let addButton = try #require(addButtons.first)
-        #expect(Self.style(of: addButton) == "AccentTextButtonStyle", "\(Self.describe(addButton))")
-        #expect(!Self.setsAColour(addButton.call), "AddButton sets a colour of its own: \(Self.describe(addButton))")
-    }
-
     // MARK: - Reading a control
-
-    /// The controls of the app's sources.
-    static func controls() throws -> [ButtonScan.Use] {
-        try RepositorySources.swiftFiles(in: "PrestoCV").flatMap { controls(in: ButtonScan(path: $0.path, text: $0.text)) }
-    }
 
     static func controls(in scan: ButtonScan) -> [ButtonScan.Use] {
         controlNames.flatMap { scan.uses(of: $0) }

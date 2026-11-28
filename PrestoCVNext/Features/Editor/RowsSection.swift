@@ -150,7 +150,7 @@ struct RowFields {
     func line(
         _ label: LocalizedStringResource, _ text: Binding<String>, _ field: EditorField, note: LocalizedStringResource? = nil
     ) -> some View {
-        LabeledField(label, text: text, focus: focus, as: RowFocus(row: row, field: field), note: note)
+        RowLineField(label, text: text, focus: focus, as: RowFocus(row: row, field: field), note: note)
             .fieldInput(field.input)
             .accessibilityIdentifier("editor.field.\(field)")
     }
@@ -198,6 +198,50 @@ private extension EditorSection {
         case .certifications: ("editor.section.certifications", "editor.add.certification", "editor.unnamed.certification")
         case .profiles: ("editor.section.profiles", "editor.add.profile", "editor.unnamed.profile")
         case .interests: ("editor.section.interests", "editor.add.interest", "editor.unnamed.interest")
+        }
+    }
+}
+
+/// A field of one line of a row. At the accessibility text sizes it wraps and takes the return key as a line break; the
+/// text it keeps is what `FieldEntry` says, so the return key ends the entry and the field is made anew, to show the
+/// text as it was (as the details do).
+private struct RowLineField: View {
+    private let label: LocalizedStringResource
+    @Binding private var text: String
+    private let focus: FocusState<RowFocus?>.Binding
+    private let name: RowFocus
+    private let note: LocalizedStringResource?
+    /// How many times the return key made the field anew, since a field that wraps shows its line break until then.
+    @State private var refreshed = 0
+    /// What the field was handed last, since a field can hand the same text over twice.
+    @State private var entries = FieldEntries()
+
+    init(
+        _ label: LocalizedStringResource, text: Binding<String>, focus: FocusState<RowFocus?>.Binding, as name: RowFocus,
+        note: LocalizedStringResource?
+    ) {
+        self.label = label
+        _text = text
+        self.focus = focus
+        self.name = name
+        self.note = note
+    }
+
+    var body: some View {
+        LabeledField(label, text: entry, focus: focus, as: name, note: note, refreshed: refreshed)
+    }
+
+    private var entry: Binding<String> {
+        Binding {
+            text
+        } set: { new in
+            switch entries.entry(new, after: text, in: name.field) {
+            case .text(let kept):
+                text = kept
+            case .returnKey:
+                refreshed += 1
+                focus.wrappedValue = nil
+            }
         }
     }
 }
