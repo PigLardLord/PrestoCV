@@ -3,7 +3,7 @@ import Testing
 
 // MARK: - The StoreKit configuration of the tip jar
 
-/// The simulator sells the tips from a StoreKit configuration file when the new app runs from Xcode (ADR 0040). It must
+/// The simulator sells the tips from a StoreKit configuration file when the app runs from Xcode (ADR 0040). It must
 /// sell what the adapter asks the store for, at the prices of #213, and only the run action may name it: the UI tests
 /// answer through `-PrestoCVNextTips`, and a test-only file must never reach a Release bundle, so it lives outside the
 /// app's folders.
@@ -12,7 +12,7 @@ struct TipsStoreKitConfigurationTests {
 
     private static let configuration = "TestPlans/StoreKit/Tips.storekit"
     private static let adapter = "PrestoCVApp/Sources/PrestoCVTipsStoreKit/StoreKitTips+Offers.swift"
-    private static let scheme = "PrestoCV.xcodeproj/xcshareddata/xcschemes/PrestoCVNext.xcscheme"
+    private static let scheme = "PrestoCV.xcodeproj/xcshareddata/xcschemes/PrestoCV.xcscheme"
 
     private struct Configuration: Decodable {
         struct Product: Decodable {
@@ -58,7 +58,7 @@ struct TipsStoreKitConfigurationTests {
         #expect(file.settings.storefront == "DEU", "A storefront that pays in euros, so the prices read as #213 gives them")
     }
 
-    @Test("only the run action of the new app's scheme names the file; no test action, test plan or project does")
+    @Test("only the run action of the app's scheme names the file; no test action, test plan or project does")
     func onlyTheRunActionNamesIt() throws {
         // The project is `project.xcproj`: a membership there would copy the file into the app.
         let naming = try Repository.presentFiles()

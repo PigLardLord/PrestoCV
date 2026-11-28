@@ -3,15 +3,15 @@ import Testing
 
 // MARK: - Document Types Tests
 
-/// The second app is among the apps another app can open a PDF in (step 5-13d of #404), as the released app is: as a
-/// viewer at the alternate rank, so that it never becomes the one that opens PDFs by default, and a PDF it is handed is
-/// a copy, never the file in place (ADR 0027). The app builds for macOS too, which rejects the key that asks iOS for a
-/// copy as NO, so the project sets that key to NO for the iOS SDKs and to YES for macOS. A Debug build carries a PDF of
-/// the corpus for the UI tests that open it; no Release build does.
+/// The app is among the apps another app can open a PDF in (step 5-13d of #404): as a viewer at the alternate rank, so
+/// that it never becomes the one that opens PDFs by default, and a PDF it is handed is a copy, never the file in place
+/// (ADR 0027). The app builds for macOS too, which rejects the key that asks iOS for a copy as NO, so the project sets
+/// that key to NO for the iOS SDKs and to YES for macOS. A Debug build carries a PDF of the corpus for the UI tests
+/// that open it; no Release build does.
 @Suite("Document Types Tests")
 struct DocumentTypesTests {
 
-    private static let infoFile = "PrestoCVNext/Info.plist"
+    private static let infoFile = "PrestoCV/Info.plist"
     private static let projectFile = "PrestoCV.xcodeproj/project.xcproj"
 
     private static func info() throws -> [String: Any] {
@@ -51,7 +51,7 @@ struct DocumentTypesTests {
     @Test("On iOS a PDF opened from another app is handed over as a copy, and the key that asks for it is set for no other SDK")
     func aPDFIsNeverOpenedInPlace() throws {
         let key = "LSSupportsOpeningDocumentsInPlace"
-        let target = try #require(try Self.block(from: "\"name\": \"PrestoCVNext\"", to: "\"name\": \""))
+        let target = try #require(try Self.block(from: "\"name\": \"PrestoCV\"", to: "\"name\": \""))
         let settings = target.split(separator: "\n").filter { $0.contains("\"INFOPLIST_KEY_\(key)") }
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.contains("[sdk=macosx*]") }
@@ -67,27 +67,36 @@ struct DocumentTypesTests {
     @Test("The key that asks iOS for a copy is set to YES for macOS, which rejects NO in an app with document types")
     func macOSOpensInPlace() throws {
         let key = "INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"
-        let target = try #require(try Self.block(from: "\"name\": \"PrestoCVNext\"", to: "\"name\": \""))
+        let target = try #require(try Self.block(from: "\"name\": \"PrestoCV\"", to: "\"name\": \""))
 
         #expect(Self.values(of: "\(key)[sdk=macosx*]", in: target) == ["YES"],
                 "\(key) is set for an SDK but not to YES for macOS: the macOS build fails on the NO it reads")
     }
 
-    @Test("The project builds the app with that file and does not copy it into the app as a resource")
+    // A file the project lists, or one inside a folder the target compiles, is copied into the app as a resource; an
+    // Info.plist copied that way clashes with the one the build writes from the setting.
+    @Test("The project builds the app with that file and copies no Info.plist into the app as a resource")
     func theProjectUsesTheFile() throws {
-        let target = try #require(try Self.block(from: "\"name\": \"PrestoCVNext\"", to: "\"name\": \""))
-        let folder = try #require(try Self.block(from: "\"path\": \"PrestoCVNext\",", to: "\"kind\": \"folder\""))
+        let target = try #require(try Self.block(from: "\"name\": \"PrestoCV\"", to: "\"name\": \""))
+        let project = try Repository.text(Self.projectFile)
+        let copied = ReleaseHygieneTests.folders(compiledBy: "PrestoCV").flatMap { folder in
+            let root = Repository.root.appendingPathComponent(folder)
+            let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects ?? []
+            return files.compactMap { $0 as? URL }.filter { $0.lastPathComponent == "Info.plist" }
+                .map { "\(folder)\($0.path.dropFirst(root.path.count))" }
+        }
 
         #expect(Self.values(of: "INFOPLIST_FILE", in: target) == [Self.infoFile])
-        #expect(Self.values(of: "exclusions", in: folder).contains("Info.plist"))
+        #expect(!project.contains("\"path\": \"\(Self.infoFile)\""), "The project copies \(Self.infoFile) into the app")
+        #expect(copied.isEmpty, "A folder the app compiles holds \(copied), which the build copies into the app")
     }
 
     @Test("Each PDF of the corpus the project copies into the app is left out of a Release build")
     func corpusPDFsAreLeftOutOfRelease() throws {
         let project = try Repository.text(Self.projectFile)
-        let target = try #require(try Self.block(from: "\"name\": \"PrestoCVNext\"", to: "\"name\": \""))
+        let target = try #require(try Self.block(from: "\"name\": \"PrestoCV\"", to: "\"name\": \""))
         let copied = project.split(separator: "\n")
-            .filter { $0.contains("\"PrestoCVNext/resources\"") && $0.contains("/Tests/ImportFixtures/") }
+            .filter { $0.contains("\"PrestoCV/resources\"") && $0.contains("/Tests/ImportFixtures/") }
             .compactMap { line in Self.values(of: "path", in: String(line)).first }
             .map { URL(fileURLWithPath: $0).lastPathComponent }
 
