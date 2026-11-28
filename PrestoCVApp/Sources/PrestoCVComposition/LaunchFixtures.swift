@@ -33,6 +33,12 @@ import PrestoCVWorkflowPorts
 ///   its first screen only once the gate has done so. It needs one of the two storage arguments, as the seed does.
 /// - `-PrestoCVNextOtherWindow <conflict|deleted>`: another window changes the stored CV written first, once, just before
 ///   that write: it saves the CV (a conflict) or deletes it. It needs one of the two storage arguments, as the seed does.
+/// - `-PrestoCVNextFailWrites <count>`: the first `<count>` writes of a CV (a creation, a replacement, a deletion) fail with a
+///   failed write, and the writes after them succeed; a count that never runs out never succeeds. It needs one of the two
+///   storage arguments, as the seed does.
+/// - `-PrestoCVNextAutosavePause <seconds>`: the editors' autosave waits this many whole seconds (at least one) after the last
+///   change, instead of its own pause, so that a UI test leaves an editor before the pause is over, however long the typing
+///   took. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextHoldImport`: a read of the import never ends by itself, and ends as cancelled when the person cancels it.
 ///   It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextOpenedFile <linkedin>`: each time a window becomes active, it is handed the PDF of the corpus of that
@@ -82,6 +88,9 @@ struct LaunchFixtures: Equatable, Sendable {
         case failuresWithoutFolder
         case unreadableOtherWindow
         case otherWindowWithoutFolder
+        case unreadableFailWrites
+        case failWritesWithoutFolder
+        case unreadableAutosavePause
         case unreadableOpenedFile
         case traceRunsWithoutFolder
         case readyDesignsWithoutFolder
@@ -100,6 +109,8 @@ struct LaunchFixtures: Equatable, Sendable {
     static let failRenamesInPairsArgument = "-PrestoCVNextFailRenamesInPairs"
     static let shareStandInArgument = "-PrestoCVNextShareStandIn"
     static let otherWindowArgument = "-PrestoCVNextOtherWindow"
+    static let failWritesArgument = "-PrestoCVNextFailWrites"
+    static let autosavePauseArgument = "-PrestoCVNextAutosavePause"
     static let holdImportArgument = "-PrestoCVNextHoldImport"
     static let openedFileArgument = "-PrestoCVNextOpenedFile"
     static let traceRunsArgument = "-PrestoCVNextTraceRuns"
@@ -124,6 +135,10 @@ struct LaunchFixtures: Equatable, Sendable {
     var sharesWithStandIn = false
     /// What another window does to the stored CV written first, nil when no other window changes it
     var otherWindow: OtherWindow?
+    /// How many of the first writes of a CV fail, nil when none does
+    var writesToFail: Int?
+    /// How many whole seconds the editors' autosave waits after the last change, nil for its own pause
+    var autosavePauseSeconds: Int?
     /// The import's reads wait until they are cancelled
     var holdsImport = false
     /// The PDF a window is handed each time it becomes active, nil when none is
@@ -179,6 +194,16 @@ struct LaunchFixtures: Equatable, Sendable {
                     throw .unreadableOtherWindow
                 }
                 fixtures.otherWindow = change
+            case failWritesArgument:
+                guard let count = Int(try value(after: argument, in: arguments, at: &index)), count >= 0 else {
+                    throw .unreadableFailWrites
+                }
+                fixtures.writesToFail = count
+            case autosavePauseArgument:
+                guard let seconds = Int(try value(after: argument, in: arguments, at: &index)), seconds >= 1 else {
+                    throw .unreadableAutosavePause
+                }
+                fixtures.autosavePauseSeconds = seconds
             case holdImportArgument:
                 fixtures.holdsImport = true
             case openedFileArgument:
@@ -206,6 +231,7 @@ struct LaunchFixtures: Equatable, Sendable {
         if fixtures.withoutSamples && fixtures.storage == .device { throw .samplesWithoutFolder }
         if fixtures.failsRenamesInPairs && fixtures.storage == .device { throw .failuresWithoutFolder }
         if fixtures.otherWindow != nil && fixtures.storage == .device { throw .otherWindowWithoutFolder }
+        if fixtures.writesToFail != nil && fixtures.storage == .device { throw .failWritesWithoutFolder }
         if fixtures.storesTraceRuns && fixtures.storage == .device { throw .traceRunsWithoutFolder }
         if fixtures.acceptsBundledDesigns && fixtures.storage == .device { throw .readyDesignsWithoutFolder }
         return fixtures
@@ -246,6 +272,11 @@ struct LaunchFixtures: Equatable, Sendable {
         failsRenamesInPairs ? PairedRenameFailures(inner: editing) : editing
     }
 
+    /// The pause of the editors' autosave: the given one, or with the fixture the seconds it asks for.
+    func autosavePause(_ normal: Duration) -> Duration {
+        autosavePauseSeconds.map { Duration.seconds($0) } ?? normal
+    }
+
     /// What the import reads through: the importer it is given, or with the fixture one whose reads wait until cancelled.
     func importing(_ importer: any CVImporting) -> any CVImporting {
         holdsImport ? HeldImport() : importer
@@ -262,9 +293,11 @@ struct LaunchFixtures: Equatable, Sendable {
         acceptsBundledDesigns ? AcceptedDesigns() : gate
     }
 
-    /// What the app stores through: the store it is given, or with the fixture one that another window changes once.
+    /// What the app stores through: the store it is given, or with the fixture one that another window changes once, and
+    /// one whose first writes fail.
     func store(_ repository: any CVRepository) -> any CVRepository {
-        otherWindow.map { OtherWindowStore(inner: repository, change: $0) } ?? repository
+        let changed = otherWindow.map { OtherWindowStore(inner: repository, change: $0) } ?? repository
+        return writesToFail.map { FailingWritesStore(inner: changed, count: $0) } ?? changed
     }
 
     /// Checks, without making or removing anything, that a fixture folder is a plain folder of the temporary folder: no

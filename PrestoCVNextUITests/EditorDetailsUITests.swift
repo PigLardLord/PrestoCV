@@ -27,6 +27,9 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
     private let dataAnalyst = StoredCV(
         identity: "7C2A7D2F-2C9D-4D2C-8E66-2A4C3D9C8B02", title: "Data Analyst", person: "Orla Penhaligon",
         saved: "2026-01-01T00:00:00Z")
+    /// A CV whose details are all empty, for the tests that type into every field.
+    private let blank = StoredCV(
+        identity: "AF5DA05C-5FC0-4A5F-9B99-5D7F60CF9E05", title: "Blank Form", person: "", saved: "2026-01-05T00:00:00Z")
     /// A CV whose job title and e-mail address take more than a line at the largest text size.
     private let paymentsLead = StoredCV(
         identity: "8D3B8E3A-3DAE-4E3D-9F77-3B5D4EAD9C03", title: "Payments Lead", person: "Mara Ellison",
@@ -139,6 +142,12 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
         app.staticTexts["editor.status"]
     }
 
+    /// What the status line reads, for a failure: asked of a line the form has scrolled off and no longer builds,
+    /// `label` itself stops the test ("Failed to get matching snapshot") and hides what failed.
+    private func reading(_ status: XCUIElement) -> String {
+        status.exists ? status.label : "no status line on the screen"
+    }
+
     /// The key of the on-screen keyboard with this character, in either case.
     private func key(_ character: String, in app: XCUIApplication) -> XCUIElement {
         app.keyboards.keys.matching(NSPredicate(format: "label ==[c] %@", character)).firstMatch
@@ -200,7 +209,7 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
         XCTAssertTrue(
             waitUntil(app.staticTexts["shell.detail.title"], reads: "Backend Engineer Lead"),
             "The title of the form follows the stored name")
-        XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
+        XCTAssertTrue(waitUntil(status(of: app), reads: saved), reading(status(of: app)))
         XCTAssertEqual(app.textFields["editor.field.title"].value as? String, "Backend Engineer Lead")
         if !isCompact(app) {
             XCTAssertTrue(row(titled: "Backend Engineer Lead", in: app).waitForExistence(timeout: 30), "The list beside it too")
@@ -245,7 +254,7 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
         fullName.tap()
         fullName.typeText("Ines Calloway")
 
-        XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
+        XCTAssertTrue(waitUntil(status(of: app), reads: saved), reading(status(of: app)))
         if isCompact(app) {
             app.backButton.tap()
         }
@@ -310,12 +319,99 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
         email.typeText("mara.at.example")
 
         // No problem is named while the person types
-        XCTAssertTrue(waitUntil(status(of: app), reads: unsavedChanges), status(of: app).label)
+        XCTAssertTrue(waitUntil(status(of: app), reads: unsavedChanges), reading(status(of: app)))
 
         app.buttons["keyboard.done"].tap()
 
-        XCTAssertTrue(waitUntil(status(of: app), reads: oneFieldNotSaved), status(of: app).label)
+        XCTAssertTrue(waitUntil(status(of: app), reads: oneFieldNotSaved), reading(status(of: app)))
         XCTAssertTrue(email.exists, "The note under the field leaves its identifier on the text field")
+    }
+
+    // MARK: Moving between fields
+
+    /// The fields that take the keyboard one after the other, with what the person types into each: the keyboard changes
+    /// between them (text, e-mail, phone, web address).
+    private let typedFields: [(identifier: String, label: String, text: String)] = [
+        ("editor.field.fullName", "Full name", "Maria Rossi"),
+        ("editor.field.professionalTitle", "Job title", "Senior Nurse"),
+        ("editor.field.location", "Location", "Rome, Italy"),
+        ("editor.field.email", "Email", "maria@example.com"),
+        ("editor.field.phone", "Phone", "+39 06 1234567"),
+        ("editor.field.website", "Website", "https://maria.example"),
+    ]
+
+    /// On iOS 27 the fields took the focus from each other in a loop: the main thread ran at full speed as soon as a
+    /// second field was tapped, and the tap never returned. Each field takes the focus, takes its text, and keeps it.
+    @MainActor
+    func testTappingTheNextFieldKeepsTheEditorResponsive() throws {
+        let app = try launch([blank], largestText: false)
+        open(blank, in: app)
+
+        for field in typedFields {
+            let input = textInput(field.identifier, in: app)
+            focus(input, named: field.label, in: app)
+            input.typeText(field.text)
+        }
+        for field in typedFields {
+            let input = textInput(field.identifier, in: app)
+            app.scrollForm(until: input, named: field.label)
+            XCTAssertEqual(input.value as? String, field.text, "\(field.label) keeps what was typed")
+        }
+    }
+
+    /// Going round the fields again and again, with the keyboard changing at each, is the case that took the focus in a
+    /// loop: every tap gives the focus.
+    @MainActor
+    func testTappingFromFieldToFieldInTurnKeepsTheEditorResponsive() throws {
+        let app = try launch([blank], largestText: false)
+        open(blank, in: app)
+
+        for _ in 0..<3 {
+            for field in typedFields {
+                focus(textInput(field.identifier, in: app), named: field.label, in: app)
+            }
+        }
+    }
+
+    /// Brings the field into reach, taps it, and waits for it to take the keyboard focus: an editor that spins never
+    /// gives it.
+    @MainActor
+    private func focus(_ input: XCUIElement, named name: String, in app: XCUIApplication) {
+        app.scrollForm(until: input, named: name)
+        input.tap()
+        XCTAssertTrue(input.waitUntilFocused(), "\(name) takes the keyboard focus: the editor may be spinning")
+    }
+
+    // MARK: The phone
+
+    /// A phone that is not a phone number is not stored, and the status line says so once the person leaves the field,
+    /// never while they type (#402, decision 11); a phone with its digits is stored. The status line sits at the top of
+    /// the form, which builds its rows only as they come into view, so the test scrolls back to the line before reading
+    /// it; the drag leaves the keyboard with the field.
+    @MainActor
+    func testAPhoneWithoutDigitsGetsAHintAndOneWithDigitsDoesNot() throws {
+        let app = try launch([backendEngineer], largestText: false)
+        open(backendEngineer, in: app)
+        let status = status(of: app)
+        XCTAssertTrue(waitUntil(status, reads: saved), "An empty phone is no problem: \(reading(status))")
+
+        let phone = textInput("editor.field.phone", in: app)
+        focus(phone, named: "The phone", in: app)
+        phone.typeText("abc")
+        app.scrollForm(until: status, named: "The status line", forward: false)
+        XCTAssertTrue(waitUntil(status, reads: unsavedChanges), "A phone being typed gets no note: \(reading(status))")
+
+        app.buttons["keyboard.done"].tap()
+        XCTAssertTrue(waitUntil(status, reads: oneFieldNotSaved),
+                      "A phone without digits is named once it is left: \(reading(status))")
+
+        focus(phone, named: "The phone", in: app)
+        phone.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3) + "+49 30 1234")
+        app.buttons["keyboard.done"].tap()
+        app.scrollForm(until: status, named: "The status line", forward: false)
+        XCTAssertTrue(waitUntil(status, reads: saved), "A phone with its digits is stored: \(reading(status))")
+        app.scrollForm(until: phone, named: "The phone")
+        XCTAssertEqual(phone.value as? String, "+49 30 1234", "The phone keeps its text")
     }
 
     // MARK: Moving on
@@ -338,7 +434,7 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
     private func checkReturnKeyMovesOn(largestText: Bool) throws {
         let app = try launch([backendEngineer], largestText: largestText)
         open(backendEngineer, in: app)
-        XCTAssertTrue(waitUntil(status(of: app), reads: saved), status(of: app).label)
+        XCTAssertTrue(waitUntil(status(of: app), reads: saved), reading(status(of: app)))
 
         let title = textInput("editor.field.title", in: app)
         app.scrollForm(until: title, named: "The CV name")
@@ -378,7 +474,7 @@ final class EditorDetailsUITests: RuntimeIssueFailingTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [pasted], timeout: 30), .completed, String(describing: location.value))
         let statusLine = status(of: app)
         app.scrollForm(until: statusLine, named: "The status", forward: false)
-        XCTAssertTrue(waitUntil(statusLine, reads: saved), statusLine.label)
+        XCTAssertTrue(waitUntil(statusLine, reads: saved), reading(statusLine))
     }
 
     /// Taps Paste in the edit menu once it shows. Paste is the first item of the menu at a caret, so it shows also where

@@ -87,7 +87,7 @@ struct LegacyImportAtLaunchTests {
         let firstRun = screens.makeFirstRun()
         await firstRun.load()
         let shell = screens.makeShell(
-            list: screens.makeCVList(untitled: "Untitled", numbered: { title, number in "\(title) (\(number))" }),
+            list: screens.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: { title, number in "\(title) (\(number))" }),
             firstRun: firstRun, copyTitle: { "Copy of \($0)" }, fileNamePattern: { _ in "CV %@" }
         )
 

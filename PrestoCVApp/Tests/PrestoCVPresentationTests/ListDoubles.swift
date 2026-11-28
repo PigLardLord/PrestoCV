@@ -107,10 +107,13 @@ struct Browsing {
 
     /// The view's word for a CV with no title, and how it numbers a title
     static let untitled = "Untitled CV"
+    /// The editor bar's own words, shorter than the list's.
+    static let barUntitled = "Untitled"
+    static let barNewCV = "New"
 
     func list() -> CVListViewModel {
         CVListViewModel(
-            browsing: browsing, editing: editing, untitled: Self.untitled, numbered: { "\($0) (\($1))" },
+            browsing: browsing, editing: editing, untitled: Self.untitled, barUntitled: Self.barUntitled, barNewCV: Self.barNewCV, numbered: { "\($0) (\($1))" },
             now: { [moment] in moment.date },
             editorsStored: { [storedGate] in await storedGate.pass() }
         )

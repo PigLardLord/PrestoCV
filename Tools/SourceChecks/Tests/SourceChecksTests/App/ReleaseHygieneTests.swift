@@ -332,6 +332,30 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture of the other window outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test makes the first writes of a CV fail, to see the editor's failed save; no Release build may be able to.
+    @Test("The fixture that fails the first writes is read only by Debug builds")
+    func theFixtureThatFailsWritesIsReadOnlyInDebugBuilds() {
+        let names = ["failWritesArgument", "writesToFail", "FailingWritesStore"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that fails writes outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// A UI test makes the autosave wait a long time, to leave an editor before it stores; no Release build may be able to.
+    @Test("The fixture that sets the autosave pause is read only by Debug builds")
+    func theFixtureThatSetsTheAutosavePauseIsReadOnlyInDebugBuilds() {
+        let names = ["autosavePauseArgument", "autosavePauseSeconds", "fixtures.autosavePause"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that sets the autosave pause outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// A UI test stores two invented runs of the diagnostics before the trace chain starts; no Release build may be able to.
     @Test("The fixture of the invented trace runs is read only by Debug builds")
     func theFixtureOfTheInventedTraceRunsIsReadOnlyInDebugBuilds() {

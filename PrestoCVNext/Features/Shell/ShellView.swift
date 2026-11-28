@@ -122,8 +122,10 @@ struct ShellView: View {
     @ViewBuilder
     private var detail: some View {
         if let editor = shell.editor {
-            EditorView(editor: editor, title: title(of: editor), review: shell.review, export: { shell.openExport() },
-                       discard: { shell.discardEditor() })
+            EditorView(
+                editor: editor, title: Text(verbatim: barTitle(of: editor)), review: shell.review,
+                export: { shell.openExport() }, discard: { shell.discardEditor() }
+            )
                 .id(ObjectIdentifier(editor))
                 .navigationBarBackButtonHidden(!shell.canLeave)
                 .sheet(item: reviewSheet) { review in
@@ -139,15 +141,8 @@ struct ShellView: View {
         }
     }
 
-    /// The open CV's name as the list shows it, or "New CV" for a draft. A stored CV whose row has gone keeps the name it
-    /// has in the editor.
-    private func title(of editor: EditorViewModel) -> Text {
-        switch shell.detail {
-        case .stored?:
-            shell.selectedRow(in: list.rows).map { Text(verbatim: $0.label) } ?? Text(verbatim: editor.content.title)
-        case .draft?, .blank?, nil:
-            Text("shell.draft.title")
-        }
+    private func barTitle(of editor: EditorViewModel) -> String {
+        list.barTitle(of: shell.detail, selected: shell.selection, editorTitle: editor.content.title)
     }
 
     /// Goes where a way to start leads: the draft it gives, or the import.

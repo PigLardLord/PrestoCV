@@ -16373,13 +16373,13 @@
         }
       }
     },
-    "shell.draft.title" : {
+    "shell.bar.new" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Neuer Lebenslauf"
+            "value" : "Lebenslauf"
           }
         },
         "en" : {
@@ -16410,6 +16410,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Novo CV"
+          }
+        }
+      }
+    },
+    "shell.bar.untitled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ohne Titel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled CV"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV sin título"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV sans titre"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV senza titolo"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CV sem título"
           }
         }
       }

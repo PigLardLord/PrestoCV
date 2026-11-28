@@ -40,7 +40,7 @@ struct ScreenFactoryTests {
     private static let words: @MainActor (String, Int) -> String = { title, number in "\(title) (\(number))" }
 
     private static func list(_ fixture: Fixture) -> CVListViewModel {
-        fixture.composition.screens.makeCVList(untitled: "Untitled", numbered: words)
+        fixture.composition.screens.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: words)
     }
 
     private static func editor(_ fixture: Fixture, _ start: EditorStart) -> EditorViewModel {
@@ -348,12 +348,12 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
         Self.typed(first, title: "First")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
@@ -376,7 +376,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -384,7 +384,7 @@ struct ScreenFactoryTests {
         let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await second.load()
         Self.typed(second, title: "Second")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         // The first editor has stored at its turn, and the second one's write is held: the person edits the first.
@@ -410,12 +410,12 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
         Self.typed(editor, title: "First")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         // The editor's write is held: the person goes on typing while it runs
@@ -440,9 +440,9 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let shell = factory.makeShell(
             list: list, firstRun: factory.makeFirstRun(), copyTitle: { $0 },
             fileNamePattern: { _ in "CV %@" }
