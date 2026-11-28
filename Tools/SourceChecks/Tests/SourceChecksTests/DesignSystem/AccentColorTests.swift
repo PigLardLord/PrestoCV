@@ -9,8 +9,8 @@ struct AccentColorTests {
 
     @Test("No colour of the app is hard-coded to the system blue, purple or indigo: the brand's colour is the Mint of the asset catalog")
     func noColourIsHardCodedToBlueOrPurple() throws {
-        let hue = try NSRegularExpression(pattern: #"\.(system)?(blue|purple|indigo|Blue|Purple|Indigo)\b"#)
-        let files = try RepositorySources.swiftFiles(in: "PrestoCV")
+        let hue = try NSRegularExpression(pattern: #"(?<!rgb)\.(system)?(blue|purple|indigo|Blue|Purple|Indigo)\b"#)
+        let files = try RepositorySources.swiftFiles(in: "PrestoCVNext")
         try #require(!files.isEmpty, "The sources of the app are in the repository")
 
         let offending = files.flatMap { file in

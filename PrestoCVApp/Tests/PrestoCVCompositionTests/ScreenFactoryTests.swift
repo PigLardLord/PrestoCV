@@ -5,7 +5,7 @@ import PrestoCVApplication
 import PrestoCVCoreTestSupport
 import PrestoCVDomain
 import PrestoCVPersistence
-import PrestoCVPresentation
+@testable import PrestoCVPresentation
 import PrestoCVWorkflowPorts
 import Testing
 @testable import PrestoCVComposition
@@ -40,7 +40,7 @@ struct ScreenFactoryTests {
     private static let words: @MainActor (String, Int) -> String = { title, number in "\(title) (\(number))" }
 
     private static func list(_ fixture: Fixture) -> CVListViewModel {
-        fixture.composition.screens.makeCVList(untitled: "Untitled", numbered: words)
+        fixture.composition.screens.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: words)
     }
 
     private static func editor(_ fixture: Fixture, _ start: EditorStart) -> EditorViewModel {
@@ -348,12 +348,12 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
         Self.typed(first, title: "First")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
@@ -376,7 +376,7 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let first = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await first.load()
@@ -384,7 +384,7 @@ struct ScreenFactoryTests {
         let second = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await second.load()
         Self.typed(second, title: "Second")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         // The first editor has stored at its turn, and the second one's write is held: the person edits the first.
@@ -410,12 +410,12 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
         let editor = factory.makeEditor(start: .blank, copyTitle: { $0 }, storeChanged: {})
         await editor.load()
         Self.typed(editor, title: "First")
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let loading = Task { @MainActor in await list.load() }
         await gate.waitReached()
         // The editor's write is held: the person goes on typing while it runs
@@ -440,9 +440,9 @@ struct ScreenFactoryTests {
             editorClock: ManualClock(), importer: NoImporter(), importFiles: NoImportFiles(),
             exportFiles: NoExportFiles(), exporter: NoExporter(), lookOptions: FixedLookOptions(), languages: [],
             languageDetector: NoDetectedLanguage(), wrapListEditing: { $0 }, wrapImport: { $0 },
-            backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
+            autosavePause: .seconds(1), backgroundTime: NoBackgroundTime(), appLanguage: .preferred(["en"]), legacyImport: .nothing
         )
-        let list = factory.makeCVList(untitled: "Untitled", numbered: Self.words)
+        let list = factory.makeCVList(untitled: "Untitled", barUntitled: "Untitled", barNewCV: "New", numbered: Self.words)
         let shell = factory.makeShell(
             list: list, firstRun: factory.makeFirstRun(), copyTitle: { $0 },
             fileNamePattern: { _ in "CV %@" }
@@ -526,7 +526,7 @@ struct ScreenFactoryTests {
 
         Education
         BSc Mathematics, Example University, 2015 – 2018
-        """])
+        """], pdfs: [])
 
         screen.importText()
         await Self.ended(screen)
@@ -550,6 +550,7 @@ struct ScreenFactoryTests {
 
         screen.importFile(at: copy)
         await Self.ended(screen)
+        await screen.files.settled()                        // the file is let go off the main actor, after the import (R19)
 
         #expect(screen.status == .failed(.unreadable))
         #expect(!FileManager.default.fileExists(atPath: copy.path), "the system's copy is deleted")
@@ -568,6 +569,7 @@ struct ScreenFactoryTests {
 
         screen.importFile(at: file)
         await Self.ended(screen)
+        await screen.files.settled()                        // the file is let go off the main actor, after the import (R19)
 
         #expect(screen.status == .failed(.unreadable))
         #expect(FileManager.default.fileExists(atPath: file.path), "a file the person chose is theirs")

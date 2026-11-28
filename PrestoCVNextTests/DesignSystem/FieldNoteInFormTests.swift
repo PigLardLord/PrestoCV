@@ -2,7 +2,7 @@
 import SwiftUI
 import Testing
 import UIKit
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// The sizes a note took in the form, in the order it took them.
 @MainActor

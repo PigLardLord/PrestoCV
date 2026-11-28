@@ -75,13 +75,6 @@ The text of the compact print reads in the order of the design's own print: an i
 
 Each bundled design says how it tightens, with rules under `html.fit-one-page` and `html.fit-one-page-compact`; a rule of a step starts at the root element, so it cannot reach a page that is not tightened. `OnePageFitTests` holds the designs to what they may set (spacing and the layout of lists, never a font size, a width or a transform), to the line height and to the least space they keep between sections and entries, and they read the cascade to hold Modern's first entry of a section flush under its heading in every step. A design without such rules is printed as it lays itself out. The version of a design goes up when its rules change, so that an installed copy is replaced.
 
-### Regenerating the thumbnails
+### The thumbnails
 
-The template carousel of the export sheet shows the `previewImageBase64` of each bundled package. It is the first page of the PDF of the example CV (`SampleCVData.complete`) that the real renderer makes with the options of the export sheet, one pixel per point (595 × 842). Regenerate it whenever the look of a design changes:
-
-```
-xcodebuild test -project PrestoCV.xcodeproj -scheme PrestoCV -destination '<an iOS simulator>' \
-  -only-testing:PrestoCVTests/BundledDesignThumbnails TEST_RUNNER_PRESTOCV_REGENERATE_THUMBNAILS=1
-```
-
-Without the variable the test is skipped. With it, each design is rendered and its `previewImageBase64` is rewritten in `CVPDFExporter/Resources/Templates/Bundled/<design>.mcvt`, the rest of the file untouched (the path comes from the test's own location, so the checkout that was built is the one that changes). Then raise the `version` of the designs whose thumbnail changed: an installed copy is only replaced by a newer version. `BundledThumbnailTests` checks that every thumbnail is a PNG of 595 × 842 pixels.
+The template carousel of the export sheet shows the `previewImageBase64` of each bundled package: the first page of the PDF of the example CV, one pixel per point (595 × 842). The test that regenerated it ran in the legacy app's test target, which was deleted with the legacy app (#406), so no test rewrites the thumbnails now. `BundledThumbnailTests` still checks that every thumbnail is a PNG of 595 × 842 pixels. When a design changes, raise its `version`: an installed copy is only replaced by a newer version.

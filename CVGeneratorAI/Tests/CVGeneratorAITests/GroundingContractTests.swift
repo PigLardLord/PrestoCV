@@ -90,18 +90,6 @@ struct GroundingContractTests {
         #expect(rows.contains { $0.kind == .faithful }, "No faithful control in \(language)")
         #expect(rows.contains { $0.kind == .probe }, "No real-model probe in \(language)")
     }
-
-    @Test("The example descriptions of the table are the ones the app shows",
-          arguments: ["en", "it", "de", "es", "fr", "pt"])
-    func exampleDescriptionsAreTheApps(language: String) throws {
-        let catalogURL = SourceTree.root.appendingPathComponent("PrestoCV/Localizable.xcstrings")
-        let catalog = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: catalogURL)) as? [String: Any])
-        let strings = try #require(catalog["strings"] as? [String: [String: Any]])
-        let localizations = try #require(strings["ai.generation.example_text"]?["localizations"] as? [String: [String: Any]])
-        let unit = try #require(localizations[language]?["stringUnit"] as? [String: Any])
-
-        #expect(unit["value"] as? String == AppExample.text(in: language))
-    }
 }
 
 // MARK: - A row
@@ -257,8 +245,8 @@ private let null = "null"
 
 // MARK: - The app's example descriptions
 
-/// `ai.generation.example_text` of the string catalog, in the six languages.
-private enum AppExample {
+/// The example description of the app (it was `ai.generation.example_text` of the legacy string catalog), in the six languages.
+enum AppExample {
     static let en = "I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, "
         + "where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. "
         + "I studied Education Sciences at the University of Bologna and graduated in 2012. "

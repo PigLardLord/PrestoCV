@@ -171,8 +171,14 @@ enum LanguageReader {
 
     /// Every CEFR level a piece states, with where.
     static func cefrLevels(in piece: Piece) -> [(Piece, LanguageProficiency)] {
-        var found: [(Piece, LanguageProficiency)] = []
-        let text = piece.text
+        cefrLevelRanges(in: piece.text).map { (piece.sub($0.range), $0.level) }
+    }
+
+    /// Whether a text states a CEFR level.
+    static func statesCEFRLevel(_ text: String) -> Bool { !cefrLevelRanges(in: text).isEmpty }
+
+    private static func cefrLevelRanges(in text: String) -> [(range: Range<String.Index>, level: LanguageProficiency)] {
+        var found: [(range: Range<String.Index>, level: LanguageProficiency)] = []
         var index = text.startIndex
         while index < text.endIndex {
             let next = text.index(after: index)
@@ -182,7 +188,7 @@ enum LanguageReader {
                 let after = afterIndex == text.endIndex ? nil : text[afterIndex]
                 if !(before?.isLetter ?? false) && !(before?.isNumber ?? false) && !(after?.isLetter ?? false) && !(after?.isNumber ?? false),
                    let level = LanguageProficiency(rawValue: text[index...next].lowercased()) {
-                    found.append((piece.sub(index..<afterIndex), level))
+                    found.append((index..<afterIndex, level))
                 }
             }
             index = next

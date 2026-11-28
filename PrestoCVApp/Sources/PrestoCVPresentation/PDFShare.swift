@@ -29,18 +29,22 @@ public final class PDFShare: Identifiable {
         self.sheet = sheet
     }
 
-    /// The share sheet closed: the file goes, and the sheet confirms a share that went through. Only the first call
-    /// counts.
+    /// The share sheet closed: the file goes, off the main actor (R19), and the sheet confirms a share that went
+    /// through. Only the first call counts.
     public func end(_ result: ShareResult) {
         guard !ended else { return }
         ended = true
-        files.remove(file)
+        let files = files, file = file
+        Task { await files.remove(file) }
         sheet?.shareEnded(self, with: result)
     }
 
     /// A share that goes without an end, as when its share sheet was never shown, still removes its file.
     isolated deinit {
         guard !ended else { return }
-        files.remove(file)
+        // A deinit cannot wait for the removal, and nothing of the share is left to run it for: a detached task, which
+        // holds only the port and the file, removes it off the main actor (R19).
+        let files = files, file = file
+        Task.detached { await files.remove(file) }
     }
 }

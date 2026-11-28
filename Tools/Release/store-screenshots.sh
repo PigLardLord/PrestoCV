@@ -285,7 +285,7 @@ print("2007-01-09T09:41:00.000%s:%s" % (offset[:3], offset[3:]))'
 # The app's texts in a language, from its string catalog, as the test takes them: a JSON object from key to text, in
 # Base64. A key without a text in the language has the source language's.
 app_strings() {
-    python3 - "$ROOT/PrestoCV/Localizable.xcstrings" "$1" <<'PY'
+    python3 - "$ROOT/PrestoCVNext/Resources/Localizable.xcstrings" "$1" <<'PY'
 import base64, json, sys
 catalog = json.load(open(sys.argv[1], encoding="utf-8"))
 texts = {}
@@ -348,7 +348,7 @@ capture() {
         if TEST_RUNNER_STORE_SCREENSHOT_STRINGS="$strings" run_child "$log" \
             xcodebuild test-without-building "${build[@]}" -destination "id=$udid" -resultBundlePath "$bundle" \
             -parallel-testing-enabled NO -collect-test-diagnostics never \
-            "-only-testing:PrestoCVUITests/StoreScreenshotsUITests/$(test_method "$language")"; then
+            "-only-testing:PrestoCVNextUITests/StoreScreenshotsUITests/$(test_method "$language")"; then
             export_captures "$bundle" "$device" "$language" || status=1
         else
             echo "store-screenshots: the $language test failed on $device; none of its screenshots is kept" >&2

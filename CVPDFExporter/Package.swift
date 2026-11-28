@@ -28,7 +28,7 @@ var targets: [Target] = [
     .testTarget(
         name: "CVRenderingTests",
         dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVBundledHeadings", "CVDesignCatalog"],
-        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json")]
+        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json"), .copy("../LayoutReferences")]
     ),
 ]
 
@@ -49,6 +49,7 @@ targets += [
     // and each platform's test target wraps every check in a one-line test.
     .target(name: "CVRenderingNativeTestSupport", dependencies: [
         "CVRendering", "CVRenderingTestSupport", "CVRenderingPDFKitInspector", "CVDocumentModel", "CVDesignCatalog", "CVBundledHeadings",
+        "CVBundledDesigns",
     ]),
     .testTarget(name: "CVRenderingPDFKitInspectorTests", dependencies: [
         "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingNativeTestSupport",
@@ -57,23 +58,21 @@ targets += [
     .testTarget(name: "CVRenderingIOSTests", dependencies: [
         "CVRenderingIOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
         "CVRenderingNativeTestSupport",
-    ]),
+    ], resources: [.copy("../LayoutReferences")]),
     .testTarget(name: "CVRenderingMacOSTests", dependencies: [
         "CVRenderingMacOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
         "CVDocumentModel", "CVDesignCatalog", "CVBundledDesigns", "CVBundledHeadings",
         "CVRenderingNativeTestSupport",
-    ]),
+    ], resources: [.copy("../LayoutReferences")]),
 ]
 #endif
 
 // Legacy targets: declared only on Apple hosts, and deleted when their replacement is wired in (ADR 0012).
 #if !os(Linux)
 products.append(.library(name: "CVPDFExporter", targets: ["CVPDFExporter"]))
-dependencies.append(.package(path: "../PrestoCVCore"))
 targets += [
     .target(
         name: "CVPDFExporter",
-        dependencies: [.product(name: "PrestoCVCore", package: "PrestoCVCore")],
         path: "Sources/CVPDFExporter",
         resources: [.copy("../../Resources/Templates")]
     ),

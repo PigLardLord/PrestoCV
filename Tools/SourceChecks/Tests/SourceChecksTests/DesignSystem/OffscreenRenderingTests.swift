@@ -11,7 +11,7 @@ struct OffscreenRenderingTests {
     @Test("No test takes the image of an ImageRenderer: it renders the view with render(rasterizationScale:renderer:)")
     func testsRenderWithCoreGraphics() throws {
         let files = try RepositorySources.testFiles()
-        try #require(files.contains { $0.path.hasPrefix("PrestoCVTests/") && $0.text.contains("ImageRenderer") },
+        try #require(files.contains { $0.path.hasPrefix("PrestoCVNextTests/") && $0.text.contains("ImageRenderer") },
                      "The tests that render views are in the repository")
 
         let offending = try files.flatMap { file in try Self.imageReads(in: file.text).map { "\(file.path):\($0)" } }

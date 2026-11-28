@@ -29,7 +29,8 @@ final class EditorReorderUITests: RuntimeIssueFailingTestCase {
         """
         let seed = try JSONEncoder().encode(["\(identity).cv.json": cv]).base64EncodedString()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", seed,
         ]
         app.launch()
         let row = app.descendants(matching: .any).matching(identifier: "shell.row")

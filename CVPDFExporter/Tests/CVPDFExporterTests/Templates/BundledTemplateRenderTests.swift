@@ -1,12 +1,11 @@
 import Testing
 import Foundation
-import PrestoCVCore
 @testable import CVPDFExporter
 
 // MARK: - Bundled Template Rendering
 //
 // Every bundled template is rendered from a CV in which each field has a value of its own, through the same
-// path as an export: the adapter, the engine, and the HTML composed from the package.
+// path as an export: the engine and the HTML composed from the package.
 
 @Suite("Bundled template rendering")
 struct BundledTemplateRenderTests {
@@ -69,52 +68,65 @@ struct BundledTemplateRenderTests {
         ("Profiles", [Field.platform, Field.profileURL]),
     ]
 
-    private static func fullCV() -> CVModel {
-        CVModel(
-            name: "Ada",
-            personalInfo: PrestoCVCore.PersonalInfo(
-                name: Field.name, title: Field.title, location: Field.location, email: Field.email,
-                phone: Field.phone, portfolio: Field.website, profile: Field.summary
+    private static func fullCV() -> CVDocument {
+        CVDocument(
+            personalInfo: PersonalInfo(
+                name: Field.name, email: Field.email, phone: Field.phone, location: Field.location,
+                website: Field.website, summary: Field.summary, title: Field.title
             ),
-            relevant_experience: [Experience(
-                title: Field.jobTitle, company: Field.company, location: Field.jobLocation,
-                period: Field.jobPeriod, description: Field.jobDescription
-            )],
-            education: [Education(
-                degree: Field.degree, school: Field.school, period: Field.studyPeriod, description: Field.studyDescription
-            )],
-            skills: [Skill(name: Field.ratedSkill, level: 4), Skill(name: Field.unratedSkill, level: 0)],
-            languages: [
-                Language(name: Field.firstLanguage, level: .b2),
-                Language(name: Field.secondLanguage, level: .native),
+            sections: [
+                CVSection(id: "work", type: .work, title: "Work Experience", items: [CVItem(
+                    title: Field.jobTitle, subtitle: Field.company, description: Field.jobDescription,
+                    period: Field.jobPeriod, location: Field.jobLocation
+                )], order: 1),
+                CVSection(id: "education", type: .education, title: "Education", items: [CVItem(
+                    title: Field.degree, subtitle: Field.school, description: Field.studyDescription,
+                    period: Field.studyPeriod
+                )], order: 2),
+                CVSection(id: "skills", type: .skills, title: "Skills", items: [
+                    CVItem(title: Field.ratedSkill, tags: ["4"], metadata: ["level": "4"]),
+                    CVItem(title: Field.unratedSkill, tags: ["0"], metadata: ["level": "0"]),
+                ], order: 3),
+                CVSection(id: "languages", type: .languages, title: "Languages", items: [
+                    CVItem(title: Field.firstLanguage, subtitle: Field.firstLevel, tags: ["B2"]),
+                    CVItem(title: Field.secondLanguage, subtitle: Field.secondLevel, tags: ["native"]),
+                ], order: 4),
+                CVSection(id: "certifications", type: .certifications, title: "Certifications", items: [CVItem(
+                    title: Field.certification, subtitle: Field.issuer, description: Field.certDescription,
+                    startDate: Field.certYear, url: Field.certURL, metadata: ["year": Field.certYear]
+                )], order: 5),
+                CVSection(id: "interests", type: .interests, title: "Interests", items: [
+                    CVItem(title: Field.firstInterest), CVItem(title: Field.secondInterest),
+                ], order: 6),
+                CVSection(id: CVSection.socialID, type: .custom, title: "Online Profiles", items: [CVItem(
+                    title: Field.platform, url: Field.profileURL
+                )], order: 7),
             ],
-            certifications: [Certification(
-                name: Field.certification, issuer: Field.issuer, year: 1843, url: Field.certURL, description: Field.certDescription
-            )],
-            interests: [Field.firstInterest, Field.secondInterest],
-            social: [Social(platform: Field.platform, url: Field.profileURL)]
+            metadata: DocumentMetadata(language: "en")
         )
     }
 
     // MARK: - Helpers
 
-    /// Every value of the CV that an export has to print: the strings and numbers of the CV as it is stored.
-    /// Left out are the ids, the name of the CV (a label in the list of CVs, not part of the document),
-    /// the language setting, and the skill ratings, which are printed as dots and checked on their own.
-    private static func printedValues(of cv: CVModel) throws -> [String] {
+    /// Every value of the CV that an export has to print: the strings and numbers of the document.
+    /// Left out are the ids, the types, the order, the visibility, the titles of the sections (the templates print
+    /// their own headings), the metadata, and the tags and ratings, which are printed as dots or not at all.
+    private static func printedValues(of cv: CVDocument) throws -> [String] {
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(cv))
-        let notPrinted: Set<String> = ["name", "documentLanguage", "skills.level"]
+        let notPrintedKeys: Set<String> = ["id", "type", "order", "visible", "tags", "metadata"]
         var values: [String] = []
         func collect(_ node: Any, path: String) {
+            let isNotPrinted = path == "sections.title" || path.split(separator: ".").contains { notPrintedKeys.contains(String($0)) }
+            if isNotPrinted { return }
             switch node {
             case let object as [String: Any]:
                 for (key, child) in object { collect(child, path: path.isEmpty ? key : "\(path).\(key)") }
             case let array as [Any]:
                 for child in array { collect(child, path: path) }
             case let text as String:
-                if !notPrinted.contains(path), !path.hasSuffix("id") { values.append(text) }
+                values.append(text)
             case let number as NSNumber:
-                if !notPrinted.contains(path) { values.append(number.stringValue) }
+                values.append(number.stringValue)
             default:
                 break
             }
@@ -131,13 +143,11 @@ struct BundledTemplateRenderTests {
         return try JSONDecoder().decode(TemplatePackage.self, from: Data(contentsOf: url))
     }
 
-    /// The page of `cv` in `language`. The fixtures have no document language, so the adapter is given `language` as
-    /// the person's: the level names are then in the language of the headings, whatever the language of the machine.
-    private static func render(_ id: String, language: String = "en", cv: CVModel = fullCV()) async throws -> String {
+    /// The page of `cv` in `language`.
+    private static func render(_ id: String, language: String = "en", cv: CVDocument = fullCV()) async throws -> String {
         let package = try loadPackage(id)
         let template = Template(id: id, name: package.manifest.name, htmlContent: package.composedHTML)
-        let converted = PrestoCVCoreAdapter(preferredLanguages: [language]).convertToCV(from: cv)
-        let document = CVDocument(personalInfo: converted.personalInfo, sections: converted.sections, metadata: DocumentMetadata(language: language))
+        let document = CVDocument(personalInfo: cv.personalInfo, sections: cv.sections, metadata: DocumentMetadata(language: language))
         return try await MustacheTemplateEngine().render(template: template, data: document, customization: CustomizationOptions())
     }
 
@@ -228,7 +238,7 @@ struct BundledTemplateRenderTests {
 
     @Test("A CV with only the required fields renders no empty element", arguments: templateIDs)
     func minimalCVRendersWithoutLeftovers(id: String) async throws {
-        let cv = CVModel(personalInfo: PrestoCVCore.PersonalInfo(name: Field.name, email: Field.email))
+        let cv = CVDocument(personalInfo: PersonalInfo(name: Field.name, email: Field.email))
 
         let body = try Self.body(of: try await Self.render(id, cv: cv))
 

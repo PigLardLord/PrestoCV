@@ -98,8 +98,8 @@ struct RepositoryTests {
 
     /// A scan of a folder that is not there finds nothing wrong, so a wrong root would pass the scans without checking anything.
     @Test("The root holds the app's project, its catalog and the folders whose code ships", arguments: [
-        "PrestoCV.xcodeproj/project.xcproj", "PrestoCV/Localizable.xcstrings", "PrestoCV/PrivacyInfo.xcprivacy",
-        "PrestoCV/Features", "PrestoCVCore/Sources/PrestoCVCore", "CVPDFExporter/Sources/CVPDFExporter",
+        "PrestoCV.xcodeproj/project.xcproj", "PrestoCVNext/Resources/Localizable.xcstrings", "PrestoCV/PrivacyInfo.xcprivacy",
+        "PrestoCVNext/Features", "PrestoCVCore/Sources/PrestoCVCore", "CVPDFExporter/Sources/CVPDFExporter",
         "CVGeneratorAI/Sources/CVGeneratorAI",
     ])
     func rootIsTheRepository(path: String) {

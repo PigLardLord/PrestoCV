@@ -1,6 +1,6 @@
 import Testing
 import SwiftUI
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// A date's month and year stand in the order of the person's locale: how a date is worded is the app's.
 @Suite("MonthOrder")

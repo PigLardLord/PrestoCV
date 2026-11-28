@@ -7,7 +7,7 @@ import WebKit
 import CVRendering
 @testable import CVRenderingIOS
 import CVRenderingWebKitSupport
-import CVRenderingPDFKitInspector
+@testable import CVRenderingPDFKitInspector
 import CVRenderingTestSupport
 import CVRenderingNativeTestSupport
 
@@ -178,6 +178,49 @@ extension IOSPDFRendererTests {
     struct Geometry {
         @Test("no violation for the fixture")
         func fixture() async throws { try await IOSPDFRendererTests.checks().fixtureGeometry() }
+
+        @Test("#562 · every line of a bundled design is sized from the page's content, as PDFKit's fonts size it",
+              arguments: ["minimal", "modern", "professional"])
+        func glyphHeights(design: String) async throws {
+            let pdf = try await IOSPDFRendererTests.checks().glyphHeightsAgreeWithPDFKit(design: design)
+            let reading = try #require(PDFKitInspector().reading(of: pdf))
+            #expect(reading.linesSizedByAttributedText == 0, "\(reading.linesSizedByAttributedText) lines sized by PDFKit's fonts")
+        }
+    }
+
+    @MainActor
+    @Suite("#467 · page breaks of the bundled designs and of an imported design at the contract's limits")
+    struct PageBreakChecks {
+        @Test("no section's start at a page's foot, no blank page, no cut line and no lost text, wherever the page breaks",
+              arguments: ["minimal", "modern", "professional"], PageBreakDocument.Body.allCases)
+        func bundled(design: String, body: PageBreakDocument.Body) async throws {
+            try await IOSPDFRendererTests.checks().pageBreaks(design: design, body: body)
+        }
+
+        @Test("a title with the most spacing below it the contract allows is never alone at a page's foot",
+              arguments: PageBreakDocument.LimitDesign.allCases, PageBreakDocument.Body.allCases)
+        func imported(design: PageBreakDocument.LimitDesign, body: PageBreakDocument.Body) async throws {
+            try await IOSPDFRendererTests.checks().pageBreaks(imported: design, body: body)
+        }
+    }
+
+    @MainActor
+    @Suite("#558 · where the text of the bundled designs lands")
+    struct Layout {
+        /// Compares each design's layout with the stored reference of this device and system version; with `RECORD_LAYOUTS`
+        /// set it writes the layout there instead and fails, so a recording run never passes (the commands are in
+        /// `LayoutReferenceStore`).
+        @Test("every line of each bundled design lands where the layout reference of this device and system version has it",
+              arguments: ["minimal", "modern", "professional"], LayoutDocument.allCases)
+        func bundled(design: String, document: LayoutDocument) async throws {
+            let checks = try await IOSPDFRendererTests.checks()
+            if let folder = LayoutRecording.folder {
+                try await checks.recordLayout(design: design, document: document, into: folder)
+            } else {
+                let stored = LayoutReferenceStore(resources: try #require(Bundle.module.resourceURL))
+                try await checks.checkLayout(design: design, document: document, against: stored)
+            }
+        }
     }
 
     @MainActor

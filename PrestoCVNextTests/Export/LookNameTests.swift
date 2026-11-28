@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// A choice the look picker offers is named by its code, which is its key in the app's string catalog (#407). That the
 /// codes the launch offers and the catalog's keys are the same set is checked by the composition's LookNamesTests.

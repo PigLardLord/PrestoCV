@@ -12,11 +12,6 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
 
     var testDescription: String { name }
 
-    /// The legacy app, which ships until the switch of migration step 5-17 (dropped by 5-17d).
-    static let legacy = CatalogUnderCheck(
-        name: "the legacy catalog", catalog: LocalizationCatalogTests.catalogPath,
-        folders: LocalizationCatalogTests.shippedFolders, rules: LocalizationCatalogTests.legacyRules)
-
     /// The new app. No source of `PrestoCVApp/Sources` (presentation, composition, integration) names a catalog key
     /// (checked for step 5-15a: none looks up a text, and R13 leaves the text to the views).
     static let next = CatalogUnderCheck(
@@ -45,8 +40,15 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // The look picker names a design, fonts or a palette by the code the launch offers (LookName); the
             // composition's LookNamesTests checks that those codes and these keys are the same set.
             dynamicKeyPrefixes: ["design.", "fonts.", "palette."],
-            // The name of the app's licence, which no translation changes.
-            properNamesOfKey: ["settings.openSource.statement": ["Apache"]],
+            // The hint of "Choose a PDF" names the system's Files app, whose name keeps its capital; the name of
+            // the app's licence and the name of the store are ones no translation changes.
+            properNamesOfKey: [
+                "import.pdf.button.hint": ["Archivos", "Fichiers", "File", "Arquivos"],
+                "settings.openSource.statement": ["Apache"],
+                "settings.tips.loading": ["App", "Store"],
+                "settings.tips.row.hint": ["App", "Store"],
+                "settings.tips.unreachable": ["App", "Store"],
+            ],
             nonKeyLiterals: [
                 "native": "the code of a language level, which ProficiencyPicker words (R13)",
                 "designsOwn": "the end of the accessibility identifier of the look picker's item for the design's own (LookName)",
@@ -90,6 +92,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
                 #"import.review.field.language \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.languageNotKept \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"import.review.field.certificationYear \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
+                #"import.opened.message \(reason)"#: ValueTypes(["%@"], "OpenedFileDialog's reason is a String"),
                 #"import.review.field.certification \(entry)"#: ValueTypes(["%lld"], "ReviewedField's entry is an Int"),
                 #"legacyImport.summary \(report.leftOut.count)"#: ValueTypes(["%lld"], "an array's count is an Int"),
                 #"legacyImport.row.label \(name) \(details)"#: ValueTypes(
@@ -110,7 +113,7 @@ struct CatalogUnderCheck: Sendable, CustomTestStringConvertible {
             // French typography: the texts of the new app write a space that cannot break before : ; ? ! and inside « ».
             frenchNoBreakSpaces: true))
 
-    static let all = [legacy, next]
+    static let all = [next]
 
     func findings() throws -> StringFindings {
         try StringChecks.run(

@@ -9,6 +9,7 @@ struct SettingsView: View {
     let settings: SettingsViewModel
     let licences: LicencesViewModel
     let diagnostics: DiagnosticsViewModel
+    let tips: TipJarViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -39,13 +40,15 @@ struct SettingsView: View {
         .presentationSizing(.form)
     }
 
-    private func header(of kind: SettingsGroup.Kind) -> Text {
+    @ViewBuilder
+    private func header(of kind: SettingsGroup.Kind) -> some View {
         switch kind {
         case .support: Text("settings.support.header")
         case .legal: Text("settings.legal.header")
         case .openSource: Text("settings.openSource.header")
         case .about: Text("settings.about.header \(settings.appName)")
         case .diagnostics: Text("diagnostics.group.header")
+        case .tips: EmptyView()
         }
     }
 
@@ -57,7 +60,7 @@ struct SettingsView: View {
             Text("settings.support.footer \(settings.supportAddress)")
                 .textSelection(.enabled)
                 .accessibilityIdentifier("settings.support.footer")
-        case .legal, .openSource, .about, .diagnostics:
+        case .tips, .legal, .openSource, .about, .diagnostics:
             EmptyView()
         }
     }
@@ -71,6 +74,9 @@ struct SettingsView: View {
         case .privacyPolicy(let page):
             LinkRow("settings.privacy", hint: "settings.privacy.hint", destination: page)
                 .accessibilityIdentifier("settings.privacy")
+        case .tips:
+            NavigationLink { TipJarView(tips: tips) } label: { Text("settings.tips.title") }
+                .accessibilityIdentifier("settings.tips")
         case .openSourceStatement:
             Text("settings.openSource.statement")
                 .accessibilityIdentifier("settings.openSource.statement")
