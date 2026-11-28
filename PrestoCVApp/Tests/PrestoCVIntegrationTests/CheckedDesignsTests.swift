@@ -161,7 +161,7 @@ struct CheckedDesignsTests {
         for _ in 0..<50 { await Task.yield() }
         #expect(designs.current.status == .checking)
         checking.endCheck()
-        try await wait.value
+        #expect(try await wait.value == false, "a design the check never names did not pass")
         #expect(designs.current.status == .ready)
     }
 

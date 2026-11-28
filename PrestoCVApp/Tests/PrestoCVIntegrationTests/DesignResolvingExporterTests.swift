@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 import PrestoCVDomain
 import PrestoCVWorkflowPorts
 import PrestoCVIntegration
@@ -74,6 +75,34 @@ private actor HeldDesignStore: DesignStore {
     func installedOrigins() async throws -> [String: DesignOrigin] { try await store.installedOrigins() }
     func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.adoptAsBundled(design) }
     func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.replaceBundled(design) }
+}
+
+/// Keeps every HTML it was given, like `RecordingRenderer`, with no actor: a print stays on the executor of its task.
+private final class UnheldRecordingRenderer: PDFRendering {
+    private let htmls = Mutex<[String]>([])
+    var rendered: [String] { htmls.withLock { $0 } }
+
+    @concurrent func render(html: String, page: PageSetup) async throws -> RenderedPDF {
+        htmls.withLock { $0.append(html) }
+        return try await FakePDFRenderer().render(html: html, page: page)
+    }
+}
+
+/// A store that gives the designs the test puts in it, with no actor: a read stays on the executor of its task. An
+/// export only reads designs, so the store's other requirements fail.
+private final class UnheldDesignStore: DesignStore {
+    struct NotAnExportRead: Error {}
+    private let held = Mutex<[String: ValidatedDesign]>([:])
+
+    func put(_ design: ValidatedDesign) { held.withLock { $0[design.manifest.id] = design } }
+
+    @concurrent func design(id: String) async throws -> ValidatedDesign? { held.withLock { $0[id] } }
+    @concurrent func installedDesigns() async throws -> [DesignManifest] { throw NotAnExportRead() }
+    @discardableResult @concurrent func save(_ design: ValidatedDesign) async throws -> ImportSave { throw NotAnExportRead() }
+    @concurrent func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { throw NotAnExportRead() }
+    @concurrent func installedOrigins() async throws -> [String: DesignOrigin] { throw NotAnExportRead() }
+    @concurrent func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { throw NotAnExportRead() }
+    @concurrent func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { throw NotAnExportRead() }
 }
 
 /// Two installed designs that differ in stylesheet, default palette and default fonts.
@@ -352,25 +381,61 @@ struct ExportWhileCheckingTests {
         checking.endCheck()
     }
 
+    /// The export's task prefers an executor the test drains, and its store and renderer have no actor, so the whole
+    /// export runs there: once drained, an export that did not wait has ended, on every run.
     @Test("an export after a retry, once the default design did not pass while the others are still checked, waits for the check to run again, then prints in the default design")
     func exportAfterARetryWhileChecking() async throws {
-        let (checking, designs, store) = checking()
-        let renderer = RecordingRenderer()
-        let snapshot = cv(nil), language = try italian()
+        let (checking, designs, _) = checking()
+        let store = UnheldDesignStore(), renderer = UnheldRecordingRenderer(), executor = DrainedExecutor()
+        let snapshot = cv(nil), language = try italian(), ended = Mutex(false)
         checking.tell(Installed.defaultID, nil)
         try await designs.verdict(on: Installed.defaultID)
 
         designs.retry()
-        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
-        for _ in 0..<50 { await Task.yield() }                         // the check still runs: an export that did not wait finds no design
+        let export = Task(executorPreference: executor) {
+            defer { ended.withLock { $0 = true } }
+            return try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language)
+        }
+        await executor.drain()                                          // the check still runs: an export that did not wait finds no design
+        #expect(ended.withLock { $0 } == false, "the export waits for the check to run again")
+        #expect(renderer.rendered.isEmpty)
+
+        executor.letGo()
         checking.endCheck()
         let professional = try Installed.designs()[0]
-        _ = try await store.saveIfNewer(professional)
+        store.put(professional)
         checking.tell(Installed.defaultID, professional)
         _ = try await export.value
 
-        #expect(try await onlyHTML(renderer).contains(Installed.professionalCSS))
+        #expect(renderer.rendered.count == 1)
+        #expect(renderer.rendered.first?.contains(Installed.professionalCSS) == true)
         #expect(checking.checks == 2)
+        checking.endCheck()
+    }
+
+    /// The store's read waits while the person retries: the export saw the default design's verdict before the retry
+    /// took it back for the check that runs again.
+    @Test("a store that fails once the default design did not pass is designsUnavailable, even when a retry comes while the store is read",
+          arguments: [false, true])
+    func storeFailureWhileARetryComes(checkEnded: Bool) async throws {
+        let (checking, designs, _) = checking()
+        let store = HeldDesignStore(installed: [], timesOut: true), renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+        checking.tell(Installed.defaultID, nil)
+        if checkEnded {
+            checking.endCheck()
+            _ = await first(designs) { $0.status == .unavailable }
+        } else {
+            try await designs.verdict(on: Installed.defaultID)
+        }
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        try #require(await store.waitUntilEntered())
+        designs.retry()                                                 // the default design waits for its verdict again
+        await store.release()
+
+        await #expect(throws: ExportFailure.designsUnavailable) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
         checking.endCheck()
     }
 

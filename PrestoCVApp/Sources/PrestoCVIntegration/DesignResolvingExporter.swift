@@ -13,9 +13,10 @@ import CVRendering
 ///   design it wants is still being checked.
 /// - A default design the store does not have, after its verdict, is `ExportFailure.designsUnavailable`: no design can
 ///   print the PDF. So is a store that fails once the default design's verdict is that it did not pass, even while the
-///   other designs are still checked; otherwise a store that fails is `ExportFailure.renderingFailed`. In both cases nothing is rendered. A cancelled task stays a `CancellationError`
-///   (R3, R7), even when the store's wait outlives the cancel and then reads or fails: nothing is rendered. The export's own
-///   failures pass through unchanged.
+///   other designs are still checked, and even when a retry takes back the verdict the export was given while the store
+///   is read; otherwise a store that fails is `ExportFailure.renderingFailed`. In both cases nothing is rendered. A
+///   cancelled task stays a `CancellationError` (R3, R7), even when the store's wait outlives the cancel and then reads
+///   or fails: nothing is rendered. The export's own failures pass through unchanged.
 public struct DesignResolvingExporter: CVExporting {
     private let resolve: ResolveDesign
     private let designs: CheckedDesigns
@@ -44,13 +45,17 @@ public struct DesignResolvingExporter: CVExporting {
 
     @concurrent private func resolved(_ choice: DesignChoice?) async throws -> ResolvedDesign {
         let defaultDesign = designs.defaultDesign, wanted = choice?.design ?? defaultDesign
+        // The default design's verdict as this export was given it: a retry that comes while the store is read takes the
+        // verdict back from the designs, not from the export.
+        var defaultFailed = false
         do {
-            try await designs.verdict(on: wanted)
+            let passed = try await designs.verdict(on: wanted)
+            if wanted == defaultDesign { defaultFailed = !passed }
             do {
                 return try await resolve(design: wanted, palette: choice?.palette, fonts: choice?.fonts)
             } catch DesignCatalogError.unknownDesign where wanted != defaultDesign {
                 try Task.checkCancellation()
-                try await designs.verdict(on: defaultDesign)
+                defaultFailed = !(try await designs.verdict(on: defaultDesign))
                 return try await resolve(design: defaultDesign, palette: choice?.palette, fonts: choice?.fonts)
             }
         } catch {
@@ -58,7 +63,8 @@ public struct DesignResolvingExporter: CVExporting {
             // cancelled task is read from the task, not from the error.
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             if case .unknownDesign? = error as? DesignCatalogError { throw ExportFailure.designsUnavailable }
-            throw designs.current.didNotPass(defaultDesign) ? ExportFailure.designsUnavailable : ExportFailure.renderingFailed
+            let unavailable = defaultFailed || designs.current.didNotPass(defaultDesign)
+            throw unavailable ? ExportFailure.designsUnavailable : ExportFailure.renderingFailed
         }
     }
 }

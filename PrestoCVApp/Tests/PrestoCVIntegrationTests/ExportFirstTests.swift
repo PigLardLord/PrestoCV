@@ -83,30 +83,6 @@ private final class UnheldRenderer: PDFRendering {
     }
 }
 
-/// A task executor that runs nothing by itself: the jobs of a task that prefers it wait until the test drains them, so
-/// a task resumed meanwhile stays where it was until then.
-private final class DrainedExecutor: TaskExecutor {
-    private let jobs = Mutex<[UnownedJob]>([])
-
-    func enqueue(_ job: consuming ExecutorJob) {
-        let job = UnownedJob(job)
-        jobs.withLock { $0.append(job) }
-    }
-
-    /// Runs the jobs that wait, and those they enqueue, on a thread of its own, and returns once none is left: the
-    /// tasks that prefer the executor then wait on something else, or ended.
-    func drain() async {
-        await withCheckedContinuation { (drained: CheckedContinuation<Void, Never>) in
-            Thread {
-                while let job = self.jobs.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) {
-                    job.runSynchronously(on: self.asUnownedTaskExecutor())
-                }
-                drained.resume()
-            }.start()
-        }
-    }
-}
-
 /// Lets the other tasks run as far as they can go, with no clock: a print that would begin begins meanwhile.
 private func settle() async { for _ in 0..<200 { await Task.yield() } }
 
