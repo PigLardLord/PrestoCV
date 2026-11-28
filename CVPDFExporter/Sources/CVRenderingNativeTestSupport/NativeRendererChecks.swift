@@ -32,6 +32,13 @@ public enum NativeCheckFailure: Error, Equatable {
     /// The lines of a design's PDF whose glyph height the inspector gives otherwise than PDFKit's font attributes, each
     /// as its page, its text, the inspector's height and PDFKit's.
     case glyphHeightsDiffer(design: String, lines: [String])
+    /// A design's layout document needed more pages than its page setup keeps.
+    case layoutDocumentTruncated(design: String, document: LayoutDocument, requiredPages: Int)
+    /// A design's layout does not match the reference of its kind of device and system version: the verdict says which.
+    case layoutDiffers(design: String, document: LayoutDocument, verdict: String)
+    /// A recording run wrote a design's layout at `path`, inside the `RECORD_LAYOUTS` folder. It fails on purpose, so a
+    /// run that keeps the variable set never passes: review and commit the recording, then run the tests without it.
+    case layoutRecorded(design: String, document: LayoutDocument, path: String)
 }
 
 /// A design that lays each profile (its platform, then its address) out with `display:flex` or `display:grid` and the
@@ -219,10 +226,7 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
     /// blank page, no line cut by a page's edge or hidden in its margin, every text node and no line outside its page; and
     /// the page count is the PDF's own.
     public func pageBreaks(design name: String, body: PageBreakDocument.Body) async throws {
-        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
-            throw NativeCheckFailure.fixtureLacks(name)
-        }
-        let design = try DesignPackageValidator().validate(package.data)
+        let design = try await Self.bundledDesign(name)
         try await pageBreaks(name, stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
                              fonts: design.manifest.defaultFonts, body: body)
     }
@@ -258,6 +262,47 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         guard faults.isEmpty else { throw NativeCheckFailure.pageBreaks(design: name, body: body, faults: faults) }
     }
 
+    // MARK: Layout
+
+    /// #558: the layout of the bundled design `name` in `document`, in the design's default palette and fonts, as this
+    /// renderer prints it on this platform and OS version.
+    public func layoutReference(design name: String, document: LayoutDocument) async throws -> LayoutReference {
+        let design = try await Self.bundledDesign(name)
+        let rendered = try document.rendered(stylesheet: design.stylesheet, palette: design.manifest.defaultPalette.palette,
+                                             fonts: design.manifest.defaultFonts)
+        let pdf = try await renderer.render(html: rendered.html, page: document.page)
+        guard !pdf.truncated else {
+            throw NativeCheckFailure.layoutDocumentTruncated(design: name, document: document, requiredPages: pdf.requiredPages)
+        }
+        guard let layout = inspector.layout(of: pdf.data) else { throw NativeCheckFailure.unreadablePDF }
+        guard layout.pages.count == pdf.pageCount else {
+            throw NativeCheckFailure.pageCountDiffers(layout: layout.pages.count, rendered: pdf.pageCount)
+        }
+        return LayoutReference(kind: .running, osVersion: .running, design: name, document: document, layout: layout)
+    }
+
+    /// #558: compares the layout of the bundled design `name` in `document` with the stored reference of this kind of
+    /// device and system version (the closest lower version when there is none), at 0.5 pt. The failure names the
+    /// reference's kind and version and every line that moved, by how much.
+    public func checkLayout(
+        design name: String, document: LayoutDocument, against store: LayoutReferenceStore
+    ) async throws {
+        let found = try await layoutReference(design: name, document: document)
+        let verdict = try store.verdict(of: found)
+        guard verdict == .matches else {
+            throw NativeCheckFailure.layoutDiffers(design: name, document: document, verdict: verdict.description)
+        }
+    }
+
+    /// #558: writes the layout of the bundled design `name` in `document` into `folder`, in the folder of this kind of
+    /// device and OS version, then fails with `layoutRecorded`: a recording never passes, so a run that keeps
+    /// `RECORD_LAYOUTS` set fails instead of skipping every comparison.
+    public func recordLayout(design name: String, document: LayoutDocument, into folder: URL) async throws {
+        let reference = try await layoutReference(design: name, document: document)
+        try LayoutRecording.write(reference, into: folder)
+        throw NativeCheckFailure.layoutRecorded(design: name, document: document, path: reference.path)
+    }
+
     // MARK: Step budget
 
     /// The completeness search on real documents (the fixture and the two separation designs) finds every node and uses
@@ -288,6 +333,14 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         case let (found?, expected?): abs(found - expected) < 0.001
         default: false
         }
+    }
+
+    /// The bundled design `name`, validated.
+    private static func bundledDesign(_ name: String) async throws -> ValidatedDesign {
+        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
+            throw NativeCheckFailure.fixtureLacks(name)
+        }
+        return try DesignPackageValidator().validate(package.data)
     }
 
     private static var injectingScript: String { "<script>document.querySelector('main').append('INJECTED')</script>" }

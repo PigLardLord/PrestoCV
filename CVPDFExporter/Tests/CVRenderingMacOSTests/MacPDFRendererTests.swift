@@ -168,6 +168,43 @@ extension MacPDFRendererTests {
     }
 
     @MainActor
+    @Suite("#558 · where the text of the bundled designs lands")
+    struct Layout {
+        /// Compares each design's layout with the stored reference of this device and system version; with `RECORD_LAYOUTS`
+        /// set it writes the layout there instead and fails, so a recording run never passes (the commands are in
+        /// `LayoutReferenceStore`).
+        @Test("every line of each bundled design lands where the layout reference of this device and system version has it",
+              arguments: ["minimal", "modern", "professional"], LayoutDocument.allCases)
+        func bundled(design: String, document: LayoutDocument) async throws {
+            let checks = try await MacPDFRendererTests.checks()
+            if let folder = LayoutRecording.folder {
+                try await checks.recordLayout(design: design, document: document, into: folder)
+            } else {
+                let stored = LayoutReferenceStore(resources: try #require(Bundle.module.resourceURL))
+                try await checks.checkLayout(design: design, document: document, against: stored)
+            }
+        }
+
+        @Test("recording a layout writes it in the folder of this kind and version, then fails so the run never passes")
+        func recording() async throws {
+            let checks = try await MacPDFRendererTests.checks()
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("layouts-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let file = LayoutReference.file(design: "minimal", document: .contractFixture)
+            let path = "\(LayoutReference.folder(.running, .running))/\(file)"
+            let recorded = NativeCheckFailure.layoutRecorded(design: "minimal", document: .contractFixture, path: path)
+            await #expect(throws: recorded) {
+                try await checks.recordLayout(design: "minimal", document: .contractFixture, into: folder)
+            }
+            let written = try LayoutReference(json: Data(contentsOf: folder.appendingPathComponent(path)))
+            #expect(written.kind == .mac)
+            #expect(written.design == "minimal")
+            #expect(written.document == .contractFixture)
+            #expect(!written.layout.lines.isEmpty)
+        }
+    }
+
+    @MainActor
     @Suite("#78 · the step budget")
     struct StepBudget {
         @Test("real documents use at most 10% of the budget")

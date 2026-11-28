@@ -28,7 +28,7 @@ var targets: [Target] = [
     .testTarget(
         name: "CVRenderingTests",
         dependencies: ["CVRendering", "CVRenderingTestSupport", "CVDocumentModel", "CVBundledDesigns", "CVBundledHeadings", "CVDesignCatalog"],
-        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json")]
+        resources: [.copy("Golden"), .copy("../../Docs/cv-document.schema.json"), .copy("../LayoutReferences")]
     ),
 ]
 
@@ -58,12 +58,12 @@ targets += [
     .testTarget(name: "CVRenderingIOSTests", dependencies: [
         "CVRenderingIOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
         "CVRenderingNativeTestSupport",
-    ]),
+    ], resources: [.copy("../LayoutReferences")]),
     .testTarget(name: "CVRenderingMacOSTests", dependencies: [
         "CVRenderingMacOS", "CVRenderingWebKitSupport", "CVRenderingPDFKitInspector", "CVRendering", "CVRenderingTestSupport",
         "CVDocumentModel", "CVDesignCatalog", "CVBundledDesigns", "CVBundledHeadings",
         "CVRenderingNativeTestSupport",
-    ]),
+    ], resources: [.copy("../LayoutReferences")]),
 ]
 #endif
 
