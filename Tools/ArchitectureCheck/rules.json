@@ -777,7 +777,8 @@
    "allowedImports": [
     "PrestoCVApplication",
     "PrestoCVDomain",
-    "Foundation"
+    "Foundation",
+    "Synchronization"
    ],
    "rules": [
     "R1",

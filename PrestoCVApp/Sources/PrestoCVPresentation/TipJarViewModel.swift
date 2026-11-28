@@ -5,6 +5,9 @@ import PrestoCVWorkflowPorts
 /// port owns the type; the screens name it through here, as they may import no port (R5).
 public typealias TipWindow = PrestoCVWorkflowPorts.TipWindow
 
+/// The record that a Mac's window closed, which the view that builds a `TipWindow` starts at the tap. The port owns it too.
+public typealias TipWindowClosure = PrestoCVWorkflowPorts.TipWindowClosure
+
 /// The tip jar screen (ADR 0040): whether the offers are being read, are there, or cannot be shown, as codes the view
 /// words (R13).
 @MainActor

@@ -1,3 +1,5 @@
+import Synchronization
+
 /// What the tip jar screen reads and buys (ADR 0040): whether this device may pay, the tips on offer with their prices, and
 /// the purchase of one. The screen owns this port (R3); its adapter is the store's, so that no store type reaches a view
 /// model (R5).
@@ -21,14 +23,25 @@ public protocol TipSelling: Sendable {
 /// again, on the main actor, when the purchase starts.
 public struct TipWindow: Sendable {
     private let read: (@MainActor @Sendable () -> (any Sendable)?)?
+    private let closure: TipWindowClosure?
 
-    /// The window the view is in: its scene, or a Mac's window, which only the adapter knows how to read.
+    /// The window the view is in: its scene, or a Mac's window, which only the adapter knows how to read. A scene tells
+    /// its own state, so nothing watches it.
     public init<Window: AnyObject & Sendable>(weak window: Window) {
         read = { [weak window] in window }
+        closure = nil
+    }
+
+    /// The window the view is in, with the record of its closing (`TipWindowClosure`), whose watch the view started at the
+    /// tap, before the purchase begins: a Mac's window does not say that it closed.
+    public init<Window: AnyObject & Sendable>(weak window: Window, closure: TipWindowClosure) {
+        read = { [weak window] in window }
+        self.closure = closure
     }
 
     private init() {
         read = nil
+        closure = nil
     }
 
     /// No window known: the store picks the place of its sheet.
@@ -37,11 +50,33 @@ public struct TipWindow: Sendable {
     /// Whether a window was known at the tap, though it may have gone since.
     public var isKnown: Bool { read != nil }
 
+    /// Whether the window was seen closing since the tap, even if it still exists: a closed window that is not released may
+    /// stay among the app's windows. Always false for a window nothing watches.
+    public var hasClosed: Bool { closure?.hasClosed ?? false }
+
     /// The window as it is now: nil once nothing else keeps it, and for `unknown`.
     @MainActor
     public func current() -> (any Sendable)? {
         read?()
     }
+}
+
+/// The record that a window closed since the tap. A Mac's window that is not released when closed may stay listed among the
+/// app's windows, and a window of a hidden app is not visible, so only its closing says that it is gone. The view that
+/// builds the `TipWindow` knows the platform: it starts the watch at the tap and calls `markClosed()` when the window
+/// closes.
+public final class TipWindowClosure: Sendable {
+    private let closed = Mutex(false)
+
+    public init() {}
+
+    /// Records the closing, from whichever thread the window closes on.
+    public func markClosed() {
+        closed.withLock { $0 = true }
+    }
+
+    /// Whether the closing was recorded.
+    public var hasClosed: Bool { closed.withLock { $0 } }
 }
 
 /// The three sizes of a tip, smallest first.

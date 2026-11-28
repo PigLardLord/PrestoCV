@@ -11,8 +11,8 @@ import UIKit
 /// purchase that waits for approval is finished by the listener when the store sends it.
 extension StoreKitTips {
     /// The sheet opens in `window` if it is still open once the tip's product has loaded: a scene in the background still
-    /// is, and so is a Mac's window in the Dock or of a hidden app (Cmd-H) that has not closed: its closing is watched from the
-    /// tap, as a closed window that is not released may stay listed. A purchase whose window has closed (a scene that
+    /// is, and so is a Mac's window in the Dock or of a hidden app (Cmd-H) that has not closed: its closing is recorded from the
+    /// tap (`TipWindow.hasClosed`), as a closed window that is not released may stay listed. A purchase whose window has closed (a scene that
     /// disconnected, a Mac's window closed, or one that is gone) does not start: no sheet opens in another window, nothing is
     /// charged, no error shows, and it ends as `cancelled`, as when the person cancels in the sheet, logged under its own
     /// code. Without a window known at the tap, the store picks the place of its sheet.
@@ -20,15 +20,15 @@ extension StoreKitTips {
         try await TipPurchases.settle(await Self.answer(buying: size, in: window), logger: logger)
     }
 
-    /// Starts the purchase where `TipSheetPlace` says (on a Mac, `watch` tells whether the tapped window closed), checking the window on the main actor with nothing awaited before
+    /// Starts the purchase where `TipSheetPlace` says, checking the window on the main actor with nothing awaited before
     /// the store's call: `purchase()` picks a scene itself, which in an app with several windows may be another one. Nil
     /// when the window has closed and nothing started.
     @MainActor
-    private static func start(_ product: Product, in window: TipWindow, closure: WindowClosure) async throws
+    private static func start(_ product: Product, in window: TipWindow) async throws
         -> Product.PurchaseResult?
     {
         #if os(macOS)
-        let place = TipSheetPlace<NSWindow>.of(window) { MacWindowFacts(of: $0, hasClosed: closure.hasClosed).isOpen }
+        let place = TipSheetPlace<NSWindow>.of(window) { MacWindowFacts(of: $0).isOpen }
         if case .window(let shown) = place { return try await product.purchase(confirmIn: shown) }
         #else
         let place = TipSheetPlace<UIScene>.of(window) { $0.activationState != .unattached }
@@ -38,25 +38,12 @@ extension StoreKitTips {
         return try await product.purchase()
     }
 
-    /// Watches the window of the tap from before the product lookup: on a Mac a window that closed meanwhile may stay
-    /// listed. On iOS a scene tells its own state, so there is nothing to watch.
-    @MainActor
-    private static func watchClosure(of window: TipWindow) -> WindowClosure {
-        #if os(macOS)
-        MacWindowWatch(watching: window.current() as? NSWindow)
-        #else
-        WindowClosure()
-        #endif
-    }
-
     private static func answer(buying size: TipSize, in window: TipWindow) async -> TipPurchaseAnswer {
-        let closure = await watchClosure(of: window)
-        defer { Task { @MainActor in closure.stop() } }
         do {
             guard let product = try await Product.products(for: [TipProducts.identifier(of: size)]).first else {
                 return .refused(.failed)
             }
-            guard let result = try await start(product, in: window, closure: closure) else { return .windowClosed }
+            guard let result = try await start(product, in: window) else { return .windowClosed }
             switch result {
             case .success(.verified(let transaction)):
                 return .bought(TipTransaction(isVerified: true, transaction: transaction))

@@ -85,14 +85,7 @@ struct MacWindowFactsTests {
         closed: Bool = false
     ) -> MacWindowFacts {
         MacWindowFacts(
-            isVisible: visible, isMiniaturized: miniaturized, appIsHidden: hidden, isListed: listed, hasClosed: closed)
-    }
-
-    @Test("a window seen closing is closed, though the app is hidden and the window is still listed")
-    func closedWhileHidden() {
-        #expect(!facts(hidden: true, closed: true).isOpen)
-        #expect(!facts(miniaturized: true, closed: true).isOpen)
-        #expect(!facts(visible: true, closed: true).isOpen)
+            isVisible: visible, isMiniaturized: miniaturized, appIsHidden: hidden, isListed: listed)
     }
 
     @Test("a window on screen is open")
@@ -126,8 +119,8 @@ struct MacWindowFactsTests {
 import AppKit
 
 @MainActor
-@Suite("Watching a Mac's window for its closing")
-struct MacWindowWatchTests {
+@Suite("A Mac's window closing between the tap and the purchase")
+final class TipWindowClosureOnAMacTests {
     private func window() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled, .closable],
@@ -136,43 +129,97 @@ struct MacWindowWatchTests {
         return window
     }
 
-    @Test("a window that closes after the watch started has closed, though it is retained and the app is hidden")
-    func closeAfterTheTap() {
+    /// The window as `TipWindowAnchor` hands it over at the tap: the watch of its closing starts there, on the main actor,
+    /// before anything else runs, and its observer is removed with the test's `observers`.
+    private func handedOver(_ window: NSWindow) -> TipWindow {
+        let closure = TipWindowClosure()
+        observers.append(
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: nil) {
+                _ in closure.markClosed()
+            })
+        return TipWindow(weak: window, closure: closure)
+    }
+
+    private var observers: [any NSObjectProtocol] = []
+
+    /// What a hidden app shows of a window that is retained and still listed, closed or not.
+    private let hiddenAppFacts = MacWindowFacts(
+        isVisible: false, isMiniaturized: false, appIsHidden: true, isListed: true)
+
+    @Test("a window closed after the tap and before the purchase starts gets no sheet, though retained, listed and the app hidden")
+    func closedBeforeThePurchaseStarts() {
         let tapped = window()
-        let watch = MacWindowWatch(watching: tapped)
-        #expect(!watch.hasClosed)
+        let handed = handedOver(tapped)
 
         tapped.close()
 
-        #expect(watch.hasClosed)
-        let facts = MacWindowFacts(
-            isVisible: false, isMiniaturized: false, appIsHidden: true, isListed: true, hasClosed: watch.hasClosed)
-        #expect(!facts.isOpen)
-        watch.stop()
+        let place = TipSheetPlace<NSWindow>.of(handed) { _ in hiddenAppFacts.isOpen }
+        #expect(place.isClosed)
+        #expect(handed.hasClosed)
     }
 
-    @Test("another window closing does not close the watched one")
-    func otherWindow() {
+    @Test("a window closed while the product loads gets no sheet")
+    func closedDuringTheLookup() async {
+        let tapped = window()
+        let handed = handedOver(tapped)
+
+        await Task { @MainActor in tapped.close() }.value
+
+        #expect(TipSheetPlace<NSWindow>.of(handed) { _ in hiddenAppFacts.isOpen }.isClosed)
+    }
+
+    @Test("an open window of a hidden app is where the sheet opens")
+    func openWindowOfAHiddenApp() {
+        let tapped = window()
+        let handed = handedOver(tapped)
+
+        let place = TipSheetPlace<NSWindow>.of(handed) { _ in hiddenAppFacts.isOpen }
+
+        if case .window(let shown) = place { #expect(shown === tapped) } else { Issue.record("expected the window") }
+        #expect(!handed.hasClosed)
+    }
+
+    @Test("another window closing changes nothing")
+    func otherWindowClosing() {
         let tapped = window()
         let other = window()
-        let watch = MacWindowWatch(watching: tapped)
+        let handed = handedOver(tapped)
 
         other.close()
 
-        #expect(!watch.hasClosed)
-        watch.stop()
+        #expect(!handed.hasClosed)
+        #expect(!TipSheetPlace<NSWindow>.of(handed) { _ in hiddenAppFacts.isOpen }.isClosed)
     }
+}
 
-    @Test("a watch stopped before the window closes sees nothing")
-    func stopped() {
-        let tapped = window()
-        let watch = MacWindowWatch(watching: tapped)
-        watch.stop()
-
-        tapped.close()
-
-        #expect(!watch.hasClosed)
+extension TipSheetPlace {
+    fileprivate var isClosed: Bool {
+        if case .closed = self { return true }
+        return false
     }
 }
 #endif
+
+@MainActor
+@Suite("The record of a window's closing")
+struct TipWindowClosureTests {
+    @Test("a window whose closing was recorded is closed for the place of the sheet, though it still reads as open")
+    func recordedClosing() {
+        let tapped = WindowStandIn(name: "left")
+        let closure = TipWindowClosure()
+        let window = TipWindow(weak: tapped, closure: closure)
+        #expect(TipSheetPlace<WindowStandIn>.of(window, isOpen: \.isOpen).code == "window left")
+
+        closure.markClosed()
+
+        #expect(window.hasClosed)
+        #expect(TipSheetPlace<WindowStandIn>.of(window, isOpen: \.isOpen).code == "closed")
+    }
+
+    @Test("a window that was not watched has not closed")
+    func notWatched() {
+        #expect(!TipWindow(weak: OtherStandIn()).hasClosed)
+        #expect(!TipWindow.unknown.hasClosed)
+    }
+}
 #endif
