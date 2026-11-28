@@ -1,0 +1,23 @@
+{
+  "comment": "Words the 1.1 listing must not use: each names a feature the app does not have (ADR 0033, issue 530). A text is checked in the language of its locale; the notes for App Review are English. The patterns also catch the usual variants (A.I., ai-powered, Drafted, Linked-In, Macs, MACOS, iMac). 'allowedIn' lists the fields where the word may still appear, because What's New says in one line that the 1.0 AI draft is gone; 'onlyIn' limits an entry to some fields. 'pendingLocales' is a baseline that may only shrink: a locale still written for 1.0 stays on it until its texts are rewritten, the checker refuses a locale on it whose texts pass ('notes' is the notes for App Review), and the Mac check compares the list with the target branch's and refuses one that grew.",
+  "pendingLocales": [],
+  "entries": [
+    {"pattern": "\\bA\\.?I\\b", "languages": ["en"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bK\\.?I\\b", "languages": ["de"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bI\\.?A\\b", "languages": ["it", "es", "fr"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bI\\.?A\\b", "languages": ["pt"], "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
+    {"pattern": "\\bia\\b", "languages": ["pt"], "ignoreCase": true, "onlyIn": ["Name", "Subtitle", "Keywords"], "reason": "1.1 has no AI draft (in a sentence, 'ia' is a form of the verb ir)"},
+    {"pattern": "\\bdraft(?:s|ed|ing)?\\b", "languages": ["en"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bentw(?:urf|ürf|erf|irf|orf)\\w*", "languages": ["de"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bbozz[ae]\\b", "languages": ["it"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bborrador(?:es)?\\b", "languages": ["es"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\bbrouillons?\\b", "languages": ["fr"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "\\brascunhos?\\b", "languages": ["pt"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "the draft was the 1.0 AI draft"},
+    {"pattern": "Apple[\\s-]*Intelligence", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no feature that uses Apple Intelligence"},
+    {"pattern": "on[\\s-]?device[\\s-]+(?:models?|AI|KI|Modell\\w*)|modell[oi] di Apple|modelos? de Apple|modelos? da Apple|modèles? d.Apple|modèles? sur l.appareil", "languages": ["*"], "ignoreCase": true, "reason": "1.1 has no on-device model"},
+    {"pattern": "linked-?in\\b", "languages": ["*"], "ignoreCase": true, "reason": "the LinkedIn import is not in 1.1"},
+    {"pattern": "\\bscans?\\b|\\w*scann\\w*|\\bscansion\\w*|\\besc[aá]ne\\w*|\\bnum[ée]ris\\w*|\\bdigitaliz\\w*", "languages": ["*"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans"},
+    {"pattern": "\\w+scans?\\b", "languages": ["de"], "ignoreCase": true, "reason": "1.1 reads PDFs that contain text, not scans (a German compound that ends in Scan)"},
+    {"pattern": "\\bi?mac(?:os|book\\w*|s)?\\b", "languages": ["*"], "ignoreCase": true, "reason": "the store page is for iPhone and iPad only (also macOS, iMac and MacBook, in any case)"}
+  ]
+}

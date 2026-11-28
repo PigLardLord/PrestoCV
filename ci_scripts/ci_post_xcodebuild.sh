@@ -8,7 +8,8 @@
 #   build-for-testing  checks the Swift against .swift-version (ADR 0026), then runs what ADR 0006 needs on a Mac beyond
 #                      the app tests: the package tests, the architecture check
 #                      and its self-test (they see the Apple-only branches of the manifests), the self-tests of the archive
-#                      check and of the screenshot tools, the check of the store listing, the tests of PrestoCVApp, and the
+#                      check and of the screenshot tools, the check of the store listing (against the target
+#                      branch's list of locales still written for 1.0), the tests of PrestoCVApp, and the
 #                      builds of the app for macOS and of CVPDFExporterExamples. It
 #                      also runs the source checks, which read the repository: the machines that then run the test plan
 #                      have only the built products.
@@ -58,7 +59,21 @@ case "$ACTION" in
     step "$ROOT/Tools/Release/store-screenshots-selftest.sh"
     # The captions are paired with the six screenshots by position: the listing must hold exactly six for each locale, and
     # the composer must refuse any other number, a capture of the wrong size and a folder it would leave stale.
-    step "$ROOT/Tools/Release/check-store-listing.py"
+    # The locales still written for 1.0 may only shrink, so on a pull request their list is compared with the target
+    # branch's. A checkout with no such branch compares with an empty list, as the baseline above; a target branch that
+    # has no list yet has nothing to compare with.
+    listing_args=()
+    if [ -n "${CI_PULL_REQUEST_TARGET_BRANCH:-}" ]; then
+      retired="$(mktemp)"
+      target="origin/$CI_PULL_REQUEST_TARGET_BRANCH"
+      if ! git -C "$ROOT" rev-parse --verify --quiet "$target^{commit}" > /dev/null; then
+        echo '{"pendingLocales": []}' > "$retired"
+        listing_args=(--against "$retired")
+      elif git -C "$ROOT" show "$target:Tools/Release/store-listing-retired-words.json" > "$retired" 2>/dev/null; then
+        listing_args=(--against "$retired")
+      fi
+    fi
+    step "$ROOT/Tools/Release/check-store-listing.py" ${listing_args[@]+"${listing_args[@]}"}
     step "$ROOT/Tools/Release/check-store-listing-selftest.py"
     step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
     step swift test --package-path "$ROOT/PrestoCVApp"
