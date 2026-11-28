@@ -1038,7 +1038,8 @@
     "PrestoCVTipsStoreKit",
     "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
-    "StoreKit"
+    "StoreKit",
+    "AppKit"
    ],
    "rules": []
   },

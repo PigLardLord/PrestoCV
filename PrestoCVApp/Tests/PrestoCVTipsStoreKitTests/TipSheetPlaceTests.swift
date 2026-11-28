@@ -80,10 +80,19 @@ final class OtherStandIn: Sendable {}
 
 @Suite("When a Mac's window is open")
 struct MacWindowFactsTests {
-    private func facts(visible: Bool = false, miniaturized: Bool = false, hidden: Bool = false, listed: Bool = true)
-        -> MacWindowFacts
-    {
-        MacWindowFacts(isVisible: visible, isMiniaturized: miniaturized, appIsHidden: hidden, isListed: listed)
+    private func facts(
+        visible: Bool = false, miniaturized: Bool = false, hidden: Bool = false, listed: Bool = true,
+        closed: Bool = false
+    ) -> MacWindowFacts {
+        MacWindowFacts(
+            isVisible: visible, isMiniaturized: miniaturized, appIsHidden: hidden, isListed: listed, hasClosed: closed)
+    }
+
+    @Test("a window seen closing is closed, though the app is hidden and the window is still listed")
+    func closedWhileHidden() {
+        #expect(!facts(hidden: true, closed: true).isOpen)
+        #expect(!facts(miniaturized: true, closed: true).isOpen)
+        #expect(!facts(visible: true, closed: true).isOpen)
     }
 
     @Test("a window on screen is open")
@@ -112,4 +121,58 @@ struct MacWindowFactsTests {
         #expect(!facts(listed: false).isOpen)
     }
 }
+
+#if os(macOS)
+import AppKit
+
+@MainActor
+@Suite("Watching a Mac's window for its closing")
+struct MacWindowWatchTests {
+    private func window() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled, .closable],
+            backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        return window
+    }
+
+    @Test("a window that closes after the watch started has closed, though it is retained and the app is hidden")
+    func closeAfterTheTap() {
+        let tapped = window()
+        let watch = MacWindowWatch(watching: tapped)
+        #expect(!watch.hasClosed)
+
+        tapped.close()
+
+        #expect(watch.hasClosed)
+        let facts = MacWindowFacts(
+            isVisible: false, isMiniaturized: false, appIsHidden: true, isListed: true, hasClosed: watch.hasClosed)
+        #expect(!facts.isOpen)
+        watch.stop()
+    }
+
+    @Test("another window closing does not close the watched one")
+    func otherWindow() {
+        let tapped = window()
+        let other = window()
+        let watch = MacWindowWatch(watching: tapped)
+
+        other.close()
+
+        #expect(!watch.hasClosed)
+        watch.stop()
+    }
+
+    @Test("a watch stopped before the window closes sees nothing")
+    func stopped() {
+        let tapped = window()
+        let watch = MacWindowWatch(watching: tapped)
+        watch.stop()
+
+        tapped.close()
+
+        #expect(!watch.hasClosed)
+    }
+}
+#endif
 #endif
