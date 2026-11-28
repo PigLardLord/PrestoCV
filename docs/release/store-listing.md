@@ -76,11 +76,11 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 | en-GB | 27 | 29 | 98 | 137 | 1728 | 23 / 60 (6 captions) | 685 |
 | de-DE | 30 | 30 | 96 | 162 | 2108 | 26 / 67 (6 captions) | 843 |
 | it | 24 | 29 | 99 | 146 | 1872 | 20 / 67 (6 captions) | 743 |
-| es-ES | 28 | 26 | 93 | 152 | 1862 | 20 / 57 (6 captions) | 745 |
-| es-MX | 28 | 26 | 97 | 157 | 1853 | 20 / 59 (6 captions) | 750 |
+| es-ES | 28 | 26 | 93 | 152 | 1862 | 20 / 57 (6 captions) | 757 |
+| es-MX | 28 | 26 | 97 | 157 | 1853 | 20 / 59 (6 captions) | 762 |
 | fr-FR | 25 | 28 | 91 | 159 | 2100 | 27 / 69 (6 captions) | 835 |
 | pt-PT | 30 | 29 | 94 | 157 | 1879 | 22 / 59 (6 captions) | 792 |
-| pt-BR | 28 | 29 | 95 | 153 | 1800 | 21 / 58 (6 captions) | 723 |
+| pt-BR | 28 | 29 | 95 | 153 | 1800 | 21 / 58 (6 captions) | 727 |
 
 Notes for App Review: 3155 characters (4000).
 <!-- counts:end -->
@@ -539,7 +539,7 @@ PrestoCV 1.1 es una app nueva. Tiene un editor nuevo que guarda mientras escribe
 
 Tus CV siguen aquí. PrestoCV encuentra los de la versión anterior y los abre en el nuevo editor.
 
-Tras actualizar: si un CV perdió algún campo por el camino, PrestoCV muestra «Importado con cambios» en el siguiente inicio. Enumera lo que se dejó fuera y qué revisar. Échale un vistazo una vez y luego revisa los CV que nombra.
+Tras actualizar: si un CV perdió algún campo por el camino, PrestoCV muestra «Importado con cambios» en el siguiente inicio. La pantalla enumera lo que se dejó fuera y qué revisar. Échale un vistazo una vez y luego revisa los CV que nombra.
 
 El borrador con IA de la versión 1.0 ya no está. Está prevista una forma mejor de empezar un CV.
 ```
@@ -617,7 +617,7 @@ PrestoCV 1.1 es una app nueva. Tiene un editor nuevo que guarda mientras escribe
 
 Tus CV siguen aquí. PrestoCV encuentra los de la versión anterior y los abre en el nuevo editor.
 
-Después de actualizar: si un CV perdió algún campo en el camino, PrestoCV muestra «Importado con cambios» la próxima vez que abras la app. Enumera lo que se dejó fuera y qué revisar. Revísala una vez y luego revisa los CV que nombra.
+Después de actualizar: si un CV perdió algún campo en el camino, PrestoCV muestra «Importado con cambios» la próxima vez que abras la app. La pantalla enumera lo que se dejó fuera y qué revisar. Revísala una vez y luego revisa los CV que nombra.
 
 El borrador con IA de la versión 1.0 ya no está. Está prevista una forma mejor de empezar un CV.
 ```
@@ -847,7 +847,7 @@ Pronto para enviar. | Um PDF caprichado, com títulos no idioma do seu CV.
 ### What's New
 
 ```text
-O PrestoCV 1.1 é um app novo. Tem um editor novo que salva enquanto você digita, uma exportação nova com prévia e escolha de modelo, fontes e cores, e um jeito novo de importar um CV: cole o texto, escolha um PDF que contenha texto ou abra um PDF do Arquivos no PrestoCV, e cada parte vai para o lugar certo.
+O PrestoCV 1.1 é um app novo. Tem um editor novo que salva enquanto você digita, uma exportação nova com prévia e escolha de modelo, fontes e cores, e um jeito novo de importar um CV: cole o texto, escolha um PDF que contenha texto ou abra no PrestoCV um PDF do app Arquivos, e cada parte vai para o lugar certo.
 
 Seus CVs continuam aqui. O PrestoCV encontra os da versão anterior e os abre no novo editor.
 
