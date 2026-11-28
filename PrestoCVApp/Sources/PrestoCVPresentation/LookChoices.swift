@@ -35,11 +35,21 @@ public struct LookChoice: Hashable, Sendable {
     }
 }
 
+/// How the designs changed from one choice of the picker to the next, while they are checked (#566).
+enum DesignsChange: Equatable {
+    case none, joined, checkBegan, checkEnded
+    /// Designs joined in the change that ended the check: the stream of the options can also fold a join and the end
+    /// into one change.
+    case joinedAndCheckEnded
+}
+
 /// The designs, palettes and font schemes the picker shows.
 public struct LookChoices: Hashable, Sendable {
     public let designs: [LookChoice]
     public let palettes: [LookChoice]
     public let fontSchemes: [LookChoice]
+    /// True while the designs are being checked: more can join (#566).
+    let checksMoreDesigns: Bool
     private let defaultDesign: String
     private let ownLooks: [String: DesignOwnLook]
 
@@ -47,8 +57,28 @@ public struct LookChoices: Hashable, Sendable {
         designs = options.designs.map(LookChoice.init)
         palettes = options.palettes.map(LookChoice.init)
         fontSchemes = options.fontSchemes.map(LookChoice.init)
+        checksMoreDesigns = options.status == .checking
         defaultDesign = options.defaultDesign
         ownLooks = options.ownLooks
+    }
+
+    /// What the designs did from these choices to `next` (#566): the check ended, with designs that joined or none, a
+    /// new one began (Try again), designs joined while it runs, or nothing to tell.
+    func designsChange(to next: LookChoices) -> DesignsChange {
+        let offered = Set(designs.map(\.id))
+        let joined = next.designs.contains { !offered.contains($0.id) }
+        if checksMoreDesigns != next.checksMoreDesigns {
+            guard !next.checksMoreDesigns else { return .checkBegan }
+            return joined ? .joinedAndCheckEnded : .checkEnded
+        }
+        return next.checksMoreDesigns && joined ? .joined : .none
+    }
+
+    /// True when an export in `design` waits for the check: the design is not offered while more can join. A CV that
+    /// keeps no design is exported in the default one.
+    func waitsForTheCheck(of design: String?) -> Bool {
+        let design = design ?? defaultDesign
+        return checksMoreDesigns && !designs.contains { $0.id == design }
     }
 
     /// The sample of the palette `design` sets a CV in when the CV keeps none; nothing to draw when it is not offered.

@@ -1,102 +1,116 @@
 import CVDesignCatalog
 import DiagnosticLogging
+import PrestoCVIntegration
 
 extension LogCategory {
-    /// The designs a CV is exported with: the sync of the bundled designs at launch.
+    /// The designs a CV is exported with: the check of the bundled designs once the app is open.
     static let designs = LogCategory("designs")
 }
 
-/// Brings the designs that ship with the app into the design store at launch (`SyncBundledDesigns`), then reads what the
-/// export and the look picker need: the default design and the installed designs.
-/// - A sync that fails other than by cancellation is tolerated while the store gives the default design: a design that is
-///   rejected, not rendered or not saved is left out, and a bundle or a store that failed leaves the designs installed
-///   before. What the sync did is logged as counts.
-/// - With no default design to give, the launch fails: `designStoreUnavailable` when the store could not be read or could
-///   not save the default design, `bundledDesignsUnavailable` when the bundle could not be read or its default design was
-///   refused.
+/// The check of the designs that ship with the app (#566), over the design store, the bundled designs and the rendering
+/// gate: `CheckedDesigns` runs it in the background once the app is open, so the launch never waits for it and never fails
+/// because of it.
+/// - `installed()` gives the designs the store holds before the check: they are offered at once. A design the store lists
+///   but cannot read is left out (`designs.unreadable`); a store that cannot be read gives none.
+/// - `check(decided:)` brings the bundled designs into the store (`SyncBundledDesigns`), the default design first, and tells
+///   each one once the store holds its verdict, with the design the store then holds. A design that is rejected, not
+///   rendered or not saved is told without a design, unless the store still holds one of that identifier from before. What
+///   the sync did is logged as counts.
 /// - A bundled design the store lists but cannot read is written again by the sync (`repaired`), after the bundled package
-///   validates and renders, and so is offered. A design the person installed is never replaced.
-/// - A design the store lists but cannot read, and the sync did not repair, is left out (`designs.unreadable`), and the launch goes on with the others. A
-///   default design the store cannot read fails the launch with `designStoreUnavailable`.
-/// - A cancelled launch is `designSyncInterrupted`, even when the cancellation is seen only once a store step returns (the
+///   validates and renders. A design the person installed is never replaced.
+/// - When the store then gives no default design, the check logs why (`designs.unavailable`): the export offers to try
+///   again, and writing goes on.
+/// - A cancelled check is `designs.interrupted`, even when the cancellation is seen only once a store step returns (the
 ///   file store's lock wait does not end early when its caller is cancelled). The designs saved before it stay saved, so
-///   the next launch does not render them again.
-struct DesignBootstrap: Sendable {
-    /// The design a CV that keeps none exports with: the default of version 1, and the first bundled design.
+///   the next launch offers them at once and does not render them again.
+struct DesignBootstrap: DesignChecking {
+    /// The design a CV that keeps none exports with: the default of version 1, and the first bundled design checked.
     static let defaultDesign = "professional"
-
-    /// What the launch reads from the store once the sync is over.
-    struct Designs: Sendable {
-        /// The installed designs, in the store's order, each with the preview the look picker shows (#407)
-        let installed: [ValidatedDesign]
-        let defaultDesign: DesignManifest
-    }
 
     let store: any DesignStore
     let source: any BundledDesignSource
     let gate: any DesignRenderingGate
     let logger: any DiagnosticLogger
-    /// The clock the time of the sync is measured on
+    /// The clock the time of the check is measured on
     let clock: any Clock<Duration>
 
-    @concurrent func run() async throws(CompositionFailure) -> Designs {
+    @concurrent func installed() async -> [ValidatedDesign] {
         let stopwatch = Stopwatch(started: clock)
-        let missing = try await sync(stopwatch)
-        let defaultDesign: ValidatedDesign, listed: [DesignManifest]
+        let listed: [DesignManifest]
         do {
-            defaultDesign = try await GetDesign(store: store)(id: Self.defaultDesign)
             listed = try await ListDesigns(store: store)()
         } catch {
-            throw failure(error, missing, stopwatch)
+            return []
         }
-        let installed = try await readable(listed, defaultDesign: defaultDesign, stopwatch)
-        guard !Task.isCancelled else { throw interrupted(stopwatch) }
-        return Designs(installed: installed, defaultDesign: defaultDesign.manifest)
-    }
-
-    /// What a launch fails with when the store does not give the default design or the list of the installed designs.
-    private func failure(_ error: any Error, _ missing: Missing, _ stopwatch: Stopwatch) -> CompositionFailure {
-        if error is CancellationError || Task.isCancelled { return interrupted(stopwatch) }
-        if case DesignCatalogError.unknownDesign = error { return unavailable(missing, stopwatch) }
-        return unavailable(.store, stopwatch)
-    }
-
-    /// The listed designs the store can read, in the store's order. A design it cannot read is left out and counted in the
-    /// log, so one damaged package does not stop the launch; the default design was read already.
-    @concurrent private func readable(
-        _ listed: [DesignManifest], defaultDesign: ValidatedDesign, _ stopwatch: Stopwatch
-    ) async throws(CompositionFailure) -> [ValidatedDesign] {
-        var readable: [ValidatedDesign] = []
+        var readable: [ValidatedDesign] = [], leftOut = 0
         for manifest in listed {
-            guard manifest.id != defaultDesign.manifest.id else {
-                readable.append(defaultDesign)
-                continue
-            }
-            do {
-                readable.append(try await GetDesign(store: store)(id: manifest.id))
-            } catch {
-                if error is CancellationError || Task.isCancelled { throw interrupted(stopwatch) }
+            switch await read(manifest.id) {
+            case .held(let design): readable.append(design)
+            case .unreadable: leftOut += 1
+            case .absent: continue
             }
         }
-        if readable.count < listed.count {
-            logger.notice(.designs, "designs.unreadable",
-                .count("leftOut", listed.count - readable.count), .duration("elapsed", stopwatch.elapsed))
-        }
+        if leftOut > 0 { unreadable(leftOut, stopwatch) }
         return readable
     }
 
-    /// Runs the sync and logs what it did. Returns what to blame if the store then has no default design.
-    @concurrent private func sync(_ stopwatch: Stopwatch) async throws(CompositionFailure) -> Missing {
-        let report: SyncReport
+    @concurrent func check(decided: @Sendable (_ id: String, _ design: ValidatedDesign?) async -> Void) async {
+        let stopwatch = Stopwatch(started: clock)
+        var leftOut = 0
+        let missing: Missing
         do {
-            report = try await SyncBundledDesigns(source: source, validator: DesignPackageValidator(), gate: gate, store: store)()
+            let report = try await SyncBundledDesigns(source: source, validator: DesignPackageValidator(), gate: gate, store: store)(
+                first: Self.defaultDesign
+            ) { id in
+                let read = await read(id)
+                if case .unreadable = read { leftOut += 1 }
+                await decided(id, read.design)
+            }
+            synced(report, stopwatch)
+            missing = report.failed.contains(Self.defaultDesign) ? .store : .bundle
         } catch let error where error is CancellationError || Task.isCancelled {
-            throw interrupted(stopwatch)
+            interrupted(stopwatch)
+            return
         } catch DesignCatalogError.bundledDesignsUnavailable {
-            return syncFailed(.bundle, stopwatch)
+            missing = syncFailed(.bundle, stopwatch)
         } catch {
-            return syncFailed(.store, stopwatch)
+            missing = syncFailed(.store, stopwatch)
         }
+        if leftOut > 0 { unreadable(leftOut, stopwatch) }
+        guard !Task.isCancelled else {
+            interrupted(stopwatch)
+            return
+        }
+        await checkDefaultDesign(missing, stopwatch)
+    }
+
+    /// Logs why the store gives no default design once the sync is over, if it gives none.
+    @concurrent private func checkDefaultDesign(_ missing: Missing, _ stopwatch: Stopwatch) async {
+        do {
+            _ = try await GetDesign(store: store)(id: Self.defaultDesign)
+        } catch let error where error is CancellationError || Task.isCancelled {
+            interrupted(stopwatch)
+        } catch DesignCatalogError.unknownDesign {
+            unavailable(missing, stopwatch)
+        } catch {
+            unavailable(.store, stopwatch)
+        }
+    }
+
+    /// The design the store holds under the identifier, read as the export reads it.
+    @concurrent private func read(_ id: String) async -> Read {
+        do {
+            return .held(try await GetDesign(store: store)(id: id))
+        } catch let error where error is CancellationError || Task.isCancelled {
+            return .absent
+        } catch DesignCatalogError.unknownDesign {
+            return .absent
+        } catch {
+            return .unreadable
+        }
+    }
+
+    private func synced(_ report: SyncReport, _ stopwatch: Stopwatch) {
         let leftOut = !(report.rejected.isEmpty && report.notRendered.isEmpty && report.failed.isEmpty && report.conflicts.isEmpty)
         logger.log(LogEntry(level: leftOut ? .notice : .info, category: .designs, event: "designs.synced", fields: [
             .count("installed", report.installed.count), .count("upgraded", report.upgraded.count),
@@ -106,8 +120,6 @@ struct DesignBootstrap: Sendable {
             .count("failed", report.failed.count), .count("conflicts", report.conflicts.count),
             .duration("elapsed", stopwatch.elapsed),
         ]))
-        guard !Task.isCancelled else { throw interrupted(stopwatch) }
-        return report.failed.contains(Self.defaultDesign) ? .store : .bundle
     }
 
     private func syncFailed(_ missing: Missing, _ stopwatch: Stopwatch) -> Missing {
@@ -115,29 +127,38 @@ struct DesignBootstrap: Sendable {
         return missing
     }
 
-    private func interrupted(_ stopwatch: Stopwatch) -> CompositionFailure {
+    private func unreadable(_ leftOut: Int, _ stopwatch: Stopwatch) {
+        logger.notice(.designs, "designs.unreadable", .count("leftOut", leftOut), .duration("elapsed", stopwatch.elapsed))
+    }
+
+    private func interrupted(_ stopwatch: Stopwatch) {
         logger.info(.designs, "designs.interrupted", .duration("elapsed", stopwatch.elapsed))
-        return .designSyncInterrupted
     }
 
-    private func unavailable(_ missing: Missing, _ stopwatch: Stopwatch) -> CompositionFailure {
+    private func unavailable(_ missing: Missing, _ stopwatch: Stopwatch) {
         logger.error(.designs, "designs.unavailable", .token("failure", missing.code), .duration("elapsed", stopwatch.elapsed))
-        return missing.failure
     }
 
-    /// What a launch blames when the store has no default design to give.
+    /// What the store gave for one identifier.
+    private enum Read {
+        case held(ValidatedDesign)
+        /// The store holds no design of that identifier, or the read was cancelled
+        case absent
+        /// The store lists the design but cannot read it
+        case unreadable
+
+        var design: ValidatedDesign? {
+            guard case .held(let design) = self else { return nil }
+            return design
+        }
+    }
+
+    /// What the check blames when the store gives no default design.
     private enum Missing {
         /// The bundle could not be read, or its default design was refused
         case bundle
         /// The store could not be read, or could not save the default design
         case store
-
-        var failure: CompositionFailure {
-            switch self {
-            case .bundle: .bundledDesignsUnavailable
-            case .store: .designStoreUnavailable
-            }
-        }
 
         var code: StaticString {
             switch self {

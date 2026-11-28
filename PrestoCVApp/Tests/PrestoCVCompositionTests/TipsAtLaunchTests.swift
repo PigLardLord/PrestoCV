@@ -1,4 +1,3 @@
-import CVRenderingTestSupport
 import Foundation
 import Synchronization
 import PrestoCVWorkflowPorts
@@ -54,8 +53,7 @@ struct TipsAtLaunchTests {
             let tips = CountingTips()
             weakTips = tips
             let state = await Composition.make(CompositionTests.inputs(
-                paths, settlement: settlement, compileRules: CompositionTests.counting(CompositionTests.CompileCounter()),
-                designs: FixedBundledSource(packages: nil), makeTips: { _ in tips }
+                paths, settlement: settlement, compileRules: CompositionTests.failing, makeTips: { _ in tips }
             ))
             guard case .failed = state else {
                 Issue.record("expected failed, got \(state)")
@@ -97,10 +95,13 @@ struct TipsAtLaunchTests {
             return tips
         }
 
-        _ = await Composition.make(CompositionTests.inputs(
-            paths, settlement: settlement, compileRules: CompositionTests.counting(CompositionTests.CompileCounter()),
-            designs: FixedBundledSource(packages: nil), makeTips: makeTips
+        let first = await Composition.make(CompositionTests.inputs(
+            paths, settlement: settlement, compileRules: CompositionTests.failing, makeTips: makeTips
         ))
+        guard case .failed = first else {
+            Issue.record("expected the first launch to fail, got \(first)")
+            return
+        }
         let composition = try CompositionTests.ready(await Composition.make(CompositionTests.inputs(
             paths, settlement: settlement, compileRules: CompositionTests.counting(CompositionTests.CompileCounter()),
             makeTips: makeTips

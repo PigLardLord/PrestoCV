@@ -3,7 +3,9 @@ import XCTest
 /// The look of the PDF in the export sheet (#407). On a narrow screen one line, "Design", names the design, the fonts and
 /// the colours in use, and a tap opens the picker in a sheet over the export; on a wide screen the picker sits among the
 /// sheet's lines. A tap on an item chooses it at once, the PDF is made again, and the CV keeps the choice. A CV whose look
-/// comes from an earlier version shows that choice as one more item, chosen, until another one replaces it.
+/// comes from an earlier version shows that choice as one more item, chosen, until another one replaces it. Each launch
+/// is a first install, with the real check of the bundled designs: the app checks them once it is open, and each joins
+/// the picker once it passes (#566).
 final class ExportLookUITests: RuntimeIssueFailingTestCase {
 
     /// A CV the launch fixture stores before the app starts, in English, with its look: nil for a part the design sets.
@@ -44,6 +46,7 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
 
         line.tap()
         XCTAssertTrue(app.buttons["look.done"].waitForExistence(timeout: 10), "A tap opens the picker")
+        waitForEveryDesign(in: app)
         XCTAssertTrue(app.buttons["look.design.modern"].isSelected, "The design in use is chosen")
         XCTAssertTrue(app.buttons["look.fonts.serif"].isSelected, "The fonts in use are chosen")
         XCTAssertFalse(app.buttons["look.design.minimal"].isSelected, "Only one design is chosen")
@@ -152,6 +155,7 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
 
         let modern = app.buttons["look.design.modern"]
         XCTAssertTrue(modern.waitForExistence(timeout: 10), "The picker is among the sheet's lines")
+        waitForEveryDesign(in: app)
         XCTAssertFalse(app.buttons["export.look"].exists, "A wide screen needs no line to open it")
         XCTAssertTrue(modern.isSelected, "The design in use is chosen")
         let plum = reveal("look.palette.plum", in: app)
@@ -319,6 +323,16 @@ final class ExportLookUITests: RuntimeIssueFailingTestCase {
     private func wait(for element: XCUIElement, toBeSelected selected: Bool) -> Bool {
         let chosen = expectation(for: NSPredicate(format: "isSelected == %@", NSNumber(value: selected)), evaluatedWith: element)
         return XCTWaiter().wait(for: [chosen], timeout: 30) == .completed
+    }
+
+    /// Waits until the picker no longer says that more designs can join, then checks that every bundled design passed
+    /// the real check and is offered (#566).
+    @MainActor
+    private func waitForEveryDesign(in app: XCUIApplication) {
+        XCTAssertTrue(waitUntilGone(element("look.designs.checking", in: app)), "The check of the designs ends")
+        for design in ["professional", "minimal", "modern"] {
+            XCTAssertTrue(app.buttons["look.design.\(design)"].exists, "\(design) passes the check and joins the picker")
+        }
     }
 
     @MainActor

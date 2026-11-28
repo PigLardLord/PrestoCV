@@ -13,6 +13,8 @@ public struct LookPickerModel: Hashable, Sendable {
     public struct Group: Hashable, Sendable {
         public let part: LookPart
         public let items: [Item]
+        /// True for the designs while they are being checked: the group says that more can join (#566).
+        public let checksMore: Bool
 
         /// The CV keeps a choice of this part that the app no longer offers: the view says so with the group.
         public var keepsAnEarlierLook: Bool { items.contains(where: \.isKept) }
@@ -57,13 +59,16 @@ public struct LookPickerModel: Hashable, Sendable {
     /// a part whose id the app does not offer has one more item, last and chosen, as the PDF keeps it.
     init(choices: LookChoices, shown: EditorLook) {
         groups = [
-            Group(part: .design, items: Self.items(.design, choices.designs, shown: shown.design, designsOwn: nil)),
+            Group(
+                part: .design, items: Self.items(.design, choices.designs, shown: shown.design, designsOwn: nil),
+                checksMore: choices.checksMoreDesigns
+            ),
             Group(part: .fonts, items: Self.items(
                 .fonts, choices.fontSchemes, shown: shown.fonts, designsOwn: choices.ownFontsSample(of: shown.design)
-            )),
+            ), checksMore: false),
             Group(part: .palette, items: Self.items(
                 .palette, choices.palettes, shown: shown.palette, designsOwn: choices.ownPaletteSample(of: shown.design)
-            ))
+            ), checksMore: false)
         ]
     }
 

@@ -6,12 +6,6 @@ public enum CompositionFailure: String, Error, Equatable, Sendable, CaseIterable
     case storeUnavailable
     case contentRulesUnavailable
     case launchFixturesRejected
-    /// The design store could not be read or written, and it holds no default design to export with
-    case designStoreUnavailable
-    /// The designs that ship with the app could not be read, and the store holds no default design to export with
-    case bundledDesignsUnavailable
-    /// The launch was cancelled while it installed the designs; the designs already saved stay saved
-    case designSyncInterrupted
     /// The headings the export prints could not be read
     case headingsUnavailable
 

@@ -144,11 +144,11 @@ func everySaveStatus() -> [SaveStatus] {
 func everyExportStatus() -> [ExportStatus] {
     let all: [ExportStatus] = [.idle, .exporting, .done(pages: 1), .truncated(pages: 1, required: 2),
                                .notReady, .unsupportedLanguage, .invalid, .incomplete(missing: 1),
-                               .textNotVisible(lines: 1), .failed]
+                               .textNotVisible(lines: 1), .designsUnavailable, .failed]
     for status in all {
         switch status {
         case .idle, .exporting, .done, .truncated, .notReady, .unsupportedLanguage, .invalid, .incomplete,
-             .textNotVisible, .failed:
+             .textNotVisible, .designsUnavailable, .failed:
             break
         }
     }

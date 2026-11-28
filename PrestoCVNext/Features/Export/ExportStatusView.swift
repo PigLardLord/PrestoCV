@@ -2,12 +2,21 @@ import PrestoCVPresentation
 import SwiftUI
 
 /// Where the export stands, under the PDF: that it runs, or why there is no PDF or what the PDF lacks. A status with
-/// nothing to say shows nothing; the fields the CV lacks are the list's below (`MissingFieldsView`).
+/// nothing to say shows nothing; the fields the CV lacks are the list's below (`MissingFieldsView`). When no design can
+/// print the PDF, the status offers "Try again" (#566).
 struct ExportStatusView: View {
     let status: ExportStatus
+    /// Checks the designs again and exports once more.
+    let retry: () -> Void
 
     var body: some View {
-        if let words = status.words {
+        if let words = status.words, status.offersRetry {
+            InlineNotice(actionTitle: "export.designs.retry", actionIdentifier: "export.designs.retry", action: retry) {
+                WholeWordsText(words)
+                    .footerTextStyle()
+                    .accessibilityIdentifier("export.status")
+            }
+        } else if let words = status.words {
             HStack(spacing: Spacing.small) {
                 if case .exporting = status { ProgressView() }
                 WholeWordsText(words)
@@ -32,7 +41,24 @@ extension ExportStatus {
         case .invalid: "export.status.invalid"
         case .incomplete(let missing): "export.status.incomplete \(missing)"
         case .textNotVisible(let lines): "export.status.text_not_visible \(lines)"
+        case .designsUnavailable: "export.designs.unavailable"
         case .failed: "export.error.failed"
+        }
+    }
+}
+
+extension DesignWait {
+    /// The words that tell the export waits for the check of its design: the PDF is being prepared.
+    var words: LocalizedStringResource { "export.loading" }
+}
+
+extension DesignsAnnouncement {
+    /// The words that tell designs joined the look, that the check of the designs ended, or both.
+    var words: LocalizedStringResource {
+        switch kind {
+        case .joined: "look.designs.joined"
+        case .checked: "look.designs.checked"
+        case .joinedAndChecked: "look.designs.joinedAndChecked"
         }
     }
 }

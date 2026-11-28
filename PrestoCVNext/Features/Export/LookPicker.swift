@@ -4,6 +4,9 @@ import SwiftUI
 /// The look of the PDF (#407): the design, then the fonts, then the colours, each a group of items with the chosen one
 /// ringed. A tap goes to the sheet, which shows the choice at once, makes the PDF again and keeps the choice in the CV.
 /// A line under the groups says so; a group that holds a choice from an earlier version says what choosing another does.
+/// While the designs are being checked, a line under them says that more can join (#566): a design that joins does not
+/// move the focus. VoiceOver hears one message when designs join and one when the check ends, told by the export sheet
+/// (`ExportSheetView`), and the focus stays where it is.
 struct LookPicker: View {
     let sheet: ExportSheetViewModel
 
@@ -33,6 +36,11 @@ private struct LookGroup: View {
                 .font(.subheadline.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
             items
+            if group.checksMore {
+                WholeWordsText("look.designs.checking")
+                    .footerTextStyle()
+                    .accessibilityIdentifier("look.designs.checking")
+            }
             if group.keepsAnEarlierLook {
                 WholeWordsText("look.footer.kept")
                     .footerTextStyle()

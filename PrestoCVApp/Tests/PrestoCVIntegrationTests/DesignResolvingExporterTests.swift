@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 import PrestoCVDomain
 import PrestoCVWorkflowPorts
 import PrestoCVIntegration
@@ -76,6 +77,34 @@ private actor HeldDesignStore: DesignStore {
     func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { try await store.replaceBundled(design) }
 }
 
+/// Keeps every HTML it was given, like `RecordingRenderer`, with no actor: a print stays on the executor of its task.
+private final class UnheldRecordingRenderer: PDFRendering {
+    private let htmls = Mutex<[String]>([])
+    var rendered: [String] { htmls.withLock { $0 } }
+
+    @concurrent func render(html: String, page: PageSetup) async throws -> RenderedPDF {
+        htmls.withLock { $0.append(html) }
+        return try await FakePDFRenderer().render(html: html, page: page)
+    }
+}
+
+/// A store that gives the designs the test puts in it, with no actor: a read stays on the executor of its task. An
+/// export only reads designs, so the store's other requirements fail.
+private final class UnheldDesignStore: DesignStore {
+    struct NotAnExportRead: Error {}
+    private let held = Mutex<[String: ValidatedDesign]>([:])
+
+    func put(_ design: ValidatedDesign) { held.withLock { $0[design.manifest.id] = design } }
+
+    @concurrent func design(id: String) async throws -> ValidatedDesign? { held.withLock { $0[id] } }
+    @concurrent func installedDesigns() async throws -> [DesignManifest] { throw NotAnExportRead() }
+    @discardableResult @concurrent func save(_ design: ValidatedDesign) async throws -> ImportSave { throw NotAnExportRead() }
+    @concurrent func saveIfNewer(_ design: ValidatedDesign) async throws -> ConditionalSave { throw NotAnExportRead() }
+    @concurrent func installedOrigins() async throws -> [String: DesignOrigin] { throw NotAnExportRead() }
+    @concurrent func adoptAsBundled(_ design: ValidatedDesign) async throws -> Bool { throw NotAnExportRead() }
+    @concurrent func replaceBundled(_ design: ValidatedDesign) async throws -> Bool { throw NotAnExportRead() }
+}
+
 /// Two installed designs that differ in stylesheet, default palette and default fonts.
 private enum Installed {
     static let defaultID = "professional"
@@ -94,8 +123,13 @@ private enum Installed {
     }
 }
 
-private func exporter(_ store: any DesignStore, renderer: any PDFRendering) -> DesignResolvingExporter {
-    DesignResolvingExporter(store: store, defaultDesign: Installed.defaultID, renderer: renderer, inspector: MinimalPDFInspector(),
+/// An exporter over the store, once the check of the designs is over and passed both installed designs.
+private func exporter(_ store: any DesignStore, renderer: any PDFRendering) async throws -> DesignResolvingExporter {
+    exporter(store, designs: await checkedDesigns(holding: try Installed.designs(), defaultDesign: Installed.defaultID), renderer: renderer)
+}
+
+private func exporter(_ store: any DesignStore, designs: CheckedDesigns, renderer: any PDFRendering) -> DesignResolvingExporter {
+    DesignResolvingExporter(store: store, designs: designs, renderer: renderer, inspector: MinimalPDFInspector(),
                             headings: HeadingsCatalog(source: BundleHeadingTableSource()), policy: .standard)
 }
 
@@ -177,7 +211,7 @@ struct DesignResolvingExporterTests {
         let store = try await Installed.store()
         let ocean = try choice("modern", palette: NamedPalette.ocean.rawValue, fonts: nil)
         let plum = try choice("modern", palette: NamedPalette.plum.rawValue, fonts: nil)
-        let export = exporter(store, renderer: FakePDFRenderer())
+        let export = try await exporter(store, renderer: FakePDFRenderer())
 
         let first = try await export.export(cv(ocean), language: try italian())
         let again = try await export.export(cv(ocean), language: try italian())
@@ -189,7 +223,7 @@ struct DesignResolvingExporterTests {
 
     @Test("a chosen design changes the PDF")
     func designChangesThePDF() async throws {
-        let export = exporter(try await Installed.store(), renderer: FakePDFRenderer())
+        let export = try await exporter(try await Installed.store(), renderer: FakePDFRenderer())
         let palette = NamedPalette.ink.rawValue, fonts = FontScheme.system.rawValue
 
         let professional = try await export.export(cv(try choice("professional", palette: palette, fonts: fonts)), language: try italian())
@@ -208,12 +242,23 @@ struct DesignResolvingExporterTests {
         #expect(await renderer.rendered.isEmpty)
     }
 
-    @Test("a store without the default design is renderingFailed, even for an unknown design")
+    @Test("a store that fails while the default design did not pass its check is designsUnavailable")
+    func storeFailureWithoutTheDefault() async throws {
+        let renderer = RecordingRenderer()
+        let designs = await checkedDesigns(holding: [], defaultDesign: Installed.defaultID)
+
+        await #expect(throws: ExportFailure.designsUnavailable) {
+            try await exporter(UnavailableStore(), designs: designs, renderer: renderer).export(cv(nil), language: try italian())
+        }
+        #expect(await renderer.rendered.isEmpty)
+    }
+
+    @Test("a store without the default design is designsUnavailable, even for an unknown design")
     func noDefaultDesign() async throws {
         let renderer = RecordingRenderer()
         let look = try choice("gone", palette: nil, fonts: nil)
 
-        await #expect(throws: ExportFailure.renderingFailed) {
+        await #expect(throws: ExportFailure.designsUnavailable) {
             try await exporter(InMemoryDesignStore(), renderer: renderer).export(cv(look), language: try italian())
         }
         #expect(await renderer.rendered.isEmpty)
@@ -253,5 +298,159 @@ struct DesignResolvingExporterTests {
         await #expect(throws: ExportFailure.notReady) {
             try await exporter(try await Installed.store(), renderer: FakePDFRenderer()).export(unnamed, language: try italian())
         }
+    }
+}
+
+@Suite("An export while the designs are checked (#566)", .timeLimit(.minutes(1)))
+struct ExportWhileCheckingTests {
+    /// Designs whose check runs, over a store that holds nothing yet: the test saves each design, then tells its verdict.
+    private func checking() -> (checking: DrivenChecking, designs: CheckedDesigns, store: InMemoryDesignStore) {
+        let checking = DrivenChecking(holding: [])
+        let designs = CheckedDesigns(checking: checking, defaultDesign: Installed.defaultID)
+        designs.start()
+        return (checking, designs, InMemoryDesignStore())
+    }
+
+    @Test("an export whose design has no verdict waits for it, even once the default design passed, then prints in it")
+    func waitsForItsDesign() async throws {
+        let (checking, designs, store) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(try choice("modern", palette: nil, fonts: nil)), language = try italian()
+        let installed = try Installed.designs()
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        _ = try await store.saveIfNewer(installed[0])
+        checking.tell(Installed.defaultID, installed[0])
+        _ = await first(designs) { $0.designs.count == 1 }
+        for _ in 0..<50 { await Task.yield() }
+        #expect(await renderer.rendered.isEmpty)
+
+        _ = try await store.saveIfNewer(installed[1])
+        checking.tell("modern", installed[1])
+        _ = try await export.value
+
+        let html = try await onlyHTML(renderer)
+        #expect(html.contains(Installed.modernCSS))
+        #expect(designs.current.status == .checking)
+    }
+
+    @Test("an export whose design does not pass prints in the default design, once the default design passed")
+    func refusedDesignFallsBack() async throws {
+        let (checking, designs, store) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(try choice("modern", palette: nil, fonts: nil)), language = try italian()
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        checking.tell("modern", nil)
+        for _ in 0..<50 { await Task.yield() }
+        #expect(await renderer.rendered.isEmpty)
+        let professional = try Installed.designs()[0]
+        _ = try await store.saveIfNewer(professional)
+        checking.tell(Installed.defaultID, professional)
+        _ = try await export.value
+
+        #expect(try await onlyHTML(renderer).contains(Installed.professionalCSS))
+    }
+
+    @Test("an export when the default design does not pass is designsUnavailable, and nothing is rendered")
+    func refusedDefault() async throws {
+        let (checking, designs, store) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        checking.tell(Installed.defaultID, nil)
+        checking.endCheck()
+
+        await #expect(throws: ExportFailure.designsUnavailable) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
+    }
+
+    @Test("a store that fails once the default design did not pass is designsUnavailable, while the other designs are still checked")
+    func storeFailureOnceTheDefaultFailed() async throws {
+        let (checking, designs, _) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+
+        let export = Task { try await exporter(UnavailableStore(), designs: designs, renderer: renderer).export(snapshot, language: language) }
+        checking.tell(Installed.defaultID, nil)
+
+        await #expect(throws: ExportFailure.designsUnavailable) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
+        #expect(designs.current.status == .checking, "the rest of the check is still held")
+        checking.endCheck()
+    }
+
+    /// The export's task prefers an executor the test drains, and its store and renderer have no actor, so the whole
+    /// export runs there: once drained, an export that did not wait has ended, on every run, and an export that waits on
+    /// the verdict holds the one open watcher (`openWatchers`), so the test cannot pass before the export reaches the wait.
+    @Test("an export after a retry, once the default design did not pass while the others are still checked, waits for the check to run again, then prints in the default design")
+    func exportAfterARetryWhileChecking() async throws {
+        let (checking, designs, _) = checking()
+        let store = UnheldDesignStore(), renderer = UnheldRecordingRenderer(), executor = DrainedExecutor()
+        let snapshot = cv(nil), language = try italian(), ended = Mutex(false)
+        checking.tell(Installed.defaultID, nil)
+        try await designs.verdict(on: Installed.defaultID)
+
+        designs.retry()
+        let export = Task(executorPreference: executor) {
+            defer { ended.withLock { $0 = true } }
+            return try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language)
+        }
+        await executor.drain()                                          // the check still runs: an export that did not wait finds no design
+        #expect(designs.openWatchers == 1, "the export is waiting on the verdict of the check that runs again")
+        #expect(ended.withLock { $0 } == false, "the export waits for the check to run again")
+        #expect(renderer.rendered.isEmpty)
+
+        executor.letGo()
+        checking.endCheck()
+        let professional = try Installed.designs()[0]
+        store.put(professional)
+        checking.tell(Installed.defaultID, professional)
+        _ = try await export.value
+
+        #expect(renderer.rendered.count == 1)
+        #expect(renderer.rendered.first?.contains(Installed.professionalCSS) == true)
+        #expect(checking.checks == 2)
+        checking.endCheck()
+    }
+
+    /// The store's read waits while the person retries: the export saw the default design's verdict before the retry
+    /// took it back for the check that runs again.
+    @Test("a store that fails once the default design did not pass is designsUnavailable, even when a retry comes while the store is read",
+          arguments: [false, true])
+    func storeFailureWhileARetryComes(checkEnded: Bool) async throws {
+        let (checking, designs, _) = checking()
+        let store = HeldDesignStore(installed: [], timesOut: true), renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+        checking.tell(Installed.defaultID, nil)
+        if checkEnded {
+            checking.endCheck()
+            _ = await first(designs) { $0.status == .unavailable }
+        } else {
+            try await designs.verdict(on: Installed.defaultID)
+        }
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        try #require(await store.waitUntilEntered())
+        designs.retry()                                                 // the default design waits for its verdict again
+        await store.release()
+
+        await #expect(throws: ExportFailure.designsUnavailable) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
+        checking.endCheck()
+    }
+
+    @Test("an export cancelled while it waits for a verdict is cancelled, and nothing is rendered")
+    func cancelledWhileWaiting() async throws {
+        let (_, designs, store) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        export.cancel()
+
+        await #expect(throws: CancellationError.self) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
     }
 }

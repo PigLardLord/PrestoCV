@@ -167,6 +167,8 @@ public struct SyncReport: Equatable, Sendable {
 ///   cannot be read (`DesignCatalogError.bundledDesignsUnavailable`), and cancellation. A cancellation passes through
 ///   unchanged at every call (the source, the listings, the adoption, the gate and the save), and the designs saved before it
 ///   stay saved (ADR 0003), so this throws untyped: a `DesignCatalogError`, or a `CancellationError`.
+/// - The app opens before the sync ends (#566), so it can name the design to sync first (its default design), and learn each
+///   design's verdict as soon as the store holds it.
 public struct SyncBundledDesigns: Sendable {
     let source: any BundledDesignSource, validator: DesignPackageValidator, gate: any DesignRenderingGate, store: any DesignStore
     public init(source: any BundledDesignSource, validator: DesignPackageValidator = DesignPackageValidator(),
@@ -175,72 +177,96 @@ public struct SyncBundledDesigns: Sendable {
     }
 
     public func callAsFunction() async throws -> SyncReport {
+        try await sync(first: nil) { _ in }
+    }
+
+    /// Syncs the packages that claim the identifier `first` before the others, which keep the order of the source, and calls
+    /// `decided` with each package's identifier once the store holds that package's verdict, whatever it is: installed,
+    /// upgraded, left alone, refused or failed. A package that names no identifier is not told. A first identifier the source
+    /// does not hold changes nothing.
+    public func callAsFunction(first: String, decided: (String) async -> Void) async throws -> SyncReport {
+        try await sync(first: first, decided: decided)
+    }
+
+    private func sync(first: String?, decided: (String) async -> Void) async throws -> SyncReport {
         let packages: [(name: String, data: Data)]
         do { packages = try await source.bundledPackages() } catch let cancellation as CancellationError { throw cancellation } catch {
             throw DesignCatalogError.bundledDesignsUnavailable
         }
         var (versions, origins) = try await listInstalled()
         var report = SyncReport()
-        for (name, data) in packages {
-            let design: ValidatedDesign
-            do throws(DesignPackageRejected) { design = try validator.validate(data) } catch {
-                report.rejected.append(RejectedBundledDesign(name: name, violations: error.violations))
-                continue
-            }
-            let id = design.manifest.id, version = design.manifest.version
-            var repairing = false
-            if let installed = versions[id] {
-                switch origins[id] {
-                case .bundled?:
-                    if version <= installed {
-                        guard try await isUnreadable(id) else {
-                            report.unchanged.append(id)
-                            continue
-                        }
-                        repairing = true
-                    }
-                case nil where version == installed:
-                    do {
-                        if try await store.adoptAsBundled(design) {
-                            origins[id] = .bundled
-                            report.adopted.append(id)
-                        } else {
-                            report.conflicts.append(id)
-                        }
-                    } catch let cancellation as CancellationError {
-                        throw cancellation
-                    } catch {
-                        report.failed.append(id)
-                    }
-                    continue
-                case .imported?, nil:
-                    report.conflicts.append(id)
-                    continue
-                }
-            }
-            do { try await gate.verify(design) } catch let cancellation as CancellationError { throw cancellation } catch {
-                report.notRendered.append(id)
-                continue
-            }
-            if repairing {
-                try await repair(design, into: &report)
-                continue
-            }
-            let outcome: ConditionalSave
-            do { outcome = try await store.saveIfNewer(design) } catch let cancellation as CancellationError { throw cancellation } catch {
-                report.failed.append(id)
-                continue
-            }
-            switch outcome {
-            case .installed: report.installed.append(id)
-            case .upgraded: report.upgraded.append(id)
-            case .keptInstalled: report.unchanged.append(id)
-            case .keptImported: report.conflicts.append(id)
-            }
-            origins[id] = outcome == .keptImported ? .imported : .bundled
-            versions[id] = max(version, versions[id] ?? version)
+        let claimed = packages.map { package -> (name: String, data: Data, id: String?) in
+            guard case .identifier(let id) = validator.claimedIdentifier(in: package.data) else { return (package.name, package.data, nil) }
+            return (package.name, package.data, id)
+        }
+        let ordered = claimed.filter { $0.id != nil && $0.id == first } + claimed.filter { $0.id == nil || $0.id != first }
+        for package in ordered {
+            try await sync(package.name, package.data, versions: &versions, origins: &origins, report: &report)
+            if let id = package.id { await decided(id) }
         }
         return report
+    }
+
+    /// Syncs one package into the report. Only a cancellation passes through.
+    private func sync(_ name: String, _ data: Data, versions: inout [String: DesignVersion], origins: inout [String: DesignOrigin],
+                      report: inout SyncReport) async throws {
+        let design: ValidatedDesign
+        do throws(DesignPackageRejected) { design = try validator.validate(data) } catch {
+            report.rejected.append(RejectedBundledDesign(name: name, violations: error.violations))
+            return
+        }
+        let id = design.manifest.id, version = design.manifest.version
+        var repairing = false
+        if let installed = versions[id] {
+            switch origins[id] {
+            case .bundled?:
+                if version <= installed {
+                    guard try await isUnreadable(id) else {
+                        report.unchanged.append(id)
+                        return
+                    }
+                    repairing = true
+                }
+            case nil where version == installed:
+                do {
+                    if try await store.adoptAsBundled(design) {
+                        origins[id] = .bundled
+                        report.adopted.append(id)
+                    } else {
+                        report.conflicts.append(id)
+                    }
+                } catch let cancellation as CancellationError {
+                    throw cancellation
+                } catch {
+                    report.failed.append(id)
+                }
+                return
+            case .imported?, nil:
+                report.conflicts.append(id)
+                return
+            }
+        }
+        do { try await gate.verify(design) } catch let cancellation as CancellationError { throw cancellation } catch {
+            report.notRendered.append(id)
+            return
+        }
+        if repairing {
+            try await repair(design, into: &report)
+            return
+        }
+        let outcome: ConditionalSave
+        do { outcome = try await store.saveIfNewer(design) } catch let cancellation as CancellationError { throw cancellation } catch {
+            report.failed.append(id)
+            return
+        }
+        switch outcome {
+        case .installed: report.installed.append(id)
+        case .upgraded: report.upgraded.append(id)
+        case .keptInstalled: report.unchanged.append(id)
+        case .keptImported: report.conflicts.append(id)
+        }
+        origins[id] = outcome == .keptImported ? .imported : .bundled
+        versions[id] = max(version, versions[id] ?? version)
     }
 
     /// Whether the store lists the design but cannot read it. Only a cancellation passes through.

@@ -645,18 +645,21 @@ struct ScreenFactoryTests {
         try #require(look.status == .applied)
     }
 
-    @Test("A look picker offers the installed designs by their codes, and shows the default design for a CV that keeps none")
-    func lookOffersTheInstalledDesigns() async throws {
+    @Test("A look picker offers the checked designs by code, the default first, and shows it for a CV that keeps none")
+    func lookOffersTheCheckedDesigns() async throws {
         let fixture = try await Self.fixture()
         defer { fixture.clean() }
         let reference = try await Self.storedCV(fixture, design: nil)
+        // The picker offers the designs that passed by the time it is made, the default first, and the check runs after
+        // the launch (#566).
+        _ = await CompositionTests.checked(fixture.composition)
         let look = fixture.composition.screens.makeLook(for: reference)
 
         await look.load()
 
         #expect(look.status == .ready)
-        #expect(look.choices.designs.map(\.id) == ["minimal", "modern", "professional"])
-        #expect(look.choices.designs.map(\.nameCode) == ["design.minimal", "design.modern", "design.professional"])
+        #expect(look.choices.designs.map(\.id) == ["professional", "minimal", "modern"])
+        #expect(look.choices.designs.map(\.nameCode) == ["design.professional", "design.minimal", "design.modern"])
         #expect(look.shown.design == "professional")
     }
 
