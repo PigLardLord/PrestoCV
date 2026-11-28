@@ -40,6 +40,10 @@ case "$ACTION" in
     for package in DiagnosticLogging DiagnosticTrace PrestoCVCore CVPDFExporter CVGeneratorAI; do
       step swift test --package-path "$ROOT/$package"
     done
+    # The source checks hold the listing's pendingLocales (the locales still written for 1.0) to the target branch's list: it
+    # may only shrink. The checks read the target branch's ref from PRESTOCV_TARGET_REF; a checkout without that ref compares
+    # with an empty list, as the baseline below, and a run with no pull request compares with nothing.
+    if [ -n "${CI_PULL_REQUEST_TARGET_BRANCH:-}" ]; then export PRESTOCV_TARGET_REF="origin/$CI_PULL_REQUEST_TARGET_BRANCH"; fi
     step swift test --package-path "$ROOT/Tools/SourceChecks"
     # On a pull request the baseline may only shrink, so it is compared with the target branch's. When the checkout has
     # no such branch, the comparison is with an empty baseline.
@@ -57,24 +61,8 @@ case "$ACTION" in
     # The screenshot tool erases simulators: its guards (reserved name, one run at a time, put back on every way out) are
     # tested here on fake tools.
     step "$ROOT/Tools/Release/store-screenshots-selftest.sh"
-    # The captions are paired with the six screenshots by position: the listing must hold exactly six for each locale, and
-    # the composer must refuse any other number, a capture of the wrong size and a folder it would leave stale.
-    # The locales still written for 1.0 may only shrink, so on a pull request their list is compared with the target
-    # branch's. A checkout with no such branch compares with an empty list, as the baseline above; a target branch that
-    # has no list yet has nothing to compare with.
-    listing_args=()
-    if [ -n "${CI_PULL_REQUEST_TARGET_BRANCH:-}" ]; then
-      retired="$(mktemp)"
-      target="origin/$CI_PULL_REQUEST_TARGET_BRANCH"
-      if ! git -C "$ROOT" rev-parse --verify --quiet "$target^{commit}" > /dev/null; then
-        echo '{"pendingLocales": []}' > "$retired"
-        listing_args=(--against "$retired")
-      elif git -C "$ROOT" show "$target:Tools/Release/store-listing-retired-words.json" > "$retired" 2>/dev/null; then
-        listing_args=(--against "$retired")
-      fi
-    fi
-    step "$ROOT/Tools/Release/check-store-listing.py" ${listing_args[@]+"${listing_args[@]}"}
-    step "$ROOT/Tools/Release/check-store-listing-selftest.py"
+    # The captions are paired with the six screenshots by position: the composer must refuse any other number, a capture of the
+    # wrong size and a folder it would leave stale (the listing's six captions are checked by the source checks above).
     step "$ROOT/Tools/Release/compose-store-screenshots-selftest.sh"
     step swift test --package-path "$ROOT/PrestoCVApp"
     # The app is built for its second platform (docs/architecture/modules.md): the test plans run it on iOS only.
