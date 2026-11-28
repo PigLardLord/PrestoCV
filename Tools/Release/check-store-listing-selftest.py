@@ -11,7 +11,10 @@ The retired words (store-listing-retired-words.json) are the claims check: a tex
 feature the app lacks, in the language of its locale.
 """
 import importlib.util
+import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -99,6 +102,7 @@ class RetiredWords(unittest.TestCase):
             self.assertTrue(entry["reason"].strip(), entry["pattern"])
             self.assertTrue(set(entry["languages"]) <= {"*", "en", "de", "it", "es", "fr", "pt"}, entry["pattern"])
             self.assertTrue(set(entry.get("allowedIn", [])) <= set(checker.FIELDS), entry["pattern"])
+            self.assertTrue(set(entry.get("onlyIn", checker.FIELDS)) <= set(checker.FIELDS), entry["pattern"])
         self.assertTrue(set(pending) <= set(listing()[0]) | {"notes"}, pending)
 
     def test_the_ai_draft_is_refused_in_every_language(self):
@@ -112,6 +116,33 @@ class RetiredWords(unittest.TestCase):
         for claim in claims:
             with self.subTest(claim):
                 self.assertTrue(retired_errors("en-US", "Description", claim), claim)
+
+    def test_the_usual_variants_are_refused(self):
+        variants = {
+            "en-US": ["ai-powered CVs", "Written by A.I.", "Drafted for you", "Keep drafting", "Apple-Intelligence",
+                      "an on device model", "Import from Linked-In", "On all your Macs"],
+            "de-DE": ["Mit K.I.", "ki-gestützt", "Drei Entwürfe", "Das On-Device-Modell schreibt"],
+            "it": ["Una Bozza pronta", "Con l'I.A.", "Con la ia generativa"],
+            "es-ES": ["Con I.A.", "Borrador listo"],
+            "fr-FR": ["Brouillon prêt"],
+            "pt-PT": ["Com IA", "Rascunho pronto"],
+        }
+        for locale, texts in variants.items():
+            for text in texts:
+                with self.subTest(locale=locale, text=text):
+                    self.assertTrue(retired_errors(locale, "Description", text), text)
+        self.assertTrue(retired_errors("pt-PT", "Keywords", "ia"))
+
+    def test_a_scan_is_refused_in_its_forms(self):
+        for locale, text in [("en-US", "Scan your CV"), ("en-US", "a scanned page"), ("de-DE", "eingescannt"),
+                             ("it", "scansiona il CV"), ("es-ES", "escanea tu CV"), ("fr-FR", "numérisez le CV")]:
+            with self.subTest(locale=locale, text=text):
+                self.assertTrue(retired_errors(locale, "Description", text), text)
+
+    def test_words_that_only_look_like_a_retired_one_pass(self):
+        self.assertEqual(retired_errors("en-US", "Description", "Scandinavian roles, all linked in one place."), [])
+        self.assertEqual(retired_errors("pt-PT", "Description", "Eu ia ao trabalho."), [])
+        self.assertEqual(retired_errors("it", "Description", "Ai colleghi piace."), [])
 
     def test_a_caption_and_the_keywords_are_checked_too(self):
         self.assertTrue(retired_errors("de-DE", "Screenshot captions", "Apple Intelligence | Ein Entwurf"))
@@ -128,7 +159,7 @@ class RetiredWords(unittest.TestCase):
         self.assertTrue(any(e.startswith("notes ") for e in errors), errors)
 
     def test_ordinary_words_are_not_retired(self):
-        text = "Mach dein CV in Italia: mail, main, machine, scale, Macedonia, ia, bozzetto and a tablet."
+        text = "Mach dein CV in Italia: mail, main, machine, scale, Macedonia, bozzetto, Entwicklung and a tablet."
         for locale in ("en-US", "de-DE", "it"):
             with self.subTest(locale):
                 self.assertEqual(retired_errors(locale, "Description", text), [])
@@ -149,6 +180,29 @@ class RetiredWords(unittest.TestCase):
         entries, _ = checker.load_retired()
         errors = checker.check_retired({"en-US": {"Description": ["Plain."]}}, "Plain.", entries, {"xx"})
         self.assertTrue(any("'xx' is not a locale" in e for e in errors), errors)
+
+
+class PendingAgainstTheTargetBranch(unittest.TestCase):
+    def test_a_grown_list_is_refused(self):
+        errors = checker.check_pending_against(["es-ES", "fr-FR"], ["es-ES"])
+        self.assertTrue(any("grew" in e and "fr-FR" in e for e in errors), errors)
+
+    def test_an_equal_or_shorter_list_passes(self):
+        self.assertEqual(checker.check_pending_against(["es-ES"], ["es-ES"]), [])
+        self.assertEqual(checker.check_pending_against([], ["es-ES", "fr-FR"]), [])
+
+    def test_the_command_line_compares_with_the_file_it_is_given(self):
+        _, pending = checker.load_retired()
+        with tempfile.TemporaryDirectory() as folder:
+            shorter, same = Path(folder) / "shorter.json", Path(folder) / "same.json"
+            shorter.write_text(json.dumps({"pendingLocales": pending[1:]}), encoding="utf-8")
+            same.write_text(json.dumps({"pendingLocales": pending}), encoding="utf-8")
+            command = [sys.executable, "-I", str(HERE / "check-store-listing.py"), "--against"]
+            refused = subprocess.run(command + [str(shorter)], capture_output=True, text=True)
+            passed = subprocess.run(command + [str(same)], capture_output=True, text=True)
+        self.assertEqual(refused.returncode, 1, refused.stderr)
+        self.assertIn(pending[0], refused.stderr)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
 
 
 if __name__ == "__main__":

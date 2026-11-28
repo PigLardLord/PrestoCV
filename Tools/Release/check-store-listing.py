@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Counts the texts of docs/release/store-listing.md and checks them against the App Store limits.
 
-    Tools/Release/check-store-listing.py           # exits 1 if a text breaks a limit or the counts table is stale
-    Tools/Release/check-store-listing.py --write   # rewrites the counts table first
+    Tools/Release/check-store-listing.py                  # exits 1 if a text breaks a limit or the counts table is stale
+    Tools/Release/check-store-listing.py --write          # rewrites the counts table first
+    Tools/Release/check-store-listing.py --against FILE   # also refuses pendingLocales that grew compared with FILE
 
 Retired words (store-listing-retired-words.json) name features the app lacks: a text that uses one fails, in the
-language of its locale.
+language of its locale. FILE is the target branch's copy of that file: the Mac check passes it, so the baseline of
+locales still written for 1.0 can only shrink.
 
 A text is the fenced ```text block under a field heading (### Name) of a locale section (## German, de-DE), or under
 "## Notes for App Review". Characters are Unicode scalars of NFC text; keywords are counted in UTF-8 bytes.
 """
+import argparse
 import json
 import re
 import sys
@@ -88,6 +91,8 @@ def retired_uses(locale, texts, entries):
                 continue
             if field in entry.get("allowedIn", []):
                 continue
+            if "onlyIn" in entry and field not in entry["onlyIn"]:
+                continue
             for match in entry["regex"].finditer(text):
                 found.append((field, match.group(0), entry["reason"]))
     return found
@@ -110,6 +115,14 @@ def check_retired(locales, notes, entries, pending):
             continue
         errors += [f"{name} {field}: '{word}' names a feature 1.1 lacks ({reason})" for field, word, reason in found]
     return errors
+
+
+def check_pending_against(pending, base_pending):
+    """The error when the pending locales grew compared with the target branch's list"""
+    grown = sorted(set(pending) - set(base_pending))
+    if not grown:
+        return []
+    return [f"retired words: pendingLocales grew compared with the target branch: {', '.join(grown)}"]
 
 
 def check(locales, notes, retired=None):
@@ -181,12 +194,18 @@ def table(locales, notes):
 
 
 def main():
-    write = sys.argv[1:] == ["--write"]
-    if sys.argv[1:] not in ([], ["--write"]):
-        sys.exit(__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--write", action="store_true", help="rewrite the counts table first")
+    parser.add_argument("--against", type=Path, metavar="FILE",
+                        help="the target branch's store-listing-retired-words.json")
+    args = parser.parse_args()
+    write = args.write
     lines = DOC.read_text(encoding="utf-8").split("\n")
     locales, notes = parse(lines)
     errors = check(locales, notes)
+    if args.against:
+        base = json.loads(args.against.read_text(encoding="utf-8"))
+        errors += check_pending_against(load_retired()[1], base.get("pendingLocales", []))
     if START not in lines or END not in lines:
         sys.exit(f"{DOC.name}: no {START} … {END} markers")
     start, end = lines.index(START), lines.index(END)
