@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs the checks of the Linux CI job, the same way, on a computer or in CI (ADR 0026):
 # the toolchain against .swift-version, the architecture check (against the base's baseline when a ref is given,
-# ADR 0006), its self-test, the source checks, and the build and tests of the new targets (ADR 0012).
+# ADR 0006), its self-test, the source checks (which also compare the store listing's pending locales with the base's), and the build and tests of the new targets (ADR 0012).
 # Usage: Tools/check-linux.sh [<base ref>], e.g. Tools/check-linux.sh origin/main
 # On a Mac, ci_scripts/ci_post_xcodebuild.sh runs these checks and the Apple ones.
 set -uo pipefail
@@ -41,6 +41,8 @@ if [ $# -gt 0 ]; then
   base_baseline="$run_tmp/base-baseline.json"
   git show "$1:Tools/ArchitectureCheck/baseline.json" > "$base_baseline" 2> /dev/null || echo '[]' > "$base_baseline"
   against=(--against "$base_baseline")
+  # The source checks hold the store listing's pendingLocales to the base's list, which may only shrink (read with git show).
+  export PRESTOCV_TARGET_REF="$1"
 fi
 
 ran=0

@@ -1523,7 +1523,27 @@
    "kind": "tool",
    "allowedImports": [
     "Testing",
+    "Foundation",
+    "StoreListing"
+   ],
+   "rules": []
+  },
+  {
+   "name": "StoreListing",
+   "path": "Tools/SourceChecks/Sources/StoreListing",
+   "kind": "tool",
+   "allowedImports": [
     "Foundation"
+   ],
+   "rules": []
+  },
+  {
+   "name": "store-listing-counts",
+   "path": "Tools/SourceChecks/Sources/store-listing-counts",
+   "kind": "tool",
+   "allowedImports": [
+    "Foundation",
+    "StoreListing"
    ],
    "rules": []
   },
