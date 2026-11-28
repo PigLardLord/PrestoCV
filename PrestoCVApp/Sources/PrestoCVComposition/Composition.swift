@@ -204,6 +204,10 @@ public final class Composition {
         )
     }
 
+    /// How many prints the renderer is given at once: macOS's renderer refuses a third print (its limit is internal to
+    /// CVRenderingMacOS), and iOS's sets none, so both platforms keep to two.
+    private static let printsAtOnce = 2
+
     /// The renderer of this platform, over the rules compiled for this composition.
     private static func renderer(rules: WKContentRuleList) -> any PDFRendering {
         #if os(iOS)
@@ -309,8 +313,8 @@ public final class Composition {
     /// Makes the one renderer, inspector and headings, the design store, the check of the bundled designs through a gate
     /// over them (`DesignBootstrap`, run by `CheckedDesigns` once `assemble` starts it), the exporter and the look options
     /// over the checked designs, and reads the languages a PDF can be written in. The headings are read before anything
-    /// renders; the designs are not waited for. The export and the check print through one `ExportFirst`, so a print of
-    /// the check never holds back an export.
+    /// renders; the designs are not waited for. The export and the check print through one `ExportFirst`, within the prints
+    /// the renderer runs at once, so a print of the check never holds back an export nor takes the place it needs.
     private static func rendering(
         _ inputs: Inputs, rules: WKContentRuleList, logger: any DiagnosticLogger
     ) async throws(CompositionFailure) -> Parts {
@@ -319,7 +323,7 @@ public final class Composition {
         let headings = HeadingsCatalog(source: BundleHeadingTableSource())
         let (gateHeadings, languages) = try await read(headings, gate: GateFixture.document.language)
         let store = FileDesignStore(directory: inputs.paths.designs, validator: DesignPackageValidator(), lockWait: .standard)
-        let turns = ExportFirst()
+        let turns = ExportFirst(prints: printsAtOnce)
         let designs = CheckedDesigns(
             checking: DesignBootstrap(
                 store: store, source: inputs.designs, gate: inputs.makeGate(turns.checking(renderer), inspector, gateHeadings),

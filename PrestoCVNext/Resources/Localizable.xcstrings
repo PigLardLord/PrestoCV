@@ -5952,37 +5952,37 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PDFs können gerade nicht erstellt werden. Starten Sie die App neu und versuchen Sie es erneut."
+            "value" : "Die Vorlagen haben die Prüfung nicht bestanden, daher kann dieses PDF nicht erstellt werden."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PDFs cannot be made right now. Restart the app and try again."
+            "value" : "The templates did not pass their check, so this PDF cannot be made."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se pueden crear PDF en este momento. Reinicia la app e inténtalo de nuevo."
+            "value" : "Las plantillas no pasaron la revisión, así que no se puede crear este PDF."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les PDF ne peuvent pas être créés pour le moment. Redémarrez l’app et réessayez."
+            "value" : "Les modèles n’ont pas passé la vérification, ce PDF ne peut donc pas être créé."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Al momento non è possibile creare PDF. Riavvia l’app e riprova."
+            "value" : "I modelli non hanno superato il controllo, quindi non è possibile creare questo PDF."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Não é possível criar PDFs agora. Reinicie o app e tente novamente."
+            "value" : "Os modelos não passaram na verificação, então não é possível criar este PDF."
           }
         }
       }
@@ -14118,6 +14118,47 @@
         }
       }
     },
+    "look.designs.checked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Vorlagen sind geprüft"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All templates are checked"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se revisaron todas las plantillas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les modèles sont vérifiés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutti i modelli sono stati controllati"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos os modelos foram verificados"
+          }
+        }
+      }
+    },
     "look.designs.checking" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14130,7 +14171,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Checking more designs…"
+            "value" : "Checking more templates…"
           }
         },
         "es" : {
@@ -14155,6 +14196,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Verificando mais modelos…"
+          }
+        }
+      }
+    },
+    "look.designs.joined" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Vorlagen sind verfügbar"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More templates are available"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay más plantillas disponibles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’autres modèles sont disponibles"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono disponibili altri modelli"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há mais modelos disponíveis"
           }
         }
       }

@@ -115,4 +115,82 @@ struct ExportSheetDesignsTests {
         await world.passThePause(thenExports: 2)
         await waitUntil("the PDF") { sheet.status == .done(pages: 1) }
     }
+
+    @Test("Designs that join while the check runs are told once, however many join; the end of the check is told once, anew")
+    func joinsAndTheEndAreTold() async {
+        let options = DrivenLookOptions(Self.options([], .checking))
+        let sheet = Self.world(options).sheet()
+        let watch = Task { await sheet.watchDesigns() }
+        defer { watch.cancel() }
+        await waitUntil("the sheet watches the designs") { options.watching == 1 }
+
+        options.tell(Self.options(["classic"], .checking))
+        await waitUntil("classic joins") { sheet.lookChoices.designs.count == 1 }
+        let joined = sheet.designsToAnnounce
+        #expect(joined?.kind == .joined)
+
+        options.tell(Self.options(["classic", "modern"], .checking))
+        await waitUntil("modern joins") { sheet.lookChoices.designs.count == 2 }
+        #expect(sheet.designsToAnnounce == joined, "one message for the joins of a check")
+
+        options.tell(Self.options(["classic", "modern"], .ready))
+        await waitUntil("the check ends") { sheet.lookPicker.groups.map(\.checksMore) == [false, false, false] }
+        #expect(sheet.designsToAnnounce?.kind == .checked)
+
+        sheet.stop()
+        #expect(sheet.designsToAnnounce == nil)
+    }
+
+    @Test("Nothing is told while the designs stay as they are, nor when the sheet opens after the check; a join that ends the check is told as the end alone")
+    func nothingNewIsNotTold() async {
+        let over = DrivenLookOptions(Self.options(["classic", "modern"], .ready))
+        let opened = Self.world(over).sheet()
+        let watchOver = Task { await opened.watchDesigns() }
+        defer { watchOver.cancel() }
+        await waitUntil("the sheet watches the designs") { over.watching == 1 }
+        over.tell(Self.options(["classic", "modern"], .ready))
+        await settle()
+        #expect(opened.designsToAnnounce == nil)
+
+        let options = DrivenLookOptions(Self.options(["classic"], .checking))
+        let sheet = Self.world(options).sheet()
+        let watch = Task { await sheet.watchDesigns() }
+        defer { watch.cancel() }
+        await waitUntil("the sheet watches the designs") { options.watching == 1 }
+        options.tell(Self.options(["classic"], .checking))
+        await settle()
+        #expect(sheet.designsToAnnounce == nil)
+
+        options.tell(Self.options(["classic", "modern"], .ready))
+        await waitUntil("modern joins") { sheet.lookChoices.designs.count == 2 }
+        #expect(sheet.designsToAnnounce?.kind == .checked)
+    }
+
+    @Test("The check that Try again starts tells its joins and its end again")
+    func aRetryIsToldAgain() async {
+        let options = DrivenLookOptions(Self.options([], .checking))
+        let sheet = Self.world(options).sheet()
+        let watch = Task { await sheet.watchDesigns() }
+        defer { watch.cancel() }
+        await waitUntil("the sheet watches the designs") { options.watching == 1 }
+
+        options.tell(Self.options(["modern"], .checking))
+        await waitUntil("modern joins") { sheet.lookChoices.designs.count == 1 }
+        let firstJoin = sheet.designsToAnnounce
+        options.tell(Self.options(["modern"], .unavailable))
+        await waitUntil("the check ends") { sheet.designsToAnnounce?.kind == .checked }
+        let firstEnd = sheet.designsToAnnounce
+
+        options.tell(Self.options(["modern"], .checking))
+        await waitUntil("the check runs again") { sheet.lookPicker.groups.first?.checksMore == true }
+        #expect(sheet.designsToAnnounce == firstEnd)
+        options.tell(Self.options(["classic", "modern"], .checking))
+        await waitUntil("classic joins") { sheet.lookChoices.designs.count == 2 }
+        #expect(sheet.designsToAnnounce?.kind == .joined)
+        #expect(sheet.designsToAnnounce != firstJoin, "a join of the new check is a new value")
+        options.tell(Self.options(["classic", "modern"], .ready))
+        await waitUntil("the check ends again") { sheet.designsToAnnounce?.kind == .checked }
+        #expect(sheet.designsToAnnounce != firstEnd, "the end of the new check is a new value")
+    }
 }
+

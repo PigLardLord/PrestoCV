@@ -95,9 +95,14 @@ public final class CheckedDesigns: Sendable {
     }
 
     /// Returns once the design has its verdict: the check told it, or the check is over. A cancelled task, or designs
-    /// released meanwhile, give a `CancellationError`.
+    /// released meanwhile, give a `CancellationError`, even when the design has its verdict. A cancel ends the wait at
+    /// once, even while the check is stuck, and takes the wait's watcher out (`changes(_:)` ends with its task).
     @concurrent public func verdict(on id: String) async throws {
-        for await decided in changes({ $0.isDecided(id) }) where decided { return }
+        for await decided in changes({ $0.isDecided(id) }) where decided {
+            // The stream still gives the change it holds after a cancel: a cancelled export must not go on to print.
+            try Task.checkCancellation()
+            return
+        }
         throw CancellationError()
     }
 

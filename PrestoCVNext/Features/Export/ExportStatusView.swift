@@ -52,6 +52,16 @@ extension DesignWait {
     var words: LocalizedStringResource { "export.loading" }
 }
 
+extension DesignsAnnouncement {
+    /// The words that tell designs joined the look, or that the check of the designs ended.
+    var words: LocalizedStringResource {
+        switch kind {
+        case .joined: "look.designs.joined"
+        case .checked: "look.designs.checked"
+        }
+    }
+}
+
 extension RemadePDF {
     /// The words that tell the PDF was made again after a pick, with its pages.
     var words: LocalizedStringResource { "export.updated \(pages)" }

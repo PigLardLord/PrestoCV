@@ -35,6 +35,11 @@ public struct LookChoice: Hashable, Sendable {
     }
 }
 
+/// How the designs changed from one choice of the picker to the next, while they are checked (#566).
+enum DesignsChange: Equatable {
+    case none, joined, checkBegan, checkEnded
+}
+
 /// The designs, palettes and font schemes the picker shows.
 public struct LookChoices: Hashable, Sendable {
     public let designs: [LookChoice]
@@ -52,6 +57,14 @@ public struct LookChoices: Hashable, Sendable {
         checksMoreDesigns = options.status == .checking
         defaultDesign = options.defaultDesign
         ownLooks = options.ownLooks
+    }
+
+    /// What the designs did from these choices to `next` (#566): the check ended, a new one began (Try again), designs
+    /// joined while it runs, or nothing to tell.
+    func designsChange(to next: LookChoices) -> DesignsChange {
+        if checksMoreDesigns != next.checksMoreDesigns { return next.checksMoreDesigns ? .checkBegan : .checkEnded }
+        let offered = Set(designs.map(\.id))
+        return next.checksMoreDesigns && next.designs.contains { !offered.contains($0.id) } ? .joined : .none
     }
 
     /// True when an export in `design` waits for the check: the design is not offered while more can join. A CV that

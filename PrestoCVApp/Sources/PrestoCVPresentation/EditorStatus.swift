@@ -64,6 +64,21 @@ public struct DesignWait: Hashable, Sendable {
     let ordinal: Int
 }
 
+/// What the export sheet tells VoiceOver of the designs while they are checked (#566): designs joined the picker, or
+/// the check ended and the picker offers all the designs that passed. Each one is a new value.
+public struct DesignsAnnouncement: Hashable, Sendable {
+    public enum Kind: Hashable, Sendable {
+        /// Designs joined the picker while the check runs.
+        case joined
+        /// The check ended.
+        case checked
+    }
+
+    public let kind: Kind
+    /// Which announcement of the designs this is, counted from one.
+    let ordinal: Int
+}
+
 /// A field of the editor's form, named by a status so that the view can mark it.
 public enum EditorField: Hashable, Sendable, CaseIterable {
     case title, fullName, professionalTitle, email, phone, location, website, summary

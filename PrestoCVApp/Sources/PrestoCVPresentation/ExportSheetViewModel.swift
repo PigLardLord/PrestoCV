@@ -61,6 +61,10 @@ public final class ExportSheetViewModel {
     /// An export that waits for the check of its design, for VoiceOver to tell that the PDF is being prepared (#566):
     /// each one is a new value. Nil while the export's design is offered, once the export ends, and once the sheet stops.
     public private(set) var waitToAnnounce: DesignWait?
+    /// The designs that joined the picker, or the end of their check, for VoiceOver to tell (#566): the first join of a
+    /// check is told however many join, then the end of that check; the check of Try again tells them again. Each one is
+    /// a new value; nil before, and once the sheet stops.
+    public private(set) var designsToAnnounce: DesignsAnnouncement?
     /// The look of the PDF: the CV's as the last export read it, with the parts chosen in the sheet on top; before the
     /// first export, the look the editor showed, else the app's default one (#407).
     public private(set) var shownLook: EditorLook
@@ -101,6 +105,10 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private var showsTheDefaultLook: Bool
     /// Counts the exports that waited for their design, so that each one is a new value.
     @ObservationIgnored private var waits = 0
+    /// True once a join of the check that runs was told: the others are told by its end.
+    @ObservationIgnored private var toldAJoin = false
+    /// Counts the announcements of the designs, so that each one is a new value.
+    @ObservationIgnored private var designsTold = 0
     /// The parts of the look chosen in the sheet, put on the CV each export reads: the CV the editor shows may not hold
     /// them yet, and the other parts follow it.
     @ObservationIgnored private var chosenLook: LookChange?
@@ -208,9 +216,31 @@ public final class ExportSheetViewModel {
     public func watchDesigns() async {
         for await options in lookOptions.changes() {
             let choices = LookChoices(options)
-            if choices != lookChoices { lookChoices = choices }
+            if choices != lookChoices {
+                tell(lookChoices.designsChange(to: choices))
+                lookChoices = choices
+            }
             if showsTheDefaultLook { shownLook = Self.defaultLook(of: options) }
         }
+    }
+
+    /// Tells a change of the designs once per check: its first join, then its end.
+    private func tell(_ change: DesignsChange) {
+        let kind: DesignsAnnouncement.Kind
+        switch change {
+        case .none: return
+        case .checkBegan:
+            toldAJoin = false
+            return
+        case .joined:
+            guard !toldAJoin else { return }
+            toldAJoin = true
+            kind = .joined
+        case .checkEnded:
+            kind = .checked
+        }
+        designsTold += 1
+        designsToAnnounce = DesignsAnnouncement(kind: kind, ordinal: designsTold)
     }
 
     /// "Try again" when no design can print the PDF: checks the designs again and exports once more. It does nothing
@@ -275,6 +305,8 @@ public final class ExportSheetViewModel {
         statusToAnnounce = nil
         remadeToAnnounce = nil
         waitToAnnounce = nil
+        designsToAnnounce = nil
+        toldAJoin = false
         pickedExport = nil
         languageToAnnounce = nil
         document = nil

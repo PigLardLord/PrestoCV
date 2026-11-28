@@ -154,6 +154,39 @@ struct CheckedDesignsTests {
         wait.cancel()
         await #expect(throws: CancellationError.self) { try await wait.value }
     }
+
+    @Test("a wait cancelled while the check is held is a CancellationError at once, and no verdict is published")
+    func cancelledWhileTheCheckIsHeld() async throws {
+        let checking = DrivenChecking(holding: [])
+        let designs = CheckedDesigns(checking: checking, defaultDesign: "professional")
+        designs.start()
+        checking.tell("professional", try design("professional"))
+        _ = await first(designs) { $0.designs.count == 1 }
+        let wait = Task { try await designs.verdict(on: "modern") }
+        for _ in 0..<50 { await Task.yield() }
+        wait.cancel()
+
+        await #expect(throws: CancellationError.self) { try await wait.value }
+        #expect(ids(designs.current) == ["professional"])
+        #expect(designs.current.status == .checking)
+    }
+
+    @Test("a cancelled task's wait is a CancellationError even when its design has its verdict")
+    func cancelledWithItsVerdict() async throws {
+        let checking = DrivenChecking(holding: [try design("professional")])
+        let designs = CheckedDesigns(checking: checking, defaultDesign: "professional")
+        designs.start()
+        _ = await first(designs) { $0.designs.count == 1 }
+        let (never, keep) = AsyncStream.makeStream(of: Void.self)
+        let wait = Task {
+            for await _ in never {}                                     // ends when the task is cancelled
+            try await designs.verdict(on: "professional")
+        }
+        wait.cancel()
+
+        await #expect(throws: CancellationError.self) { try await wait.value }
+        keep.finish()
+    }
 }
 
 @Suite("The look options follow the checked designs (#566)", .timeLimit(.minutes(1)))

@@ -39,6 +39,7 @@ struct ExportSheetView: View {
                 .announce(sheet.shareFailure) { $0.words }
                 .announce(sheet.remadeToAnnounce) { $0.words }
                 .announce(sheet.waitToAnnounce) { $0.words }
+                .announce(sheet.designsToAnnounce) { $0.words }
             }
             .scrollBounceBehavior(.basedOnSize)
             .onNarrowScreen { isNarrow = $0 }
@@ -53,7 +54,8 @@ struct ExportSheetView: View {
                 }
             }
         }
-        // The designs that pass their check while the sheet is open join its look (#566)
+        // The designs that pass their check while the sheet is open join its look (#566); VoiceOver hears once that
+        // designs joined, and once that the check ended, whether the picker is in the sheet or in its own sheet
         .task { await sheet.watchDesigns() }
         .fullScreenPresentation(item: fullPDF) { full in
             FullPDFView(full: full, done: { sheet.closeFullPDF() })
