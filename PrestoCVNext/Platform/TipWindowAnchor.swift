@@ -22,7 +22,8 @@ final class TipWindowAnchor {
     #else
     fileprivate weak var view: NSView?
 
-    /// The observer of the closing of the window handed over last; one at a time, replaced at the next tap.
+    /// The observer of the closing of the window handed over last; one at a time, replaced at the next read. The model
+    /// reads the window only for a tap that starts a purchase, so the watch of a purchase running is never replaced.
     private var closingObserver: (any NSObjectProtocol)?
 
     /// The window the view is in now; unknown while the view is in none. A Mac's window does not say that it closed, so the

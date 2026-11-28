@@ -30,10 +30,9 @@ struct TipJarView: View {
                 Section {
                     ForEach(rows) { row in
                         TipRowView(row: row, isBuying: tips.attempt == .buying(row.size)) {
-                            // The window is read at the tap, before the purchase starts, so that the store's sheet opens
-                            // in the window where the person tapped
-                            let window = anchor.window
-                            Task { await tips.buy(row.size, in: window) }
+                            // The model reads the window at the tap, and only when the tap starts a purchase, so that the
+                            // store's sheet opens in the window where the person tapped
+                            tips.buy(row.size, in: { anchor.window })
                         }
                         .disabled(tips.attempt.isBuying)
                     }

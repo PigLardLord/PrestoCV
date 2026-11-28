@@ -122,8 +122,8 @@ struct TipJarViewModelTests {
         let left = WindowMark(name: "left")
         let right = WindowMark(name: "right")
 
-        await model.buy(.small, in: TipWindow(weak: left))
-        await model.buy(.large, in: TipWindow(weak: right))
+        await model.buy(.small, in: { TipWindow(weak: left) })?.value
+        await model.buy(.large, in: { TipWindow(weak: right) })?.value
 
         let names = withExtendedLifetime((left, right)) {
             selling.windows.withLock { $0 }.map { ($0.current() as? WindowMark)?.name }
@@ -137,7 +137,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: selling)
         await model.load()
 
-        await model.buy(.medium, in: .unknown)
+        await model.buy(.medium, in: { .unknown })?.value
 
         #expect(model.attempt == .thanked)
         #expect(selling.bought.withLock { $0 } == [.medium])
@@ -149,7 +149,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .success(.pending)))
         await model.load()
 
-        await model.buy(.small, in: .unknown)
+        await model.buy(.small, in: { .unknown })?.value
 
         #expect(model.attempt == .pending)
         #expect(model.state == .offers(rows))
@@ -160,7 +160,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .success(.cancelled)))
         await model.load()
 
-        await model.buy(.large, in: .unknown)
+        await model.buy(.large, in: { .unknown })?.value
 
         #expect(model.attempt == .idle)
         #expect(model.state == .offers(rows))
@@ -172,7 +172,7 @@ struct TipJarViewModelTests {
             let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .failure(failure)))
             await model.load()
 
-            await model.buy(.small, in: .unknown)
+            await model.buy(.small, in: { .unknown })?.value
 
             #expect(model.attempt == attempt)
             #expect(model.state == .offers(rows))
@@ -184,7 +184,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .failure(.notAllowed)))
         await model.load()
 
-        await model.buy(.small, in: .unknown)
+        await model.buy(.small, in: { .unknown })?.value
 
         #expect(model.state == .unavailable(.notAllowed))
         #expect(model.attempt == .idle)
@@ -200,16 +200,42 @@ struct TipJarViewModelTests {
         selling.finish(request: 0, with: .success(all))
         await loading.value
 
-        let first = Task { await model.buy(.small, in: .unknown) }
+        let first = model.buy(.small, in: { .unknown })
         await arrivals.next()
         #expect(model.attempt == .buying(.small))
-        await model.buy(.large, in: .unknown)
+        let second = model.buy(.large, in: { .unknown })
+        await second?.value
+        #expect(second == nil)
         #expect(selling.bought.withLock { $0 } == [.small])
         #expect(model.attempt == .buying(.small))
 
         selling.finishPurchase(with: .success(.completed))
-        await first.value
+        await first?.value
         #expect(model.attempt == .thanked)
+    }
+
+    @Test("a second tap while a purchase runs reads no window, so the running purchase still sees its window close")
+    func secondTapKeepsTheWatch() async {
+        let selling = GatedTips()
+        let model = TipJarViewModel(selling: selling)
+        var arrivals = selling.arrivals.makeAsyncIterator()
+        let loading = Task { await model.load() }
+        await arrivals.next()
+        selling.finish(request: 0, with: .success(all))
+        await loading.value
+        let anchor = OneWatchAnchor()
+
+        let first = model.buy(.small, in: { anchor.read() })
+        await arrivals.next()
+        let second = model.buy(.large, in: { anchor.read() })
+        anchor.windowCloses()
+        selling.finishPurchase(with: .success(.cancelled))
+        await first?.value
+
+        #expect(second == nil, "a tap while a purchase runs starts nothing")
+        #expect(anchor.reads == 1, "the refused tap reads no window, so it replaces no watch")
+        // The purchase that runs goes on after its wait, as the adapter does once the product has loaded
+        #expect(selling.windowClosed.withLock { $0 } == [true], "the running purchase sees that its window closed")
     }
 
     @Test("an offers read that ends after a purchase found the device may not pay does not bring the offers back")
@@ -224,10 +250,10 @@ struct TipJarViewModelTests {
 
         let reading = Task { await model.load() }
         await arrivals.next()
-        let buying = Task { await model.buy(.small, in: .unknown) }
+        let buying = model.buy(.small, in: { .unknown })
         await arrivals.next()
         selling.finishPurchase(with: .failure(.notAllowed))
-        await buying.value
+        await buying?.value
         selling.finish(request: 1, with: .success(all))
         await reading.value
 
@@ -253,10 +279,10 @@ struct TipJarViewModelTests {
 
                 let reading = Task { await model.load() }
                 await arrivals.next()
-                let buying = Task { await model.buy(.small, in: .unknown) }
+                let buying = model.buy(.small, in: { .unknown })
                 await arrivals.next()
                 selling.finishPurchase(with: purchased)
-                await buying.value
+                await buying?.value
                 selling.finish(request: 1, with: late)
                 await reading.value
 
@@ -274,7 +300,7 @@ struct TipJarViewModelTests {
         for purchased in answers {
             let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: purchased))
             await model.load()
-            await model.buy(.small, in: .unknown)
+            await model.buy(.small, in: { .unknown })?.value
 
             await model.load()
 
@@ -292,7 +318,7 @@ struct TipJarViewModelTests {
         await arrivals.next()
         selling.finish(request: 0, with: .success(all))
         await loading.value
-        let buying = Task { await model.buy(.medium, in: .unknown) }
+        let buying = model.buy(.medium, in: { .unknown })
         await arrivals.next()
 
         let reading = Task { await model.load() }
@@ -302,7 +328,7 @@ struct TipJarViewModelTests {
 
         #expect(model.attempt == .buying(.medium))
         selling.finishPurchase(with: .success(.cancelled))
-        await buying.value
+        await buying?.value
     }
 }
 
@@ -315,6 +341,9 @@ final class GatedTips: TipSelling {
     private let pending = Mutex<[CheckedContinuation<Result<[TipOffer], TipFailure>, Never>]>([])
     private let purchases = Mutex<[CheckedContinuation<Result<TipPurchase, TipFailure>, Never>]>([])
     let bought = Mutex<[TipSize]>([])
+    /// For each purchase, whether its window was seen closing when the purchase went on: after the wait for the first, at
+    /// once for a later one.
+    let windowClosed = Mutex<[Bool]>([])
 
     init() {
         (arrivals, arrived) = AsyncStream.makeStream()
@@ -334,11 +363,15 @@ final class GatedTips: TipSelling {
         guard bought.withLock({ sizes in
             sizes.append(size)
             return sizes.count == 1
-        }) else { return .completed }
+        }) else {
+            windowClosed.withLock { $0.append(window.hasClosed) }
+            return .completed
+        }
         let result = await withCheckedContinuation { continuation in
             purchases.withLock { $0.append(continuation) }
             arrived.yield()
         }
+        windowClosed.withLock { $0.append(window.hasClosed) }
         return try result.get()
     }
 
@@ -382,6 +415,27 @@ final class StubTips: TipSelling {
         bought.withLock { $0.append(size) }
         windows.withLock { $0.append(window) }
         return try purchased.withLock { $0 }.get()
+    }
+}
+
+/// A stand-in for the view's anchor on a Mac: it keeps one watch of its window's closing, replaced at each read, as the
+/// anchor replaces its observer each time it hands the window over.
+@MainActor
+final class OneWatchAnchor {
+    private let window = WindowMark(name: "tapped")
+    private var watch: TipWindowClosure?
+    private(set) var reads = 0
+
+    func read() -> TipWindow {
+        reads += 1
+        let closure = TipWindowClosure()
+        watch = closure
+        return TipWindow(weak: window, closure: closure)
+    }
+
+    /// The window closes: only the watch kept now sees it, as a removed observer hears nothing.
+    func windowCloses() {
+        watch?.markClosed()
     }
 }
 

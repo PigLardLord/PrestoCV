@@ -40,14 +40,25 @@ public final class TipJarViewModel {
         await read(number)
     }
 
-    /// Buys the tip of this size through the store's sheet, which opens in `window`, the window where the person tapped,
-    /// and shows what became of it. A tap while a purchase runs buys
-    /// nothing: only one purchase runs at a time. The person chose from the offers on screen, so a read started before
-    /// the tap cannot replace them, nor hide what became of the purchase; a read started while it runs still can.
-    public func buy(_ size: TipRow.Size, in window: TipWindow) async {
-        if case .buying = attempt { return }
+    /// Buys the tip of this size through the store's sheet, which opens in the window where the person tapped, and shows
+    /// what became of it. Called at the tap: the purchase starts at once, and the returned task ends with it. A tap while
+    /// a purchase runs buys nothing and returns nil: only one purchase runs at a time. The person chose from the offers on
+    /// screen, so a read started before the tap cannot replace them, nor hide what became of the purchase; a read started
+    /// while it runs still can.
+    ///
+    /// `window` reads the window from the view, and only for a tap that starts a purchase: on a Mac each read starts a new
+    /// watch of the window's closing in place of the last, so a refused tap that read it would end the watch of the
+    /// purchase running, and that purchase could open its sheet in a window that closed.
+    @discardableResult
+    public func buy(_ size: TipRow.Size, in window: () -> TipWindow) -> Task<Void, Never>? {
+        if case .buying = attempt { return nil }
+        let tapped = window()
         startRead()
         attempt = .buying(size)
+        return Task { await purchase(size, in: tapped) }
+    }
+
+    private func purchase(_ size: TipRow.Size, in window: TipWindow) async {
         do throws(TipFailure) {
             switch try await selling.purchase(TipSize(size), in: window) {
             case .completed: attempt = .thanked

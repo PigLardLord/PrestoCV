@@ -38,7 +38,7 @@ func useEveryPublicMember(of settings: SettingsViewModel, licences: LicencesView
         case .notAllowed, .unreachable, .noOffers, .failed: break
         }
     }
-    await tips.buy(.small, in: .unknown)
+    await tips.buy(.small, in: { .unknown })?.value
     switch tips.attempt as TipAttempt {
     case .idle, .thanked, .pending, .failed, .unreachable: break
     case .buying(let size): let _: TipRow.Size = size
