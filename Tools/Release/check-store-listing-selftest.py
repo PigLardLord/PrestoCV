@@ -204,18 +204,38 @@ class PendingAgainstTheTargetBranch(unittest.TestCase):
         self.assertEqual(checker.check_pending_against(["es-ES"], ["es-ES"]), [])
         self.assertEqual(checker.check_pending_against([], ["es-ES", "fr-FR"]), [])
 
-    def test_the_command_line_compares_with_the_file_it_is_given(self):
+    def test_the_command_line_passes_with_the_list_of_this_branch(self):
         _, pending = checker.load_retired()
         with tempfile.TemporaryDirectory() as folder:
-            shorter, same = Path(folder) / "shorter.json", Path(folder) / "same.json"
-            shorter.write_text(json.dumps({"pendingLocales": pending[1:]}), encoding="utf-8")
+            same = Path(folder) / "same.json"
             same.write_text(json.dumps({"pendingLocales": pending}), encoding="utf-8")
-            command = [sys.executable, "-I", str(HERE / "check-store-listing.py"), "--against"]
-            refused = subprocess.run(command + [str(shorter)], capture_output=True, text=True)
-            passed = subprocess.run(command + [str(same)], capture_output=True, text=True)
-        self.assertEqual(refused.returncode, 1, refused.stderr)
-        self.assertIn(pending[0], refused.stderr)
+            passed = run_checker(HERE / "check-store-listing.py", "--against", same)
         self.assertEqual(passed.returncode, 0, passed.stderr)
+
+    def test_the_command_line_compares_with_the_file_it_is_given(self):
+        # The list of this branch may be empty, and an empty list cannot grow: the checker runs on a copy of the
+        # repository whose list holds one locale, against a target branch whose list holds none.
+        retired = json.loads(checker.RETIRED.read_text(encoding="utf-8"))
+        retired["pendingLocales"] = ["es-ES"]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            tools, docs = root / "Tools" / "Release", root / "docs" / "release"
+            tools.mkdir(parents=True)
+            docs.mkdir(parents=True)
+            (tools / "check-store-listing.py").write_bytes((HERE / "check-store-listing.py").read_bytes())
+            (tools / checker.RETIRED.name).write_text(json.dumps(retired), encoding="utf-8")
+            (docs / checker.DOC.name).write_bytes(checker.DOC.read_bytes())
+            empty = root / "empty.json"
+            empty.write_text(json.dumps({"pendingLocales": []}), encoding="utf-8")
+            refused = run_checker(tools / "check-store-listing.py", "--against", empty)
+        self.assertEqual(refused.returncode, 1, refused.stderr)
+        self.assertIn("pendingLocales grew compared with the target branch: es-ES", refused.stderr)
+
+
+def run_checker(script, *arguments):
+    """The checker run as the Mac check runs it, with no bytecode written"""
+    command = [sys.executable, "-I", "-B", str(script)] + [str(argument) for argument in arguments]
+    return subprocess.run(command, capture_output=True, text=True)
 
 
 if __name__ == "__main__":

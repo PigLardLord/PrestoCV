@@ -1,6 +1,6 @@
 {
   "comment": "Words the 1.1 listing must not use: each names a feature the app does not have (ADR 0033, issue 530). A text is checked in the language of its locale; the notes for App Review are English. The patterns also catch the usual variants (A.I., ai-powered, Drafted, Linked-In, Macs, MACOS, iMac). 'allowedIn' lists the fields where the word may still appear, because What's New says in one line that the 1.0 AI draft is gone; 'onlyIn' limits an entry to some fields. 'pendingLocales' is a baseline that may only shrink: a locale still written for 1.0 stays on it until its texts are rewritten, the checker refuses a locale on it whose texts pass ('notes' is the notes for App Review), and the Mac check compares the list with the target branch's and refuses one that grew.",
-  "pendingLocales": ["es-ES", "es-MX", "fr-FR", "pt-PT", "pt-BR"],
+  "pendingLocales": [],
   "entries": [
     {"pattern": "\\bA\\.?I\\b", "languages": ["en"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
     {"pattern": "\\bK\\.?I\\b", "languages": ["de"], "ignoreCase": true, "allowedIn": ["What's New"], "reason": "1.1 has no AI draft"},
