@@ -1,8 +1,9 @@
 import XCTest
 
 /// The helpers the screens' tests share to scroll the form and to say where an element lies (5-15c): `place(in:)` reads
-/// where the middle of an element is against the window, `canBeTapped(in:)` adds that a tap would reach it, and
-/// `scrollForm` fails the test where it cannot bring the element to a place where a tap lands on it.
+/// where the middle of an element is against the window, `canBeTapped(in:)` adds that a tap would reach it,
+/// `tapRoom(in:)` is the part of the form a tap lands on, clear of the bar, the keyboard and the Done button over it, and
+/// `scrollForm` fails the test where it cannot bring the element into that room.
 final class ScreenHelpersUITests: RuntimeIssueFailingTestCase {
 
     private let engineer = (identity: "6B1F6C1E-1B8C-4C1B-9D55-1F3B2C8B7A01", title: "Backend Engineer")
@@ -13,8 +14,10 @@ final class ScreenHelpersUITests: RuntimeIssueFailingTestCase {
 
     // MARK: Tests
 
-    /// With the keyboard up, a field the form brings into view is inside the window and can be tapped, clear of the
-    /// keyboard where the keyboard shows (a simulator with a hardware keyboard shows none).
+    /// With the keyboard up, a field the form brings into view lies in the room the form leaves for a tap, clear of the
+    /// keyboard and of the Done button over it where they show (a simulator with a hardware keyboard shows none), and a
+    /// tap on it gives it the keyboard. XCTest's own `isHittable` said yes for the field under the Done button's strip,
+    /// where the tap reached nothing.
     @MainActor
     func testAnElementThatFitsIsWhollyBetweenTheBarAndTheKeyboard() throws {
         let app = try launchAndOpen(largestText: true)
@@ -33,6 +36,15 @@ final class ScreenHelpersUITests: RuntimeIssueFailingTestCase {
         if keyboard.exists {
             XCTAssertLessThan(website.frame.midY, keyboard.frame.minY, "The field is not under the keyboard")
         }
+        let done = app.buttons["keyboard.done"]
+        if done.exists {
+            XCTAssertLessThan(website.frame.midY, done.frame.minY, "The field is not under the Done button")
+        }
+        XCTAssertEqual(website.place(within: app.tapRoom(in: app.openForm)), .inside,
+                       "The field lies in the room the form leaves for a tap")
+
+        website.tap()
+        XCTAssertTrue(website.waitUntilFocused(), "A tap on the field gives it the keyboard")
     }
 
     /// Without the keyboard, a field far down the form is brought inside the window, below the bar.

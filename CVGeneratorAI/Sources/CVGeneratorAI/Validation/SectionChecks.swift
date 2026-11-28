@@ -14,6 +14,8 @@ extension CVDataSanitizer {
             let job: Int
             /// The clauses of the description that name the job, back it or join it.
             let clauses: [String]
+            /// Whether the job goes on, as the rules keep it: the extraction says so and the description says so (#359).
+            let goesOn: Bool
         }
 
         /// One for one with the jobs that `sanitize(cvData, against: description)` keeps, in their order.
@@ -29,7 +31,7 @@ extension CVDataSanitizer {
             let entries = entries(of: cvData, source)
             let jobs = keptJobs(entries.jobs, source, entries).compactMap { kept -> DraftContext.Job? in
                 guard let index = entries.jobs.firstIndex(where: { $0.subject == kept.job.subject }) else { return nil }
-                return DraftContext.Job(job: index, clauses: entries.evidence(of: kept.job.subject).context)
+                return DraftContext.Job(job: index, clauses: entries.evidence(of: kept.job.subject).context, goesOn: kept.experience.current)
             }
             return DraftContext(jobs: jobs, field: entries.fieldClause(), own: entries.ownSentences())
         }
@@ -1138,7 +1140,8 @@ extension CVDataSanitizer {
         try reading(description) { source in
             let facts = grounded(cvData, writing: nil, in: source)
             let entries = entries(of: cvData, source)
-            let written = WrittenText(source: source, claimed: entries.claimed(in: source), wordList: wordList, tagger: lexicalClasses)
+            let claimed = entries.claimed(in: source)
+            let written = WrittenText(source: source, claimed: claimed, wordList: wordList, tagger: lexicalClasses)
             let titles = [facts.personalInfo.title] + facts.experience.map(\.title)
             let ownWords = Self.words(of: titles + facts.education.map(\.degree))
             let cleanField = field.flatMap { field in
@@ -1186,6 +1189,8 @@ extension CVDataSanitizer {
             // I coordinate patient care" of a nursing assistant. The person's own words, quoted, stay.
             let keptTitles = titles.compactMap { $0?.presentValue }
             let personName = facts.personalInfo.name
+            // The words of the person's work, which a school may share (#359, P3): a sentence of them and a language is no study tied to it.
+            let ownWorkWords = Self.words(of: titles + facts.experience.map(\.company))
             var verdict = SummaryVerdict()
             var seen = Set<String>()
             var idleFirst: String?
@@ -1193,6 +1198,11 @@ extension CVDataSanitizer {
             var endings = Set<[String]>()
             var closings = Set<[String]>()
             let qualityWords = qualities.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
+            // The qualities of the soft skills the draft keeps, and those the description states of the person, are the only ones the
+            // summary names as a manner (#359, N1): with no soft skill known, the summary is not read for them. A quality the
+            // description gives someone else ("My colleague works with precision.") is not the person's.
+            let heldQualities: Set<String>? = qualities.isEmpty
+                ? nil : UnheldQualities.heldWords(softSkills: qualities, stated: claimed.foldedWords)
             let skillWords = qualityWords + tools.map { Word.words(in: $0).map(\.folded) }.filter { !$0.isEmpty }
             var hasATail = false
             for raw in SentenceSplitter.sentences(in: summary ?? "") {
@@ -1221,6 +1231,16 @@ extension CVDataSanitizer {
                        written.rejection(of: $0, ownWords: summaryOwnWords, ownQualifications: ownQualifications) == nil
                    }) {
                     sentence = head
+                }
+                // A manner phrase of qualities that are not all soft skills loses the ones that are not (#359, N1): "with focus and
+                // precision" of a draft that holds only "precision" says "with precision"; the sentence goes when it cannot be cut clean.
+                var unheldQualities: [String]?
+                if let heldQualities {
+                    switch UnheldQualities.check(sentence, language: language, held: heldQualities) {
+                    case .unchanged: break
+                    case .without(let cut): sentence = cut
+                    case .unheld(let names): unheldQualities = names
+                    }
                 }
                 let key = sentence.lowercased().filter(\.isLetter)
                 guard !key.isEmpty, seen.insert(key).inserted else { continue }
@@ -1260,6 +1280,10 @@ extension CVDataSanitizer {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.guaranteesReason))
                 } else if Self.copiesADuty(sentence, duties: duties, title: dutyTitles, skills: tools + qualities) {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.copiesADutyReason))
+                } else if DraftDepth.isRich, OwnQualifications.tiesAStudyToALanguage(
+                    sentence, education: facts.education, languages: facts.languages, apart: ownWorkWords, source: source
+                ) {
+                    verdict.rejected.append(Rejection(sentence: sentence, reason: Self.tiesAStudyToALanguage))
                 } else if !work.isEmpty, !namesWork(sentence), !verdict.kept.isEmpty {
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesNoWork))
                 } else if source.written(sentence, quoting: entries.summaryQuotes, allowsNumbers: false, orPlain: { _ in false }) == nil,
@@ -1269,6 +1293,10 @@ extension CVDataSanitizer {
                           RoleAssertion.unkeptRole(in: sentence, titles: keptTitles, name: personName, language: language) != nil {
                     // Last, so that a word the written check names ("certified") is the reason the model reads.
                     verdict.rejected.append(Rejection(sentence: sentence, reason: Self.namesAnUnstatedRole))
+                } else if let unheldQualities {
+                    verdict.rejected.append(Rejection(
+                        sentence: sentence, reason: Self.namesAnUnheldQuality + ": " + unheldQualities.joined(separator: ", ")
+                    ))
                 } else {
                     if !work.isEmpty, verdict.kept.isEmpty, !namesWork(sentence) { idleFirst = sentence }
                     if let verb { verbs.insert(verb) }
@@ -1478,6 +1506,10 @@ extension CVDataSanitizer {
     /// A summary sentence that shares no word with the titles, the kept descriptions and the tools: only the first of a summary
     /// with no opening may (#354), as the first sentence is the one a reader takes for the person's own introduction.
     static let namesNoWork = "it says nothing of the work: name a duty of the roles"
+    /// A manner phrase of a quality that is none of the kept soft skills, which cannot be cut clean (#359, N1).
+    static let namesAnUnheldQuality = "it names a quality that is none of the person's soft skills: leave it out, or name a soft skill"
+    /// A sentence of a rich summary that says a school or a course taught the person's languages (#359, P3).
+    static let tiesAStudyToALanguage = "it says a school or a course taught the languages: say the studies and the languages in separate sentences"
     static let namesAnUnstatedRole = "it names a role the person did not state: say the person's own title, or none"
     static let speaksInTheThirdPerson = "it speaks of the person in the third person: write it as the person, with no subject"
     static let hasNoVerbOfThePerson = "it says nothing of the person: write it as the person, with the verb of the person first"
@@ -1584,7 +1616,7 @@ extension CVDataSanitizer {
     }
 
     /// Whether a German word in lower case is an adverb of manner: by its ending, or one of the short ones.
-    private static func isGermanAdverb(_ word: String) -> Bool {
+    static func isGermanAdverb(_ word: String) -> Bool {
         guard word.first?.isLowercase == true else { return false }
         return ["ig", "lich", "los", "bar", "sam", "isch", "frei", "haft"].contains { word.count > $0.count + 2 && word.hasSuffix($0) }
             || germanShortAdverbs.contains(word)
@@ -2079,10 +2111,16 @@ extension CVDataSanitizer {
 
     /// The first five letters of each word of five letters or more of `texts` that says nothing of a work: how a summary sentence
     /// is matched to the work. Matched by four letters, "with" and "each" tied a sentence of qualities to any duty (#354).
+    /// A stem is read without its accents, as a title and a verb of one stock write them differently ("Bäckerin", "backe"; #359,
+    /// P4): the sentence "Ich backe Brot mit Präzision" of a baker said nothing of the work.
     private static func workStems(of texts: [String]) -> Set<String> {
-        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map { String($0.prefix(5)) } })
-            .subtracting(idleStems)
+        Set(texts.flatMap { letterWords(of: $0).filter { $0.count >= 5 && !idleWords.contains($0) }.map(stem(of:)) })
+            .subtracting(foldedIdleStems)
     }
+
+    private static func stem(of word: String) -> String { String(DescriptionText.normalized(word).prefix(5)) }
+
+    private static let foldedIdleStems = Set(idleStems.map(stem(of:)))
 
     /// The words of five letters or more that say nothing of a work, in the six languages: quantifiers, connectives, auxiliaries.
     private static let idleWords: Set<String> = [
@@ -2159,16 +2197,18 @@ extension CVDataSanitizer {
     }
 
     /// The written skills, cleaned by code: a quality or an activity listed as a technology ("precisione", "Planung") is a soft
-    /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a German infinitive (`isGermanActivity`),
-    /// while a method or a field of the trade stays ("manutenzione preventiva", "Facturación"); the singular and the
-    /// plural of one skill count once, and of two tools of one kind, by their head noun ("studio monitors", "nearfield monitor"), the
-    /// second goes, unless that noun is a generic kind ("software di diagnostica", "software di controllo"); a fragment, a verb, a
-    /// skill in another language (a product name is none: "Docker") and a soft skill that names a tool go, and so does stationery,
-    /// furniture or protective wear
-    /// (`namesAnEverydayObject`); so does a technology that is a bare kind of tool
-    /// ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo") stays (#354). A technology the verb it starts with leads ("usare i PLC") is
-    /// cut to its object; a tool word ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective,
-    /// and a soft skill the description writes only as a name goes (`namesAName`).
+    /// skill, and a tool named by an activity ("software di gestione fermi") goes; so does a German infinitive
+    /// (`isGermanActivity`), while a method or a field of the trade stays ("manutenzione preventiva", "Contabilidad"),
+    /// and a concept, an activity or a place the description does not write goes ("Facturación", "Lehrplan", "aula";
+    /// `namesAConcept`, #359); the singular and the plural of one skill count once, and of two tools of one kind, by their head
+    /// noun ("studio monitors", "nearfield monitor"), the second goes, unless that noun is a generic kind ("software di
+    /// diagnostica", "software di controllo"); a fragment, a verb (a lone form the description does not write, too: "pensa",
+    /// "organiza"; `verbReading`, #359), a skill in another language (a product name is none: "Docker") and a soft skill that
+    /// names a tool go, and so does stationery, furniture or protective wear (`namesAnEverydayObject`); so does a technology that
+    /// is a bare kind of tool ("software"; `namesAKindOfTool`), while a kind with a word of its trade ("software di rilievo")
+    /// stays (#354). A technology the verb it starts with leads ("usare i PLC") is cut to its object; a tool word
+    /// ("software") never leads as a verb. A lone English quality in -ed ("organized") is an adjective, and a soft skill the
+    /// description writes only as a name goes (`namesAName`).
     func skillCheck(technologies: [String], softSkills: [String], against description: String) -> SkillVerdict {
         skillCheck(technologies: technologies, softSkills: softSkills, stated: [], against: description)
     }
@@ -2192,6 +2232,11 @@ extension CVDataSanitizer {
         let tagsVerbs = language.map { lexicalClasses.tagsLexicalClass(inLanguage: $0) } ?? false
         var verdict = SkillVerdict()
         var keys = Set<String>()
+        let said = DescriptionText.normalized(description)
+        let trimmed = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        let amongVerbs = (technologies + softSkills).filter {
+            verbReading(of: $0.trimmingCharacters(in: trimmed), language: language, said: said) == .verb
+        }.count >= 2
         let check = { (raw: String, cutsVerb: Bool) -> String? in
             let item = raw.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
             let words = item.split(separator: " ").map(String.init)
@@ -2212,8 +2257,9 @@ extension CVDataSanitizer {
             let saidVerb = second != nil && Self.saysAfterSubject(first, in: description, language: language)
             let infinitive = words.count > 2 && Self.skillArticles.contains(second ?? "")
                 && (Self.infinitiveEndings[language ?? ""] ?? []).contains(where: first.hasSuffix)
+            let loneVerb = second == nil && verbReading(of: item, language: language, said: said).map { $0 == .verb || amongVerbs } == true
             var kept = item
-            if !Self.toolWords.contains(first), taggedVerb || saidVerb || infinitive {
+            if !Self.toolWords.contains(first), taggedVerb || saidVerb || infinitive || loneVerb {
                 let rest = words.dropFirst().drop { Self.skillLinkWords.contains($0.lowercased()) }
                 guard cutsVerb, rest.contains(where: { $0.count >= 3 }) else {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "verb"))
@@ -2266,6 +2312,9 @@ extension CVDataSanitizer {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a word of a name"))
                 } else if language == "de", Self.isGermanActivity(item) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "activity"))
+                } else if Self.namesAConcept(item, language: language),
+                          DescriptionText.spans(of: DescriptionText.normalized(item), in: said).isEmpty {
+                    verdict.dropped.append(Rejection(sentence: raw, reason: "a concept, an activity or a place, not a tool"))
                 } else if Self.namesARecord(item, language: language) {
                     verdict.dropped.append(Rejection(sentence: raw, reason: "a record or a document, not a tool"))
                 } else if Self.namesAPart(item, language: language) {
@@ -2285,7 +2334,7 @@ extension CVDataSanitizer {
             }
         }
         for raw in softSkills {
-            guard let item = check(raw, false), keys.insert(Self.skillKey(item)).inserted else { continue }
+            guard let item = check(capitalisedNoun(raw, language: language), false), keys.insert(Self.skillKey(item)).inserted else { continue }
             guard !Self.emptyQualities.contains(DescriptionText.normalized(item)) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "an empty word, not a quality"))
                 continue
@@ -2294,7 +2343,7 @@ extension CVDataSanitizer {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a tool"))
                 continue
             }
-            guard !Self.namesAName(item, in: description) else {
+            guard !namesAName(item, in: description, names: names, language: language) else {
                 verdict.dropped.append(Rejection(sentence: raw, reason: "a name"))
                 continue
             }
@@ -2304,6 +2353,105 @@ extension CVDataSanitizer {
         verdict.softSkills = qualities.kept
         verdict.dropped += qualities.dropped
         return verdict
+    }
+
+    // MARK: Lone verbs
+
+    /// How a lone word reads as a verb: surely, or only among other verbs.
+    private enum VerbReading { case verb, alsoANoun }
+
+    /// The forms of a lone verb by language: the ending of the form a draft lists ("pensa", "organiza", "planifie"), that of its
+    /// infinitive, and the endings that make verbs and no noun, each with the letters it needs before it ("organizza", not "pizza";
+    /// "organiza", not "baliza").
+    private static let loneVerbForms: [String: (form: String, infinitive: String, verbEndings: [String: Int])] = [
+        "it": ("a", "are", ["ifica": 3, "izza": 4]),
+        "es": ("a", "ar", ["ifica": 3, "iza": 4, "iona": 4]),
+        "pt": ("a", "ar", ["ifica": 3, "iza": 4, "iona": 4]),
+        "fr": ("e", "er", ["ifie": 3]),
+    ]
+
+    /// How a skill of one word in lower case reads as a form of a verb of the description's language that the description does
+    /// not write (#359, P1: "pensa", "spiega", "organizza" listed as tools or qualities): surely, when an ending makes only verbs
+    /// ("verifica", "organiza", "planifie") or, in Italian, when no noun's plural makes it ("pense" for "pensa"); only among other
+    /// verbs, when the word is also a noun ("sega", "insegna", "lima", "scie"). A word with a capital is a name ("Trova"), a
+    /// tool's word or kind is a tool, and an Italian word in -ma is a noun of Greek origin ("schema"); German and English lone
+    /// verbs are the tagger's.
+    private func verbReading(of item: String, language: String?, said description: String) -> VerbReading? {
+        guard let language, let forms = Self.loneVerbForms[language], item.count >= 4, item.hasSuffix(forms.form),
+              item.allSatisfy({ $0.isLetter && $0.isLowercase }), !Self.toolWords.contains(item),
+              !Self.toolKinds.contains(DescriptionText.normalized(item)),
+              DescriptionText.spans(of: DescriptionText.normalized(item), in: description).isEmpty else { return nil }
+        let stem = String(item.dropLast(forms.form.count))
+        guard wordList.knows(stem + forms.infinitive, inLanguage: language) == true else { return nil }
+        if forms.verbEndings.contains(where: { item.hasSuffix($0.key) && item.count - $0.key.count >= $0.value }) { return .verb }
+        guard language == "it", !stem.hasSuffix("m") else { return .alsoANoun }
+        // A noun in -ca or -ga makes its plural in -che or -ghe ("seghe"), one in -cia or -gia in -ce or -ge too ("bilance").
+        var plurals = [stem.hasSuffix("c") || stem.hasSuffix("g") ? stem + "he" : stem + "e"]
+        if stem.hasSuffix("ci") || stem.hasSuffix("gi") { plurals.append(String(stem.dropLast()) + "e") }
+        return plurals.contains { wordList.knows($0, inLanguage: language) == true } ? .alsoANoun : .verb
+    }
+
+    // MARK: Concepts
+
+    /// Whether a technology is a concept, an activity or a place and no tool (#359): the books of an office ("Balance", "Cuentas"),
+    /// its billing ("Facturación"), a school's plan or room ("curriculum", "aula", "Klassenzimmer"), or a German compound of a
+    /// plan, a training, a development, an adjustment, an administration, an analysis, a review or a room ("Lehrplananpassung",
+    /// "Lehrerausbildung", "Dokumentenverwaltung", "Serverraum"). A word the description writes stays: the caller asks.
+    /// A field of the trade is no concept here ("Contabilidad"), and neither is a device of a German compound
+    /// ("Analysegerät", "Planfräser").
+    static func namesAConcept(_ item: String, language: String?) -> Bool {
+        guard let language else { return false }
+        let folded = DescriptionText.normalized(item.replacingOccurrences(of: "ß", with: "ss"))
+        if conceptWords[language]?.contains(folded) == true { return true }
+        guard language == "de", folded.allSatisfy(\.isLetter) else { return false }
+        return germanConceptHeads.contains { folded.hasSuffix($0) && folded.count >= $0.count + 3 }
+    }
+
+    /// The concepts, activities and places of one trade or another listed as tools, in each language, without accents.
+    private static let conceptWords: [String: Set<String>] = [
+        "it": ["bilancio", "conti", "tasse", "imposte", "fatturazione", "curricolo", "curriculum", "aula", "classe"],
+        "es": ["balance", "cuentas", "impuestos", "facturacion", "curriculo", "curriculum", "aula", "clase"],
+        "pt": ["balanco", "contas", "impostos", "faturacao", "facturacao", "curriculo", "curriculum", "aula", "sala de aula"],
+        "fr": ["bilan", "comptes", "impots", "facturation", "programme scolaire", "classe", "salle de classe"],
+        "de": ["bilanz", "konten", "steuern", "rechnungsstellung", "fakturierung", "lehrplan", "klasse", "klassenzimmer"],
+        "en": ["accounts", "taxes", "invoicing", "billing", "curriculum", "classroom"],
+    ]
+
+    /// The last nouns of a German compound that names a plan, a training, a development, an adjustment, an administration, an
+    /// analysis, a review or a room, without accents.
+    private static let germanConceptHeads = [
+        "plan", "planung", "ausbildung", "entwicklung", "anpassung", "verwaltung", "analyse", "prufung", "zimmer", "raum",
+    ]
+
+    // MARK: German qualities
+
+    /// The endings of the German nouns of a quality ("Zuverlässigkeit", "Präzision", "Verständnis"), lower case.
+    private static let germanNounEndings = ["keit", "heit", "ung", "schaft", "tät", "ion", "nis", "tum", "ismus", "enz", "anz"]
+
+    /// A German quality that is a noun, written with its capital (#359, P4). The model writes the qualities in lower case in every
+    /// language ("zuverlässigkeit", "präzision"), and German writes its nouns with a capital: the skills list showed them so, the
+    /// strengths sentence of the summary took them for adjectives ("Als Bäckerin bin ich zuverlässigkeit und präzision."), and the
+    /// final check dropped that sentence for words the dictionary does not know. A lone word is a noun when it ends as a noun of a
+    /// quality does, or when the device's dictionary knows it with a capital and not as written; an adjective ("zuverlässig") and a
+    /// phrase ("verständnis für kunden") stay as they are, as does every other language. Applied twice, it is the same.
+    private func capitalisedNoun(_ quality: String, language: String?) -> String {
+        let item = quality.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+        guard language == "de", item.first?.isLowercase == true, item.allSatisfy(\.isLetter) else { return quality }
+        let noun = item.prefix(1).uppercased() + item.dropFirst()
+        let endsAsANoun = item.count >= 6 && Self.germanNounEndings.contains { item.hasSuffix($0) }
+        let isANoun = endsAsANoun || wordList.knows(item, inLanguage: "de") == false && wordList.knows(noun, inLanguage: "de") == true
+        return isANoun ? noun : quality
+    }
+
+    /// Whether a soft skill of one word is written in the description only as a name (`namesAName`). In German, whose nouns all
+    /// have a capital, a quality the description states ("mit Geduld und Sorgfalt") is written so, past the start of a sentence and
+    /// never in lower case: it is a name only when the device's dictionary does not know it as a noun, or when it is a word of one
+    /// of the `names` of the CV ("Hans").
+    private func namesAName(_ item: String, in description: String, names: [String], language: String?) -> Bool {
+        guard Self.namesAName(item, in: description) else { return false }
+        guard language == "de", wordList.knows(item, inLanguage: "de") == true else { return true }
+        let key = DescriptionText.normalized(item)
+        return names.contains { $0.split { !$0.isLetter }.contains { DescriptionText.normalized(String($0)) == key } }
     }
 
     // MARK: Names among the tools

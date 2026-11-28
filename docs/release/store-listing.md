@@ -112,6 +112,42 @@ NETWORK AND DATA
 - The privacy label "Data Not Collected" is therefore accurate: the app collects no data and does not track. Its privacy manifest declares no collected data types and no tracking domains.
 ```
 
+## In-app purchases: the tips
+
+From version 1.1, Settings → Support PrestoCV offers three tips. A tip is a one-time thank you: it unlocks nothing, and the app works the same with or without one. In App Store Connect they are under Monetization → In-App Purchases; each one is submitted with the first version that offers it. The product identifiers are the app's (`PrestoCVApp/Sources/PrestoCVTipsStoreKit/StoreKitTips+Offers.swift`) and those of the StoreKit test file (`TestPlans/StoreKit/Tips.storekit`).
+
+| Tip | Product identifier | Reference name | Type | Price |
+|---|---|---|---|---|
+| Small | `com.PigLardLord.prestocv.tip.small` | Tip small | Consumable, no Family Sharing | 1.99 EUR |
+| Medium | `com.PigLardLord.prestocv.tip.medium` | Tip medium | Consumable, no Family Sharing | 4.99 EUR |
+| Large | `com.PigLardLord.prestocv.tip.large` | Tip large | Consumable, no Family Sharing | 9.99 EUR |
+
+- **Price.** Each tip has one price set by hand, in Germany, the base storefront; App Store Connect sets the price of every other storefront from it. Some land lower than the base: the medium tip is 3.99 USD in the United States, 3.99 GBP in the United Kingdom and 3.00 CHF in Switzerland. A change of price or of the base storefront needs the maintainer's yes.
+- **Availability.** The app's own storefronts, and the new storefronts Apple adds.
+- **App Store localizations.** The nine of the listing below. The name is the tip's name in the app (`settings.tips.small`, `.medium`, `.large`); the description says it is a one-time tip that unlocks nothing.
+
+| Localization | Small | Medium | Large | Description |
+|---|---|---|---|---|
+| en-US | Small tip | Medium tip | Large tip | A one-time tip. It unlocks nothing. |
+| en-GB | Small tip | Medium tip | Large tip | A one-time tip. It unlocks nothing. |
+| de-DE | Kleines Trinkgeld | Mittleres Trinkgeld | Großes Trinkgeld | Einmaliges Trinkgeld. Schaltet nichts frei. |
+| it | Mancia piccola | Mancia media | Mancia grande | Una mancia una tantum. Non sblocca nulla. |
+| es-ES | Propina pequeña | Propina mediana | Propina grande | Una propina única. No desbloquea nada. |
+| es-MX | Propina pequeña | Propina mediana | Propina grande | Una propina única. No desbloquea nada. |
+| fr-FR | Petit pourboire | Pourboire moyen | Gros pourboire | Un pourboire unique. Il ne débloque rien. |
+| pt-PT | Gorjeta pequena | Gorjeta média | Gorjeta grande | Uma gorjeta única. Não desbloqueia nada. |
+| pt-BR | Gorjeta pequena | Gorjeta média | Gorjeta grande | Uma gorjeta única. Não libera nada. |
+
+### Review information of every tip
+
+The screenshot is the tip jar with its three tips and their prices. The note, in English:
+
+```text
+A tip is an optional, one-time thank you to the developer. It unlocks nothing: no feature, content or service of the app depends on it, and the app works the same with or without one. The tip jar is in Settings > Support PrestoCV.
+```
+
+The notes for App Review above are those of version 1.0, which has no in-app purchase; the notes of version 1.1 name the tip jar.
+
 ## English (U.S.), en-US
 
 ### Name
