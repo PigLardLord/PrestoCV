@@ -113,13 +113,26 @@ struct TipJarViewModelTests {
 
     // MARK: - Buying a tip
 
+    @Test("a purchase is asked for in the window where the person tapped")
+    func purchaseInTheTappingWindow() async {
+        let selling = StubTips(canPay: true, result: .success(all))
+        let model = TipJarViewModel(selling: selling)
+        await model.load()
+
+        await model.buy(.small, in: TipWindow(WindowMark(name: "left")))
+        await model.buy(.large, in: TipWindow(WindowMark(name: "right")))
+
+        let names = selling.windows.withLock { $0 }.map { ($0.handle as? WindowMark)?.name }
+        #expect(names == ["left", "right"])
+    }
+
     @Test("a completed purchase thanks the person, buys the size chosen and keeps the offers")
     func completedPurchaseThanks() async {
         let selling = StubTips(canPay: true, result: .success(all), purchased: .success(.completed))
         let model = TipJarViewModel(selling: selling)
         await model.load()
 
-        await model.buy(.medium)
+        await model.buy(.medium, in: .unknown)
 
         #expect(model.attempt == .thanked)
         #expect(selling.bought.withLock { $0 } == [.medium])
@@ -131,7 +144,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .success(.pending)))
         await model.load()
 
-        await model.buy(.small)
+        await model.buy(.small, in: .unknown)
 
         #expect(model.attempt == .pending)
         #expect(model.state == .offers(rows))
@@ -142,7 +155,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .success(.cancelled)))
         await model.load()
 
-        await model.buy(.large)
+        await model.buy(.large, in: .unknown)
 
         #expect(model.attempt == .idle)
         #expect(model.state == .offers(rows))
@@ -154,7 +167,7 @@ struct TipJarViewModelTests {
             let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .failure(failure)))
             await model.load()
 
-            await model.buy(.small)
+            await model.buy(.small, in: .unknown)
 
             #expect(model.attempt == attempt)
             #expect(model.state == .offers(rows))
@@ -166,7 +179,7 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: .failure(.notAllowed)))
         await model.load()
 
-        await model.buy(.small)
+        await model.buy(.small, in: .unknown)
 
         #expect(model.state == .unavailable(.notAllowed))
         #expect(model.attempt == .idle)
@@ -182,10 +195,10 @@ struct TipJarViewModelTests {
         selling.finish(request: 0, with: .success(all))
         await loading.value
 
-        let first = Task { await model.buy(.small) }
+        let first = Task { await model.buy(.small, in: .unknown) }
         await arrivals.next()
         #expect(model.attempt == .buying(.small))
-        await model.buy(.large)
+        await model.buy(.large, in: .unknown)
         #expect(selling.bought.withLock { $0 } == [.small])
         #expect(model.attempt == .buying(.small))
 
@@ -206,7 +219,7 @@ struct TipJarViewModelTests {
 
         let reading = Task { await model.load() }
         await arrivals.next()
-        let buying = Task { await model.buy(.small) }
+        let buying = Task { await model.buy(.small, in: .unknown) }
         await arrivals.next()
         selling.finishPurchase(with: .failure(.notAllowed))
         await buying.value
@@ -235,7 +248,7 @@ struct TipJarViewModelTests {
 
                 let reading = Task { await model.load() }
                 await arrivals.next()
-                let buying = Task { await model.buy(.small) }
+                let buying = Task { await model.buy(.small, in: .unknown) }
                 await arrivals.next()
                 selling.finishPurchase(with: purchased)
                 await buying.value
@@ -256,7 +269,7 @@ struct TipJarViewModelTests {
         for purchased in answers {
             let model = TipJarViewModel(selling: StubTips(canPay: true, result: .success(all), purchased: purchased))
             await model.load()
-            await model.buy(.small)
+            await model.buy(.small, in: .unknown)
 
             await model.load()
 
@@ -274,7 +287,7 @@ struct TipJarViewModelTests {
         await arrivals.next()
         selling.finish(request: 0, with: .success(all))
         await loading.value
-        let buying = Task { await model.buy(.medium) }
+        let buying = Task { await model.buy(.medium, in: .unknown) }
         await arrivals.next()
 
         let reading = Task { await model.load() }
@@ -312,7 +325,7 @@ final class GatedTips: TipSelling {
 
     /// The first purchase waits until the test finishes it; a later one completes at once, so a purchase that should not
     /// have started shows in `bought` without holding the test.
-    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase {
+    func purchase(_ size: TipSize, in window: TipWindow) async throws(TipFailure) -> TipPurchase {
         guard bought.withLock({ sizes in
             sizes.append(size)
             return sizes.count == 1
@@ -343,6 +356,8 @@ final class StubTips: TipSelling {
     let purchased: Mutex<Result<TipPurchase, TipFailure>>
     let asked = Mutex(0)
     let bought = Mutex<[TipSize]>([])
+    /// The windows the purchases were asked for, in order.
+    let windows = Mutex<[TipWindow]>([])
 
     init(
         canPay: Bool, result: Result<[TipOffer], TipFailure>,
@@ -358,8 +373,14 @@ final class StubTips: TipSelling {
         return try result.withLock { $0 }.get()
     }
 
-    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase {
+    func purchase(_ size: TipSize, in window: TipWindow) async throws(TipFailure) -> TipPurchase {
         bought.withLock { $0.append(size) }
+        windows.withLock { $0.append(window) }
         return try purchased.withLock { $0 }.get()
     }
+}
+
+/// A stand-in for the scene of a window: the model only passes it on.
+struct WindowMark: Sendable {
+    let name: String
 }

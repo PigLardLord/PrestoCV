@@ -459,7 +459,7 @@ struct GivenTips: TipsListening {
 
     /// The offers' answer buys: a tip goes through. A device that may not pay, or a store that cannot be reached, refuses
     /// the purchase as it refused the offers.
-    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase {
+    func purchase(_ size: TipSize, in window: TipWindow) async throws(TipFailure) -> TipPurchase {
         switch given {
         case .offers: .completed
         case .cancelled: .cancelled

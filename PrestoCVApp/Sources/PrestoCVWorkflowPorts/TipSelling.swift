@@ -9,8 +9,27 @@ public protocol TipSelling: Sendable {
     func offers() async throws(TipFailure) -> [TipOffer]
     /// Buys the tip of this size through the store's own purchase sheet, and finishes what the store sold, verified or not:
     /// a tip unlocks nothing, so nothing is granted or kept. A tip the store did not verify throws `TipFailure.failed`, a
-    /// device that may not pay `TipFailure.notAllowed`, a store that cannot be reached `TipFailure.unreachable`.
-    func purchase(_ size: TipSize) async throws(TipFailure) -> TipPurchase
+    /// device that may not pay `TipFailure.notAllowed`, a store that cannot be reached `TipFailure.unreachable`. The store's
+    /// sheet opens in `window`, the window where the person tapped: an app with several windows must say which one.
+    func purchase(_ size: TipSize, in window: TipWindow) async throws(TipFailure) -> TipPurchase
+}
+
+/// The window where the person asked for a tip, as the adapter needs it to open the store's sheet there, and nothing a
+/// screen or its model can read: the view that knows its window hands it over, and only the adapter opens it (R5).
+public struct TipWindow: Sendable {
+    /// What the view gave: the window's scene, which only the adapter knows how to read.
+    public let handle: (any Sendable)?
+
+    public init(_ handle: any Sendable) {
+        self.handle = handle
+    }
+
+    private init() {
+        handle = nil
+    }
+
+    /// No window known: the store picks the place of its sheet.
+    public static let unknown = TipWindow()
 }
 
 /// The three sizes of a tip, smallest first.
