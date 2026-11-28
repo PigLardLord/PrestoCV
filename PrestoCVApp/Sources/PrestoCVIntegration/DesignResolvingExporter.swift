@@ -12,8 +12,8 @@ import CVRendering
 ///   wants, then for the default design's when it falls back, never for the whole check, and never falls back while the
 ///   design it wants is still being checked.
 /// - A default design the store does not have, after its verdict, is `ExportFailure.designsUnavailable`: no design can
-///   print the PDF. So is a store that fails while the default design did not pass its check; otherwise a store that fails
-///   is `ExportFailure.renderingFailed`. In both cases nothing is rendered. A cancelled task stays a `CancellationError`
+///   print the PDF. So is a store that fails once the default design's verdict is that it did not pass, even while the
+///   other designs are still checked; otherwise a store that fails is `ExportFailure.renderingFailed`. In both cases nothing is rendered. A cancelled task stays a `CancellationError`
 ///   (R3, R7), even when the store's wait outlives the cancel and then reads or fails: nothing is rendered. The export's own
 ///   failures pass through unchanged.
 public struct DesignResolvingExporter: CVExporting {
@@ -58,7 +58,7 @@ public struct DesignResolvingExporter: CVExporting {
             // cancelled task is read from the task, not from the error.
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             if case .unknownDesign? = error as? DesignCatalogError { throw ExportFailure.designsUnavailable }
-            throw designs.current.status == .unavailable ? ExportFailure.designsUnavailable : ExportFailure.renderingFailed
+            throw designs.current.didNotPass(defaultDesign) ? ExportFailure.designsUnavailable : ExportFailure.renderingFailed
         }
     }
 }

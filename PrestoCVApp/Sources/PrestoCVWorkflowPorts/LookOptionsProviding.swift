@@ -9,7 +9,8 @@ public protocol LookOptionsProviding: Sendable {
     func options() -> LookOptions
     /// The options now, then again each time they change: a design that joins, or the end of the check.
     func changes() -> AsyncStream<LookOptions>
-    /// Checks the designs again when the default design did not pass (`unavailable`); does nothing otherwise.
+    /// Checks the designs again when the default design did not pass: at once when the check is over (`unavailable`), or
+    /// when the check that still runs ends. Does nothing otherwise.
     func retry()
 }
 

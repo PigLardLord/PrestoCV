@@ -110,6 +110,26 @@ struct CheckedDesignsTests {
         #expect(checking.checks == 2)
     }
 
+    @Test("a retry once the default design did not pass, while the others are still checked, checks again when that check ends")
+    func retryWhileTheCheckRuns() async throws {
+        let checking = DrivenChecking(holding: [])
+        let designs = CheckedDesigns(checking: checking, defaultDesign: "professional")
+        designs.start()
+        checking.tell("professional", nil)
+        try await designs.verdict(on: "professional")                   // the default did not pass; the check still runs
+
+        designs.retry()
+        designs.retry()                                                 // already asked: one more check, not two
+        checking.endCheck()
+        checking.tell("professional", try design("professional"))
+        checking.endCheck()
+        let over = await first(designs) { $0.status != .checking }
+
+        #expect(over?.status == .ready, "the check that ran on is not the end: the default design is checked again")
+        #expect(ids(over) == ["professional"])
+        #expect(checking.checks == 2)
+    }
+
     @Test("a verdict waits for its design, not for the whole check")
     func verdictWaitsForItsDesign() async throws {
         let checking = DrivenChecking(holding: [])

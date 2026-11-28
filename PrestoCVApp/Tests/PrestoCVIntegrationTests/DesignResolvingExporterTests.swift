@@ -337,6 +337,43 @@ struct ExportWhileCheckingTests {
         #expect(await renderer.rendered.isEmpty)
     }
 
+    @Test("a store that fails once the default design did not pass is designsUnavailable, while the other designs are still checked")
+    func storeFailureOnceTheDefaultFailed() async throws {
+        let (checking, designs, _) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+
+        let export = Task { try await exporter(UnavailableStore(), designs: designs, renderer: renderer).export(snapshot, language: language) }
+        checking.tell(Installed.defaultID, nil)
+
+        await #expect(throws: ExportFailure.designsUnavailable) { try await export.value }
+        #expect(await renderer.rendered.isEmpty)
+        #expect(designs.current.status == .checking, "the rest of the check is still held")
+        checking.endCheck()
+    }
+
+    @Test("an export after a retry, once the default design did not pass while the others are still checked, waits for the check to run again, then prints in the default design")
+    func exportAfterARetryWhileChecking() async throws {
+        let (checking, designs, store) = checking()
+        let renderer = RecordingRenderer()
+        let snapshot = cv(nil), language = try italian()
+        checking.tell(Installed.defaultID, nil)
+        try await designs.verdict(on: Installed.defaultID)
+
+        designs.retry()
+        let export = Task { try await exporter(store, designs: designs, renderer: renderer).export(snapshot, language: language) }
+        for _ in 0..<50 { await Task.yield() }                         // the check still runs: an export that did not wait finds no design
+        checking.endCheck()
+        let professional = try Installed.designs()[0]
+        _ = try await store.saveIfNewer(professional)
+        checking.tell(Installed.defaultID, professional)
+        _ = try await export.value
+
+        #expect(try await onlyHTML(renderer).contains(Installed.professionalCSS))
+        #expect(checking.checks == 2)
+        checking.endCheck()
+    }
+
     @Test("an export cancelled while it waits for a verdict is cancelled, and nothing is rendered")
     func cancelledWhileWaiting() async throws {
         let (_, designs, store) = checking()

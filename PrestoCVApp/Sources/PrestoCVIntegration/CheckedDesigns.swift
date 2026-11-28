@@ -22,14 +22,18 @@ public struct CheckedDesignsSnapshot: Sendable {
 
     /// Whether the design has its verdict: the check told it, or the check is over.
     func isDecided(_ id: String) -> Bool { status != .checking || decided.contains(id) }
+
+    /// Whether the design has its verdict and did not pass, whether or not the rest of the check is over.
+    func didNotPass(_ id: String) -> Bool { isDecided(id) && !designs.contains { $0.manifest.id == id } }
 }
 
 /// The designs a PDF can be made with while the app is open (#566). The app opens before the bundled designs are checked:
 /// the designs the store already holds are offered at once, and each bundled design joins once it passes the check. A
 /// design that does not pass is never offered.
 /// - The check runs once, in the background, from `start()`; it ends with the check, or when these designs are released.
-/// - When the default design does not pass, or the store cannot give it, the status is `unavailable`, and `retry()` checks
-///   again. The app still opens: only a PDF cannot be made.
+/// - When the default design does not pass, or the store cannot give it, the status is `unavailable` once the check is
+///   over, and `retry()` checks again; a retry that comes while the others are still checked checks again when that check
+///   ends. The app still opens: only a PDF cannot be made.
 /// - An export waits for its design's verdict (`verdict(on:)`), never for the whole check.
 public final class CheckedDesigns: Sendable {
     public let defaultDesign: String
@@ -61,11 +65,18 @@ public final class CheckedDesigns: Sendable {
         if starts { run() }
     }
 
-    /// Checks again when the default design did not pass (`unavailable`); does nothing while a check runs or after one
-    /// passed. The designs offered stay offered.
+    /// Checks again when the default design did not pass: at once when the check is over (`unavailable`), or when the check
+    /// that still runs ends, and the default design's verdict waits for that check. Does nothing while the default design
+    /// has no verdict, or once it passed. The designs offered stay offered.
     public func retry() {
         let retries = shared.state.withLock { state in
-            guard state.status == .unavailable else { return false }
+            guard state.snapshot(defaultDesign: defaultDesign).didNotPass(defaultDesign) else { return false }
+            guard state.status == .unavailable else {
+                state.checksAgain = true
+                state.decided.remove(defaultDesign)
+                state.publish(defaultDesign: defaultDesign)
+                return false
+            }
             state.status = .checking
             state.decided = Set(state.designs.keys)
             state.publish(defaultDesign: defaultDesign)
@@ -109,22 +120,20 @@ public final class CheckedDesigns: Sendable {
     private func run() {
         let shared = shared, checking = checking, defaultDesign = defaultDesign
         let task = Task {
-            let installed = await checking.installed()
-            shared.state.withLock { state in
-                for design in installed { state.designs[design.manifest.id] = design; state.decided.insert(design.manifest.id) }
-                state.publish(defaultDesign: defaultDesign)
-            }
-            await checking.check { id, design in
+            repeat {
+                let installed = await checking.installed()
                 shared.state.withLock { state in
-                    state.designs[id] = design
-                    state.decided.insert(id)
+                    for design in installed { state.designs[design.manifest.id] = design; state.decided.insert(design.manifest.id) }
                     state.publish(defaultDesign: defaultDesign)
                 }
-            }
-            shared.state.withLock { state in
-                state.status = state.designs[defaultDesign] == nil ? .unavailable : .ready
-                state.publish(defaultDesign: defaultDesign)
-            }
+                await checking.check { id, design in
+                    shared.state.withLock { state in
+                        state.designs[id] = design
+                        state.decided.insert(id)
+                        state.publish(defaultDesign: defaultDesign)
+                    }
+                }
+            } while shared.state.withLock({ $0.endCheck(defaultDesign: defaultDesign) }) && !Task.isCancelled
         }
         shared.state.withLock { $0.task = task }
     }
@@ -144,6 +153,8 @@ private final class Shared: Sendable {
         var status = LookOptionsStatus.checking
         var designs: [String: ValidatedDesign] = [:]
         var decided: Set<String> = []
+        /// A retry came while the check ran: the check runs again when it ends.
+        var checksAgain = false
         var watchers: [Int: Watcher] = [:]
         var nextWatcher = 0
         var task: Task<Void, Never>?
@@ -155,6 +166,19 @@ private final class Shared: Sendable {
                 return firstID < secondID
             }
             return CheckedDesignsSnapshot(designs: ordered, status: status, decided: decided)
+        }
+
+        /// Ends a check and returns whether it runs again: after a retry that came while it ran, the designs that did not
+        /// pass wait for their verdicts again; otherwise the status follows the default design.
+        mutating func endCheck(defaultDesign: String) -> Bool {
+            defer { publish(defaultDesign: defaultDesign) }
+            guard checksAgain else {
+                status = designs[defaultDesign] == nil ? .unavailable : .ready
+                return false
+            }
+            checksAgain = false
+            decided = Set(designs.keys)
+            return true
         }
 
         /// Tells every watcher, under the lock, so that they see the changes in order.
