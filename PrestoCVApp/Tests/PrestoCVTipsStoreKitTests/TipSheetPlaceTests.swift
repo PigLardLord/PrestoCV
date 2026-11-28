@@ -77,4 +77,39 @@ final class WindowStandIn {
 
 /// A window of another kind than the one the adapter opens.
 final class OtherStandIn: Sendable {}
+
+@Suite("When a Mac's window is open")
+struct MacWindowFactsTests {
+    private func facts(visible: Bool = false, miniaturized: Bool = false, hidden: Bool = false, listed: Bool = true)
+        -> MacWindowFacts
+    {
+        MacWindowFacts(isVisible: visible, isMiniaturized: miniaturized, appIsHidden: hidden, isListed: listed)
+    }
+
+    @Test("a window on screen is open")
+    func onScreen() {
+        #expect(facts(visible: true).isOpen)
+    }
+
+    @Test("a window in the Dock is open")
+    func inTheDock() {
+        #expect(facts(miniaturized: true).isOpen)
+    }
+
+    @Test("an open window of an app hidden with Cmd-H is open: it is not visible, but still one of the app's windows")
+    func hiddenApp() {
+        #expect(facts(hidden: true).isOpen)
+    }
+
+    @Test("a window that is not visible, with the app showing, is closed")
+    func closed() {
+        #expect(!facts().isOpen)
+    }
+
+    @Test("a window gone from the app's windows is closed, whether or not the app is hidden")
+    func gone() {
+        #expect(!facts(hidden: true, listed: false).isOpen)
+        #expect(!facts(listed: false).isOpen)
+    }
+}
 #endif

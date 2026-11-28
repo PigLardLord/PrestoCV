@@ -11,8 +11,8 @@ import UIKit
 /// purchase that waits for approval is finished by the listener when the store sends it.
 extension StoreKitTips {
     /// The sheet opens in `window` if it is still open once the tip's product has loaded: a scene in the background still
-    /// is, and so is a Mac's window in the Dock. A purchase whose window has closed (a scene that disconnected, a Mac's
-    /// window no longer on screen, or one that is gone) does not start: no sheet opens in another window, nothing is
+    /// is, and so is a Mac's window in the Dock or of a hidden app (Cmd-H). A purchase whose window has closed (a scene that
+    /// disconnected, a Mac's window closed, or one that is gone) does not start: no sheet opens in another window, nothing is
     /// charged, no error shows, and it ends as `cancelled`, as when the person cancels in the sheet, logged under its own
     /// code. Without a window known at the tap, the store picks the place of its sheet.
     public func purchase(_ size: TipSize, in window: TipWindow) async throws(TipFailure) -> TipPurchase {
@@ -25,7 +25,7 @@ extension StoreKitTips {
     @MainActor
     private static func start(_ product: Product, in window: TipWindow) async throws -> Product.PurchaseResult? {
         #if os(macOS)
-        let place = TipSheetPlace<NSWindow>.of(window) { $0.isVisible || $0.isMiniaturized }
+        let place = TipSheetPlace<NSWindow>.of(window) { MacWindowFacts(of: $0).isOpen }
         if case .window(let shown) = place { return try await product.purchase(confirmIn: shown) }
         #else
         let place = TipSheetPlace<UIScene>.of(window) { $0.activationState != .unattached }
