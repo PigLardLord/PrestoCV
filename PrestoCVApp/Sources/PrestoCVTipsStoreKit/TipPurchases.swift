@@ -8,6 +8,8 @@ import StoreKit
 enum TipPurchaseAnswer: Sendable {
     case bought(TipTransaction)
     case cancelled
+    /// The window of the tap closed before the sheet opened, so no purchase started.
+    case windowClosed
     case pending
     case refused(TipFailure)
 }
@@ -23,8 +25,8 @@ enum TipPurchases {
     }
 
     /// Finishes the transaction the store sold, verified or not, since a tip grants nothing and one left unfinished comes
-    /// back at every launch; one the store did not verify does not go through. The outcome is logged as a code only:
-    /// never the product, the price or the transaction.
+    /// back at every launch; one the store did not verify does not go through. A purchase whose window closed ends as one
+    /// the person cancelled. The outcome is logged as a code only: never the product, the price or the transaction.
     static func settle(_ answer: TipPurchaseAnswer, logger: any DiagnosticLogger) async throws(TipFailure) -> TipPurchase {
         let ended: Result<TipPurchase, TipFailure>
         let outcome: StaticString
@@ -35,6 +37,7 @@ enum TipPurchases {
                 ? (.success(.completed), "completed")
                 : (.failure(.failed), "unverified")
         case .cancelled: (ended, outcome) = (.success(.cancelled), "cancelled")
+        case .windowClosed: (ended, outcome) = (.success(.cancelled), "windowClosed")
         case .pending: (ended, outcome) = (.success(.pending), "pending")
         case .refused(.notAllowed): (ended, outcome) = (.failure(.notAllowed), "notAllowed")
         case .refused(.unreachable): (ended, outcome) = (.failure(.unreachable), "unreachable")

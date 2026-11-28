@@ -2,11 +2,13 @@ import PrestoCVPresentation
 import SwiftUI
 #if os(iOS)
 import UIKit
+#else
+import AppKit
 #endif
 
 /// Tells which window a view is in, when the person taps in it: the store's sheet opens in the window it is asked for, and
-/// an app with several windows must say which. An empty view behind the content joins the anchor to the window; the
-/// anchor never keeps the view or its window alive.
+/// an app with several windows must say which. An empty view behind the content joins the anchor to the window; neither
+/// the anchor nor the window it hands over keeps the view or its window alive.
 @MainActor
 final class TipWindowAnchor {
     #if os(iOS)
@@ -14,11 +16,15 @@ final class TipWindowAnchor {
 
     /// The scene of the window the view is in now; unknown while the view is in none.
     var window: TipWindow {
-        view?.window?.windowScene.map(TipWindow.init) ?? .unknown
+        view?.window?.windowScene.map { TipWindow(weak: $0) } ?? .unknown
     }
     #else
-    /// A Mac has no scenes to tell: the store picks the place of its sheet.
-    var window: TipWindow { .unknown }
+    fileprivate weak var view: NSView?
+
+    /// The window the view is in now; unknown while the view is in none.
+    var window: TipWindow {
+        view?.window.map { TipWindow(weak: $0) } ?? .unknown
+    }
     #endif
 }
 
@@ -46,9 +52,25 @@ private struct TipWindowReader: UIViewRepresentable {
     }
 }
 #else
-private struct TipWindowReader: View {
+private struct TipWindowReader: NSViewRepresentable {
     let anchor: TipWindowAnchor
 
-    var body: some View { EmptyView() }
+    func makeNSView(context: Context) -> NSView {
+        let view = UntouchedView()
+        view.setAccessibilityElement(false)
+        anchor.view = view
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        anchor.view = view
+    }
+}
+
+/// An empty view that takes no click: every click goes to the content in front of it.
+private final class UntouchedView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
 }
 #endif

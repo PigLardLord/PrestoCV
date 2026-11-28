@@ -119,10 +119,15 @@ struct TipJarViewModelTests {
         let model = TipJarViewModel(selling: selling)
         await model.load()
 
-        await model.buy(.small, in: TipWindow(WindowMark(name: "left")))
-        await model.buy(.large, in: TipWindow(WindowMark(name: "right")))
+        let left = WindowMark(name: "left")
+        let right = WindowMark(name: "right")
 
-        let names = selling.windows.withLock { $0 }.map { ($0.handle as? WindowMark)?.name }
+        await model.buy(.small, in: TipWindow(weak: left))
+        await model.buy(.large, in: TipWindow(weak: right))
+
+        let names = withExtendedLifetime((left, right)) {
+            selling.windows.withLock { $0 }.map { ($0.current() as? WindowMark)?.name }
+        }
         #expect(names == ["left", "right"])
     }
 
@@ -381,6 +386,10 @@ final class StubTips: TipSelling {
 }
 
 /// A stand-in for the scene of a window: the model only passes it on.
-struct WindowMark: Sendable {
+final class WindowMark: Sendable {
     let name: String
+
+    init(name: String) {
+        self.name = name
+    }
 }

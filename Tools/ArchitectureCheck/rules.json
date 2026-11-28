@@ -1010,6 +1010,8 @@
     "PrestoCVWorkflowPorts",
     "DiagnosticLogging",
     "StoreKit",
+    "UIKit",
+    "AppKit",
     "Foundation",
     "Synchronization"
    ],
