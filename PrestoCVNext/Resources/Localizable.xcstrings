@@ -14241,6 +14241,47 @@
         }
       }
     },
+    "look.designs.joinedAndChecked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Vorlagen sind verfügbar. Alle Vorlagen sind geprüft."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More templates are available. All templates are checked."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hay más plantillas disponibles. Se revisaron todas las plantillas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’autres modèles sont disponibles. Tous les modèles sont vérifiés."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono disponibili altri modelli. Tutti i modelli sono stati controllati."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há mais modelos disponíveis. Todos os modelos foram verificados."
+          }
+        }
+      }
+    },
     "look.designsOwn" : {
       "extractionState" : "manual",
       "localizations" : {

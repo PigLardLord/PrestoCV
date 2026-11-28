@@ -53,11 +53,12 @@ extension DesignWait {
 }
 
 extension DesignsAnnouncement {
-    /// The words that tell designs joined the look, or that the check of the designs ended.
+    /// The words that tell designs joined the look, that the check of the designs ended, or both.
     var words: LocalizedStringResource {
         switch kind {
         case .joined: "look.designs.joined"
         case .checked: "look.designs.checked"
+        case .joinedAndChecked: "look.designs.joinedAndChecked"
         }
     }
 }

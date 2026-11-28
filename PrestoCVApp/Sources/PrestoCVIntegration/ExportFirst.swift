@@ -12,6 +12,8 @@ import CVRendering
 ///   returns. So an export that comes once a print of the check is let in, before that print reaches the renderer, finds
 ///   the place taken and prints within the limit, or waits for the first place that frees.
 /// - A print cancelled before it is let in gives a `CancellationError`, takes no place and never begins.
+/// - A print cancelled once it is let in, before its render begins, gives a `CancellationError` and its place back, and
+///   never begins: the place was taken under the lock, so the cancel finds no waiter to take out.
 /// - Only the prints are counted, not the whole export: an export can wait for its design's verdict, which the check
 ///   gives, so an export that held the check back while it waits would wait for ever.
 /// - A print the renderer abandons on a timeout or a cancellation gives its place back when its render returns; the
@@ -88,7 +90,8 @@ public final class ExportFirst: Sendable {
     public func checking(_ renderer: any PDFRendering) -> any PDFRendering { CheckRenderer(renderer: renderer, turns: self) }
 
     /// Returns once the print has its place; it must give it back with `ended(_:)`. A task cancelled before it is let in
-    /// gives a `CancellationError` and takes no place.
+    /// gives a `CancellationError` and takes no place; one cancelled once it is let in returns with its place, so the
+    /// renderers check the cancel before they print.
     @concurrent fileprivate func turn(_ kind: Kind) async throws {
         try Task.checkCancellation()
         let id = state.withLock { state in
@@ -135,6 +138,7 @@ private struct ExportRenderer: PDFRendering {
     @concurrent func render(html: String, page: PageSetup) async throws -> RenderedPDF {
         try await turns.turn(.export)
         defer { turns.ended(.export) }
+        try Task.checkCancellation()
         return try await renderer.render(html: html, page: page)
     }
 }
@@ -147,6 +151,7 @@ private struct CheckRenderer: PDFRendering {
     @concurrent func render(html: String, page: PageSetup) async throws -> RenderedPDF {
         try await turns.turn(.check)
         defer { turns.ended(.check) }
+        try Task.checkCancellation()
         return try await renderer.render(html: html, page: page)
     }
 }

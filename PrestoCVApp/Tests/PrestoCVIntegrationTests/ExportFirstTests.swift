@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Synchronization
 import PrestoCVIntegration
 import CVRendering
 
@@ -69,6 +70,41 @@ private actor GatedRenderer: PDFRendering {
 
     /// Lets the print of `html` end; it must have begun.
     func release(_ html: String) { held.removeValue(forKey: html)?.resume() }
+}
+
+/// A renderer that counts its prints and prints at once, with no actor: a print stays on the executor of its task.
+private final class UnheldRenderer: PDFRendering {
+    private let count = Mutex(0)
+    var prints: Int { count.withLock { $0 } }
+
+    @concurrent func render(html: String, page: PageSetup) async throws -> RenderedPDF {
+        count.withLock { $0 += 1 }
+        return RenderedPDF(data: Data(html.utf8), pageCount: 1, requiredPages: 1)
+    }
+}
+
+/// A task executor that runs nothing by itself: the jobs of a task that prefers it wait until the test drains them, so
+/// a task resumed meanwhile stays where it was until then.
+private final class DrainedExecutor: TaskExecutor {
+    private let jobs = Mutex<[UnownedJob]>([])
+
+    func enqueue(_ job: consuming ExecutorJob) {
+        let job = UnownedJob(job)
+        jobs.withLock { $0.append(job) }
+    }
+
+    /// Runs the jobs that wait, and those they enqueue, on a thread of its own, and returns once none is left: the
+    /// tasks that prefer the executor then wait on something else, or ended.
+    func drain() async {
+        await withCheckedContinuation { (drained: CheckedContinuation<Void, Never>) in
+            Thread {
+                while let job = self.jobs.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) {
+                    job.runSynchronously(on: self.asUnownedTaskExecutor())
+                }
+                drained.resume()
+            }.start()
+        }
+    }
 }
 
 /// Lets the other tasks run as far as they can go, with no clock: a print that would begin begins meanwhile.
@@ -245,5 +281,30 @@ struct ExportFirstTests {
         _ = try await check.value
         let begunThen = await renderer.begun
         #expect(begunThen == ["first", "check"])
+    }
+
+    /// The print before it lets a waiting print in when it ends, under the lock, and a cancel that comes then finds
+    /// nothing to take back. The waiting print's task prefers an executor the test drains, so it stays let in and not yet
+    /// resumed while the test cancels it: the cancel comes between the two on every run.
+    @Test("a print cancelled once it is let in, before its render begins, never begins and gives its place back",
+          arguments: [true, false])
+    func cancelledOnceLetIn(export: Bool) async throws {
+        let turns = ExportFirst(prints: 1)
+        let firstRenderer = HeldRenderer(fails: false), renderer = UnheldRenderer(), executor = DrainedExecutor()
+        let printing = export ? turns.exporting(renderer) : turns.checking(renderer)
+
+        let first = Task { try await turns.exporting(firstRenderer).render(html: "first", page: .a4) }
+        await firstRenderer.waitUntilEntered()
+        let cancelled = Task(executorPreference: executor) { try await printing.render(html: "cancelled", page: .a4) }
+        await executor.drain()                                          // it waits for the place the first print holds
+        await firstRenderer.release()
+        _ = try await first.value                                       // its end let the waiting print in
+        cancelled.cancel()
+        await executor.drain()
+
+        await #expect(throws: CancellationError.self) { try await cancelled.value }
+        #expect(renderer.prints == 0)
+        _ = try await turns.checking(renderer).render(html: "after", page: .a4)
+        #expect(renderer.prints == 1, "the place is free again")
     }
 }

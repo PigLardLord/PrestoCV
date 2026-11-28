@@ -141,7 +141,7 @@ struct ExportSheetDesignsTests {
         #expect(sheet.designsToAnnounce == nil)
     }
 
-    @Test("Nothing is told while the designs stay as they are, nor when the sheet opens after the check; a join that ends the check is told as the end alone")
+    @Test("Nothing is told while the designs stay as they are, nor when the sheet opens after the check; a join that ends the check, with none told before, is told with the end in one announcement")
     func nothingNewIsNotTold() async {
         let over = DrivenLookOptions(Self.options(["classic", "modern"], .ready))
         let opened = Self.world(over).sheet()
@@ -163,7 +163,30 @@ struct ExportSheetDesignsTests {
 
         options.tell(Self.options(["classic", "modern"], .ready))
         await waitUntil("modern joins") { sheet.lookChoices.designs.count == 2 }
-        #expect(sheet.designsToAnnounce?.kind == .checked)
+        #expect(sheet.designsToAnnounce?.kind == .joinedAndChecked)
+    }
+
+    @Test("A join and the end that the stream folds into one change are told in one announcement; after a join told, the end alone")
+    func aJoinWithTheEnd() async {
+        let options = DrivenLookOptions(Self.options([], .checking))
+        let folded = Self.world(options).sheet()
+        options.tell(Self.options(["classic"], .checking))
+        options.tell(Self.options(["classic", "modern"], .ready))       // before the sheet watches: it reads the last
+        let watchFolded = Task { await folded.watchDesigns() }
+        defer { watchFolded.cancel() }
+        await waitUntil("the check ends") { folded.lookChoices.designs.count == 2 }
+        #expect(folded.designsToAnnounce?.kind == .joinedAndChecked)
+
+        let following = DrivenLookOptions(Self.options([], .checking))
+        let sheet = Self.world(following).sheet()
+        let watch = Task { await sheet.watchDesigns() }
+        defer { watch.cancel() }
+        await waitUntil("the sheet watches the designs") { following.watching == 1 }
+        following.tell(Self.options(["classic"], .checking))
+        await waitUntil("classic joins") { sheet.designsToAnnounce?.kind == .joined }
+        following.tell(Self.options(["classic", "modern"], .ready))
+        await waitUntil("the check ends") { sheet.lookChoices.designs.count == 2 }
+        #expect(sheet.designsToAnnounce?.kind == .checked, "the join was told")
     }
 
     @Test("The check that Try again starts tells its joins and its end again")

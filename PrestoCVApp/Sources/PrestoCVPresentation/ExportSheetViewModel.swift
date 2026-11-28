@@ -224,7 +224,8 @@ public final class ExportSheetViewModel {
         }
     }
 
-    /// Tells a change of the designs once per check: its first join, then its end.
+    /// Tells a change of the designs once per check: its first join, then its end. Designs that join in the change that
+    /// ends the check, with no join told, are told with the end in one announcement.
     private func tell(_ change: DesignsChange) {
         let kind: DesignsAnnouncement.Kind
         switch change {
@@ -238,6 +239,8 @@ public final class ExportSheetViewModel {
             kind = .joined
         case .checkEnded:
             kind = .checked
+        case .joinedAndCheckEnded:
+            kind = toldAJoin ? .checked : .joinedAndChecked
         }
         designsTold += 1
         designsToAnnounce = DesignsAnnouncement(kind: kind, ordinal: designsTold)

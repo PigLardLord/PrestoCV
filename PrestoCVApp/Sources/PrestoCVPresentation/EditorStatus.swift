@@ -64,14 +64,17 @@ public struct DesignWait: Hashable, Sendable {
     let ordinal: Int
 }
 
-/// What the export sheet tells VoiceOver of the designs while they are checked (#566): designs joined the picker, or
-/// the check ended and the picker offers all the designs that passed. Each one is a new value.
+/// What the export sheet tells VoiceOver of the designs while they are checked (#566): designs joined the picker, the
+/// check ended and the picker offers all the designs that passed, or both. Each one is a new value.
 public struct DesignsAnnouncement: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         /// Designs joined the picker while the check runs.
         case joined
         /// The check ended.
         case checked
+        /// Designs joined in the change that ended the check, and no join of that check was told: both in one
+        /// announcement, since a second one would cut the first short.
+        case joinedAndChecked
     }
 
     public let kind: Kind
