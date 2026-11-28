@@ -17,6 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True  # importing the checker must leave no __pycache__ in the repository
 spec = importlib.util.spec_from_file_location("check_store_listing", HERE / "check-store-listing.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
