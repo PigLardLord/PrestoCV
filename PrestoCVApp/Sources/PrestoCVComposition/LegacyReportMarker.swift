@@ -6,11 +6,11 @@ import PrestoCVWorkflowPorts
 struct LegacyReportMarker: LegacyReportReminding {
     let file: URL
 
-    func remindsAgain() async -> Bool {
+    @concurrent func remindsAgain() async -> Bool {
         !FileManager.default.fileExists(atPath: file.path)
     }
 
-    func stopReminding() async throws(LegacyReminderFailure) {
+    @concurrent func stopReminding() async throws(LegacyReminderFailure) {
         do {
             try Data().write(to: file, options: .atomic)
         } catch {

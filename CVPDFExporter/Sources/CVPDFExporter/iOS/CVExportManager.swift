@@ -14,7 +14,6 @@ public final class CVExportManager: NSObject {
     private let logger = Logger(subsystem: "CVPDFExporter", category: "ExportManager")
     private let exportUseCase: PDFExportUseCase
     private let templateRepository: BundledTemplateRepository
-    private let adapter: PrestoCVCoreAdapter
     private var exportedFileURL: URL?
     private weak var presentingViewController: UIViewController?
 
@@ -39,7 +38,6 @@ public final class CVExportManager: NSObject {
         )
 
         self.templateRepository = BundledTemplateRepository()
-        self.adapter = PrestoCVCoreAdapter()
 
         super.init()
     }
@@ -48,12 +46,12 @@ public final class CVExportManager: NSObject {
 
     /// Exports CV to PDF and presents it in QuickLook
     /// - Parameters:
-    ///   - cvData: The CV data from PrestoCVCore
+    ///   - cvDocument: The CV to export
     ///   - templateId: The template to use (default: "modern")
     ///   - customization: Customization options
     ///   - presentingViewController: The view controller to present QuickLook from
     public func exportAndPreview(
-        cvData: Any,
+        cvDocument: CVDocument,
         templateId: String = "modern",
         customization: CustomizationOptions = CustomizationOptions(),
         from presentingViewController: UIViewController
@@ -67,8 +65,6 @@ public final class CVExportManager: NSObject {
         let loadingAlert = showLoadingAlert(on: presentingViewController)
 
         do {
-            // Convert CV data
-            let cvDocument = adapter.convertToCV(from: cvData)
             logger.debug("CV document created for: \(cvDocument.personalInfo.name)")
 
             // Load template
@@ -114,18 +110,15 @@ public final class CVExportManager: NSObject {
 
     /// Exports CV to PDF and returns the data
     /// - Parameters:
-    ///   - cvData: The CV data from PrestoCVCore
+    ///   - cvDocument: The CV to export
     ///   - templateId: The template to use
     ///   - customization: Customization options
     /// - Returns: PDF data
     public func exportToPDF(
-        cvData: Any,
+        cvDocument: CVDocument,
         templateId: String = "modern",
         customization: CustomizationOptions = CustomizationOptions()
     ) async throws -> Data {
-        // Convert CV data
-        let cvDocument = adapter.convertToCV(from: cvData)
-
         // Load template
         let template = try await templateRepository.loadTemplate(id: templateId)
 

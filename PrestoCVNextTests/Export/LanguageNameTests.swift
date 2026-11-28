@@ -1,6 +1,6 @@
 import Testing
 import SwiftUI
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// A language is named in the language the app shows: as it stands in a sentence, and with a capital when it stands
 /// alone in a list.

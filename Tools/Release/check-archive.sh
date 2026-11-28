@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Checks an archive before it is uploaded: the bundle identifier, the display name, the version and build, the privacy
-# manifest, the encryption declaration, the app icon, the oldest iOS release the app supports (MinimumOSVersion, which
+# manifest (it must be a valid property list, the same as the source manifest PrestoCV/PrivacyInfo.xcprivacy, which
+# ReleaseHygieneTests checks against the code, and it must declare no tracking, no tracking domain and no collected data
+# type: the app tracks nothing and collects nothing), the encryption declaration, the app icon, the oldest iOS release the app supports (MinimumOSVersion, which
 # Xcode writes from IPHONEOS_DEPLOYMENT_TARGET: the check reads what the archive says, not what the sources set, so a
 # target that no source check can read is found here), and the document type that "Open in PrestoCV" needs. That type is
 # PDF only, with role Viewer and rank Alternate, and the app never opens it in place; the app declares no type of its own
-# (no exported or imported type declaration). PrestoCVTests/App/AppInfoPlistTests.swift requires the same of the source
-# Info.plist, so change both together. Fails on the first thing that is wrong.
+# (no exported or imported type declaration). Tools/SourceChecks (ReleaseHygieneTests and DocumentTypesTests) requires
+# the same of the source Info.plist and the target's settings, so change both together. Fails on the first thing that
+# is wrong.
 #
 #   Tools/Release/check-archive.sh <path to PrestoCV.xcarchive>
 #
@@ -18,6 +21,7 @@ APP="$ARCHIVE/Products/Applications/PrestoCV.app"
 PLIST="$APP/Info.plist"
 read_key() { /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST" 2>/dev/null; }
 fail() { echo "::error::$1"; exit 1; }
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 [ -d "$APP" ] || fail "no PrestoCV.app in $ARCHIVE"
 [ "$(read_key CFBundleIdentifier)" = "com.PigLardLord.prestocv" ] || fail "unexpected bundle identifier: $(read_key CFBundleIdentifier)"
@@ -26,11 +30,36 @@ fail() { echo "::error::$1"; exit 1; }
 [ -n "$(read_key CFBundleVersion)" ] || fail "no build number"
 [ "$(read_key ITSAppUsesNonExemptEncryption)" = "false" ] || fail "ITSAppUsesNonExemptEncryption is not false"
 [ -f "$APP/PrivacyInfo.xcprivacy" ] || fail "no privacy manifest in the app bundle"
+
+# The privacy manifest the archive ships is read, not only found. The two are compared as property lists (both converted
+# to JSON by plutil with sorted keys), so that the format and the order of the keys do not matter.
+MANIFEST="$APP/PrivacyInfo.xcprivacy"
+SOURCE_MANIFEST="$ROOT/PrestoCV/PrivacyInfo.xcprivacy"
+[ -f "$SOURCE_MANIFEST" ] || fail "no source privacy manifest at PrestoCV/PrivacyInfo.xcprivacy"
+plutil -lint "$MANIFEST" >/dev/null 2>&1 || fail "the privacy manifest is not a valid property list"
+[ "$(plutil -type NSPrivacyTracking "$MANIFEST" 2>/dev/null)" = "bool" ] \
+  && [ "$(plutil -extract NSPrivacyTracking raw -o - "$MANIFEST")" = "false" ] || fail "NSPrivacyTracking is not the boolean false"
+# no_entries <key>: the key is absent, or an empty array.
+no_entries() {
+  local type
+  type="$(plutil -type "$1" "$MANIFEST" 2>/dev/null)" || return 0
+  [ "$type" = "array" ] && [ "$(plutil -extract "$1" raw -o - "$MANIFEST")" = "0" ]
+}
+no_entries NSPrivacyTrackingDomains || fail "the privacy manifest lists tracking domains"
+no_entries NSPrivacyCollectedDataTypes || fail "the privacy manifest declares collected data types"
+# -r sorts the keys of every dictionary, so that the order of the keys in the file does not matter (without it plutil
+# lists them in an order that depends on the file). Each conversion is checked on its own.
+manifest_json="$(plutil -convert json -r -o - "$MANIFEST" 2>/dev/null)" || fail "the privacy manifest cannot be converted to JSON"
+source_json="$(plutil -convert json -r -o - "$SOURCE_MANIFEST" 2>/dev/null)" || fail "the source privacy manifest cannot be converted to JSON"
+[ "$manifest_json" = "$source_json" ] || fail "the privacy manifest differs from the source manifest PrestoCV/PrivacyInfo.xcprivacy"
 [ -n "$(read_key CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" ] || fail "no app icon"
 
-# The document type's contract. AppInfoPlistTests reads typed values (an array of dictionaries, a Bool), and PlistBuddy
-# prints a string "false", a number or a dictionary with the key 0 the same way as the right type, so the types are
-# checked with plutil, which names them. Its key paths are separated by dots, and an array index is a number.
+# The document type's contract, as the source checks require it: ReleaseHygieneTests (infoPlistOpensPDFs,
+# infoPlistDeclaresNoTypes, theInfoPlistBuildsOnEveryPlatform) and DocumentTypesTests (pdfIsDeclaredAtTheAlternateRank,
+# aPDFIsNeverOpenedInPlace, macOSOpensInPlace). The in-place key comes from the target's settings, NO for the iOS SDKs,
+# so an iOS archive holds false. Those checks read typed values, and PlistBuddy prints a string "false", a number or a
+# dictionary with the key 0 the same way as the right type, so here the types are checked with plutil, which names
+# them. Its key paths are separated by dots, and an array index is a number.
 plist_type() { plutil -type "$1" "$PLIST" 2>/dev/null; }
 plist_value() { plutil -extract "$1" raw -o - "$PLIST" 2>/dev/null; }
 DOCUMENT_TYPES="CFBundleDocumentTypes"

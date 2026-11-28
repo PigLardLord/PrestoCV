@@ -74,13 +74,54 @@ struct Grounding {
         func speaks(at place: Place) -> Bool {
             let clause = clauses.clause(at: place)
             let statement = Statement(clause: clause, quotes: all, language: language)
-            guard statement.speaksForThePerson else { return false }
+            guard statement.speaksForThePerson else { return sharesTheSubject(at: place) }
             return clause.isAnchored || !(statement.startsWithItsVerb || !statement.hasVerbs) || speaks(before: place)
         }
 
         private func speaks(before place: Place) -> Bool {
             speaks(at: Place(sentence: place.sentence, clause: place.clause - 1))
         }
+
+        /// Whether the German clause at `place` leaves out its subject and shares the person's with the clause before it (#359): a
+        /// comma, "und" or "oder" split it off from a clause that opens with a subordinating word and "ich" and speaks for the person
+        /// ("wo ich Jungpflanzen umgetopft und die Beete gepflegt habe"), or from one that shares the subject in turn, and it ends
+        /// with a verb in the first person of the present, which German puts last there ("die Pflege der Parkanlagen plane"). Its
+        /// noun before the verb is then the object, not the subject (`Voice`), and its article no relative pronoun
+        /// (`RelativeClauses`). A clause with a pronoun of its own ("und er die Bäume fällte") or a verb that may be another
+        /// person's ("fällte", a past that "er" says as "ich" does) shares nothing.
+        func sharesTheSubject(at place: Place) -> Bool {
+            guard language == .german, place.clause > 0 else { return false }
+            let clause = clauses.clause(at: place)
+            guard !clause.isAnchored, let verb = clause.words.indices.last, !clause.isCapitalised(verb),
+                  Self.isTheFirstPersonOfThePresent(clause.words[verb].folded),
+                  !clause.words.contains(where: { Self.pronouns.contains($0.folded) }),
+                  !Statement(clause: clause, quotes: all, language: language).namesAnotherPerson else { return false }
+            let previous = Place(sentence: place.sentence, clause: place.clause - 1)
+            let before = clauses.clause(at: previous)
+            let split = before.source.trimmingCharacters(in: .whitespacesAndNewlines)
+            let conjunction = split.split(whereSeparator: \.isWhitespace).last.map { ["und", "oder"].contains($0.lowercased()) } ?? false
+            guard split.hasSuffix(",") || conjunction else { return false }
+            let words = before.words
+            guard words.count > 2, Self.subordinators.contains(words[0].folded), words[1].folded == "ich" else {
+                return sharesTheSubject(at: previous)
+            }
+            return speaks(at: previous)
+        }
+
+        /// Whether the German verb `folded` is in the first person of the present: it ends with "e", and not with the "te" of a
+        /// past ("plante", "fällte"), unless its third person adds a "t" ("leite", "leitet").
+        private static func isTheFirstPersonOfThePresent(_ folded: String) -> Bool {
+            guard folded.count >= 4, folded.hasSuffix("e") else { return false }
+            return !folded.hasSuffix("te") || Vocabulary.isVerb(folded + "t", in: .german)
+        }
+
+        /// The German words that open a clause whose verb comes last, folded.
+        private static let subordinators: Set<String> = [
+            "wo", "wobei", "dass", "weil", "als", "nachdem", "indem", "wahrend", "seit", "seitdem", "bevor", "sobald",
+        ]
+
+        /// The German pronouns that can be the subject of a clause, folded.
+        private static let pronouns: Set<String> = ["ich", "wir", "du", "ihr", "er", "sie", "es", "man"]
 
         /// The positions of the words of the clause at `place` that claim a skill, an interest, a language, or the person's title or
         /// place (#202): none when the clause claims nothing (`claims(at:)`); otherwise every word before a relative that brings in
@@ -89,8 +130,21 @@ struct Grounding {
         func claimedWords(at place: Place) -> Set<Int> {
             guard claims(at: place) else { return [] }
             let clause = clauses.clause(at: place)
-            let end = RelativeClauses.start(in: clause, language: language) ?? clause.words.count
-            return Set(0..<end).subtracting(clauses.quotedWords(at: place))
+            let relative = sharesTheSubject(at: place)
+                ? nil : RelativeClauses.start(in: clause, goingOnWith: clausesGoingOn(after: place), language: language)
+            return Set(0..<(relative ?? clause.words.count)).subtracting(clauses.quotedWords(at: place))
+        }
+
+        /// The later clauses of the sentence at `place` that go on with its clause (`RelativeClauses`): each one a comma or a
+        /// conjunction split off, up to one that opens a clause of its own with a subordinating word, a pronoun or a relative.
+        private func clausesGoingOn(after place: Place) -> [Clause] {
+            var result: [Clause] = []
+            for clause in clauses.sentences[place.sentence].dropFirst(place.clause + 1) {
+                guard !clause.isAnchored, let first = clause.words.first?.folded, !Self.subordinators.contains(first),
+                      !Self.pronouns.contains(first), !Vocabulary.isRelative(first, in: language) else { break }
+                result.append(clause)
+            }
+            return result
         }
 
         /// Whether the clause at `place` claims a skill, an interest or a language for the person (#202): it speaks for the person,
@@ -587,6 +641,9 @@ extension Grounding {
         var continuations: Set<DescriptionClauses.Place> = []
         /// The clauses attributed by rule (a).
         var naming: Set<DescriptionClauses.Place> = []
+        /// The clauses in which the person goes on from the employer that opens their sentence, split off by a comma ("À l'Hôtel du
+        /// Lac Vert, j'aidais au service des petits-déjeuners"): rule (a) reads them as the clause that names the employer (#359).
+        var fronted: Set<DescriptionClauses.Place> = []
         /// A job named in a verbless clause coordinated after another job's naming clause: that job, the head of the sentence.
         var head: [Int: Int] = [:]
     }
@@ -609,12 +666,15 @@ extension Grounding {
             var previousNaming = false
             var chainHead: Int?
             var continued: Clause?
+            // The sentence opens with the employer alone, with no verb and no year ("À l'Hôtel du Lac Vert, ...").
+            var opensWithTheEmployer = false
             for place in bySentence[sentence, default: []].sorted(by: { $0.clause < $1.clause }) {
                 let clause = clauses.clause(at: place)
                 let statement = Statement(clause: clause, quotes: reading.all, language: language)
                 let named = jobs.filter { mentioning[$0].contains(place) }
                 var allowed: [Int] = []
                 var isContinuation = false
+                var isFronted = false
                 var coordinated: [Int] = []
                 if !named.isEmpty {
                     if !clause.isAnchored && !statement.hasVerbs && previousNaming, last != nil {
@@ -628,12 +688,21 @@ extension Grounding {
                     allowed = named
                     previousNaming = true
                     continued = nil
+                    opensWithTheEmployer = place.clause == 0 && !statement.hasVerbs && !clause.words.contains(where: \.isNumber)
                 } else if let lastJobs = last,
-                          Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true {
+                          Self.continues(clause, statement, language) || continued.map({ Self.goesOn(clause, $0, language) }) == true
+                            || (continued != nil && reading.sharesTheSubject(at: place))
+                            || Self.goesOnInNouns(clause, after: continued, language) {
                     allowed = chain.count > 1 ? chain : lastJobs
                     isContinuation = true
                     previousNaming = false
                     continued = clause
+                    opensWithTheEmployer = false
+                } else if let lastJobs = last, opensWithTheEmployer, previousNaming, Self.isSaidByThePerson(clause, language) {
+                    allowed = lastJobs
+                    isFronted = true
+                    previousNaming = false
+                    opensWithTheEmployer = false
                 } else if previousNaming, Self.isPlace(clause) {
                     continue
                 } else {
@@ -642,10 +711,12 @@ extension Grounding {
                     previousNaming = false
                     chainHead = nil
                     continued = nil
+                    opensWithTheEmployer = false
                 }
                 guard !allowed.isEmpty, !reading.claimedWords(at: place).isEmpty else { continue }
                 result.jobsOf[place] = allowed
                 if isContinuation { result.continuations.insert(place) } else { result.naming.insert(place) }
+                if isFronted { result.fronted.insert(place) }
                 if let chainHead { for job in coordinated where job != chainHead { result.head[job] = chainHead } }
             }
         }
@@ -679,6 +750,41 @@ extension Grounding {
             return endings.contains { verb.count > $0.count + 2 && verb.hasSuffix($0) }
         }
         return isImperfect(continuation.words) && isImperfect(clause.words)
+    }
+
+    /// Whether the German `clause` goes on from the employers before it with the person's work in nouns, with no verb (#359): "mit", an
+    /// article and a noun ("..., dann bei Grünwerk Sauer von 2017 bis 2020, mit dem Verlegen von Pflasterflächen"), as English goes
+    /// on with a gerund ("..., then at Copperfield Arena from 2019 to 2021, setting up the PA systems"); or an article and a noun that
+    /// "und" or "oder" adds to such a clause, `continuation` ("und dem Einbau von Bewässerungsanlagen").
+    private static func goesOnInNouns(_ clause: Clause, after continuation: Clause?, _ language: Vocabulary.Language?) -> Bool {
+        guard language == .german, !clause.isAnchored else { return false }
+        let articles = Voice.words[.german]?.articles ?? []
+        let isInNouns = { (clause: Clause) -> Bool in
+            let start = clause.words.first?.folded == "mit" ? 1 : 0
+            return clause.words.count > start + 1 && articles.contains(clause.words[start].accented) && clause.isCapitalised(start + 1)
+                && !RelativeClauses.hasAVerb(clause, after: -1, language: language)
+        }
+        if clause.words.first?.folded == "mit" { return isInNouns(clause) }
+        guard let continuation, isInNouns(continuation),
+              let split = continuation.source.split(whereSeparator: \.isWhitespace).last,
+              ["und", "oder"].contains(split.lowercased()) else { return false }
+        return isInNouns(clause)
+    }
+
+    /// Whether `clause` was split off by a comma and opens with the person as its subject ("j'aidais au service", "I also helped"),
+    /// a pronoun that only the subject of a verb takes.
+    private static func isSaidByThePerson(_ clause: Clause, _ language: Vocabulary.Language?) -> Bool {
+        let pronouns: Set<String> = switch language {
+        case .english: ["i"]
+        case .french: ["je", "j"]
+        case .italian: ["io"]
+        case .spanish: ["yo"]
+        case .portuguese: ["eu"]
+        case .german: ["ich"]
+        case nil: []
+        }
+        guard !clause.isAnchored, clause.words.count > 1, let first = clause.words.first else { return false }
+        return pronouns.contains(first.folded)
     }
 
     /// The prepositions that open the place of a job ("in Leeds", "a Termoli", "en Logroño", "em Maringá", "à Annecy"), folded.
@@ -765,40 +871,54 @@ extension Grounding {
     func pinnedDuties(of index: Int) -> [PinnedDuty] {
         let firstNamed = attribution.naming.filter { attribution.jobsOf[$0]?.contains(index) == true }.map(\.sentence).min()
         let places = attribution.jobsOf.keys.filter { attribution.jobsOf[$0]?.contains(index) == true }.sorted(by: Self.isBefore)
-        let pieces = places.compactMap { place -> (place: Place, text: String)? in
+        let pieces = places.compactMap { place -> (place: Place, duty: ClauseDuty)? in
             let clause = clauses.clause(at: place)
             let words = clause.words
             var start = 0
             if attribution.naming.contains(place) {
-                guard let firstNamed, place.sentence > firstNamed, place.clause == 0, attribution.jobsOf[place]?.count == 1,
+                let isFronted = attribution.fronted.contains(place)
+                guard let firstNamed, place.sentence > firstNamed, place.clause == 0 || isFronted, attribution.jobsOf[place]?.count == 1,
                       !words.contains(where: \.isNumber) else { return nil }
-                let names = Set(subjects[index].mentions.flatMap { $0 })
-                guard let end = words.lastIndex(where: { names.contains($0.folded) }) else { return nil }
-                start = end + 1
+                // A clause that goes on from the employer that opens its sentence holds no word of the employer: it is the duty, whole.
+                if !isFronted {
+                    let names = Set(subjects[index].mentions.flatMap { $0 })
+                    guard let end = words.lastIndex(where: { names.contains($0.folded) }) else { return nil }
+                    start = end + 1
+                }
             } else if !attribution.continuations.contains(place) {
                 return nil
             }
             return duty(of: clause, from: start).map { (place, $0) }
         }
+        typealias Joined = (place: Place, text: String, parts: [String], verbLast: [[String]]?, conjunctions: [String])
         // Two duties of one sentence joined by a conjunction stay one duty ("I rigged the lights and loaded the
         // trucks"), so neither is a piece without its subject.
-        var joined: [(place: Place, text: String, parts: [String])] = []
-        for piece in pieces {
+        var joined: [Joined] = []
+        for (place, piece) in pieces {
             // The conjunction is not one of the clause's words: it ends the clause as the sentence has it.
-            if let last = joined.last, last.place.sentence == piece.place.sentence, last.place.clause + 1 == piece.place.clause,
+            if let last = joined.last, last.place.sentence == place.sentence, last.place.clause + 1 == place.clause,
                let conjunction = clauses.clause(at: last.place).source.split(whereSeparator: \.isWhitespace).last.map(String.init),
                Self.conjunctions.contains(conjunction.lowercased()),
                let head = piece.text.first {
-                let nextClause = clauses.clause(at: piece.place)
+                // A German clause after one with the verb last has its verb last too: the two are written as one main clause.
+                if let chain = last.verbLast {
+                    let words = piece.words.first?.lowercased() == "ich" ? Array(piece.words.dropFirst()) : piece.words
+                    if let main = GermanMainClause.written(chain + [words], joinedBy: last.conjunctions + [conjunction]) {
+                        joined[joined.count - 1] = (place, main.text, main.parts, chain + [words], last.conjunctions + [conjunction])
+                        continue
+                    }
+                }
+                let nextClause = clauses.clause(at: place)
                 let firstWord = String(piece.text.prefix { !$0.isWhitespace })
                 let lowered = String(head).lowercased() + firstWord.dropFirst()
                 let written = nextClause.written(from: 0, to: nextClause.words.count)
                 let start = written.split(separator: " ").contains { $0 == lowered } ? String(head).lowercased() : String(head)
                 joined[joined.count - 1] = (
-                    piece.place, String(last.text.dropLast()) + " " + conjunction + " " + start + piece.text.dropFirst(), last.parts + [piece.text]
+                    place, String(last.text.dropLast()) + " " + conjunction + " " + start + piece.text.dropFirst(), last.parts + [piece.text],
+                    nil, []
                 )
             } else {
-                joined.append((piece.place, piece.text, [piece.text]))
+                joined.append((place, piece.text, [piece.text], piece.isVerbLast ? [piece.words] : nil, []))
             }
         }
         return joined.map { PinnedDuty(text: $0.text, parts: $0.parts) }
@@ -816,25 +936,38 @@ extension Grounding {
         }
     }
 
-    private func duty(of clause: Clause, from first: Int) -> String? {
+    /// A duty cut from one clause: its text, its words as written, and whether they are a German clause after "wo ich" with the
+    /// verb last, which `text` writes as a main clause.
+    private struct ClauseDuty {
+        let text: String
+        let words: [String]
+        let isVerbLast: Bool
+    }
+
+    private func duty(of clause: Clause, from first: Int) -> ClauseDuty? {
         let words = clause.words
         let language = explainer.language
         var start = first
         var end = words.count
         while end > start, Self.conjunctions.contains(words[end - 1].folded) { end -= 1 }
         while end > start, explainer.isTimePhrase(words[end - 1]) { end -= 1 }
-        var moved: String?
+        var moved: (text: String, words: [String])?
         if start < end, Self.relativeWords.contains(words[start].accented) {
             start += 1
             // German puts the verb last after "wo": "wo ich Anlagen installiere" is "Ich installiere Anlagen".
             if language == .german, start < end - 2, words[start].folded == "ich" {
-                moved = "Ich " + clause.written(from: end - 1, to: end) + " " + clause.written(from: start + 1, to: end - 1)
+                let after = (start + 1..<end).map { clause.written(from: $0, to: $0 + 1) }
+                moved = GermanMainClause.written([after], joinedBy: []).map { ($0.text, after) }
             }
         }
         guard end - start >= 2 else { return nil }
-        let text = moved ?? clause.written(from: start, to: end)
+        if let moved { return ClauseDuty(text: moved.text, words: moved.words, isVerbLast: true) }
+        let text = clause.written(from: start, to: end)
         guard let head = text.first else { return nil }
-        return String(head).uppercased() + text.dropFirst() + "."
+        return ClauseDuty(
+            text: String(head).uppercased() + text.dropFirst() + ".", words: (start..<end).map { clause.written(from: $0, to: $0 + 1) },
+            isVerbLast: false
+        )
     }
 
     /// The sentences in which the person says what they do and what they are like at work, with no job (#354): "I mix on

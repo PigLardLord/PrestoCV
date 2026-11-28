@@ -11,23 +11,23 @@ public struct EditCVWorkflow: CVEditing {
 
     public func new() -> CV { NewCV(ids: ids)() }
 
-    public func load(_ id: CVID) async throws(EditFailure) -> CV {
+    @concurrent public func load(_ id: CVID) async throws(EditFailure) -> CV {
         do { return try await LoadCV(repository: repository)(id) } catch { throw EditFailure(error) }
     }
 
-    public func save(_ cv: CV) async throws(EditFailure) -> CV {
+    @concurrent public func save(_ cv: CV) async throws(EditFailure) -> CV {
         do { return try await SaveCV(repository: repository)(cv) } catch { throw EditFailure(error) }
     }
 
-    public func rename(_ cv: CV, to title: String) async throws(EditFailure) -> CV {
+    @concurrent public func rename(_ cv: CV, to title: String) async throws(EditFailure) -> CV {
         do { return try await RenameCV(repository: repository)(cv, to: title) } catch { throw EditFailure(error) }
     }
 
-    public func duplicate(_ cv: CV, title: String) async throws(EditFailure) -> CV {
+    @concurrent public func duplicate(_ cv: CV, title: String) async throws(EditFailure) -> CV {
         do { return try await DuplicateCV(repository: repository, ids: ids)(cv, title: title) } catch { throw EditFailure(error) }
     }
 
-    public func delete(_ cv: CV) async throws(EditFailure) {
+    @concurrent public func delete(_ cv: CV) async throws(EditFailure) {
         do { try await DeleteCV(repository: repository)(cv) } catch { throw EditFailure(error) }
     }
 

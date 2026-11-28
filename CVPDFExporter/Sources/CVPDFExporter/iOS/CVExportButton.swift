@@ -7,7 +7,7 @@ public struct CVExportButton: View {
 
     // MARK: - Properties
 
-    let cvData: Any
+    let cvDocument: CVDocument
     let templateId: String
     let customization: CustomizationOptions
 
@@ -20,11 +20,11 @@ public struct CVExportButton: View {
     // MARK: - Initialization
 
     public init(
-        cvData: Any,
+        cvDocument: CVDocument,
         templateId: String = "modern",
         customization: CustomizationOptions = CustomizationOptions()
     ) {
-        self.cvData = cvData
+        self.cvDocument = cvDocument
         self.templateId = templateId
         self.customization = customization
     }
@@ -84,7 +84,7 @@ public struct CVExportButton: View {
                 }
 
                 try await exportManager.exportAndPreview(
-                    cvData: cvData,
+                    cvDocument: cvDocument,
                     templateId: templateId,
                     customization: customization,
                     from: topController
@@ -112,14 +112,14 @@ public class CVExportViewController: UIViewController {
 
     /// Presents CV export with QuickLook preview
     public func exportCV(
-        data: Any,
+        document: CVDocument,
         templateId: String = "modern",
         customization: CustomizationOptions = CustomizationOptions()
     ) {
         Task {
             do {
                 try await exportManager.exportAndPreview(
-                    cvData: data,
+                    cvDocument: document,
                     templateId: templateId,
                     customization: customization,
                     from: self

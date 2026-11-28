@@ -18,68 +18,69 @@ struct ImportFileAdapterTests {
     // MARK: Access and count
 
     @Test("each received file has its own access, and the copy goes with the last one")
-    func eachReceiveHasItsOwnAccess() throws {
+    func eachReceiveHasItsOwnAccess() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
         let spelled = URL(fileURLWithPath: world.scratch.inbox.path + "/../app.example-Inbox/./cv.pdf")
 
-        let first = world.adapter.receive(copy)
-        let second = world.adapter.receive(spelled)
+        let first = await world.adapter.receive(copy)
+        let second = await world.adapter.receive(spelled)
         #expect(world.files.calls.starts == [copy, spelled])
 
-        world.adapter.release(first)
+        await world.adapter.release(first)
         #expect(world.files.calls.stops == [copy])
         #expect(FileManager.default.fileExists(atPath: copy.path))
 
-        world.adapter.release(second)
+        await world.adapter.release(second)
         #expect(world.files.calls.stops == [copy, spelled])
         #expect(!FileManager.default.fileExists(atPath: copy.path))
         world.expectBalanced()
     }
 
     @Test("two receives of one URL give two received files")
-    func idsAreDistinct() throws {
+    func idsAreDistinct() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
 
-        let first = world.adapter.receive(copy)
-        let second = world.adapter.receive(copy)
+        let first = await world.adapter.receive(copy)
+        let second = await world.adapter.receive(copy)
 
         #expect(first.id != second.id)
         #expect(first.url == copy && second.url == copy)
-        world.adapter.release(first)
-        world.adapter.release(second)
+        await world.adapter.release(first)
+        await world.adapter.release(second)
         world.expectBalanced()
     }
 
     @Test("three received files of one copy keep it until the third is released")
-    func chainOfThree() throws {
+    func chainOfThree() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = (1...3).map { _ in world.adapter.receive(copy) }
+        var received: [ReceivedFile] = []
+        for _ in 1...3 { received.append(await world.adapter.receive(copy)) }
 
-        world.adapter.release(received[1])
-        world.adapter.release(received[0])
+        await world.adapter.release(received[1])
+        await world.adapter.release(received[0])
         #expect(FileManager.default.fileExists(atPath: copy.path))
         #expect(world.files.calls.removed.isEmpty)
 
-        world.adapter.release(received[2])
+        await world.adapter.release(received[2])
         #expect(!FileManager.default.fileExists(atPath: copy.path))
         world.expectBalanced()
     }
 
     @Test("a second release of a file is logged and stops nothing")
-    func releasedTwice() throws {
+    func releasedTwice() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
-        world.adapter.release(received)
-        world.adapter.release(received)
+        await world.adapter.release(received)
+        await world.adapter.release(received)
 
         #expect(world.files.calls.stops.count == 1)
         #expect(world.logger.events == ["import.file.releasedAgain"])
@@ -87,34 +88,34 @@ struct ImportFileAdapterTests {
     }
 
     @Test("a second release of one file does not take the turn of another file of the same copy")
-    func secondReleaseDoesNotTakeAnothersTurn() throws {
+    func secondReleaseDoesNotTakeAnothersTurn() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let first = world.adapter.receive(copy)
-        let second = world.adapter.receive(copy)
+        let first = await world.adapter.receive(copy)
+        let second = await world.adapter.receive(copy)
 
-        world.adapter.release(first)
-        world.adapter.release(first)
+        await world.adapter.release(first)
+        await world.adapter.release(first)
         #expect(FileManager.default.fileExists(atPath: copy.path))
 
-        world.adapter.release(second)
+        await world.adapter.release(second)
         #expect(!FileManager.default.fileExists(atPath: copy.path))
         world.expectBalanced()
     }
 
     @Test("every name the copy was received by goes at the last release, before its access stops")
-    func everyNameOfTheCopy() throws {
+    func everyNameOfTheCopy() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
         let otherName = world.scratch.inbox.appendingPathComponent("cv-1.pdf")
         try FileManager.default.linkItem(at: copy, to: otherName)
 
-        let first = world.adapter.receive(copy)
-        let second = world.adapter.receive(otherName)
-        world.adapter.release(first)
-        world.adapter.release(second)
+        let first = await world.adapter.receive(copy)
+        let second = await world.adapter.receive(otherName)
+        await world.adapter.release(first)
+        await world.adapter.release(second)
 
         #expect(try world.scratch.names(in: world.scratch.inbox) == [])
         #expect(world.files.calls.order == ["stop cv.pdf", "remove cv-1.pdf", "remove cv.pdf", "stop cv-1.pdf"])
@@ -122,15 +123,17 @@ struct ImportFileAdapterTests {
     }
 
     @Test("receive starts the access before it looks at the file")
-    func receiveOrder() throws {
+    func receiveOrder() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("a.pdf", in: world.scratch.inbox)
+        let before = world.files.calls.events.count
 
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
-        #expect(Array(world.files.calls.events.prefix(3)) == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
-        world.adapter.release(received)
+        let events = Array(world.files.calls.events.dropFirst(before).prefix(3))
+        #expect(events == ["start a.pdf", "resolve a.pdf", "identity a.pdf"])
+        await world.adapter.release(received)
     }
 
     @Test("a link pointed elsewhere after the receive still reads and lets go the file it named")
@@ -140,12 +143,12 @@ struct ImportFileAdapterTests {
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox, "mine")
         let other = try world.scratch.file("other.pdf", in: world.scratch.chosen, "other")
         let link = try world.scratch.link("link.pdf", to: copy)
-        let received = world.adapter.receive(link)
+        let received = await world.adapter.receive(link)
 
         try world.scratch.retarget(link, to: other)
 
         #expect(try await world.adapter.readPDF(of: received) == Data("mine".utf8))
-        world.adapter.release(received)
+        await world.adapter.release(received)
         #expect(!FileManager.default.fileExists(atPath: copy.path))
         #expect(try String(contentsOf: other, encoding: .utf8) == "other")
         #expect(try world.scratch.names(in: world.scratch.chosen) == ["link.pdf", "other.pdf"])
@@ -159,12 +162,12 @@ struct ImportFileAdapterTests {
         let world = try World(maximumBytes: 1_000)
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox, String(repeating: "x", count: 1_001))
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
         await #expect(throws: ImportFailure.tooLarge) { try await world.adapter.readPDF(of: received) }
 
         #expect(world.logger.entries("import.file.notRead").isEmpty)
-        world.adapter.release(received)
+        await world.adapter.release(received)
         world.expectBalanced()
     }
 
@@ -174,10 +177,10 @@ struct ImportFileAdapterTests {
         defer { world.scratch.remove() }
         let text = String(repeating: "x", count: 1_000)
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox, text)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
         #expect(try await world.adapter.readPDF(of: received) == Data(text.utf8))
-        world.adapter.release(received)
+        await world.adapter.release(received)
     }
 
     @Test(
@@ -188,11 +191,11 @@ struct ImportFileAdapterTests {
         // /proc files state a size of 0 and hold more
         let world = try World(maximumBytes: 10)
         defer { world.scratch.remove() }
-        let received = world.adapter.receive(URL(fileURLWithPath: "/proc/self/status"))
+        let received = await world.adapter.receive(URL(fileURLWithPath: "/proc/self/status"))
 
         await #expect(throws: ImportFailure.tooLarge) { try await world.adapter.readPDF(of: received) }
 
-        world.adapter.release(received)
+        await world.adapter.release(received)
         #expect(world.files.calls.removed.isEmpty)
     }
 
@@ -203,10 +206,10 @@ struct ImportFileAdapterTests {
         let bytes = Data((0..<200_000).map { UInt8(truncatingIfNeeded: $0) })
         let copy = world.scratch.inbox.appendingPathComponent("cv.pdf")
         try bytes.write(to: copy)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
         #expect(try await world.adapter.readPDF(of: received) == bytes)
-        world.adapter.release(received)
+        await world.adapter.release(received)
     }
 
     // MARK: A file that is not there, or not the one received
@@ -216,13 +219,13 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let missing = world.scratch.inbox.appendingPathComponent("cv.pdf")
-        let received = world.adapter.receive(missing)
+        let received = await world.adapter.receive(missing)
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
 
         #expect(world.logger.entries("import.file.notRead").map { $0.value("reason") } == [.token("noIdentity")])
         #expect(world.files.calls.reads.isEmpty)
-        world.adapter.release(received)
+        await world.adapter.release(received)
         #expect(world.files.calls.removed.isEmpty)
         #expect(world.files.calls.stops.count == 1)
     }
@@ -232,14 +235,14 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
         try FileManager.default.removeItem(at: copy)
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
 
         let logged = world.logger.entries("import.file.notRead").map { $0.value("error") }
         #expect(logged == [.error(type: "ImportFileError", code: "ENOENT")])
-        world.adapter.release(received)
+        await world.adapter.release(received)
         #expect(world.logger.entries("import.file.copyNotDeleted").isEmpty)
         world.expectBalanced()
     }
@@ -249,8 +252,8 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
-        world.adapter.release(received)
+        let received = await world.adapter.receive(copy)
+        await world.adapter.release(received)
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
 
@@ -263,7 +266,7 @@ struct ImportFileAdapterTests {
         let world = try World(faults: .init(cancelDuringRead: true))
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
 
         let outcome = await Task { () -> Result<Data, any Error> in
             do { return .success(try await world.adapter.readPDF(of: received)) } catch { return .failure(error) }
@@ -271,7 +274,7 @@ struct ImportFileAdapterTests {
 
         guard case .failure(let error) = outcome else { Issue.record("the read of a cancelled task succeeded"); return }
         #expect(error is CancellationError)
-        world.adapter.release(received)
+        await world.adapter.release(received)
         world.expectBalanced()
     }
 
@@ -280,12 +283,12 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let pipe = try world.scratch.pipe("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(pipe)
+        let received = await world.adapter.receive(pipe)
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
 
         #expect(world.logger.entries("import.file.notRead").map { $0.value("reason") } == [.token("noIdentity")])
-        world.adapter.release(received)
+        await world.adapter.release(received)
         #expect(world.files.calls.reads.isEmpty)
         #expect(world.files.calls.removed.isEmpty)
         #expect(world.files.calls.stops.count == 1)
@@ -297,7 +300,7 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
         try FileManager.default.removeItem(at: copy)
         try world.scratch.pipe("cv.pdf", in: world.scratch.inbox)
 
@@ -305,7 +308,7 @@ struct ImportFileAdapterTests {
         let notRead = world.logger.entries("import.file.notRead").map { $0.value("error") }
         #expect(notRead == [.error(type: "ImportFileError", code: "notTheFile")])
 
-        world.adapter.release(received)
+        await world.adapter.release(received)
         let notDeleted = world.logger.entries("import.file.copyNotDeleted").map { $0.value("error") }
         #expect(notDeleted == [.error(type: "ImportFileError", code: "notTheFile")])
         #expect(world.scratch.kind(of: copy) == S_IFIFO)
@@ -318,14 +321,14 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox, "mine")
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
         try world.scratch.replace(copy, with: "other")
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
         let notRead = world.logger.entries("import.file.notRead").map { $0.value("error") }
         #expect(notRead == [.error(type: "ImportFileError", code: "notTheFile")])
 
-        world.adapter.release(received)
+        await world.adapter.release(received)
         let notDeleted = world.logger.entries("import.file.copyNotDeleted").map { $0.value("error") }
         #expect(notDeleted == [.error(type: "ImportFileError", code: "notTheFile")])
         #expect(try String(contentsOf: copy, encoding: .utf8) == "other")
@@ -340,14 +343,14 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let first = world.adapter.receive(copy)
+        let first = await world.adapter.receive(copy)
 
-        let overlap = try #require(Self.releaseWhileReceiving(world, first, copy))
+        let overlap = try #require(await Self.releaseWhileReceiving(world, first, copy))
 
         #expect(overlap.finishedDuringRemove == false)
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: overlap.second) }
         #expect(world.logger.entries("import.file.notRead").map { $0.value("reason") } == [.token("noIdentity")])
-        world.adapter.release(overlap.second)
+        await world.adapter.release(overlap.second)
         #expect(world.files.calls.removed.count == 1)
         world.expectBalanced()
     }
@@ -357,9 +360,9 @@ struct ImportFileAdapterTests {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
-        let received = world.adapter.receive(copy)
+        let received = await world.adapter.receive(copy)
         let adapter = world.adapter
-        world.files.onRead { _ in adapter.release(received) }
+        world.files.onRead { _ in waitFor { await adapter.release(received) } }
 
         await #expect(throws: ImportFailure.fileNotRead) { try await world.adapter.readPDF(of: received) }
 
@@ -371,12 +374,12 @@ struct ImportFileAdapterTests {
     // MARK: Which files are deleted
 
     @Test("a file outside the copy folders is never deleted")
-    func outsideTheCopyFoldersStays() throws {
+    func outsideTheCopyFoldersStays() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let mine = try world.scratch.file("cv.pdf", in: world.scratch.chosen)
 
-        world.adapter.release(world.adapter.receive(mine))
+        await world.adapter.release(world.adapter.receive(mine))
 
         #expect(FileManager.default.fileExists(atPath: mine.path))
         #expect(world.files.calls.removed.isEmpty)
@@ -384,48 +387,48 @@ struct ImportFileAdapterTests {
     }
 
     @Test("a copy in the Documents inbox goes")
-    func documentsInboxCopyGoes() throws {
+    func documentsInboxCopyGoes() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.documentsInbox)
 
-        world.adapter.release(world.adapter.receive(copy))
+        await world.adapter.release(world.adapter.receive(copy))
 
         #expect(!FileManager.default.fileExists(atPath: copy.path))
     }
 
     @Test("a file of the app's documents that is in no copy folder stays")
-    func documentsFileStays() throws {
+    func documentsFileStays() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let file = try world.scratch.file("cv.pdf", in: world.scratch.documents)
 
-        world.adapter.release(world.adapter.receive(file))
+        await world.adapter.release(world.adapter.receive(file))
 
         #expect(FileManager.default.fileExists(atPath: file.path))
         #expect(world.files.calls.removed.isEmpty)
     }
 
     @Test("a file in a subfolder of a copy folder stays")
-    func subfolderOfInboxStays() throws {
+    func subfolderOfInboxStays() async throws {
         let world = try World()
         defer { world.scratch.remove() }
         let folder = world.scratch.inbox.appendingPathComponent("sub", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         let file = try world.scratch.file("cv.pdf", in: folder)
 
-        world.adapter.release(world.adapter.receive(file))
+        await world.adapter.release(world.adapter.receive(file))
 
         #expect(FileManager.default.fileExists(atPath: file.path))
         #expect(world.files.calls.removed.isEmpty)
     }
 
     @Test("a copy folder received as a file is never deleted")
-    func copyFolderItselfIsNeverDeleted() throws {
+    func copyFolderItselfIsNeverDeleted() async throws {
         let world = try World()
         defer { world.scratch.remove() }
 
-        world.adapter.release(world.adapter.receive(world.scratch.inbox))
+        await world.adapter.release(world.adapter.receive(world.scratch.inbox))
 
         #expect(world.scratch.kind(of: world.scratch.inbox) == S_IFDIR)
         #expect(world.files.calls.removed.isEmpty)
@@ -433,17 +436,88 @@ struct ImportFileAdapterTests {
     }
 
     @Test("a copy that cannot be deleted is logged, and its access still stops")
-    func failedDeletion() throws {
+    func failedDeletion() async throws {
         let world = try World(faults: .init(removeFails: true))
         defer { world.scratch.remove() }
         let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
 
-        world.adapter.release(world.adapter.receive(copy))
+        await world.adapter.release(world.adapter.receive(copy))
 
         #expect(world.files.calls.removed.count == 1)
         let logged = world.logger.entries("import.file.copyNotDeleted").map { $0.value("error") }
         #expect(logged == [.error(type: "ImportFileError", code: "EACCES")])
         #expect(FileManager.default.fileExists(atPath: copy.path))
+        world.expectBalanced()
+    }
+
+    // MARK: Off the main actor
+
+    @MainActor
+    @Test("a receive, a read and a release touch the file system off the main actor, also when the screen asks from it (R19)")
+    func fileCallsRunOffTheMainActor() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let received = await world.adapter.receive(copy)
+        _ = try await world.adapter.readPDF(of: received)
+        await world.adapter.release(received)
+
+        let calls = world.files.calls
+        #expect(calls.events.contains("start cv.pdf") && calls.events.contains("read cv.pdf")
+            && calls.events.contains("remove cv.pdf"))
+        #expect(calls.onMainActor.isEmpty)
+        world.expectBalanced()
+    }
+
+    // MARK: Files this run did not receive
+
+    @Test("a file in a copy folder that this run did not receive is never deleted: at launch, after an import, after a window goes away")
+    func unreceivedFileIsNeverDeleted() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let scratch = world.scratch
+        try scratch.file("stray.pdf", in: scratch.inbox)
+        try scratch.file("stray.pdf", in: scratch.documentsInbox)
+
+        _ = world.nextLaunch()
+        let launch = world.nextLaunch()
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+        #expect(try scratch.names(in: scratch.documentsInbox) == ["stray.pdf"])
+
+        let imported = try scratch.file("imported.pdf", in: scratch.inbox)
+        let read = await launch.receive(imported)
+        _ = try await launch.readPDF(of: read)
+        await launch.release(read)
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+
+        let gone = await launch.receive(try scratch.file("gone.pdf", in: scratch.documentsInbox))
+        await launch.release(gone)
+        #expect(try scratch.names(in: scratch.inbox) == ["stray.pdf"])
+        #expect(try scratch.names(in: scratch.documentsInbox) == ["stray.pdf"])
+        world.expectBalanced()
+    }
+
+    @Test("adapters made with logging(to:) share their received files, each with its own log")
+    func adaptersThatShareFiles() async throws {
+        let world = try World()
+        defer { world.scratch.remove() }
+        let inbox = world.nextLaunch()
+        let screenLog = RecordingLogger()
+        let screen = inbox.logging(to: screenLog)
+        let copy = try world.scratch.file("cv.pdf", in: world.scratch.inbox)
+
+        let waiting = await inbox.receive(copy)
+        let read = await screen.receive(copy)
+        await inbox.release(waiting)
+
+        #expect(try world.scratch.names(in: world.scratch.inbox) == ["cv.pdf"])
+        _ = try await screen.readPDF(of: read)
+        await screen.release(read)
+        #expect(try world.scratch.names(in: world.scratch.inbox) == [])
+        await screen.release(read)
+        #expect(screenLog.events == ["import.file.releasedAgain"])
+        #expect(world.logger.events.isEmpty)
         world.expectBalanced()
     }
 
@@ -455,19 +529,19 @@ struct ImportFileAdapterTests {
         _ world: World,
         _ first: ReceivedFile,
         _ copy: URL
-    ) -> (second: ReceivedFile, finishedDuringRemove: Bool)? {
+    ) async -> (second: ReceivedFile, finishedDuringRemove: Bool)? {
         let second = Box<ReceivedFile?>(nil)
         let finishedDuringRemove = Box(false)
         let done = Signal()
         let adapter = world.adapter
         world.files.onRemove { _ in
-            DispatchQueue.global().async {
-                second.set(adapter.receive(copy))
+            Task.detached {
+                second.set(await adapter.receive(copy))
                 done.signal()
             }
             finishedDuringRemove.set(done.wait(seconds: 0.3))
         }
-        world.adapter.release(first)
+        await world.adapter.release(first)
         guard finishedDuringRemove.current || done.wait(seconds: 10) else {
             Issue.record("the receive never ended")
             return nil
@@ -478,6 +552,17 @@ struct ImportFileAdapterTests {
 }
 
 // MARK: - Test doubles
+
+/// Runs `work` to its end from a hook of the file system, which the adapter calls inside a step that cannot wait: the
+/// hook's thread waits for it, for a while.
+private func waitFor(_ work: @escaping @Sendable () async -> Void) {
+    let done = Signal()
+    Task.detached {
+        await work()
+        done.signal()
+    }
+    if !done.wait(seconds: 10) { Issue.record("the work of the hook never ended") }
+}
 
 /// A value shared with a closure that runs on another thread.
 private final class Box<Value: Sendable>: Sendable {
@@ -518,6 +603,8 @@ private final class SpyFiles: ImportFileSystem {
         var removed: [URL] = []
         /// Every call, as "<call> <last path component>".
         var events: [String] = []
+        /// The calls made on the main actor, as `events` names them.
+        var onMainActor: [String] = []
 
         /// The deletes and the stops of access, in their order.
         var order: [String] { events.filter { $0.hasPrefix("remove ") || $0.hasPrefix("stop ") } }
@@ -537,7 +624,6 @@ private final class SpyFiles: ImportFileSystem {
     private let faults: Faults
     private let recorded = Mutex(Calls())
     private let hooks = Mutex(Hooks())
-
     init(_ faults: Faults = Faults()) {
         self.faults = faults
     }
@@ -588,10 +674,17 @@ private final class SpyFiles: ImportFileSystem {
         try system.remove(url, identity: identity)
     }
 
-    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void = { _ in }) {
+    private func record(_ call: String, _ url: URL) {
+        record(call, url) { _ in }
+    }
+
+    private func record(_ call: String, _ url: URL, _ change: (inout Calls) -> Void) {
+        let onMainActor = MainActorProbe.isOnTheMainActor
         recorded.withLock { calls in
             change(&calls)
-            calls.events.append("\(call) \(url.lastPathComponent)")
+            let event = "\(call) \(url.lastPathComponent)"
+            calls.events.append(event)
+            if onMainActor { calls.onMainActor.append(event) }
         }
     }
 }
@@ -601,6 +694,7 @@ private struct World {
     let scratch: Scratch
     let files: SpyFiles
     let logger: RecordingLogger
+    let maximumBytes: Int
     let adapter: ImportFileAdapter
 
     init(maximumBytes: Int = 1_000, faults: SpyFiles.Faults = SpyFiles.Faults()) throws {
@@ -610,7 +704,18 @@ private struct World {
         self.scratch = scratch
         self.files = files
         self.logger = logger
-        adapter = ImportFileAdapter(files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger)
+        self.maximumBytes = maximumBytes
+        adapter = ImportFileAdapter(
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger
+        )
+    }
+
+    /// The adapter of the app launched again, over the same folders, file system and log: it holds none of the files
+    /// the earlier one received.
+    func nextLaunch() -> ImportFileAdapter {
+        ImportFileAdapter(
+            files: files, copyFolders: scratch.copyFolders, maximumBytes: maximumBytes, logger: logger
+        )
     }
 
     /// Every start of access has had its stop, on the same URL.

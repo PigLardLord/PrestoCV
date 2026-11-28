@@ -1,6 +1,6 @@
 import SwiftUI
 import Testing
-@testable import PrestoCVNext
+@testable import PrestoCV
 
 /// The export sheet shows the PDF's pages for the eye only: its own lines say what the PDF holds, so assistive
 /// technologies skip the pages. SwiftUI's `accessibilityHidden` does not reach into a hosted view, so the pages hide
@@ -26,15 +26,19 @@ struct PDFPagesTests {
         }
     }
 
-    /// The pages of a view once it is on a screen of an iPhone's size.
-    private func pagesView(of pages: some View) -> PDFPagesView? {
+    /// The pages of a view once it is on a screen of an iPhone's size, with its first PDF opened (off the main actor)
+    /// and laid out.
+    private func pagesView(of pages: some View) async -> PDFPagesView? {
         let host = UIHostingController(rootView: pages)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.layoutIfNeeded()
         defer { window.isHidden = true }
-        return find(in: host.view)
+        guard let found = find(in: host.view) else { return nil }
+        await found.showing?.value
+        host.view.layoutIfNeeded()
+        return found
     }
 
     /// Makes SwiftUI run its update of a hosted view now: `layoutIfNeeded` alone finds no layout due and leaves the new
@@ -50,18 +54,18 @@ struct PDFPagesTests {
     }
 
     @Test("Pages for the eye only give assistive technologies nothing to read, and other pages are read")
-    func pagesForTheEyeOnlyAreHidden() throws {
+    func pagesForTheEyeOnlyAreHidden() async throws {
         let pdf = onePagePDF()
-        let hidden = try #require(pagesView(of: PDFPages(pdf: pdf, id: 1, isForTheEyeOnly: true)), "The PDF is shown")
-        let read = try #require(pagesView(of: PDFPages(pdf: pdf, id: 1, isForTheEyeOnly: false)), "The PDF is shown")
+        let hidden = try #require(await pagesView(of: PDFPages(pdf: pdf, id: 1, isForTheEyeOnly: true)), "The PDF is shown")
+        let read = try #require(await pagesView(of: PDFPages(pdf: pdf, id: 1, isForTheEyeOnly: false)), "The PDF is shown")
 
         #expect(hidden.accessibilityElementsHidden, "The text PDFKit gives a screen reader is not given")
         #expect(read.accessibilityElementsHidden == false, "Pages that are not for the eye only are read")
     }
 
     @Test("The pages open fitted to the width, and zoom in up to four times the fit and never out of it")
-    func zoomGoesFromTheFitToFourTimesIt() throws {
-        let pages = try #require(pagesView(of: PDFPages(pdf: onePagePDF(), id: 1, isForTheEyeOnly: true)))
+    func zoomGoesFromTheFitToFourTimesIt() async throws {
+        let pages = try #require(await pagesView(of: PDFPages(pdf: onePagePDF(), id: 1, isForTheEyeOnly: true)))
 
         #expect(pages.document?.pageCount == 1, "The view shows the PDF it is given")
         let fit = pages.scaleFactorForSizeToFit
@@ -82,7 +86,9 @@ struct PDFPagesTests {
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
         host.view.layoutIfNeeded()
-        let pages = try #require(find(in: host.view), "The PDF is shown")
+        let pages = try #require(find(in: host.view), "The pages are shown")
+        await pages.showing?.value
+        #expect(pages.document?.pageCount == 1, "The first PDF is opened off the main actor, then shown")
 
         host.rootView = PDFPages(pdf: pdf(pages: 2), id: 2, isForTheEyeOnly: true)
         runTheUpdate(of: host)
@@ -104,7 +110,7 @@ struct PDFPagesTests {
     /// fails by a crash.
     @Test("PDFKit reads the shown document from a queue of its own, as it does while it looks for form fields")
     func documentIsReadOffTheMainActor() async throws {
-        let pages = try #require(pagesView(of: PDFPages(pdf: onePagePDF(), id: 1, isForTheEyeOnly: false)))
+        let pages = try #require(await pagesView(of: PDFPages(pdf: onePagePDF(), id: 1, isForTheEyeOnly: false)))
 
         let read = await documentRead(offTheMainActorFrom: pages)
         #expect(read, "The queue reads the document the view shows")

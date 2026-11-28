@@ -29,6 +29,9 @@ public enum NativeCheckFailure: Error, Equatable {
     case pageBreaks(design: String, body: PageBreakDocument.Body, faults: [Int: [PageBreakFault]])
     /// A design's page-break document of `summaryLines` profile lines needed more pages than `PageBreakDocument.page` keeps.
     case pageBreakDocumentTruncated(design: String, summaryLines: Int, requiredPages: Int)
+    /// The lines of a design's PDF whose glyph height the inspector gives otherwise than PDFKit's font attributes, each
+    /// as its page, its text, the inspector's height and PDFKit's.
+    case glyphHeightsDiffer(design: String, lines: [String])
     /// A design's layout document needed more pages than its page setup keeps.
     case layoutDocumentTruncated(design: String, document: LayoutDocument, requiredPages: Int)
     /// A design's layout does not match the reference of its kind of device and system version: the verdict says which.
@@ -187,6 +190,35 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
         }
     }
 
+    /// #562: the inspector gives every line of the contract fixture's PDF, in the bundled design `name` with its default
+    /// palette and fonts, the glyph height PDFKit's font attributes give it (the system font's, for these designs).
+    /// Returns the PDF, so a test can check how the inspector read it.
+    @discardableResult
+    public func glyphHeightsAgreeWithPDFKit(design name: String) async throws -> Data {
+        guard let package = try await BundleDesignSource().bundledPackages().first(where: { $0.name == name }) else {
+            throw NativeCheckFailure.fixtureLacks(name)
+        }
+        let design = try DesignPackageValidator().validate(package.data)
+        let headings = try HeadingsCatalog(source: BundleHeadingTableSource()).headings(for: "en")
+        let document = DocumentHTMLBuilder().render(ContractFixture.document, stylesheet: design.stylesheet,
+                                                    palette: design.manifest.defaultPalette.palette,
+                                                    fonts: design.manifest.defaultFonts, headings: headings)
+        let pdf = try await renderer.render(html: document.html, page: .a4)
+        guard let layout = inspector.layout(of: pdf.data), let expected = PDFKitFonts.lines(of: pdf.data) else {
+            throw NativeCheckFailure.unreadablePDF
+        }
+        let found = layout.lines.map { (page: $0.pageIndex, text: $0.text, height: $0.glyphHeight) }
+        let differing = found.count == expected.count
+            ? zip(found, expected).filter { line, oracle in
+                line.page != oracle.page || line.text != oracle.text || !Self.same(line.height, oracle.height)
+            }.map { line, oracle in "p\(line.page) \(line.text): \(String(describing: line.height)), PDFKit \(String(describing: oracle.height))" }
+            : ["\(found.count) lines, PDFKit \(expected.count)"]
+        guard differing.isEmpty, !found.isEmpty else {
+            throw NativeCheckFailure.glyphHeightsDiffer(design: name, lines: differing)
+        }
+        return pdf.data
+    }
+
     // MARK: Page breaks
 
     /// #467: the bundled design `name`, in its default palette and fonts, prints every `PageBreakDocument` of `body` whole
@@ -293,6 +325,15 @@ public struct NativeRendererChecks<Renderer: PDFRendering> {
     }
 
     // MARK: Helpers
+
+    /// Two glyph heights are the same when both are unknown or they differ by less than a thousandth of a point.
+    private static func same(_ found: Double?, _ expected: Double?) -> Bool {
+        switch (found, expected) {
+        case (nil, nil): true
+        case let (found?, expected?): abs(found - expected) < 0.001
+        default: false
+        }
+    }
 
     /// The bundled design `name`, validated.
     private static func bundledDesign(_ name: String) async throws -> ValidatedDesign {

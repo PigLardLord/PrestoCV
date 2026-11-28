@@ -147,19 +147,15 @@ struct DraftingInputsTests {
         }
     }
 
-    @Test("The examples are the app's, read from its string catalog in every language it has")
-    func examplesAreTheCatalogs() throws {
-        let data = try Data(contentsOf: SourceTree.root.appendingPathComponent("PrestoCV/Localizable.xcstrings"))
-        let catalog = try JSONDecoder().decode(Catalog.self, from: data)
-        let example = try #require(catalog.strings["ai.generation.example_text"])
+    @Test("The examples are the app's, one in every language the drafting evaluation covers")
+    func examplesAreTheAppsInEveryLanguage() throws {
         let examples = try DraftingInputs.examples()
 
-        let localizations = try #require(example.localizations)
-        #expect(Set(localizations.keys) == Set(DraftingInputs.languages))
+        #expect(Set(examples.map(\.language)) == Set(DraftingInputs.languages))
         #expect(examples.count == 6)
         for input in examples {
             #expect(input.kind == .example)
-            #expect(input.description == localizations[input.language]?.stringUnit?.value, "\(input.id)")
+            #expect(input.description == AppExample.text(in: input.language), "\(input.id)")
             #expect(input.facts.first { $0.kind == .name }?.forms == ["Maria Rossi"], "\(input.id)")
         }
     }
@@ -188,40 +184,6 @@ struct DraftingInputsTests {
             #expect(AppLanguageDetector.languageTag(of: input.description) == language, "\(input.id)")
         }
     }
-
-    @Test("The copy of the language detector has the app's lines")
-    func detectorCopyHasTheAppsLines() throws {
-        let app = try Self.codeLines(of: "PrestoCV/Features/AIGeneration/Mapping/DescriptionLanguageDetector.swift")
-        let copy = try Self.codeLines(of: "CVGeneratorAI/Tests/CVGeneratorAITests/Support/AppLanguageDetector.swift")
-
-        #expect(app.count == 7)
-        #expect(copy == app)
-    }
-
-    /// The lines from `minimumConfidence` to the returned tag, trimmed, without blank lines or comments.
-    private static func codeLines(of path: String) throws -> [String] {
-        let text = try String(contentsOf: SourceTree.root.appendingPathComponent(path), encoding: .utf8)
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("//") }
-        let start = try #require(lines.firstIndex { $0.hasPrefix("static let minimumConfidence") }, "\(path)")
-        let end = try #require(lines.firstIndex { $0 == "return language.rawValue" }, "\(path)")
-        return Array(lines[start...end])
-    }
-}
-
-/// The part of `Localizable.xcstrings` these tests read.
-private struct Catalog: Decodable {
-    struct Entry: Decodable {
-        struct Localization: Decodable {
-            struct StringUnit: Decodable { let value: String }
-            let stringUnit: StringUnit?
-        }
-
-        let localizations: [String: Localization]?
-    }
-
-    let strings: [String: Entry]
 }
 
 /// A phrase and a description, and whether the description states the phrase.

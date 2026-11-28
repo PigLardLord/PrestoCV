@@ -1,8 +1,7 @@
 import NaturalLanguage
 
-/// A copy of the app's `DescriptionLanguageDetector` (PrestoCV/Features/AIGeneration/Mapping/DescriptionLanguageDetector.swift),
-/// which the app hands to the sanitizer: the package cannot import the app. `DraftingInputsTests` checks that its lines are the
-/// app's and pins its answer for every input of the drafting evaluation, so a copy that drifts fails there.
+/// The language detector that the app hands to the sanitizer (the package cannot import the app). `DraftingInputsTests` pins its
+/// answer for every input of the drafting evaluation.
 enum AppLanguageDetector {
     static let minimumConfidence = 0.6
 

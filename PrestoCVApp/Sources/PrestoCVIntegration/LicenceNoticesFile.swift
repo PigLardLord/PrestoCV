@@ -24,7 +24,7 @@ public struct LicenceNoticesFile: LicenceNoticesReading {
         self.contents = contents
     }
 
-    public func notices() async throws -> [LicenceNotice] {
+    @concurrent public func notices() async throws -> [LicenceNotice] {
         let data = try await contents()
         let file: NoticesFile
         do {

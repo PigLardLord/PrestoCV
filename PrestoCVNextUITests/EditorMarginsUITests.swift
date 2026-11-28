@@ -59,7 +59,8 @@ final class EditorMarginsUITests: RuntimeIssueFailingTestCase {
         let seed = try JSONEncoder().encode(["\(identity).cv.json": stored]).base64EncodedString()
         let app = XCUIApplication()
         app.launchArguments += [
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextSeed", seed,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-PrestoCVNextEmptyStorage", "-PrestoCVNextReadyDesigns",
+            "-PrestoCVNextSeed", seed,
         ]
         app.launch()
         return app

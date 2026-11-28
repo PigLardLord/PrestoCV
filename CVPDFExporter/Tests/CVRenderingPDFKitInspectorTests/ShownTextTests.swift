@@ -1,0 +1,449 @@
+#if canImport(PDFKit)   // Apple platforms only (R11)
+import Testing
+import Foundation
+import CoreGraphics
+import CVRendering
+import CVRenderingNativeTestSupport
+@testable import CVRenderingPDFKitInspector
+
+/// #562: the inspector sizes a line from the text operators of the page's content, not from the fonts PDFKit resolves
+/// for its characters (slow and verbose for the system font). On the drawn PDFs it gives every line the size PDFKit's
+/// fonts give, without asking PDFKit for them, forms included.
+@Suite("#562 · glyph heights read from the page's content")
+struct ShownTextTests {
+    typealias Line = DrawnPDF.Line
+
+    static let known = [
+        PDFKitLayoutTests.line("Twelve point text", size: 12, x: 100, y: 700),
+        PDFKitLayoutTests.line("Three point", size: 3, x: 100, y: 600),
+        PDFKitLayoutTests.line("Twelve scaled to three", size: 12, x: 100, y: 500, scale: 0.25),
+        PDFKitLayoutTests.line("Three scaled to twelve", size: 3, x: 100, y: 400, scale: 4),
+        PDFKitLayoutTests.line("Six point text", size: 6, x: 100, y: 300),
+    ]
+
+    /// The drawn PDFs of the layout tests, each by what it shows.
+    static func drawn() -> [(name: String, data: Data)] {
+        let cropped = DrawnPDF.pages([[
+            PDFKitLayoutTests.line("Inside the crop box", size: 12, x: 100, y: 300),
+            PDFKitLayoutTests.line("Straddling the crop box edge", size: 12, x: 100, y: 497),
+        ]], cropBox: CGRect(x: 50, y: 100, width: 300, height: 400))
+        return [
+            ("known positions", DrawnPDF.pages([known])),
+            ("text past the edges", DrawnPDF.pages([PDFKitLayoutTests.outside])),
+            ("a crop box", cropped),
+            ("a rotated page", DrawnPDF.rotated(DrawnPDF.pages([known]), by: 90)),
+            ("two pages", DrawnPDF.pages([known, PDFKitLayoutTests.outside])),
+        ]
+    }
+
+    @Test("every line of the drawn PDFs is sized from the content, as PDFKit's fonts size it")
+    func drawnPDFs() throws {
+        for (name, data) in Self.drawn() {
+            let reading = try #require(PDFKitInspector().reading(of: data), "\(name)")
+            let expected = try #require(PDFKitFonts.lines(of: data), "\(name)")
+            #expect(reading.linesSizedByAttributedText == 0, "\(name): \(reading.linesSizedByAttributedText) lines sized by PDFKit's fonts")
+            #expect(reading.layout.lines.map(\.text) == expected.map(\.text), "\(name)")
+            #expect(reading.layout.lines.map(\.pageIndex) == expected.map(\.page), "\(name)")
+            for (line, oracle) in zip(reading.layout.lines, expected) {
+                let height = try #require(line.glyphHeight, "\(name): \(line.text) has no height")
+                let size = try #require(oracle.height, "\(name): PDFKit gives \(line.text) no font")
+                #expect(abs(height - size) < 0.001, "\(name): \(line.text) is \(height), PDFKit's fonts give \(size)")
+            }
+        }
+    }
+
+    /// A one-page A4 PDF written by hand, for content the drawn PDFs do not hold: the catalog and the page tree, then
+    /// `objects` from object 3 on, the page first.
+    static func handWritten(_ objects: [String]) -> Data {
+        let all = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"] + objects
+        var pdf = "%PDF-1.4\n"
+        var offsets: [Int] = []
+        for (index, object) in all.enumerated() {
+            offsets.append(pdf.utf8.count)
+            pdf += "\(index + 1) 0 obj\n\(object)\nendobj\n"
+        }
+        let table = pdf.utf8.count
+        pdf += "xref\n0 \(all.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets { pdf += String(format: "%010d 00000 n \n", offset) }
+        pdf += "trailer\n<< /Size \(all.count + 1) /Root 1 0 R >>\nstartxref\n\(table)\n%%EOF\n"
+        return Data(pdf.utf8)
+    }
+
+    /// A stream object holding `content`, its dictionary's other entries `dictionary`.
+    static func stream(_ content: String, _ dictionary: String = "") -> String {
+        "<< \(dictionary)/Length \(content.utf8.count) >>\nstream\n\(content)\nendstream"
+    }
+
+    static let helvetica = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+
+    /// A one-page A4 PDF whose page content `page` draws the form XObject `/Fm0`, which shows `form` in Helvetica
+    /// (`/F1`) through its own `matrix`. Written by hand: Core Graphics copies a drawn page's content into the new page
+    /// rather than keeping it as a form.
+    static func pageShowingAForm(_ form: String, matrix: String, drawnWith page: String) -> Data {
+        handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Fm0 4 0 R >> >> /Contents 5 0 R >>",
+            stream(form, "/Type /XObject /Subtype /Form /BBox [0 0 595 842] /Matrix [\(matrix)] /Resources << /Font << /F1 6 0 R >> >> "),
+            stream(page),
+            helvetica,
+        ])
+    }
+
+    /// A one-page A4 PDF whose content is `content`, with the fonts `/F1` (Helvetica), `/F2` (a Type 0 font whose
+    /// predefined CMap writes vertically), `/F3` (a Type 0 font whose embedded CMap writes vertically) and `/F4` (a
+    /// Type 0 font that writes across), and Type 0 fonts whose embedded CMap writes vertically by its program only
+    /// (`/F5`), is built on a predefined vertical CMap (`/F6`) or on an embedded one (`/F7`), or writes across (`/F8`),
+    /// and one whose program uses a vertical CMap with a comment between its name and `usecmap` (`/F10`). The Type 0
+    /// fonts `/F11` to `/F15` name their CMap: `/F11` the predefined `V`, `/F12` one the scan does not know, `/F13` the
+    /// predefined `H`; `/F14` and `/F15` embed one built on a CMap the scan does not know and on `H`.
+    static func pageShowing(_ content: String) -> Data {
+        let cid = "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>"
+        let cmap = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /Custom def /WMode 1 def "
+            + "1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange <0000> <FFFF> 0 endcidrange "
+            + "endcmap CMapName currentdict /CMap defineresource pop end end"
+        let across = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapName /Across def /WMode 0 def "
+            + "1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange <0000> <FFFF> 0 endcidrange "
+            + "endcmap CMapName currentdict /CMap defineresource pop end end"
+        let commented = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /Identity-V % its base CMap\n"
+            + "usecmap /CMapName /Commented def 1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange "
+            + "<0000> <FFFF> 0 endcidrange endcmap CMapName currentdict /CMap defineresource pop end end"
+        let font = { (cmap: Int) in "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding \(cmap) 0 R /DescendantFonts [7 0 R] >>" }
+        let named = { (cmap: String) in "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /\(cmap) /DescendantFonts [7 0 R] >>" }
+        return handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 9 0 R "
+                + "/F4 11 0 R /F5 12 0 R /F6 14 0 R /F7 16 0 R /F8 18 0 R /F10 20 0 R /F11 22 0 R /F12 23 0 R /F13 24 0 R "
+                + "/F14 25 0 R /F15 27 0 R /F16 29 0 R /F17 30 0 R >> >> /Contents 4 0 R >>",
+            stream(content),
+            helvetica,
+            "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-V /DescendantFonts [7 0 R] >>",
+            "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /Mincho \(cid) /FontDescriptor 8 0 R >>",
+            "<< /Type /FontDescriptor /FontName /Mincho /Flags 4 /FontBBox [0 -120 1000 880] /ItalicAngle 0 /Ascent 880 "
+                + "/Descent -120 /CapHeight 700 /StemV 80 >>",
+            "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding 10 0 R /DescendantFonts [7 0 R] >>",
+            stream(cmap, "/Type /CMap /CMapName /Custom \(cid) /WMode 1 "),
+            "<< /Type /Font /Subtype /Type0 /BaseFont /Mincho /Encoding /Identity-H /DescendantFonts [7 0 R] >>",
+            font(13), stream(cmap, "/Type /CMap /CMapName /Custom \(cid) "),
+            font(15), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /UniJIS-UCS2-V "),
+            font(17), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap 13 0 R "),
+            font(19), stream(across, "/Type /CMap /CMapName /Across \(cid) "),
+            font(21), stream(commented, "/Type /CMap /CMapName /Commented \(cid) "),
+            named("V"), named("Custom"), named("H"),
+            font(26), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /Custom "),
+            font(28), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /H "),
+            named("Custom-H"), font(31), stream(across, "/Type /CMap /CMapName /Across \(cid) /UseCMap /Custom-H "),
+        ])
+    }
+
+    /// The first page of `data`.
+    static func page(of data: Data) throws -> CGPDFPage {
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        return try #require(CGPDFDocument(provider)?.page(at: 1))
+    }
+
+    /// The runs the scan finds on the first page of `data`.
+    static func runs(of data: Data) throws -> [ShownText] {
+        ShownTextScanner.reading(of: try page(of: data)).runs
+    }
+
+    @Test("text a page shows through a form is sized through the form's matrix and the page's transform")
+    func form() throws {
+        // The form doubles and the page quarters: the text is shown at half its size, where PDFKit's fonts put it.
+        let data = Self.pageShowingAForm("BT /F1 12 Tf 100 700 Td (Twelve point text) Tj ET BT /F1 6 Tf 100 300 Td (Six point text) Tj ET",
+                                         matrix: "2 0 0 2 0 0", drawnWith: "q 0.25 0 0 0.25 20 30 cm /Fm0 Do Q")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        #expect(reading.formsRead == 1, "the page's content drew no form")
+        #expect(reading.linesSizedByAttributedText == 0)
+        #expect(reading.layout.lines.map(\.text) == ["Twelve point text", "Six point text"])
+        #expect(reading.layout.lines.map(\.glyphHeight) == [6, 3], "\(reading.layout.lines)")
+        #expect(PDFKitFonts.lines(of: data)?.map(\.height) == [6, 3])
+    }
+
+    /// A one-page A4 PDF whose page content `content` shows Helvetica (`/F1`) and may name the graphics state parameters
+    /// `/Small` (Helvetica at 3 pt), `/Clear` (no font), `/Broken` (a font entry that is not [font size]), and `/BadSize`
+    /// (Helvetica at a size that is not a number).
+    static func pageWithGraphicsStates(_ content: String) -> Data {
+        handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> /ExtGState << "
+                + "/Small << /Font [5 0 R 3] >> /Clear << /CA 0.5 >> /Broken << /Font [5 0 R] >> "
+                + "/BadSize << /Font [5 0 R /Bad] >> >> >> /Contents 4 0 R >>",
+            stream(content),
+            helvetica,
+        ])
+    }
+
+    @Test("graphics state parameters that set a font size the text after them as Tf does")
+    func fontFromGraphicsState() throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 12 Tf /Small gs 100 700 Td (Tiny) Tj ET BT /F1 6 Tf /Clear gs 100 600 Td (Six) Tj ET")
+        #expect(try Self.runs(of: data).map(\.size) == [3, 6], "a font and its size, then parameters that set no font")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        #expect(PDFKitFonts.lines(of: data)?.map(\.height) == [3, 6], "PDFKit's fonts")
+        #expect(reading.linesSizedByAttributedText == 0)
+        #expect(reading.layout.lines.map(\.glyphHeight) == [3, 6], "\(reading.layout.lines)")
+    }
+
+    /// A font the scan cannot read may write vertically, so the run after it may start anywhere on the page, as after a
+    /// `Tf` that names a font missing from the resources.
+    @Test("parameters the scan cannot read set a font it does not know, and every line is sized by PDFKit's fonts",
+          arguments: ["/Broken gs", "/Missing gs", "/BadSize gs"])
+    func unreadableGraphicsState(_ parameters: String) throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 6 Tf 100 700 Td (Six) Tj ET BT /F1 12 Tf \(parameters) 100 500 Td (Twelve) Tj ET")
+        #expect(try Self.runs(of: data).map(\.size) == [6, nil], "the size after parameters the scan cannot read")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(expected.map(\.height) == [6, 12], "PDFKit's fonts keep the font of the Tf")
+        #expect(reading.linesSizedByAttributedText == 2, "\(reading.layout.lines)")
+        #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(reading.layout.lines)")
+    }
+
+    /// A font whose size the scan cannot read moves the text position by adjustments it cannot measure: the small text
+    /// after the move would seem to start in the line of the large text, which would then take its size.
+    @Test("a move by a font of a size the scan cannot read leaves every line to PDFKit's fonts")
+    func moveByAnUnreadableSize() throws {
+        let data = Self.pageWithGraphicsStates(
+            "BT /F1 12 Tf 100 500 Td (Twelve) Tj ET BT /F1 12 Tf /BadSize gs 100 500 Td [-30000] TJ /F1 3 Tf (Tiny) Tj ET")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(reading.linesSizedByAttributedText == reading.layout.lines.count, "\(reading.layout.lines)")
+        #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(reading.layout.lines) \(expected)")
+    }
+
+    @Test("an operand the scan cannot read, missing or not of the type its operator takes, makes the reading incomplete",
+          arguments: ["1 0 0 1 0 /x cm", "/x TL", "TL", "/x Ts", "/x Tz", "0 /x Td", "0 /x TD", "1 0 0 1 0 /x Tm",
+                      "/F1 /x Tf", "(F1) 12 Tf", "12 gs", "12 Tj", "12 '", "0 0 12 \"", "/x 0 (B) \"", "0 /x (B) \"",
+                      "(B) \"", "12 TJ", "[/x (B)] TJ", "12 Do"])
+    func unreadableOperand(_ operation: String) throws {
+        let readable = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing("BT /F1 12 Tf 100 700 Td (A) Tj ET")))
+        let content = "BT /F1 12 Tf 100 700 Td (A) Tj \(operation) ET"
+        let reading = ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing(content)))
+        #expect(readable.isComplete, "the page without the operation")
+        #expect(!reading.isComplete, "\(content)")
+    }
+
+    @Test("operands of the types their operators take keep the reading complete",
+          arguments: ["1 0 0 1 0 0 cm", "14 TL", "2 Ts", "50 Tz", "0 -14 Td", "0 -14 TD", "1 0 0 1 0 0 Tm", "/F1 9 Tf",
+                      "T*", "(B) Tj", "(B) '", "1 0 (B) \"", "[(B) -10 (C)] TJ"])
+    func readableOperand(_ operation: String) throws {
+        let content = "BT /F1 12 Tf 100 700 Td (A) Tj \(operation) ET"
+        #expect(ShownTextScanner.reading(of: try Self.page(of: Self.pageShowing(content))).isComplete, "\(content)")
+    }
+
+    @Test("a page whose forms nest deeper than the scan reads is read in part, and its lines are sized by PDFKit's fonts")
+    func formsTooDeep() throws {
+        let form = "/Type /XObject /Subtype /Form /BBox [0 0 595 842] "
+        let nested = (0..<ShownTextScanner.formDepthLimit).map { level in
+            Self.stream("/Fm Do", form + "/Resources << /XObject << /Fm \(7 + level) 0 R >> >> ")
+        }
+        // The deepest form shows small text on the line of the page's own text, which the scan sizes alone.
+        let data = Self.handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                + "/Resources << /Font << /F1 5 0 R >> /XObject << /Fm 6 0 R >> >> "
+                + "/Contents 4 0 R >>",
+            Self.stream("BT /F1 12 Tf 100 700 Td (A) Tj ET /Fm Do"),
+            Self.helvetica,
+        ] + nested + [Self.stream("BT /F1 3 Tf 108 700 Td (B) Tj ET", form + "/Resources << /Font << /F1 5 0 R >> >> ")])
+        let shown = ShownTextScanner.reading(of: try Self.page(of: data))
+        #expect(!shown.isComplete)
+        #expect(shown.formsRead == ShownTextScanner.formDepthLimit)
+        #expect(shown.runs.map(\.size) == [12], "the deepest form is not read")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        #expect(expected.map(\.height) == [3], "PDFKit's fonts: \(expected.map(\.text))")
+        #expect(reading.linesSizedByAttributedText == 1)
+        #expect(reading.layout.lines.map(\.glyphHeight) == [3], "\(reading.layout.lines)")
+    }
+
+    @Test("a page that draws an XObject missing from its resources, or a form with no resources, is read in part")
+    func formsNotRead() throws {
+        let missing = Self.pageShowingAForm("BT /F1 12 Tf 100 700 Td (Twelve point text) Tj ET", matrix: "1 0 0 1 0 0",
+                                            drawnWith: "/Fm0 Do /Nowhere Do")
+        let bare = Self.handWritten([
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+                + "/Resources << /Font << /F1 5 0 R >> /XObject << /Fm 6 0 R >> >> "
+                + "/Contents 4 0 R >>",
+            Self.stream("BT /F1 12 Tf 100 700 Td (A) Tj ET /Fm Do"),
+            Self.helvetica,
+            Self.stream("BT /F1 3 Tf 108 700 Td (B) Tj ET", "/Type /XObject /Subtype /Form /BBox [0 0 595 842] "),
+        ])
+        for (name, data) in [("a missing XObject", missing), ("a form with no resources", bare)] {
+            #expect(!ShownTextScanner.reading(of: try Self.page(of: data)).isComplete, "\(name)")
+            let reading = try #require(PDFKitInspector().reading(of: data), "\(name)")
+            let expected = try #require(PDFKitFonts.lines(of: data), "\(name)")
+            #expect(reading.linesSizedByAttributedText == reading.layout.lines.count, "\(name): \(reading.layout.lines)")
+            #expect(reading.layout.lines.map(\.glyphHeight) == expected.map(\.height), "\(name): \(reading.layout.lines)")
+        }
+    }
+
+    // MARK: Where a run starts
+
+    @Test("text shown right after other text starts somewhere on the text line, the first run where the position was set")
+    func showAfterShow() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F1 12 Tf 100 700 Td (First) Tj /F1 3 Tf (Second) Tj [-60000 (Right)] TJ ET"))
+        #expect(runs == [ShownText(start: .at(x: 100, y: 700), size: 12),
+                         ShownText(start: .onTheLine(x: 100, y: 700, dx: 1, dy: 0), size: 3),
+                         ShownText(start: .onTheLine(x: 100, y: 700, dx: 1, dy: 0), size: 3)])
+    }
+
+    @Test("a TJ that shows no glyph moves the position along the text line by its adjustments, scaled as the text is")
+    func moveOnly() throws {
+        #expect(try Self.runs(of: Self.pageShowing("BT /F1 10 Tf 100 600 Td [-1000] TJ (Moved) Tj ET"))
+                == [ShownText(start: .at(x: 110, y: 600), size: 10)])
+        #expect(try Self.runs(of: Self.pageShowing("BT /F1 10 Tf 50 Tz 100 600 Td [-500 -500] TJ [-1000 (Moved)] TJ ET"))
+                == [ShownText(start: .at(x: 110, y: 600), size: 10)], "the moves add up, at half the horizontal scale")
+    }
+
+    @Test("every operator that sets the text position makes the next run's start known again")
+    func positioning() throws {
+        let content = "BT /F1 12 Tf 14 TL 100 700 Td (a) Tj (b) Tj 0 -14 Td (c) Tj (d) Tj T* (e) Tj (f) Tj (g) ' (h) Tj "
+            + "1 0 (i) \" (j) Tj 0 -14 TD (k) Tj (l) Tj 1 0 0 1 300 500 Tm (m) Tj ET BT (n) Tj ET"
+        let starts = try Self.runs(of: Self.pageShowing(content)).map(\.start)
+        let after = { (y: Double) in ShownText.Start.onTheLine(x: 100, y: y, dx: 1, dy: 0) }
+        #expect(starts == [.at(x: 100, y: 700), after(700), .at(x: 100, y: 686), after(686), .at(x: 100, y: 672), after(672),
+                           .at(x: 100, y: 658), after(658), .at(x: 100, y: 644), after(644), .at(x: 100, y: 630), after(630),
+                           .at(x: 300, y: 500), .at(x: 0, y: 0)])
+    }
+
+    @Test("text in a font that may write vertically, or after it with no positioning between them, may start anywhere")
+    func vertical() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F2 12 Tf 100 700 Td <0001> Tj /F1 12 Tf (a) Tj 0 -20 Td (b) Tj ET "
+            + "BT /F3 9 Tf 100 600 Td <0001> Tj ET BT /F9 9 Tf 100 500 Td (c) Tj ET BT /F1 9 Tf 100 400 Td (d) Tj ET "
+            + "BT /F4 9 Tf 100 300 Td <0001> Tj (e) Tj ET BT /F2 9 Tf 100 200 Td [-500] TJ /F1 9 Tf (f) Tj ET"))
+        #expect(runs == [ShownText(start: .anywhere, size: 12), ShownText(start: .anywhere, size: 12),
+                         ShownText(start: .at(x: 100, y: 680), size: 12),
+                         ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: nil),
+                         ShownText(start: .at(x: 100, y: 400), size: 9),
+                         ShownText(start: .at(x: 100, y: 300), size: 9), ShownText(start: .onTheLine(x: 100, y: 300, dx: 1, dy: 0), size: 9),
+                         ShownText(start: .anywhere, size: 9)],
+                "a predefined vertical CMap, an embedded one, a missing font, then a font that writes across, and a move in a vertical font")
+    }
+
+    @Test("an embedded CMap may write vertically by its program or by the CMap it is built on, whatever its dictionary says")
+    func embeddedCMaps() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F5 9 Tf 100 700 Td <0001> Tj ET BT /F6 9 Tf 100 600 Td <0001> Tj ET "
+            + "BT /F7 9 Tf 100 500 Td <0001> Tj ET BT /F8 9 Tf 100 400 Td <0001> Tj (a) Tj ET BT /F5 9 Tf 100 300 Td <0001> Tj ET "
+            + "BT /F10 9 Tf 100 200 Td <0001> Tj ET"))
+        #expect(runs == [ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 400), size: 9), ShownText(start: .onTheLine(x: 100, y: 400, dx: 1, dy: 0), size: 9),
+                         ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9)],
+                "mode 1 in the program only, a base named -V, an embedded vertical base, a CMap writing across, the first again, a commented base")
+    }
+
+    @Test("a CMap a font or its base names writes across only when it is a predefined horizontal CMap")
+    func namedCMaps() throws {
+        let runs = try Self.runs(of: Self.pageShowing("BT /F11 9 Tf 100 700 Td <0001> Tj ET BT /F12 9 Tf 100 600 Td <0001> Tj ET "
+            + "BT /F13 9 Tf 100 500 Td <0001> Tj ET BT /F14 9 Tf 100 400 Td <0001> Tj ET BT /F15 9 Tf 100 300 Td <0001> Tj ET "
+            + "BT /F16 9 Tf 100 200 Td <0001> Tj ET BT /F17 9 Tf 100 100 Td <0001> Tj ET"))
+        #expect(runs == [ShownText(start: .anywhere, size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 500), size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .at(x: 100, y: 300), size: 9), ShownText(start: .anywhere, size: 9),
+                         ShownText(start: .anywhere, size: 9)],
+                "the predefined V, an unknown name, the predefined H, an unknown base, a base named H, a custom -H, its base")
+    }
+
+    @Test("a CMap program may write vertically by a /WMode not followed by 0, a usecmap not after a name or after one not of a predefined horizontal CMap, or an open string, with a name's # escapes read")
+    func cmapPrograms() {
+        let vertical = ["/WMode 1 def", "/WMode\n1 def", "<</WMode 1>>", "/WMode 0.0 def", "/WMode", "/WMode 0 def /WMode 1 def",
+                        "/UniJIS-UCS2-V usecmap", "/Identity-V % its base CMap\nusecmap", "/WMode % the mode\n1 def",
+                        "(100%) pop /WMode 1 def", "<~9j%~> pop /WMode 1 def", "dup usecmap", "usecmap",
+                        "(not closed /WMode 0 def", "<00 /WMode 0 def", "<~9j /WMode 0 def", "/Identity#2DV usecmap",
+                        "/#57Mode 1 def", "/WMod#65 1 def", "/Identity#2dV usecmap", "/Custom usecmap", "/V usecmap",
+                        "/Custom#2V usecmap", "/Custom-H2 usecmap", "/#48V usecmap", "/Custom-H usecmap",
+                        "/Custom#2DH usecmap"]
+        let across = ["/WMode 0 def", "<</WMode 0>>", "/UniJIS-UCS2-H usecmap", "/CMapName /Custom-V def", "/WMode0 1", "",
+                      "% a comment: /WMode 1", "<</WMode 0>> % /UniJIS-UCS2-V usecmap", "/Identity-H % its base\rusecmap",
+                      "/WMode % the mode\r0 def", "/WMode % the mode\u{0C}0 def", "(/WMode 1) pop", "(a \\) /WMode 1) pop",
+                      "((a) /WMode 1) pop", "<2F574D6F6465> pop /WMode 0 def", "<~/WMode 1~> pop", "/#57Mode 0 def",
+                      "/Identity#2DH usecmap", "/Custom-V#", "/#WMode 1", "/#+7Mode 1", "/H usecmap", "/#48 usecmap"]
+        for program in vertical { #expect(CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
+        for program in across { #expect(!CMapProgram(Data(program.utf8)).mayWriteVertically, "\(program)") }
+    }
+
+    @Test("lines on the text line of text shown after other text are sized by PDFKit's fonts, the others from the content")
+    func linesAfterAShow() throws {
+        let data = Self.pageShowing("BT /F1 12 Tf 100 700 Td (First) Tj /F1 3 Tf (Second) Tj /F1 12 Tf [-30000 (Far right)] TJ ET "
+            + "BT /F1 6 Tf 100 600 Td (Six point text) Tj ET")
+        let reading = try #require(PDFKitInspector().reading(of: data))
+        let expected = try #require(PDFKitFonts.lines(of: data))
+        let onTheLine = reading.layout.lines.filter { $0.box.y - 1 <= 700 && 700 <= $0.box.maxY + 1 }
+        #expect(!onTheLine.isEmpty, "\(reading.layout.lines)")
+        #expect(reading.linesSizedByAttributedText == onTheLine.count, "\(reading.layout.lines)")
+        #expect(reading.layout.lines.map(\.text) == expected.map(\.text))
+        for (line, oracle) in zip(reading.layout.lines, expected) {
+            let height = try #require(line.glyphHeight, "\(line.text) has no height")
+            let size = try #require(oracle.height, "PDFKit gives \(line.text) no font")
+            #expect(abs(height - size) < 0.001, "\(line.text) is \(height), PDFKit's fonts give \(size)")
+        }
+        #expect(reading.layout.lines.first { $0.text == "Six point text" }?.glyphHeight == 6)
+    }
+
+    // MARK: Runs and boxes
+
+    static let upper = CGRect(x: 100, y: 697, width: 90, height: 12)
+    static let lower = CGRect(x: 100, y: 597, width: 90, height: 12)
+
+    @Test("a box takes the smallest size of the runs that start in it, and a box with none takes none")
+    func smallest() {
+        let runs = [ShownText(x: 100, y: 700, size: 12), ShownText(x: 150, y: 700, size: 9)]
+        #expect(PDFKitInspector.smallestSizes(of: runs, in: [Self.upper, Self.lower]) == [9, nil])
+    }
+
+    @Test("a box holding a run of unknown size has none, whatever the other runs in it")
+    func unknownSize() {
+        let runs = [ShownText(x: 100, y: 600, size: 12), ShownText(x: 120, y: 600, size: nil), ShownText(x: 100, y: 700, size: 12)]
+        #expect(PDFKitInspector.smallestSizes(of: runs, in: [Self.upper, Self.lower]) == [12, nil])
+    }
+
+    @Test("a run that starts more than an em beside every box, or above or below them all, sizes none")
+    func besideEveryBox() {
+        let runs = [ShownText(x: 100, y: 700, size: 12), ShownText(x: 210, y: 700, size: 3), ShownText(x: 130, y: 650, size: 3),
+                    ShownText(x: 86, y: 600, size: 3)]
+        #expect(PDFKitInspector.smallestSizes(of: runs, in: [Self.upper, Self.lower]) == [12, nil])
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 196, y: 700, size: 8)], in: [Self.upper]) == [8],
+                "a run that starts within an em past the box's end is in it")
+    }
+
+    @Test("of two boxes a run lies in, the one whose bottom edge is nearest its baseline holds it")
+    func nearestBottomEdge() {
+        let tall = CGRect(x: 100, y: 690, width: 90, height: 20)
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 100, y: 700, size: 10)], in: [tall, Self.upper]) == [nil, 10])
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 100, y: 691, size: 10)], in: [tall, Self.upper]) == [10, nil])
+    }
+
+    @Test("a run known only to start on a text line leaves every box the line meets, with the same slack, to PDFKit's fonts")
+    func onTheLine() {
+        let far = CGRect(x: 300, y: 597, width: 90, height: 12)
+        let across = ShownText(start: .onTheLine(x: 100, y: 700, dx: 1, dy: 0), size: 3)
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 100, y: 700, size: 12), across, ShownText(x: 100, y: 600, size: 9)],
+                                              in: [Self.upper, Self.lower]) == [nil, 9])
+        let slanted = ShownText(start: .onTheLine(x: 100, y: 700, dx: 1, dy: -1), size: 3)
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 100, y: 700, size: 12), ShownText(x: 100, y: 600, size: 9),
+                                                   ShownText(x: 300, y: 600, size: 9), slanted],
+                                              in: [Self.upper, Self.lower, far]) == [nil, nil, 9], "a line down to the right")
+        let sized = ShownText(x: 100, y: 600, size: 9)
+        #expect(PDFKitInspector.smallestSizes(of: [sized, ShownText(start: .onTheLine(x: 500, y: 610, dx: 1, dy: 0), size: 3)],
+                                              in: [Self.lower]) == [nil], "a point of slack above the box")
+        #expect(PDFKitInspector.smallestSizes(of: [sized, ShownText(start: .onTheLine(x: 500, y: 611.5, dx: 1, dy: 0), size: 3)],
+                                              in: [Self.lower]) == [9], "more than a point above the box")
+        #expect(PDFKitInspector.smallestSizes(of: [sized, ShownText(start: .onTheLine(x: 0, y: 0, dx: 0, dy: 0), size: 3)],
+                                              in: [Self.lower]) == [nil], "a line with no direction")
+    }
+
+    @Test("a run that may start anywhere leaves every box to PDFKit's fonts")
+    func anywhere() {
+        let runs = [ShownText(x: 100, y: 700, size: 12), ShownText(x: 100, y: 600, size: 9), ShownText(start: .anywhere, size: 3)]
+        #expect(PDFKitInspector.smallestSizes(of: runs, in: [Self.upper, Self.lower]) == [nil, nil])
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(start: .anywhere, size: nil)], in: []).isEmpty)
+    }
+
+    @Test("no box, no size")
+    func noBox() {
+        #expect(PDFKitInspector.smallestSizes(of: [ShownText(x: 100, y: 700, size: 12)], in: []).isEmpty)
+        #expect(PDFKitInspector.smallestSizes(of: [], in: [Self.upper]) == [nil])
+    }
+}
+
+private extension ShownText {
+    /// A run whose start is known exactly.
+    init(x: Double, y: Double, size: Double?) { self.init(start: .at(x: x, y: y), size: size) }
+}
+#endif

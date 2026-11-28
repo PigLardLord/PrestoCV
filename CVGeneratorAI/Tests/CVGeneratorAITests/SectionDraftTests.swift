@@ -829,6 +829,47 @@ struct SectionDraftTests {
         #expect(job("Talleres Cinca", in: draft)?.startDate == "2019")
     }
 
+    /// The description of the input `it-plain` of the evaluation.
+    private static let italian = """
+        Mi chiamo Luca Ferrandi e sono cuoco. Dal 2020 lavoro al ristorante Il Gabbiano di Rimini, dove preparo i primi piatti. \
+        Dal 2016 al 2020 sono stato aiuto cuoco all'Hotel Belvedere di Riccione. Ho studiato all'istituto alberghiero \
+        Valmarecchia e mi sono diplomato nel 2016.
+        """
+
+    @Test("A job the extraction calls current keeps the end year its request read when the description says it ended; the job that goes on gets none (it-plain, #359)",
+          arguments: [nil, "2020", "2016"])
+    func endedJobKeepsItsEndYear(currentEnd: String?) async throws {
+        let service = FakeCVGenerationService()
+        service.generateResult = .success(CVData(
+            personalInfo: PersonalInfo(name: "Luca Ferrandi", title: "cuoco"),
+            experience: [
+                Experience(title: "aiuto cuoco", company: "Hotel Belvedere", current: true),
+                Experience(title: "cuoco", company: "ristorante Il Gabbiano", current: true),
+            ]
+        ))
+        service.jobResults = [
+            0: RoleWriting(startDate: "2016", endDate: "2020", duties: "Preparavo i contorni. Tagliavo le verdure."),
+            1: RoleWriting(startDate: "2020", endDate: currentEnd, duties: "Preparo i primi piatti. Taglio le verdure."),
+        ]
+        service.toolsResult = [["forno"], ["forno"]]
+        service.softSkillsResult = ["precisione", "affidabilità"]
+        service.summaryResult = "Lavoro come cuoco."
+        let italian = CVDataSanitizer(languageOfText: { _ in "it" }, lexicalClasses: ForcedLexicalTagger([:]), wordList: TableWordList())
+        let generator = CVGeneratorUseCase(
+            service: service, claimChecker: FakeClaimChecker(), logger: SilentLogger(), clock: ContinuousClock(),
+            tracer: NoTracer(), validator: DefaultCVValidator(), sanitizer: italian, limits: .onTestClock()
+        )
+
+        let draft = try await generator.generateCV(from: CVGenerationRequest(userPrompt: Self.italian)).cvData
+
+        let ended = try #require(job("Hotel Belvedere", in: draft))
+        #expect([ended.startDate, ended.endDate] == ["2016", "2020"])
+        #expect(!ended.current)
+        let current = try #require(job("ristorante Il Gabbiano", in: draft))
+        #expect([current.startDate, current.endDate] == ["2020", nil])
+        #expect(current.current)
+    }
+
     // MARK: A stated technology
 
     @Test("A technology the person states with its verb keeps its object; one of more than four words is a clause and goes (jobs-en, #354)")

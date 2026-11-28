@@ -57,7 +57,7 @@ struct ImportFlowTests {
         let model = ImportWorld().model()
         model.text = "typed before"
 
-        model.paste(["Ada Ferro", "Structural engineer"])
+        model.paste(["Ada Ferro", "Structural engineer"], pdfs: [])
 
         #expect(model.text == "Ada Ferro\nStructural engineer")
     }
@@ -67,8 +67,8 @@ struct ImportFlowTests {
         let model = ImportWorld().model()
         model.text = "typed before"
 
-        model.paste([])
-        model.paste([""])
+        model.paste([], pdfs: [])
+        model.paste([""], pdfs: [])
 
         #expect(model.text == "typed before")
     }
@@ -97,7 +97,7 @@ struct ImportFlowTests {
 
         #expect(model.canImportText == false)
         model.importText()
-        model.importPDF(ImportValues.pdf)
+        model.paste([], pdfs: [ImportValues.pdf])
         #expect(model.status == .importing)
         await world.importer.gate.open()
         await waitUntil("the draft") { model.status == .ready }

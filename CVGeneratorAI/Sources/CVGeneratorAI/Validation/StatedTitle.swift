@@ -194,7 +194,7 @@ enum StatedTitle {
 
     /// The present of "to be" in the first person, as `Word.accented` writes it ("I'm" is "i" and "m"). The past ("was", "ero",
     /// "war", "era", "étais", "fui") and the other persons are none: a title the person had, or another person's, is no headline.
-    private static let presentFirstPersonBe: [Vocabulary.Language: Set<String>] = [
+    static let presentFirstPersonBe: [Vocabulary.Language: Set<String>] = [
         .english: ["am", "m"], .italian: ["sono"], .german: ["bin"], .spanish: ["soy"], .french: ["suis"], .portuguese: ["sou"],
     ]
 
@@ -213,7 +213,7 @@ enum StatedTitle {
         forms(presentFirstPersonBe, in: language).contains(word)
     }
 
-    private static func forms(_ table: [Vocabulary.Language: Set<String>], in language: Vocabulary.Language?) -> Set<String> {
+    static func forms(_ table: [Vocabulary.Language: Set<String>], in language: Vocabulary.Language?) -> Set<String> {
         language.map { table[$0] ?? [] } ?? table.values.reduce(into: []) { $0.formUnion($1) }
     }
 }

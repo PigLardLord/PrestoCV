@@ -16,11 +16,10 @@ struct ExportDebugOutputTests {
 
     // MARK: - Helpers
 
-    private static let folder = "PrestoCV/Features/Export"
+    private static let folder = "PrestoCVNext/Features/Export"
 
     /// Where the pasteboard is used on purpose, and why: the person asks for the copy with a tap.
     private static let copyOnTap = [
-        "PrestoCV/Features/Import/Views/ImportReviewSheet.swift": "the Copy button of the text the import could not place",
         "PrestoCVNext/Platform/Pasteboard.swift": "the copy that the Copy button of an import's review asks for, of the text the import could not place",
     ]
 
@@ -89,8 +88,8 @@ struct ExportDebugOutputTests {
         let files = try Self.swiftFiles()
 
         #expect(files.count >= 10, "Only \(files.count) Swift files under \(Self.folder)")
-        #expect(files.contains { $0.lastPathComponent == "CVExportSheetView.swift" })
-        #expect(files.contains { $0.lastPathComponent == "CVExportSheetViewModel.swift" })
+        #expect(files.contains { $0.lastPathComponent == "ExportSheetView.swift" })
+        #expect(files.contains { $0.lastPathComponent == "LookPicker.swift" })
     }
 
     @Test("no file of the export feature prints or touches the pasteboard, in a Debug build either")
@@ -110,10 +109,11 @@ struct ExportDebugOutputTests {
         let names = Set(files.map { Self.path(of: $0) })
 
         #expect(files.count >= 200, "Only \(files.count) Swift files in the code that ships")
-        #expect(names.contains("PrestoCV/DesignSystem/Components/LabeledTextField.swift"), "the design system")
-        #expect(names.contains("PrestoCV/Features/Export/ViewModels/CVExportSheetViewModel.swift"), "the feature")
-        #expect(names.contains { $0.hasPrefix("CVPDFExporter/Sources/CVPDFExporter/") }, "the exporter package")
-        #expect(names.contains { $0.hasPrefix("PrestoCVCore/Sources/PrestoCVCore/") }, "the core package")
+        #expect(names.contains("PrestoCVNext/DesignSystem/LabeledField.swift"), "the design system")
+        #expect(names.contains("PrestoCVNext/Features/Export/ExportSheetView.swift"), "the feature")
+        #expect(names.contains { $0.hasPrefix("PrestoCVApp/Sources/PrestoCVPresentation/") }, "the app package")
+        #expect(names.contains { $0.hasPrefix("CVPDFExporter/Sources/CVRendering/") }, "the exporter package")
+        #expect(names.contains { $0.hasPrefix("PrestoCVCore/Sources/PrestoCVDomain/") }, "the core package")
     }
 
     @Test("no code that ships prints or touches the pasteboard, in a Debug build either, apart from previews and a Copy button")

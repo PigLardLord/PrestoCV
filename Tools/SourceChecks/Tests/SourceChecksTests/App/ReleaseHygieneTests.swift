@@ -22,23 +22,17 @@ struct ReleaseHygieneTests {
         let linkedProducts: [String]
     }
 
-    /// The released app, which does not link the new app's targets.
-    static let legacy = App(
-        name: "PrestoCV", folder: "PrestoCV", manifest: "PrestoCV/PrivacyInfo.xcprivacy",
-        linkedProducts: [
-            "PrestoCVCore", "CVPDFExporter", "CVGeneratorAI", "PrestoCVDomain", "PrestoCVApplication", "PrestoCVImporting",
-            "PrestoCVImportingPDFKit", "DiagnosticLogging", "DiagnosticLoggingOSLog", "DiagnosticTrace", "DiagnosticTraceFiles",
-            "DiagnosticTraceDistribution",
-        ]
-    )
-
-    /// The second app, which becomes the shipped one at the switch (docs/architecture/modules.md).
-    static let next = App(
-        name: "PrestoCVNext", folder: "PrestoCVNext", manifest: "PrestoCVNext/PrivacyInfo.xcprivacy",
+    /// The shipped app: the target keeps the released app's name, bundle id, `Info.plist`, icon and privacy manifest, and
+    /// compiles the new app's sources (docs/architecture/modules.md).
+    static let shipped = App(
+        name: "PrestoCV", folder: "PrestoCVNext", manifest: "PrestoCV/PrivacyInfo.xcprivacy",
         linkedProducts: ["PrestoCVComposition", "PrestoCVPresentation"]
     )
 
-    static let apps = [legacy, next]
+    static let apps = [shipped]
+
+    /// The products of the legacy targets (ADR 0012), which no app target links since the repoint.
+    static let legacyProducts: Set<String> = ["PrestoCVCore", "CVPDFExporter", "CVGeneratorAI"]
 
     private static func projectText() -> String {
         do {
@@ -76,6 +70,28 @@ struct ReleaseHygieneTests {
         }
     }
 
+    /// The package products the project links into any target.
+    static func productsLinkedByAnyTarget() -> [String] {
+        let project = projectText()
+        let member = try! NSRegularExpression(pattern: #""product-name": "([^"]+)""#)
+        return member.matches(in: project, range: NSRange(project.startIndex..., in: project)).compactMap { match in
+            Range(match.range(at: 1), in: project).map { String(project[$0]) }
+        }
+    }
+
+    /// The folders whose sources the project compiles into a target: its folder entries with that target as a member.
+    static func folders(compiledBy target: String) -> [String] {
+        let project = projectText()
+        let entry = try! NSRegularExpression(pattern: #""kind": "folder",\s*"path": "([^"]+)",\s*"target-membership": \[([^\]]*)\]"#)
+        return entry.matches(in: project, range: NSRange(project.startIndex..., in: project)).compactMap { match in
+            guard let path = Range(match.range(at: 1), in: project), let members = Range(match.range(at: 2), in: project) else {
+                return nil
+            }
+            let targets = project[members].split(separator: ",").map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\" \n")) }
+            return targets.contains(target) ? String(project[path]) : nil
+        }
+    }
+
     /// The targets a Release build of the app compiles in: the products it links, and every target they depend on, in
     /// this package and in the sibling packages, however far down. A linked product no package declares is unresolved.
     static func reached(by app: App) -> (targets: [PackageManifests.Target], unresolved: [PackageManifests.ProductReference]) {
@@ -96,7 +112,7 @@ struct ReleaseHygieneTests {
         [app.folder] + reached(by: app).targets.map(\.folder)
     }
 
-    /// The folders of both apps: what any Release build of the repository carries.
+    /// The folders of every app target: what any Release build of the repository carries.
     static let shippedFolders = Array(Set(apps.flatMap(shippedFolders(of:)))).sorted()
 
     struct Line {
@@ -159,16 +175,100 @@ struct ReleaseHygieneTests {
         }
     }
 
-    @Test("The walk reaches the targets the linked products take in, however far down")
+    @Test("The shipped target compiles the new app's folder, links no legacy product, and no second app target is left")
+    func theShippedTargetIsTheNewApp() {
+        let folders = Self.folders(compiledBy: Self.shipped.name)
+        let legacy = Self.legacyProducts.intersection(Self.productsLinkedByAnyTarget())
+
+        #expect(folders == [Self.shipped.folder], "The shipped target compiles \(folders)")
+        #expect(legacy.isEmpty, "The project links the legacy products \(legacy.sorted())")
+        #expect(!Self.projectText().contains(#""name": "PrestoCVNext","#), "The second app target is still in the project")
+    }
+
+    /// What `PrestoCV/` keeps for the shipped target: the released app's `Info.plist`, icon, asset catalog, privacy
+    /// manifest and sample CVs (docs/architecture/modules.md). Everything else in it was the legacy app.
+    static let keptInTargetFolder: [String] = [
+        "PrestoCV/Info.plist", "PrestoCV/PrivacyInfo.xcprivacy", "PrestoCV/PrestoCV.icon/", "PrestoCV/Assets.xcassets/",
+        "PrestoCV/Resources/Samples/",
+    ]
+
+    @Test("The legacy app's code and tests are gone: PrestoCV/ keeps only what the shipped target uses")
+    func theLegacyAppIsGone() throws {
+        let tracked = try Repository.trackedFiles()
+        let legacyCode = tracked.filter { path in
+            path.hasPrefix("PrestoCVTests/") || path.hasPrefix("PrestoCVUITests/")
+                || (path.hasPrefix("PrestoCV/") && !Self.keptInTargetFolder.contains { path == $0 || ($0.hasSuffix("/") && path.hasPrefix($0)) })
+        }
+
+        #expect(legacyCode.isEmpty, "Legacy files are still tracked: \(legacyCode.prefix(10)) and \(max(0, legacyCode.count - 10)) more")
+    }
+
+    /// The targets of the project file with their build settings, read as JSON5 (it has trailing commas). A setting is a
+    /// word or a list of words.
+    private struct Project: Decodable {
+        enum Setting: Decodable, Equatable {
+            case word(String)
+            case words([String])
+
+            init(from decoder: any Decoder) throws {
+                let value = try decoder.singleValueContainer()
+                if let word = try? value.decode(String.self) {
+                    self = .word(word)
+                } else {
+                    self = .words(try value.decode([String].self))
+                }
+            }
+        }
+
+        struct Target: Decodable {
+            let name: String
+            let buildSettings: [String: Setting]?
+
+            enum CodingKeys: String, CodingKey {
+                case name
+                case buildSettings = "build-settings"
+            }
+        }
+
+        let targets: [Target]
+    }
+
+    private static func buildSettings(of target: String) throws -> [String: Project.Setting] {
+        let decoder = JSONDecoder()
+        decoder.allowsJSON5 = true
+        let project = try decoder.decode(Project.self, from: Data(projectText().utf8))
+        return try #require(project.targets.first { $0.name == target }?.buildSettings, "No target \(target)")
+    }
+
+    @Test("The shipped Info.plist builds for macOS, and the document key is NO for the iOS SDKs and YES for macOS")
+    func theInfoPlistBuildsOnEveryPlatform() throws {
+        let url = Self.root.appendingPathComponent("PrestoCV/Info.plist")
+        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let settings = try Self.buildSettings(of: Self.shipped.name)
+        let documentKey = "INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace"
+        let documentSettings = settings.filter { $0.key.hasPrefix(documentKey) }
+
+        // iOS gets NO so the app is handed a copy of the PDF it is given, as the released app is. The target builds for
+        // macOS too, which rejects NO for an app with document types, and a setting made for some SDKs only still makes
+        // the build write the key for macOS as NO: the macOS SDK sets it itself, to YES.
+        #expect(plist["CFBundleDocumentTypes"] != nil, "Info.plist no longer declares the PDFs the app opens")
+        #expect(plist["LSSupportsOpeningDocumentsInPlace"] == nil, "Info.plist sets the key for macOS too")
+        #expect(documentSettings == [
+            "\(documentKey)[sdk=iphoneos*]": .word("NO"),
+            "\(documentKey)[sdk=iphonesimulator*]": .word("NO"),
+            "\(documentKey)[sdk=macosx*]": .word("YES"),
+        ], "The target sets \(documentSettings)")
+    }
+
+    @Test("The walk reaches the targets the linked products take in, however far down, and no legacy target")
     func theWalkReachesTheTargetsBelow() {
-        let names = Set(Self.reached(by: Self.next).targets.map(\.name))
-        let legacy = Set(Self.reached(by: Self.legacy).targets.map(\.name))
+        let names = Set(Self.reached(by: Self.shipped).targets.map(\.name))
 
         #expect(names.isSuperset(of: [
             "PrestoCVComposition", "PrestoCVWorkflowPorts", "PrestoCVIntegration", "PrestoCVImportFiles", "CVDocumentModel",
             "CVDesignCatalog", "CVRendering", "CVDrafting", "PrestoCVPersistence", "DiagnosticTraceFiles",
-        ]), "Reached by the new app: \(names.sorted())")
-        #expect(legacy.isDisjoint(with: ["PrestoCVImportFiles", "PrestoCVWorkflowPorts"]), "The released app does not link these")
+        ]), "Reached by the shipped app: \(names.sorted())")
+        #expect(names.isDisjoint(with: Self.legacyProducts), "The shipped app compiles in a legacy target")
     }
 
     // MARK: Debug output
@@ -185,29 +285,6 @@ struct ReleaseHygieneTests {
     }
 
     // MARK: Test hooks
-
-    @Test("The launch argument that hands CV files to the app is read only by Debug builds")
-    func theSeedOfTheUITestsIsReadOnlyInDebugBuilds() {
-        let reads = Self.shippedLines().filter { $0.code.contains("PrestoCVUITestsSeed") || $0.code.contains("seedFiles(") }
-
-        let offenders = reads.filter { !$0.isDebugOnly }
-
-        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the seed: update it with the code")
-        #expect(offenders.isEmpty, "The seed of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
-    }
-
-    /// A Release build asks the store how it was installed, and nothing else turns its trace on (ADR 0032).
-    @Test("The launch argument that gives the store's answer to the trace is read only by Debug builds")
-    func theDistributionOfTheTraceIsGivenOnlyToDebugBuilds() {
-        let reads = Self.shippedLines().filter {
-            $0.code.contains("diagnosticsDistribution") || $0.code.contains("DiagnosticsDistributionOverride")
-        }
-
-        let offenders = reads.filter { !$0.isDebugOnly }
-
-        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the answer: update it with the code")
-        #expect(offenders.isEmpty, "The answer of the UI tests outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
-    }
 
     /// The new app's fixtures (storage, seed, answer of the store) are launch arguments of the UI tests.
     @Test("The launch arguments of the new app's fixtures are read only by Debug builds")
@@ -253,6 +330,31 @@ struct ReleaseHygieneTests {
 
         #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
         #expect(offenders.isEmpty, "The fixture that holds the import outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// A UI test opens a PDF in the app as another app would; no Release build may open a file the person did not.
+    @Test("The fixture that opens a file in the app is read only by Debug builds")
+    func theFixtureThatOpensAFileIsReadOnlyInDebugBuilds() {
+        let names = ["openedFile", "OpenedFileFixture"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that opens a file outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// UI tests that are not about the designs accept the bundled designs without rendering them; no Release build may
+    /// install a design that no render checked.
+    @Test("The fixture that accepts the bundled designs without rendering them is read only by Debug builds")
+    func theFixtureThatAcceptsTheDesignsIsReadOnlyInDebugBuilds() {
+        let names = ["readyDesignsArgument", "acceptsBundledDesigns", "AcceptedDesigns", "fixtures.designGate"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that accepts the designs outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
     /// A UI test reads a share through a stand-in, as the system's share sheet runs in another process. A Release build
@@ -304,6 +406,30 @@ struct ReleaseHygieneTests {
         #expect(offenders.isEmpty, "The fixture of the other window outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
     }
 
+    /// A UI test makes the first writes of a CV fail, to see the editor's failed save; no Release build may be able to.
+    @Test("The fixture that fails the first writes is read only by Debug builds")
+    func theFixtureThatFailsWritesIsReadOnlyInDebugBuilds() {
+        let names = ["failWritesArgument", "writesToFail", "FailingWritesStore"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that fails writes outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
+    /// A UI test makes the autosave wait a long time, to leave an editor before it stores; no Release build may be able to.
+    @Test("The fixture that sets the autosave pause is read only by Debug builds")
+    func theFixtureThatSetsTheAutosavePauseIsReadOnlyInDebugBuilds() {
+        let names = ["autosavePauseArgument", "autosavePauseSeconds", "fixtures.autosavePause"]
+        let reads = Self.shippedLines().filter { line in names.contains { line.code.contains($0) } }
+
+        let offenders = reads.filter { !$0.isDebugOnly }
+
+        #expect(!reads.isEmpty, "The scan no longer finds the code that reads the fixture: update it with the code")
+        #expect(offenders.isEmpty, "The fixture that sets the autosave pause outside #if DEBUG: \(offenders.map { "\($0.file):\($0.number)" })")
+    }
+
     /// A UI test stores two invented runs of the diagnostics before the trace chain starts; no Release build may be able to.
     @Test("The fixture of the invented trace runs is read only by Debug builds")
     func theFixtureOfTheInventedTraceRunsIsReadOnlyInDebugBuilds() {
@@ -343,16 +469,19 @@ struct ReleaseHygieneTests {
         "NSPrivacyAccessedAPICategoryActiveKeyboards": #"\bactiveInputModes\b"#,
     ]
 
+    private func propertyList(at path: String) throws -> [String: Any] {
+        let url = Self.root.appendingPathComponent(path)
+        return try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+    }
+
     private func declaredCategories(in manifest: String) throws -> Set<String> {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return Set(types.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
     }
 
     private func declaredWithoutReasons(in manifest: String) throws -> [String] {
-        let url = Self.root.appendingPathComponent(manifest)
-        let plist = try #require(PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as? [String: Any])
+        let plist = try propertyList(at: manifest)
         let types = try #require(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
         return types.filter { ($0["NSPrivacyAccessedAPITypeReasons"] as? [String] ?? []).isEmpty }
             .compactMap { $0["NSPrivacyAccessedAPIType"] as? String }
@@ -376,5 +505,25 @@ struct ReleaseHygieneTests {
             #expect(withoutReason.isEmpty, "\(app.name): no reason declared for \(withoutReason)")
             #expect(declared == used, "\(app.name): declared \(declared.sorted()), used by the code \(used.sorted())")
         }
+    }
+
+    // MARK: Document types
+
+    /// `Tools/Release/check-archive.sh` enforces the same rule on the archive before it is uploaded: change both together.
+    private static let infoPlist = "PrestoCV/Info.plist"
+
+    @Test("Info.plist declares PDFs only, as a viewer of alternate rank, so that \"Open in PrestoCV\" offers the import")
+    func infoPlistOpensPDFs() throws {
+        let types = try #require(try propertyList(at: Self.infoPlist)["CFBundleDocumentTypes"] as? [[String: Any]])
+
+        #expect(types.count == 1)
+        #expect(types.first?["LSItemContentTypes"] as? [String] == ["com.adobe.pdf"])
+        #expect(types.first?["LSHandlerRank"] as? String == "Alternate", "PrestoCV is no default reader of PDFs")
+        #expect(types.first?["CFBundleTypeRole"] as? String == "Viewer")
+    }
+
+    @Test("Info.plist declares no type of its own", arguments: ["UTExportedTypeDeclarations", "UTImportedTypeDeclarations"])
+    func infoPlistDeclaresNoTypes(key: String) throws {
+        #expect(try propertyList(at: Self.infoPlist)[key] == nil)
     }
 }

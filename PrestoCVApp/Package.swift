@@ -2,8 +2,7 @@
 import PackageDescription
 
 // App integration and presentation (docs/architecture/modules.md). Step 5 fills the targets one by one (#62); the
-// second app target, PrestoCVNext, links the composition and the presentation until the shipped target takes them
-// over at the switch (#88, #89).
+// app target, PrestoCV, links the composition and the presentation (#88, #89).
 var products: [Product] = [
     .library(name: "PrestoCVWorkflowPorts", targets: ["PrestoCVWorkflowPorts"]),
     .library(name: "PrestoCVIntegration", targets: ["PrestoCVIntegration"]),
@@ -89,9 +88,18 @@ targets.append(.testTarget(name: "PrestoCVPresentationTests", dependencies: [
 
 // The composition root is Apple-only (docs/architecture/modules.md): it wires the platform adapters.
 #if !os(Linux)
+targets.append(.target(name: "PrestoCVTipsStoreKit", dependencies: [
+    "PrestoCVWorkflowPorts",
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+]))
+targets.append(.testTarget(name: "PrestoCVTipsStoreKitTests", dependencies: [
+    "PrestoCVTipsStoreKit", "PrestoCVWorkflowPorts",
+    .product(name: "DiagnosticLogging", package: "DiagnosticLogging"),
+]))
 products.append(.library(name: "PrestoCVComposition", targets: ["PrestoCVComposition"]))
 targets.append(.target(name: "PrestoCVComposition", dependencies: [
     "PrestoCVImportFiles", "PrestoCVExportFiles", "PrestoCVLegacyLeftovers", "PrestoCVIntegration", "PrestoCVPresentation", "PrestoCVWorkflowPorts",
+    "PrestoCVTipsStoreKit",
     .product(name: "PrestoCVApplication", package: "PrestoCVCore"),
     .product(name: "PrestoCVDomain", package: "PrestoCVCore"),
     .product(name: "PrestoCVImporting", package: "PrestoCVCore"),
