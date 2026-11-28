@@ -1,12 +1,12 @@
 # App Store listing
 
-The texts of PrestoCV's App Store product page for version 1.0, one section per App Store localization, and the notes for App Review. They are entered by hand in App Store Connect, so this file is the versioned copy: a change to the listing changes this file first.
+The texts of PrestoCV's App Store product page for version 1.1, one section per App Store localization, and the notes for App Review. They are entered by hand in App Store Connect, so this file is the versioned copy: a change to the listing changes this file first.
 
-- **Where they go.** In App Store Connect, the name and the subtitle are under App Information. The keywords, the promotional text, the description and the screenshots are under the version (1.0), for each localization. The notes for App Review are under App Review Information, at the bottom of the version page.
+- **Where they go.** In App Store Connect, the name and the subtitle are under App Information. The keywords, the promotional text, the description and the screenshots are under the version (1.1), for each localization. The notes for App Review are under App Review Information, at the bottom of the version page.
 - **Limits.** Name and subtitle: 30 characters. Keywords: 100 bytes of UTF-8, each keyword longer than two characters, separated by commas without spaces. Promotional text: 170 characters. Description, What's New and review notes: 4,000 characters. App Review Guideline 2.3.7 rules out prices and "free" claims in the name, the subtitle and the screenshots, and competitors' names in the keywords; guideline 2.3.1 asks for review notes that say specifically how to reach every feature.
-- **What's New.** App Store Connect has no What's New field for an app's first version, so version 1.0 has none. The texts below are those of version 1.0.1, which has the field.
+- **What's New.** Version 1.1 is an update, so it has the field. Its text has three parts: what is new, what stays (the CVs of the earlier version are found again) and what to check after the update (the report of the import). A line says that the AI draft of version 1.0 is gone and that a better way to start is planned; the checker lets What's New, and no other field, name the AI draft.
 - **Counts.** `Tools/Release/check-store-listing.py` counts every text of this file, checks it against those limits, and checks that the table under [Character counts](#character-counts) is current. Run it after changing a text; `--write` rewrites the table.
-- **What each claim rests on.** Every feature named here is in the app as it ships (the legacy app of ADR 0022). In the AI draft, the facts (the name, the contacts, the employers, the schools, the dates, the figures and the languages) occur in the person's description; the summary, the role descriptions and the skills are written by the model from it and may be wrong, so no text promises a correct draft ([ADR 0031](../architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md), with [ADR 0023](../architecture/adr/0023-ground-the-ai-draft-in-the-description.md)). The device list is Apple's, from "How to get Apple Intelligence" (support.apple.com/en-us/121115), read on 2026-10-18.
+- **What each claim rests on.** Every feature named here is in the app as it ships (the new app, `PrestoCVNext/`), and the checker fails on a word of a feature that 1.1 lacks: the AI draft, Apple Intelligence, the on-device model, the LinkedIn import, scans and the Mac. The words, with the reason of each, are in `Tools/Release/store-listing-retired-words.json`; a locale still written for 1.0 is on its list of pending locales until its texts are rewritten, and the checker refuses a list with a locale that the target branch's list lacks, so the list only shrinks. The pull request that changes this file lists the file of each claim.
 - **The copy is written for each market, not translated.** The register follows the app's own texts: "Sie" in German, "vous" in French, "tu" in Italian and Spanish, "você" in Brazilian Portuguese. The French texts put a no-break space (U+00A0) before a colon and inside « », as French typography does: keep it when copying them.
 
 ## Settings for every localization
@@ -44,16 +44,18 @@ Six screenshots per localization and device, one per caption, in the order of th
 | # | Screen |
 |---|---|
 | 1 | My CVs: a complete CV and three copies of it adapted to other jobs. |
-| 2 | The AI screen with the person's description typed in. The simulator has no on-device model, so the test turns the AI entry on with `-AIAvailabilityOverride available`. On a smaller iPhone the form goes up to show the whole of Generate, but the heading stays below the navigation bar: the descriptions are short enough for both. |
-| 3 | The editor of a CV stored with the facts of that description, where the person checks and changes every line, as its caption says. What the description does not mention, the e-mail, the phone and the portfolio, is blank, and so is the summary: a stored CV holds only what was typed into it, while an AI draft writes one ([ADR 0031](../architecture/adr/0031-let-the-ai-draft-write-around-the-facts.md)). The navigation bar carries the name of the CV and "Saved on this device", with no Done button. On iPhone the form is scrolled until the Personal Information heading sits just under the navigation bar, so that every fact and every blank field with its hint is in view, and the section bar floats over the empty summary box and covers no text; the test fails if a bar covers a text or cuts one in two. The app makes an AI draft only with the on-device model, and has no fake one (rule R14), so this is a CV stored with those facts, not a draft: it has no draft notice. |
-| 4 | New CV with its choices: import a CV, the AI draft, Example CV and Empty CV. The test turns the AI entry on with `-AIAvailabilityOverride available`, so the AI card is live, not dimmed with the reason that a device without Apple Intelligence shows; the test fails if it is dimmed. |
-| 5 | The export sheet: the preview, the language of the headings, Send or save PDF, and the designs. |
-| 6 | The share sheet over the export sheet, with the PDF in the serif font style and its headings in the CV's language. |
+| 2 | The editor of the complete CV of screen 1. |
+| 3 | "Import a CV" with the text of a CV pasted in. |
+| 4 | "New CV" with its three ways to start: "Paste or import a CV", "Start from an example" and "Start with a blank CV". |
+| 5 | "Export CV": the preview of the PDF, its design (template, fonts and colours) with "Change", the language of the headings and "Send or save PDF". |
+| 6 | The share sheet over the export sheet, with the PDF and its headings in the CV's language. |
+
+- **Not in the repository yet.** The test that captures these six screens, and its people, are ported to the new app with its UI tests (#408). Until then `store-screenshots.sh` has no test to run, and App Store Connect keeps the screenshots of version 1.0.
 
 - **Sizes.** The tool makes up to three sets. Version 1 has two: `iphone`, 1320 × 2868 (iPhone 17 Pro Max), the iPhone 6.9-inch set (`APP_IPHONE_69`), and `ipad`, 2064 × 2752 (iPad Pro 13-inch), the iPad 13-inch set (`APP_IPAD_PRO_3GEN_129`). App Store Connect scales the 6.9-inch images to the smaller iPhones. The third, `iphone-6.3`, 1206 × 2622 (iPhone 17 Pro, `APP_IPHONE_61`), is made only if `asc-prestocv validate` reports an iPhone set missing after the upload, as Apple's "Screenshot specifications" (developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications, read on 2026-10-18) name an "iPhone with Dynamic Island (medium display)" set. The sizes each type takes are the ones `asc-prestocv screenshots sizes --all` lists (read on 2026-10-26). The images are PNG without an alpha channel, which Apple rejects.
 - **Languages.** The app has six languages. en-GB, es-MX and pt-BR use the screenshots of en, es and pt with their own captions; pt-PT uses those of pt, whose texts are Brazilian, like the app's.
-- **People.** One fictional person per language: Emily Parker (en), Lena Hoffmann (de), Lucía Martínez (es), Camille Laurent (fr), Giulia Conti (it), Ana Ferreira (pt). Their employers and schools are made up, their e-mail addresses are at example.com, and they have no phone number. They are in `PrestoCVNextUITests/StoreScreenshotFixtures.swift`.
-- **Capture.** `StoreScreenshotsUITests`, one test per language. Each screen is a launch of its own: the debug-only launch argument `-PrestoCVUITestsSeed` hands the app the CV files of the screen, in Base64, which it writes into the new UI-test storage folder of `-PrestoCVUITestsEmptyStorage` before it reads it, in a folder beside it that is moved to its place once every file is there, so that a seed that fails or is cut short leaves no half-seeded folder and the next launch on that name seeds again (a folder that is already there keeps what the app saved in it, so a relaunch on a named folder never has its CVs overwritten by the seed). The test finds the buttons by the app's own texts, which the tool hands over from `PrestoCVNext/Resources/Localizable.xcstrings` (the test does not read the source tree; a key the tool did not hand over stops the test and names the key), and attaches each screen at the simulator's resolution once the element it shows has come to rest: nothing waits for a fixed time. It is in no test plan that CI runs: the `PrestoCV` plan skips it, the `CI` plan has no UI tests, and only the `StoreScreenshots` plan holds it. That plan turns test timeouts on, so that the 30 minutes each language's test is given (`executionTimeAllowance`) end a test that hangs; without the setting Xcode ignores the allowance.
+- **People.** One fictional person per language: Emily Parker (en), Lena Hoffmann (de), Lucía Martínez (es), Camille Laurent (fr), Giulia Conti (it), Ana Ferreira (pt). Their employers and schools are made up, their e-mail addresses are at example.com, and they have no phone number. They go in `PrestoCVNextUITests/StoreScreenshotFixtures.swift` with #408.
+- **Capture.** `StoreScreenshotsUITests`, one test per language, which comes with #408: the `StoreScreenshots` plan and the tool already name it. The launch arguments below are those of version 1.0's test; the port names the new app's. Each screen is a launch of its own: the debug-only launch argument `-PrestoCVUITestsSeed` hands the app the CV files of the screen, in Base64, which it writes into the new UI-test storage folder of `-PrestoCVUITestsEmptyStorage` before it reads it, in a folder beside it that is moved to its place once every file is there, so that a seed that fails or is cut short leaves no half-seeded folder and the next launch on that name seeds again (a folder that is already there keeps what the app saved in it, so a relaunch on a named folder never has its CVs overwritten by the seed). The test finds the buttons by the app's own texts, which the tool hands over from `PrestoCVNext/Resources/Localizable.xcstrings` (the test does not read the source tree; a key the tool did not hand over stops the test and names the key), and attaches each screen at the simulator's resolution once the element it shows has come to rest: nothing waits for a fixed time. It is in no test plan that CI runs: the `PrestoCV` plan skips it, the `CI` plan has no UI tests, and only the `StoreScreenshots` plan holds it. That plan turns test timeouts on, so that the 30 minutes each language's test is given (`executionTimeAllowance`) end a test that hangs; without the setting Xcode ignores the allowance.
 - **Compose.** `Tools/Release/compose-store-screenshots.swift`, in Swift with Core Text and the system font, puts each caption above its screenshot on the app's dark green (#0A403B), with a glow of the accent (#00DAC3) and a plain rounded frame: no picture of a device. The title is set large and bold, in at most two lines, and the line below it smaller, in at most three. All the titles of a locale and device get one size, and all its lines below another: the largest at which each fits, or a little smaller where that lets them break much better. The line breaks go after a sentence or a clause where they can, and not after a short word such as "a" or "der"; apostrophes are set as ’, and "Apple Intelligence" stays on one line. The titles start at the same height, and the screenshot stays in the same place, on every image of a device.
 - **Regenerating them.** On a Mac with Xcode 27 or later, from the repository:
 
@@ -70,17 +72,17 @@ Characters are Unicode characters; keywords are counted in UTF-8 bytes, which is
 <!-- counts:start -->
 | Locale | Name (30) | Subtitle (30) | Keywords (100 bytes) | Promotional text (170) | Description (4000) | Captions (longest title / line) | What's New (4000) |
 |---|---|---|---|---|---|---|---|
-| en-US | 27 | 29 | 98 | 166 | 2494 | 24 / 63 (6 captions) | 1326 |
-| en-GB | 27 | 29 | 98 | 166 | 2485 | 24 / 63 (6 captions) | 1326 |
-| de-DE | 30 | 30 | 96 | 163 | 2931 | 29 / 72 (6 captions) | 1616 |
-| it | 24 | 29 | 99 | 170 | 2708 | 23 / 62 (6 captions) | 1434 |
+| en-US | 27 | 29 | 98 | 137 | 1737 | 23 / 59 (6 captions) | 684 |
+| en-GB | 27 | 29 | 98 | 137 | 1728 | 23 / 60 (6 captions) | 685 |
+| de-DE | 30 | 30 | 96 | 162 | 2108 | 26 / 67 (6 captions) | 843 |
+| it | 24 | 29 | 99 | 146 | 1872 | 20 / 67 (6 captions) | 743 |
 | es-ES | 28 | 26 | 93 | 163 | 2767 | 22 / 64 (6 captions) | 1422 |
 | es-MX | 28 | 26 | 97 | 162 | 2745 | 22 / 64 (6 captions) | 1422 |
 | fr-FR | 25 | 28 | 91 | 168 | 2924 | 28 / 73 (6 captions) | 1546 |
 | pt-PT | 30 | 29 | 94 | 168 | 2811 | 24 / 61 (6 captions) | 1476 |
 | pt-BR | 28 | 29 | 95 | 162 | 2722 | 24 / 61 (6 captions) | 1444 |
 
-Notes for App Review: 3997 characters (4000).
+Notes for App Review: 3155 characters (4000).
 <!-- counts:end -->
 
 ## Notes for App Review
@@ -88,26 +90,30 @@ Notes for App Review: 3997 characters (4000).
 In English, once for every localization, under App Review Information → Notes. The button names are the app's English texts.
 
 ```text
-PrestoCV is a CV maker for iPhone and iPad. It has no account, no sign-in, no in-app purchase, no subscription and no ads, so no demo account is needed: every feature is available as soon as the app opens.
+PrestoCV is a CV maker for iPhone and iPad. It has no account, no sign-in, no subscription and no ads, so no demo account is needed: every feature is available as soon as the app opens. Its only in-app purchase is an optional tip jar (see TIPS); a tip unlocks nothing.
 
-WITHOUT THE AI DRAFT (any iPhone or iPad)
-1. On the first launch, tap "Start from an example" and choose one of the five examples, or tap "Create My First CV" for a blank CV. Later, the + button in My CVs opens the New CV screen with the same choices, "Empty CV" and "Example CV".
-2. Edit any section: the editor saves by itself, and "Saved on this device" shows under the title. The examples leave the name and the contact details blank: add a name and an email, because the PDF needs both.
-3. Tap "Preview & export", the share symbol at the top right. Choose a design, a font style and a color palette in the Templates, Fonts and Colors tabs; the preview updates.
+START (any iPhone or iPad)
+1. On the first launch the app offers three ways to start: "Paste or import a CV", "Start from an example" (choose one in the list) and "Start with a blank CV". Later, the "New CV" button in "My CVs" opens the same choices.
+2. Edit any section. The editor saves by itself, and "Saved on this device" shows under the title. In "My CVs", each CV's row offers "Duplicate", "Rename" and "Delete". The examples leave the name and contact details blank: add a name and an email before exporting.
+3. Tap "Export" in the editor to open "Export CV". It shows a preview of the PDF and its page count. In "Template", "Fonts" and "Colours" choose a look; the preview updates. The line for the headings' language lets you change it.
 4. Tap "Send or save PDF" to open the share sheet; Save to Files, for example, saves the PDF.
 5. Saving: change a CV, close the app from the app switcher and open it again: the change is there.
 
-THE AI DRAFT
-- It needs a device that supports Apple Intelligence: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, or iPad mini (A17 Pro). Apple Intelligence must be turned on (Settings > Apple Intelligence & Siri) and its model downloaded, with the device language and the Siri language set to the same supported language.
-- On such a device, the first launch offers "Draft My CV with AI" right after "Paste or import a CV". Later, choose "AI CV Generation" on the New CV screen, in the same place.
-- Type a description of at least 10 characters. The screen shows an example under "Example"; this is the same text, ready to paste:
-I'm Maria Rossi, a primary school teacher from Bologna. Since 2016 I have taught at the Don Milani school, where I trained 3 new teachers. Before that, from 2012 to 2016, I worked as an assistant in a nursery. I studied Education Sciences at the University of Bologna and graduated in 2012. I speak Italian (native) and English (B2). In my free time I like chess and hiking.
-- Tap "Generate CV with AI". Writing takes up to a minute. The draft opens in the editor with a notice. Names, contacts, dates, employers, schools and figures come from the description, and anything it does not mention is left blank. The summary, the role descriptions and the skills are written by the on-device model, which is why the notice asks the person to check every field. Nothing leaves the device. Export it as above.
-- If the AI draft can't run, the AI option is shown dimmed, right after "Paste or import a CV", with a short reason, and tapping it shows the full text: where to turn Apple Intelligence on (Settings; System Settings on a Mac), that its model is still downloading (the option then turns on by itself), or that the device doesn't support AI drafts and the CV can be created by hand or from an example. The rest of the app works the same.
-- For an English or German description, the draft also needs the system's language data. If iOS has not downloaded it, the screen says it waits, for 60 seconds at most, before the writing starts; then the draft opens by itself, or a message says it did not come.
+IMPORT
+- "Paste or import a CV" opens "Import a CV". Paste with the system's paste button after copying the text of a CV, or tap "Choose a PDF" and pick a PDF that contains text from Files (a photo of a page has no text to read). To get such a PDF, export one from the app and save it to Files.
+- Open in: in Files, open a PDF with PrestoCV. The import starts; if the open CV has changes that cannot be saved, the app first asks "Import the PDF?".
+- After an import, "Check the import" lists the values to check and, under "Not imported", the text that fits no field.
+- The CV is read on the device; nothing is uploaded.
+
+AFTER AN UPDATE FROM 1.0.x
+- At the first launch of 1.1 the app finds the CVs of the earlier version and opens them in the new editor. If a CV lost a field in the move, the sheet "Imported with changes" lists "What was left out" and "To check". "Not now" closes it; the old copies stay on the device until "Confirm".
+- A fresh install has no CVs of the earlier version, so this sheet cannot appear there. A reviewer cannot trigger it; every other feature above works on a fresh install.
+
+TIPS
+- Settings (the "Settings" button) > "Support PrestoCV" offers three one-time tips, in the App Store sandbox for review. A tip unlocks nothing, and the app works the same with or without one.
 
 NETWORK AND DATA
-- The app makes no network requests. It contains no networking code and no third-party SDKs. The only download it can start is the system's own: iOS downloads its language data for the AI draft, as it downloads the model. The AI draft runs on Apple's on-device model through the Foundation Models framework, and the PDF is rendered on the device.
+- The app makes no network requests of its own, and it has no third-party SDKs and no analytics. The only network use is the App Store's own, through StoreKit, when the tip jar loads the tips and takes a tip. The PDF is rendered on the device.
 - CVs are stored only in the app's container on the device. Nothing is sent to the developer or to anyone else; a PDF leaves the device only when the user shares it from the share sheet.
 - The privacy label "Data Not Collected" is therefore accurate: the app collects no data and does not track. Its privacy manifest declares no collected data types and no tracking domains.
 ```
@@ -146,7 +152,7 @@ The screenshot is the tip jar with its three tips and their prices. The note, in
 A tip is an optional, one-time thank you to the developer. It unlocks nothing: no feature, content or service of the app depends on it, and the app works the same with or without one. The tip jar is in Settings > Support PrestoCV.
 ```
 
-The notes for App Review above are those of version 1.0, which has no in-app purchase; the notes of version 1.1 name the tip jar.
+The notes for App Review above are those of version 1.1: they name the tip jar and say how to reach it.
 
 ## English (U.S.), en-US
 
@@ -171,7 +177,7 @@ builder,creator,curriculum,vitae,job,application,template,pdf,career,generator,o
 ### Promotional text
 
 ```text
-Tell your story in your own words, and on supported devices Apple Intelligence drafts your CV on the device. Pick a design, export a polished PDF. No account, no ads.
+Write your CV, or import the one you have. Pick a template, export a polished PDF and share it. Saved on your device. No account, no ads.
 ```
 
 ### Description
@@ -179,56 +185,51 @@ Tell your story in your own words, and on supported devices Apple Intelligence d
 ```text
 PrestoCV helps you write a clear CV or resume on your iPhone or iPad and send it as a PDF. There's no account to create, no subscription and no ads. Your CVs are saved on your device, and the app doesn't track you.
 
-THREE WAYS TO START
-• Draft it with AI: describe your work and studies in your own words, and Apple Intelligence writes a first draft on your device.
-• Start from an example: five sample CVs from different fields (academia, business, design, healthcare and software), with the name and contact details left blank for you to fill in.
-• Start from a blank CV.
-
-A DRAFT THAT STARTS FROM YOUR WORDS
-• Apple's on-device model writes the draft on your iPhone or iPad. Your description isn't sent anywhere.
-• Your name, contacts, employers, schools and dates come from your description, and what you don't mention stays blank. The summary, the job descriptions and the skills are suggested by the model for your role and field.
-• It can still make mistakes, such as a detail in the wrong place: check every field before you send it.
-• The AI draft needs a device that supports Apple Intelligence, with Apple Intelligence turned on: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, and iPad mini (A17 Pro).
-• On every other device, PrestoCV works fully without it: you start from a blank CV or from an example.
+WAYS TO START
+• Paste or import a CV you already have: paste its text, or choose a PDF that contains text, from Files too. PrestoCV puts each part in its place and shows what to check. Your CV is read on your device.
+• Start from an example: sample CVs from different fields, with the name and contact details left blank for you to fill in.
+• Start with a blank CV.
 
 WRITE AND EDIT
-• Sections for your profile, work experience, education, skills, languages, certifications, interests and links.
+• Sections for your summary, work experience, education, skills, languages, certifications, interests and online profiles.
 • Language levels from A1 to C2, plus native.
-• Keep several CVs, and duplicate one to adapt it for another job.
+• Keep several CVs, duplicate one to adapt it for another job, rename or delete them.
 • Changes are saved on your device a moment after you stop typing, and when you leave the editor or the app. If one can't be saved, PrestoCV tells you and keeps it in the editor.
 
 EXPORT TO PDF
-• Three designs, three font styles and four color palettes, with a preview of the PDF and its page count.
+• Choose a template, fonts and colors, with a preview of the PDF and its page count.
 • "Send or save PDF" opens the share sheet: email it, message it or save it to Files.
 • The headings follow the language your CV is written in. Write it in German and the PDF says "Berufserfahrung", even if the app is in English. You can also choose the language yourself.
 
 FOR EVERYONE
 • Available in English, German, Spanish, French, Italian and Portuguese.
-• Supports Dynamic Type and VoiceOver.
+• If you like PrestoCV, Settings has a tip jar: a one-time tip that unlocks nothing.
 
 PRIVACY
-No account, no ads, no tracking, no data collected. PrestoCV never sends your CVs or your description anywhere on its own: a PDF leaves your device only when you share it.
+No account, no ads, no tracking, no data collected. PrestoCV never sends your CVs anywhere on its own: a PDF leaves your device only when you share it.
 ```
 
 ### Screenshot captions
 
 ```text
 Your CV, on your terms. | No account. No subscription. Your CV stays on your iPhone.
-Just tell your story. | Apple Intelligence turns it into a first draft, on your iPhone.
-Written from your words. | You check and change every line.
-Start in seconds. | From a blank CV or one of five examples.
-Look the part. | Three designs, three font styles, four color palettes.
+Write it your way. | A section for every part of your CV, saved as you type.
+Already have a CV? | Paste its text or choose a PDF, then check what was read.
+Start in seconds. | Paste a CV, pick an example or begin with a blank one.
+Look the part. | Choose a template, fonts and colors, and see the PDF first.
 Ready to send. | A polished PDF, with headings in your CV's language.
 ```
 
 ### What's New
 
 ```text
-When the app recognizes the text you paste in as a CV, with its sections and dates, the AI draft now keeps your own words, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+PrestoCV 1.1 is a new app. It has a new editor that saves as you type, a new export with a preview and a choice of template, fonts and colors, and a new way to import a CV: paste its text, choose a PDF that contains text, or open a PDF from Files in PrestoCV, and each part goes in its place.
 
-Importing a CV now loses less. The notice in the editor names each section that was not imported, and it stays with the CV until you dismiss it; "What to check" now groups the text not imported by where it stood in the CV. A heading that joins studies and certifications now fills both. The title under your name is now read whole when it is written in parts. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two. A second website and the place of a study now stay in view as text not imported, and a contact label with nothing beside it is no longer dropped. More of the headings the app does not know are now read as headings when they are drawn like the CV's others: the lines under them stay apart as text not imported instead of joining the section above. A website on GitHub Pages is now your website, not a GitHub profile.
+Your CVs are still here. PrestoCV finds the ones from the earlier version and opens them in the new editor.
 
-A swipe back right after an edit no longer leaves the editor on screen with no way back.
+After you update: if a CV lost a field on the way, PrestoCV shows "Imported with changes" at the next launch. It lists what was left out and what to check. Look it over once, then look at any CV it names.
+
+The AI draft of version 1.0 is gone. A better way to start a CV is planned.
 ```
 
 ## English (U.K.), en-GB
@@ -254,7 +255,7 @@ builder,creator,curriculum,vitae,job,application,template,pdf,career,generator,o
 ### Promotional text
 
 ```text
-Tell your story in your own words, and on supported devices Apple Intelligence drafts your CV on the device. Pick a design, export a polished PDF. No account, no ads.
+Write your CV, or import the one you have. Pick a template, export a polished PDF and share it. Saved on your device. No account, no ads.
 ```
 
 ### Description
@@ -262,56 +263,51 @@ Tell your story in your own words, and on supported devices Apple Intelligence d
 ```text
 PrestoCV helps you write a clear CV on your iPhone or iPad and send it as a PDF. There's no account to create, no subscription and no ads. Your CVs are saved on your device, and the app doesn't track you.
 
-THREE WAYS TO START
-• Draft it with AI: describe your work and studies in your own words, and Apple Intelligence writes a first draft on your device.
-• Start from an example: five sample CVs from different fields (academia, business, design, healthcare and software), with the name and contact details left blank for you to fill in.
-• Start from a blank CV.
-
-A DRAFT THAT STARTS FROM YOUR WORDS
-• Apple's on-device model writes the draft on your iPhone or iPad. Your description isn't sent anywhere.
-• Your name, contacts, employers, schools and dates come from your description, and what you don't mention stays blank. The summary, the job descriptions and the skills are suggested by the model for your role and field.
-• It can still make mistakes, such as a detail in the wrong place: check every field before you send it.
-• The AI draft needs a device that supports Apple Intelligence, with Apple Intelligence turned on: iPhone 15 Pro, iPhone 15 Pro Max, iPhone 16 models or later, iPhone Air, iPad models with M1 or later, and iPad mini (A17 Pro).
-• On every other device, PrestoCV works fully without it: you start from a blank CV or from an example.
+WAYS TO START
+• Paste or import a CV you already have: paste its text, or choose a PDF that contains text, from Files too. PrestoCV puts each part in its place and shows what to check. Your CV is read on your device.
+• Start from an example: sample CVs from different fields, with the name and contact details left blank for you to fill in.
+• Start with a blank CV.
 
 WRITE AND EDIT
-• Sections for your profile, work experience, education, skills, languages, certifications, interests and links.
+• Sections for your summary, work experience, education, skills, languages, certifications, interests and online profiles.
 • Language levels from A1 to C2, plus native.
-• Keep several CVs, and duplicate one to tailor it to another job.
+• Keep several CVs, duplicate one to tailor it to another job, rename or delete them.
 • Changes are saved on your device a moment after you stop typing, and when you leave the editor or the app. If one can't be saved, PrestoCV tells you and keeps it in the editor.
 
 EXPORT TO PDF
-• Three designs, three font styles and four colour palettes, with a preview of the PDF and its page count.
+• Choose a template, fonts and colours, with a preview of the PDF and its page count.
 • "Send or save PDF" opens the share sheet: email it, message it or save it to Files.
 • The headings follow the language your CV is written in. Write it in German and the PDF says "Berufserfahrung", even if the app is in English. You can also choose the language yourself.
 
 FOR EVERYONE
 • Available in English, German, Spanish, French, Italian and Portuguese.
-• Supports Dynamic Type and VoiceOver.
+• If you like PrestoCV, Settings has a tip jar: a one-time tip that unlocks nothing.
 
 PRIVACY
-No account, no ads, no tracking, no data collected. PrestoCV never sends your CVs or your description anywhere on its own: a PDF leaves your device only when you share it.
+No account, no ads, no tracking, no data collected. PrestoCV never sends your CVs anywhere on its own: a PDF leaves your device only when you share it.
 ```
 
 ### Screenshot captions
 
 ```text
 Your CV, on your terms. | No account. No subscription. Your CV stays on your iPhone.
-Just tell your story. | Apple Intelligence turns it into a first draft, on your iPhone.
-Written from your words. | You check and change every line.
-Start in seconds. | From a blank CV or one of five examples.
-Look the part. | Three designs, three font styles, four colour palettes.
+Write it your way. | A section for every part of your CV, saved as you type.
+Already have a CV? | Paste its text or choose a PDF, then check what was read.
+Start in seconds. | Paste a CV, pick an example or begin with a blank one.
+Look the part. | Choose a template, fonts and colours, and see the PDF first.
 Ready to send. | A polished PDF, with headings in your CV's language.
 ```
 
 ### What's New
 
 ```text
-When the app recognizes the text you paste in as a CV, with its sections and dates, the AI draft now keeps your own words, reading it the way an import does. A job you still hold now ends with the word your CV uses for "present". A duty is no longer written twice or put under the wrong job, and a finished job no longer reads in the present tense.
+PrestoCV 1.1 is a new app. It has a new editor that saves as you type, a new export with a preview and a choice of template, fonts and colours, and a new way to import a CV: paste its text, choose a PDF that contains text, or open a PDF from Files in PrestoCV, and each part goes in its place.
 
-Importing a CV now loses less. The notice in the editor names each section that was not imported, and it stays with the CV until you dismiss it; "What to check" now groups the text not imported by where it stood in the CV. A heading that joins studies and certifications now fills both. The title under your name is now read whole when it is written in parts. An imported certification with an "Issued by" line below it is now one certification with its issuer, not two. A second website and the place of a study now stay in view as text not imported, and a contact label with nothing beside it is no longer dropped. More of the headings the app does not know are now read as headings when they are drawn like the CV's others: the lines under them stay apart as text not imported instead of joining the section above. A website on GitHub Pages is now your website, not a GitHub profile.
+Your CVs are still here. PrestoCV finds the ones from the earlier version and opens them in the new editor.
 
-A swipe back right after an edit no longer leaves the editor on screen with no way back.
+After you update: if a CV lost a field on the way, PrestoCV shows "Imported with changes" at the next launch. It lists what was left out and what to check. Look it over once, then look at any CV it names.
+
+The AI draft of version 1.0 is gone. A better way to start a CV is planned.
 ```
 
 ## German, de-DE
@@ -337,7 +333,7 @@ Bewerbung,Vorlage,Muster,Beispiel,Curriculum,Vitae,Job,Karriere,PDF,Generator,Au
 ### Promotional text
 
 ```text
-Erzählen Sie Ihren Werdegang in eigenen Worten: Auf unterstützten Geräten entwirft Apple Intelligence Ihren Lebenslauf direkt dort. Design wählen, PDF exportieren.
+Schreiben Sie Ihren Lebenslauf oder importieren Sie den, den Sie schon haben. Vorlage wählen, PDF exportieren und teilen. Auf Ihrem Gerät gespeichert, ohne Konto.
 ```
 
 ### Description
@@ -345,56 +341,51 @@ Erzählen Sie Ihren Werdegang in eigenen Worten: Auf unterstützten Geräten ent
 ```text
 Mit PrestoCV schreiben Sie Ihren Lebenslauf auf dem iPhone oder iPad und verschicken ihn als PDF. Sie brauchen kein Konto und kein Abo, und es gibt keine Werbung. Ihre Lebensläufe bleiben auf Ihrem Gerät – ganz ohne Tracking.
 
-DREI WEGE ZUM LEBENSLAUF
-• Mit KI entwerfen: Beschreiben Sie Berufserfahrung und Ausbildung in eigenen Worten, und Apple Intelligence schreibt auf Ihrem Gerät einen ersten Entwurf.
-• Mit einem Beispiel beginnen: fünf Beispiel-Lebensläufe aus verschiedenen Bereichen (Wissenschaft, Wirtschaft, Design, Gesundheitswesen und Softwareentwicklung). Name und Kontaktdaten sind leer, damit Sie Ihre eigenen eintragen.
+SO FANGEN SIE AN
+• Einen vorhandenen Lebenslauf einfügen oder importieren: Fügen Sie seinen Text ein oder wählen Sie ein PDF, das Text enthält, auch aus der Dateien-App. PrestoCV bringt jeden Teil an seinen Platz und zeigt, was Sie prüfen sollten. Ihr Lebenslauf wird auf Ihrem Gerät gelesen.
+• Mit einem Beispiel beginnen: Beispiel-Lebensläufe aus verschiedenen Bereichen. Name und Kontaktdaten sind leer, damit Sie Ihre eigenen eintragen.
 • Mit einem leeren Lebenslauf beginnen.
 
-EIN ENTWURF, DER VON IHREN WORTEN AUSGEHT
-• Das On-Device-Modell von Apple schreibt den Entwurf direkt auf Ihrem iPhone oder iPad. Ihre Beschreibung wird nirgendwohin gesendet.
-• Name, Kontaktdaten, Arbeitgeber, Schulen und Zeitangaben stammen aus Ihrer Beschreibung, und was Sie nicht erwähnen, bleibt leer. Zusammenfassung, Tätigkeitsbeschreibungen und Kenntnisse schlägt das Modell passend zu Ihrem Beruf und Fachgebiet vor.
-• Der Entwurf kann trotzdem Fehler enthalten, etwa eine Angabe an der falschen Stelle: Prüfen Sie jedes Feld, bevor Sie ihn versenden.
-• Für den KI-Entwurf brauchen Sie ein Gerät mit Apple Intelligence, auf dem Apple Intelligence eingeschaltet ist: iPhone 15 Pro, iPhone 15 Pro Max, alle Modelle ab iPhone 16, iPhone Air, iPad-Modelle mit M1 oder neuer und iPad mini (A17 Pro).
-• Auf allen anderen Geräten funktioniert PrestoCV vollständig ohne KI: Sie beginnen mit einem leeren Lebenslauf oder einem Beispiel.
-
 SCHREIBEN UND BEARBEITEN
-• Abschnitte für Kurzprofil, Berufserfahrung, Ausbildung, Fähigkeiten, Sprachen, Zertifikate, Interessen und Links.
+• Abschnitte für Kurzprofil, Berufserfahrung, Ausbildung, Fähigkeiten, Sprachen, Zertifikate, Interessen und Online-Profile.
 • Sprachniveaus von A1 bis C2 sowie Muttersprache.
-• Mehrere Lebensläufe verwalten und einen duplizieren, um ihn an eine andere Stelle anzupassen.
+• Mehrere Lebensläufe verwalten, einen duplizieren, um ihn an eine andere Stelle anzupassen, umbenennen oder löschen.
 • Änderungen werden einen Moment nach dem Tippen auf Ihrem Gerät gespeichert, außerdem beim Verlassen des Editors oder der App. Lässt sich eine Änderung nicht speichern, meldet PrestoCV das und behält sie im Editor.
 
 ALS PDF EXPORTIEREN
-• Drei Designs, drei Schriftstile und vier Farbpaletten, mit PDF-Vorschau und Seitenzahl.
+• Vorlage, Schriften und Farben wählen, mit PDF-Vorschau und Seitenzahl.
 • „PDF senden oder speichern“ öffnet das Teilen-Menü: per Mail oder Nachricht verschicken oder in der Dateien-App sichern.
 • Die Überschriften folgen der Sprache, in der Ihr Lebenslauf geschrieben ist. Schreiben Sie ihn auf Englisch, steht im PDF „Work experience“, auch wenn die App auf Deutsch ist. Die Sprache können Sie auch selbst wählen.
 
 FÜR ALLE
 • Verfügbar auf Deutsch, Englisch, Spanisch, Französisch, Italienisch und Portugiesisch.
-• Unterstützt Dynamic Type und VoiceOver.
+• Wenn Ihnen PrestoCV gefällt: In den Einstellungen gibt es die Möglichkeit, ein einmaliges Trinkgeld zu geben, das nichts freischaltet.
 
 DATENSCHUTZ
-Kein Konto, keine Werbung, kein Tracking, keine Datenerhebung. PrestoCV sendet Ihre Lebensläufe und Ihre Beschreibung nie von sich aus irgendwohin: Ein PDF verlässt Ihr Gerät nur, wenn Sie es teilen.
+Kein Konto, keine Werbung, kein Tracking, keine Datenerhebung. PrestoCV sendet Ihre Lebensläufe nie von sich aus irgendwohin: Ein PDF verlässt Ihr Gerät nur, wenn Sie es teilen.
 ```
 
 ### Screenshot captions
 
 ```text
 Ihr Lebenslauf. Nur Ihrer. | Kein Konto, kein Abo. Ihr Lebenslauf bleibt auf Ihrem iPhone.
-Erzählen Sie einfach. | Apple Intelligence macht daraus einen ersten Entwurf – auf Ihrem iPhone.
-Aus Ihren Worten geschrieben. | Sie prüfen und ändern jede Zeile.
-Sofort loslegen. | Mit einem leeren Lebenslauf oder einem von fünf Beispielen.
-Ein starker Auftritt. | Drei Designs, drei Schriftstile, vier Farbpaletten.
+Schreiben, wie Sie wollen. | Ein Abschnitt für jeden Teil, beim Tippen gespeichert.
+Schon einen Lebenslauf? | Text einfügen oder PDF wählen, dann prüfen, was gelesen wurde.
+Sofort loslegen. | Lebenslauf einfügen, Beispiel wählen oder leer beginnen.
+Ein starker Auftritt. | Vorlage, Schriften und Farben wählen, vorab das PDF sehen.
 Bereit zum Versenden. | Ein sauberes PDF, mit Überschriften in der Sprache des Lebenslaufs.
 ```
 
 ### What's New
 
 ```text
-Wenn die App den eingefügten Text als Lebenslauf erkennt, mit seinen Abschnitten und Daten, übernimmt der KI-Entwurf jetzt Ihre eigenen Worte und liest ihn wie einen Import. Eine Stelle, die Sie noch innehaben, endet jetzt mit dem Wort, das Ihr Lebenslauf für „heute“ verwendet. Eine Aufgabe steht nicht mehr doppelt da oder unter der falschen Stelle, und eine beendete Stelle steht nicht mehr in der Gegenwart.
+PrestoCV 1.1 ist eine neue App. Sie hat einen neuen Editor, der beim Tippen speichert, einen neuen Export mit Vorschau und Auswahl von Vorlage, Schriften und Farben und einen neuen Import: Fügen Sie den Text eines Lebenslaufs ein, wählen Sie ein PDF mit Text oder öffnen Sie ein PDF aus der Dateien-App in PrestoCV, und jeder Teil kommt an seinen Platz.
 
-Beim Import eines Lebenslaufs geht jetzt weniger verloren. Der Hinweis im Editor nennt jeden Abschnitt, der nicht übernommen wurde, und bleibt beim Lebenslauf, bis Sie ihn ausblenden; „Was zu prüfen ist“ ordnet den nicht übernommenen Text jetzt danach, wo er im Lebenslauf stand. Eine Überschrift, die Ausbildung und Zertifikate verbindet, füllt jetzt beide. Der Titel unter Ihrem Namen wird jetzt ganz gelesen, wenn er in Teilen geschrieben ist. Ein importiertes Zertifikat mit einer Zeile „Ausgestellt von“ darunter ist jetzt ein Zertifikat mit seinem Aussteller, nicht zwei. Eine zweite Website und der Ort einer Ausbildung bleiben jetzt als nicht übernommener Text sichtbar, und eine Kontaktbezeichnung ohne Angabe daneben fällt nicht mehr weg. Mehr Überschriften, die die App nicht kennt, werden jetzt als Überschriften gelesen, wenn sie wie die anderen Überschriften des Lebenslaufs gesetzt sind: Die Zeilen darunter bleiben als nicht übernommener Text für sich, statt in den Abschnitt darüber zu geraten. Eine Website auf GitHub Pages ist jetzt Ihre Website, kein GitHub-Profil.
+Ihre Lebensläufe sind noch da. PrestoCV findet die der früheren Version und öffnet sie im neuen Editor.
 
-Ein Wischen zurück direkt nach einer Änderung lässt den Editor nicht mehr ohne Weg zurück auf dem Bildschirm stehen.
+Nach dem Update: Ist bei einem Lebenslauf unterwegs ein Feld verloren gegangen, zeigt PrestoCV beim nächsten Start „Mit Änderungen importiert“. Dort steht, was nicht übernommen wurde und was Sie prüfen sollten. Sehen Sie es einmal durch und prüfen Sie dann die genannten Lebensläufe.
+
+Der KI-Entwurf von Version 1.0 ist entfallen. Ein besserer Einstieg in den Lebenslauf ist geplant.
 ```
 
 ## Italian, it
@@ -420,64 +411,59 @@ vitae,lavoro,candidatura,modello,esempio,pdf,carriera,compilare,generatore,impie
 ### Promotional text
 
 ```text
-Racconta il tuo percorso con parole tue: sui dispositivi compatibili, Apple Intelligence ne fa una bozza sul dispositivo. Scegli un design, esporta il PDF. Senza account.
+Scrivi il tuo CV o importa quello che hai già. Scegli un modello, esporta un PDF curato e condividilo. Salvato sul tuo dispositivo, senza account.
 ```
 
 ### Description
 
 ```text
-PrestoCV ti aiuta a scrivere il tuo curriculum su iPhone o iPad e a inviarlo in PDF. Non devi creare un account e non ci sono abbonamenti né pubblicità. I tuoi CV restano sul tuo dispositivo e l'app non ti traccia.
+PrestoCV ti aiuta a scrivere il tuo curriculum su iPhone o iPad e a inviarlo in PDF. Non devi creare un account e non ci sono abbonamenti né pubblicità. I tuoi CV restano sul tuo dispositivo e l’app non ti traccia.
 
-TRE MODI PER INIZIARE
-• Scrivilo con l'IA: descrivi il tuo lavoro e i tuoi studi con parole tue, e Apple Intelligence scrive una prima bozza sul tuo dispositivo.
-• Parti da un esempio: cinque CV di esempio in ambiti diversi (università, azienda, design, sanità e sviluppo software), con nome e contatti lasciati vuoti, da completare con i tuoi.
+COME INIZIARE
+• Incolla o importa un CV che hai già: incolla il testo oppure scegli un PDF che contiene testo, anche da File. PrestoCV mette ogni parte al suo posto e ti mostra cosa controllare. Il CV viene letto sul tuo dispositivo.
+• Parti da un esempio: CV di esempio in ambiti diversi, con nome e contatti lasciati vuoti, da completare con i tuoi.
 • Parti da un CV vuoto.
 
-UNA BOZZA CHE PARTE DALLE TUE PAROLE
-• La scrive il modello di Apple direttamente sul tuo iPhone o iPad. La tua descrizione non viene inviata da nessuna parte.
-• Nome, contatti, datori di lavoro, scuole e date vengono dalla tua descrizione, e ciò che non indichi resta vuoto. Il riepilogo, le descrizioni dei ruoli e le competenze li propone il modello, in base al tuo ruolo e al tuo settore.
-• La bozza può comunque contenere errori, per esempio un dato nel posto sbagliato: controlla ogni campo prima di inviarla.
-• La bozza con l'IA richiede un dispositivo compatibile con Apple Intelligence, con la funzione attiva: iPhone 15 Pro, iPhone 15 Pro Max, tutti i modelli da iPhone 16 in poi, iPhone Air, modelli di iPad con chip M1 o successivo e iPad mini (A17 Pro).
-• Su tutti gli altri dispositivi PrestoCV funziona completamente anche senza: parti da un CV vuoto o da un esempio.
-
 SCRIVI E MODIFICA
-• Sezioni per profilo professionale, esperienza lavorativa, formazione, competenze, lingue, certificazioni, interessi e link.
+• Sezioni per profilo professionale, esperienza lavorativa, formazione, competenze, lingue, certificazioni, interessi e profili online.
 • Livelli di lingua da A1 a C2, più madrelingua.
-• Tieni più CV e duplicane uno per adattarlo a un'altra offerta di lavoro.
-• Le modifiche vengono salvate sul tuo dispositivo un attimo dopo che smetti di scrivere, e quando esci dall'editor o dall'app. Se una modifica non si può salvare, PrestoCV te lo dice e la tiene nell'editor.
+• Tieni più CV, duplicane uno per adattarlo a un’altra offerta di lavoro, rinominali o eliminali.
+• Le modifiche vengono salvate sul tuo dispositivo un attimo dopo che smetti di scrivere, e quando esci dall’editor o dall’app. Se una modifica non si può salvare, PrestoCV te lo dice e la tiene nell’editor.
 
 ESPORTA IN PDF
-• Tre design, tre stili di carattere e quattro palette di colori, con l'anteprima del PDF e il numero di pagine.
+• Scegli modello, caratteri e colori, con l’anteprima del PDF e il numero di pagine.
 • «Invia o salva il PDF» apre il menu di condivisione: mandalo via email o per messaggio, oppure salvalo in File.
-• I titoli seguono la lingua in cui è scritto il CV. Se lo scrivi in inglese, nel PDF trovi «Work experience», anche con l'app in italiano. Puoi anche scegliere la lingua tu.
+• I titoli seguono la lingua in cui è scritto il CV. Se lo scrivi in inglese, nel PDF trovi «Work experience», anche con l’app in italiano. Puoi anche scegliere la lingua tu.
 
 PER TUTTI
 • Disponibile in italiano, inglese, tedesco, spagnolo, francese e portoghese.
-• Supporta Dynamic Type e VoiceOver.
+• Se PrestoCV ti piace, nelle Impostazioni trovi una mancia una tantum che non sblocca nulla.
 
 PRIVACY
-Nessun account, nessuna pubblicità, nessun tracciamento, nessun dato raccolto. PrestoCV non invia mai di sua iniziativa i tuoi CV o la tua descrizione: un PDF lascia il dispositivo solo quando lo condividi tu.
+Nessun account, nessuna pubblicità, nessun tracciamento, nessun dato raccolto. PrestoCV non invia mai di sua iniziativa i tuoi CV: un PDF lascia il dispositivo solo quando lo condividi tu.
 ```
 
 ### Screenshot captions
 
 ```text
 Il tuo CV, solo tuo. | Nessun account, nessun abbonamento. Resta sul tuo iPhone.
-Racconta la tua storia. | Apple Intelligence ne scrive una prima bozza, sul tuo iPhone.
-Nasce dalle tue parole. | Tu controlli e modifichi ogni riga.
-Parti subito. | Da un CV vuoto o da uno dei cinque esempi.
-Fai bella figura. | Tre design, tre stili di carattere, quattro palette di colori.
+Scrivilo a modo tuo. | Una sezione per ogni parte, salvata mentre scrivi.
+Hai già un CV? | Incolla il testo o scegli un PDF, poi controlla cosa è stato letto.
+Parti subito. | Incolla un CV, scegli un esempio o parti da uno vuoto.
+Fai bella figura. | Scegli modello, caratteri e colori e guarda prima il PDF.
 Pronto da inviare. | Un PDF curato, con i titoli nella lingua del tuo CV.
 ```
 
 ### What's New
 
 ```text
-Quando l'app riconosce come CV il testo che incolli, con sezioni e date, la bozza con l'IA ora mantiene le tue parole: lo legge come un'importazione. Un lavoro in corso finisce con la parola che usa il tuo CV per dire «oggi». Un compito non viene più scritto due volte né messo sotto il lavoro sbagliato, e un lavoro concluso non è più al presente.
+PrestoCV 1.1 è un’app nuova. Ha un nuovo editor che salva mentre scrivi, una nuova esportazione con anteprima e scelta di modello, caratteri e colori, e una nuova importazione: incolla il testo di un CV, scegli un PDF che contiene testo oppure apri un PDF da File in PrestoCV, e ogni parte va al suo posto.
 
-L'importazione di un CV ora perde meno. L'avviso nell'editor nomina ogni sezione non importata e resta con il CV finché non lo chiudi; «Cosa controllare» ora raggruppa il testo non importato secondo il punto del CV in cui si trovava. Un'intestazione che unisce istruzione e certificazioni ora riempie entrambe le sezioni. Il titolo sotto il tuo nome ora viene letto per intero quando è scritto in più parti. Una certificazione importata con sotto una riga «Rilasciato da» ora è una sola certificazione con il suo ente, non due. Un secondo sito web e il luogo di uno studio ora restano visibili come testo non importato, e un'etichetta di contatto senza nulla accanto non va più persa. Più intestazioni che l'app non conosce ora vengono lette come intestazioni, se sono impaginate come le altre del CV: le righe sotto restano a parte come testo non importato invece di finire nella sezione sopra. Un sito su GitHub Pages ora è il tuo sito web, non un profilo GitHub.
+I tuoi CV sono ancora qui. PrestoCV trova quelli della versione precedente e li apre nel nuovo editor.
 
-Uno swipe indietro subito dopo una modifica non lascia più l'editor sullo schermo senza un modo per tornare indietro.
+Dopo l’aggiornamento: se un CV ha perso un campo nel passaggio, al prossimo avvio PrestoCV mostra «Importato con modifiche». Elenca cosa non è stato importato e cosa controllare. Dagli un’occhiata, poi controlla i CV che nomina.
+
+La bozza con l’IA della versione 1.0 non c’è più. È in programma un modo migliore per iniziare un CV.
 ```
 
 ## Spanish (Spain), es-ES
