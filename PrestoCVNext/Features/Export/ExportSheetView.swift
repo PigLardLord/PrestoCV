@@ -6,8 +6,8 @@ import SwiftUI
 /// what the CV lacks. The look is a picker among the lines on a wide screen, and one line that opens the picker in a
 /// sheet on a narrow one. While a choice makes the PDF again, the PDF it replaces stays dimmed. A tap on the pages, or
 /// their corner button, shows the PDF on the whole screen; Share, in the bar, opens the system's share sheet with it. It
-/// renders the sheet's model and forwards Close, Share, the look and the language chosen and the taps; the export, the
-/// share and keeping the choices in the CV are the model's (R5).
+/// renders the sheet's model and forwards Close, Share, the look and the language chosen, "Try again" and the taps; the
+/// export, the share, the designs and keeping the choices in the CV are the model's (R5).
 struct ExportSheetView: View {
     let sheet: ExportSheetViewModel
     /// Closes the sheet, which stops an export that runs.
@@ -27,7 +27,7 @@ struct ExportSheetView: View {
                         LookPicker(sheet: sheet)
                     }
                     HeadingsLanguageLine(sheet: sheet)
-                    ExportStatusView(status: sheet.status)
+                    ExportStatusView(status: sheet.status) { sheet.retryDesigns() }
                     ShareOutcomeLine(outcome: sheet.shareOutcome)
                     ShareFailedLine(failure: sheet.shareFailure)
                     MissingFieldsView(missing: sheet.missing)
@@ -38,6 +38,7 @@ struct ExportSheetView: View {
                 .announce(sheet.shareOutcome) { $0.words }
                 .announce(sheet.shareFailure) { $0.words }
                 .announce(sheet.remadeToAnnounce) { $0.words }
+                .announce(sheet.waitToAnnounce) { $0.words }
             }
             .scrollBounceBehavior(.basedOnSize)
             .onNarrowScreen { isNarrow = $0 }
@@ -52,6 +53,8 @@ struct ExportSheetView: View {
                 }
             }
         }
+        // The designs that pass their check while the sheet is open join its look (#566)
+        .task { await sheet.watchDesigns() }
         .fullScreenPresentation(item: fullPDF) { full in
             FullPDFView(full: full, done: { sheet.closeFullPDF() })
         }

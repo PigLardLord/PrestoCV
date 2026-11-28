@@ -44,6 +44,8 @@ public enum ExportStatus: Hashable, Sendable {
     case incomplete(missing: Int)
     /// `lines` text lines of the PDF are outside their page or too small to read.
     case textNotVisible(lines: Int)
+    /// No design can print the PDF: the default design did not pass its check (#566). "Try again" checks the designs again.
+    case designsUnavailable
     case failed
 }
 
@@ -52,6 +54,13 @@ public enum ExportStatus: Hashable, Sendable {
 public struct RemadePDF: Hashable, Sendable {
     public let pages: Int
     /// Which PDF made again of the sheet this is, counted from one.
+    let ordinal: Int
+}
+
+/// An export of the sheet that waits for the check of its design (#566), for VoiceOver to tell that the PDF is being
+/// prepared: each one is a new value.
+public struct DesignWait: Hashable, Sendable {
+    /// Which wait of the sheet this is, counted from one.
     let ordinal: Int
 }
 
@@ -116,9 +125,13 @@ extension ExportStatus {
         case .invalidDocument: self = .invalid
         case .incomplete(let missing): self = .incomplete(missing: missing)
         case .textNotVisible(let lines): self = .textNotVisible(lines: lines)
+        case .designsUnavailable: self = .designsUnavailable
         case .renderingFailed: self = .failed
         }
     }
+
+    /// The status offers "Try again": no design can print the PDF, and the designs can be checked again (#566).
+    public var offersRetry: Bool { self == .designsUnavailable }
 }
 
 extension EditorField {

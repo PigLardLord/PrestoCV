@@ -2,8 +2,25 @@ import Foundation
 
 /// What the look picker offers, as app values: ids, the codes the view words (R13) and what the view draws each choice
 /// with. The design catalog is the real source (step 3-4); a view model only reads what it is given.
+/// The app opens while the bundled designs are still being checked (#566): the options can grow, and their status says
+/// whether more designs can join.
 public protocol LookOptionsProviding: Sendable {
+    /// The options now.
     func options() -> LookOptions
+    /// The options now, then again each time they change: a design that joins, or the end of the check.
+    func changes() -> AsyncStream<LookOptions>
+    /// Checks the designs again when the default design did not pass (`unavailable`); does nothing otherwise.
+    func retry()
+}
+
+/// How far the check of the bundled designs is (#566), as a code the view words (R13).
+public enum LookOptionsStatus: Hashable, Sendable {
+    /// The designs are being checked: more can join the options.
+    case checking
+    /// Every design has its verdict, and the default design passed.
+    case ready
+    /// The default design did not pass, or the store cannot give it: no PDF can be made until a check passes.
+    case unavailable
 }
 
 /// One choice of a picker: the id a CV keeps, the code of its name, which the view words, and what the view draws it
@@ -73,6 +90,8 @@ public struct LookOptions: Hashable, Sendable {
     public let defaultDesign: String
     /// The own palette and fonts of each design, by the design's id.
     public let ownLooks: [String: DesignOwnLook]
+    /// Whether more designs can join.
+    public let status: LookOptionsStatus
 
     /// The palette of the default design: none when the options know no own look for it.
     public var defaultPalette: String? { ownLooks[defaultDesign]?.palette }
@@ -81,12 +100,13 @@ public struct LookOptions: Hashable, Sendable {
 
     public init(
         designs: [LookOption], palettes: [LookOption], fontSchemes: [LookOption],
-        defaultDesign: String, ownLooks: [String: DesignOwnLook]
+        defaultDesign: String, ownLooks: [String: DesignOwnLook], status: LookOptionsStatus
     ) {
         self.designs = designs
         self.palettes = palettes
         self.fontSchemes = fontSchemes
         self.defaultDesign = defaultDesign
         self.ownLooks = ownLooks
+        self.status = status
     }
 }

@@ -31,16 +31,18 @@ import CVRenderingIOS
 import CVRenderingMacOS
 #endif
 
-/// How the app was assembled: ready, or failed with the one code the app shows as one error screen. The designs are part
-/// of the assembly, so the app keeps a single switch.
+/// How the app was assembled: ready, or failed with the one code the app shows as one error screen. The designs are not
+/// part of it: they are checked once the app is open (#566), and a design that does not pass only keeps a PDF from being
+/// made.
 public enum CompositionState: Sendable {
     case ready(Composition)
     case failed(CompositionFailure)
 }
 
 /// The one place that creates infrastructure (R4, ADR 0008): the paths, the repository, the platform renderer over the
-/// content rules compiled once, the design store with the bundled designs synced into it, the import's PDF reader and
-/// file port, the reader of a text's language, the clock, the ids, the log and the trace.
+/// content rules compiled once, the design store and the check of the bundled designs, started once and held for as long
+/// as the app runs, the import's PDF reader and file port, the reader of a text's language, the clock, the ids, the log and
+/// the trace.
 @MainActor
 public final class Composition {
     /// Compiles the content rules of every web view. The composition calls it once, so a test counts the calls.
@@ -128,6 +130,9 @@ public final class Composition {
     let renderer: any PDFRendering
     let inspector: any PDFLayoutInspecting
     let headings: HeadingsCatalog
+    /// The designs a PDF can be made with, checked in the background from the launch: held for as long as the app runs,
+    /// since releasing them stops the check
+    let designs: CheckedDesigns
     let samples: any SampleCVSource
     let clock: any TimeSource
     let ids: any IDGenerator
@@ -157,6 +162,7 @@ public final class Composition {
         let renderer: any PDFRendering
         let inspector: any PDFLayoutInspecting
         let headings: HeadingsCatalog
+        let designs: CheckedDesigns
         let exporter: any CVExporting
         let lookOptions: any LookOptionsProviding
         let languages: [ExportLanguage]
@@ -174,6 +180,7 @@ public final class Composition {
         renderer = parts.renderer
         inspector = parts.inspector
         headings = parts.headings
+        designs = parts.designs
         samples = DirectorySampleCVSource(directory: inputs.samples)
         clock = inputs.clock
         ids = inputs.ids
@@ -268,14 +275,16 @@ public final class Composition {
         } catch {
             return .failed(CompositionFailure(error))
         }
+        let parts: Parts
         do {
-            let parts = try await rendering(inputs, rules: rules, logger: trace.logger)
-            return .ready(Composition(
-                inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, tips: tips, trace: trace
-            ))
+            parts = try await rendering(inputs, rules: rules, logger: trace.logger)
         } catch {
             return .failed(error)
         }
+        parts.designs.start()
+        return .ready(Composition(
+            inputs: inputs, repository: repository, legacyImport: legacyImport, parts: parts, tips: tips, trace: trace
+        ))
     }
 
     /// Moves the CVs of the released app's store into the new store before any screen reads it, so the first-run decision
@@ -297,9 +306,11 @@ public final class Composition {
         await cleaner.clean()
     }
 
-    /// Makes the one renderer, inspector and headings, syncs the bundled designs into the design store through a gate
-    /// over them (`DesignBootstrap`), then makes the exporter and the look options over the store, and reads the
-    /// languages a PDF can be written in. The headings are read before anything renders.
+    /// Makes the one renderer, inspector and headings, the design store, the check of the bundled designs through a gate
+    /// over them (`DesignBootstrap`, run by `CheckedDesigns` once `assemble` starts it), the exporter and the look options
+    /// over the checked designs, and reads the languages a PDF can be written in. The headings are read before anything
+    /// renders; the designs are not waited for. The export and the check print through one `ExportFirst`, so a print of
+    /// the check never holds back an export.
     private static func rendering(
         _ inputs: Inputs, rules: WKContentRuleList, logger: any DiagnosticLogger
     ) async throws(CompositionFailure) -> Parts {
@@ -308,19 +319,24 @@ public final class Composition {
         let headings = HeadingsCatalog(source: BundleHeadingTableSource())
         let (gateHeadings, languages) = try await read(headings, gate: GateFixture.document.language)
         let store = FileDesignStore(directory: inputs.paths.designs, validator: DesignPackageValidator(), lockWait: .standard)
-        let designs = try await DesignBootstrap(
-            store: store, source: inputs.designs, gate: inputs.makeGate(renderer, inspector, gateHeadings), logger: logger,
-            clock: ContinuousClock()
-        ).run()
+        let turns = ExportFirst()
+        let designs = CheckedDesigns(
+            checking: DesignBootstrap(
+                store: store, source: inputs.designs, gate: inputs.makeGate(turns.checking(renderer), inspector, gateHeadings),
+                logger: logger, clock: ContinuousClock()
+            ),
+            defaultDesign: DesignBootstrap.defaultDesign
+        )
         return Parts(
             renderer: renderer,
             inspector: inspector,
             headings: headings,
+            designs: designs,
             exporter: DesignResolvingExporter(
-                store: store, defaultDesign: DesignBootstrap.defaultDesign, renderer: renderer, inspector: inspector,
-                headings: headings, policy: .standard
+                store: store, designs: designs, renderer: turns.exporting(renderer), inspector: inspector, headings: headings,
+                policy: .standard
             ),
-            lookOptions: CatalogLookOptions(installed: designs.installed, defaultDesign: designs.defaultDesign),
+            lookOptions: CatalogLookOptions(designs: designs),
             languages: languages.compactMap(ExportLanguage.init),
             exportFiles: await exportFiles(root: inputs.paths.exportShare, logger: logger)
         )

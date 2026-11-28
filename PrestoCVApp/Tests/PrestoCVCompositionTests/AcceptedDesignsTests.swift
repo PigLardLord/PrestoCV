@@ -4,6 +4,7 @@ import CVDesignCatalog
 import CVRenderingTestSupport
 import DiagnosticLoggingTestSupport
 import Foundation
+import PrestoCVIntegration
 import Testing
 @testable import PrestoCVComposition
 
@@ -13,15 +14,15 @@ import Testing
 struct AcceptedDesignsTests {
     private static let program = "/path/to/PrestoCVNext"
 
-    @Test("The real sync, over the real bundled packages, installs the three designs through the accepted gate")
-    func syncInstallsTheBundledDesigns() async throws {
-        let designs = try await DesignBootstrap(
+    @Test("The real check, over the real bundled packages, offers the three designs through the accepted gate")
+    func checkOffersTheBundledDesigns() async {
+        let designs = await DesignBootstrap(
             store: InMemoryDesignStore(), source: BundleDesignSource(), gate: AcceptedDesigns(), logger: RecordingLogger(),
             clock: TickingClock(step: .milliseconds(5))
-        ).run()
+        ).checked().current
 
-        #expect(designs.installed.map(\.manifest.id) == ["minimal", "modern", "professional"])
-        #expect(designs.defaultDesign.id == "professional")
+        #expect(designs.designs.map(\.manifest.id) == ["professional", "minimal", "modern"])
+        #expect(designs.status == .ready)
     }
 
     @Test("The fixture checks the designs through the accepted gate only when its argument is given")

@@ -52,7 +52,7 @@ struct LookLine: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.medium) {
                     LookPicker(sheet: sheet)
-                    ExportStatusView(status: sheet.status)
+                    ExportStatusView(status: sheet.status) { sheet.retryDesigns() }
                 }
                 .padding(Spacing.medium)
             }

@@ -127,15 +127,15 @@ A draft ends with one of `draft.finished`, `draft.cancelled`, `draft.refused`, `
 
 ### The designs (category `designs`)
 
-Every launch brings the designs that ship with the app into the design store before the first screen, and renders a design only when it is new or changed. The first launch renders the three bundled designs; a launch after it renders none.
+The app opens before the designs that ship with it are checked (#566). Once it is open, a check in the background brings them into the design store, the default design first, and renders a design only when it is new or changed: the first launch renders the three bundled designs, a launch after it renders none. The designs the store already holds are offered at once; a bundled design joins the picker and the export once it passes. The launch never waits for the check and never fails because of it.
 
 | Event | Level | Fields | When |
 |---|---|---|---|
-| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `repaired` (a bundled design the store listed but could not read, written again), `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The bundled designs were synced into the store. A design left out does not stop the launch while the store still gives the default design. |
-| `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the launch goes on with the designs installed before, if the default design is among them. |
-| `designs.interrupted` | info | `elapsed` | The launch was cancelled during the sync or while the store was read. The designs saved before it stay saved, so the next launch does not render them again. |
-| `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read were left out of the launch; the launch goes on with the others. |
-| `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The store gives no default design, so the launch fails with this code. |
+| `designs.synced` | info, notice when a design was left out | `installed`, `upgraded`, `unchanged`, `adopted`, `repaired` (a bundled design the store listed but could not read, written again), `rejected` (the package was not valid), `notRendered` (the test render failed), `failed` (the store could not save it), `conflicts` (a design the app did not install holds its id), `elapsed` | The check brought the bundled designs into the store. A design left out is not offered; PDFs can still be made while the store gives the default design. |
+| `designs.syncFailed` | notice | `reason` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | The bundled designs or the store could not be read, so nothing was synced; the app goes on with the designs installed before, and PDFs can be made if the default design is among them. |
+| `designs.interrupted` | info | `elapsed` | The check was cancelled during the sync or while the store was read. The designs saved before it stay saved, so the next launch offers them at once and does not render them again. |
+| `designs.unreadable` | notice | `leftOut` (the designs the store lists but cannot read), `elapsed` | Installed designs the store could not read are not offered; the check writes a bundled one again (`repaired` in `designs.synced`), and the app goes on with the others. |
+| `designs.unavailable` | error | `failure` (`bundledDesignsUnavailable` or `designStoreUnavailable`), `elapsed` | Once the check is over, the store gives no default design, so no PDF can be made: the export says so and offers "Try again", which checks the designs again. Writing goes on. |
 
 ### The share of an export (category `export`)
 

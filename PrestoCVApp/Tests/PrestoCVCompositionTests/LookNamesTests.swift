@@ -16,16 +16,16 @@ struct LookNamesTests {
 
     @Test("The codes the launch offers are the catalog's design, fonts and palette keys")
     func codesAreTheCatalogKeys() async throws {
-        let designs = try await DesignBootstrap(
+        let designs = await DesignBootstrap(
             store: InMemoryDesignStore(), source: BundleDesignSource(), gate: FakeRenderingGate(),
             logger: RecordingLogger(), clock: TickingClock(step: .milliseconds(5))
-        ).run()
-        let options = CatalogLookOptions(installed: designs.installed, defaultDesign: designs.defaultDesign).options()
+        ).checked()
+        let options = CatalogLookOptions(designs: designs).options()
         let codes = (options.designs + options.palettes + options.fontSchemes).map(\.nameCode)
 
         let keys = try Self.catalogKeys().filter { key in Self.prefixes.contains(where: key.hasPrefix) }
 
-        #expect(codes.count == designs.installed.count + NamedPalette.allCases.count + FontScheme.allCases.count)
+        #expect(codes.count == designs.current.designs.count + NamedPalette.allCases.count + FontScheme.allCases.count)
         #expect(Set(codes).count == codes.count, "no two options share a code")
         #expect(codes.filter { !keys.contains($0) } == [], "codes without a name in the catalog")
         #expect(keys.filter { !codes.contains($0) }.sorted() == [], "names in the catalog that no option has")

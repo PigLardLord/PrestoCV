@@ -44,8 +44,8 @@ import PrestoCVWorkflowPorts
 /// - `-PrestoCVNextOpenedFile <linkedin>`: each time a window becomes active, it is handed the PDF of the corpus of that
 ///   name, which only a Debug build carries, as if another app opened it there. It writes nothing, so it needs no folder.
 /// - `-PrestoCVNextReadyDesigns`: the bundled designs are accepted without the renders that check them (`AcceptedDesigns`),
-///   so that a UI test that is not about the designs or the first launch does not wait for those renders on every launch of
-///   an empty folder. The sync, its validator and the design store stay the real ones. It needs one of the two storage
+///   so that a UI test that is not about the designs or the first launch does not wait for those renders when it exports
+///   soon after a launch of an empty folder: the app opens before the check, and an export waits for its design (#566). The sync, its validator and the design store stay the real ones. It needs one of the two storage
 ///   arguments, as the seed does, so that the device's own design store never holds a design that no render checked. A
 ///   named folder keeps its designs for the next launch, which then finds them unchanged and does not check them either.
 struct LaunchFixtures: Equatable, Sendable {

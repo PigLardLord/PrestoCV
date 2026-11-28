@@ -9,12 +9,14 @@ import DiagnosticTraceTestSupport
 import Foundation
 import PrestoCVApplication
 import PrestoCVCoreTestSupport
+import PrestoCVIntegration
 import Testing
 import WebKit
 @testable import PrestoCVComposition
 
 /// The composition over a temporary folder: fake clock, ids and logger, the real repository, the real design store and
-/// bundled designs, the real rule compiler behind a counting seam, and a fake gate that renders nothing.
+/// bundled designs, the real rule compiler behind a counting seam, and a fake gate that renders nothing. The designs are
+/// checked once the composition is ready (#566): a test about them waits for the check (`checked(_:)`).
 @MainActor
 @Suite("The composition")
 struct CompositionTests {
@@ -134,6 +136,15 @@ struct CompositionTests {
 
     struct Failed: Error { let state: String }
 
+    /// The designs once the composition's check of them is over.
+    static func checked(_ composition: Composition) async -> CheckedDesignsSnapshot {
+        for await snapshot in composition.designs.changes({ $0 }) where snapshot.status != .checking { return snapshot }
+        return composition.designs.current
+    }
+
+    /// The designs a PDF can be made with, as the app offers them: the default design first, then the others by identifier
+    private static let offered = ["professional", "minimal", "modern"]
+
     @Test("It builds ready over an empty folder, and the repository it holds reads and writes there")
     func readyOverAnEmptyFolder() async throws {
         let paths = Self.paths()
@@ -183,13 +194,34 @@ struct CompositionTests {
         let source = CountingSource()
         let maker = GateMaker(FakeRenderingGate())
 
-        _ = try Self.ready(await Composition.make(
+        let composition = try Self.ready(await Composition.make(
             Self.inputs(paths, compileRules: Self.counting(counter), designs: source, makeGate: maker.make)
         ))
+        _ = await Self.checked(composition)
 
         #expect(counter.calls == 1)
         #expect(await source.reads == 1)
         #expect(maker.made == 1)
+    }
+
+    @Test("The app is ready while the check of the designs still runs, and the designs join once they pass")
+    func readyBeforeTheCheck() async throws {
+        let paths = Self.paths()
+        defer { try? FileManager.default.removeItem(at: paths.temporary) }
+        let gate = SuspendingRenderingGate(holding: "professional")
+
+        let composition = try Self.ready(await Composition.make(Self.inputs(
+            paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(gate).make
+        )))
+        #expect(await gate.waitUntilEntered(), "The check renders the default design first")
+        let during = composition.designs.current
+        await gate.release()
+        let after = await Self.checked(composition)
+
+        #expect(during.status == .checking)
+        #expect(during.designs.isEmpty, "No design is offered before it passes")
+        #expect(after.status == .ready)
+        #expect(after.designs.map(\.manifest.id) == Self.offered)
     }
 
     @Test("The first launch renders and installs the three bundled designs in the designs folder, and the second renders none")
@@ -199,19 +231,21 @@ struct CompositionTests {
         let first = FakeRenderingGate()
         let second = FakeRenderingGate()
 
-        _ = try Self.ready(await Composition.make(Self.inputs(
+        let installed = await Self.checked(try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(first).make
-        )))
-        _ = try Self.ready(await Composition.make(Self.inputs(
+        ))))
+        let again = await Self.checked(try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(second).make
-        )))
+        ))))
 
-        #expect(await first.verified == ["minimal", "modern", "professional"])
+        #expect(await first.verified == Self.offered)
         #expect(await second.verified.isEmpty)
+        #expect(installed.designs.map(\.manifest.id) == Self.offered)
+        #expect(again.designs.map(\.manifest.id) == Self.offered)
         #expect(try FileManager.default.contentsOfDirectory(atPath: paths.designs.path).isEmpty == false)
     }
 
-    @Test("A designs folder that cannot be written gives designStoreUnavailable, and installs nothing")
+    @Test("A designs folder that cannot be written leaves the designs unavailable, and the app is ready and writes CVs")
     func unwritableDesigns() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
@@ -219,63 +253,60 @@ struct CompositionTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: paths.designs.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: paths.designs.path) }
 
-        let state = await Composition.make(Self.inputs(paths, compileRules: Self.counting(CompileCounter())))
+        let composition = try Self.ready(await Composition.make(Self.inputs(paths, compileRules: Self.counting(CompileCounter()))))
+        let designs = await Self.checked(composition)
 
-        guard case .failed(let failure) = state else {
-            Issue.record("expected failed, got \(state)")
-            return
-        }
-        #expect(failure == .designStoreUnavailable)
+        #expect(designs.status == .unavailable)
+        #expect(designs.designs.isEmpty)
         #expect(try FileManager.default.contentsOfDirectory(atPath: paths.designs.path).isEmpty)
+        try await CVRepositoryContract.verify(composition.repository)
     }
 
-    @Test("Bundled designs that cannot be read, with none installed, give bundledDesignsUnavailable")
-    func unreadableBundle() async {
+    @Test("Bundled designs that cannot be read, with none installed, leave the designs unavailable, and the app is ready")
+    func unreadableBundle() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
 
-        let state = await Composition.make(Self.inputs(
+        let composition = try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()), designs: FixedBundledSource(packages: nil)
-        ))
+        )))
+        let designs = await Self.checked(composition)
 
-        guard case .failed(let failure) = state else {
-            Issue.record("expected failed, got \(state)")
-            return
-        }
-        #expect(failure == .bundledDesignsUnavailable)
+        #expect(designs.status == .unavailable)
+        #expect(designs.designs.isEmpty)
     }
 
-    @Test("An interrupted sync gives designSyncInterrupted, and the next launch renders only the designs not yet saved")
+    @Test("An interrupted check leaves the app ready, and the next launch renders only the designs not yet saved")
     func interruptedSync() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
         let next = FakeRenderingGate()
 
-        let state = await Composition.make(Self.inputs(
+        let interrupted = await Self.checked(try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()),
             makeGate: GateMaker(FakeRenderingGate(cancellingOn: ["modern"])).make
-        ))
-        _ = try Self.ready(await Composition.make(Self.inputs(
+        ))))
+        let again = await Self.checked(try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()), makeGate: GateMaker(next).make
-        )))
+        ))))
 
-        guard case .failed(let failure) = state else {
-            Issue.record("expected failed, got \(state)")
-            return
-        }
-        #expect(failure == .designSyncInterrupted)
-        #expect(await next.verified == ["modern", "professional"])
+        #expect(interrupted.designs.map(\.manifest.id) == ["professional", "minimal"])
+        #expect(await next.verified == ["modern"])
+        #expect(again.designs.map(\.manifest.id) == Self.offered)
     }
 
-    @Test("A design the gate refuses is left out, and the launch is ready")
+    @Test("A design the gate refuses is never offered, and the others are")
     func refusedDesign() async throws {
         let paths = Self.paths()
         defer { try? FileManager.default.removeItem(at: paths.temporary) }
 
-        _ = try Self.ready(await Composition.make(Self.inputs(
+        let designs = await Self.checked(try Self.ready(await Composition.make(Self.inputs(
             paths, compileRules: Self.counting(CompileCounter()),
             makeGate: GateMaker(FakeRenderingGate(refusing: ["modern"])).make
-        )))
+        ))))
+
+        #expect(designs.status == .ready)
+        #expect(designs.designs.map(\.manifest.id) == ["professional", "minimal"])
     }
 
     @Test("Rules that cannot be compiled give a failed state with a code, and no store folder is left half made")

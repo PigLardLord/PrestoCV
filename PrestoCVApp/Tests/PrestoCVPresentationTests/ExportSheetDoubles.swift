@@ -132,6 +132,8 @@ final class SheetWorld {
     let detector = LanguageDetectorStub()
     /// The CV the editor shows: what the next snapshot holds.
     var cv: CV
+    /// The designs, palettes and fonts the next sheet offers.
+    var lookOptions: any LookOptionsProviding = LookOptionsFake()
     /// How many snapshots the sheet asked for.
     private(set) var snapshotsTaken = 0
     /// Each language the sheet took to the CV.
@@ -165,7 +167,7 @@ final class SheetWorld {
             fileNamePattern: { Self.patterns[$0.tag] ?? "%@" },
             onLanguageChosen: { self.chosen.append($0); whenChosen($0) },
             languageDetector: detector, onLanguageFound: { self.kept.append($0) },
-            lookOptions: LookOptionsFake(), look: cv.design.map { EditorLook($0) },
+            lookOptions: lookOptions, look: cv.design.map { EditorLook($0) },
             onLookChosen: { self.looks.append(ChosenLook(look: $0, parts: $1)) },
             clock: self.clock, pause: Self.pause)
     }
@@ -187,6 +189,52 @@ final class SheetWorld {
         guard let language = ExportLanguage(tag) else { preconditionFailure("\(tag) is a language tag") }
         return language
     }
+}
+
+/// The look options while the designs are checked (#566): each watcher is given the options now, then each options the
+/// test tells; the retries are counted.
+final class DrivenLookOptions: LookOptionsProviding {
+    private struct State {
+        var options: LookOptions
+        var watchers: [Int: AsyncStream<LookOptions>.Continuation] = [:]
+        var nextWatcher = 0
+        var retries = 0
+    }
+
+    private let state: Mutex<State>
+
+    init(_ options: LookOptions) { state = Mutex(State(options: options)) }
+
+    /// How many watchers follow the options now.
+    var watching: Int { state.withLock { $0.watchers.count } }
+    var retries: Int { state.withLock { $0.retries } }
+
+    /// The options change: every watcher is given them.
+    func tell(_ options: LookOptions) {
+        state.withLock { state in
+            state.options = options
+            for watcher in state.watchers.values { watcher.yield(options) }
+        }
+    }
+
+    func options() -> LookOptions { state.withLock { $0.options } }
+
+    func changes() -> AsyncStream<LookOptions> {
+        let (stream, continuation) = AsyncStream.makeStream(of: LookOptions.self, bufferingPolicy: .bufferingNewest(1))
+        let id = state.withLock { state in
+            let id = state.nextWatcher
+            state.nextWatcher += 1
+            state.watchers[id] = continuation
+            continuation.yield(state.options)
+            return id
+        }
+        continuation.onTermination = { [weak self] _ in
+            self?.state.withLock { _ = $0.watchers.removeValue(forKey: id) }
+        }
+        return stream
+    }
+
+    func retry() { state.withLock { $0.retries += 1 } }
 }
 
 /// A look the sheet took to the CV, and the part of it the person chose.

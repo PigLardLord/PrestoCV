@@ -55,8 +55,12 @@ public final class ExportSheetViewModel {
     /// The languages the sheet offers.
     public let offeredLanguages: [ExportLanguage]
 
-    /// The designs, palettes and font schemes the sheet offers.
-    public let lookChoices: LookChoices
+    /// The designs, palettes and font schemes the sheet offers: the designs that passed their check, more joining while
+    /// it runs (#566).
+    public private(set) var lookChoices: LookChoices
+    /// An export that waits for the check of its design, for VoiceOver to tell that the PDF is being prepared (#566):
+    /// each one is a new value. Nil while the export's design is offered, once the export ends, and once the sheet stops.
+    public private(set) var waitToAnnounce: DesignWait?
     /// The look of the PDF: the CV's as the last export read it, with the parts chosen in the sheet on top; before the
     /// first export, the look the editor showed, else the app's default one (#407).
     public private(set) var shownLook: EditorLook
@@ -91,6 +95,12 @@ public final class ExportSheetViewModel {
     @ObservationIgnored private let detector: any CVLanguageDetecting
     @ObservationIgnored private let onLanguageFound: @MainActor (ExportLanguage) -> Void
     @ObservationIgnored private let onLookChosen: @MainActor (EditorLook, Set<LookPart>) -> Void
+    @ObservationIgnored private let lookOptions: any LookOptionsProviding
+    /// True while the look shown is the default one, for a CV that keeps none and no choice in the sheet: it follows the
+    /// default design's own look once the check finds it (#566).
+    @ObservationIgnored private var showsTheDefaultLook: Bool
+    /// Counts the exports that waited for their design, so that each one is a new value.
+    @ObservationIgnored private var waits = 0
     /// The parts of the look chosen in the sheet, put on the CV each export reads: the CV the editor shows may not hold
     /// them yet, and the other parts follow it.
     @ObservationIgnored private var chosenLook: LookChange?
@@ -153,12 +163,18 @@ public final class ExportSheetViewModel {
         self.onLanguageChosen = onLanguageChosen
         self.detector = languageDetector
         self.onLanguageFound = onLanguageFound
+        self.lookOptions = lookOptions
         let options = lookOptions.options()
         self.lookChoices = LookChoices(options)
-        self.shownLook = look
-            ?? EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
+        self.shownLook = look ?? Self.defaultLook(of: options)
+        self.showsTheDefaultLook = look == nil
         self.onLookChosen = onLookChosen
         self.pauseFromNow = Self.pause(pause, on: clock)
+    }
+
+    /// The look of a CV that keeps none: the default design in its own palette and fonts, when the options know them.
+    private static func defaultLook(of options: LookOptions) -> EditorLook {
+        EditorLook(design: options.defaultDesign, palette: options.defaultPalette, fonts: options.defaultFonts)
     }
 
     /// The end of a pause is fixed when the pause starts, on the clock's own instants.
@@ -185,6 +201,24 @@ public final class ExportSheetViewModel {
         picks += 1
         languageToAnnounce = LanguageChoice(language: language, ordinal: picks)
         onLanguageChosen(language)
+    }
+
+    /// Follows the designs as their check goes on (#566), until the task that calls it is cancelled: the view runs it
+    /// while the sheet is on screen.
+    public func watchDesigns() async {
+        for await options in lookOptions.changes() {
+            let choices = LookChoices(options)
+            if choices != lookChoices { lookChoices = choices }
+            if showsTheDefaultLook { shownLook = Self.defaultLook(of: options) }
+        }
+    }
+
+    /// "Try again" when no design can print the PDF: checks the designs again and exports once more. It does nothing
+    /// while the status says otherwise.
+    public func retryDesigns() {
+        guard status.offersRetry else { return }
+        lookOptions.retry()
+        begin(afterAPick: false)
     }
 
     /// Exports again, with the CV as it stands now: the screen calls it when the look changes while the sheet is open.
@@ -240,6 +274,7 @@ public final class ExportSheetViewModel {
         status = .idle
         statusToAnnounce = nil
         remadeToAnnounce = nil
+        waitToAnnounce = nil
         pickedExport = nil
         languageToAnnounce = nil
         document = nil
@@ -335,6 +370,7 @@ public final class ExportSheetViewModel {
     /// choice still goes to the CV. A look with an id no design may have changes nothing.
     private func choose(_ part: LookPart, _ look: EditorLook) {
         guard let step = LookChange(shown: look, parts: [part]) else { return }
+        showsTheDefaultLook = false
         let keepsThePDF = look == shownLook && (status == .exporting || document != nil)
         chosenLook = chosenLook.map { $0.followed(by: step) } ?? step
         shownLook = look
@@ -353,6 +389,7 @@ public final class ExportSheetViewModel {
         status = .exporting
         statusToAnnounce = nil
         remadeToAnnounce = nil
+        waitToAnnounce = nil
         // A second intent while an export runs keeps the PDF the first one replaced: the one stopped made none
         if let document, let documentID { replaced = (document, documentID) }
         document = nil
@@ -377,6 +414,10 @@ public final class ExportSheetViewModel {
 
     private func export(_ mine: Int) async {
         guard let (cv, language) = await readCVAndLanguage(mine) else { return }
+        if lookChoices.waitsForTheCheck(of: cv.design?.design) {
+            waits += 1
+            waitToAnnounce = DesignWait(ordinal: waits)
+        }
         let status: ExportStatus
         var document: ExportedDocument?
         do {
@@ -406,6 +447,7 @@ public final class ExportSheetViewModel {
         status = ended
         statusToAnnounce = ended.isTold ? ended : nil
         remadeToAnnounce = nil
+        waitToAnnounce = nil
         if case .done(let pages) = ended, pickedExport == generation {
             remakes += 1
             remadeToAnnounce = RemadePDF(pages: pages, ordinal: remakes)
@@ -447,7 +489,10 @@ public final class ExportSheetViewModel {
     /// sheet on top, in the language of the PDF; nil when the CV lacks a field the PDF needs.
     private func prepare(_ read: CV, automatic: ExportLanguage) -> (CV, DocumentLanguage)? {
         let cv = chosenLook.map { ChangeCV.applying($0, to: read) } ?? read
-        shownLook = cv.design.map { EditorLook($0) } ?? shownLook
+        if let design = cv.design {
+            shownLook = EditorLook(design)
+            showsTheDefaultLook = false
+        }
         automaticLanguage = automatic
         missing = ExportMissing(cv)
         guard missing.blockers.isEmpty else {
@@ -484,7 +529,7 @@ private extension ExportStatus {
     var isTold: Bool {
         switch self {
         case .idle, .exporting, .done, .notReady: false
-        case .truncated, .unsupportedLanguage, .invalid, .incomplete, .textNotVisible, .failed: true
+        case .truncated, .unsupportedLanguage, .invalid, .incomplete, .textNotVisible, .designsUnavailable, .failed: true
         }
     }
 }

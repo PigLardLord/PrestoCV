@@ -8,21 +8,26 @@ import CVRendering
 /// - A CV that keeps no design exports with the default design. A design the catalog does not have also gives the default
 ///   design, and nothing else changes: the CV keeps its palette and fonts, as in version 1. A palette or fonts the CV does
 ///   not name, or that the catalog does not know, give the design's own (`ResolveDesign`).
-/// - A store that fails, or a default design it does not have, is `ExportFailure.renderingFailed`, and nothing is
-///   rendered. A cancelled task stays a `CancellationError` (R3, R7), even when the store's wait outlives the cancel and
-///   then reads or fails: nothing is rendered. The export's own failures pass through unchanged.
+/// - The app opens before the bundled designs are checked (#566): the export first waits for the verdict of the design it
+///   wants, then for the default design's when it falls back, never for the whole check, and never falls back while the
+///   design it wants is still being checked.
+/// - A default design the store does not have, after its verdict, is `ExportFailure.designsUnavailable`: no design can
+///   print the PDF. So is a store that fails while the default design did not pass its check; otherwise a store that fails
+///   is `ExportFailure.renderingFailed`. In both cases nothing is rendered. A cancelled task stays a `CancellationError`
+///   (R3, R7), even when the store's wait outlives the cancel and then reads or fails: nothing is rendered. The export's own
+///   failures pass through unchanged.
 public struct DesignResolvingExporter: CVExporting {
     private let resolve: ResolveDesign
-    private let defaultDesign: String
+    private let designs: CheckedDesigns
     private let renderer: any PDFRendering
     private let inspector: any PDFLayoutInspecting
     private let headings: HeadingsCatalog
     private let policy: ExportPolicy
 
-    public init(store: any DesignStore, defaultDesign: String, renderer: any PDFRendering, inspector: any PDFLayoutInspecting,
+    public init(store: any DesignStore, designs: CheckedDesigns, renderer: any PDFRendering, inspector: any PDFLayoutInspecting,
                 headings: HeadingsCatalog, policy: ExportPolicy) {
         resolve = ResolveDesign(store: store)
-        self.defaultDesign = defaultDesign
+        self.designs = designs
         self.renderer = renderer
         self.inspector = inspector
         self.headings = headings
@@ -38,19 +43,22 @@ public struct DesignResolvingExporter: CVExporting {
     }
 
     @concurrent private func resolved(_ choice: DesignChoice?) async throws -> ResolvedDesign {
-        let wanted = choice?.design ?? defaultDesign
+        let defaultDesign = designs.defaultDesign, wanted = choice?.design ?? defaultDesign
         do {
+            try await designs.verdict(on: wanted)
             do {
                 return try await resolve(design: wanted, palette: choice?.palette, fonts: choice?.fonts)
             } catch DesignCatalogError.unknownDesign where wanted != defaultDesign {
                 try Task.checkCancellation()
+                try await designs.verdict(on: defaultDesign)
                 return try await resolve(design: defaultDesign, palette: choice?.palette, fonts: choice?.fonts)
             }
         } catch {
             // ADR 0010: cancellation is not a failure. The file store's lock wait ignores the cancel and then times out, so a
             // cancelled task is read from the task, not from the error.
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
-            throw ExportFailure.renderingFailed
+            if case .unknownDesign? = error as? DesignCatalogError { throw ExportFailure.designsUnavailable }
+            throw designs.current.status == .unavailable ? ExportFailure.designsUnavailable : ExportFailure.renderingFailed
         }
     }
 }

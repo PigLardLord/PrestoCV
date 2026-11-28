@@ -50,6 +50,11 @@ func useEveryPublicMember(of sheet: ExportSheetViewModel, sharing share: PDFShar
     let _: ShareFailure? = sheet.shareFailure
     let remade: RemadePDF? = sheet.remadeToAnnounce
     let _: Int? = remade?.pages
+    let _: DesignWait? = sheet.waitToAnnounce
+    let _: Bool = sheet.status.offersRetry
+    let _: [Bool] = sheet.lookPicker.groups.map(\.checksMore)
+    let _: () async -> Void = sheet.watchDesigns
+    sheet.retryDesigns()
     let result = ShareResult(activity: nil, completed: false, failed: false)
     share.end(result)
     sheet.refresh()

@@ -719,3 +719,63 @@ struct CatalogReadCancellationTests {
         await #expect(throws: DesignCatalogError.unknownDesign("bold")) { _ = try await ResolveDesign(store: failing)(design: "bold", palette: nil, fonts: nil) }
     }
 }
+
+/// The identifiers a sync tells, in order, and whether the store held each design when the sync told it.
+private actor ToldVerdicts {
+    private(set) var told: [String] = []
+    private(set) var held: [String: Bool] = [:]
+
+    func record(_ id: String, in store: any DesignStore) async {
+        told.append(id)
+        do { held[id] = try await store.design(id: id) != nil } catch { held[id] = false }
+    }
+}
+
+@Suite("syncing the default design first, and telling each verdict (#566)")
+struct SyncDefaultFirstTests {
+    @Test("the design named first is synced first, the others in the order of the source")
+    func firstThenSourceOrder() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate(), verdicts = ToldVerdicts()
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold"), try bundled("plain")])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)(first: "plain") { await verdicts.record($0, in: store) }
+        #expect(await gate.verified == ["plain", "clean", "bold"])
+        #expect(report.installed == ["plain", "clean", "bold"])
+        #expect(await verdicts.told == ["plain", "clean", "bold"])
+        #expect(await verdicts.held == ["plain": true, "clean": true, "bold": true])
+    }
+
+    @Test("a first design the source does not hold leaves the order of the source")
+    func unknownFirst() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate(), verdicts = ToldVerdicts()
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold")])
+        _ = try await SyncBundledDesigns(source: source, gate: gate, store: store)(first: "ghost") { await verdicts.record($0, in: store) }
+        #expect(await gate.verified == ["clean", "bold"])
+        #expect(await verdicts.told == ["clean", "bold"])
+    }
+
+    @Test("every package that names a design is told once its verdict is in the store, passed or not")
+    func everyVerdictTold() async throws {
+        let store = SpyDesignStore(savesFailFor: ["plain"]), gate = FakeRenderingGate(refusing: ["bold"]), verdicts = ToldVerdicts()
+        let refused = try bundled("odd", css: ".cv{display:none}")
+        let source = FixedBundledSource(packages: [try bundled("clean"), try bundled("bold"), try bundled("plain"), refused,
+                                                   (name: "junk", data: Data("not a package".utf8))])
+        let report = try await SyncBundledDesigns(source: source, gate: gate, store: store)(first: "clean") { await verdicts.record($0, in: store) }
+        #expect(report.installed == ["clean"] && report.notRendered == ["bold"] && report.failed == ["plain"])
+        #expect(report.rejected.map(\.name) == ["odd", "junk"])
+        #expect(await verdicts.told == ["clean", "bold", "plain", "odd"])
+        #expect(await verdicts.held == ["clean": true, "bold": false, "plain": false, "odd": false])
+    }
+
+    @Test("a design already installed is told at once, with no render")
+    func unchangedTold() async throws {
+        let store = InMemoryDesignStore(), gate = FakeRenderingGate(), verdicts = ToldVerdicts()
+        try await installedBySync(DesignStoreContract.design(id: "clean"), in: store)
+        let report = try await SyncBundledDesigns(source: FixedBundledSource(packages: [try bundled("clean")]), gate: gate, store: store)(first: "clean") {
+            await verdicts.record($0, in: store)
+        }
+        #expect(report.unchanged == ["clean"])
+        #expect(await gate.verified.isEmpty)
+        #expect(await verdicts.told == ["clean"])
+        #expect(await verdicts.held == ["clean": true])
+    }
+}

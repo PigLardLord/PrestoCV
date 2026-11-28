@@ -78,9 +78,21 @@ struct LookOptionsFake: LookOptionsProviding {
             ownLooks: [
                 "classic": DesignOwnLook(palette: "ocean", fonts: "sans"),
                 "modern": DesignOwnLook(palette: "forest", fonts: "serif")
-            ]
+            ],
+            status: .ready
         )
     }
+
+    func changes() -> AsyncStream<LookOptions> { once(options()) }
+    func retry() {}
+}
+
+/// A stream of one value, as options that never change give it.
+func once(_ options: LookOptions) -> AsyncStream<LookOptions> {
+    let (stream, continuation) = AsyncStream.makeStream(of: LookOptions.self)
+    continuation.yield(options)
+    continuation.finish()
+    return stream
 }
 
 /// A moment a test moves by hand.

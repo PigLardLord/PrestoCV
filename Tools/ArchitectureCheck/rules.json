@@ -67,7 +67,9 @@
   "CVBrowsing.startFromSample(_:)": "Builds the sample's starting point in memory.",
   "CVEditing.new()": "Makes an empty CV in memory; nothing is read or written.",
   "CVEditing.autosaveWriter(startingFrom:)": "Makes the writer object; the saving itself is async.",
-  "LookOptionsProviding.options()": "Returns the catalog's look options held in memory."
+  "LookOptionsProviding.options()": "Returns the catalog's look options held in memory.",
+  "LookOptionsProviding.changes()": "Returns the stream at once; the options arrive through it.",
+  "LookOptionsProviding.retry()": "Starts the check again in the background; nothing waits for it."
  },
  "longWorkCalls": [
   "Data(contentsOf:)", "Data(contentsOfFile:)", "String(contentsOf:)", "String(contentsOfFile:)",
@@ -805,7 +807,8 @@
     "CVDesignCatalog",
     "CVRendering",
     "CVDrafting",
-    "Foundation"
+    "Foundation",
+    "Synchronization"
    ],
    "rules": [
     "R1",

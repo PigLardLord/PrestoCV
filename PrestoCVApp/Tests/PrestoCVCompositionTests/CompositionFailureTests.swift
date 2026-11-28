@@ -30,8 +30,7 @@ struct CompositionFailureTests {
     @Test("The codes are distinct words")
     func rawValues() {
         #expect(CompositionFailure.allCases.map(\.rawValue) == [
-            "storeUnavailable", "contentRulesUnavailable", "launchFixturesRejected", "designStoreUnavailable",
-            "bundledDesignsUnavailable", "designSyncInterrupted", "headingsUnavailable",
+            "storeUnavailable", "contentRulesUnavailable", "launchFixturesRejected", "headingsUnavailable",
         ])
     }
 

@@ -44,6 +44,15 @@ struct NoBackgroundTime: BackgroundTime {
 /// Look options for the tests that never show a look picker: no design to choose, and the default design's id.
 struct FixedLookOptions: LookOptionsProviding {
     func options() -> LookOptions {
-        LookOptions(designs: [], palettes: [], fontSchemes: [], defaultDesign: "professional", ownLooks: [:])
+        LookOptions(designs: [], palettes: [], fontSchemes: [], defaultDesign: "professional", ownLooks: [:], status: .ready)
     }
+
+    func changes() -> AsyncStream<LookOptions> {
+        let (stream, continuation) = AsyncStream.makeStream(of: LookOptions.self)
+        continuation.yield(options())
+        continuation.finish()
+        return stream
+    }
+
+    func retry() {}
 }

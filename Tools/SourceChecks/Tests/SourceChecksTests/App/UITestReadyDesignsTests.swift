@@ -3,10 +3,10 @@ import Foundation
 
 // MARK: - The bundled designs in the UI tests of the new stack
 
-/// A launch over an empty folder of the fixture is a first install: before its first screen the app checks every bundled
-/// design by rendering it, three designs in each of their font schemes, which takes seconds on every launch (#561). A UI
-/// test that is not about the designs or the first launch passes `-PrestoCVNextReadyDesigns`, and the app accepts the
-/// bundled designs without rendering them. So every launch over a folder of the fixture passes it, launch by launch
+/// A launch over an empty folder of the fixture is a first install: once its first screen is up the app checks every
+/// bundled design by rendering it, three designs in each of their font schemes, which takes seconds (#561), and an export
+/// waits for the check of its design (#566). A UI test that is not about the designs or the first launch passes
+/// `-PrestoCVNextReadyDesigns`, and the app accepts the bundled designs without rendering them. So every launch over a folder of the fixture passes it, launch by launch
 /// (`FixtureLaunches`), unless its file is one of those listed here, which keep the real check on purpose and never pass it.
 @Suite("UI tests of the new stack - the bundled designs are accepted without their renders")
 struct UITestReadyDesignsTests {
@@ -19,9 +19,9 @@ struct UITestReadyDesignsTests {
 
     /// The files that keep the real check of the bundled designs, and why.
     private static let realCheck: [String: String] = [
-        "PrestoCVNextUITests/FirstRunUITests.swift": "the first launch, with its wait for the designs, is what it tests",
+        "PrestoCVNextUITests/FirstRunUITests.swift": "the first launch, with the check of the designs behind it, is what it tests",
         "PrestoCVNextUITests/LaunchUITests.swift": "the launch itself is what it tests",
-        "PrestoCVNextUITests/ExportLookUITests.swift": "every bundled design passes the real check before a person picks it",
+        "PrestoCVNextUITests/ExportLookUITests.swift": "every bundled design passes the real check and joins the picker",
         "PrestoCVNextUITests/FailedCompositionUITests.swift": "the launch fails at the folder, before the designs",
     ]
 

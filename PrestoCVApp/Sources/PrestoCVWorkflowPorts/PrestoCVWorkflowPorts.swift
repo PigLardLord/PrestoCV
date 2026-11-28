@@ -29,6 +29,8 @@ public enum ExportFailure: Error, Equatable, Sendable {
     case textNotVisible(lines: Int)
     /// The headings could not be read, or the PDF could not be read back (text or layout).
     case renderingFailed
+    /// No design can print the PDF: the default design did not pass its check, or the store cannot give it (#566).
+    case designsUnavailable
 }
 
 /// Preview and export take the editor's current snapshot, saved or not; they never reload storage.
